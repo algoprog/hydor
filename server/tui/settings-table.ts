@@ -595,7 +595,7 @@ row('memory', 'Most documents to read into the wiki', 'number', {
   range: { min: 0, max: 100000 },
   read: rd('/api/wiki/settings', 'documentLimit'),
   write: put('/api/wiki/settings', (v) => ({ documentLimit: v })),
-  note: 'A project with more documents than this keeps them out of its wiki: agents search them instead. A project’s own Settings tab can set a number of its own.',
+  note: 'With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all. A project’s own Settings tab can set a number of its own.',
 });
 row('memory', 'Wiki folder', 'page', { note: 'Changing it may move the wiki’s files, which you review on the page first.' });
 row('memory', 'Project wikis', 'choice', {

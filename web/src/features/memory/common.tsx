@@ -8,11 +8,12 @@ import { ago } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { LOCALE } from '../../i18n/locale';
+import { tr } from '../../i18n/runtime';
 import { SOURCE, useMemory } from './state';
 
 type HistoryRow = MemoryHistoryRow & { sessionTitle?: string };
 
-const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date', basis: 'How it is known' };
+const ACTION: Record<MemoryHistoryRow['action'], string> = { added: 'Added', updated: 'Changed', deleted: 'Deleted', restored: 'Restored', expiry: 'End date', basis: 'How it is known', moved: 'Moved' };
 /** How a note is known, in a note's facts and its history. */
 export const BASIS: Record<MemoryBasis, string> = { user: 'you said so', checked: 'checked', inferred: 'not checked yet' };
 export const BASIS_HINT: Record<MemoryBasis, string> = {
@@ -22,6 +23,8 @@ export const BASIS_HINT: Record<MemoryBasis, string> = {
 };
 /** What the server calls a session no longer listed. */
 export const GONE = 'A session that is gone';
+/** A place a note moved from or to: the app's own "About you" in the reader's language, a project by its name. */
+export const movedPlace = (p?: string) => (p === 'About you' ? tr('About you') : (p ?? ''));
 
 export const when = (t: number) => new Date(t).toLocaleString(LOCALE);
 export const dayOf = (t: number) =>
@@ -90,6 +93,9 @@ export function HistoryList({ id }: { id: number }) {
             </div>
           )}
           {h.action === 'expiry' && <div className="mt-0.5">{h.after ? `Until ${dayOf(Date.parse(h.after))}` : 'Taken away'}</div>}
+          {h.action === 'moved' && (
+            <div className="mt-0.5">{tr(`Moved from ${movedPlace(h.before)} to ${movedPlace(h.after)}`)}</div>
+          )}
           {h.action === 'basis' && <div className="mt-0.5">{h.after && h.after in BASIS ? BASIS[h.after as MemoryBasis] : 'Not said'}</div>}
         </li>
       ))}

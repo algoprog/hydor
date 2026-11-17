@@ -203,18 +203,26 @@ agents that speak ACP and take MCP servers.
   LightOn's mDenseOn model on your own computer (in 8 bits through ONNX Runtime on the CPU: a 340 MB download, about
   1 GB of memory and a second or two to start, only while needed), each counting only when it stands out from the rest
   for that request; a place with few notes
-  whole; and an index of the rest by title, to look up. Nothing fills the room, and only what agents looked up weighs
-  in ranking. Claude Code and Codex get the notes for the request with the first message, their instructions the same
+  whole; an index of the rest by title, to look up (what agents used most first, the rest counted by area of the project);
+  and a few lines naming the wiki articles that bear on the request, and the project's plans in progress. Nothing fills the
+  room, and only what agents looked up weighs in ranking. Later messages add only what newly bears on them (a stricter bar, at
+  most three notes and one wiki line, usually nothing), and opening a file adds the notes about it and its folders, once for each
+  folder; a rare exact name in a request (a file name, a flag, a version) finds the few notes that hold it. Custom with a model
+  of a small context gets less: memory is sized to its window. Each note counts how often agents were given it and how often they
+  used it (looked it up, cited it or worked with its file); notes the helper kept from documents come last, as quoted material. Claude Code and Codex get the notes for the request with the first message, their instructions the same
   for every session of a project until its notes change, so the provider's cache of them holds from one session to
   the next; Custom keeps its block until it condenses, asks Claude models on OpenRouter to cache the conversation, and
   changes its tools at most once in a session, so its provider's cache holds. The model starts as you begin a
   message, and a session never waits for it. About once a day the helper
   model tidies memory up: it merges notes that say the same thing, titles them, and when there are more than fit,
-  sums related ones up in topics and, for a project, a short profile; and it learns from the day's conversations
+  sums related ones up in topics and, for a project, a short profile (the standing rules agents need first); it checks the notes
+  that name files that changed in the project's repository against the code, moves notes saved about you that are about one project
+  to it, writes long design-history notes into the project's wiki, and compares notes with the project's AGENTS.md, removing what it
+  says already and suggesting up to three lasting conventions for it, which you add or dismiss; and it learns from the day's conversations
   (Learn from conversations): it corrects notes they show wrong, checks the unchecked, and keeps at most three things
   a day that no agent saved, reading only what you wrote yourself (not attached files or pasted text) and never sessions
   with memory off. It runs whenever the app is on, once a day has passed, there is something new and you pause. Every change can be undone.
-  Settings → Memory lists every note with when it was written, changed and last needed (each place its three
+  Settings → Memory lists every note with when it was written, changed and last needed or given (each place its three
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
   Memory is one system of three parts, notes, Wiki memory and documents (below), and Settings → Memory has the Wiki memory group.
@@ -229,6 +237,7 @@ agents that speak ACP and take MCP servers.
   Keys and sign-in files are never copied, a skill's folder is capped (200 files, 512 KB each, 2 MB in all), and a
   skill whose name your skills have already is left out with a note. MCP servers are not brought over. Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
   background).
+  [How memory works](memory.md) describes what agents are given and when, and how memory stays current; [Memory internals](memory-internals.md) is for people changing it.
 - **Wiki memory** (formerly the LLM Wiki; Settings → Memory → Wiki memory): linked Markdown articles that agents keep for each
   project, and one shared wiki, from its documents and its work, each with its sources (`wiki/` articles, `raw/` sources,
   `index.md`, `log.md`). On for every project unless turned off: Settings has the default (it decides the shared wiki too) and
@@ -238,21 +247,27 @@ agents that speak ACP and take MCP servers.
   (``- Wiki: `path` ``) names it. Every wiki folder is inside the wiki folder or its project, however it is set. Learn from new documents
   (on unless turned off): when a document is added or changed in knowledge, the helper model reads it (its first 40,000
   characters, one document at a time, after its base has been quiet for half a minute, at most 40 an hour), keeps its text as a
-  source, adds to up to three articles and writes up to two new ones, keeping only the important information (key facts,
+  source, picks among the twenty articles that match it best (by words and meaning), adds to up to three and writes up to two new ones, keeping only the important information (key facts,
   findings, decisions, names and numbers; the detail stays in the document, for search), and, for a project's documents, adds up
-  to three short notes to its memory; a rewrite that would drop a fifth of an article, anything with a secret and an article over
-  20,000 characters are left out, and each outcome is listed under Recent updates; documents already in a project's knowledge are
+  to three short notes to its memory; a newer source may replace what an article said, the helper giving a reason for each
+  statement it removes (a rewrite keeps at least half, and the earlier text is kept as a snapshot, the 20 newest of each article), an
+  article over 12,000 characters is first split into a hub and parts, anything with a secret is left out, and each outcome is
+  listed under Recent updates; documents already in a project's knowledge are
   read once too, at the same pace (the newest 400 a project, looked at again every ten minutes). A large data file (CSV, TSV, a
   spreadsheet or JSON data, over 40,000 characters of text or 256 KB) is analysed with code instead: the helper writes Python that
   Hydor runs in a sandbox with no network that sees only that file, read-only (up to four runs of a minute each), and only its
   findings become the source and go into the articles; without such a sandbox (macOS and Windows for now) these files are searched
   only, and agents in sessions can analyse them with code from their paths. A project with more documents than the most to read
-  into the wiki (Settings, 100 at first, 0 to 100,000; a project's Settings tab can set a number of its own) keeps them all out of
-  its wiki: none is read, no update is listed, agents search them instead, and its Memory tab says so; raise the limit and they are
-  read. Learn from the project's work (about once a day, when memory's Learn from conversations is on, nobody has written for ten
+  into the wiki (Settings, 100 at first, 0 to 100,000; a project's Settings tab can set a number of its own) has its wiki read only
+  that many: the pinned ones (a document's menu in the Documents list), then those agents used most, then the newest, with an
+  overview article for each folder it does not read; agents search all of them, and its Memory tab says so. Each article keeps a
+  summary, the files it names and the commit it was written at: once a day, one whose files changed is marked out of date (agents see
+  that), and up to five a day are brought up to date from the change. Learn from the project's work (about once a day, when memory's Learn from conversations is on, nobody has written for ten
   minutes, and the last pass was 20 hours ago; the first time it looks back two weeks): the helper reads the project's recent
   conversations (your own words and each agent's last reply of a turn, never tool output; not confidential sessions, sessions with
-  memory off, child sessions or scheduled runs), at most four a project and twelve a pass. It keeps where it stopped in each
+  memory off, child sessions or scheduled runs), the ones with most to keep first (commits made, corrections, fixes, length), at most
+  four a project and twelve a pass, and a session once it has been quiet for 30 minutes (up to eight a day); once a day it also reads
+  up to 60 new commit messages. It keeps where it stopped in each
   session: one it has read is never read again, a session that goes on is read from its new turns only, and one an agent is still
   working in, or that it had no room for, waits for the next time. It keeps each conversation as a source with the secrets taken
   out and adds to or starts articles with lasting knowledge only (no memory notes, nothing personal), and an update opens its
@@ -260,7 +275,8 @@ agents that speak ACP and take MCP servers.
   write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
   never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
   folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). Checkpoints: before and after an automatic
-  compaction Claude Code, Codex and the Custom agent save one checkpoint of the session in the wiki folder, with the secrets taken out (for
+  compaction Claude Code, Codex and the Custom agent save one checkpoint of the session in the wiki folder (a resumed Claude Code or Codex
+  session is given it once, and Custom's is cut to its model's context), with the secrets taken out (for
   Claude Code and Codex, the last messages go to the helper model first, up to about 14 seconds, for its summary);
   Hydor registers a hook in Claude Code and Codex for it, unless hooks or plugins of yours might already capture compactions, and
   trusts only its own Codex hook (found once per Codex version). Each chat has two switches in its options, **Wiki memory** and **Auto
@@ -1152,7 +1168,9 @@ about risky ones, and commands can run in a sandbox that lets them change files 
   with those tools, added when the model looks one up or uses it; the rules that hold whatever tools are in use
   (how replies look, memory, keys never typed into the chat, cleaning up) always stay. A model with a short context
   (about 32,000 tokens or less, not through OpenRouter) gets a leaner set: no guidance on answer UIs, the tool list
-  by name only and fewer tools in full.
+  by name only and fewer tools in full; memory is sized to its window too (under 12,000 tokens: a small block with the
+  start of your profile, at most three notes, no index, nothing added with a message or a file, no wiki lines; up to
+  about 33,000: at most 6% of the window, five notes and a short index), and the wiki's instructions come only with the tools they are about.
 - **Skills by group**: Custom's instructions name its skills by group (the project's, yours, then the library's
   groups such as Coding or Documents) rather than listing each, up to 200 skills (at most 40 of the project's and
   yours); the ones that fit a new session's first message come with what each is for, and its skill tool loads one

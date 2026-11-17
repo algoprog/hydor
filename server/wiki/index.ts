@@ -12,13 +12,22 @@ import { userLang } from '../language/index.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 
-const INSTRUCTIONS = [
-  'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work. It is one part of memory, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves).',
-  'Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, then the articles it names. Cite the articles you use.',
-  'To keep something: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.',
-  'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.',
-  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write.',
-].join(' ');
+/** What every agent is told while wiki memory is on: that it is there and how to look in it. */
+const LOOK =
+  'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves). Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, then the articles it names. Cite the articles you use.';
+
+/**
+ * How to use its tools, as guides: every agent gets them with its instructions, and Custom only while one of their
+ * tools is offered in full, so a model of a small context is not given them on every turn (features/types.ts).
+ */
+const KEEP =
+  'To keep something in the wiki: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.';
+const CHECK = 'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.';
+const PLANS =
+  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write.';
+const KEEP_TOOLS = ['wiki_ingest_document', 'wiki_ingest_text', 'wiki_write'];
+const CHECK_TOOLS = ['wiki_check', 'wiki_lessons_preview', 'wiki_lessons_save'];
+const PLAN_TOOLS = ['wiki_plan_adopt', 'wiki_plan_preview', 'wiki_plan_revision_preview', 'wiki_plan_revise'];
 
 /** Supply workflow instructions and tools to an agent only while wiki memory is on for its project. */
 export const wiki: Feature = {
@@ -43,6 +52,15 @@ export const wiki: Feature = {
     if (!wikiMemoryOn(d.db, space)) return undefined;
     // Custom's own agent asks the app for compaction checkpoints only when this is set.
     const language = LANGS.find((item) => item.id === userLang(d.db))!.english;
-    return { instructions: [INSTRUCTIONS, `Write new wiki articles, source notes, lessons, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`], env: sessionMemoryOn(d.db, s.key ?? '') ? { HYDOR_WIKI_EVENTS: '1' } : undefined };
+    const write = `Write new wiki articles, source notes, lessons, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`;
+    return {
+      instructions: [LOOK],
+      guides: [
+        { tools: KEEP_TOOLS, text: `${KEEP} ${write}` },
+        { tools: CHECK_TOOLS, text: CHECK },
+        { tools: PLAN_TOOLS, text: PLANS },
+      ],
+      env: sessionMemoryOn(d.db, s.key ?? '') ? { HYDOR_WIKI_EVENTS: '1' } : undefined,
+    };
   },
 };

@@ -10,6 +10,7 @@ import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
 import { meaningState, setMeaning, warmMeaning } from './embed.ts';
 import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
+import { agentsSuggestions, applySuggestion, conventionsFile, dismissSuggestion } from './agentsmd.ts';
 import { bringinRoutes } from './bringin/index.ts';
 import { findNotes } from './search.ts';
 import { secretIn } from './secrets.ts';
@@ -369,6 +370,35 @@ export function memoryRoutes(d: Deps) {
     const n = clearAll(db);
     changed();
     return { cleared: n };
+  });
+
+  /** Sentences the tidy-up suggests for a project's AGENTS.md (newest first), each with the note it came from and the file it would go to. */
+  app.get('/api/memory/agents-suggestions', async () => ({
+    suggestions: agentsSuggestions(db).map((s) => ({ ...s, project: path.basename(s.repo) || s.repo, file: conventionsFile(s.repo) ?? undefined, note: getEntry(db, s.entry)?.text })),
+  }));
+
+  /** Adds a suggested sentence to the project's AGENTS.md, or its CLAUDE.md when it has no AGENTS.md (under "Learned conventions") and removes its note. */
+  app.post('/api/memory/agents-suggestions/:id/apply', async (req) => {
+    try {
+      const s = applySuggestion(db, idOf((req.params as { id: string }).id));
+      edited();
+      return { suggestion: s };
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(400, (e as Error).message);
+    }
+  });
+
+  /** The user does not want a suggested sentence: it stays dismissed and its note stays. */
+  app.post('/api/memory/agents-suggestions/:id/dismiss', async (req) => {
+    try {
+      const s = dismissSuggestion(db, idOf((req.params as { id: string }).id));
+      changed();
+      return { suggestion: s };
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(404, (e as Error).message);
+    }
   });
 
   // Bring in: what other assistants know, read by the helper and picked from (bringin/).

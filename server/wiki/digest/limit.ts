@@ -1,6 +1,7 @@
-// How many documents a project's wiki reads. A project with more documents in its knowledge than its limit keeps them
-// out of its wiki (agents search them instead), as does the shared knowledge against Settings' number: reading
-// thousands of files with the helper model is slow and costs a lot, and retrieval serves them well.
+// How many documents a project's wiki reads. A project with more documents in its knowledge than its limit reads only
+// `limit` of them: the pinned ones, then those agents used most, then the newest. The others stay for agents to search
+// (as does the shared knowledge against Settings' number): reading thousands of files with the helper model is slow
+// and costs a lot, and retrieval serves them well.
 import type { DB } from '../../db.ts';
 import { knowledgeSchema } from '../../knowledge/store.ts';
 import type { WikiDocuments } from '../../../shared/wiki.ts';
@@ -31,4 +32,31 @@ export function documentsOverLimit(db: DB, space: string | null): WikiDocuments 
   const limit = documentLimit(db, space);
   const count = documentCount(db, space);
   return { count, limit, over: count > limit };
+}
+
+/** A document as the sets below name it. */
+export const docKey = (base: string, path: string) => `${base}\n${path}`;
+
+/**
+ * The documents a place's wiki reads when it holds more than its limit, in the order they are picked: pinned (the
+ * latest pin first), then the most used by agents, then the newest; never more than the limit. Null when it holds no
+ * more than its limit: every document is read.
+ */
+export function documentsToRead(db: DB, space: string | null): { base: string; path: string; title: string; id: number }[] | null {
+  const { limit, over } = documentsOverLimit(db, space);
+  if (!over) return null;
+  const bases = documentBases(db, space);
+  return db
+    .prepare(
+      `select d.id as id, d.base as base, d.path as path, d.title as title from kb_docs d left join kb_doc_marks m on m.base = d.base and m.path = d.path
+       where d.status = 'indexed' and d.base in (${bases.map(() => '?').join(',')})
+       order by coalesce(m.pinned_at, 0) desc, coalesce(m.uses, 0) desc, d.mtime desc, d.id desc limit ?`,
+    )
+    .all(...bases, limit) as { base: string; path: string; title: string; id: number }[];
+}
+
+/** Whether a document is read into the place's wiki: always when the place is within its limit, else when it is picked. */
+export function wikiReads(db: DB, space: string | null, base: string, path: string): boolean {
+  const picked = documentsToRead(db, space);
+  return !picked || picked.some((d) => d.base === base && d.path === path);
 }

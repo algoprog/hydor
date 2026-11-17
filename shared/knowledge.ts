@@ -46,6 +46,8 @@ export interface KnowledgeDoc {
   status: 'indexed' | 'error' | 'empty';
   error?: string;
   indexedAt: number;
+  /** Pinned: wiki memory always reads it, even when the project has more documents than its limit. */
+  wikiPin?: boolean;
 }
 
 /** A passage found: the text, the document and the part of it (a page, slide, sheet or heading) to cite. */

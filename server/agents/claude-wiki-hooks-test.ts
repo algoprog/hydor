@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { claudeSpec, claudeWikiHooksMayOverlap } from './claude.ts';
+import { claudeSpec, claudeWikiHooksMayOverlap, settingsOf } from './claude.ts';
 import { runToken } from '../mcp.ts';
 import { wikiHookRunOf } from '../wiki/session/hook-auth.ts';
 
@@ -35,6 +35,23 @@ try {
   assert.equal(claudeWikiHooksMayOverlap(opts, env), true);
   fs.writeFileSync(path.join(config, 'settings.json'), '{');
   assert.equal(claudeWikiHooksMayOverlap(opts, env), true);
+
+  // A project's skill switches pass a --settings of their own: Claude Code keeps one, so the app's hooks join it.
+  fs.rmSync(path.join(config, 'settings.json'));
+  const switches = ['--settings', JSON.stringify({ skillOverrides: { 'pdf-tools': 'off' } })];
+  const given = (args: string[]) => ({ instructions: [], notes: [], mcpServers: {}, env: {}, args, skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {} });
+  const both = claudeSpec({ ...opts, add: given(switches) }, { ...env, HYDOR_MEMORY_HOOKS: '1' });
+  assert.equal(both.args.filter((a) => a === '--settings').length, 1, 'one --settings');
+  const merged = JSON.parse(both.args[both.args.indexOf('--settings') + 1]);
+  assert.deepEqual(merged.skillOverrides, { 'pdf-tools': 'off' }, 'the switches kept');
+  assert.equal(merged.hooks.PostToolUse[0].matcher, 'Read|Edit|MultiEdit|Write|NotebookEdit', "memory's hook beside them");
+  assert.equal(merged.hooks.PreCompact[0].matcher, 'auto', "the wiki's hooks too");
+  // One that does not read as JSON goes on as it was, and no hooks are added beside it.
+  assert.deepEqual(settingsOf(['--settings', '{', '--x']), { settings: {}, rest: ['--settings', '{', '--x'], bad: true });
+  const broken = claudeSpec({ ...opts, add: given(['--settings', '{']) }, { ...env, HYDOR_MEMORY_HOOKS: '1' });
+  assert.equal(broken.args.filter((a) => a === '--settings').length, 1);
+  assert.equal(broken.args[broken.args.indexOf('--settings') + 1], '{');
+  assert.equal(broken.env.HYDOR_MEMORY_HOOK_TOKEN, undefined);
   process.stdout.write('Claude wiki hook configuration tests passed\n');
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });

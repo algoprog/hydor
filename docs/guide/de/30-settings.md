@@ -239,7 +239,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Wiki-Memory in Chats standardmäßig einschalten**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
 - [**Automatische Lessons Learned in Chats standardmäßig einschalten**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
 - [**Aus neuen Dokumenten lernen**](/settings?s=memory&find=Learn%20from%20new%20documents): Neue und geänderte Dokumente ergänzen Memory-Notizen und aktualisieren das Wiki, mit dem Hilfsmodell.
-- [**Höchstzahl der Dokumente für das Wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): Ein Projekt mit mehr Dokumenten als dieser Zahl liest sie nicht in sein Wiki: Agenten durchsuchen sie stattdessen.
+- [**Höchstzahl der Dokumente für das Wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): Bei mehr Dokumenten als hier liest das Wiki eines Projekts die angehefteten, die am häufigsten genutzten und die neuesten ein: Agenten durchsuchen alle.
 - [**Wiki-Ordner**](/settings?s=memory&find=Wiki%20folder): Wo das geteilte Wiki liegt, und die Projekt-Wikis, sofern unten nichts anderes eingestellt ist.
 - [**Projekt-Wikis**](/settings?s=memory&find=Project%20wikis): Wo das Wiki jedes Projekts liegt: im Wiki-Ordner oder im Ordner jedes Projekts.
 - [**Ordner innerhalb jedes Projekts**](/settings?s=memory&find=Folder%20inside%20each%20project): Wo in seinem Ordner jedes Projekt sein Wiki führt.

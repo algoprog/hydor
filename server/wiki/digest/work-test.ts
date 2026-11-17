@@ -190,8 +190,10 @@ const readTitles = (from: number) => asked.slice(from).filter((q) => q.system ==
 
 test('caps: 4 conversations a project, the latest first', async () => {
   const when = Date.now() + 24 * 3600_000;
+  // Two fresh projects: a project has at most 8 conversations read in a day, and alpha has had its share above.
+  const p0 = mk('P0');
   const p1 = mk('P1');
-  for (const [pi, p] of [alpha, p1].entries()) for (let i = 0; i < 6; i++) session(`claude:cap-${pi}-${i}`, p.folder, { title: `Cap ${pi}-${i}`, last: when - (i + 1) * 3600_000 - pi * 1000 });
+  for (const [pi, p] of [p0, p1].entries()) for (let i = 0; i < 6; i++) session(`claude:cap-${pi}-${i}`, p.folder, { title: `Cap ${pi}-${i}`, last: when - (i + 1) * 3600_000 - pi * 1000 });
   const asks = asked.length;
   assert.equal(await learnWikiFromWork(db, ask, when), 2 * PER_PROJECT);
   assert.equal(PER_PROJECT, 4);

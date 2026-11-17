@@ -11,10 +11,12 @@ import type { Deps, Feature } from '../features/types.ts';
 import { meaningHeld, meaningOn } from '../memory/embed.ts';
 import { dropVectorBlocks, fillSoon, onIndexed, progress, scanAll, scanSoon } from './indexer.ts';
 import { basesFor, spaceOfSession } from './scope.ts';
+import { emitIndexed } from './events.ts';
+import { marksOf, setWikiPin } from './marks.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docById, docsOf, dropDoc, filesDir, removeSource, sourcesOf, toDoc, updateBase } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
-import { wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
+import { isWikiBase, wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 import { wikiChatEnabled } from '../wiki/access.ts';
 
 function state(d: Deps): KnowledgeState {
@@ -84,7 +86,23 @@ function routes(d: Deps) {
     rescan(id(req), { failed: true });
     return { ok: true };
   });
-  app.get('/api/knowledge/:id/docs', async (req) => ({ docs: docsOf(db, baseRow(db, id(req)).id, { limit: 2000 }).filter((d) => wikiDocumentVisible(db, d.base, d.path)).map(toDoc) }));
+  app.get('/api/knowledge/:id/docs', async (req) => {
+    const marks = marksOf(db, baseRow(db, id(req)).id);
+    return { docs: docsOf(db, baseRow(db, id(req)).id, { limit: 2000 }).filter((d) => wikiDocumentVisible(db, d.base, d.path)).map((d) => ({ ...toDoc(d), ...(marks.get(d.path)?.pinnedAt ? { wikiPin: true } : {}) })) };
+  });
+  /** Pins a document for wiki memory (it is always read, even when the project has more documents than its limit), or lets it go. */
+  app.put('/api/knowledge/documents/:id/wiki-pin', async (req) => {
+    const doc = docById(db, Number(id(req)));
+    if (!doc || !wikiDocumentVisible(db, doc.base, doc.path)) throw new HttpError(404, 'No such document');
+    if (isWikiBase(db, doc.base)) throw new HttpError(400, 'A wiki’s own articles are not read into the wiki');
+    const pin = body(req).pin;
+    if (typeof pin !== 'boolean') throw new HttpError(400, 'Say pin: true or false');
+    setWikiPin(db, doc.base, doc.path, pin);
+    // Wiki memory reads a document just pinned now, as it reads one just indexed.
+    if (pin && doc.status === 'indexed') emitIndexed({ base: doc.base, path: doc.path, title: doc.title });
+    changed();
+    return { id: doc.id, pinned: pin };
+  });
   /** Removes a document: one dropped on the page is deleted; one in a folder stays there and is left out until it changes. */
   app.delete('/api/knowledge/:id/docs/:doc', async (req) => {
     const doc = docById(db, Number((req.params as { doc: string }).doc));

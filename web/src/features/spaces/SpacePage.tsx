@@ -710,7 +710,7 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
           </p>
         </Row>
         {wikiChoice !== 'off' && (
-          <Row title="Most documents to read into its wiki" sub="A project with more documents than this keeps them out of its wiki: agents search them instead.">
+          <Row title="Most documents to read into its wiki" sub="With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all.">
             <div className="flex flex-wrap items-center gap-2">
               <Segmented
                 size="sm"

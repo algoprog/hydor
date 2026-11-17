@@ -86,12 +86,13 @@ export function EntryEditor({
   );
 }
 
-/** "Added", "Updated", "Removed", "Ends" (or "Undone"), coloured by what happened. */
+/** "Added", "Updated", "Removed", "Moved", "Ends" (or "Undone"), coloured by what happened. */
 export function ChangeBadge({ c }: { c: MemoryChange }) {
   if (c.undone) return <Badge>Undone</Badge>;
   if (c.action === 'added') return <Badge tone="ok">Added</Badge>;
   if (c.action === 'updated') return <Badge tone="info">Updated</Badge>;
   if (c.action === 'expiry') return <Badge tone="info">{c.expiresAt ? 'Ends' : 'No end date'}</Badge>;
   if (c.action === 'checked') return <Badge tone="ok">Checked</Badge>;
+  if (c.action === 'moved') return <Badge tone="info">Moved</Badge>;
   return <Badge tone="warn">Removed</Badge>;
 }

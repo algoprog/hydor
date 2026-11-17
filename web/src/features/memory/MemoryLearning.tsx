@@ -2,17 +2,18 @@
 // last ran, what it changed (each change undoable), and running it now.
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { MessageSquare, Sparkles, Undo2 } from 'lucide-react';
-import type { MemoryChange, MemoryState } from '@shared/memory';
+import type { AgentsSuggestion, MemoryChange, MemoryState } from '@shared/memory';
 import { changeSummary } from '@shared/memory';
 import { Badge, Button, cx, Dialog, IconButton, Switch, Throbber } from '../../components/ui';
-import { post, put } from '../../lib/api';
+import { api, post, put } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Group, Row } from '../settings/kit';
-import { dayOf, reloadState, when } from './common';
+import { tr } from '../../i18n/runtime';
+import { dayOf, movedPlace, reloadState, when } from './common';
 import { ChangeBadge } from './parts';
-import { placeName, useMemoryState } from './state';
+import { placeName, useMemory, useMemoryState } from './state';
 
 const set = (p: Record<string, unknown>) => put('/api/memory', p).then(reloadState).catch(toastError);
 
@@ -51,9 +52,59 @@ function TidyChange({ c, onUndo }: { c: MemoryChange; onUndo: () => void }) {
         )}
       </div>
       <div translate="no" className="mt-1 space-y-0.5 text-[13.5px] leading-snug break-words">
-        {c.before && c.action !== 'expiry' && <div className="text-fg-3 line-through decoration-fg-3/60">{c.before}</div>}
-        {c.after && <div className="text-fg">{c.after}</div>}
+        {c.action === 'moved' && (
+          <>
+            {c.text && <div className="text-fg">{c.text}</div>}
+            <div className="text-[12px] text-fg-3">{tr(`Moved from ${movedPlace(c.before)} to ${movedPlace(c.after)}`)}</div>
+          </>
+        )}
+        {c.action !== 'moved' && c.before && c.action !== 'expiry' && <div className="text-fg-3 line-through decoration-fg-3/60">{c.before}</div>}
+        {c.action !== 'moved' && c.after && <div className="text-fg">{c.after}</div>}
         {c.action === 'expiry' && c.expiresAt && <div className="text-[12px] text-fg-3">Until {dayOf(c.expiresAt)}</div>}
+      </div>
+    </div>
+  );
+}
+
+type Suggestion = AgentsSuggestion & { project: string; file?: string; note?: string };
+
+/** The sentences the tidy-up suggests for projects' AGENTS.md that wait for an answer; loaded again when memory changes. */
+function usePendingSuggestions(): [Suggestion[], () => Promise<void>] {
+  const version = useMemory((s) => s.version);
+  const [list, setList] = useState<Suggestion[]>([]);
+  const load = () =>
+    api<{ suggestions: Suggestion[] }>('/api/memory/agents-suggestions')
+      .then((r) => setList(r.suggestions.filter((x) => x.status === 'pending')))
+      .catch(() => {});
+  useEffect(() => {
+    void load();
+  }, [version]);
+  return [list, load];
+}
+
+/** A sentence for a project's AGENTS.md: the note it came from, and Add or Dismiss. */
+function SuggestionRow({ s, onDone }: { s: Suggestion; onDone: () => void }) {
+  const act = (what: 'apply' | 'dismiss') =>
+    post(`/api/memory/agents-suggestions/${s.id}/${what}`)
+      .then(() => (what === 'apply' && toast('Added to AGENTS.md'), reloadState(), onDone()))
+      .catch(toastError);
+  return (
+    <div className="px-5 py-2.5">
+      <div translate="no" className="text-[13.5px] leading-snug break-words text-fg">
+        {s.text}
+      </div>
+      <div translate="no" className="mt-0.5 text-[12px] leading-snug break-words text-fg-3">
+        {s.project}
+        {s.file ? ` · ${s.file}` : ''}
+        {s.note ? ` · ${s.note}` : ''}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" variant="secondary" onClick={() => void act('apply')}>
+          Add
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => void act('dismiss')}>
+          Dismiss
+        </Button>
       </div>
     </div>
   );
@@ -93,6 +144,7 @@ export function LearningGroup() {
   const st = useMemoryState();
   const r = st?.tidy;
   const [open, setOpen] = useState(false);
+  const [suggestions, loadSuggestions] = usePendingSuggestions();
   // While it runs, look again every few seconds.
   useEffect(() => {
     if (!r?.running) return;
@@ -133,7 +185,7 @@ export function LearningGroup() {
             disabled={off}
             control={
               <>
-                {r && r.changes.length > 0 && (
+                {r && (r.changes.length > 0 || suggestions.length > 0) && (
                   <Button size="sm" variant="ghost" disabled={off} onClick={() => setOpen(true)}>
                     What changed
                   </Button>
@@ -145,6 +197,7 @@ export function LearningGroup() {
             }
           >
             {r?.learnError && r.learnError !== r.error && !r.running && <div className="text-[12.5px] leading-snug text-warn">Learning from conversations stopped: {r.learnError}</div>}
+            {r?.upkeepError && !r.running && <div className="text-[12.5px] leading-snug text-warn">Some upkeep steps stopped: {r.upkeepError}</div>}
           </Row>
         </>
       )}
@@ -154,6 +207,16 @@ export function LearningGroup() {
             <TidyChange key={`${c.entry}-${i}`} c={c} onUndo={() => void undo(i)} />
           ))}
         </div>
+        {suggestions.length > 0 && (
+          <div className={cx('-mx-5', r && r.changes.length > 0 && 'mt-2 border-t border-line')}>
+            <div className="px-5 pt-3 pb-1 text-[12px] font-medium text-fg-2">Suggested for AGENTS.md</div>
+            <div className="divide-y divide-line">
+              {suggestions.map((s) => (
+                <SuggestionRow key={s.id} s={s} onDone={() => void loadSuggestions()} />
+              ))}
+            </div>
+          </div>
+        )}
       </Dialog>
     </Group>
   );

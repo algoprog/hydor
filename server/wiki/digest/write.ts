@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { applyWikiChanges, readWiki, wikiHash } from '../core.ts';
 import { browseWiki } from '../browse.ts';
+import { snapshotArticle, type Removed } from './history.ts';
 
 /** A path as this feature writes one: no segment starting with a dot, under wiki/ and ending .md, or index.md or log.md. */
 export function writable(p: string): boolean {
@@ -45,7 +46,7 @@ const exists = (root: string, rel: string) => readOrNull(root, rel) !== null;
 
 // ---- frontmatter ------------------------------------------------------------------------------------------------
 
-interface Front {
+export interface Front {
   /** Keys with their lines, in order, as written. */
   keys: { key: string; lines: string[] }[];
   body: string;
@@ -64,7 +65,7 @@ export function splitFront(text: string): Front {
 }
 
 /** The values of a list key (`sources:`), as a block or inline. */
-function listOf(f: Front, key: string): string[] {
+export function listOf(f: Front, key: string): string[] {
   const k = f.keys.find((x) => x.key === key);
   if (!k) return [];
   const inline = /^[^:]+:\s*\[([^\]]*)\]\s*$/.exec(k.lines[0]);
@@ -85,18 +86,110 @@ export function titleOfArticle(text: string, fallback: string): string {
 
 const day = (t: number) => new Date(t).toISOString().slice(0, 10);
 
+/** The value of a one-line key (`summary:`, `commit:`), without its quotes; undefined when there is none. */
+export function frontValue(f: Front, key: string): string | undefined {
+  const k = f.keys.find((x) => x.key === key);
+  if (!k) return undefined;
+  const raw = /^[^:]+:\s*(.*?)\s*$/.exec(k.lines[0])?.[1] ?? '';
+  if (raw.startsWith('"')) {
+    try {
+      return String(JSON.parse(raw)).trim() || undefined;
+    } catch {
+      /* not JSON: as written */
+    }
+  }
+  return raw.replace(/^['"]|['"]$/g, '').trim() || undefined;
+}
+
+/** A line of text cut to `n` characters at a word. */
+export function clipLine(s: string, n: number): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n - 1);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > n * 0.6 ? cut.slice(0, at) : cut).replace(/[\s,;:.-]+$/, '')}…`;
+}
+
+/** Longest summary an article's front matter holds. */
+export const SUMMARY_MAX = 160;
+
+/** A summary as one plain line: links become their text (the index lists summaries, and a link in one would point from the wrong folder). */
+const plainLine = (s: string) => s.replace(/!?\[([^\]\n]*)\]\([^)\s]*\)/g, '$1').replace(/[<>]/g, '');
+
+/** The first line of a body that is not a heading, as one line. */
+export function firstLine(body: string): string {
+  return clipLine(plainLine(body.split('\n').find((l) => l.trim() && !/^\s*(?:#|---|<!--)/.test(l)) ?? ''), SUMMARY_MAX);
+}
+
+/** An article's summary: its `summary:`, else its first line that is not a heading (at most SUMMARY_MAX characters). */
+export function summaryOf(content: string): string {
+  const f = splitFront(content);
+  return frontValue(f, 'summary') ?? firstLine(f.body);
+}
+
+/** A path as the front matter lists it: plain characters only. */
+const listable = (p: string) => /^[\w@.+\-/]+$/.test(p) && !p.includes('..');
+
+const KEYS_OWNED = ['title', 'summary', 'sources', 'anchors', 'commit', 'stale', 'updated'];
+
+export interface Compose {
+  title: string;
+  /** A source to add to the article's `sources`. */
+  source?: string;
+  /** Sources a new part takes over from the article it was split from. */
+  carry?: string[];
+  now: number;
+  /** One line about what the article covers; kept as it was when not given. */
+  summary?: string;
+  /** The repository paths the article names; kept as they were when not given. */
+  anchors?: string[];
+  /** The repository's commit the article was written against; kept as it was when not given. */
+  commit?: string | null;
+}
+
 /**
  * An article as written: the old frontmatter kept (its other keys as they were), the title kept (or the one given),
- * the new source added to its `sources`, `updated` set, then the body the model wrote.
+ * the new source added to its `sources`, `summary`, `anchors` and `commit` set (or kept), `updated` set, `stale`
+ * dropped (the article was just written), then the body the model wrote.
  */
-export function composeArticle(old: string | null, body: string, o: { title: string; source: string; now: number }): string {
+export function composeArticle(old: string | null, body: string, o: Compose): string {
   const f = old ? splitFront(old) : { keys: [] as Front['keys'], body: '' };
-  const sources = [...new Set([...listOf(f, 'sources'), o.source])];
+  const sources = [...new Set([...listOf(f, 'sources'), ...(o.carry ?? []), ...(o.source ? [o.source] : [])])];
   const own = f.keys.find((k) => k.key === 'title');
   const titleLine = own ? own.lines[0].replace(/^[^:]+:\s*/, '') : JSON.stringify(plainTitle(old ? titleOfArticle(old, o.title) : o.title));
-  const kept = f.keys.filter((k) => !['title', 'sources', 'updated'].includes(k.key)).flatMap((k) => k.lines);
-  const front = ['---', `title: ${titleLine}`, 'sources:', ...sources.map((s) => `  - ${s}`), `updated: ${day(o.now)}`, ...kept, '---'];
+  const kept = f.keys.filter((k) => !KEYS_OWNED.includes(k.key)).flatMap((k) => k.lines);
+  const summary = o.summary != null ? clipLine(plainLine(o.summary), SUMMARY_MAX) : frontValue(f, 'summary');
+  const anchors = (o.anchors ?? (old ? listOf(f, 'anchors') : [])).filter(listable);
+  const commit = o.commit || frontValue(f, 'commit');
+  const front = [
+    '---',
+    `title: ${titleLine}`,
+    ...(summary ? [`summary: ${JSON.stringify(summary)}`] : []),
+    ...(sources.length ? ['sources:', ...sources.map((s) => `  - ${s}`)] : []),
+    ...(anchors.length ? ['anchors:', ...anchors.map((a) => `  - ${a}`)] : []),
+    ...(commit ? [`commit: ${commit}`] : []),
+    `updated: ${day(o.now)}`,
+    ...kept,
+    '---',
+  ];
   return `${front.join('\n')}\n\n${body.trim()}\n`;
+}
+
+/** The article with its `stale:` set to `paths` (none: removed), the body and every other key untouched. */
+export function withStale(text: string, paths: string[]): string {
+  const f = splitFront(text);
+  if (!f.keys.length) return text;
+  const lines = f.keys.filter((k) => k.key !== 'stale').flatMap((k) => k.lines);
+  const stale = paths.filter(listable).slice(0, 5);
+  const m = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text)!;
+  const rest = text.slice(m[0].length);
+  return `---\n${[...lines, ...(stale.length ? ['stale:', ...stale.map((p) => `  - ${p}`)] : [])].join('\n')}\n---\n${rest}`;
+}
+
+/** The article's `commit:` and `anchors:` and `stale:`, as drift needs them. */
+export function trackingOf(content: string): { anchors: string[]; commit?: string; stale: string[] } {
+  const f = splitFront(content);
+  return { anchors: listOf(f, 'anchors'), commit: frontValue(f, 'commit'), stale: listOf(f, 'stale') };
 }
 
 /** The body of a model's article without any frontmatter it wrote anyway. */
@@ -150,11 +243,14 @@ export async function writeFile(root: string, rel: string, make: (current: strin
 const START = '<!-- articles:start -->';
 const END = '<!-- articles:end -->';
 
-/** `index.md`: every article with its title and link, in a block the code owns (what else is in the file stays). */
+/** `index.md`: every article with its title, link and summary, in a block the code owns (what else is in the file stays). */
 export async function writeIndex(root: string): Promise<void> {
   await writeFile(root, 'index.md', (cur) => {
     const articles = browseWiki(root).articles;
-    const lines = articles.map((a) => `- [${a.title.replace(/[\[\]]/g, '')}](${encodeURI(a.path)})`);
+    const lines = articles.map((a) => {
+      const summary = plainLine(summaryOf(readOrNull(root, a.path)?.content ?? '')).replace(/[\r\n]+/g, ' ');
+      return `- [${a.title.replace(/[\[\]]/g, '')}](${encodeURI(a.path)})${summary ? ` — ${summary}` : ''}`;
+    });
     const block = `${START}\n${lines.join('\n') || '(no articles yet)'}\n${END}`;
     if (cur == null) return `# Wiki index\n\nEvery article, by title.\n\n${block}\n`;
     const a = cur.indexOf(START);
@@ -170,4 +266,136 @@ export async function appendLog(root: string, o: { document: string; articles: {
   const links = o.articles.map((a) => `[${a.title.replace(/[\[\]\r\n]/g, '')}](${encodeURI(a.path)})`).join(', ');
   const line = `- ${day(o.now)} · ${doc}${links ? ` → ${links}` : ' → nothing changed in the articles'}`;
   await writeFile(root, 'log.md', (cur) => (cur == null ? `# Log\n\n${line}\n` : `${cur.replace(/\s*$/, '')}\n${line}\n`));
+}
+
+/** Lines added to `log.md` as they are (each already a whole `- date · …` line). */
+async function appendLines(root: string, lines: string[]): Promise<void> {
+  if (!lines.length) return;
+  await writeFile(root, 'log.md', (cur) => (cur == null ? `# Log\n\n${lines.join('\n')}\n` : `${cur.replace(/\s*$/, '')}\n${lines.join('\n')}\n`));
+}
+
+const logSource = (s: string) => s.replace(/[\r\n\[\]]+/g, ' ').trim().slice(0, 120);
+const logLink = (a: { path: string; title: string }) => `[${a.title.replace(/[\[\]\r\n]/g, '')}](${encodeURI(a.path)})`;
+
+/** `log.md`: a line for each article a source revised (`replaced` statements went, the earlier text is kept) or split into parts. */
+export async function appendRevisions(root: string, o: { source: string; now: number; revised?: { path: string; title: string; replaced: number }[]; split?: { path: string; title: string; parts: number }[] }): Promise<void> {
+  const d = day(o.now);
+  await appendLines(root, [
+    ...(o.revised ?? []).map((r) => `- ${d} · ${logSource(o.source)} → revised ${logLink(r)}: ${r.replaced ? `replaced ${r.replaced} statement${r.replaced === 1 ? '' : 's'}` : 'brought up to date'} (earlier text kept)`),
+    ...(o.split ?? []).map((r) => `- ${d} · ${logSource(o.source)} → split ${logLink(r)} into ${r.parts} parts (earlier text kept)`),
+  ]);
+}
+
+// ---- revising -------------------------------------------------------------------------------------------------
+
+/** A rewrite shorter than this share of the old article is refused unless it says what it replaced. */
+export const KEEP_SHARE = 0.8;
+/** Whatever it says it replaced, a rewrite keeps at least this share of the old article. */
+export const KEEP_FLOOR = 0.5;
+
+/** The `removed` list of an answer: what is usable, and whether every item in it had its statement and a reason. */
+export function parseRemoved(raw: unknown): { items: Removed[]; valid: boolean } {
+  if (raw == null) return { items: [], valid: true };
+  if (!Array.isArray(raw)) return { items: [], valid: false };
+  const items: Removed[] = [];
+  let valid = true;
+  for (const r of raw.slice(0, 60)) {
+    const text = typeof (r as { text?: unknown })?.text === 'string' ? (r as { text: string }).text.replace(/\s+/g, ' ').trim() : '';
+    const why = typeof (r as { why?: unknown })?.why === 'string' ? (r as { why: string }).why.replace(/\s+/g, ' ').trim() : '';
+    if (text.length < 3 || why.length < 3) valid = false;
+    else items.push({ text: text.slice(0, 400), why: why.slice(0, 200) });
+  }
+  return { items, valid };
+}
+
+const plain = (s: string) => s.toLowerCase().replace(/[`*_>#\[\]()|~-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** Whether a statement the helper says it replaced was really in the article (its words, or most of them). */
+function saidIn(body: string, statement: string): boolean {
+  const hay = plain(body);
+  const t = plain(statement);
+  if (!t || hay.includes(t)) return !!t;
+  const ws = [...new Set(t.match(/[\p{L}\p{N}]{3,}/gu) ?? [])];
+  return ws.length >= 3 && ws.filter((w) => hay.includes(w)).length / ws.length >= 0.7;
+}
+
+/**
+ * Whether a rewrite of an article's body may replace it. As long as it keeps KEEP_SHARE of the old text it may; shorter
+ * only when it lists what it dropped, every item with a reason, each item a statement the article really had, and it
+ * still keeps KEEP_FLOOR of it.
+ */
+export function judgeRewrite(oldBody: string, newBody: string, removed: { items: Removed[]; valid: boolean }): { ok: true } | { ok: false; reason: string } {
+  const was = oldBody.trim().length;
+  const now = newBody.trim().length;
+  if (now >= was * KEEP_SHARE) return { ok: true };
+  if (!removed.items.length || !removed.valid) return { ok: false, reason: 'the new text dropped what it said' };
+  if (!removed.items.every((r) => saidIn(oldBody, r.text))) return { ok: false, reason: 'the new text listed statements the article never said' };
+  if (now < was * KEEP_FLOOR) return { ok: false, reason: 'the new text dropped too much of what it said' };
+  return { ok: true };
+}
+
+export interface StoreArticle {
+  path: string;
+  title: string;
+  /** The new body, links already cleaned. */
+  body: string;
+  source?: string;
+  now: number;
+  summary?: string;
+  anchors?: string[];
+  commit?: string | null;
+  removed?: { items: Removed[]; valid: boolean };
+  /** What the snapshot says the rewrite came from. */
+  why?: string;
+  /** Skip the KEEP_SHARE guard: the caller has judged the rewrite (a split's hub). */
+  judged?: boolean;
+  /** Only write over exactly this file text (a split: the article was read and split as it was). */
+  expect?: string;
+  carry?: string[];
+}
+
+export interface Stored {
+  status: 'written' | 'refused' | 'unchanged';
+  reason?: string;
+  /** Statements the rewrite replaced (listed with their reasons), 0 for a first write or a plain addition. */
+  replaced: number;
+  /** The copy of the article's earlier text, when there was one. */
+  snapshot?: string;
+}
+
+/**
+ * Writes an article: a new one, or a rewrite of an existing one, which first keeps the earlier text in the wiki's
+ * history (`.history/`, with the reasons when statements were replaced). The rewrite is judged against what the file
+ * holds now (another writer may have changed it since it was read), under the rule of judgeRewrite.
+ */
+export async function storeArticle(root: string, a: StoreArticle): Promise<Stored> {
+  const removed = a.removed ?? { items: [], valid: true };
+  let result: Stored = { status: 'unchanged', replaced: 0 };
+  const did = await writeFile(root, a.path, (cur) => {
+    if (cur != null) {
+      if (a.expect != null && cur !== a.expect) {
+        result = { status: 'refused', reason: 'changed meanwhile', replaced: 0 };
+        return null;
+      }
+      if (!a.judged) {
+        const j = judgeRewrite(splitFront(cur).body, a.body, removed);
+        if (!j.ok) {
+          result = { status: 'refused', reason: j.reason, replaced: 0 };
+          return null;
+        }
+      }
+    }
+    const next = composeArticle(cur, a.body, { title: a.title, source: a.source, carry: a.carry, now: a.now, summary: a.summary, anchors: a.anchors, commit: a.commit });
+    if (cur == null) {
+      result = { status: 'written', replaced: 0 };
+      return next;
+    }
+    const replaced = removed.items.length;
+    const snapshot = snapshotArticle(root, a.path, cur, a.now, { source: a.why ?? a.source, removed: removed.items });
+    result = { status: 'written', replaced, snapshot };
+    return next;
+  });
+  // Nothing written and no reason given: the text came out as it was.
+  if (!did && result.status === 'written') result = { status: 'unchanged', replaced: 0 };
+  return result;
 }

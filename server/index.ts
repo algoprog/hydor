@@ -80,6 +80,7 @@ import { setRunnerWrap } from './runner/client.ts';
 import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
+import { memoryTouchRoutes, windowOf } from './memory/deliver.ts';
 import { exportRoutes } from './session-export.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { makeOf } from '../shared/content-asks.ts';
@@ -1978,22 +1979,37 @@ app.put('/api/me/timezone', async (req) => {
   setUserTimezone(db, String((req.body as { tz?: string } | undefined)?.tz ?? ''));
   return { tz: userTimezone(db) };
 });
+
 /**
  * Custom reads what the capabilities add to its instructions before each turn; its run's token is the permission.
  * `epoch` counts the times it condensed its conversation: memory's block stays the same within one. `lean=1`: its
- * model has a small context. Each capability's part comes apart, and its tools' guides, which Custom adds while one
- * of their tools is offered.
+ * model has a small context, and `window` its size in tokens. Each capability's part comes apart, and its tools'
+ * guides, which Custom adds while one of their tools is offered. With `q`, the message that starts the turn, `turn` is
+ * what goes with that message (memory newly relevant to it), '' for nothing.
  */
 app.get('/agent/run/:token/context', async (req, reply) => {
   const runId = runOf((req.params as { token: string }).token);
   const live = runId ? sessions.liveByRun(runId) : null;
   if (!runId || !live) return reply.code(403).send({ error: 'Not a running agent' });
-  const q = req.query as { epoch?: string; lean?: string };
+  const q = req.query as { epoch?: string; lean?: string; window?: string; q?: string };
   const epoch = Number(q.epoch);
-  const { parts, guides } = await featureContext({ key: live.key, cwd: live.cwd, extra: sessionExtra(db, live.key), runId, epoch: Number.isInteger(epoch) && epoch >= 0 ? epoch : 0, lean: q.lean === '1' });
+  const query = typeof q.q === 'string' ? q.q.slice(0, 4000) : undefined;
+  const { parts, guides, turn } = await featureContext({
+    key: live.key,
+    cwd: live.cwd,
+    extra: sessionExtra(db, live.key),
+    runId,
+    epoch: Number.isInteger(epoch) && epoch >= 0 ? epoch : 0,
+    lean: q.lean === '1',
+    window: windowOf(q.window),
+    query,
+  });
   // `text` for a Custom from before the parts: everything, as it was.
-  return { text: [...parts.map((p) => p.text), ...guides.map((g) => g.text)].join('\n\n'), parts, guides, now: localNow(db), tz: userTimezone(db) };
+  return { text: [...parts.map((p) => p.text), ...guides.map((g) => g.text)].join('\n\n'), parts, guides, turn: turn.map((t) => t.text).join('\n\n'), now: localNow(db), tz: userTimezone(db) };
 });
+
+// Custom's tools and Claude Code's hook: the notes about the files they read or change (server/memory/deliver.ts).
+memoryTouchRoutes(app, { db, sessions });
 mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`);
 
 // ---- machines -----------------------------------------------------------------------------------

@@ -9,17 +9,25 @@
 // something new, the helper model tidies memory up and, unless that is turned off, learns from the conversations
 // since (tidy.ts); notes past their end date go within minutes. Settings → Memory turns it off for all sessions, a session's menu for one. Claude Code's and Codex's
 // own memories stay off in the sessions the app runs: these notes are the one memory every agent shares.
-import type { Agent } from '../../shared/types.ts';
+// While a session works, what newly bears on a message comes with it, and what is about the files its agent touches
+// comes as it touches them (Claude Code's hook, Custom's tools) or with the next message (deliver.ts); nothing twice
+// (given.ts). When a turn ends, what the agent used of what it was given counts as used.
+import type { Agent, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import type { Deps, Feature, SpawnAdditions } from '../features/types.ts';
-import { kick, warmMeaning, watchNotes } from './embed.ts';
+import { sessionExtra } from '../sessionExtra.ts';
+import { wikiDeliverySpace, wikiLines } from '../wiki/deliver.ts';
+import { ADD_BUDGET, memClass, messageAdditions } from './deliver.ts';
+import { kick, requestVector, warmMeaning, watchNotes } from './embed.ts';
 import { noteChanges } from './extract.ts';
-import { memoryInstructions, memoryParts } from './inject.ts';
+import { addTouched, askRef, blockIds, blocksOf, clearGiven, dropGiven, givenRefs, idsOf, moveGiven, noteBlock, noteEpoch, noteRef, recordGiven, runRef, seeCompactions, seeUses, takeTouched, touchedFiles } from './given.ts';
+import { memoryBlock, memoryParts } from './inject.ts';
 import { memoryRoutes } from './routes.ts';
-import { expireDue, keepBlock, keptBlock, learnOn, memoryOn, sessionMemoryOn, setCursor, sweep, tidyOn } from './store.ts';
+import { cursorOf, expireDue, keepBlock, keptBlock, learnOn, markGiven, memoryOn, sessionMemoryOn, setCursor, sweep, tidyOn, words } from './store.ts';
 import { helperAsk, tidy, tidyDue, titlesFor, untitled } from './tidy.ts';
 import { memoryTools } from './tools.ts';
 import { startTranscriptVectors } from './transcripts.ts';
+import { startAnchors } from './upkeep.ts';
 
 /**
  * Each agent's own memory stays off in the sessions the app runs: Claude Code's auto memory (a folder of files only
@@ -32,14 +40,40 @@ export function ownMemoryOff(agent: Agent): SpawnAdditions {
   return {};
 }
 
-/** A session's memory block: the one it was given while that holds (store.ts keptBlock), else made now and kept. */
-async function blockFor(d: Pick<Deps, 'db'>, key: string | undefined, flavor: string, epoch: number, make: () => Promise<string>): Promise<string> {
-  if (!key) return make();
+/**
+ * A session's memory block: the one it was given while that holds (store.ts keptBlock), else made now and kept. Its
+ * entries count as given to the session (given.ts noteBlock), in place of those of a block it no longer has.
+ */
+async function blockFor(d: Pick<Deps, 'db'>, key: string | undefined, flavor: string, epoch: number, make: () => Promise<string>): Promise<{ text: string; made: boolean }> {
+  if (!key) return { text: await make(), made: true };
+  const before = blocksOf(d.db, key);
   const kept = keptBlock(d.db, key, flavor, epoch);
-  if (kept != null) return kept;
-  const text = await make();
-  keepBlock(d.db, key, flavor, epoch, text);
-  return text;
+  const text = kept ?? (await make());
+  if (kept == null) keepBlock(d.db, key, flavor, epoch, text);
+  noteBlock(
+    d.db,
+    key,
+    text,
+    before.filter((b) => kept == null || b.flavor !== flavor),
+  );
+  return { text, made: kept == null };
+}
+
+/** Custom, Hydor's own agent, which hears memory with its turns (turnNotes) rather than with each message. */
+const isCustom = (s: { agent?: Agent; acpAgent?: string } | null | undefined) => s?.agent === 'acp' && s.acpAgent === CONSOLE_ID;
+
+/** What a new Codex thread was given before it had a key (by its run), moved to its key. */
+function attachRun(d: Deps, key: string) {
+  const run = d.sessions.runOf?.(key);
+  if (run) moveGiven(d.db, runRef(run), key);
+}
+
+/** Where to read a session's turns from: after the item read last, else from its latest message. */
+function startOf(items: TimelineItem[], after?: string): number {
+  const i = after ? items.findIndex((x) => x.id === after) + 1 : 0;
+  if (i > 0) return i;
+  for (let j = items.length - 1; j >= 0; j--) if (items[j].kind === 'user') return j;
+  return 0;
 }
 
 /** Wait after a turn ends, so turns in quick succession are read together. */
@@ -85,6 +119,18 @@ async function readTurns(d: Deps, key: string) {
   const items = tl.parser.items;
   // Memory off (for all, or this session): those turns are passed over for good.
   if (!sessionMemoryOn(db, key)) return setCursor(db, key, items[items.length - 1]?.id);
+  // What the agent used of what it was given, before the cursor moves on; then a compaction since lets it all go
+  // (save its instructions' block); and the files it worked on wait for the next message (Custom hears of them at once).
+  try {
+    const from = startOf(items, cursorOf(db, key)?.item);
+    attachRun(d, key);
+    seeUses(db, key, items, from);
+    seeCompactions(db, key, items, from);
+    const s = d.sessions.summary(key);
+    if (s && !isCustom(s) && s.cwd) addTouched(key, touchedFiles(items, s.cwd, from));
+  } catch (e) {
+    console.warn(`[memory] ${key}: what was used: ${(e as Error)?.message ?? e}`);
+  }
   if (noteChanges(db, { key, items }).changes.length) changed(d);
 }
 
@@ -96,26 +142,90 @@ export const memory: Feature = {
     const own = ownMemoryOff(s.agent);
     if (!memoryOn(d.db) || s.extra.memory === false) return own;
     // Custom reads its memory with its first turn, and again once its conversation is condensed (context below).
-    if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return own;
+    if (isCustom(s)) return own;
     // A session that began before memory came in two parts goes on with the block it began with.
     const before = s.resume && s.key ? keptBlock(d.db, s.key, 'full', 0) : null;
     if (before != null) return { ...own, instructions: [before] };
+    // What it is given is kept by its key, or by its run until a new Codex thread has one.
+    const holder = s.key ?? runRef(s.runId);
+    // A session that goes on still has in its conversation what it was given, unless that was condensed since.
+    if (s.resume && s.key)
+      try {
+        seeCompactions(d.db, s.key, (await d.sessions.timeline(s.key)).parser.items);
+      } catch {}
+    const refs = s.resume ? givenRefs(d.db, holder) : new Set<string>();
     // In the instructions, what is the same for every session of the place (and again for this one when it goes on
     // within the hour), so the provider's cache of them holds from one session to the next; what bears on the request,
-    // and this session's own notes when it goes on, come with the first message, once.
+    // this session's own notes when it goes on, and the wiki's articles that stand out for it come with the first
+    // message, once.
     const query = s.prompt?.trim() || (s.resume ? await lastAsk(d, s.key) : undefined);
-    const parts = await memoryParts(d.db, { cwd: s.cwd, key: s.key, session: s.resume, query });
+    const space = wikiDeliverySpace(d.db, { key: s.key, cwd: s.cwd, extra: s.extra });
+    const wiki =
+      space && query && words(query).length >= 2
+        ? await wikiLines(d.db, { space, query, limit: ADD_BUDGET.full.wiki, exclude: new Set([...refs].filter((r) => r.startsWith('w:'))), vector: await requestVector(d.db, query) })
+        : [];
+    // A session that goes on within the hour keeps the instructions it had: what they give stays out of the message too.
+    const kept = s.key ? keptBlock(d.db, s.key, 'stable', 0) : null;
+    const parts = await memoryParts(d.db, { cwd: s.cwd, key: s.key, session: s.resume, query, exclude: [...idsOf(refs), ...(kept ? blockIds(kept) : [])], wiki });
     const stable = await blockFor(d, s.key, 'stable', 0, async () => parts.stable);
-    return { ...own, instructions: [stable], ...(parts.request ? { notes: [parts.request] } : {}) };
+    if (!s.key) recordGiven(d.db, holder, parts.stableIds.map(noteRef));
+    // The message it starts with had its notes now: the message's own search is not made again for it (aboutMessage).
+    recordGiven(d.db, holder, [...parts.requestIds.map(noteRef), ...parts.wikiRefs, ...(s.prompt?.trim() ? [askRef(s.prompt)] : [])]);
+    markGiven(d.db, [...(stable.made ? parts.stableIds : []), ...parts.requestIds]);
+    // Claude Code hears of the notes about the files it touches as it touches them (claude.ts adds the hook).
+    const hook: Record<string, string> = s.agent === 'claude' && s.extra.confidential !== true ? { HYDOR_MEMORY_HOOKS: '1' } : {};
+    return { ...own, env: { ...own.env, ...hook }, instructions: [stable.text], ...(parts.request ? { notes: [parts.request] } : {}) };
   },
   async context(s, d) {
     // A confidential session reads memory and keeps nothing in it (server/confidential).
     const reads = s.extra.confidential === true;
     if (!memoryOn(d.db) || (s.extra.memory === false && !reads)) return null;
+    // A block that fits the model: a model switched to one of another size gets one of its own (its flavor says).
+    const cls = memClass({ window: s.window, lean: s.lean });
+    const flavor = `${reads ? 'read' : 'full'}${cls === 'full' ? '' : `:${cls}`}`;
+    const epoch = s.epoch ?? 0;
+    // Condensed: what came with its messages is gone from the conversation.
+    noteEpoch(d.db, s.key, epoch);
     // The same block until the conversation is condensed (`epoch`), so the instructions stay as the provider cached them.
-    return blockFor(d, s.key, reads ? 'read' : 'full', s.epoch ?? 0, async () =>
-      memoryInstructions(d.db, { cwd: s.cwd, key: s.key, session: true, query: await lastAsk(d, s.key), readOnly: reads }),
+    // Made for the message that starts the turn (Custom sends it), else the latest one the user wrote.
+    const block = await blockFor(d, s.key, flavor, epoch, async () =>
+      (await memoryBlock(d.db, { cwd: s.cwd, key: s.key, session: true, query: s.query?.trim() || (await lastAsk(d, s.key)), readOnly: reads, cls, window: s.window })).text,
     );
+    return block.text;
+  },
+  async turnNotes(s, d) {
+    const reads = s.extra.confidential === true;
+    if (!memoryOn(d.db) || (s.extra.memory === false && !reads)) return null;
+    const cls = memClass({ window: s.window, lean: s.lean });
+    if (cls === 'tiny') return null;
+    // The wiki's articles for the request once a conversation (again once it was condensed), then one now and then.
+    const start = !givenRefs(d.db, s.key).has('s:wiki');
+    const space = reads ? null : wikiDeliverySpace(d.db, { key: s.key, cwd: s.cwd, extra: s.extra });
+    const text = await messageAdditions(d.db, { key: s.key, cwd: s.cwd, query: s.query, cls, wiki: space ? { space } : null, wikiStart: start, mark: !reads });
+    if (space && start && words(s.query).length >= 3) recordGiven(d.db, s.key, ['s:wiki']);
+    return text;
+  },
+  async aboutMessage(text, key, d) {
+    // Claude Code, Codex and ACP agents: what newly bears on the message (Custom hears it with its turn: turnNotes).
+    if (!sessionMemoryOn(d.db, key) || text.trimStart().startsWith('/') || words(text).length < 3) return null;
+    const extra = sessionExtra(d.db, key);
+    const s = d.sessions.summary(key);
+    if (extra.confidential === true || !s || isCustom(s)) return null;
+    attachRun(d, key);
+    // The message the session started with: what bears on it came with the start.
+    const started = givenRefs(d.db, key).has(askRef(text));
+    if (started) dropGiven(d.db, key, [askRef(text)]);
+    const space = wikiDeliverySpace(d.db, { key, cwd: s.cwd, extra });
+    return messageAdditions(d.db, { key, cwd: s.cwd, query: text, cls: 'full', wiki: space ? { space } : null, touched: takeTouched(key), search: !started });
+  },
+  event(e, d) {
+    // A session removed: what it was given goes with it.
+    if (e.t === 'sessions' && e.remove?.length)
+      for (const key of e.remove)
+        if (!d.sessions.summary(key)) {
+          clearGiven(d.db, key);
+          takeTouched(key);
+        }
   },
   turnEnd(t, d) {
     // Only sessions this app runs, and turns that ended with a reply. With memory off they are still
@@ -125,6 +235,7 @@ export const memory: Feature = {
   },
   start(d) {
     watchNotes(d.db);
+    startAnchors(d.db);
     startTranscriptVectors(d.db);
     void kick(d.db).catch((e) => console.warn(`[memory] search by meaning: ${(e as Error).message}`));
     // A scheduled task due within the minute (not a watcher's look): search by meaning's model starts now, so the notes

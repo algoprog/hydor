@@ -14,6 +14,7 @@ import { splitHandoff } from '../handoff.ts';
 import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER, runOf } from '../mcp.ts';
 import { wikiHookToken } from '../wiki/session/hook-auth.ts';
+import { memoryHookToken } from '../memory/hook-auth.ts';
 import { JsonFields } from '../pages/drafts.ts';
 
 type Json = Record<string, any>;
@@ -114,7 +115,7 @@ const TOOL_TIMEOUT_MS = 600_000;
 
 /** Do not register a second compaction hook when existing settings or plugins may already capture it. */
 export function claudeWikiHooksMayOverlap(o: ClaudeOpts, env: Record<string, string>): boolean {
-  if (o.add?.args?.some((arg) => /^(?:--plugin-dir|--plugin-url|--settings)(?:=|$)/.test(arg))) return true;
+  if (o.add?.args?.some((arg) => /^(?:--plugin-dir|--plugin-url)(?:=|$)/.test(arg)) || settingsOf(o.add?.args ?? []).bad) return true;
   const base = env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
   const files = [path.join(base, 'settings.json'), path.join(o.cwd, '.claude', 'settings.json'), path.join(o.cwd, '.claude', 'settings.local.json')];
   for (const file of files) {
@@ -128,6 +129,62 @@ export function claudeWikiHooksMayOverlap(o: ClaudeOpts, env: Record<string, str
   }
   return false;
 }
+
+/**
+ * Another capability's own --settings among its arguments (a project's skill switches), taken out so it can be merged
+ * with the app's hooks into one: Claude Code keeps a single --settings. `bad`: one that does not read as JSON, which is
+ * then passed on as it was and no hooks are added beside it.
+ */
+export function settingsOf(args: string[]): { settings: Record<string, unknown>; rest: string[]; bad: boolean } {
+  const rest: string[] = [];
+  let settings: Record<string, unknown> = {};
+  let bad = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const inline = a.startsWith('--settings=') ? a.slice('--settings='.length) : null;
+    const value = a === '--settings' ? args[i + 1] : inline;
+    if (value == null) {
+      rest.push(a);
+      continue;
+    }
+    if (a === '--settings') i++;
+    try {
+      const v = JSON.parse(value);
+      if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object');
+      settings = { ...settings, ...v };
+    } catch {
+      bad = true;
+      rest.push('--settings', value);
+    }
+  }
+  return { settings, rest, bad };
+}
+
+/** Whether the user's settings turn hooks off (disableAllHooks), or allow only managed ones (allowManagedHooksOnly). */
+export function claudeHooksOff(o: ClaudeOpts, env: Record<string, string>): boolean {
+  // Another capability's --settings is merged with the app's hooks (settingsOf), unless it does not read as JSON.
+  if (settingsOf(o.add?.args ?? []).bad) return true;
+  const base = env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  for (const file of [path.join(base, 'settings.json'), path.join(o.cwd, '.claude', 'settings.json'), path.join(o.cwd, '.claude', 'settings.local.json')]) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const settings = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (settings.disableAllHooks || settings.allowManagedHooksOnly) return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Memory's hook after Claude Code reads or changes a file: it sends the file's path (never its content) to the app,
+ * which answers with the notes about that file and its area not given yet, and prints the answer for Claude Code to
+ * add to what the tool returned. Its bearer is inherited at runtime, never written in settings. Gives up after 5 s.
+ */
+const MEMORY_HOOK_SCRIPT = `let b='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>{if(b.length<1048576)b+=x});process.stdin.on('end',async()=>{try{const v=JSON.parse(b);const i=v.tool_input||{};const f=typeof i.file_path==='string'?i.file_path:typeof i.notebook_path==='string'?i.notebook_path:'';if(!f)return;const r=await fetch(process.argv[1],{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+process.env.HYDOR_MEMORY_HOOK_TOKEN},body:JSON.stringify({session_id:v.session_id,tool_name:v.tool_name,file_path:f}),signal:AbortSignal.timeout(5000)});if(r.ok)process.stdout.write(await r.text())}catch{}});`;
+/** The tools whose files memory hears of. */
+const MEMORY_HOOK_TOOLS = 'Read|Edit|MultiEdit|Write|NotebookEdit';
 
 // A synchronous command hook sends only bounded fields; its bearer is inherited at runtime, never written in settings.
 const WIKI_HOOK_SCRIPT = `let b='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>{if(b.length<1048576)b+=x});process.stdin.on('end',async()=>{try{const v=JSON.parse(b);if(v.trigger!=='auto'||!['PreCompact','PostCompact'].includes(v.hook_event_name))return;const body={session_id:v.session_id,hook_event_name:v.hook_event_name,trigger:v.trigger,...(typeof v.compact_summary==='string'?{compact_summary:v.compact_summary.slice(0,12000)}:{})};await fetch(process.argv[1],{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+process.env.HYDOR_WIKI_HOOK_TOKEN},body:JSON.stringify(body),signal:AbortSignal.timeout(18000)})}catch{}});`;
@@ -151,16 +208,31 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   if (o.model) args.push('--model', o.model);
   if (o.effort) args.push('--effort', o.effort);
   if (o.mode) args.push('--permission-mode', o.mode);
+  // The app's hooks, in one --settings: each kind keeps its own conditions.
+  const hooks: Record<string, unknown[]> = {};
+  const runId = o.pageServer ? runOf(new URL(o.pageServer).pathname.split('/').pop() ?? '') : null;
   // Auto-only avoids duplicating Hydor's existing manual compaction checkpoint.
-  if (env.HYDOR_WIKI_AUTO_HOOKS === '1' && o.pageServer && !claudeWikiHooksMayOverlap(o, env)) {
-    const token = new URL(o.pageServer).pathname.split('/').pop() ?? '';
-    const runId = runOf(token);
-    if (runId) {
-      env = { ...env, HYDOR_WIKI_HOOK_TOKEN: wikiHookToken(runId) };
-      const hook = { type: 'command', command: process.execPath, args: ['-e', WIKI_HOOK_SCRIPT, `http://127.0.0.1:${config.port}/agent/claude/wiki-event`], timeout: 20 };
-      args.push('--settings', JSON.stringify({ hooks: { PreCompact: [{ matcher: 'auto', hooks: [hook] }], PostCompact: [{ matcher: 'auto', hooks: [hook] }] } }));
-    }
+  if (env.HYDOR_WIKI_AUTO_HOOKS === '1' && runId && !claudeWikiHooksMayOverlap(o, env)) {
+    env = { ...env, HYDOR_WIKI_HOOK_TOKEN: wikiHookToken(runId) };
+    const hook = { type: 'command', command: process.execPath, args: ['-e', WIKI_HOOK_SCRIPT, `http://127.0.0.1:${config.port}/agent/claude/wiki-event`], timeout: 20 };
+    hooks.PreCompact = [{ matcher: 'auto', hooks: [hook] }];
+    hooks.PostCompact = [{ matcher: 'auto', hooks: [hook] }];
   }
+  // Memory's notes about the files Claude Code reads and changes, as it does (memory on for the session: index.ts).
+  if (env.HYDOR_MEMORY_HOOKS === '1' && runId && !claudeHooksOff(o, env)) {
+    env = { ...env, HYDOR_MEMORY_HOOK_TOKEN: memoryHookToken(runId) };
+    const hook = { type: 'command', command: process.execPath, args: ['-e', MEMORY_HOOK_SCRIPT, `http://127.0.0.1:${config.port}/agent/claude/memory-touch`], timeout: 6 };
+    hooks.PostToolUse = [{ matcher: MEMORY_HOOK_TOOLS, hooks: [hook] }];
+  }
+  const extra = settingsOf(o.add?.args ?? []);
+  const settings: Record<string, unknown> = { ...extra.settings };
+  if (Object.keys(hooks).length) {
+    const theirs = (settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {}) as Record<string, unknown[]>;
+    const merged: Record<string, unknown[]> = { ...theirs };
+    for (const [event, list] of Object.entries(hooks)) merged[event] = [...(Array.isArray(theirs[event]) ? theirs[event] : []), ...list];
+    settings.hooks = merged;
+  }
+  if (Object.keys(settings).length) args.push('--settings', JSON.stringify(settings));
   // The app's own server (and the capabilities' servers) join the user's MCP servers. The app's tools
   // need no approval here: those that need the user's say ask in the conversation themselves.
   // Their tools may take minutes (a video model at work, a form waiting for the user): over HTTP, Claude Code
@@ -185,7 +257,7 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
       args.push('--append-system-prompt-file', file);
     } else args.push('--append-system-prompt', text);
   }
-  if (o.add?.args?.length) args.push(...o.add.args);
+  if (extra.rest.length) args.push(...extra.rest);
   // An assistant's limits: tools switched off, and none of the user's own MCP servers.
   if (o.add?.disallowedTools?.length) args.push('--disallowedTools', o.add.disallowedTools.join(','));
   if (o.add?.strictMcp) args.push('--strict-mcp-config');

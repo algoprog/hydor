@@ -239,7 +239,7 @@
 - [**默认在聊天中启用 Wiki 记忆**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
 - [**默认在聊天中自动建议经验总结**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
 - [**从新文档中学习**](/settings?s=memory&find=Learn%20from%20new%20documents)：新添加和修改的文档会添加记忆笔记，并用辅助模型更新 wiki。
-- [**最多读入 wiki 的文档数**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki)：文档多于此数的项目不会把它们读入 wiki：智能体改为搜索它们。
+- [**最多读入 wiki 的文档数**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki)：文档多于此数时，项目的 wiki 会读取其中置顶的、最常用的和最新的：智能体会搜索全部文档。
 - [**Wiki 文件夹**](/settings?s=memory&find=Wiki%20folder)：共享 wiki 保存的位置，以及下面没有另行设置时项目 wiki 保存的位置。
 - [**项目 Wiki**](/settings?s=memory&find=Project%20wikis)：每个项目的 wiki 保存在哪里：保存在 wiki 文件夹中，或保存在每个项目的文件夹中。
 - [**每个项目内的文件夹**](/settings?s=memory&find=Folder%20inside%20each%20project)：每个项目在自己的文件夹里的什么位置保存 wiki。

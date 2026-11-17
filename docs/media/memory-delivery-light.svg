@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'>
+<title id="t">How each agent gets memory</title>
+<desc id="d">A grid of the four kinds of agent (Claude Code, Codex, ACP agents, Custom) against four moments: the start, each message, opening a file, and condensing or resuming.</desc>
+<defs><marker id="a-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#19202e"/></marker><marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#556075"/></marker><marker id="a-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#2563eb"/></marker><marker id="a-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#13805a"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#a86a0b"/></marker><marker id="a-violet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#6d44e0"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c4402f"/></marker><marker id="a-line" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c9d1df"/></marker></defs>
+<rect width="960" height="560" fill="#ffffff"/>
+<text x="40" y="40" font-size="20" font-weight="700" fill="#19202e" text-anchor="start">How each agent gets memory</text>
+<text x="156" y="80" font-size="13" font-weight="700" fill="#556075" text-anchor="start">At the start</text>
+<text x="344" y="80" font-size="13" font-weight="700" fill="#556075" text-anchor="start">With each message</text>
+<text x="532" y="80" font-size="13" font-weight="700" fill="#556075" text-anchor="start">When a file is opened</text>
+<text x="720" y="80" font-size="13" font-weight="700" fill="#556075" text-anchor="start">Condensed or resumed</text>
+<rect x="30" y="96" width="112" height="104" rx="10" fill="#e8ecf4" stroke="#2563eb" stroke-width="2"/>
+<text x="44" y="153" font-size="13.5" font-weight="700" fill="#2563eb" text-anchor="start">Claude Code</text>
+<rect x="152" y="96" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="164" y="116" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Instructions: the</text>
+<text x="164" y="132" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">explanation, profiles, small</text>
+<text x="164" y="148" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">places and the index. The</text>
+<text x="164" y="164" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">first message: notes that</text>
+<text x="164" y="180" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">stand out.</text>
+<rect x="340" y="96" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="352" y="116" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">In the message, under</text>
+<text x="352" y="132" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">“newly relevant”. Usually</text>
+<text x="352" y="148" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">nothing.</text>
+<rect x="528" y="96" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="540" y="116" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">A hook adds notes about it</text>
+<text x="540" y="132" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">right after Read, Edit or</text>
+<text x="540" y="148" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Write, unless your settings</text>
+<text x="540" y="164" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">turn hooks off.</text>
+<rect x="716" y="96" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="728" y="116" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">On resume: not what it was</text>
+<text x="728" y="132" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">given before, and the</text>
+<text x="728" y="148" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">checkpoint if its context</text>
+<text x="728" y="164" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">was condensed.</text>
+<rect x="30" y="210" width="112" height="88" rx="10" fill="#e8ecf4" stroke="#6d44e0" stroke-width="2"/>
+<text x="44" y="259" font-size="13.5" font-weight="700" fill="#6d44e0" text-anchor="start">Codex</text>
+<rect x="152" y="210" width="180" height="88" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="164" y="230" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">The same as Claude Code.</text>
+<rect x="340" y="210" width="180" height="88" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="352" y="230" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">The same as Claude Code.</text>
+<rect x="528" y="210" width="180" height="88" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="540" y="230" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">No hook: files it touched</text>
+<text x="540" y="246" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">wait, and their notes come</text>
+<text x="540" y="262" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">with the next message.</text>
+<rect x="716" y="210" width="180" height="88" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="728" y="230" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">On resume: not what it was</text>
+<text x="728" y="246" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">given before, and the</text>
+<text x="728" y="262" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">checkpoint if its context</text>
+<text x="728" y="278" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">was condensed.</text>
+<rect x="30" y="308" width="112" height="72" rx="10" fill="#e8ecf4" stroke="#13805a" stroke-width="2"/>
+<text x="44" y="349" font-size="13.5" font-weight="700" fill="#13805a" text-anchor="start">ACP agents</text>
+<rect x="152" y="308" width="180" height="72" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="164" y="328" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">All of it with the first</text>
+<text x="164" y="344" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">message.</text>
+<rect x="340" y="308" width="180" height="72" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="352" y="328" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">The same as Claude Code.</text>
+<rect x="528" y="308" width="180" height="72" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="540" y="328" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Files it touched wait, and</text>
+<text x="540" y="344" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">their notes come with the</text>
+<text x="540" y="360" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">next message.</text>
+<rect x="716" y="308" width="180" height="72" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="728" y="328" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">On resume: not what it was</text>
+<text x="728" y="344" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">given before.</text>
+<rect x="30" y="390" width="112" height="104" rx="10" fill="#e8ecf4" stroke="#a86a0b" stroke-width="2"/>
+<text x="44" y="447" font-size="13.5" font-weight="700" fill="#a86a0b" text-anchor="start">Custom</text>
+<rect x="152" y="390" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="164" y="410" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">A memory block before the</text>
+<text x="164" y="426" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">first turn, kept until the</text>
+<text x="164" y="442" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">conversation is condensed,</text>
+<text x="164" y="458" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">sized to the model’s</text>
+<text x="164" y="474" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">window.</text>
+<rect x="340" y="390" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="352" y="410" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Notes for the message join</text>
+<text x="352" y="426" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">the context of the message</text>
+<text x="352" y="442" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">that starts a turn.</text>
+<rect x="528" y="390" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="540" y="410" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">After a read, edit or write,</text>
+<text x="540" y="426" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">a line of notes joins the</text>
+<text x="540" y="442" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">tool’s output.</text>
+<rect x="716" y="390" width="180" height="104" rx="10" fill="#f3f5f9" stroke="#c9d1df" stroke-width="1.5"/>
+<text x="728" y="410" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">A new block is made, with</text>
+<text x="728" y="426" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">the checkpoint cut to fit the</text>
+<text x="728" y="442" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">window.</text>
+<text x="30" y="518" font-size="12" font-weight="400" fill="#556075" text-anchor="start">A confidential session reads memory but saves nothing; with memory off for a session, nothing is given.</text>
+</svg>

@@ -225,6 +225,8 @@ export interface AppContext {
   guides?: { tools: string[]; text: string }[];
   text?: string;
   now?: string;
+  /** What goes with the message that starts the turn (memory newly relevant to it), not in the instructions. */
+  turn?: string;
 }
 
 export interface PromptOptions {

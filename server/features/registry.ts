@@ -120,19 +120,24 @@ export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
   return out;
 }
 
-/** What the capabilities give Custom for a turn: each one's instructions (by its id), and its tools' guides, which Custom adds while one of their tools is offered. */
+/**
+ * What the capabilities give Custom for a turn: each one's instructions (by its id), its tools' guides, which Custom
+ * adds while one of their tools is offered, and what goes with the turn's message (`turn`, when it sent one).
+ */
 export interface CustomContext {
   parts: { id: string; text: string }[];
   guides: ToolGuide[];
+  turn: { id: string; text: string }[];
 }
 
 /**
  * Custom's instructions from the capabilities, for its next turn: each one's `context`, or for one
  * without it, the instructions and guides its `spawn` gives every agent. `epoch` counts the times Custom
- * condensed the conversation (memory gives the same block within one); `lean`, a model of a small context.
+ * condensed the conversation (memory gives the same block within one); `lean`, a model of a small context, and
+ * `window` its size in tokens. With `query`, the message that starts the turn, what each `turnNotes` has for it too.
  */
-export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string; epoch?: number; lean?: boolean }): Promise<CustomContext> {
-  const out: CustomContext = { parts: [], guides: [] };
+export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string; epoch?: number; lean?: boolean; window?: number; query?: string }): Promise<CustomContext> {
+  const out: CustomContext = { parts: [], guides: [], turn: [] };
   if (!deps) return out;
   for (const f of list) {
     try {
@@ -149,6 +154,17 @@ export async function featureContext(s: { key: string; cwd: string; extra: Sessi
       warn(f, 'context', e);
     }
   }
+  // After every instruction is made: what goes with the message leaves out what they give (memory's block).
+  if (s.query?.trim())
+    for (const f of list) {
+      if (!f.turnNotes) continue;
+      try {
+        const t = await f.turnNotes({ key: s.key, cwd: s.cwd, extra: s.extra, window: s.window, lean: s.lean, query: s.query }, deps);
+        if (t?.trim()) out.turn.push({ id: f.id, text: t.trim() });
+      } catch (e) {
+        warn(f, 'turnNotes', e);
+      }
+    }
   return out;
 }
 

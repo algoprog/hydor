@@ -390,7 +390,7 @@ test('documents wait for their base to be quiet, and at most so many are read an
   stop();
 });
 
-test('a project with more documents than its limit: they are not read, quietly; its own number wins; raising it reads them', async () => {
+test('a project with more documents than its limit: it reads the newest of them, quietly; its own number wins; raising it reads them all', async () => {
   const dir = path.join(tmp, 'beta-docs');
   const folder = path.join(tmp, 'beta');
   fs.mkdirSync(dir);
@@ -405,22 +405,28 @@ test('a project with more documents than its limit: they are not read, quietly; 
   write = () => ({ articles: [{ path: 'wiki/beta-notes.md', content: '# Beta notes\n\nSomething longer than twenty characters.\n' }] });
   assert.equal(wikiSettings(db).documentLimit, 100, 'the default');
   setWikiSettings(db, { documentLimit: 2 });
-  for (const n of [1, 2, 3]) fs.writeFileSync(path.join(dir, `beta-${n}.md`), `# Beta ${n}\n\nA document about beta number ${n}, with enough words to be read.\n`);
+  for (const n of [1, 2, 3]) {
+    fs.writeFileSync(path.join(dir, `beta-${n}.md`), `# Beta ${n}\n\nA document about beta number ${n}, with enough words to be read.\n`);
+    fs.utimesSync(path.join(dir, `beta-${n}.md`), new Date(2020 + n, 0, 1), new Date(2020 + n, 0, 1));
+  }
   const n0 = asked.length;
   await scan(bbase.id, (k) => k >= 3);
   await d.settled();
-  assert.equal(asked.length, n0, 'over the limit: the helper is not asked');
-  assert.deepEqual(await betaUpdates(), [], 'and no update row for each document');
+  assert.ok(asked.length > n0, 'over the limit: it reads the documents it picks');
+  assert.deepEqual((await betaUpdates()).map((u) => path.basename(u.path)).sort(), ['beta-2.md', 'beta-3.md'], 'the 2 newest of the 3, and no update row for the other');
   assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 2, over: true });
   assert.deepEqual(await documentsOf(`/api/projects/${beta.id}/wiki/updates`), { count: 3, limit: 2, over: true }, 'the route says so');
   assert.equal((await documentsOf('/api/wiki/updates')).limit, 2, 'the shared wiki uses the global number');
-  // The backfill skips it as well, and does not mark it.
+  // The backfill queues the ones it picks, newest first, and does not mark the place.
   const queued: string[] = [];
   const queue = { enqueue: (e: IndexedDoc) => void queued.push(e.path) };
   const mine = (e: string[]) => e.filter((p) => p.startsWith(dir));
   backfillDocuments(db, queue);
-  assert.deepEqual(mine(queued), []);
+  assert.deepEqual(mine(queued).map((p) => path.basename(p)), ['beta-3.md', 'beta-2.md']);
   assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1');
+  queued.length = 0;
+  backfillDocuments(db, queue);
+  assert.deepEqual(mine(queued), [], 'each picked document is queued once');
   // Its own number wins over the global one.
   assert.equal(updateSpace(db, beta.id, { wikiDocumentLimit: 5 }).wikiDocumentLimit, 5);
   assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 5, over: false });
@@ -446,18 +452,17 @@ test('a project with more documents than its limit: they are not read, quietly; 
   const own = ensureWikiKnowledge(db, { root: wikiRoot(db, beta.id)!, space: beta.id });
   db.prepare("insert into kb_docs (base, source, path, title, format, size, mtime, passages, status, indexed_at) values (?, 's', '/w/a.md', 'a.md', 'md', 1, 0, 1, 'indexed', 1)").run(own.base);
   assert.equal(documentsOverLimit(db, beta.id).count, 3);
-  // Over again: a new document is skipped, quietly, and the mark is dropped so raising the limit reads what was missed.
+  // Over again: a new document is among the newest, so it is read; the mark is dropped so raising the limit reads what was missed.
   updateSpace(db, beta.id, { wikiDocumentLimit: 3 });
   fs.writeFileSync(path.join(dir, 'beta-4.md'), '# Beta 4\n\nA fourth document about beta, with enough words to be read.\n');
-  const n1 = asked.length;
   const rows = (await betaUpdates()).length;
   await scan(bbase.id, (k) => k >= 4);
   await d.settled();
-  assert.equal(asked.length, n1);
-  assert.equal((await betaUpdates()).length, rows);
+  assert.equal((await betaUpdates()).length, rows + 1, 'the new document is read');
   queued.length = 0;
   backfillDocuments(db, queue);
   assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1', 'over again: no longer marked');
+  queued.length = 0;
   updateSpace(db, beta.id, { wikiDocumentLimit: null });
   assert.equal('wikiDocumentLimit' in spaceById(db, beta.id)!, false, 'null: as in Settings again');
   assert.equal(documentsOverLimit(db, beta.id).limit, 2);

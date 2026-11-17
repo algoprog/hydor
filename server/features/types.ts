@@ -157,9 +157,15 @@ export interface Feature {
   /**
    * Instructions for Custom, read before each of its turns. `epoch` counts the times its conversation was
    * condensed: what may change from turn to turn (memory) keeps the same text within one, so the instructions
-   * stay as the provider cached them.
+   * stay as the provider cached them. `query`: the message that starts the turn, when Custom sent it.
    */
-  context?(s: { key: string; cwd: string; extra: SessionExtra; epoch?: number; lean?: boolean }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
+  context?(s: { key: string; cwd: string; extra: SessionExtra; epoch?: number; lean?: boolean; window?: number; query?: string }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
+  /**
+   * What Custom should hear with the user's message that starts a turn (`query`), inside that message rather than in
+   * its instructions, so those stay as the provider cached them: memory newly relevant to it. Asked once per turn,
+   * after every capability's `context`. `window`: its model's context in tokens; `lean`, a small one.
+   */
+  turnNotes?(s: { key: string; cwd: string; extra: SessionExtra; window?: number; lean?: boolean; query: string }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** A turn ended (every session counts, also ones run outside the app). */
   turnEnd?(t: TurnInfo, d: Deps): void | Promise<void>;
   /** Told of every event sent to the pages: a session changed, a capability's list changed… */

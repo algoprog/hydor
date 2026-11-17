@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 644" width="960" height="644" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'>
+<title id="t">A note’s life</title>
+<desc id="d">A note is saved, anchored to the files it names, given to agents and used. When its files change it is flagged and re-checked, then kept, fixed or deleted. Over time it can be merged into a topic, moved to its project, replaced by a pointer to the wiki, or expire.</desc>
+<defs><marker id="a-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#19202e"/></marker><marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#556075"/></marker><marker id="a-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#2563eb"/></marker><marker id="a-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#13805a"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#a86a0b"/></marker><marker id="a-violet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#6d44e0"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c4402f"/></marker><marker id="a-line" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c9d1df"/></marker></defs>
+<rect width="960" height="644" fill="#ffffff"/>
+<text x="40" y="40" font-size="20" font-weight="700" fill="#19202e" text-anchor="start">A note’s life</text>
+<rect x="40" y="66" width="200" height="124" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="54" y="92" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">Saved</text>
+<text x="54" y="114.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">An agent, you or the helper</text>
+<text x="54" y="131.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">writes it, with how it is</text>
+<text x="54" y="148.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">known: you said so, checked,</text>
+<text x="54" y="165.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">or not checked yet.</text>
+<rect x="267" y="66" width="200" height="124" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="281" y="92" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">Anchored</text>
+<text x="281" y="114.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">The files it names are found</text>
+<text x="281" y="131.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">in the project, and the</text>
+<text x="281" y="148.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">commit is noted.</text>
+<rect x="494" y="66" width="200" height="124" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="508" y="92" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">Given</text>
+<text x="508" y="114.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">At the start, with a message</text>
+<text x="508" y="131.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">it bears on, or when the</text>
+<text x="508" y="148.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">agent opens a file it is</text>
+<text x="508" y="165.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">anchored to.</text>
+<rect x="720" y="66" width="200" height="124" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="734" y="92" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">Used</text>
+<text x="734" y="114.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">The agent looks it up, cites it</text>
+<text x="734" y="131.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">by number, or works on its</text>
+<text x="734" y="148.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">file or names its code.</text>
+<path d="M242 128 L265 128" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-accent)"/>
+<path d="M469 128 L492 128" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-accent)"/>
+<path d="M696 128 L718 128" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-accent)"/>
+<text x="148" y="234" font-size="11" font-weight="700" fill="#556075" text-anchor="start">WHEN THE CODE MOVES ON</text>
+<rect x="40" y="246" width="180" height="112" rx="12" fill="#f3f5f9" stroke="#a86a0b" stroke-width="2"/>
+<text x="54" y="272" font-size="15" font-weight="700" fill="#a86a0b" text-anchor="start">Its files change</text>
+<text x="54" y="294.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">A new commit touches a</text>
+<text x="54" y="311.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">file or folder the note is</text>
+<text x="54" y="328.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">anchored to.</text>
+<rect x="247" y="246" width="180" height="112" rx="12" fill="#f3f5f9" stroke="#a86a0b" stroke-width="2"/>
+<text x="261" y="272" font-size="15" font-weight="700" fill="#a86a0b" text-anchor="start">Flagged</text>
+<text x="261" y="294.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Checked every ten</text>
+<text x="261" y="311.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">minutes: which files,</text>
+<text x="261" y="328.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">since which commit.</text>
+<rect x="454" y="246" width="180" height="112" rx="12" fill="#f3f5f9" stroke="#a86a0b" stroke-width="2"/>
+<text x="468" y="272" font-size="15" font-weight="700" fill="#a86a0b" text-anchor="start">Re-checked</text>
+<text x="468" y="294.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">In the tidy-up the helper</text>
+<text x="468" y="311.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">reads the note with the</text>
+<text x="468" y="328.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">change to its files.</text>
+<path d="M366 192 L366 214 L130 214 L130 244" fill="none" stroke="#a86a0b" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-amber)"/>
+<path d="M222 302 L245 302" fill="none" stroke="#a86a0b" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-amber)"/>
+<path d="M429 302 L452 302" fill="none" stroke="#a86a0b" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-amber)"/>
+<rect x="676" y="214" width="244" height="58" rx="10" fill="#f3f5f9" stroke="#13805a" stroke-width="1.8"/>
+<text x="690" y="235" font-size="13.5" font-weight="700" fill="#13805a" text-anchor="start">Keep</text>
+<text x="690" y="251" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Still true: marked as checked against</text>
+<text x="690" y="266" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">the code</text>
+<rect x="676" y="278" width="244" height="58" rx="10" fill="#f3f5f9" stroke="#2563eb" stroke-width="1.8"/>
+<text x="690" y="299" font-size="13.5" font-weight="700" fill="#2563eb" text-anchor="start">Fix</text>
+<text x="690" y="315" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">Text brought up to date, anchors taken</text>
+<text x="690" y="330" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">again</text>
+<rect x="676" y="342" width="244" height="58" rx="10" fill="#f3f5f9" stroke="#c4402f" stroke-width="1.8"/>
+<text x="690" y="363" font-size="13.5" font-weight="700" fill="#c4402f" text-anchor="start">Delete</text>
+<text x="690" y="379" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">No longer true: removed, and can be</text>
+<text x="690" y="394" font-size="12" font-weight="400" fill="#19202e" text-anchor="start">restored</text>
+<path d="M636 302 L674 302" fill="none" stroke="#a86a0b" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-amber)"/>
+<text x="40" y="432" font-size="11" font-weight="700" fill="#556075" text-anchor="start">OVER TIME, BY THE TIDY-UP AND THE CLOCK</text>
+<rect x="40" y="446" width="205" height="132" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="54" y="472" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">Merged</text>
+<text x="54" y="494.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Near-copies join into one</text>
+<text x="54" y="511.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">note. Many related notes are</text>
+<text x="54" y="528.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">summed up by a topic; the</text>
+<text x="54" y="545.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">notes stay for look-ups.</text>
+<rect x="265" y="446" width="205" height="132" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="279" y="472" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">Moved</text>
+<text x="279" y="494.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">A note saved as about you that</text>
+<text x="279" y="511.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">is about one project goes to</text>
+<text x="279" y="528.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">that project’s memory.</text>
+<rect x="490" y="446" width="205" height="132" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="504" y="472" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">Into the wiki</text>
+<text x="504" y="494.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Long design history becomes</text>
+<text x="504" y="511.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">wiki articles. The note keeps</text>
+<text x="504" y="528.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">a one-line pointer to them.</text>
+<rect x="715" y="446" width="205" height="132" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="729" y="472" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">Expired</text>
+<text x="729" y="494.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">An end date passes: agents</text>
+<text x="729" y="511.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">stop getting it, and it waits 30</text>
+<text x="729" y="528.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">days in Deleted notes.</text>
+<text x="40" y="616" font-size="12.5" font-weight="400" fill="#556075" text-anchor="start">Every change by the helper is in the note’s history, and each one of the last tidy-up can be undone.</text>
+</svg>

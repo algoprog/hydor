@@ -425,19 +425,55 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
 
 /**
  * What the app's capabilities add to the instructions for this turn (memory, the assistant…), and the local time.
- * Memory's part stays the same until the conversation is condensed (`epoch`), so the instructions do too.
+ * Memory's part stays the same until the conversation is condensed (`epoch`), so the instructions do too; `window`
+ * (the model's context, in tokens) and `lean` size it to the model. With `query`, the message that starts the turn,
+ * `turn` is what goes with that message (memory newly relevant to it).
  */
-async function appContext(epoch = 0, lean = false): Promise<AppContext> {
+async function appContext(epoch = 0, lean = false, o: { window?: number; query?: string } = {}): Promise<AppContext> {
   if (!RUNTIME) return {};
   try {
-    const r = await fetch(`${RUNTIME}/context?epoch=${epoch}${lean ? '&lean=1' : ''}`, { signal: AbortSignal.timeout(5000) });
+    const q = o.query?.trim() ? `&q=${encodeURIComponent(o.query.trim().slice(0, 800))}` : '';
+    const r = await fetch(`${RUNTIME}/context?epoch=${epoch}${lean ? '&lean=1' : ''}${o.window ? `&window=${o.window}` : ''}${q}`, { signal: AbortSignal.timeout(8000) });
     const d: any = r.ok ? await r.json() : {};
     const parts = Array.isArray(d.parts) ? d.parts.map((x: any) => ({ id: String(x?.id ?? ''), text: String(x?.text ?? '') })) : undefined;
     const guides = Array.isArray(d.guides) ? d.guides.map((g: any) => ({ tools: Array.isArray(g?.tools) ? g.tools.map(String) : [], text: String(g?.text ?? '') })) : undefined;
-    return { parts, guides, text: parts ? undefined : String(d.text ?? ''), now: d.now ? String(d.now) : undefined };
+    return { parts, guides, text: parts ? undefined : String(d.text ?? ''), now: d.now ? String(d.now) : undefined, turn: typeof d.turn === 'string' && d.turn.trim() ? d.turn.trim() : undefined };
   } catch {
     return {};
   }
+}
+
+/** The words of a message, for what bears on it: its text, not the files it carries nor the app's notes ahead of it. */
+const askedIn = (blocks: any[]) =>
+  blocks
+    .map((b) => (b?.type === 'text' ? String(b.text ?? '') : ''))
+    .join(' ')
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ' ')
+    .trim();
+
+/** Below this context (tokens), memory adds nothing to tools' output (server/memory/deliver.ts TINY_WINDOW). */
+const TINY_WINDOW = 12_000;
+/** The tools after which memory may have notes about the file read or changed. */
+const TOUCHES = new Set(['read_file', 'write_file', 'edit_file', 'multi_edit', 'apply_patch']);
+
+/** Memory's notes about the files a tool read or changed, not given yet, to add to its output ('' for most). */
+async function memoryTouch(s: Session, p: Prepared, w: number, lean: boolean): Promise<string> {
+  if (!RUNTIME || PUBLIC_RUN || !p.tool || !p.args || !TOUCHES.has(p.tool.name) || w < TINY_WINDOW) return '';
+  let files: string[];
+  try {
+    files = p.tool.name === 'apply_patch' ? parsePatch(String(p.args.patch ?? '')).ops.map((o) => o.path) : [p.tool.path?.(p.args)].filter((f): f is string => !!f);
+  } catch {
+    return '';
+  }
+  const out: string[] = [];
+  for (const f of [...new Set(files)].slice(0, 3)) {
+    try {
+      const r = await fetch(`${RUNTIME}/memory-touch?path=${encodeURIComponent(path.resolve(s.cwd, f))}&window=${w}${lean ? '&lean=1' : ''}`, { signal: AbortSignal.timeout(2000) });
+      const d: any = r.ok ? await r.json() : {};
+      if (typeof d.text === 'string' && d.text.trim()) out.push(d.text.trim());
+    } catch {}
+  }
+  return out.length ? `\n${out.join('\n\n')}` : '';
 }
 
 /** The kinds of tools the session's assistant allows (server/assistants), or null for every tool. */
@@ -452,8 +488,11 @@ async function assistantTools(): Promise<string[] | null> {
   }
 }
 
-/** The user's message: text, files they attached, images (described for a model that does not see), and when it is. */
-async function promptContent(s: Session, m: AgentModel, blocks: any[], now: string | undefined, signal: AbortSignal): Promise<string | Part[]> {
+/**
+ * The user's message: text, files they attached, images (described for a model that does not see), and when it is;
+ * `turn`, what the app has for the message that starts the turn (memory newly relevant to it).
+ */
+async function promptContent(s: Session, m: AgentModel, blocks: any[], now: string | undefined, signal: AbortSignal, turn?: string): Promise<string | Part[]> {
   const text = blocks
     .map((b) => (b.type === 'text' ? b.text : b.type === 'resource' && b.resource?.text != null ? `\n<file path="${b.resource.uri}">\n${b.resource.text}\n</file>` : b.type === 'resource_link' ? `(${b.uri})` : ''))
     .join('');
@@ -462,7 +501,8 @@ async function promptContent(s: Session, m: AgentModel, blocks: any[], now: stri
   if (now) notes.push(`Local time: ${now}.`);
   const bg = runningOf(s.id);
   if (bg.length) notes.push(`Still running in the background: ${bg.map((p) => `${p.id} (${p.command.slice(0, 60)})`).join(', ')}.`);
-  const context = notes.length ? `\n\n<context>${notes.join(' ')}</context>` : '';
+  const said = [notes.join(' '), turn ?? ''].filter(Boolean);
+  const context = said.length ? `\n\n<context>${said.join('\n')}</context>` : '';
   const images: Img[] = blocks.filter((b) => b.type === 'image' && b.data).map((b) => ({ data: b.data, mimeType: b.mimeType ?? 'image/png' }));
   if (!images.length) return text + context;
   if (m.vision) return [{ type: 'text', text: text + context }, ...keptImages(s, images)];
@@ -482,14 +522,14 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   const skills: Skill[] = PUBLIC_RUN ? [] : findSkills(s.cwd);
   s.skillDirs = skills.map((k) => path.dirname(k.file));
   // A public run hears nothing from the app's capabilities (memory, connections…), only the time.
-  const app: AppContext = PUBLIC_RUN ? { now: (await appContext()).now } : await appContext(s.epoch ?? 0, isSmall(s, m));
+  const app: AppContext = PUBLIC_RUN ? { now: (await appContext()).now } : await appContext(s.epoch ?? 0, isSmall(s, m), { window: window(s, m), query: askedIn(blocks) });
   s.condensed = undefined;
   // Reasoning from earlier turns is not sent again: it only weighed on the saved conversation.
   for (const x of s.messages) {
     delete x.reasoning;
     delete x.reasoning_details;
   }
-  s.messages.push({ role: 'user', content: await promptContent(s, m, blocks, app.now, ac.signal) });
+  s.messages.push({ role: 'user', content: await promptContent(s, m, blocks, app.now, ac.signal, app.turn) });
   save(s);
   const receive = async () => {
     let received = false;
@@ -675,7 +715,10 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
       if (prepared[i].tool?.readOnly) while (j < prepared.length && prepared[j].tool?.readOnly) j++;
       await Promise.all(
         prepared.slice(i, j).map(async (p, k) => {
-          results[i + k] = { id: p.c.id, name: p.tool?.name ?? p.c.name, ...(await execute(s, p, guard, { ...ctxBase, catalog })) };
+          const r = await execute(s, p, guard, { ...ctxBase, catalog });
+          // Memory's notes about the file it read or changed, not given yet, with what the tool returned.
+          if (r.ok) r.output += await memoryTouch(s, p, w, small);
+          results[i + k] = { id: p.c.id, name: p.tool?.name ?? p.c.name, ...r };
         }),
       );
       i = j;

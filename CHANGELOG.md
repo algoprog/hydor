@@ -3,6 +3,45 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.75.0 · 17 November 2026
+
+Memory that keeps up with big projects: agents get what bears on each message and on each file they open, notes and
+wiki articles follow the code as it changes, the wiki revises itself, and models with a small context get memory sized
+to them.
+
+- **Memory with each message and each file**: besides what they start with, agents get the notes that newly bear on
+  each later message, and the notes about a file and its folder when they open or change it, each only once a session,
+  and usually nothing at all. They also start with the project's wiki articles that bear on the request, and its active
+  plans.
+- **Better picks**: agents start with the notes that help more often (measured on this app's own sessions), never a
+  note together with the topic that sums it up, and a rare name you write (a file, a function, a version) finds the
+  notes that hold it. A project's profile puts first the rules agents need in most sessions.
+- **Notes that follow the code**: a project's notes and wiki articles are tied to the files they name. When those files
+  change, they are marked as maybe out of date (agents see it, and you see it under **In the code** in the note), and
+  the tidy-up checks them against the change: still true, brought up to date, or removed.
+- **A tidier memory**: the tidy-up moves notes about one project out of **About you**, moves long design history into
+  the project's wiki (leaving a pointer), drops notes the project's AGENTS.md already says, and suggests lasting
+  conventions for it: **Add** or **Dismiss** them under **Suggested for AGENTS.md** in **What the last tidy-up changed**.
+- **Needed means used**: **Needed by agents** now counts the times agents used a note (looked it up, cited it, worked on
+  its files), and a new line, **Given to agents**, the times they got it without asking.
+- **A wiki that revises itself**: an article can now replace what a newer source contradicts, with a reason for each
+  statement it removes, and its earlier text is kept (the 20 latest of each article). Long articles are split into
+  parts, the index gives each article's summary, and articles whose files changed are brought up to date each day
+  (**Code changes** in Recent updates).
+- **Big document sets**: a project with more documents than its wiki reads now has the pinned, the most used and the
+  newest read, up to its limit, and an overview article for the rest. **Read into wiki memory**, in a document's menu
+  on the project's Memory tab, pins one.
+- **Learning from busy projects**: the wiki picks the conversations that hold the most (commits made, corrections,
+  fixes), reads a session once it has gone quiet, and reads the day's commit messages (**Commits** in Recent updates).
+- **Small models**: with a model of a small context, Custom gets memory sized to it: under 12,000 tokens a small block
+  and nothing added with messages or files; up to 33,000 a little more; your profile's start only (a session that saw
+  only its start cannot rewrite it); and a session's checkpoint cut to fit.
+- **How memory works**: two new pages in the documentation, with figures, describe memory for everyone and its
+  internals for developers.
+- Hydor subagents that reach their account's usage limit carry on with another account, and tell their lead so.
+- Quadrant charts write every name in full, beside its point or in a numbered key when names would overlap; subagent
+  cards name the tier and the agent once.
+
 ## 0.74.0 · 17 November 2026
 
 Plans and lesson suggestions in Wiki memory, Wiki memory switches for each chat, the whole guide in German, and all of a

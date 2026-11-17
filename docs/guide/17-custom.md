@@ -190,6 +190,14 @@ A feature's instructions about its own tools come with those tools. While a tool
 
 So a first message to a model with a small context is shorter than it used to be, and what each part takes is in the breakdown under **Options**: see [Long conversations and long output](#long-conversations-and-long-output).
 
+**Memory is sized to the model's context.** A model with a small context could not do its work if memory took a fixed amount, so memory's share shrinks with the window (the **Memory** row of the breakdown shows what it takes):
+
+- **Under 12,000 tokens**: a small block, at most 6% of the context, with the first 120 words of your profile (it says they are only the start), at most three notes, and no index. Memory adds nothing with your messages or when the model reads or changes a file, and gives no wiki article lines or plans. The model is told it can look notes up with the memory tool.
+- **Up to about 33,000 tokens** (not through OpenRouter): a block of at most 6% of the context, the first 400 words of your profile, at most five notes, a short index, one wiki article line and one plan line, and at most one note with a message (600 characters) and one when a file is read or changed (350).
+- **Larger models**: everything [memory gives an agent](/guide/memory#what-an-agent-starts-with), which is a small share of their context.
+
+As a guide, memory's block comes to about 1,700 characters for a model of 8,000 tokens, 3,800 for 32,000 and 7,300 for 200,000. A session that was given only the start of your profile can't rewrite it: the model tells you what to add, or you edit it in [Settings → Memory](/settings?s=memory&find=Your%20profile). The wiki's instructions are shortened too: Custom always gets one short paragraph about wiki memory, and how to keep sources, check the wiki, learn lessons and adopt plans comes only while the tools for them are offered. After Custom condenses its conversation, the session's checkpoint (see [Checkpoints and lessons learned](/guide/wiki-memory#checkpoints-and-lessons-learned)) is cut to 8% of the context, at most 16,000 characters, with where to read the rest.
+
 ## How Custom copes with weaker models
 
 Not every model is as practised with tools as Claude or GPT. Custom catches the common slips and puts the model back on track:

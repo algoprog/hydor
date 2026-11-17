@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 538" width="960" height="538" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'>
+<title id="t">What an agent is given, and when</title>
+<desc id="d">A session’s memory timeline in five moments: the start, each message, opening a file, after the conversation is condensed, and when a session resumes, with what is given at each.</desc>
+<defs><marker id="a-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#e9edf4"/></marker><marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#9ba7ba"/></marker><marker id="a-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#5b9dff"/></marker><marker id="a-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#4fc995"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#e8a93d"/></marker><marker id="a-violet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#a78bfa"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#f0786a"/></marker><marker id="a-line" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#313b4c"/></marker></defs>
+<rect width="960" height="538" fill="#0f1319"/>
+<text x="40" y="40" font-size="20" font-weight="700" fill="#e9edf4" text-anchor="start">What an agent is given, and when</text>
+<rect x="20" y="94" width="920" height="4" rx="2" fill="#313b4c" stroke="none" stroke-width="1.5"/>
+<circle cx="106" cy="96" r="11" fill="#5b9dff"/>
+<text x="106" y="100.5" font-size="12" font-weight="700" fill="#0f1319" text-anchor="middle">1</text>
+<rect x="20" y="130" width="172" height="276" rx="12" fill="#171c25" stroke="#313b4c" stroke-width="1.5"/>
+<text x="34" y="156" font-size="14" font-weight="700" fill="#5b9dff" text-anchor="start">At the start</text>
+<text x="34" y="178" font-size="10.5" font-weight="700" fill="#9ba7ba" text-anchor="start">GIVEN</text>
+<circle cx="38" cy="195" r="3" fill="#5b9dff"/>
+<text x="48" y="199.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Your profile</text>
+<circle cx="38" cy="220" r="3" fill="#5b9dff"/>
+<text x="48" y="224.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">The project’s profile</text>
+<circle cx="38" cy="245" r="3" fill="#5b9dff"/>
+<text x="48" y="249.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">An index of what is</text>
+<text x="48" y="266.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">kept</text>
+<circle cx="38" cy="287" r="3" fill="#5b9dff"/>
+<text x="48" y="291.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Notes that stand out</text>
+<text x="48" y="308.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">for your first</text>
+<text x="48" y="325.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">message</text>
+<circle cx="38" cy="346" r="3" fill="#5b9dff"/>
+<text x="48" y="350.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">A few wiki article</text>
+<text x="48" y="367.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">lines</text>
+<circle cx="38" cy="388" r="3" fill="#5b9dff"/>
+<text x="48" y="392.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Active plans</text>
+<circle cx="293" cy="96" r="11" fill="#4fc995"/>
+<text x="293" y="100.5" font-size="12" font-weight="700" fill="#0f1319" text-anchor="middle">2</text>
+<rect x="207" y="130" width="172" height="276" rx="12" fill="#171c25" stroke="#313b4c" stroke-width="1.5"/>
+<text x="221" y="156" font-size="14" font-weight="700" fill="#4fc995" text-anchor="start">With each message</text>
+<text x="221" y="178" font-size="10.5" font-weight="700" fill="#9ba7ba" text-anchor="start">GIVEN</text>
+<circle cx="225" cy="195" r="3" fill="#4fc995"/>
+<text x="235" y="199.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Only what newly</text>
+<text x="235" y="216.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">bears on it</text>
+<circle cx="225" cy="237" r="3" fill="#4fc995"/>
+<text x="235" y="241.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Not what it was given</text>
+<text x="235" y="258.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">before</text>
+<circle cx="225" cy="279" r="3" fill="#4fc995"/>
+<text x="235" y="283.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Usually nothing</text>
+<circle cx="480" cy="96" r="11" fill="#4fc995"/>
+<text x="480" y="100.5" font-size="12" font-weight="700" fill="#0f1319" text-anchor="middle">3</text>
+<rect x="394" y="130" width="172" height="276" rx="12" fill="#171c25" stroke="#313b4c" stroke-width="1.5"/>
+<text x="408" y="156" font-size="14" font-weight="700" fill="#4fc995" text-anchor="start">When it opens a file</text>
+<text x="408" y="178" font-size="10.5" font-weight="700" fill="#9ba7ba" text-anchor="start">GIVEN</text>
+<circle cx="412" cy="195" r="3" fill="#4fc995"/>
+<text x="422" y="199.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Notes about that file,</text>
+<text x="422" y="216.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">its folder and the</text>
+<text x="422" y="233.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">folder above</text>
+<circle cx="412" cy="254" r="3" fill="#4fc995"/>
+<text x="422" y="258.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Each folder once in a</text>
+<text x="422" y="275.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">session</text>
+<circle cx="412" cy="296" r="3" fill="#4fc995"/>
+<text x="422" y="300.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Usually nothing</text>
+<circle cx="667" cy="96" r="11" fill="#e8a93d"/>
+<text x="667" y="100.5" font-size="12" font-weight="700" fill="#0f1319" text-anchor="middle">4</text>
+<rect x="581" y="130" width="172" height="276" rx="12" fill="#171c25" stroke="#313b4c" stroke-width="1.5"/>
+<text x="595" y="156" font-size="14" font-weight="700" fill="#e8a93d" text-anchor="start">After the</text>
+<text x="595" y="176" font-size="14" font-weight="700" fill="#e8a93d" text-anchor="start">conversation is</text>
+<text x="595" y="196" font-size="14" font-weight="700" fill="#e8a93d" text-anchor="start">condensed</text>
+<text x="595" y="218" font-size="10.5" font-weight="700" fill="#9ba7ba" text-anchor="start">GIVEN</text>
+<circle cx="599" cy="235" r="3" fill="#e8a93d"/>
+<text x="609" y="239.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Memory read again</text>
+<text x="609" y="256.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">for your latest</text>
+<text x="609" y="273.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">message</text>
+<circle cx="599" cy="294" r="3" fill="#e8a93d"/>
+<text x="609" y="298.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">A checkpoint of the</text>
+<text x="609" y="315.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">session so far, cut to</text>
+<text x="609" y="332.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">fit</text>
+<circle cx="854" cy="96" r="11" fill="#e8a93d"/>
+<text x="854" y="100.5" font-size="12" font-weight="700" fill="#0f1319" text-anchor="middle">5</text>
+<rect x="768" y="130" width="172" height="276" rx="12" fill="#171c25" stroke="#313b4c" stroke-width="1.5"/>
+<text x="782" y="156" font-size="14" font-weight="700" fill="#e8a93d" text-anchor="start">When a session</text>
+<text x="782" y="176" font-size="14" font-weight="700" fill="#e8a93d" text-anchor="start">resumes</text>
+<text x="782" y="198" font-size="10.5" font-weight="700" fill="#9ba7ba" text-anchor="start">GIVEN</text>
+<circle cx="786" cy="215" r="3" fill="#e8a93d"/>
+<text x="796" y="219.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">Not what it was given</text>
+<text x="796" y="236.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">before</text>
+<circle cx="786" cy="257" r="3" fill="#e8a93d"/>
+<text x="796" y="261.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">If its context was</text>
+<text x="796" y="278.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">condensed since: the</text>
+<text x="796" y="295.5" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">checkpoint, once</text>
+<rect x="20" y="420" width="172" height="98" rx="10" fill="#1e2531" stroke="none" stroke-width="1.5"/>
+<text x="34" y="438" font-size="10" font-weight="700" fill="#9ba7ba" text-anchor="start">ARRIVES</text>
+<text x="34" y="453" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">Instructions, and the</text>
+<text x="34" y="468" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">first message</text>
+<rect x="207" y="420" width="172" height="98" rx="10" fill="#1e2531" stroke="none" stroke-width="1.5"/>
+<text x="221" y="438" font-size="10" font-weight="700" fill="#9ba7ba" text-anchor="start">ARRIVES</text>
+<text x="221" y="453" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">With the message</text>
+<rect x="394" y="420" width="172" height="98" rx="10" fill="#1e2531" stroke="none" stroke-width="1.5"/>
+<text x="408" y="438" font-size="10" font-weight="700" fill="#9ba7ba" text-anchor="start">ARRIVES</text>
+<text x="408" y="453" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">Claude Code and Custom:</text>
+<text x="408" y="468" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">right after the read or</text>
+<text x="408" y="483" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">edit. Codex and ACP: with</text>
+<text x="408" y="498" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">the next message</text>
+<rect x="581" y="420" width="172" height="98" rx="10" fill="#1e2531" stroke="none" stroke-width="1.5"/>
+<text x="595" y="438" font-size="10" font-weight="700" fill="#9ba7ba" text-anchor="start">ARRIVES</text>
+<text x="595" y="453" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">Custom: a new block,</text>
+<text x="595" y="468" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">with its checkpoint</text>
+<rect x="768" y="420" width="172" height="98" rx="10" fill="#1e2531" stroke="none" stroke-width="1.5"/>
+<text x="782" y="438" font-size="10" font-weight="700" fill="#9ba7ba" text-anchor="start">ARRIVES</text>
+<text x="782" y="453" font-size="12" font-weight="400" fill="#e9edf4" text-anchor="start">With the first message</text>
+</svg>

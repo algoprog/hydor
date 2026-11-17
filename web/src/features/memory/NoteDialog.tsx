@@ -1,6 +1,7 @@
 // One note, whole: its text (to edit), who wrote it and when, how it is known, how often agents needed it, its end
 // date, what it sums up (a topic or profile) and its history; to delete, restore or keep it.
 import { useEffect, useState, type ReactNode } from 'react';
+import { tr } from '../../i18n/runtime';
 import { ArchiveRestore, Check, Pencil } from 'lucide-react';
 import type { MemoryListEntry } from '@shared/memory';
 import { isUserProfile } from '@shared/memory';
@@ -162,11 +163,26 @@ export function NoteDialog({ entry, stale, onClose, onChanged }: { entry: Memory
               </span>
             </Fact>
           )}
+          {e.drift && !deleted && (
+            <Fact name="In the code">
+              {tr(`${e.drift.paths.join(', ')} changed in the project since this was written (seen ${ago(e.drift.at)}). The next tidy-up checks it against the code.`)}
+            </Fact>
+          )}
           <Fact name="Needed by agents">
             {e.uses > 0 ? (
               <>
                 <span>{e.uses === 1 ? 'Once' : `${e.uses} times`}</span>
                 {e.usedAt ? <span>, last {ago(e.usedAt)}</span> : null}
+              </>
+            ) : (
+              'Not yet'
+            )}
+          </Fact>
+          <Fact name="Given to agents">
+            {e.given > 0 ? (
+              <>
+                <span>{e.given === 1 ? 'Once' : `${e.given} times`}</span>
+                {e.givenAt ? <span>, last {ago(e.givenAt)}</span> : null}
               </>
             ) : (
               'Not yet'

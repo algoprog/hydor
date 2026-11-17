@@ -22,6 +22,10 @@ const FEW = 3;
 /** One recent update: the document (or the session it was learned from), when, what it did to the wiki and the notes (or why it did nothing). */
 function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => void }) {
   const session = u.path.startsWith('session:') ? u.path.slice('session:'.length) : null;
+  const commits = u.path.startsWith('commits:');
+  /** The articles brought up to date after the project's code changed (their anchored files), and a folder's overview. */
+  const code = u.path.startsWith('code:');
+  const overview = u.path.startsWith('overview:');
   const first = u.articles.slice(0, FEW);
   const more = u.articles.length - first.length;
   return (
@@ -33,6 +37,20 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
             <button type="button" translate="no" onClick={() => openSession(session)} className="text-accent hover:underline">
               {u.document}
             </button>
+          </span>
+        ) : commits ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-fg-3">Commits</span>:{' '}
+            <span translate="no">{u.document.replace(/^Commits /, '')}</span>
+          </span>
+        ) : code ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-fg-3">Code changes</span>
+          </span>
+        ) : overview ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-fg-3">Overview</span>:{' '}
+            <span translate="no">{u.document.replace(/^Overview: /, '')}</span>
           </span>
         ) : (
           <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px]" title={u.path}>
@@ -90,12 +108,14 @@ export function useWikiUpdates(id: string, active: boolean, version: number): { 
   return state;
 }
 
-/** Said when the project has more documents than its wiki reads: they stay for agents to search. */
+/** Said when the project has more documents than its wiki reads: it reads the pinned, the most used and the newest; agents search all of them. */
 export function DocumentsNote({ documents }: { documents?: WikiDocuments }) {
   if (!documents?.over) return null;
   return (
     <p className="text-[12.5px] leading-snug text-fg-3">
-      {tr(documents.count === 1 ? `This project has 1 document, more than the ${documents.limit} its wiki reads: agents search them instead of reading them into the wiki.` : `This project has ${documents.count} documents, more than the ${documents.limit} its wiki reads: agents search them instead of reading them into the wiki.`)}
+      {documents.limit > 0
+        ? tr(`Its wiki reads ${documents.limit} of its ${documents.count} documents: the pinned, the most used and the newest. Agents search all of them.`)
+        : tr(documents.count === 1 ? 'This project has 1 document, more than the 0 its wiki reads: agents search it instead of reading it into the wiki.' : `This project has ${documents.count} documents, more than the 0 its wiki reads: agents search them instead of reading them into the wiki.`)}
     </p>
   );
 }

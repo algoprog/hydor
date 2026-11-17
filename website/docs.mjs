@@ -24,8 +24,11 @@ const ASK_SECTION = 'ask-an-agent';
  * lines the README's ("## Documentation"). */
 const MORE = [
   { title: 'Install and run', slugs: ['install', 'configuration', 'remote-access', 'machines'] },
-  { title: 'Under the hood', slugs: ['features', 'how-it-works', 'privacy', 'search-providers', 'development', 'release-notes'] },
+  { title: 'Under the hood', slugs: ['features', 'how-it-works', 'how-memory-works', 'memory-internals', 'privacy', 'search-providers', 'development', 'release-notes'] },
 ];
+/** A document whose page address differs from its file's name: the guide's own topic is called "memory", so the document
+ * docs/memory.md is the page /docs/how-memory-works. */
+const FILE_OF = { 'how-memory-works': 'memory' };
 const MORE_ICONS = {
   install: 'Download',
   configuration: 'SlidersHorizontal',
@@ -33,11 +36,16 @@ const MORE_ICONS = {
   machines: 'Server',
   features: 'ListChecks',
   'how-it-works': 'Workflow',
+  'how-memory-works': 'Brain',
+  'memory-internals': 'Database',
   privacy: 'ShieldCheck',
   'search-providers': 'Search',
   development: 'Code',
   'release-notes': 'Newspaper',
 };
+
+/** A section's text without its figures and comments (HTML in the Markdown), which the search has no use for. */
+const stripFigures = (md) => md.replace(/<figure>[\s\S]*?<\/figure>/g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -75,10 +83,10 @@ function pages(root, { guide, topics }) {
   const lines = Object.fromEntries([...readme.matchAll(/^- \[[^\]]+\]\(docs\/([a-z0-9-]+)\.md\): (.+)$/gm)].map((m) => [m[1], m[2]]));
   const morePages = MORE.flatMap((g) =>
     g.slugs.map((slug) => {
-      const file = slug === 'release-notes' ? 'CHANGELOG.md' : `docs/${slug}.md`;
+      const file = slug === 'release-notes' ? 'CHANGELOG.md' : `docs/${FILE_OF[slug] ?? slug}.md`;
       const md = fs.readFileSync(path.join(root, file), 'utf8');
       const t = guide.parseTopic(`${slug}.md`, md);
-      const blurb = lines[slug] ?? (slug === 'release-notes' ? 'What changed in each version' : t.summary.replace(/[*`]/g, '').split(/(?<=[.:])\s/)[0]);
+      const blurb = lines[FILE_OF[slug] ?? slug] ?? (slug === 'release-notes' ? 'What changed in each version' : t.summary.replace(/[*`]/g, '').split(/(?<=[.:])\s/)[0]);
       return { slug, file, topic: { ...t, id: slug }, group: g.title, blurb: blurb.charAt(0).toUpperCase() + blurb.slice(1), icon: null, iconName: MORE_ICONS[slug] };
     }),
   );
@@ -135,6 +143,16 @@ function renderDoc(md, { file, anchors, hrefOfFile, image }) {
       }
       return h('p', rest, children);
     },
+    // A <picture> with a dark and a light source (GitHub picks by the reader's theme): the site is dark, so its dark one.
+    picture: ({ node }) => {
+      const sources = node.children.filter((c) => c.tagName === 'source');
+      const dark = sources.find((c) => /dark/.test(String(c.properties.media ?? ''))) ?? sources[0];
+      const img = node.children.find((c) => c.tagName === 'img');
+      const url = image(dark?.properties.srcSet ?? img?.properties.src, file);
+      return url ? h('img', { src: url, alt: img?.properties.alt ?? '', loading: 'lazy', decoding: 'async' }) : null;
+    },
+    // A <figure> written in HTML, with its caption: the same figure as a picture on its own line.
+    figure: ({ node, children }) => h('figure', { className: 'doc-figure' }, children),
     img: ({ node, src, alt }) => {
       const url = image(src, file);
       return url ? h('img', { src: url, alt: alt ?? '', loading: 'lazy' }) : null;
@@ -390,7 +408,7 @@ ${html}
   // release notes), for Help's own search.
   const index = all
     .filter((p) => !guide.AGENT_TOPICS.includes(p.slug) && p.slug !== 'release-notes')
-    .map((p) => ({ id: p.slug, title: p.topic.title, sections: p.topic.sections.filter((s) => s.id !== ASK_SECTION).map((s) => ({ id: s.id, title: s.title, text: guide.plainText(s.text) })) }));
+    .map((p) => ({ id: p.slug, title: p.topic.title, sections: p.topic.sections.filter((s) => s.id !== ASK_SECTION).map((s) => ({ id: s.id, title: s.title, text: guide.plainText(stripFigures(s.text)) })) }));
   fs.writeFileSync(path.join(docsOut, 'search.json'), JSON.stringify(index));
   await esbuild({
     entryPoints: [path.join(root, 'website/search.ts')],

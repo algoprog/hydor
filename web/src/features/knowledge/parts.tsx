@@ -3,7 +3,7 @@
 // where they are and kept up to date, its documents, what could not be read, moving it to a space), and a
 // search the way agents do.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, FileText, FolderInput, FolderPlus, Library, MemoryStick, MoreHorizontal, RefreshCw, RotateCw, Search, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
+import { BookOpen, FileText, FolderInput, FolderPlus, Library, MemoryStick, MoreHorizontal, Pin, PinOff, RefreshCw, RotateCw, Search, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
 import type { KnowledgeBase, KnowledgeDoc, KnowledgeHit, KnowledgeState } from '@shared/knowledge';
 import { citation } from '@shared/knowledge';
 import { FolderFinder } from '../../components/FolderPicker';
@@ -16,6 +16,7 @@ import { toast, toastError } from '../../lib/store';
 import { entriesFromDrop, pickedFromInput, startUpload, walkEntries, type PickedFile } from '../../lib/upload';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
+import { useWikiSettings } from '../wiki/spaceMemory';
 
 /** The bases and whether search by meaning is on, kept up to date. */
 export function useKnowledge(): [KnowledgeState | null, () => void] {
@@ -114,8 +115,48 @@ function Counts({ b, meaning }: { b: KnowledgeBase; meaning: boolean }) {
   );
 }
 
+/** One document: its name, size, a pin mark when wiki memory always reads it, and a menu to pin it (or let it go) and, for a file dropped on the page, to remove it. */
+function DocRow({ b, d, own, load, wiki }: { b: KnowledgeBase; d: KnowledgeDoc; own: boolean; load: () => void; wiki: boolean }) {
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const [menu, setMenu] = useState(false);
+  const pin = (on: boolean) => {
+    setMenu(false);
+    void put(`/api/knowledge/documents/${d.id}/wiki-pin`, { pin: on }).then(load, toastError);
+  };
+  return (
+    <div className="group flex items-center gap-2 px-2.5 py-1.5 text-[12.5px]">
+      <FileText size={13} className={cx('shrink-0', d.status === 'error' ? 'text-err' : 'text-fg-3')} />
+      <button type="button" onClick={() => openFile(d.path)} className="min-w-0 flex-1 truncate text-left hover:underline" title={d.path}>
+        {own ? d.path.slice(b.filesDir.length + 1) : tildify(d.path)}
+      </button>
+      {d.wikiPin && <Pin size={12} className="shrink-0 text-accent" aria-label="Read into wiki memory" />}
+      <span className={cx('shrink-0', d.status === 'indexed' ? 'text-fg-3' : 'text-err')} title={d.error}>
+        {d.status === 'indexed' ? `${d.passages} · ${bytes(d.size)}` : d.status === 'empty' ? 'no text' : 'could not read'}
+      </span>
+      {wiki && d.status === 'indexed' && (
+        <>
+          <IconButton ref={menuRef} label="More" size="sm" className="opacity-0 group-hover:opacity-100 max-sm:opacity-100" onClick={() => setMenu((o) => !o)}>
+            <MoreHorizontal size={13} />
+          </IconButton>
+          <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={250}>
+            <MenuItem icon={d.wikiPin ? <PinOff size={14} /> : <Pin size={14} />} onClick={() => pin(!d.wikiPin)}>
+              {d.wikiPin ? 'Don’t read into wiki memory' : 'Read into wiki memory'}
+            </MenuItem>
+          </Popover>
+        </>
+      )}
+      {own && (
+        <IconButton label="Remove" size="sm" className="opacity-0 group-hover:opacity-100 max-sm:opacity-100" onClick={() => void del(`/api/knowledge/${enc(b.id)}/docs/${d.id}`).then(load, toastError)}>
+          <X size={13} />
+        </IconButton>
+      )}
+    </div>
+  );
+}
+
 function Docs({ b }: { b: KnowledgeBase }) {
   const [docs, setDocs] = useState<KnowledgeDoc[] | null>(null);
+  const wiki = useWikiSettings()?.enabled !== false;
   const load = useCallback(() => void api<{ docs: KnowledgeDoc[] }>(`/api/knowledge/${enc(b.id)}/docs`).then((r) => setDocs(r.docs), toastError), [b.id]);
   useEffect(load, [load, b.docs, b.passages, b.indexing?.done]);
   if (!docs) return <Throbber size={18} />;
@@ -124,20 +165,7 @@ function Docs({ b }: { b: KnowledgeBase }) {
   return (
     <div className="max-h-[320px] divide-y divide-line overflow-y-auto rounded-lg border border-line">
       {docs.map((d) => (
-        <div key={d.id} className="group flex items-center gap-2 px-2.5 py-1.5 text-[12.5px]">
-          <FileText size={13} className={cx('shrink-0', d.status === 'error' ? 'text-err' : 'text-fg-3')} />
-          <button type="button" onClick={() => openFile(d.path)} className="min-w-0 flex-1 truncate text-left hover:underline" title={d.path}>
-            {own(d) ? d.path.slice(b.filesDir.length + 1) : tildify(d.path)}
-          </button>
-          <span className={cx('shrink-0', d.status === 'indexed' ? 'text-fg-3' : 'text-err')} title={d.error}>
-            {d.status === 'indexed' ? `${d.passages} · ${bytes(d.size)}` : d.status === 'empty' ? 'no text' : 'could not read'}
-          </span>
-          {own(d) && (
-            <IconButton label="Remove" size="sm" className="opacity-0 group-hover:opacity-100 max-sm:opacity-100" onClick={() => void del(`/api/knowledge/${enc(b.id)}/docs/${d.id}`).then(load, toastError)}>
-              <X size={13} />
-            </IconButton>
-          )}
-        </div>
+        <DocRow key={d.id} b={b} d={d} own={own(d)} load={load} wiki={wiki} />
       ))}
     </div>
   );

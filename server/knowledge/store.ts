@@ -28,6 +28,7 @@ export function knowledgeSchema(db: DB) {
     create table if not exists kb_chunks (id integer primary key, doc integer not null, seq integer not null, part text, text text not null);
     create index if not exists kb_chunks_doc on kb_chunks (doc, seq);
     create table if not exists kb_vectors (chunk integer primary key, model text not null, code blob not null);
+    create table if not exists kb_doc_marks (base text not null, path text not null, pinned_at integer not null default 0, uses integer not null default 0, used_at integer, primary key (base, path)) without rowid;
   `);
   // 0.7.0's bases were all shared: the space a base belongs to came after.
   if (!(db.prepare('pragma table_info(kb_bases)').all() as { name: string }[]).some((c) => c.name === 'space')) db.exec('alter table kb_bases add column space text');
@@ -152,6 +153,7 @@ export function deleteBase(db: DB, id: string) {
   db.transaction(() => {
     for (const { id: doc } of db.prepare('select id from kb_docs where base = ?').all(id) as { id: number }[]) dropDoc(db, doc);
     db.prepare('delete from kb_sources where base = ?').run(id);
+    db.prepare('delete from kb_doc_marks where base = ?').run(id);
     db.prepare('delete from kb_bases where id = ?').run(id);
   })();
   fs.rmSync(path.dirname(filesDir(id)), { recursive: true, force: true });

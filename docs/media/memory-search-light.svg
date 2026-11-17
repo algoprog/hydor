@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 592" width="960" height="592" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'>
+<title id="t">How notes are found and picked</title>
+<desc id="d">A request is searched by words and by meaning. The two ranked lists are fused by rank. A note passes by standing out from the rest, or by an exact identifier. A topic or its notes are picked, within the budget, into the given set.</desc>
+<defs><marker id="a-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#19202e"/></marker><marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#556075"/></marker><marker id="a-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#2563eb"/></marker><marker id="a-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#13805a"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#a86a0b"/></marker><marker id="a-violet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#6d44e0"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c4402f"/></marker><marker id="a-line" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#c9d1df"/></marker></defs>
+<rect width="960" height="592" fill="#ffffff"/>
+<text x="40" y="40" font-size="20" font-weight="700" fill="#19202e" text-anchor="start">How notes are found and picked</text>
+<rect x="30" y="150" width="150" height="170" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="44" y="176" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">The request</text>
+<text x="44" y="198.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Your message, or</text>
+<text x="44" y="215.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">the words an agent</text>
+<text x="44" y="232.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">looks up.</text>
+<rect x="225" y="76" width="225" height="150" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="239" y="102" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">By words</text>
+<text x="239" y="124.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">A full-text index of the notes. Any</text>
+<text x="239" y="141.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">word counts, rare words count</text>
+<text x="239" y="158.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">most (BM25).</text>
+<rect x="225" y="240" width="225" height="150" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="239" y="266" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">By meaning</text>
+<text x="239" y="288.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">mDenseOn vectors in 4 bits,</text>
+<text x="239" y="305.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">compared on your CPU. Notes</text>
+<text x="239" y="322.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">below cosine 0.15 are not</text>
+<text x="239" y="339.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">offered.</text>
+<rect x="490" y="76" width="210" height="314" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="504" y="102" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">Fuse by rank</text>
+<text x="504" y="124.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Each list adds weight ÷ (60 +</text>
+<text x="504" y="141.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">rank): words 0.1, meaning 1,</text>
+<text x="504" y="158.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">exact names 1. Notes changed</text>
+<text x="504" y="175.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">or looked up lately and often</text>
+<text x="504" y="192.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">get up to half again.</text>
+<rect x="740" y="76" width="190" height="150" rx="12" fill="#f3f5f9" stroke="#13805a" stroke-width="2"/>
+<text x="754" y="102" font-size="15" font-weight="700" fill="#13805a" text-anchor="start">Stands out</text>
+<text x="754" y="124.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Its similarity is 2.3 or</text>
+<text x="754" y="141.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">more standard deviations</text>
+<text x="754" y="158.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">above this request’s</text>
+<text x="754" y="175.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">average over all notes at</text>
+<text x="754" y="192.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">the start, 3.0 for a later</text>
+<text x="754" y="209.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">message.</text>
+<rect x="740" y="240" width="190" height="150" rx="12" fill="#f3f5f9" stroke="#13805a" stroke-width="2"/>
+<text x="754" y="266" font-size="15" font-weight="700" fill="#13805a" text-anchor="start">Exact identifier</text>
+<text x="754" y="288.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">A path, file name,</text>
+<text x="754" y="305.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">camelCase word, version</text>
+<text x="754" y="322.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">or flag that only a few notes</text>
+<text x="754" y="339.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">contain makes them pass.</text>
+<text x="754" y="356.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Plain hyphenated words do</text>
+<text x="754" y="373.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">not count.</text>
+<path d="M182 235 L205 235 L205 150 L223 150" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+<path d="M182 235 L205 235 L205 315 L223 315" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+<path d="M452 150 L488 150" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+<path d="M452 315 L488 315" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+<path d="M702 150 L738 150" fill="none" stroke="#6d44e0" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-violet)"/>
+<path d="M702 315 L738 315" fill="none" stroke="#6d44e0" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-violet)"/>
+<path d="M932 150 L946 150 L946 416 L835 416" fill="none" stroke="#13805a" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M835 392 L835 416 L170 416 L170 440" fill="none" stroke="#13805a" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-green)"/>
+<text x="826" y="408" font-size="11.5" font-weight="400" fill="#556075" text-anchor="end">either lets a note pass</text>
+<rect x="30" y="442" width="282" height="130" rx="12" fill="#f3f5f9" stroke="#6d44e0" stroke-width="2"/>
+<text x="44" y="468" font-size="15" font-weight="700" fill="#6d44e0" text-anchor="start">A topic or its notes</text>
+<text x="44" y="490.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">A topic with two or more of its notes found</text>
+<text x="44" y="507.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">is given in their place. With exactly one,</text>
+<text x="44" y="524.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">only that note. With none, the topic itself.</text>
+<text x="44" y="541.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Order does not matter.</text>
+<rect x="339" y="442" width="282" height="130" rx="12" fill="#f3f5f9" stroke="#a86a0b" stroke-width="2"/>
+<text x="353" y="468" font-size="15" font-weight="700" fill="#a86a0b" text-anchor="start">The budget</text>
+<text x="353" y="490.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">At most 10 notes and topics (you can</text>
+<text x="353" y="507.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">change it), within a set number of</text>
+<text x="353" y="524.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">characters. A model with a small context</text>
+<text x="353" y="541.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">gets less.</text>
+<rect x="648" y="442" width="282" height="130" rx="12" fill="#f3f5f9" stroke="#2563eb" stroke-width="2"/>
+<text x="662" y="468" font-size="15" font-weight="700" fill="#2563eb" text-anchor="start">The given set</text>
+<text x="662" y="490.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">Marked as given, and not given again in this</text>
+<text x="662" y="507.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">session. It counts as used when the agent</text>
+<text x="662" y="524.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">then looks it up, cites it or works on its</text>
+<text x="662" y="541.5" font-size="12.5" font-weight="400" fill="#19202e" text-anchor="start">files.</text>
+<path d="M314 507 L337 507" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+<path d="M623 507 L646 507" fill="none" stroke="#556075" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#a-muted)"/>
+</svg>

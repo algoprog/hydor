@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MEMORY_BASES, PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryBasis, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
+import { MEMORY_BASES, PROFILE_WORDS_DEFAULT, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, TOP_K_DEFAULT, TOP_K_MAX, isUserProfile, type MemoryBasis, type MemoryDrift, type MemoryEntry, type MemoryHistoryRow, type MemoryKind, type MemoryScope, type MemorySource } from '../../shared/memory.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
@@ -61,6 +61,8 @@ export function memorySchema(db: DB) {
   if (!cols.has('basis')) db.exec('alter table memory_entries add column basis text');
   if (!cols.has('hits')) db.exec('alter table memory_entries add column hits integer not null default 0');
   if (!cols.has('hit_at')) db.exec('alter table memory_entries add column hit_at integer');
+  if (!cols.has('given')) db.exec('alter table memory_entries add column given integer not null default 0');
+  if (!cols.has('given_at')) db.exec('alter table memory_entries add column given_at integer');
   db.exec(`
     drop index if exists memory_entries_scope;
     -- A place's entries, the latest changed first, without sorting all of them.
@@ -81,7 +83,20 @@ export function memorySchema(db: DB) {
     -- What a session's agent was given of memory (inject.ts): the same block until its conversation is condensed
     -- (\`epoch\`) or it rests for a while, so its instructions stay as its provider cached them.
     create table if not exists memory_blocks (key text not null, flavor text not null, epoch integer not null, text text not null, at integer not null, primary key (key, flavor)) without rowid;
+    -- What one session was given (given.ts): \`n:<id>\` an entry, \`w:<path>\` a wiki article, \`p:<path>\` a plan, \`a:<dir>\` an
+    -- area looked up for file touches; \`used\`: an agent used that entry since. Cleared when its conversation is condensed.
+    create table if not exists memory_given (key text not null, ref text not null, at integer not null, used integer not null default 0, primary key (key, ref)) without rowid;
   `);
+  // Until now \`uses\` counted every time an entry was given as bearing on a request as well as looked up: from here on
+  // being given is counted apart (\`given\`), and \`uses\` keeps what agents looked up (\`hits\`), once.
+  if (kvGet(db, 'memory.given.migrated') !== '1') {
+    db.transaction(() => {
+      // used_at stays as it was (the last time it was given or looked up), so Not needed lately counts on from there
+      // rather than taking every note that was only ever given as unused at once; from here on only use moves it.
+      db.exec('update memory_entries set given = max(0, uses - hits), given_at = used_at, uses = hits');
+      kvSet(db, 'memory.given.migrated', '1');
+    })();
+  }
   if (!db.prepare("select 1 from sqlite_master where type = 'table' and name = 'memory_fts'").get())
     db.exec(`
       create virtual table memory_fts using fts5(text, content = 'memory_entries', content_rowid = 'id', tokenize = 'unicode61 remove_diacritics 2');
@@ -101,6 +116,19 @@ export function memorySchema(db: DB) {
       delete from memory_vectors where entry = new.id;
     end;
   `);
+  // Anchors: the files and folders a project note names, and the drift of the code they name (anchors.ts, drift.ts).
+  db.exec(`
+    create table if not exists memory_anchors (
+      entry integer not null references memory_entries(id) on delete cascade,
+      path text not null,
+      primary key (entry, path)
+    ) without rowid;
+    create index if not exists memory_anchors_path on memory_anchors(path);
+  `);
+  if (!cols.has('anchor_commit')) db.exec('alter table memory_entries add column anchor_commit text');
+  if (!cols.has('drift')) db.exec('alter table memory_entries add column drift text');
+  // The entry's updated_at when its anchors were taken: older than updated_at, its text changed since.
+  if (!cols.has('anchored_at')) db.exec('alter table memory_entries add column anchored_at integer');
   ready.add(db);
 }
 
@@ -240,6 +268,8 @@ interface Row {
   expires_at: number | null;
   used_at: number | null;
   uses: number;
+  given_at: number | null;
+  given: number | null;
   hit_at: number | null;
   hits: number | null;
   title: string | null;
@@ -248,13 +278,27 @@ interface Row {
   session: string | null;
   turn: string | null;
   source: MemorySource;
+  anchor_list?: string | null;
+  drift?: string | null;
 }
 
 /** A basis as stored: one of the known ones, else none. */
 export const basisOf = (v: unknown): MemoryBasis | undefined => (MEMORY_BASES.includes(v as MemoryBasis) ? (v as MemoryBasis) : undefined);
 
 /** Entries with how many notes each sums up. */
-const SELECT = 'select e.*, (select count(*) from memory_links l where l.parent = e.id) as covers from memory_entries e';
+const SELECT =
+  'select e.*, (select count(*) from memory_links l where l.parent = e.id) as covers, (select group_concat(a.path, char(31)) from memory_anchors a where a.entry = e.id) as anchor_list from memory_entries e';
+
+/** The drift of a row as stored (JSON), when it reads. */
+function driftOf(v: string | null | undefined): MemoryDrift | undefined {
+  if (!v) return undefined;
+  try {
+    const d = JSON.parse(v) as MemoryDrift;
+    return Array.isArray(d?.paths) && typeof d.since === 'string' ? { paths: d.paths.map(String), since: d.since, at: Number(d.at) || 0 } : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const toEntry = (r: Row): MemoryEntry => ({
   id: r.id,
@@ -270,12 +314,16 @@ const toEntry = (r: Row): MemoryEntry => ({
   expiresAt: r.expires_at ?? undefined,
   usedAt: r.used_at ?? undefined,
   uses: r.uses ?? 0,
+  givenAt: r.given_at ?? undefined,
+  given: r.given ?? 0,
   hitAt: r.hit_at ?? undefined,
   hits: r.hits ?? 0,
   covers: r.kind && r.kind !== 'note' ? r.covers : undefined,
   session: r.session ?? undefined,
   turn: r.turn ?? undefined,
   source: r.source,
+  anchors: r.anchor_list ? r.anchor_list.split('\u001f').sort() : undefined,
+  drift: driftOf(r.drift),
 });
 
 /** Who changed an entry, where and why. */
@@ -463,11 +511,21 @@ export function setExpiry(db: DB, id: number, expiresAt: number | null, by: Chan
   return true;
 }
 
-/** Agents got these as bearing on what they were doing (needed: what Settings shows and suggests removing by). */
+/**
+ * Agents used these: cited one in a turn, or worked on a file it is about after it was given (given.ts). Needed: what
+ * Settings shows and suggests removing by. Ranking does not weigh it (only look-ups: markHit).
+ */
 export function markUsed(db: DB, ids: number[], at = Date.now()) {
   if (!ids.length) return;
   memorySchema(db);
   db.prepare(`update memory_entries set uses = uses + 1, used_at = ? where id in (${ids.map(() => '?').join(',')})`).run(at, ...ids);
+}
+
+/** Agents got these without asking: at the start of a session, with a message, on touching a file. Not a use. */
+export function markGiven(db: DB, ids: number[], at = Date.now()) {
+  if (!ids.length) return;
+  memorySchema(db);
+  db.prepare(`update memory_entries set given = given + 1, given_at = ? where id in (${ids.map(() => '?').join(',')})`).run(at, ...ids);
 }
 
 /** Agents looked these up themselves (recall found them, or they corrected one): needed, and what ranking weighs. */
@@ -533,6 +591,7 @@ export function clearAll(db: DB): number {
   const n = db.transaction(() => {
     db.prepare('delete from memory_history').run();
     db.prepare('delete from memory_cursor').run();
+    db.prepare('delete from memory_given').run();
     db.prepare('delete from memory_links').run();
     db.prepare('delete from memory_blocks').run();
     return db.prepare('delete from memory_entries').run().changes;
@@ -680,8 +739,8 @@ export function expireDue(db: DB, now = Date.now()): number {
 }
 
 /**
- * Notes about the user or a project that no agent has needed for STALE_DAYS: not changed, found or given
- * as bearing on a request since. Topics and profiles are left out (the tidy-up keeps them current), and so
+ * Notes about the user or a project that no agent has needed for STALE_DAYS: not changed, looked up or used
+ * since (being given without asking does not count). Topics and profiles are left out (the tidy-up keeps them current), and so
  * are notes with an end date (they go by themselves) and a session's (they go with the session).
  */
 export function staleEntries(db: DB, o: { now?: number; limit?: number } = {}): MemoryEntry[] {
@@ -720,7 +779,43 @@ export function sweep(db: DB, now = Date.now()) {
       .all() as { id: number }[];
     for (const { id } of [...gone, ...orphans]) eraseEntry(db, id);
     db.prepare('delete from memory_cursor where not exists (select 1 from sessions s where s.key = memory_cursor.key) and not exists (select 1 from app_sessions a where a.key = memory_cursor.key)').run();
+    // What sessions that are gone were given (and a run's that never got its key).
+    db.prepare(
+      "delete from memory_given where (key like 'run:%' and at < ?) or (key not like 'run:%' and not exists (select 1 from sessions s where s.key = memory_given.key) and not exists (select 1 from app_sessions a where a.key = memory_given.key))",
+    ).run(now - 86400_000);
     // A block rested long enough is made again anyway.
     db.prepare('delete from memory_blocks where at < ?').run(now - 2 * BLOCK_REST_MS);
   })();
+}
+
+// ---- moving an entry to another place -----------------------------------------------------------
+
+/**
+ * Moves an entry to another place (the tidy-up's re-filing, and its undo): its history says from which place to which
+ * (`names`, as the pages show them), its vector and end date stay, and what summed it up (or what it sums up) is
+ * unlinked: a topic is about the notes of its own place. Returns what was unlinked (parent, child) so an undo can put
+ * it back; null when there is no such entry or it is there already.
+ */
+export function moveEntry(db: DB, id: number, to: Place, by: ChangeBy, names: { from: string; to: string }): { entry: MemoryEntry; links: [number, number][] } | null {
+  const cur = getEntry(db, id);
+  const key = to.scope === 'global' ? '' : to.scopeKey;
+  if (!cur || (cur.scope === to.scope && cur.scopeKey === key)) return null;
+  const at = by.at ?? Date.now();
+  const links = db.transaction(() => {
+    const gone = db.prepare('select parent, child from memory_links where child = ? or parent = ?').all(id, id) as { parent: number; child: number }[];
+    db.prepare('delete from memory_links where child = ? or parent = ?').run(id, id);
+    db.prepare('update memory_entries set scope = ?, scope_key = ?, updated_at = ?, session = ?, turn = ?, source = ? where id = ?').run(to.scope, key, at, by.session ?? null, by.turn ?? null, by.source, id);
+    log(db, id, 'moved', names.from, names.to, by, at);
+    return gone.map((l) => [l.parent, l.child] as [number, number]);
+  })();
+  changed(db, cur);
+  changed(db, { scope: to.scope, scopeKey: key });
+  return { entry: getEntry(db, id)!, links };
+}
+
+/** Puts back links taken away (those whose notes are still there). */
+export function restoreLinks(db: DB, links: [number, number][]) {
+  memorySchema(db);
+  const add = db.prepare('insert or ignore into memory_links (parent, child) select ?, ? where exists (select 1 from memory_entries where id = ?) and exists (select 1 from memory_entries where id = ?)');
+  db.transaction(() => links.forEach(([p, c]) => add.run(p, c, p, c)))();
 }

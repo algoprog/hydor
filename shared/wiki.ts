@@ -3,7 +3,7 @@
 
 /** The most documents a wiki may be set to read: a limit is a whole number from 0 to this. */
 export const MAX_WIKI_DOCUMENTS = 100_000;
-/** The default limit: a project with more documents keeps them out of its wiki. */
+/** The default limit: a project with more documents has only this many read into its wiki (the pinned, the most used, the newest). */
 export const DEFAULT_WIKI_DOCUMENTS = 100;
 
 /** Settings → Memory → Wiki memory (GET and PUT /api/wiki/settings). */
@@ -14,7 +14,7 @@ export interface WikiMemorySettings {
   fromDocuments: boolean;
   /**
    * The most documents a project's knowledge may hold for its wiki to read them (0 to 100000; default 100). A project with
-   * more keeps them out of its wiki: agents search them instead. A project's own number (Space.wikiDocumentLimit) wins;
+   * more has only that many read into its wiki (the pinned, the most used and the newest): agents search them all. A project's own number (Space.wikiDocumentLimit) wins;
    * the shared wiki uses this one.
    */
   documentLimit: number;

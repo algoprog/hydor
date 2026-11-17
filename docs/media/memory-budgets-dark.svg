@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-labelledby="t d" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'>
+<title id="t">Memory’s share of a Custom model’s context</title>
+<desc id="d">A stacked bar chart of the most memory Custom may use, as a share of the model’s context window, for windows of 8,000, 32,000 and 200,000 tokens: the memory block, additions with messages and file touches, and a checkpoint. The share is 14.0%, 14.7% and 3.5%.</desc>
+<defs><marker id="a-text" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#e9edf4"/></marker><marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#9ba7ba"/></marker><marker id="a-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#5b9dff"/></marker><marker id="a-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#4fc995"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#e8a93d"/></marker><marker id="a-violet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#a78bfa"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#f0786a"/></marker><marker id="a-line" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M1 1.5 L8.5 5 L1 8.5 z" fill="#313b4c"/></marker></defs>
+<rect width="960" height="500" fill="#0f1319"/>
+<text x="40" y="40" font-size="20" font-weight="700" fill="#e9edf4" text-anchor="start">Memory’s share of a Custom model’s context</text>
+<text x="40" y="62" font-size="12.5" font-weight="400" fill="#9ba7ba" text-anchor="start">As a share of the window, counting 4 characters to a token: the block as measured, the rest at the most allowed</text>
+<line x1="118" y1="394" x2="898" y2="394" stroke="#313b4c" stroke-width="1.6"/>
+<text x="106" y="398" font-size="12" font-weight="400" fill="#9ba7ba" text-anchor="end">0%</text>
+<line x1="118" y1="329.55555555555554" x2="898" y2="329.55555555555554" stroke="#313b4c" stroke-width="1" stroke-dasharray="3 5"/>
+<text x="106" y="333.55555555555554" font-size="12" font-weight="400" fill="#9ba7ba" text-anchor="end">4%</text>
+<line x1="118" y1="265.1111111111111" x2="898" y2="265.1111111111111" stroke="#313b4c" stroke-width="1" stroke-dasharray="3 5"/>
+<text x="106" y="269.1111111111111" font-size="12" font-weight="400" fill="#9ba7ba" text-anchor="end">8%</text>
+<line x1="118" y1="200.66666666666669" x2="898" y2="200.66666666666669" stroke="#313b4c" stroke-width="1" stroke-dasharray="3 5"/>
+<text x="106" y="204.66666666666669" font-size="12" font-weight="400" fill="#9ba7ba" text-anchor="end">12%</text>
+<line x1="118" y1="136.22222222222223" x2="898" y2="136.22222222222223" stroke="#313b4c" stroke-width="1" stroke-dasharray="3 5"/>
+<text x="106" y="140.22222222222223" font-size="12" font-weight="400" fill="#9ba7ba" text-anchor="end">16%</text>
+<rect x="183" y="311.98909505208337" width="130" height="82.01090494791663" fill="#5b9dff"/>
+<text x="248" y="357.9945475260417" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">5.1%</text>
+<rect x="183" y="183.12183973524307" width="130" height="128.8672553168403" fill="#e8a93d"/>
+<text x="248" y="252.5554673936632" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">8.0%</text>
+<text x="248" y="173.12183973524307" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">13.1%</text>
+<text x="248" y="420" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">8k tokens</text>
+<text x="248" y="439" font-size="12.5" font-weight="400" fill="#9ba7ba" text-anchor="middle">tiny class</text>
+<rect x="443" y="347.5861545138889" width="130" height="46.413845486111086" fill="#5b9dff"/>
+<text x="508" y="375.79307725694446" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">2.9%</text>
+<rect x="443" y="335.908942328559" width="130" height="11.677212185329893" fill="#4fc995"/>
+<text x="583" y="345.747548421224" font-size="12" font-weight="700" fill="#4fc995" text-anchor="start">0.7%</text>
+<rect x="443" y="207.0293952094184" width="130" height="128.87954711914062" fill="#e8a93d"/>
+<text x="508" y="276.4691687689887" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">8.0%</text>
+<text x="508" y="197.0293952094184" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">11.6%</text>
+<text x="508" y="420" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">32k tokens</text>
+<text x="508" y="439" font-size="12.5" font-weight="400" fill="#9ba7ba" text-anchor="middle">lean class</text>
+<rect x="703" y="379.2522916666667" width="130" height="14.747708333333321" fill="#5b9dff"/>
+<text x="843" y="390.62614583333334" font-size="12" font-weight="700" fill="#5b9dff" text-anchor="start">0.9%</text>
+<rect x="703" y="374.6203472222222" width="130" height="4.631944444444457" fill="#4fc995"/>
+<text x="843" y="380.93631944444445" font-size="12" font-weight="700" fill="#4fc995" text-anchor="start">0.3%</text>
+<rect x="703" y="342.398125" width="130" height="32.22222222222223" fill="#e8a93d"/>
+<text x="768" y="363.50923611111114" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">2.0%</text>
+<text x="768" y="332.398125" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">3.2%</text>
+<text x="768" y="420" font-size="15" font-weight="700" fill="#e9edf4" text-anchor="middle">200k tokens</text>
+<text x="768" y="439" font-size="12.5" font-weight="400" fill="#9ba7ba" text-anchor="middle">full class</text>
+<rect x="118" y="452" width="14" height="14" rx="3" fill="#5b9dff" stroke="none" stroke-width="1.5"/>
+<text x="140" y="464" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">The memory block (measured, 150 notes)</text>
+<rect x="412.5" y="452" width="14" height="14" rx="3" fill="#4fc995" stroke="none" stroke-width="1.5"/>
+<text x="434.5" y="464" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">With a message, and on a file touch (most)</text>
+<rect x="705" y="452" width="14" height="14" rx="3" fill="#e8a93d" stroke="none" stroke-width="1.5"/>
+<text x="727" y="464" font-size="12.5" font-weight="400" fill="#e9edf4" text-anchor="start">The session checkpoint (most)</text>
+<text x="118" y="488" font-size="11.5" font-weight="400" fill="#9ba7ba" text-anchor="start">A window under 12,000 tokens (tiny) gets no additions and no index. Windows of 8,192, 32,768 and 200,000 tokens.</text>
+</svg>

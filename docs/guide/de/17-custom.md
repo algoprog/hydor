@@ -190,6 +190,14 @@ Funktionsspezifische Tool-Anleitungen werden erst mit dem jeweiligen Tool gelade
 
 So fällt die erste Anfrage bei Modellen mit kleinem Kontext kürzer aus. Die Verteilung siehst du unter **Optionen**; siehe [Lange Unterhaltungen und umfangreiche Ausgaben](#long-conversations-and-long-output).
 
+**Memory richtet sich nach dem Kontext des Modells.** Ein Modell mit kleinem Kontext könnte seine Arbeit nicht erledigen, wenn Memory einen festen Anteil beansprucht. Deshalb schrumpft der Anteil von Memory mit dem Fenster (die Zeile **Memory** in der Verteilung zeigt, was es belegt):
+
+- **Unter 12.000 Tokens**: ein kleiner Block mit höchstens 6 % des Kontexts, den ersten 120 Wörtern deines Profils (es weist darauf hin, dass dies nur der Anfang ist), höchstens drei Notizen und ohne Index. Memory fügt weder deinen Nachrichten noch dem Lesen oder Ändern einer Datei etwas hinzu und liefert keine Zeilen zu Wiki-Artikeln oder Plänen. Dem Modell wird gesagt, dass es Notizen mit dem Memory-Tool nachschlagen kann.
+- **Bis etwa 33.000 Tokens** (nicht über OpenRouter): ein Block mit höchstens 6 % des Kontexts, den ersten 400 Wörtern deines Profils, höchstens fünf Notizen, einem kurzen Index, einer Zeile zu einem Wiki-Artikel und einer Zeile zu einem Plan sowie höchstens einer Notiz zu einer Nachricht (600 Zeichen) und einer beim Lesen oder Ändern einer Datei (350).
+- **Größere Modelle**: alles, was [Memory einem Agenten mitgibt](/guide/memory#what-an-agent-starts-with); das ist ein kleiner Teil ihres Kontexts.
+
+Als Richtwert umfasst der Memory-Block etwa 1.700 Zeichen bei einem Modell mit 8.000 Tokens, 3.800 bei 32.000 und 7.300 bei 200.000. Eine Sitzung, die nur den Anfang deines Profils erhalten hat, kann es nicht umschreiben: Das Modell sagt dir, was zu ergänzen ist, oder du bearbeitest es unter [Einstellungen → Memory](/settings?s=memory&find=Your%20profile). Auch die Anleitungen zum Wiki sind gekürzt: Custom erhält immer einen kurzen Absatz zum Wiki-Memory; wie man Quellen aufbewahrt, das Wiki prüft, Lessons Learned festhält und Pläne übernimmt, kommt erst, wenn die zugehörigen Tools angeboten werden. Nachdem Custom seine Unterhaltung verdichtet hat, wird der Checkpoint der Sitzung (siehe [Checkpoints und Lessons Learned](/guide/wiki-memory#checkpoints-and-lessons-learned)) auf 8 % des Kontexts gekürzt, höchstens 16.000 Zeichen, mit dem Hinweis, wo man den Rest liest.
+
 ## Wie Custom schwächere Modelle unterstützt
 
 Nicht jedes Modell kann Tools so zuverlässig einsetzen wie Claude oder GPT. Custom erkennt typische Fehler und lenkt das Modell zurück zur Aufgabe:

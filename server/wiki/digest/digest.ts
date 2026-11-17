@@ -4,31 +4,36 @@
 // document at a time, a few dozen an hour. Nothing here is thrown into knowledge's indexing: what goes wrong is
 // recorded as an update with its error.
 import type { DB } from '../../db.ts';
+import fs from 'node:fs';
+import path from 'node:path';
 import { baseRow, chunksOf, docByPath } from '../../knowledge/store.ts';
+import { searchKnowledge } from '../../knowledge/search.ts';
+import { meaningOn, queryVector } from '../../memory/embed.ts';
 import type { IndexedDoc } from '../../knowledge/events.ts';
 import { memoryOn, addEntry, cleanText, entries, repoRoot, sameText, titleOf } from '../../memory/store.ts';
 import { redactSecrets, secretIn, steeringIn } from '../../memory/secrets.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { browseWiki } from '../browse.ts';
 import { ingestWikiSource, wikiHash } from '../core.ts';
-import { isWikiBase } from '../knowledge/bindings.ts';
+import { isWikiBase, wikiKnowledgeSchema } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
 import { guardWikiFolder } from '../settings/gitignore.ts';
 import { analysisAvailable, analyzeDataFile, needsAnalysis } from './analyze.ts';
 import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeSystem, type ArticleLine, type DigestAsk, type TextKind } from './plan.ts';
-import { documentsOverLimit } from './limit.ts';
+import { gitHead, resolvePaths } from './anchors.ts';
+import { SPLIT_AT, splitArticle } from './split.ts';
+import { wikiReads } from './limit.ts';
 import { digested, markDigested, recordUpdate } from './store.ts';
-import { appendLog, bodyOf, cleanLinks, composeArticle, freePath, readOrNull, splitFront, titleOfArticle, writeFile, writeIndex } from './write.ts';
+import { appendLog, appendRevisions, bodyOf, cleanLinks, clipLine, freePath, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
+import type { Removed } from './history.ts';
 
 /** The most of a document the helper reads. */
 export const MAX_DOC_CHARS = 40_000;
-/** An article longer than this is not rewritten (the model could not keep all of it). */
+/** An article longer than this is not rewritten when splitting it failed (the model could not keep all of it). */
 const MAX_ARTICLE_CHARS = 20_000;
 /** Articles listed to the helper, the most that bear on the document first. */
-const LIST_ARTICLES = 80;
-/** A rewrite shorter than this share of the old article is refused: it dropped what the article said. */
-const KEEP_SHARE = 0.8;
+export const LIST_ARTICLES = 20;
 
 /** Whether documents may update wiki memory (Settings → Memory → Wiki memory), as the settings say; on unless off. */
 const fromDocumentsOn = (db: DB) => wikiSettings(db).fromDocuments;
@@ -60,22 +65,54 @@ export function documentText(db: DB, docId: number, max = MAX_DOC_CHARS): { text
 
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 
-/** The articles to show the helper: the ones whose title words are in the document first. */
-function listArticles(root: string, docText: string): { lines: ArticleLine[]; all: Set<string>; more: number; titles: Map<string, string> } {
+/** How the two rankings (title words, meaning) are joined: reciprocal rank fusion, as the knowledge search joins its own. */
+const RRF_K = 60;
+
+/** What the wiki's index finds by meaning for a text: article paths, best first. Nothing when meaning is off or the wiki is not indexed yet. */
+async function byMeaning(db: DB, root: string, space: string | null, doc: { title: string; text: string }): Promise<string[]> {
+  try {
+    if (!meaningOn(db)) return [];
+    wikiKnowledgeSchema(db);
+    const real = fs.realpathSync(root);
+    const row = db.prepare('select base from kb_wiki_bindings where root = ? and space is ? and active = 1').get(real, space) as { base: string } | undefined;
+    if (!row) return [];
+    const query = `${doc.title}\n${doc.text.slice(0, 1500)}`;
+    const vector = await queryVector(db, query, { wait: true, timeoutMs: 20_000 });
+    if (!vector) return [];
+    const { hits, meaning } = await searchKnowledge(db, { query, bases: [row.base], mode: 'meaning', limit: 50, vector });
+    if (!meaning) return [];
+    const seen: string[] = [];
+    for (const h of hits) {
+      const rel = path.relative(real, h.path).split(path.sep).join('/');
+      if (/^wiki\/.+\.md$/.test(rel) && !seen.includes(rel)) seen.push(rel);
+    }
+    return seen;
+  } catch {
+    // The knowledge index failing never stops the digest: the title words still rank the articles.
+    return [];
+  }
+}
+
+/**
+ * The articles to show the helper: the best LIST_ARTICLES by the title words that are in the text and by meaning (the
+ * wiki's own index, when search by meaning is on and the wiki is indexed), the two rankings fused by rank; each as its
+ * path, title and summary (or first line). The full set stays for checking the paths it names.
+ */
+export async function listArticles(db: DB, root: string, space: string | null, doc: { title: string; text: string }): Promise<{ lines: ArticleLine[]; all: Set<string>; more: number; titles: Map<string, string> }> {
   const all = browseWiki(root).articles;
-  const hay = docText.toLowerCase();
-  const scored = all.map((a) => {
-    const words = a.title.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [];
-    return { a, score: words.filter((w) => hay.includes(w)).length };
-  });
-  scored.sort((x, y) => y.score - x.score || x.a.path.localeCompare(y.a.path));
-  const shown = scored.slice(0, LIST_ARTICLES).map((s) => s.a);
-  const lines = shown.map((a) => {
-    const body = splitFront(readOrNull(root, a.path)?.content ?? '').body;
-    const first = body.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? '';
-    return { path: a.path, title: a.title, first: oneLine(first) };
-  });
-  return { lines, all: new Set(all.map((a) => a.path)), more: Math.max(0, all.length - shown.length), titles: new Map(all.map((a) => [a.path, a.title])) };
+  const hay = doc.text.toLowerCase();
+  const scored = all
+    .map((a) => ({ a, score: (a.title.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []).filter((w) => hay.includes(w)).length }))
+    .sort((x, y) => y.score - x.score || x.a.path.localeCompare(y.a.path));
+  const fused = new Map<string, number>();
+  const join = (paths: string[]) => paths.forEach((p, i) => fused.set(p, (fused.get(p) ?? 0) + 1 / (RRF_K + i + 1)));
+  join(scored.filter((s) => s.score > 0).map((s) => s.a.path));
+  const known = new Set(all.map((a) => a.path));
+  join((await byMeaning(db, root, space, doc)).filter((p) => known.has(p)));
+  const order = new Map(scored.map((s, i) => [s.a.path, i]));
+  const shown = [...all].sort((x, y) => (fused.get(y.path) ?? 0) - (fused.get(x.path) ?? 0) || order.get(x.path)! - order.get(y.path)!).slice(0, LIST_ARTICLES);
+  const lines = shown.map((a) => ({ path: a.path, title: a.title, first: oneLine(summaryOf(readOrNull(root, a.path)?.content ?? '')) }));
+  return { lines, all: known, more: Math.max(0, all.length - shown.length), titles: new Map(all.map((a) => [a.path, a.title])) };
 }
 
 export interface DigestTextInput {
@@ -137,21 +174,41 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
   let articles: string[] = [];
   let notes = 0;
   try {
-    const listing = listArticles(root, docText);
+    const listing = await listArticles(db, root, space, { title, text: docText });
     const place = project ? repoRoot(project.folder) : null;
     const noteTitles = place ? entries(db, { scope: 'repo', scopeKey: place, limit: 100 }).map(titleOf) : [];
     const plan = checkPlan(await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind, continued: i.continued }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
+    const at = now();
+    // The project's repository, for the paths an article names and the commit it was written against (none outside git).
+    const head = place ? await gitHead(place) : null;
+    const repo = place && head ? { root: place, head } : null;
+    const written: { path: string; title: string }[] = [];
 
-    // The articles to write: existing ones with their text, new ones with a free path.
+    // The articles to write: existing ones with their text (a long one is split first), new ones with a free path.
     const targets: { path: string; title: string; current?: string }[] = [];
     for (const p of plan.update) {
       const cur = readOrNull(root, p);
       if (!cur) continue;
+      const title0 = titleOfArticle(cur.content, listing.titles.get(p) ?? p);
+      if (splitFront(cur.content).body.length > SPLIT_AT) {
+        const s = await splitArticle(root, ask, { path: p, title: title0, current: cur.content, incoming: { title, text: docText, kind }, taken: new Set(listing.all), source: title, now: at, repo });
+        if (s.ok) {
+          // The article is a hub now; the new text goes to the part it belongs in.
+          for (const w of s.done.written) {
+            written.push(w);
+            listing.all.add(w.path);
+            listing.titles.set(w.path, w.title);
+          }
+          targets.push(s.done.target);
+          continue;
+        }
+        problems.push(`${p}: could not split it (${s.error})`);
+      }
       if (cur.content.length > MAX_ARTICLE_CHARS) {
         problems.push(`${p} is too long to rewrite: left as it was`);
         continue;
       }
-      targets.push({ path: p, title: titleOfArticle(cur.content, listing.titles.get(p) ?? p), current: cur.content });
+      targets.push({ path: p, title: title0, current: cur.content });
     }
     const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
     for (const c of plan.create) {
@@ -161,8 +218,8 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     }
 
     if (targets.length) {
-      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ document: { title, text: docText, cut, kind, continued: i.continued }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown }[] };
-      const accepted: { target: (typeof targets)[number]; body: string }[] = [];
+      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ today: new Date(at).toISOString().slice(0, 10), document: { title, text: docText, cut, kind, continued: i.continued }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown; summary?: unknown; removed?: unknown }[] };
+      const accepted: { target: (typeof targets)[number]; body: string; summary?: string; removed: { items: Removed[]; valid: boolean } }[] = [];
       for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
         const target = targets.find((t) => t.path === a.path);
         if (!target || accepted.some((x) => x.target === target) || typeof a.content !== 'string') continue;
@@ -172,40 +229,55 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
           problems.push(`${target.path}: left out, it held a secret`);
           continue;
         }
-        if (target.current != null && body.length < splitFront(target.current).body.trim().length * KEEP_SHARE) {
-          problems.push(`${target.path}: left as it was, the new text dropped what it said`);
-          continue;
+        // A shorter rewrite is accepted only with a list of what it replaced, each with its reason.
+        const removed = parseRemoved(a.removed);
+        if (target.current != null) {
+          const j = judgeRewrite(splitFront(target.current).body, body, removed);
+          if (!j.ok) {
+            problems.push(`${target.path}: left as it was, ${j.reason}`);
+            continue;
+          }
         }
-        accepted.push({ target, body });
+        accepted.push({ target, body, summary: typeof a.summary === 'string' && a.summary.trim() ? clipLine(a.summary, SUMMARY_MAX) : undefined, removed });
       }
       // A link may go to an article, the source, the index and the log, not to anything else.
       const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), sourcePath, 'index.md', 'log.md']);
-      const written: { path: string; title: string }[] = [];
-      const at = now();
-      for (const { target, body } of accepted) {
+      const revised: { path: string; title: string; replaced: number }[] = [];
+      const plain: { path: string; title: string }[] = [];
+      for (const { target, body, summary, removed } of accepted) {
         try {
           const text = cleanLinks(body, target.path, known);
-          const did = await writeFile(root, target.path, (cur) => {
-            // Another writer may have grown the article since it was read: never drop what it says now.
-            if (cur != null && text.length < splitFront(cur).body.trim().length * KEEP_SHARE) return null;
-            return composeArticle(cur, text, { title: target.title, source: sourcePath, now: at });
-          });
-          if (did) written.push({ path: target.path, title: target.title });
-          else problems.push(`${target.path}: changed meanwhile, left as it is now`);
+          // The article is written against what the file holds now: another writer may have changed it since it was read.
+          const stored: Stored = await storeArticle(root, { path: target.path, title: target.title, body: text, source: sourcePath, now: at, summary, anchors: repo ? await resolvePaths(repo.root, text) : undefined, commit: head, removed, why: title });
+          if (stored.status === 'refused' && stored.reason !== 'changed meanwhile') problems.push(`${target.path}: left as it was, ${stored.reason}`);
+          else if (stored.status !== 'written') problems.push(`${target.path}: changed meanwhile, left as it is now`);
+          else {
+            const entry = { path: target.path, title: titleOfArticle(readOrNull(root, target.path)?.content ?? '', target.title) };
+            if (stored.replaced) revised.push({ ...entry, replaced: stored.replaced });
+            else plain.push(entry);
+            if (!written.some((w) => w.path === target.path)) written.push(entry);
+          }
         } catch (e) {
           problems.push(`${target.path}: ${(e as Error).message}`);
         }
       }
-      articles = written.map((w) => w.path);
       if (written.length) {
         try {
           await writeIndex(root);
-          await appendLog(root, { document: title, articles: written.map((w) => ({ path: w.path, title: titleOfArticle(readOrNull(root, w.path)?.content ?? '', w.title) })), now: at });
+          if (plain.length) await appendLog(root, { document: title, articles: plain, now: at });
+          if (revised.length) await appendRevisions(root, { source: title, now: at, revised });
         } catch (e) {
           problems.push(`index or log: ${(e as Error).message}`);
         }
       }
+    } else if (written.length) {
+      try {
+        await writeIndex(root);
+      } catch (e) {
+        problems.push(`index: ${(e as Error).message}`);
+      }
     }
+    articles = written.map((w) => w.path);
 
     // Notes for a project's documents: short, new, with nothing secret and nothing that steers.
     if (i.notes && project && place) {
@@ -334,8 +406,8 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
     const project = space ? spaceById(db, space) : null;
     if (space && !project) return 'skip';
     if (!memoryOn(db) || !fromDocumentsOn(db) || !wikiMemoryOn(db, space)) return 'skip';
-    // Too many documents for its wiki to read (Wiki memory's limit): they stay for agents to search, with no update listed for each.
-    if (documentsOverLimit(db, space).over) return 'skip';
+    // More documents than its wiki reads (Wiki memory's limit): it reads the pinned, the most used and the newest; the rest stay for agents to search, with no update listed for each.
+    if (!wikiReads(db, space, base.id, ev.path)) return 'skip';
     const doc = docByPath(db, ev.path, [base.id]);
     if (!doc || doc.status !== 'indexed') return 'skip';
     const { text: raw, cut } = documentText(db, doc.id);

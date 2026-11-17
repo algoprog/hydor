@@ -57,9 +57,14 @@ export interface MemoryEntry {
   updatedAt: number;
   /** When it stops being true: from then on agents no longer get it, and it is deleted. */
   expiresAt?: number;
-  /** When an agent last got it as bearing on what it was doing, or found it with recall; and how often. */
+  /** When an agent last used it, and how often: looked it up with recall, cited it in a turn (#123), or worked on a file
+   * it is about (its anchored file, or a name it writes in backticks) after it was given. */
   usedAt?: number;
   uses: number;
+  /** When an agent last got it without asking (at the start of a session, with a message, on touching a file), and how
+   * often: given is not used, only what an agent did with it says that. */
+  givenAt?: number;
+  given: number;
   /** When an agent last looked it up (recall found it, or it was corrected), and how often: what ranking weighs,
    * since being given at the start says only that the ranking picked it. */
   hitAt?: number;
@@ -70,6 +75,17 @@ export interface MemoryEntry {
   session?: string;
   turn?: string;
   source: MemorySource;
+  /** The files and folders (repo-relative, a folder ends in "/") of the project it names: kept by memory/anchors.ts. */
+  anchors?: string[];
+  /** Set once files it is anchored to changed after it was written or last checked: which, since which commit, and when. */
+  drift?: MemoryDrift;
+}
+
+/** Files a note names that changed in the project since the commit its anchors were taken at. */
+export interface MemoryDrift {
+  paths: string[];
+  since: string;
+  at: number;
 }
 
 /**
@@ -80,7 +96,7 @@ export interface MemoryHistoryRow {
   id: number;
   entry: number;
   at: number;
-  action: 'added' | 'updated' | 'deleted' | 'restored' | 'expiry' | 'basis';
+  action: 'added' | 'updated' | 'deleted' | 'restored' | 'expiry' | 'basis' | 'moved';
   before?: string;
   after?: string;
   why?: string;
@@ -95,7 +111,7 @@ export interface MemoryHistoryRow {
  */
 export interface MemoryChange {
   entry: number;
-  action: 'added' | 'updated' | 'deleted' | 'expiry' | 'checked';
+  action: 'added' | 'updated' | 'deleted' | 'expiry' | 'checked' | 'moved';
   scope: MemoryScope;
   scopeKey: string;
   kind?: MemoryKind;
@@ -106,6 +122,13 @@ export interface MemoryChange {
   expiredBefore?: number;
   /** For "checked": how it was known before. */
   basisBefore?: MemoryBasis;
+  /** For "checked" against the code: the drift and the commit it had, to put back when undone. */
+  driftBefore?: MemoryDrift;
+  commitBefore?: string;
+  /** For "moved": the note's text (before and after hold the place names). */
+  text?: string;
+  /** For "moved" (from About you to a project): the topics' links taken away (parent, child), to put back when undone. */
+  links?: [number, number][];
   why?: string;
   /** The conversation it was learned from, or that showed it wrong or true (the tidy-up). */
   session?: string;
@@ -156,6 +179,8 @@ export interface TidyReport {
   /** Conversations read to learn from (Learn from conversations), and why that part stopped when it did. */
   sessions?: number;
   learnError?: string;
+  /** A step after the near-copies (checking against the code, moving notes, notes into the wiki, AGENTS.md) that stopped, and why. */
+  upkeepError?: string;
   error?: string;
 }
 
@@ -211,6 +236,19 @@ export function changeSummary(changes: MemoryChange[]): string {
     n('deleted') && `${n('deleted')} removed`,
     n('expiry') && `${n('expiry')} given an end date`,
     n('checked') && `${n('checked')} checked`,
+    n('moved') && `${n('moved')} moved`,
   ].filter(Boolean);
   return parts.length ? parts.join(', ') : 'undone';
+}
+
+/** A sentence for AGENTS.md the tidy-up suggests from a note (a lasting convention of the repository), and what became of it. */
+export interface AgentsSuggestion {
+  id: number;
+  /** The note it came from (it stays until the sentence is added). */
+  entry: number;
+  /** The project's folder. */
+  repo: string;
+  text: string;
+  at: number;
+  status: 'pending' | 'applied' | 'dismissed';
 }

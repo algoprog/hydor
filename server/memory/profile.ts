@@ -105,16 +105,44 @@ const WHEN =
 
 /** What an agent is told: the profile, or that there is none yet, and when to keep it current. */
 /** `readOnly`: a confidential session, which reads the profile and changes nothing in memory (server/confidential). */
-export function profileBlock(text: string | null | undefined, readOnly = false): string {
+export function profileBlock(text: string | null | undefined, readOnly = false, cut = false): string {
   if (!text?.trim()) return `# The user's profile\nNone yet. Start it with update_user_profile ${WHEN}.`;
   return [
     "# The user's profile",
     'Who the user is and how they like to work, kept across sessions by the agents here and by the user (Settings → Memory). Let it shape how you work with them and how you reply; their guidelines and what they say now come first.',
     '',
     text.trim(),
-    ...(readOnly ? [] : ['', `Keep it current with update_user_profile, ${WHEN}.`]),
+    ...(cut ? ['', 'Only its start, to fit this model’s context: it cannot be rewritten from here.'] : readOnly ? [] : ['', `Keep it current with update_user_profile, ${WHEN}.`]),
   ].join('\n');
 }
+
+/**
+ * The most words of the profile Custom gives a model of a small context: under 12,000 tokens of window, and up to
+ * 33,000 (the lean ones); a larger one gets it whole. Cut at a line's end where it can be, so its first lines (who the
+ * user is, how they like replies) come through whole.
+ */
+export const PROFILE_WORDS_TINY = 120;
+export const PROFILE_WORDS_LEAN = 400;
+
+/** A profile cut to `limit` words, at the end of a line where it can be. */
+export function fitWords(text: string, limit: number): { text: string; cut: boolean } {
+  if (wordCount(text) <= limit) return { text, cut: false };
+  const out: string[] = [];
+  let n = 0;
+  for (const line of text.split('\n')) {
+    const c = wordCount(line);
+    if (n + c > limit) {
+      if (!out.length) out.push(line.split(/\s+/).slice(0, limit).join(' '));
+      break;
+    }
+    out.push(line);
+    n += c;
+  }
+  return { text: out.join('\n').trim(), cut: true };
+}
+
+/** Sessions given the profile cut to fit their model: having seen only its start, they may not rewrite it. */
+const cutFor = new Set<string>();
 
 const hash = (s: string) => crypto.createHash('sha1').update(s).digest('base64url').slice(0, 16);
 
@@ -150,6 +178,7 @@ export function updateProfileTool(limit: number): RunTool {
     async run(a, ctx) {
       const db = ctx.deps.db;
       if (!sessionMemoryOn(db, ctx.key)) throw new Error('Memory is off for this session: the profile was not changed.');
+      if (cutFor.has(ctx.key)) throw new Error('This session was given only the start of the profile (its model has a small context), so it cannot rewrite it: tell the user what to add, or they can edit it in Settings → Memory.');
       const text = cleanProfile(String(a.profile ?? ''), Infinity);
       if (text.length < 3) throw new Error('profile is empty. The user can clear their profile in Settings → Memory.');
       const max = profileWords(db);
@@ -194,12 +223,25 @@ export const profile: Feature = {
   },
   context(s, d) {
     if (!memoryOn(d.db)) return null;
+    // A model of a small context gets the profile's start (memory's other parts are sized to it as well: inject.ts).
+    const limit = s.window != null && s.window < 12_000 ? PROFILE_WORDS_TINY : s.lean ? PROFILE_WORDS_LEAN : Infinity;
+    const fit = (text: string) => {
+      const f = fitWords(text, limit);
+      if (f.cut) cutFor.add(s.key);
+      else cutFor.delete(s.key);
+      return f;
+    };
     // A confidential session reads the profile, and changes nothing in memory.
     if (s.extra.confidential === true) {
       const text = userProfile(d.db)?.text;
-      return text?.trim() ? profileBlock(text, true) : null;
+      if (!text?.trim()) return null;
+      const f = fit(text);
+      return profileBlock(f.text, true, f.cut);
     }
     if (s.extra.memory === false) return null;
-    return profileBlock(userProfile(d.db)?.text);
+    const text = userProfile(d.db)?.text;
+    if (!text?.trim()) return profileBlock(text);
+    const f = fit(text);
+    return profileBlock(f.text, false, f.cut);
   },
 };

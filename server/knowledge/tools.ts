@@ -8,7 +8,8 @@ import { meaningOn } from '../memory/embed.ts';
 import { basesFor, basesOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { baseRow, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
-import { wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
+import { isWikiBase, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
+import { countUses } from './marks.ts';
 
 const MAX_READ = 14_000;
 const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Projects: shared knowledge for every session, or a project’s own).';
@@ -64,6 +65,8 @@ const SEARCH: RunTool = {
     const r = await searchKnowledge(db, { query, mode, bases: a.base ? [String(a.base)] : undefined, within: scope.map((b) => b.id), limit: Math.min(Number(a.limit) || 8, 25) });
     const byWordsOnly = mode !== 'exact' && mode !== 'words' && !r.meaning ? ` (by words only: search by meaning is ${meaningOn(db) ? 'not running yet' : 'off'})` : '';
     if (!r.hits.length) return `Nothing in the knowledge bases matches that${byWordsOnly}. Try other words${mode === 'exact' ? '' : ', or mode: "exact" for a name or a number'}.`;
+    // What agents find is what the wiki reads first when a project has more documents than its limit.
+    countUses(db, r.hits.filter((h) => !isWikiBase(db, h.base)));
     const head = `${r.hits.length} passage${r.hits.length === 1 ? '' : 's'} from the user's knowledge bases${byWordsOnly}. Cite each one you use as [file, page or part] with its path.`;
     const body = r.hits.map((h, i) => `[${i + 1}] ${citation(h)} · ${h.baseName} · ${h.ref}\n${h.path}\n${h.text}`);
     return [head, ...body].join('\n\n');
@@ -102,6 +105,7 @@ const READ: RunTool = {
     else throw new Error('Give a ref (from knowledge_search) or a path');
     if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path)) throw new Error('That document is not in a knowledge base this session searches');
     const rows = chunksOf(db, doc.id, from, count);
+    if (!isWikiBase(db, doc.base)) countUses(db, [doc]);
     if (!rows.length) return `${doc.title} has ${doc.passages} passages; there is nothing from passage ${from + 1}.`;
     let out = `${doc.title} (${doc.path}), passages ${from + 1}–${from + rows.length} of ${doc.passages}:\n`;
     let part: string | null = null;
