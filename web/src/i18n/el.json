@@ -24756,5 +24756,14 @@
 "This project has {0} documents, more than the {1} its wiki reads: agents search them instead of reading them into the wiki.":"Αυτό το έργο έχει {0} έγγραφα, περισσότερα από τα {1} που διαβάζει το wiki του: οι πράκτορες τα αναζητούν αντί να τα διαβάζουν στο wiki.",
 "This project has 1 document, more than the {0} its wiki reads: agents search them instead of reading them into the wiki.":"Αυτό το έργο έχει 1 έγγραφο, περισσότερα από τα {0} που διαβάζει το wiki του: οι πράκτορες το αναζητούν αντί να το διαβάζουν στο wiki.",
 "wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search instead keep out of the wiki default 100 per project own number":"μνήμη wiki έγγραφα όριο μέγιστος αριθμός πλήθος πάρα πολλά μεγάλο πολλά έγγραφα έργο γνώσεις ανάγνωση βοηθητικό μοντέλο ανάκτηση αναζήτηση αντί έξω από το wiki προεπιλογή 100 ανά έργο δικός του αριθμός",
-"wikiDocumentLimit: a whole number from 0 to {0}, or null":"wikiDocumentLimit: ακέραιος από 0 έως {0}, ή null"
+"wikiDocumentLimit: a whole number from 0 to {0}, or null":"wikiDocumentLimit: ακέραιος από 0 έως {0}, ή null",
+"Skills turned on for this project":"Οι δεξιότητες ενεργοποιήθηκαν για αυτό το έργο",
+"Some skills could not be loaded. Reload before changing all skills.":"Δεν ήταν δυνατή η φόρτωση ορισμένων δεξιοτήτων. Ανανεώστε πριν αλλάξετε όλες τις δεξιότητες.",
+"Turn on all skills":"Ενεργοποίηση όλων των δεξιοτήτων",
+"Follow default settings for all skills":"Όλες οι δεξιότητες όπως στις προεπιλεγμένες ρυθμίσεις",
+"Change default skill settings for all projects":"Αλλαγή προεπιλεγμένων ρυθμίσεων δεξιοτήτων για όλα τα έργα",
+"Turn on all skills for this project?":"Ενεργοποίηση όλων των δεξιοτήτων για αυτό το έργο;",
+"Every available skill listed here changes for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.":"Όλες οι διαθέσιμες δεξιότητες που εμφανίζονται εδώ αλλάζουν για τις συνεδρίες αυτού του έργου, ακόμη και όσες κρύβονται από τα φίλτρα. Οι δεξιότητες που προστίθενται αργότερα ακολουθούν τη συνήθη ρύθμισή τους και οι ενεργές συνεδρίες διατηρούν τις ρυθμίσεις τους μέχρι να ξεκινήσουν ξανά.",
+"Some agents’ skills could not be read and will stay as they are.":"Δεν ήταν δυνατή η ανάγνωση των δεξιοτήτων ορισμένων πρακτόρων και αυτές θα παραμείνουν αμετάβλητες.",
+"Available skills updated for this project":"Οι διαθέσιμες δεξιότητες ενημερώθηκαν για αυτό το έργο"
 }

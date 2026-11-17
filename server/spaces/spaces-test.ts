@@ -25,7 +25,7 @@ import {
   restoreSpaceSkill,
   saveSpaceSkill,
   setSpaceSwitch,
-  switchSpaceSkillsOff,
+  switchSpaceSkills,
   spaceSkillsDir,
   spaceSkillsView,
   spaceSkillText,
@@ -357,7 +357,7 @@ test('bulk project skill switches are atomic and reject stale snapshots', async 
   setSpaceSwitch(db, sp.id, { name: 'research', on: true });
   const expected = spaceSwitches(db, sp.id);
   const skills = [{ name: 'research', usual: false }, { name: 'docker', usual: true }, { name: 'deploy', agent: 'claude', usual: true }, { name: 'imagegen', agent: 'codex', usual: true }];
-  assert.deepEqual(switchSpaceSkillsOff(db, sp.id, { skills, expected }), { docker: false, 'claude:deploy': false, 'codex:imagegen': false });
+  assert.deepEqual(switchSpaceSkills(db, sp.id, { skills, expected, on: false }), { docker: false, 'claude:deploy': false, 'codex:imagegen': false });
   assert.deepEqual(spaceSwitches(db, other.id), {});
   // The same switches reach each agent's session configuration.
   const base = { cwd: tmp, runId: 'bulk', resume: false, extra: { space: sp.id } };
@@ -366,12 +366,17 @@ test('bulk project skill switches are atomic and reject stale snapshots', async 
   assert.deepEqual(codex?.codexConfig, { skills: { config: [{ name: 'imagegen', enabled: false }] } });
   const claude = await skillpack.spawn!({ ...base, agent: 'claude' }, deps);
   assert.ok(claude?.args?.some((arg) => arg.includes('\"deploy\":\"off\"')));
-  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills, expected }), /changed/);
+  assert.throws(() => switchSpaceSkills(db, sp.id, { skills, expected, on: false }), /changed/);
   const before = spaceSwitches(db, sp.id);
-  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills: Array.from({ length: 401 }, (_, i) => ({ name: `skill-${i}`, usual: true })), expected: before }), /at most/);
+  assert.throws(() => switchSpaceSkills(db, sp.id, { skills: Array.from({ length: 401 }, (_, i) => ({ name: `skill-${i}`, usual: true })), expected: before, on: false }), /at most/);
   assert.deepEqual(spaceSwitches(db, sp.id), before);
-  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills: [{ name: 'docker', usual: true }, { name: 'docker', usual: false }], expected: before }), /different settings/);
+  assert.throws(() => switchSpaceSkills(db, sp.id, { skills: [{ name: 'docker', usual: true }, { name: 'docker', usual: false }], expected: before, on: false }), /different settings/);
   assert.deepEqual(spaceSwitches(db, sp.id), before);
+  // Turning every skill on removes unnecessary overrides and preserves globally disabled ones locally.
+  assert.deepEqual(switchSpaceSkills(db, sp.id, { skills, expected: before, on: true }), { research: true });
+  assert.deepEqual(spaceSwitches(db, other.id), {});
+  assert.throws(() => switchSpaceSkills(db, sp.id, { skills, expected: before, on: true }), /changed/);
+  assert.throws(() => switchSpaceSkills(db, sp.id, { skills, expected: { research: true }, on: 'yes' }), /Invalid skill snapshot/);
   deleteSpace(db, sp.id);
   deleteSpace(db, other.id);
 });

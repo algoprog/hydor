@@ -23490,5 +23490,13 @@
   "{0}% left across {1} free subscriptions": "{0} % verbleibend · kostenlose Abonnements: {1}",
   "{0}% left across {1} paid subscription": "{0} % verbleibend · kostenpflichtige Abonnements: {1}",
   "{0}% left across {1} paid subscriptions": "{0} % verbleibend · kostenpflichtige Abonnements: {1}",
-  "“{0}” is locked": "„{0}“ ist gesperrt"
+  "“{0}” is locked": "„{0}“ ist gesperrt",
+  "Turn on all skills for this project?": "Alle Skills für dieses Projekt einschalten?",
+  "Every available skill listed here changes for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.": "Alle hier verfügbaren Skills werden für Sitzungen dieses Projekts geändert, auch wenn sie durch Filter ausgeblendet sind. Später hinzugefügte Skills folgen ihrer üblichen Einstellung. Bereits laufende Sitzungen behalten ihre Einstellung bis zum nächsten Start.",
+  "Some agents’ skills could not be read and will stay as they are.": "Die Skills einiger Agenten konnten nicht gelesen werden und bleiben unverändert.",
+  "Available skills updated for this project": "Verfügbare Skills für dieses Projekt aktualisiert",
+  "Turn on all skills": "Alle Skills einschalten",
+  "Skills turned on for this project": "Skills für dieses Projekt eingeschaltet",
+  "Follow default settings for all skills": "Standardeinstellungen für alle Skills übernehmen",
+  "Change default skill settings for all projects": "Standard-Skill-Einstellungen für alle Projekte ändern"
 }

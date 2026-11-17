@@ -938,7 +938,9 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
         {editing ? (
           <EditFromHere item={item} initial={text} onDone={() => setEditing(false)} />
         ) : (
-          <div className={cx('mt-1 mr-2 flex items-center gap-1.5 text-[11.5px] text-fg-3 transition-opacity', item.meta !== 'queued' && 'opacity-0 group-hover/u:opacity-100 focus-within:opacity-100')}>
+          <div className="mt-1 mr-2 flex items-center gap-1.5 text-[11.5px] text-fg-3">
+            {/* Copy the displayed message text without attachment or editor metadata. */}
+            {text && <CopyButton text={text} label="Copy message" className="h-8 w-8" />}
             {item.meta === 'queued' && <span>sent while working ·</span>}
             {canEdit && (
               <>
