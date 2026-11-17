@@ -191,6 +191,9 @@ export interface FileInput {
 
 type Phase = 'working' | 'waiting' | 'idle' | 'error' | 'off';
 
+/** How long after the work a held "Finished" notice waited on ended it goes out, when no turn follows first. */
+const HELD_GRACE_MS = 15_000;
+
 /** Where a session stands for notifications: running here, running elsewhere, or not running. */
 function phaseOf(s: SessionSummary): Phase {
   const l = s.live;
@@ -614,6 +617,12 @@ export class SessionManager extends EventEmitter {
   private statuses = new Map<string, { status: Phase; turnStart: number }>();
   /** Turns of sessions run here that ended since their status was last looked at, by when each began. */
   private endedTurns = new Map<string, number>();
+  /**
+   * "Finished" notices held back because the session was still at work when its turn ended (stillAtWork), by key: when
+   * the first turn held ended. Each goes out once that work is over: at the end of the next turn, however short (the
+   * agent woken by what it waited on), or a moment after the work ended when no turn follows (releaseHeld). In memory only.
+   */
+  private heldDone = new Map<string, number>();
 
   /**
    * Turns that end (after running a while), sessions that start waiting for an answer or approval, and
@@ -639,6 +648,11 @@ export class SessionManager extends EventEmitter {
           const hit = this.limitHits.delete(s.key);
           if (hit) this.limitEnds.set(s.key, now);
           this.afterTurn(s, hit, now);
+          // A notice held from an earlier turn goes out at the end of this one, once nothing it started still runs.
+          if (prev) this.finishedNotice(s, st, false, now);
+        } else if (prev && st === 'idle' && this.heldDone.has(s.key) && !this.stillAtWork(s)) {
+          // What a held notice waited on ended (its background tasks, its subagents) with no turn after it yet.
+          this.releaseHeld(s.key);
         }
         continue; // the first sighting is only a baseline
       }
@@ -667,6 +681,9 @@ export class SessionManager extends EventEmitter {
         }
       } else if (st === 'error') {
         this.notify({ ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
+      } else if (st === 'off') {
+        // Its process ended, and what it started with it: a notice held for that work no longer comes.
+        this.heldDone.delete(s.key);
       }
       // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
@@ -686,11 +703,49 @@ export class SessionManager extends EventEmitter {
           .prepare('insert into app_sessions (key, agent, done_at, created_at, updated_at) values (?, ?, ?, ?, ?) on conflict(key) do update set done_at = excluded.done_at')
           .run(s.key, s.agent, now, now, now);
         this.queueSummary(s.key);
-        // The last lines of the transcript land a moment after the turn ends. A Custom goal still going says when it is met,
-        // and a lead whose helpers are still at work is not finished: their replies wake it, and the turn after them says so.
-        if (!(s.acpAgent === CONSOLE_ID && s.goal?.status === 'active') && !this.helpersAtWork(s)) setTimeout(() => this.notify({ ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
       }
+      // Its "Finished" notice (a turn of 10 s or more), or one held from an earlier turn, unless it is still at work.
+      if ((st === 'idle' || st === 'error') && busy(prev.status)) this.finishedNotice(s, st, now - prev.turnStart >= 10_000, now);
     }
+  }
+
+  /**
+   * A turn of `s` ended as `st` (`long`: it ran 10 s or more, as a "Finished" notice needs). Its notice, or one held from
+   * an earlier turn, goes out unless the session is still at work: background tasks or Hydor subagents it started still
+   * run, and their end wakes it again, so it has not finished (a command left running, such as a dev server, holds it
+   * too); then it waits (heldDone). A failed turn has a notice of its own, and a Custom goal still going says when it is met.
+   */
+  private finishedNotice(s: SessionSummary, st: Phase, long: boolean, now: number) {
+    const held = this.heldDone.get(s.key);
+    if (st !== 'idle' || (s.acpAgent === CONSOLE_ID && s.goal?.status === 'active')) {
+      this.heldDone.delete(s.key);
+      return;
+    }
+    if (!long && held === undefined) return;
+    if (this.stillAtWork(s)) {
+      this.heldDone.set(s.key, held ?? now);
+      return;
+    }
+    this.heldDone.delete(s.key);
+    // The last lines of the transcript land a moment after the turn ends.
+    setTimeout(() => this.notify({ key: s.key, title: s.title, agent: s.agent, at: now, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
+  }
+
+  /**
+   * What a held "Finished" notice waited on is over and no turn followed yet: it goes out a moment later (the agent
+   * usually takes a turn on its end at once; that turn's end sends it then), unless the session is at work again.
+   */
+  private releaseHeld(key: string, grace = HELD_GRACE_MS) {
+    const at = this.heldDone.get(key);
+    setTimeout(() => {
+      if (at === undefined || this.heldDone.get(key) !== at) return;
+      const s = this.summary(key);
+      const st = s ? phaseOf(s) : 'off';
+      if (st === 'off') return void this.heldDone.delete(key);
+      if (st !== 'idle' || this.stillAtWork(s!)) return;
+      this.heldDone.delete(key);
+      this.notify({ key, title: s!.title, agent: s!.agent, at: Date.now(), kind: 'done', body: this.lastReply(key) ?? 'Finished' } satisfies NotifyEvent);
+    }, grace);
   }
 
   /**
@@ -740,13 +795,14 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Whether a session that ended its turn still has helpers at work: its agent's own in the background (Claude Code's
-   * Agent tool), or child sessions it started that are still at work (in a turn, or with background tasks of their own).
-   * It is woken as each ends, so it has not finished.
+   * Whether a session that ended its turn is still at work: background tasks it started still run (commands, monitors,
+   * workflows, its program's own subagents; also those of a session open in VS Code or a terminal), or Hydor subagents it
+   * started are at work (in a turn, or with background tasks of their own). It is woken as each ends: not finished yet.
    */
-  private helpersAtWork(s: SessionSummary): boolean {
-    // Its own helpers alone ("local_agent"): a command left running in the background (a dev server) may never end.
-    if ((s.live?.backgroundTasks ?? []).some((t) => (t.kind ?? '').includes('agent') && t.status === 'running')) return true;
+  private stillAtWork(s: SessionSummary): boolean {
+    const l = s.live && s.live.status !== 'exited' ? s.live : null;
+    const tasks = l ? (l.status === 'error' ? [] : l.backgroundTasks) : s.external?.backgroundTasks;
+    if ((tasks ?? []).some((t) => t.status === 'running')) return true;
     return (this.runningHelpers().get(s.key)?.size ?? 0) > 0;
   }
 
@@ -2111,7 +2167,11 @@ export class SessionManager extends EventEmitter {
     const now = Date.now();
     // Marked before anything is stopped, so no report slips past between the stop and the mark.
     for (const k of below) setSessionExtra(this.db, k, { stoppedWithParent: now });
-    for (const k of [key, ...below]) setSessionExtra(this.db, k, { stoppedAll: now });
+    for (const k of [key, ...below]) {
+      setSessionExtra(this.db, k, { stoppedAll: now });
+      // You stopped it: no "Finished" notice comes for the work it was waiting on.
+      this.heldDone.delete(k);
+    }
     const mine = await this.stopOwn(key);
     for (const k of below) await this.stopOwn(k).catch(() => {});
     return { turn: mine.turn, tasks: mine.tasks, children: running.get(key)?.size ?? 0 };

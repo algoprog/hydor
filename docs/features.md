@@ -1313,7 +1313,8 @@ programs shows each program's version and what is out, with Check now, Update no
   correction until the turn ends instead. Quote any part of a reply, or of your own
   messages, into your next message.
 - Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a push
-  notification on your phone with the app closed (a desktop app shows the system's own notifications, with its window
+  notification on your phone with the app closed (finished means nothing it started still runs: while its background
+  tasks, such as a command or a monitor, or its subagents are still at work, the notice waits until they end) (a desktop app shows the system's own notifications, with its window
   in front, behind or closed, none for the session you are looking at, and a click opens the session); agents and
   apps' steps can also send you one themselves (notify_user) for what cannot wait. A plain yes-or-no approval has
   Approve and Deny right on the notification (where the browser shows buttons; a desktop app's have none: click to

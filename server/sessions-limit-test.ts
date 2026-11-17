@@ -66,7 +66,8 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     // What watchStatus would otherwise run for real.
     notify: () => {},
     keepEnding: () => {},
-    helpersAtWork: () => false,
+    heldDone: new Map<string, number>(),
+    stillAtWork: () => false,
     runningHelpers: () => new Map(),
     lastReply: () => null,
     queueSummary: () => {},
@@ -95,6 +96,8 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     resumeAfterLimit: async () => {},
   };
   m.afterTurn = proto.afterTurn.bind(m);
+  m.finishedNotice = proto.finishedNotice.bind(m);
+  m.releaseHeld = proto.releaseHeld.bind(m);
   m.afterLimit = proto.afterLimit.bind(m);
   m.switchAtLimit = proto.switchAtLimit.bind(m);
   m.switchForSubagents = proto.switchForSubagents.bind(m);
@@ -131,6 +134,76 @@ function quickTurn(t: ReturnType<typeof manager>, extra: Record<string, unknown>
   t.m.endedTurns.set(KEY, Date.now() - 500);
   t.watchStatus([summary('idle', extra)]);
 }
+
+// ---- the "Finished" notice waits while what the session started still runs ----------------------------
+
+/** watchStatus with the real notice parts, recording the notices; a held one goes out 30 ms after its work ends. */
+function noticing() {
+  const t = manager();
+  const notices: { kind: string; body?: string }[] = [];
+  let current: unknown = summary('idle');
+  t.m.notify = (n: { kind: string }) => notices.push(n);
+  t.m.stillAtWork = proto.stillAtWork.bind(t.m);
+  t.m.releaseHeld = (key: string) => proto.releaseHeld.call(t.m, key, 30);
+  t.m.summary = () => current;
+  const look = (s: unknown) => {
+    current = s;
+    t.watchStatus([s]);
+  };
+  /** Its turn (of `ms`) ends now, with these background tasks still listed. */
+  const turnEnds = (ms: number, tasks: unknown[]) => {
+    t.m.statuses.set(KEY, { status: 'working', turnStart: Date.now() - ms });
+    look(summary('idle', { live: { status: 'idle', backgroundTasks: tasks } }));
+  };
+  return { t, notices, look, turnEnds };
+}
+const command = (status = 'running') => ({ id: 'b1', kind: 'local_bash', description: 'npm run build', status });
+const done = (notices: { kind: string }[]) => notices.filter((n) => n.kind === 'done').length;
+
+test('finished notice: held while a background command still runs, sent once it ends with no turn after it', async () => {
+  const { t, notices, look, turnEnds } = noticing();
+  turnEnds(60_000, [command()]);
+  await sleep(1700);
+  assert.equal(done(notices), 0);
+  assert.ok(t.m.heldDone.has(KEY));
+  // The command ends, and the agent takes no turn on it.
+  look(summary('idle', { live: { status: 'idle', backgroundTasks: [] } }));
+  await sleep(150);
+  assert.equal(done(notices), 1);
+  assert.equal(t.m.heldDone.has(KEY), false);
+});
+
+test('finished notice: a held one goes out at the end of the next turn, however short, once nothing runs', async () => {
+  const { notices, turnEnds } = noticing();
+  turnEnds(60_000, [command()]);
+  // The command ends and wakes the agent for a 2-second turn.
+  turnEnds(2_000, [command('completed')]);
+  await sleep(1700);
+  assert.equal(done(notices), 1);
+  // A short turn with no notice held sends none, as before.
+  turnEnds(2_000, []);
+  await sleep(1700);
+  assert.equal(done(notices), 1);
+});
+
+test('finished notice: sent at once with nothing running; held while a Hydor subagent works; dropped when the process ends', async () => {
+  const { t, notices, look, turnEnds } = noticing();
+  turnEnds(60_000, []);
+  await sleep(1700);
+  assert.equal(done(notices), 1);
+  t.m.runningHelpers = () => new Map([[KEY, new Set(['claude:child'])]]);
+  turnEnds(60_000, []);
+  await sleep(1700);
+  assert.equal(done(notices), 1);
+  assert.ok(t.m.heldDone.has(KEY));
+  // Its process ends: the notice held for that work no longer comes, even once the subagent is done.
+  look(summary('off', { live: null }));
+  assert.equal(t.m.heldDone.has(KEY), false);
+  t.m.runningHelpers = () => new Map();
+  look(summary('idle', { live: { status: 'idle', backgroundTasks: [] } }));
+  await sleep(150);
+  assert.equal(done(notices), 1);
+});
 
 // ---- watchStatus -> afterTurn ---------------------------------------------------------
 
