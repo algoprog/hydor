@@ -278,7 +278,7 @@ Geprüft wird nach jedem Modellaufruf. Der Durchlauf stoppt nach dem Aufruf, der
 
 - Der Agent stoppt. Unter dem Durchlauf steht „Am Ausgabenlimit gestoppt“ mit Verbrauch, Limit und **Limit erhöhen …**. Eine Benachrichtigung nennt die Sitzung.
 - Ihre laufenden Hydor-Subagenten stoppen ebenfalls. Ihr Hinweis sagt, dass die Sitzung, die sie gestartet hat, ihr Ausgabenlimit erreicht hat, mit **Öffnen**, um dorthin zu gehen.
-- Neue Nachrichten warten. Gesendeter Text wird nicht weitergegeben, sondern bleibt mit einem Limit-Hinweis im Feld. Die Warteschlange bleibt angehalten, bis du das Limit erhöhst oder entfernst.
+- Neue Nachrichten warten. Gesendeter Text wird nicht weitergegeben, sondern kommt mit einem Limit-Hinweis zurück ins Feld. Die Warteschlange bleibt angehalten, bis du das Limit erhöhst oder entfernst.
 
 ### Das Limit erhöhen oder entfernen
 

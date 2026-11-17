@@ -14,7 +14,8 @@ import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog
 import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
 import { activityOf, confirmResume, inBackground, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, releaseSentPictures, sendingPictures, type Attachment } from '../../lib/attachments';
-import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
+import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText, keepSending, sendDone } from '../../lib/drafts';
+import { sendingMessage } from '../../lib/outgoing';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
@@ -310,6 +311,28 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     if (list.length) setAtts((l) => [...l, ...list]);
   };
 
+  // A message that did not go goes back to its box, ahead of what was written there since: into its own session's box
+  // wherever that is now (this box may show another session by then, or none).
+  const shownKey = useRef(key);
+  shownKey.current = key;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const giveBack = (k: string, t: string, list: Attachment[]) => {
+    const join = (cur: string) => [t, cur].filter((x) => x.trim()).join('\n\n');
+    if (mounted.current && shownKey.current === k) {
+      setText(join);
+      setAtts((cur) => [...list, ...cur]);
+    } else {
+      keepDraftText(k, join(draftText(k)));
+      keepDraftFiles(k, [...list, ...draftFiles(k)]);
+    }
+  };
+
   /** `opposite`: Ctrl/Cmd+Enter, which steers instead of queueing (or the other way round). */
   // The id a message goes with: the same each time it is sent again (its answer lost on the way, or Send pressed again
   // after an error), so the server sends it once; a new one once it went, or once what is sent changes.
@@ -320,17 +343,41 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     if ((!t && !atts.length) || busy || locked) return;
     if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
     const queue = working && !takeover && (waitsMemory || (followUpPref() === 'queue') !== opposite);
+    const list = atts;
     setBusy(true);
     // The message shows these pictures the moment it does, not once the agent has written it down (lib/attachments.ts).
-    const went = sendingPictures(key, t, atts, queue);
-    const what = `${takeover ? 'takeover' : queue ? 'queue' : 'message'}\u0000${t}\u0000${atts.map((a) => `${a.id}:${a.name}`).join('|')}`;
+    const went = sendingPictures(key, t, list, queue);
+    // The message shows at once, in the conversation or with the messages waiting, as it will once the server has it,
+    // and the box is free for the next (lib/outgoing.ts). Not a command ("/compact"): each agent shows those its own way.
+    const tl = useTimeline.getState().byKey[key];
+    const sent = list.filter((a) => !a.path);
+    const shown = t.startsWith('/')
+      ? null
+      : sendingMessage(key, {
+          text: t,
+          files: sent.filter((a) => !a.image).map((a) => a.name),
+          images: sent.filter((a) => a.image).length,
+          pictures: sent.filter((a) => a.image && a.url).map((a) => a.url!),
+          // Not loaded yet: the transcript's messages from about when it was sent.
+          after: tl && !(tl.loading && !tl.items.length) ? tl.total : null,
+          before: (useLive.getState().byKey[key]?.overlay.items ?? []).filter((i) => i.kind === 'user').map((i) => i.id),
+          waiting: (s.queue ?? []).map((m) => m.id),
+          queued: queue,
+        });
+    // The box is empty again, but its text is kept until the server answers: should the page close, it comes back.
+    keepSending(key, t);
+    setText('');
+    setAtts([]);
+    window.dispatchEvent(new Event('wa:follow'));
+    const what = `${takeover ? 'takeover' : queue ? 'queue' : 'message'}\u0000${t}\u0000${list.map((a) => `${a.id}:${a.name}`).join('|')}`;
     if (sending.current?.what !== what) sending.current = { what, id: `send-${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}` };
     const sendId = sending.current.id;
     try {
       // An answer lost on the way is asked for again, with the same id: the message goes once.
+      let r: { queued?: boolean } | undefined;
       for (let tries = 0; ; tries++) {
         try {
-          await post(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(atts), sendId });
+          r = await post<{ queued?: boolean }>(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(list), sendId });
           break;
         } catch (e) {
           if (!lostOnTheWay(e) || tries >= 2) throw e;
@@ -338,17 +385,17 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         }
       }
       sending.current = null;
-      went(true);
-      window.dispatchEvent(new Event('wa:follow'));
-      // Also when the page was left while it went.
-      clearDraft(key);
-      setText('');
       // Its pictures went with it; the other files have nothing to release.
-      setAtts([]);
+      went(true);
+      // The server may have put it in the queue instead (the agent takes one message at a time): it shows there.
+      shown?.(true, r?.queued);
     } catch (e) {
       went(false);
+      shown?.(false);
+      giveBack(key, t, list);
       toastError(e);
     } finally {
+      sendDone(key);
       setBusy(false);
     }
   };

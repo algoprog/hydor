@@ -1410,6 +1410,9 @@ programs shows each program's version and what is out, with Check now, Update no
   over the app on a phone) with a slider or side by side, and arrows to the reply's other screens.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
+- A message you send shows in the conversation at once, with the agent at work under it (or in the queue, when
+  it waits there), before the agent has it, and the box is free for the next; one that does not go through comes
+  off again and goes back into the box, with a notice that says why.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
   edit, attachments included. Custom picks up follow-ups (including a queued message's Send now) at the next
   model step, after running tools finish. An older Custom process kept across an app update queues the

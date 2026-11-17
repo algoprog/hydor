@@ -909,12 +909,22 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
             )}
             {files.length > 0 && (
               <div className={cx('flex flex-wrap gap-1.5', text && 'mt-2')}>
-                {files.map((f) => (
-                  <button key={f} onClick={() => openFile(f)} title={f} className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-bg-1 px-2 py-1 text-[12px] text-fg-2 transition-colors hover:text-fg">
-                    <FileText size={12} className="shrink-0" />
-                    <span className="truncate">{basename(f)}</span>
-                  </button>
-                ))}
+                {files.map((f) =>
+                  // On its way, it names its files: they open once they are on this computer.
+                  item.sending ? (
+                    <span key={f} title={f} className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-bg-1 px-2 py-1 text-[12px] text-fg-2">
+                      <FileText size={12} className="shrink-0" />
+                      <span translate="no" className="truncate">
+                        {f}
+                      </span>
+                    </span>
+                  ) : (
+                    <button key={f} onClick={() => openFile(f)} title={f} className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-bg-1 px-2 py-1 text-[12px] text-fg-2 transition-colors hover:text-fg">
+                      <FileText size={12} className="shrink-0" />
+                      <span className="truncate">{basename(f)}</span>
+                    </button>
+                  ),
+                )}
               </div>
             )}
 
@@ -950,7 +960,13 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
             )}
             {canEdit && (
               <>
-                <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded px-1 transition-colors hover:text-fg" title="Go back to just before this message and send something else">
+                {/* On its way (not in the session yet), it can be gone back to once it is there. */}
+                <button
+                  onClick={() => setEditing(true)}
+                  disabled={item.sending}
+                  className="inline-flex items-center gap-1 rounded px-1 transition-colors enabled:hover:text-fg disabled:opacity-50"
+                  title={item.sending ? 'Sending…' : 'Go back to just before this message and send something else'}
+                >
                   <Pencil size={11} /> Edit from here
                 </button>
                 <span>·</span>

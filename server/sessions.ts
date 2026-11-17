@@ -1344,19 +1344,19 @@ export class SessionManager extends EventEmitter {
   }
 
   /** Messages the page sent lately, by the id it gave each (`sendOnce`), for ten minutes. */
-  private sends = new Map<string, { at: number; done: Promise<void> }>();
+  private sends = new Map<string, { at: number; done: Promise<unknown> }>();
 
   /**
    * Sends a message once for the id the page gave it (its own for each message it sends). Sent again because its
    * answer was lost on the way (a phone that slept, a network that changed), it is not sent twice: the page gets what
    * came of the first. Without an id, `send` simply runs.
    */
-  sendOnce(id: string | undefined, send: () => Promise<void> | void): Promise<void> {
+  sendOnce<T>(id: string | undefined, send: () => Promise<T> | T): Promise<T> {
     if (!id) return Promise.resolve(send());
     const now = Date.now();
     for (const [k, v] of this.sends) if (now - v.at > 10 * 60_000) this.sends.delete(k);
     const known = this.sends.get(id);
-    if (known) return known.done;
+    if (known) return known.done as Promise<T>;
     const done = Promise.resolve().then(send);
     // One that failed may be sent again.
     done.catch(() => this.sends.delete(id));
@@ -2784,16 +2784,21 @@ export class SessionManager extends EventEmitter {
     return [...imgs, ...docs];
   }
 
-  async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []) {
+  /** Hands a message to the session's agent; 'queued' when it went to the queue instead, for the agent to take later. */
+  async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []): Promise<'queued' | undefined> {
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
+    const queued = () => {
+      this.enqueue(key, text, images, files);
+      return 'queued' as const;
+    };
     // The agent has not had its first message yet (it waits for the project's memory): this one goes after it.
-    if (this.gates.has(key)) return this.enqueue(key, text, images, files);
+    if (this.gates.has(key)) return queued();
     await beforeSend(key);
     await this.switchBeforeSend(key).catch(() => {});
     if (!this.lives.has(key)) await this.start(key);
     const l = this.live(key);
     // Custom accepts follow-ups between steps; other ACP agents take only one prompt at a time.
-    if (l.agent === 'acp' && (l.adapter.state.status === 'starting' || (!this.isCustom(key) && ['working', 'waiting'].includes(l.adapter.state.status)))) return this.enqueue(key, text, images, files);
+    if (l.agent === 'acp' && (l.adapter.state.status === 'starting' || (!this.isCustom(key) && ['working', 'waiting'].includes(l.adapter.state.status)))) return queued();
     await this.snapshot(key);
     this.limitHits.delete(key);
     this.userStopped.delete(key);
@@ -2805,7 +2810,7 @@ export class SessionManager extends EventEmitter {
     } catch (e) {
       // A Custom process started before the update may not know _hydor/message. Keep the user's
       // original message and attachments in the persistent queue, without stopping its running turn.
-      if (this.isCustom(key) && e instanceof RpcError && e.code === -32601 && e.message.includes('_hydor/message')) return this.enqueue(key, text, images, files);
+      if (this.isCustom(key) && e instanceof RpcError && e.code === -32601 && e.message.includes('_hydor/message')) return queued();
       throw e;
     }
     this.touchApp(key);
@@ -2816,7 +2821,7 @@ export class SessionManager extends EventEmitter {
    * process first (two writers corrupt the transcript), then resumes it, optionally with a
    * message. Not for Codex, whose one app-server process serves every thread in its window.
    */
-  async takeover(key: string, text = '', images: ImageInput[] = [], files: FileInput[] = []) {
+  async takeover(key: string, text = '', images: ImageInput[] = [], files: FileInput[] = []): Promise<'queued' | undefined> {
     this.external.poll();
     const ext = this.external.get(key);
     if (ext) {
@@ -2825,8 +2830,8 @@ export class SessionManager extends EventEmitter {
       this.external.poll();
       if (this.external.get(key)) throw new HttpError(409, `The session is still running in ${ext.client}.`);
     }
-    if (text.trim() || images.length || files.length) await this.send(key, text, images, files);
-    else await this.start(key);
+    if (text.trim() || images.length || files.length) return this.send(key, text, images, files);
+    await this.start(key);
   }
 
   async answer(key: string, approvalId: string, a: ApprovalAnswer): Promise<{ key: string } | void> {

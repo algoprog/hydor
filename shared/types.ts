@@ -205,6 +205,8 @@ export type UserItem = BaseItem & {
   handoff?: HandoffInfo;
   /** Byte offset of the transcript line that holds the message's images (they are read from there to show). */
   imageAt?: number;
+  /** Page-only: a message this page is sending, shown until the session's own copy takes its place (web/src/lib/outgoing.ts). */
+  sending?: boolean;
 };
 
 /** A conversation carried over from a session of another agent (see server/handoff.ts). */

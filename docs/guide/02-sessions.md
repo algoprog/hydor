@@ -164,7 +164,7 @@ At the top of a session:
 
 The conversation reads like a chat. Each turn is your message, the agent's work, and the reply it ended on:
 
-- **Your message** shows on the right, with its pictures and attached files. A long one folds to its first lines; **Show more** opens it.
+- **Your message** shows on the right, with its pictures and attached files, the moment you send it, before the agent has it: the agent shows at work under it, and the message box is free for your next one. Should it not go through (no connection, a spending cap reached), it comes off again and goes back into the message box, with a notice that says why. A long one folds to its first lines; **Show more** opens it.
 - **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with what the turn cost on the right ("≈ $0.12"): click it for the turn's [time and cost](/guide/sessions#a-turns-time-and-cost). On a plan (Claude Code, Codex) that is what its tokens would cost at API prices, not what you pay; with no price known for the model, the tokens show there instead. While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work's outline grows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s (47m)". A finished turn folds its work away; click the line to open it.
 - **The outline of the work**: each short note the agent writes between its steps (what it found, what it does next) starts a part, and the steps it then takes go in it. A finished part is one line with a check: the note in a few words ("Run the checkout tests first to see what fails", "Apply the discount first and round once"), how many steps it took and the lines it changed. Click it for the whole note and each step. The part under way shows the agent's note in full and, under it, the step being taken now, such as "Editing total.ts · 4 s"; click that line for the part's steps so far. Steps taken before the agent's first note make a part named for what they did ("Ran 3 commands, read 2 files"). A long turn shows its latest parts; **Show 12 earlier parts** shows the rest.
 - **Steps** are named in plain words: "Run the tests", "Read index.ts", "Searched the web", with the command itself in quieter type. Click one to see what it did. Claude Code runs a command, or another step that changes things, on its own; the steps of Hydor's own that the agent asked for after it in the same message (web searches, page reads…) wait until it ends. Such a step shows **Waiting** in place of its clock, quietly, until it really starts; then its clock counts from that moment, and a finished step shows the time it really took. The outline's line for the step under way names the step really running.
@@ -290,7 +290,7 @@ The message box says which: "Send a follow-up into the running turn" or "Queue a
 
 ## Manage the queue
 
-Queued messages wait above the message box, numbered in the order they go out. One goes out each time a turn ends, by itself.
+Queued messages wait above the message box, numbered in the order they go out; one you queue shows there the moment you send it. One goes out each time a turn ends, by itself.
 
 - Drag a message by its handle to change the order.
 - **Send now** (the arrow): sends it at once, into the running turn.

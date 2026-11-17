@@ -1,6 +1,6 @@
 // Messages waiting to go out when the running turn ends. Drag one by its handle to change the
 // order; edit one to change its text or its attachments (take some off, add more).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, KeyboardSensor, MouseSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -9,6 +9,7 @@ import { childReplyOf } from '@shared/children';
 import type { QueuedAttachment, QueuedMessage, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { attachmentPayload, dropSentPictures, queuedPicturesOf, readAttachments, releaseAttachments, useSentPictures, type Attachment, type SentPictures } from '../../lib/attachments';
+import { copiesInQueue, sendingQueued, sentShown, useOutgoing, type Outgoing } from '../../lib/outgoing';
 import { toast, toastError } from '../../lib/store';
 import { AttachmentList } from '../../components/Attachments';
 import { openLightbox } from '../../components/Lightbox';
@@ -106,6 +107,40 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
           <Trash2 size={13} />
         </button>
       </span>
+    </div>
+  );
+}
+
+/** A message sent to the queue from here, shown at once until the queue's copy takes its place (lib/outgoing.ts). */
+function SendingRow({ o, n }: { o: Outgoing; n: number }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-xl border border-dashed border-line-2 bg-panel/60 py-2 pr-2 pl-1" title="Sending…">
+      <span className="mt-px shrink-0 p-0.5 text-fg-3 opacity-40" aria-hidden>
+        <GripVertical size={14} />
+      </span>
+      <span className="tnum mt-0.5 w-3 shrink-0 text-[11px] text-fg-3">{n}</span>
+      <div className="min-w-0 flex-1">
+        {o.text && (
+          <div translate="no" className="line-clamp-2 text-[13.5px] leading-snug whitespace-pre-wrap text-fg-2">
+            {o.text}
+          </div>
+        )}
+        {(o.pictures.length > 0 || o.files.length > 0) && (
+          <div className={cx('flex flex-wrap gap-1.5', o.text && 'mt-1.5')}>
+            {o.pictures.map((src) => (
+              <img key={src} src={src} alt="" className="h-9 w-9 rounded-lg border border-line object-cover" />
+            ))}
+            {o.files.map((f, i) => (
+              <span key={`${i}:${f}`} className="flex h-7 max-w-[220px] items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-2 text-[12px] text-fg-2" title={f}>
+                <FileText size={13} className="shrink-0 text-fg-3" />
+                <span translate="no" className="truncate">
+                  {f}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -223,7 +258,15 @@ export function QueueList({ s }: { s: SessionSummary }) {
   const sensors = useSensors(useSensor(MouseSensor, MOUSE), useSensor(AreaTouchSensor, TOUCH), useSensor(KeyboardSensor, KEYS));
   const sentList = useSentPictures((x) => x.byKey[s.key]);
   const list = order ? order.map((id) => server.find((m) => m.id === id)).filter((m): m is QueuedMessage => !!m) : server;
-  if (!list.length) return null;
+  // Messages sent here from this page show at once, each until the queue's own copy does (lib/outgoing.ts).
+  const outgoing = useOutgoing((x) => x.byKey[s.key]);
+  const copies = useMemo(() => copiesInQueue(outgoing, s.queue ?? []), [outgoing, s.queue]);
+  const sending = sendingQueued(outgoing, copies);
+  useEffect(() => {
+    const ids = [...copies.keys()].filter((id) => !outgoing?.find((o) => o.id === id)?.shown);
+    if (ids.length) sentShown(s.key, ids);
+  }, [copies, outgoing, s.key]);
+  if (!list.length && !sending.length) return null;
   const sent = queuedPicturesOf(sentList, server);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
@@ -256,6 +299,9 @@ export function QueueList({ s }: { s: SessionSummary }) {
           )}
         </SortableContext>
       </DndContext>
+      {sending.map((o, i) => (
+        <SendingRow key={o.id} o={o} n={list.length + i + 1} />
+      ))}
     </div>
   );
 }

@@ -657,8 +657,9 @@ const sendIdOf = (b: { sendId?: unknown }) => (typeof b.sendId === 'string' && S
 app.post('/api/sessions/:key/message', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
-  await sessions.sendOnce(sendIdOf(b), () => sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
-  return { ok: true };
+  const r = await sessions.sendOnce(sendIdOf(b), () => sessions.send(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []));
+  // Put in the queue instead (the agent takes one message at a time): the page shows it there.
+  return { ok: true, ...(r === 'queued' ? { queued: true } : {}) };
 });
 // ---- scheduled and webhook tasks ------------------------------------------------------------
 
@@ -759,8 +760,8 @@ app.post('/api/sessions/:key/queue/:id/delete', async (req) => {
 app.post('/api/sessions/:key/takeover', async (req) => {
   const b = (req.body ?? {}) as any;
   noteUserMessage();
-  await sessions.takeover(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
-  return { ok: true };
+  const r = await sessions.takeover(K(req), String(b.text ?? ''), Array.isArray(b.images) ? b.images : [], Array.isArray(b.files) ? b.files : []);
+  return { ok: true, ...(r === 'queued' ? { queued: true } : {}) };
 });
 app.post('/api/sessions/:key/approvals/:id', async (req) => {
   const b = (req.body ?? {}) as any;

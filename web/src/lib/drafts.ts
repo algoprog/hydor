@@ -8,13 +8,43 @@ import { machineKey } from './machine';
 const textKey = (key: string) => `wa.draft.${key}`;
 const files = new Map<string, Attachment[]>();
 
-/** What is written in session `key`'s box and not sent. */
+/** What is written in session `key`'s box and not sent, with a message a page was sending when it closed ahead of it. */
 export function draftText(key: string): string {
   try {
-    return localStorage.getItem(textKey(key)) ?? '';
+    const text = localStorage.getItem(textKey(key)) ?? '';
+    const lost = sendingNow.has(key) ? null : localStorage.getItem(sendingKey(key));
+    if (!lost) return text;
+    // The page closed (a reload, a phone that dropped it) before the server answered: it may not have gone.
+    localStorage.removeItem(sendingKey(key));
+    const both = [lost, text].filter((t) => t.trim()).join('\n\n');
+    localStorage.setItem(textKey(key), both);
+    return both;
   } catch {
     return '';
   }
+}
+
+const sendingKey = (key: string) => `wa.sending.${key}`;
+/** The sessions this page sends a message to now. */
+const sendingNow = new Set<string>();
+
+/**
+ * Session `key`'s box sends `text`, and is empty again at once: the text is kept until the server answers (`sendDone`),
+ * so that should the page close meanwhile, its box has it back.
+ */
+export function keepSending(key: string, text: string) {
+  sendingNow.add(key);
+  try {
+    if (text) localStorage.setItem(sendingKey(key), text);
+  } catch {}
+}
+
+/** The server answered the message session `key`'s box sent (it went, or it is back in the box). */
+export function sendDone(key: string) {
+  sendingNow.delete(key);
+  try {
+    localStorage.removeItem(sendingKey(key));
+  } catch {}
 }
 
 export function keepDraftText(key: string, text: string) {

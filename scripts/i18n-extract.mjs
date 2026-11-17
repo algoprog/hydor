@@ -336,6 +336,8 @@ const NO_WORDS = new Set([
   'shared/outbox-words.ts',
   // An answer card as text and Markdown, for the clipboard and a conversation's export (files, not the pages' words).
   'shared/answer-ui/text.ts',
+  // A message on its way, its files listed as the server lists them (split off again before it shows).
+  'web/src/lib/outgoing.ts',
 ]);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
   if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;

@@ -1,8 +1,9 @@
-import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ArrowDown, Check, ChevronRight, FileDiff, FilePen, FilePlus2, FileText, FileX, Info, X } from 'lucide-react';
 import type { Agent, ApprovalRequest, ExternalState, FileChange, LiveOverlay, LiveState, SystemItem, TimelineItem, ToolItem, TurnItem, UserItem } from '@shared/types';
 import { api, enc } from '../../lib/api';
 import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/attachments';
+import { copiesInConversation, onItsWay, sendingItems, sentShown, settlesAt, useOutgoing } from '../../lib/outgoing';
 import { basename, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useSessions, useTimeline } from '../../lib/store';
@@ -924,6 +925,9 @@ const SegmentView = memo(function SegmentView({
   );
 });
 
+/** The agent as it shows under a message on its way to it (one object, so the turn under it is not drawn again for it). */
+const ON_ITS_WAY: LiveInfo = { status: 'working' };
+
 export function Timeline({
   sessionKey,
   agent,
@@ -1151,7 +1155,19 @@ export function Timeline({
   };
   // The same function from one render to the next: the turns read it through FollowCtx, and a new one drew them all again.
   const following = useCallback(() => stick.current, []);
-  const merged = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
+  const withLive = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
+  // Messages sent from here show at once, before the session has them: each until its own copy shows (lib/outgoing.ts).
+  const outgoing = useOutgoing((s) => s.byKey[sessionKey]);
+  const saved = tl?.items.length ?? 0;
+  const copies = useMemo(() => copiesInConversation(outgoing, withLive, saved), [outgoing, withLive, saved]);
+  const merged = useMemo(() => {
+    const on = sendingItems(outgoing, copies);
+    return on.length ? [...withLive, ...on] : withLive;
+  }, [withLive, outgoing, copies]);
+  useEffect(() => {
+    const ids = [...copies.keys()].filter((id) => !outgoing?.find((o) => o.id === id)?.shown);
+    if (ids.length) sentShown(sessionKey, ids);
+  }, [copies, outgoing, sessionKey]);
   const lastSegs = useRef<Segment[] | null>(null);
   const segs = useMemo(() => (lastSegs.current = keepUnchanged(lastSegs.current, segment(merged))), [merged]);
   // Pictures sent from this page, in their messages until those show their own (lib/attachments.ts).
@@ -1182,8 +1198,22 @@ export function Timeline({
   const here = !!live && live.status !== 'exited' && live.status !== 'error';
   const ext = here ? null : (external ?? null);
   const working = here ? live!.status === 'working' || live!.status === 'starting' || live!.status === 'waiting' : !!ext && ext.status !== 'idle';
+  // A message on its way to an agent that was not at work: the agent shows at work under it already, until its session
+  // says so itself (a moment after the server took the message at most: drawn again then).
+  const [drawn, redraw] = useReducer((n: number) => n + 1, 0);
+  const workedAt = useRef(0);
+  if (working) workedAt.current = Date.now();
+  const sendingNow = !working && onItsWay(outgoing, Date.now(), workedAt.current);
+  const settles = sendingNow ? settlesAt(outgoing) : null;
+  useEffect(() => {
+    if (settles == null) return;
+    const t = setTimeout(redraw, Math.max(0, settles - Date.now()) + 20);
+    return () => clearTimeout(t);
+  }, [settles, drawn]);
   const liveInfo: LiveInfo | null = !working
-    ? null
+    ? sendingNow
+      ? ON_ITS_WAY
+      : null
     : ext
       ? { status: ext.status, since: ext.since, worked, where: ext.client, note: ext.detail === 'input needed' ? undefined : ext.detail }
       : { status: live!.status, since: live!.turnStartedAt, worked, memory: live!.memory === 'building' };
@@ -1236,6 +1266,8 @@ export function Timeline({
     const copy = known.current && savedCopy(tl?.items ?? [], o);
     if (copy) known.current!.add(copy.id);
   }
+  // Nor the session's copy of a message sent from here, which takes the place of the message as it was sent.
+  if (known.current) for (const [id, copy] of copies) if (!outgoing?.find((o) => o.id === id)?.queued) known.current.add(copy);
   // The same function from one render to the next, so a turn that did not change is not drawn again for it.
   const fresh = useCallback((id: string) => !!known.current && !known.current.has(id), []);
 

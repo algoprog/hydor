@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { QueuedMessage, TimelineItem } from '@shared/types';
 import { mu } from './machine';
+import { splitAttachedFiles } from './outgoing';
 import { toast, useTimeline } from './store';
 
 /**
@@ -85,12 +86,8 @@ export function releaseAttachments(list: Attachment[]) {
   for (const a of list) if (a.url && !a.path) URL.revokeObjectURL(a.url);
 }
 
-/** A sent message lists non-image attachments at its end; split them off for display. */
-export function splitAttachedFiles(text: string): { text: string; files: string[] } {
-  const m = /(?:^|\n+)Attached files:\n((?:- [^\n]+\n?)+)$/.exec(text);
-  if (!m) return { text, files: [] };
-  return { text: text.slice(0, m.index), files: m[1].trim().split('\n').map((l) => l.slice(2)) };
-}
+/** A sent message lists non-image attachments at its end; split them off for display (lib/outgoing.ts). */
+export { splitAttachedFiles };
 
 // ---- pictures of messages sent from this page ---------------------------------------------
 

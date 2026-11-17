@@ -278,7 +278,7 @@ The cap is checked after each model call, so a turn stops right after the call t
 
 - The agent stops, and a note under the turn says "Stopped at the spending cap" with what was spent of the cap, and **Raise the cap…**. A notice names the session that stopped.
 - Its Hydor subagents that are running stop too. Their note says that the session that started them reached its spending cap, with **Open it** to go there.
-- New messages wait. A message you send is not sent: a notice says the cap is reached, and your text stays in the message box. Messages in the queue are held ("The queue is on hold") until you raise or remove the cap.
+- New messages wait. A message you send is not sent: a notice says the cap is reached, and your text goes back into the message box. Messages in the queue are held ("The queue is on hold") until you raise or remove the cap.
 
 ### Raise or remove the cap
 
