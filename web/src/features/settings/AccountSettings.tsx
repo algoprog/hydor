@@ -2,16 +2,20 @@
 // limit, and the agents’ programs on this machine.
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExternalLink, KeyRound, LogIn, LogOut, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow } from '@shared/types';
+import type { AccountAgent, AccountStatus, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow } from '@shared/types';
+import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toast, toastError, useAppSettings, useLogins } from '../../lib/store';
-import { AgentIcon, agentName } from '../../components/AgentIcon';
+import { AgentIcon } from '../../components/AgentIcon';
 import { CopyButton } from '../../components/Markdown';
 import { Badge, Button, cx, Dialog, MenuItem, MenuSep, Throbber, inputCls, Segmented, Switch, useConfirm } from '../../components/ui';
 import { Group, MoreMenu, Row, Stack } from './kit';
 
-export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: Agent; account?: AgentAccount; open: boolean; onClose: () => void; onDone: () => void }) {
+/** An account program's name, as the app shows it. */
+const agentName = (a: AccountAgent) => ACCOUNT_AGENT_NAMES[a];
+
+export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: AccountAgent; account?: AgentAccount; open: boolean; onClose: () => void; onDone: () => void }) {
   // An added account signs in into its own folder.
   const q = account ? `?account=${encodeURIComponent(account.id)}` : '';
   const who = account ? `${agentName(agent)} (${account.name})` : agentName(agent);
@@ -69,27 +73,31 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
     <Dialog open={open} onClose={cancel} title={`Sign in to ${who}`} width={520}>
       {!flow ? (
         <div className="space-y-4">
-          <Segmented
-            value={method}
-            onChange={setMethod}
-            options={
-              agent === 'claude'
-                ? [
-                    { value: 'claudeai', label: 'Claude subscription' },
-                    { value: 'console', label: 'Console (API billing)' },
-                  ]
-                : [
-                    { value: 'device', label: 'Device code' },
-                    { value: 'browser', label: 'Browser redirect' },
-                  ]
-            }
-          />
+          {agent !== 'grok' && (
+            <Segmented
+              value={method}
+              onChange={setMethod}
+              options={
+                agent === 'claude'
+                  ? [
+                      { value: 'claudeai', label: 'Claude subscription' },
+                      { value: 'console', label: 'Console (API billing)' },
+                    ]
+                  : [
+                      { value: 'device', label: 'Device code' },
+                      { value: 'browser', label: 'Browser redirect' },
+                    ]
+              }
+            />
+          )}
           <p className="text-[13px] text-fg-2">
             {agent === 'claude'
               ? 'You get a sign-in link. Approve access in your browser; the page then shows a code to paste back here.'
-              : method === 'device'
-                ? 'You get a link and a one-time code. Open the link on any device, sign in to ChatGPT, and enter the code. This page notices when you are done.'
-                : 'You get a sign-in link. After you sign in, your browser tries to open a localhost page and fails: copy that address and paste it here.'}
+              : agent === 'grok'
+                ? 'You get a link and a one-time code. Open the link on any device, sign in with your Grok account, and confirm the code. This page notices when you are done.'
+                : method === 'device'
+                  ? 'You get a link and a one-time code. Open the link on any device, sign in to ChatGPT, and enter the code. This page notices when you are done.'
+                  : 'You get a sign-in link. After you sign in, your browser tries to open a localhost page and fails: copy that address and paste it here.'}
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={cancel}>
@@ -123,7 +131,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
           )}
           {flow.code && (
             <div>
-              <div className="mb-1.5 text-[12px] font-medium text-fg-2">2. Enter this code</div>
+              <div className="mb-1.5 text-[12px] font-medium text-fg-2">{agent === 'grok' ? '2. Confirm this code' : '2. Enter this code'}</div>
               <div className="flex items-center gap-3">
                 <span className="rounded-xl border border-line-2 bg-bg-1 px-4 py-2 font-mono text-[22px] font-semibold tracking-[0.15em]">{flow.code}</span>
                 <CopyButton text={flow.code} />
@@ -185,7 +193,7 @@ function AccountRow({
   actions = [],
   apiKey,
 }: {
-  agent: Agent;
+  agent: AccountAgent;
   a: AccountStatus | null;
   account?: AgentAccount;
   onChange: () => void;
@@ -395,7 +403,7 @@ function ApiKeyDialog({ target, onClose, onDone }: { target: { id: string; name:
   );
 }
 
-type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[]; apiKeys?: Record<string, boolean> };
+type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; grok?: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[]; apiKeys?: Record<string, boolean> };
 
 export function AccountSettings() {
   const [accounts, setAccounts] = useState<AccountsInfo | null>(null);
@@ -449,15 +457,18 @@ export function AccountSettings() {
       : []),
   ];
   // Each agent’s own sign-in, then the accounts added for it.
-  const rows = (agent: Agent, main: AccountStatus | undefined) => [
-    <AccountRow
-      key={agent}
-      agent={agent}
-      a={main ?? null}
-      onChange={load}
-      apiKey={agent === 'claude' && !!accounts?.apiKeys?.main}
-      actions={agent === 'claude' ? keyActions('main', 'Claude Code') : []}
-    />,
+  const rows = (agent: AccountAgent, main: AccountStatus | undefined) => [
+    // Grok Build's own sign-in only when it is set up; its added accounts show either way.
+    (main || agent !== 'grok') && (
+      <AccountRow
+        key={agent}
+        agent={agent}
+        a={main ?? null}
+        onChange={load}
+        apiKey={agent === 'claude' && !!accounts?.apiKeys?.main}
+        actions={agent === 'claude' ? keyActions('main', 'Claude Code') : []}
+      />
+    ),
     ...(accounts?.extra ?? [])
       .filter((x) => x.agent === agent)
       .map((x) => (
@@ -476,12 +487,14 @@ export function AccountSettings() {
         />
       )),
   ];
-  const limits = !!accounts?.extra.length || !!accounts?.claude.loggedIn || !!accounts?.extra.some((x) => x.agent === 'claude');
+  // Switching at a limit is for Claude Code's and Codex's added accounts (Grok Build's have no usage the app reads).
+  const switchable = !!accounts?.extra.some((x) => x.agent !== 'grok');
+  const limits = switchable || !!accounts?.claude.loggedIn || !!accounts?.extra.some((x) => x.agent === 'claude');
   return (
     <Stack>
       <Group
         title="Accounts"
-        info="The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
+        info="The Claude Code, Codex and Grok Build sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add an account
@@ -490,15 +503,16 @@ export function AccountSettings() {
       >
         {rows('claude', accounts?.claude)}
         {rows('codex', accounts?.codex)}
+        {(accounts?.grok || accounts?.extra.some((x) => x.agent === 'grok')) && rows('grok', accounts?.grok)}
       </Group>
       {limits && (
         <Group title="At a usage limit">
-          {!!accounts?.extra.length && <AutoSwitchSetting />}
+          {switchable && <AutoSwitchSetting />}
           {(accounts?.claude.loggedIn || accounts?.extra.some((x) => x.agent === 'claude')) && <ApiCreditSetting />}
         </Group>
       )}
       <AgentPrograms />
-      <AddAgentAccount open={adding} onClose={() => setAdding(false)} onAdded={load} />
+      <AddAgentAccount open={adding} grok={!!accounts?.grok} onClose={() => setAdding(false)} onAdded={load} />
       <ApiKeyDialog target={keyFor} onClose={() => setKeyFor(null)} onDone={load} />
       {confirmNode}
     </Stack>
@@ -638,8 +652,8 @@ function AgentPrograms() {
   );
 }
 
-function AddAgentAccount({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: () => void }) {
-  const [agent, setAgent] = useState<Agent>('claude');
+function AddAgentAccount({ open, grok, onClose, onAdded }: { open: boolean; grok: boolean; onClose: () => void; onAdded: () => void }) {
+  const [agent, setAgent] = useState<AccountAgent>('claude');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState<AgentAccount | null>(null);
@@ -677,12 +691,13 @@ function AddAgentAccount({ open, onClose, onAdded }: { open: boolean; onClose: (
         }
       >
         <div className="space-y-3 text-[13px]">
-          <Segmented<Agent>
+          <Segmented<AccountAgent>
             value={agent}
             onChange={setAgent}
             options={[
               { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={14} /> },
               { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={14} /> },
+              ...(grok ? [{ value: 'grok' as const, label: 'Grok Build', icon: <AgentIcon agent="grok" size={14} /> }] : []),
             ]}
           />
           <label className="block">

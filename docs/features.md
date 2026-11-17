@@ -98,13 +98,21 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   network (bubblewrap on Linux, Seatbelt on a Mac), or ask each time where that can't be done (Windows, some containers); its title, notices and memory send nothing out; a
   lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode,
-  Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own). Their approvals become approval cards you can answer
+  Qwen Code, Goose, Kimi CLI, Auggie, Grok Build, or a command of your own). Their approvals become approval cards you can answer
   from a phone, and the app's guidelines, memory notes and skills reach them with the first message; the app's tools
   reach every one that takes MCP servers (through a small bridge when it takes only commands). The app installs the
   ones it can get with npm by itself (with an ACP adapter when the agent needs one, without install scripts); the
   others show their own install command.
-- Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
-  shows its own usage and limits, and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
+- Grok Build, xAI's coding agent, is one click in More agents (the app installs it from npm when first needed, or uses
+  yours, also xAI's own installer's `~/.grok/bin`) and runs over ACP with the app's tools, approval cards and Grok's
+  models. Sign in with a Grok subscription under Settings → Accounts: a link and a one-time code to confirm on any
+  device, no pasting; an `XAI_API_KEY` works instead. A session started while signed out stops and says where to sign
+  in. A session whose ACP agent can no longer reopen it starts afresh, with a note, instead of failing.
+- Several accounts per agent: sign in more than one Claude Code, Codex or Grok Build account and pick one per session
+  (Grok accounts each keep their own sign-in and Grok history, and share the CLI's config, rules, skills, plugins and
+  MCP sign-ins; a Grok session's Account chip moves it to another from the next message, its history with it); each
+  shows its own usage and limits (Claude Code and Codex only: Grok has no usage meters, no switching at a limit and no
+  API credit yet), and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on (a Claude Code
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error), and the app's own quick
@@ -1234,10 +1242,10 @@ the memory it needs, about how fast, and the disk it takes. Installed models sho
 with one click. Models without native tool calls are told about the tools in their own format, or in the
 prompt, and their calls are read from what they write.
 
-The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode…,
+The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode, Grok Build…,
 with npm into the app's folder), and stay up to date: once a day each is brought to its newest version, the
 app's copies with npm and your own installs with their own updater (`claude update`, `codex update`,
-`opencode upgrade`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
+`opencode upgrade`, `grok update`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
 new version is kept only once it starts and answers the way the sessions use it (no sign-in or usage needed),
 within a minute of the computer being awake or two more on a second start; one that does not is undone, and the
 sessions keep running the version before. Settings → Accounts → Agent

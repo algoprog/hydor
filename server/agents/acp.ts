@@ -272,17 +272,24 @@ export class AcpLive extends LiveAdapter {
         noted = true;
         return this.rpc.call(method, { ...params, mcpServers: [] }, 120_000);
       });
+    let loaded = false;
     if (resume && this.acpSession && this.caps.loadSession) {
       // The agent replays the conversation as updates: the transcript has it already.
       this.loading = true;
       try {
         const r = await signedIn(() => open('session/load', { sessionId: this.acpSession, cwd: this.o.cwd })).catch(auth);
         this.offers(r);
+        loaded = true;
+      } catch (e) {
+        // Not signed in is said as it is; an agent that no longer has the session (its folder gone) starts a new one.
+        if (e instanceof HttpError) throw e;
+        this.record({ t: 'note', text: `${this.o.def.name} could not reopen this session (${(e as Error).message.slice(0, 200)}): it starts afresh here, without the conversation above.` });
       } finally {
         this.loading = false;
       }
-    } else {
-      if (resume && this.acpSession) this.record({ t: 'note', text: `${this.o.def.name} cannot reopen earlier sessions: it starts afresh here, without the conversation above.` });
+    }
+    if (!loaded) {
+      if (resume && this.acpSession && !this.caps.loadSession) this.record({ t: 'note', text: `${this.o.def.name} cannot reopen earlier sessions: it starts afresh here, without the conversation above.` });
       const r = await signedIn(() => open('session/new', { cwd: this.o.cwd })).catch(auth);
       this.acpSession = String(r?.sessionId ?? '');
       if (!this.acpSession) throw new Error('The agent did not open a session');

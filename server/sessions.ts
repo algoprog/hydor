@@ -16,6 +16,7 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
 import { formContent } from '../shared/forms.ts';
+import { isGrok } from '../shared/grok.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
 import { keptOfTranscript, type Indexer } from './indexer/index.ts';
@@ -36,7 +37,7 @@ import { addNote, dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross, shareTrust } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, grokSessionMove, historyMoves, moveAcross, shareTrust } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -1104,6 +1105,8 @@ export class SessionManager extends EventEmitter {
     // A tool call's input as the model writes it: Pages draws a page while it is being written.
     adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
     adapter.on('ratelimit', (info: any) => {
+      // Plan limits are Claude Code's and Codex's: an ACP agent (Grok Build too) has none the app reads.
+      if (adapter.agent === 'acp') return;
       // Limits belong to the account the session runs as.
       const account = this.lives.get(key)?.account;
       const tell = (u: AgentUsage) => this.emit('usage', account ? { accounts: { [account]: u } } : { [adapter.agent]: u });
@@ -1251,9 +1254,13 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An ACP agent (Gemini CLI, OpenCode…): its own command, driven over the Agent Client Protocol. */
-  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
+  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
+    // Grok Build is the one ACP agent with accounts: an added one is its own GROK_HOME (sign-in and sessions), and the
+    // session resumes as it, also after a restart of the app (the run's options keep it).
+    const account = isGrok(def) ? opts.account || undefined : undefined;
+    if (account) Object.assign(env, accountEnv(this.db, 'grok', account));
     // Missing: installed now when the app knows its package (Gemini CLI, OpenCode…).
     const cmd = findCommand(def.command, env) ?? (await ensureCommand(def.command).catch(() => null));
     if (!cmd) throw new HttpError(400, `${def.name} is not installed here (no ${def.command} on the PATH)${def.hint ? `. Install it: ${def.hint}` : ''}`);
@@ -1266,12 +1273,12 @@ export class SessionManager extends EventEmitter {
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
     Object.assign(env, add.env, acpEnvFor(def.command, env));
-    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };
+    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, account, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
     const adapter = new AcpLive(runner, o);
     await runner.connect();
-    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner, acpAgent: def.id, firstNotes: add.notes.join('\n\n') || undefined };
+    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner, account, acpAgent: def.id, firstNotes: add.notes.join('\n\n') || undefined };
     this.attach(l);
     try {
       await adapter.boot(!!opts.resume);
@@ -1377,6 +1384,8 @@ export class SessionManager extends EventEmitter {
     if (ask) o = { ...o, extra: { ...o.extra, memoryBuild: true } };
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
     let account = o.account || undefined;
+    // Only Grok Build has accounts among the ACP agents.
+    if (o.agent === 'acp' && !isGrok(acpAgent(this.db, o.acpAgent))) account = undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
     if (o.agent !== 'acp' && autoSwitchOn(this.db)) {
       const lim = this.controlFor(o.agent, account).lastUsage?.limited;
@@ -1958,20 +1967,41 @@ export class SessionManager extends EventEmitter {
     if (this.lives.get(key) === l) this.lives.delete(key);
   }
 
+  /** Whether an ACP session is one of Grok Build, the one ACP agent with accounts. */
+  isGrokSession(key: string): boolean {
+    if (!key.startsWith('acp:')) return false;
+    const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
+    const id = this.lives.get(key)?.acpAgent ?? r?.acp_agent;
+    try {
+      return !!id && isGrok(acpAgent(this.db, id));
+    } catch {
+      return false;
+    }
+  }
+
   /**
-   * Moves a Claude Code or Codex session's history into another of the agent's accounts (undefined: the CLI's
+   * Moves a Claude Code, Codex or Grok Build session's history into another of the agent's accounts (undefined: the CLI's
    * own), which it runs as from then on. Its agent process stops first; it is started again when used.
    */
   async moveToAccount(key: string, to: string | undefined) {
     const agent = agentOfKey(key);
-    if (agent === 'acp') throw new HttpError(400, 'Not available for this agent');
+    if (agent === 'acp' && !this.isGrokSession(key)) throw new HttpError(400, 'Not available for this agent');
     const from = this.accountOf(key);
     if ((from ?? '') === (to ?? '')) return;
-    accountEnv(this.db, agent, to);
+    accountEnv(this.db, agent === 'acp' ? 'grok' : agent, to);
     if (this.external.get(key)) throw new HttpError(409, 'This session is running in another program');
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') throw new HttpError(409, 'Wait for the turn to end, or stop it');
     await this.stopAndWait(key);
+    if (agent === 'acp') {
+      // Grok keeps its own copy of the conversation in its home, so it goes along; with none (never started, or it is gone) the next start begins afresh.
+      const grokId = acpSessionOf(acpTranscriptPath(key.slice(4)));
+      const move = grokId ? grokSessionMove(this.db, grokId, from, to) : null;
+      if (move) moveAcross(...move);
+      this.db.prepare('update app_sessions set account = ? where key = ?').run(to ?? null, key);
+      this.queueSummary(key);
+      return;
+    }
     const file = this.transcriptFor(key);
     const moves = file && fs.existsSync(file) ? historyMoves(this.db, agent, key.slice(key.indexOf(':') + 1), file, from, to) : [];
     // Codex finds a thread only in its account's folder; a Claude session with no transcript has nothing to move.
@@ -2011,8 +2041,8 @@ export class SessionManager extends EventEmitter {
   /** Sign-in, usage and models for an agent's account: the CLI's own, or an added one. */
   controlFor(agent: 'claude', account?: string | null): ClaudeControl;
   controlFor(agent: 'codex', account?: string | null): CodexControl;
-  controlFor(agent: Agent, account?: string | null): ClaudeControl | CodexControl;
-  controlFor(agent: Agent, account?: string | null): ClaudeControl | CodexControl {
+  controlFor(agent: 'claude' | 'codex', account?: string | null): ClaudeControl | CodexControl;
+  controlFor(agent: 'claude' | 'codex', account?: string | null): ClaudeControl | CodexControl {
     if (!account) return agent === 'claude' ? this.claude : this.codex;
     let c = this.extraControls.get(account);
     if (!c) {
@@ -2063,11 +2093,11 @@ export class SessionManager extends EventEmitter {
     const effort = (cfg.effort ?? prefs.effort) || undefined;
     const mode = (cfg.mode ?? prefs.mode) || (agent === 'claude' ? 'default' : 'auto');
     const hasTranscript = !!this.transcriptFor(key) && fs.existsSync(this.transcriptFor(key)!);
-    // The account it ran as: its history is in that account's folder, where the agent looks for it.
-    const account = agent === 'acp' ? undefined : this.accountOf(key);
+    // The account it ran as: its history is in that account's folder, where the agent looks for it (an ACP agent has one only for Grok Build).
+    const account = this.accountOf(key);
     if (agent === 'acp') {
       const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
-      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, acpAgent: r?.acp_agent ?? undefined, prompt });
+      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, account, acpAgent: r?.acp_agent ?? undefined, prompt });
     } else await this.spawn(agent, cwd, agent === 'claude' ? { sessionId: id, resume: hasTranscript, model, effort, mode, account, prompt } : { threadId: id, model, effort, mode, account, prompt });
     this.db
       .prepare(

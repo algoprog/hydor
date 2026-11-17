@@ -100,21 +100,21 @@
 
 ### Λογαριασμοί
 
-[Ρυθμίσεις → Λογαριασμοί](/settings?s=accounts): οι συνδέσεις Claude Code και Codex που χρησιμοποιεί κάθε συνεδρία. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
+[Ρυθμίσεις → Λογαριασμοί](/settings?s=accounts): οι συνδέσεις Claude Code, Codex και Grok Build που χρησιμοποιεί κάθε συνεδρία. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
-- [**Λογαριασμοί**](/settings?s=accounts&find=Accounts): Οι συνδέσεις του Claude Code και του Codex που χρησιμοποιούν οι συνεδρίες, και όσοι λογαριασμοί προσθέσετε.
+- [**Λογαριασμοί**](/settings?s=accounts&find=Accounts): Οι συνδέσεις του Claude Code, του Codex και του Grok Build που χρησιμοποιούν οι συνεδρίες, και όσοι λογαριασμοί προσθέσετε.
 - [**Αλλαγή λογαριασμού στο όριο**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Μια συνεδρία που εξαντλεί τη χρήση της συνεχίζει με άλλον λογαριασμό.
 - [**Χρήση πίστωσης API στο όριο**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): Όταν κάθε λογαριασμός Claude Code φτάσει στο όριό του, οι συνεδρίες συνεχίζουν με χρέωση σε ένα κλειδί API της Anthropic.
-- [**Προγράμματα πρακτόρων**](/settings?s=accounts&find=Agent%20programs): Ποια προγράμματα πρακτόρων είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων.
+- [**Προγράμματα πρακτόρων**](/settings?s=accounts&find=Agent%20programs): Ποια προγράμματα πρακτόρων, μεταξύ τους το Grok Build, είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων.
 - [**Αυτόματη ενημέρωση**](/settings?s=accounts&find=Update%20automatically): Κρατά το Claude Code, το Codex και τα άλλα προγράμματα πρακτόρων στη νεότερη έκδοσή τους.
 
 ### Περισσότεροι πράκτορες
 
-[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose και άλλοι πράκτορες που μιλούν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
+[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που μιλούν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
 - [**Οι πράκτορές σας**](/settings?s=agents&find=Your%20agents): Πράκτορες που εμφανίζονται δίπλα στο Claude Code και το Codex.
 - [**Προσθήκη δικού σας**](/settings?s=agents&find=Add%20your%20own): Οποιοσδήποτε πράκτορας που υποστηρίζει ACP, μέσω της εντολής του.
-- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code και Goose, έτοιμα για προσθήκη.
+- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose και Grok Build, έτοιμα για προσθήκη.
 
 ### Μοντέλα
 
