@@ -8,7 +8,7 @@ import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, Meter, severityColor } from '../../components/charts';
 import { Button, cx, Throbber, Tabs } from '../../components/ui';
-import { SystemHeader } from '../system/SystemHeader';
+import { PageHeader } from '../layout/PageHeader';
 import { StatsBody } from '../stats/StatsPage';
 import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
@@ -155,9 +155,10 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
   }, [refresh]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* A tab of System since 0.37.0 (its place in the sidebar went to Agents); Limits, Activity and the Arena are its own. */}
-      <SystemHeader
-        tab="usage"
+      {/* A tool of its own in the sidebar again since 0.82.0 (a tab of System from 0.37.0); Limits, Activity and the Arena are its own. */}
+      <PageHeader
+        title="Usage"
+        tip="usage"
         sub={SUBS[tab]}
         actions={
           tab === 'limits' && (

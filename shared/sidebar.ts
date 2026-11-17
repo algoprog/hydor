@@ -5,16 +5,17 @@
 import type { Agent } from './types.ts';
 
 /**
- * Every tool, in its usual order: the Library, Spaces, Apps, Agents and Browser, then System, Settings, Search and Help,
- * five to a row on top and four under (the sidebar's grid). System holds Files, Git, Terminal, Preview, the computer's monitor and Usage (tools of their own before
- * 0.19.0, Usage before 0.37.0). A capability's tool (Library, Spaces, Apps, Agents, Browser) gives its name with its entry
- * (WebFeature.nav). Orders kept on the server name them, so a name stays when its tool's page or label changes.
+ * Every tool, in its usual order: the Library, Spaces, Apps, Agents, Browser and Usage, then System, Settings, Search and
+ * Help, five to a row (the sidebar's grid). System holds Files, Git, Terminal, Preview and the computer's monitor (tools of
+ * their own before 0.19.0). Usage was a tab of System from 0.37.0 to 0.82.0 and is a tool of its own again. A capability's
+ * tool (Library, Spaces, Apps, Agents, Browser) gives its name with its entry (WebFeature.nav). Orders kept on the server
+ * name them, so a name stays when its tool's page or label changes.
  */
-export const SIDEBAR_TOOLS = ['pages', 'spaces', 'apps', 'agents', 'browser', 'system', 'settings', 'search', 'help'] as const;
+export const SIDEBAR_TOOLS = ['pages', 'spaces', 'apps', 'agents', 'browser', 'usage', 'system', 'settings', 'search', 'help'] as const;
 export type SidebarTool = (typeof SIDEBAR_TOOLS)[number];
 
 /** Tools that moved into System: an order kept from before still names them, and they are passed over. */
-export const RETIRED_TOOLS = ['files', 'git', 'terminal', 'preview', 'usage'];
+export const RETIRED_TOOLS = ['files', 'git', 'terminal', 'preview'];
 
 export const isSidebarTool = (v: unknown): v is SidebarTool => (SIDEBAR_TOOLS as readonly unknown[]).includes(v);
 

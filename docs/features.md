@@ -1657,7 +1657,7 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, System, Settings, Search, Help; Usage is a tab of System, nine tools in two rows) stay in
+- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, Usage, System, Settings, Search, Help: ten tools in two rows of five) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,

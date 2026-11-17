@@ -25327,5 +25327,7 @@
 "your own browsing bookmarks browser page favourites":"δική σας περιήγηση σελιδοδείκτες σελίδα προγράμματος περιήγησης αγαπημένα",
 "your own browsing chrome extensions add-ons browser page desktop app":"δική σας περιήγηση επεκτάσεις chrome πρόσθετα σελίδα προγράμματος περιήγησης εφαρμογή υπολογιστή",
 "A link in the zip file is not allowed: {0}":"Δεν επιτρέπεται σύνδεσμος μέσα στο αρχείο zip: {0}",
-"The zip file unpacks to more than {0}":"Το αρχείο zip αποσυμπιέζεται σε περισσότερα από {0}"
+"The zip file unpacks to more than {0}":"Το αρχείο zip αποσυμπιέζεται σε περισσότερα από {0}",
+"usage limits plan quota reset tokens sidebar":"χρήση όρια πακέτο ποσόστωση επαναφορά tokens πλευρική στήλη usage",
+"What you have used of each plan, and when it resets (Usage, in the sidebar)":"Πόσο έχετε χρησιμοποιήσει από κάθε πακέτο και πότε μηδενίζεται (Χρήση, στην πλευρική στήλη)"
 }

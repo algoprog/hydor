@@ -6,7 +6,7 @@ Claude Code, Codex and Grok Build run on plans with usage limits, and every mode
 
 ## Open the Usage page
 
-Open **System** in the sidebar (on a phone, open the sidebar first) and click its **Usage** tab. A thin bar under the System icon shows at a glance how much is left across all your paid Claude Code, Codex and Grok Build subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left.
+Open **Usage** in the sidebar (on a phone, open the sidebar first). A thin bar under the Usage icon shows at a glance how much is left across all your paid Claude Code, Codex and Grok Build subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left.
 
 The [Usage page](/usage) has three tabs:
 

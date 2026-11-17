@@ -24071,5 +24071,9 @@
   "your own browsing bookmarks browser page favourites": "eigenes surfen lesezeichen browser-seite favoriten",
   "your own browsing chrome extensions add-ons browser page desktop app": "eigenes surfen chrome erweiterungen add-ons browser-seite desktop-app",
   "A link in the zip file is not allowed: {0}": "Eine Verknüpfung in der ZIP-Datei ist nicht erlaubt: {0}",
-  "The zip file unpacks to more than {0}": "Die ZIP-Datei wird entpackt größer als {0}"
+  "The zip file unpacks to more than {0}": "Die ZIP-Datei wird entpackt größer als {0}",
+  "system computer overview machine files git terminal preview monitor experiments": "System, Computer, Übersicht, Rechner, Dateien, Git, Terminal, Vorschau, Monitor, Experimente",
+  "This computer: its files, Git, terminals, the web apps running on it, how busy it is, and the jobs it runs for you": "Dieser Computer: Dateien, Git, Terminals, laufende Web-Apps, Auslastung und Jobs, die er für dich ausführt",
+  "usage limits plan quota reset tokens sidebar": "Nutzung, Limits, Tarif, Kontingent, Zurücksetzen, Token, Seitenleiste",
+  "What you have used of each plan, and when it resets (Usage, in the sidebar)": "Was du von jedem Tarif genutzt hast und wann das Limit zurückgesetzt wird (Nutzung, in der Seitenleiste)"
 }

@@ -73,14 +73,15 @@ Jede Sitzungszeile hat ein Menü: Fahre darüber und klicke rechts auf **⋯**, 
 
 ### Die Werkzeuge unten
 
-Unten in der Seitenleiste stehen die App-Werkzeuge mit fünf Einträgen in der oberen Zeile und vier darunter:
+Unten in der Seitenleiste stehen die App-Werkzeuge in zwei Zeilen mit je fünf Einträgen:
 
 - **Bibliothek**: erstellte Werkzeuge und Seiten, gespeicherte Bilder und Videos und deine Veröffentlichungen. Siehe [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
 - **Projekte**: Sitzungen, Dokumente und Richtlinien je Projekt sowie das für alle Sitzungen durchsuchbare gemeinsame Wissen. Siehe [Projekte und Wissen](/guide/projects).
 - **Apps**: wiederkehrende Aufgaben, für die du ein Formular ausfüllst und ein Agent die Arbeit übernimmt. Siehe [Apps](/guide/apps).
 - **Agenten**: deine und die mitgelieferten Agenten mit Aufgaben, Arbeitsorten, Zeitplänen, Modellen und Zuständigkeiten. Siehe [Agenten](/guide/agents).
 - **Browser**: ein eigener Browser in der App mit Tabs, Lesezeichen und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
-- **System**: dieser Computer mit Tabs für **Übersicht** zu Zustand und aktuellem Inhalt der Werkzeuge, **Dateien** zum Durchsuchen, Öffnen und Bearbeiten, **Git** für Repositorys, Änderungen, Branches und Verlauf, **Terminal** für auch nach einem Seitenwechsel weiterlaufende Shells, **Vorschau** für lokale Entwicklungsserver, nur auf den eigenen Seiten dieses Computers, **Überwachen** mit Live-Anzeigen für Prozessoren, Grafikkarten, Arbeitsspeicher, Datenträger und aktive Programme sowie **Nutzung** mit verbrauchtem Kontingent, Rücksetzzeiten, **Aktivität** und **Arena**. Ein schmaler Balken unter dem Systemsymbol zeigt das übrige Kontingent deiner bezahlten Abos oder, falls du keine hast, deiner kostenlosen Abos. Ist nichts mehr übrig, wird er rot. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git) und [Nutzung, Limits und Kosten](/guide/usage).
+- **Nutzung**: wie viel du vom Kontingent jedes Abos verbraucht hast und wann es zurückgesetzt wird, mit den Tabs **Aktivität** und **Arena**. Ein schmaler Balken unter dem Symbol zeigt das übrige Kontingent deiner bezahlten Abos oder, falls du keine hast, deiner kostenlosen Abos. Ist nichts mehr übrig, wird er rot. Siehe [Nutzung, Limits und Kosten](/guide/usage).
+- **System**: dieser Computer mit Tabs für **Übersicht** zu Zustand und aktuellem Inhalt der Werkzeuge, **Dateien** zum Durchsuchen, Öffnen und Bearbeiten, **Git** für Repositorys, Änderungen, Branches und Verlauf, **Terminal** für auch nach einem Seitenwechsel weiterlaufende Shells, **Vorschau** für lokale Entwicklungsserver, nur auf den eigenen Seiten dieses Computers und **Überwachen** mit Live-Anzeigen für Prozessoren, Grafikkarten, Arbeitsspeicher, Datenträger und aktive Programme. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git).
 - **Einstellungen**: sämtliche App-Einstellungen. Ein Punkt zeigt eine verfügbare neue Version an. Siehe [Alle Einstellungen](/guide/settings).
 - **Suchen**: öffnet dieselbe Suche wie Strg+K.
 - **Hilfe**: öffnet diesen Leitfaden, in dem du auch einen Agenten zur App befragen kannst. Hier startet auch die Willkommenstour.

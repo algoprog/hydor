@@ -32,6 +32,9 @@ runs inside the app.
   window closed. **Settings → Browser** lists it first; Chrome and Chromium are still there to choose.
 - **The terminal**: `hydor` chat shows what an agent's browser waits for (a login, a payment, an address on this
   computer, a button to allow, a page's question) and lets you answer it, and `hydor run` stops with needs-answer.
+- **Usage** has its own button in the sidebar again, right after **Browser**, with the bar that shows how much your
+  plans have left; **System** keeps Files, Git, Terminal, Preview, Monitor and Experiments. The sidebar's ten tools sit
+  in two rows of five.
 
 ## 0.81.0 · 17 November 2026
 

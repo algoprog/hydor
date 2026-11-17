@@ -6,7 +6,7 @@ Claude Code, Codex und Grok Build nutzen Abonnements mit Nutzungslimits. Gleichz
 
 ## Die Nutzungsseite öffnen
 
-Öffne **System** in der Seitenleiste und dann den Tab **Nutzung**. Auf dem Smartphone öffnest du zuerst die Seitenleiste. Ein schmaler Balken unter dem System-Symbol zeigt die verbleibende Nutzung aller bezahlten Claude-Code-, Codex- und Grok-Build-Abonnements. Für jedes Abo zählt dabei das am weitesten ausgeschöpfte Limit. Hast du ausschließlich kostenlose Abos, zeigt der Balken diese; ohne Abos entfällt er. Sind alle Kontingente aufgebraucht, wird er rot. Beim Darüberfahren siehst du die verbleibende Nutzung je Abo.
+Öffne **Nutzung** in der Seitenleiste. Auf dem Smartphone öffnest du zuerst die Seitenleiste. Ein schmaler Balken unter dem Nutzungssymbol zeigt die verbleibende Nutzung aller bezahlten Claude-Code-, Codex- und Grok-Build-Abonnements. Für jedes Abo zählt dabei das am weitesten ausgeschöpfte Limit. Hast du ausschließlich kostenlose Abos, zeigt der Balken diese; ohne Abos entfällt er. Sind alle Kontingente aufgebraucht, wird er rot. Beim Darüberfahren siehst du die verbleibende Nutzung je Abo.
 
 Die [Nutzungsseite](/usage) hat drei Tabs:
 

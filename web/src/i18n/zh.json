@@ -25343,5 +25343,7 @@
 "your own browsing bookmarks browser page favourites":"你自己的浏览 书签 浏览器页面 收藏夹",
 "your own browsing chrome extensions add-ons browser page desktop app":"你自己的浏览 chrome 扩展程序 附加组件 浏览器页面 桌面应用",
 "A link in the zip file is not allowed: {0}":"ZIP 文件中不允许包含链接：{0}",
-"The zip file unpacks to more than {0}":"这个 ZIP 文件解压后超过 {0}"
+"The zip file unpacks to more than {0}":"这个 ZIP 文件解压后超过 {0}",
+"usage limits plan quota reset tokens sidebar":"用量 限额 套餐 配额 重置 tokens 侧边栏 usage",
+"What you have used of each plan, and when it resets (Usage, in the sidebar)":"你已用掉每个套餐的多少，以及何时重置（侧边栏中的“用量”）"
 }
