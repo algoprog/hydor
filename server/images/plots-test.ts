@@ -582,9 +582,7 @@ if (ff) {
   const v = getVideo(db, d1.src.slice('naget-video:'.length));
   ok(v && fs.statSync(v.file).size === fs.statSync(clip).size && getAsset(db, d1.poster.slice('naget-asset:'.length))?.mime === 'image/jpeg', 'the video kept as decks keep theirs, its first frame a kept picture');
   const left = [...videoJobs.values()].find((j) => j.job.job === j1.job);
-  // The job is marked ended before its asynchronous cleanup finishes; inspect only this job's directory.
-  const downloaded = left ? (await left.f.done).files[0]?.path : undefined;
-  ok(left?.ended && downloaded && await until(() => !fs.existsSync(path.dirname(downloaded)), 5000), 'the download’s folder gone');
+  ok(left?.ended && !fs.readdirSync(os.tmpdir()).some((n) => n.startsWith('hydor-video-') && fs.existsSync(path.join(os.tmpdir(), n, 'video.mp4'))), 'the download’s folder gone');
 
   // From a kept picture: the frame sent, the shape left to the picture.
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP4z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
