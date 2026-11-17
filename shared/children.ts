@@ -11,7 +11,8 @@ export interface ChildNote {
   acpAgent?: string;
   acpName?: string;
   model?: string;
-  /** "Custom · Qwen3 Coder", "Claude Code · sonnet". */
+  /** Who it is, as its lead was told: its program and model ("Custom · Qwen3 Coder"), after the agent of yours it works as and
+   * before its tier when it has them ("Translator · Claude Code · haiku · Quick"). childLabel gives the program and model alone. */
   label: string;
   title: string;
   /** The start of its brief. */
@@ -27,6 +28,16 @@ export interface ChildNote {
   /** It runs again one tier up: the child it takes over from, that child's tier, and why it fell short. */
   steppedFrom?: { key: string; tier: Tier; why: string };
   startedAt: number;
+}
+
+/** A child's program and model ("Claude Code · sonnet"): its label without the agent of yours it works as and its tier, which its
+ * card and the terminal show by themselves (a tier's label is its id, capitalised; this also reads tiers newer than this version). */
+export function childLabel(n: Pick<ChildNote, 'label' | 'as' | 'tier'>): string {
+  let l = n.label;
+  if (n.as && l.startsWith(`${n.as} · `)) l = l.slice(n.as.length + 3);
+  const cut = l.lastIndexOf(' · ');
+  if (n.tier && cut > 0 && l.slice(cut + 3).toLowerCase() === n.tier.toLowerCase()) l = l.slice(0, cut);
+  return l;
 }
 
 /** Settings → Capabilities → Subagents. */

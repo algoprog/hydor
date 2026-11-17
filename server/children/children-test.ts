@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { childReplyOf, type ChildNote } from '../../shared/children.ts';
+import { childLabel, childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { Agent, AgentModel, LiveState, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { budget } from '../budget/index.ts';
@@ -634,6 +634,8 @@ test('as: one of the user’s agents works the part, with its own settings and t
   const d = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
   assert.equal(d.as, 'Translator');
   assert.equal(d.asId, translator.id);
+  // Its card names the agent and the tier by themselves, so its program and model come without them.
+  assert.equal(childLabel(d), 'Claude Code · haiku');
   // An agent of yours asks only those it lists.
   const lone = saveAssistant(db, { name: 'Lone', instructions: 'Work alone.' });
   const k2 = leadKey('t4');

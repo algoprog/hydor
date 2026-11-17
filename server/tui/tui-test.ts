@@ -195,6 +195,9 @@ test('the turn’s line, subagents, tiers and a spending cap', () => {
   assert.equal(modelLabel('auto'), 'Automatic');
   const child: ChildNote = { child: 'claude:c1', agent: 'claude', label: 'Claude Code · sonnet', title: 'Add --json to export', brief: '', cwd: '/', tier: 'standard', startedAt: 0 };
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: child }, L)![0], '  ◆ Subagent started: Add --json to export · Claude Code · sonnet · Standard');
+  // As the server keeps it (the agent of yours it works as and its tier in its label too): each named once.
+  const named = { ...child, title: 'Translate', label: 'Translator · Claude Code · haiku · Quick', as: 'Translator', tier: 'quick' as const };
+  assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: named }, L)![0], '  ◆ Subagent started: Translate · Translator · Claude Code · haiku · Quick');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'auto', tier: 'max', label: 'Fable 5.2', why: 'a hard proof' } }, L)![0], '  ◆ Automatic picked Max (Fable 5.2): a hard proof');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'stepUp', tier: 'best', label: 'Opus 5.5' } }, L)![0], '  ◆ Stepped up to Best (Opus 5.5)');
   assert.match(noteLines({ id: 'n', key: 'k', kind: 'budget', at: 0, data: { capUsd: 5, spentUsd: 5.02 } }, L)![0], /Stopped at its spending cap: \$5\.02 of \$5\.00/);

@@ -2,7 +2,7 @@
 // in a card, so the two places look alike. Its title, what it is (a Hydor subagent, or the agent of yours it works as), its program
 // and model, its tier, how it stands, what it cost, a way in, and Stop while it works; a line under it when it was stepped up.
 import { researchOf } from '@shared/research';
-import type { ChildNote } from '@shared/children';
+import { childLabel, type ChildNote } from '@shared/children';
 import type { SessionNote } from '@shared/features';
 import { tierLabel } from '@shared/tiers';
 import { useSessions } from '../../lib/store';
@@ -26,7 +26,7 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
         <>
           {d.as ? <span translate="no">{d.as}</span> : <span title={HYDOR_SUBAGENT_HINT}>{researcher ? 'Researcher' : 'Hydor subagent'}</span>}
           <span>·</span>
-          <span className="truncate">{d.label}</span>
+          <span className="truncate">{childLabel(d)}</span>
           {d.tier && (
             <span data-i18n="agents" className="shrink-0 rounded-full bg-accent-soft px-1.5 text-[11px] text-fg-2">
               {tierLabel(d.tier)}

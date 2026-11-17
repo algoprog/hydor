@@ -15,6 +15,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { agentMode, type Assistant } from '../../shared/assistants.ts';
 import type { AppField } from '../../shared/apps.ts';
+import { childLabel } from '../../shared/children.ts';
 import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, ServerEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
 import { enc, spentOf, type Conn } from './client.ts';
@@ -1198,7 +1199,7 @@ export class Chat {
     const lines = hs.map((h, i) => {
       const s = h.summary;
       const state = s ? statusWord(s, p) || p.dim(h.replaced ? 'Stepped up' : 'Done') : p.dim('…');
-      return truncate(`${INDENT}${p.accent(String(i + 1))}  ${state}  ${h.note.title}${p.dim(` · ${[h.note.label, h.note.tier ? tierName(h.note.tier) : '', money(s?.stats.costUsd)].filter(Boolean).join(' · ')}`)}`, this.look.width);
+      return truncate(`${INDENT}${p.accent(String(i + 1))}  ${state}  ${h.note.title}${p.dim(` · ${[h.note.as, childLabel(h.note), h.note.tier ? tierName(h.note.tier) : '', money(s?.stats.costUsd)].filter(Boolean).join(' · ')}`)}`, this.look.width);
     });
     this.say(...lines, ...bgLines, p.dim(`${INDENT}/subagents <n> shows a subagent’s conversation`));
   }

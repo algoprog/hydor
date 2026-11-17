@@ -3,7 +3,7 @@
 // end of a turn, subagents (Hydor's child sessions) starting and finishing, tier notes, and approval cards with their choices.
 // The words follow the web app's (web/src/features/session: items.tsx, outline.ts, Timeline.tsx).
 import type { BudgetNote } from '../../shared/budget.ts';
-import { childReplyOf, type ChildNote } from '../../shared/children.ts';
+import { childLabel, childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import type { ApprovalOption, ApprovalRequest, ModelOption, TimelineItem, ToolInfo, ToolItem, TurnItem } from '../../shared/types.ts';
 import { commandLabel, commandLine } from '../../web/src/lib/commands.ts';
@@ -323,7 +323,7 @@ export function noteLines(n: SessionNote, look: Look): string[] | null {
   const { p } = look;
   if (n.kind === 'child') {
     const c = n.data as ChildNote;
-    const bits = [c.label, c.tier ? tierName(c.tier) : ''].filter(Boolean).join(' · ');
+    const bits = [c.as, childLabel(c), c.tier ? tierName(c.tier) : ''].filter(Boolean).join(' · ');
     const head = c.steppedFrom ? `Subagent stepped up to ${tierName(c.tier)}: ${c.title}` : `Subagent started: ${c.title}`;
     return [truncate(`${INDENT}${p.accent('◆')} ${head}${bits ? p.dim(` · ${bits}`) : ''}`, look.width)];
   }
