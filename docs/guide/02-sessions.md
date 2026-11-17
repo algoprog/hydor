@@ -179,7 +179,7 @@ The agent may also keep a checklist (**Plan** or **To-dos**, with how many are d
 
 Day lines ("Yesterday", "Today") separate the days; a conversation all from today has none. Older messages load as you scroll up, or with **Show earlier messages**. New messages and replies come in at the end of the conversation, with no empty space left under them. Once a reply is long enough to fill the screen, the view stops at its first line and stays there as it grows, so you read a long reply from its beginning; a short one simply sits under what came before. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end, and also shows while a reply runs on below the screen.
 
-Under each finished reply are **Copy message**, **Fork from this reply** and **Read aloud**. **Fork from this reply** works on any reply of Claude Code, and on the last reply of a finished turn for Codex and Custom, since those fork a whole turn. Hover over your own message for **Edit from here** and the time it was sent.
+Under each finished reply are **Copy message**, **Fork from this reply** and **Read aloud**. **Fork from this reply** works on any reply of Claude Code, and on the last reply of a finished turn for Codex and Custom, since those fork a whole turn. Under each of your own messages, **Copy message**, **Edit from here** and the time it was sent are always shown, not only when you hover.
 
 ### A turn's time and cost
 
@@ -357,7 +357,7 @@ The fork opens, titled "… · fork", with the same agent, model, effort, permis
 
 Go back to one of your messages and say something else instead:
 
-1. Hover over your message and press **Edit from here**.
+1. Press **Edit from here** under your message.
 2. Change the text.
 3. Tick **Put the files back as they were before this message** if the agent's changes since then should be undone too.
 4. Press **Send from here** (Enter), or **Cancel** (Esc).

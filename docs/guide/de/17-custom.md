@@ -215,7 +215,7 @@ Andernfalls beschreibt das Hilfsmodell Bildinhalt und Anordnung und gibt vorhand
 
 ## Verzweigen und ab hier bearbeiten
 
-Custom-Sitzungen lassen sich wie Claude-Code- und Codex-Sitzungen über das Sitzungsmenü (⋯) → **Verzweigen** kopieren. Mit **Ab hier bearbeiten** änderst du eine frühere eigene Nachricht: Die Unterhaltung geht in einer Kopie unmittelbar vor dieser Nachricht weiter; die bisherige Sitzung wird archiviert. **Dateien auf den Stand vor dieser Nachricht zurücksetzen** macht spätere Dateiänderungen rückgängig. Bei Custom gilt das nur für Änderungen seiner eigenen Dateiwerkzeuge. Änderungen durch Befehle bleiben bestehen.
+Custom-Sitzungen lassen sich wie Claude-Code- und Codex-Sitzungen über das Sitzungsmenü (⋯) → **Verzweigen** kopieren. Mit **Von hier aus bearbeiten** änderst du eine frühere eigene Nachricht: Die Unterhaltung geht in einer Kopie unmittelbar vor dieser Nachricht weiter; die bisherige Sitzung wird archiviert. **Dateien auf den Stand vor dieser Nachricht zurücksetzen** macht spätere Dateiänderungen rückgängig. Bei Custom gilt das nur für Änderungen seiner eigenen Dateiwerkzeuge. Änderungen durch Befehle bleiben bestehen.
 
 Custom speichert Unterhaltungen auf dem Datenträger und setzt sie nach einem App-Neustart fort.
 

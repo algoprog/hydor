@@ -123,7 +123,7 @@ Eine vertrauliche Sitzung zeigt neben ihrem Titel im Sitzungskopf und in der Sei
 - **Netzwerkbeschränkung für Befehle**: Wo technisch unterstützt, führt Hydor Befehle in jedem Berechtigungsmodus ohne Netzwerkzugriff aus. Diese Beschränkung verhindert Downloads, Installationen aus dem Internet, Pushes und andere Netzwerkübertragungen durch diese Befehle. Wo sie nicht möglich ist, etwa unter Windows oder in manchen Containern, fragt jeder Befehl unabhängig vom Modus nach deiner Freigabe. Der Schlosshinweis erklärt das. Das ist keine allgemeine Netzwerkisolation der Sitzung: Zugriffe auf ein gewähltes Modell im privaten Netzwerk bleiben möglich.
 - **Weiterhin verfügbar**: Dateien im Arbeitsordner, lokal gelesene Dokumente, die Bibliothek, gemeinsames Wissen, lesender Zugriff auf deine Memory-Notizen und dein Profil ohne Ergänzungen, ebenfalls vertrauliche Hydor-Subagenten und Antwortansichten ohne Webbilder oder Karten.
 - **Eingeschränkte Weitergabe durch App-Funktionen**: Der Titel stammt nur dann vom Hilfsmodell, wenn dieses lokal läuft, andernfalls aus dem Anfang deiner Nachricht. Benachrichtigungen nennen nur „Eine vertrauliche Sitzung“ und ob sie abgeschlossen ist, dich benötigt oder fehlgeschlagen ist. Es gibt keinen Leselink, keinen Pull-Request aus dem Sitzungsmenü und keine aus der Sitzung erstellte Automation oder App. Andere Sitzungen und externe Agenten können sie nicht lesen. Antworten zeigen keine Webbilder; angezeigte Seiten laden keine externen Inhalte, weshalb etwa ein Diagramm mit einer Bibliothek aus dem Web nicht dargestellt wird. Diktieren funktioniert nur mit lokaler Spracherkennung unter [Einstellungen → Funktionen → Sprache](/settings?s=voice), Vorlesen nur mit einer Stimme auf deinem Gerät.
-- **Dauerhaft vertraulich**: Auch Abzweigungen und **Ab hier bearbeiten** bleiben vertraulich. Der Modus lässt sich für diese Sitzung nicht ausschalten, damit die bisherigen Inhalte geschützt bleiben. Starte für andere Arbeit eine neue Sitzung.
+- **Dauerhaft vertraulich**: Auch Abzweigungen und **Von hier aus bearbeiten** bleiben vertraulich. Der Modus lässt sich für diese Sitzung nicht ausschalten, damit die bisherigen Inhalte geschützt bleiben. Starte für andere Arbeit eine neue Sitzung.
 
 Die Grenzen: Hydor prüft den Standort eines Modellservers, nicht dessen Verhalten. Ein Endpunkt in deinem Netzwerk, der Anfragen an einen Onlinedienst weiterleitet, bleibt faktisch ein Onlinedienst. Für selbst kopierte, geöffnete oder anderweitig versendete Inhalte bist du verantwortlich, etwa einen Link in einer Antwort, eine aus der Bibliothek geöffnete erzeugte Seite oder einen Push auf der Git-Seite. Das gilt auch, wenn du die Sitzung auf einem anderen Gerät liest: Die App überträgt ihre Seiten wie gewohnt dorthin, gegebenenfalls durch deinen Tunnel.
 
@@ -179,7 +179,7 @@ Der Agent kann außerdem eine Checkliste als **Plan** oder **Aufgaben** mit Erle
 
 Tagestrenner wie „Gestern“ und „Heute“ trennen mehrere Tage; bei einer Unterhaltung nur von heute entfallen sie. Ältere Nachrichten werden beim Hochscrollen oder über **Frühere Nachrichten anzeigen** geladen. Neue Nachrichten und Antworten erscheinen ohne Leerraum am Unterhaltungsende. Sobald eine Antwort den Bildschirm füllt, bleibt die Ansicht an ihrem Anfang, während der Text weiterwächst. So kannst du lange Antworten von vorn lesen. Kürzere Antworten stehen einfach unter der bisherigen Unterhaltung. Scrollst du während der Arbeit nach oben, bleibt die Ansicht dort. **Neueste** bringt dich ans Ende; die Schaltfläche erscheint auch, wenn eine Antwort unterhalb des Bildschirms weiterläuft.
 
-Unter jeder abgeschlossenen Antwort stehen **Nachricht kopieren**, **Ab dieser Antwort verzweigen** und **Vorlesen**. **Ab dieser Antwort verzweigen** funktioniert bei Claude Code an jeder Antwort, bei Codex und Custom nur an der letzten Antwort eines abgeschlossenen Durchlaufs, da diese immer einen ganzen Durchlauf verzweigen. Fahre über deine eigene Nachricht, um **Von hier aus bearbeiten** und die Uhrzeit zu sehen, zu der du sie gesendet hast.
+Unter jeder abgeschlossenen Antwort stehen **Nachricht kopieren**, **Ab dieser Antwort verzweigen** und **Vorlesen**. **Ab dieser Antwort verzweigen** funktioniert bei Claude Code an jeder Antwort, bei Codex und Custom nur an der letzten Antwort eines abgeschlossenen Durchlaufs, da diese immer einen ganzen Durchlauf verzweigen. Unter jeder deiner eigenen Nachrichten stehen immer **Nachricht kopieren**, **Von hier aus bearbeiten** und die Uhrzeit, zu der du sie gesendet hast, nicht erst beim Darüberfahren.
 
 ### Zeit und Kosten eines Durchlaufs
 
@@ -353,11 +353,11 @@ Eine Abzweigung ist eine neue Sitzung, die die bisherige Unterhaltung übernimmt
 
 Die neue Sitzung öffnet sich mit dem Titel „… · Abzweigung“ und demselben Agenten, Modell, Denkaufwand, Berechtigungsmodus und Konto. Oben steht „Abgezweigt von …“ mit **Öffnen**. Bei Codex enthält die Abzweigung nur die neuen Nachrichten; den vorherigen Verlauf liest du im Original. Abzweigungen funktionieren mit Claude Code, Codex und Custom, jedoch nicht bei einer in einer anderen App geöffneten Sitzung. Auch eine Claude-Code-Antwort vor einer Kontextverdichtung lässt sich abzweigen: Die Abzweigung erhält den vollständigen Verlauf bis zu dieser Antwort in seinem damaligen, unverdichteten Zustand.
 
-## Ab hier bearbeiten
+## Von hier aus bearbeiten
 
 Gehe zu einer deiner früheren Nachrichten zurück und ersetze sie:
 
-1. Fahre über die Nachricht und wähle **Ab hier bearbeiten**.
+1. Wähle unter deiner Nachricht **Von hier aus bearbeiten**.
 2. Ändere den Text.
 3. Aktiviere **Dateien auf den Stand vor dieser Nachricht zurücksetzen**, wenn auch die seitdem vorgenommenen Änderungen des Agenten rückgängig gemacht werden sollen.
 4. Wähle **Ab hier senden** beziehungsweise Enter oder **Abbrechen** beziehungsweise Esc.
@@ -415,7 +415,7 @@ Auch [vertrauliche Sitzungen](#keep-a-session-confidential) lassen sich exportie
 Ein Worktree ist eine separate Dateikopie eines Repositorys auf einem neuen Branch. Der Agent kann dort arbeiten, ohne deinen ursprünglichen Arbeitsstand zu verändern. So können auch mehrere Agenten gleichzeitig am selben Repository arbeiten.
 
 - **Starten**: Öffne auf der Startseite **Ordner** und aktiviere **Neuer Worktree von …**. Der Ordner muss in einem Git-Repository liegen. Die App erstellt vom ausgecheckten Branch einen neuen Branch mit dem Präfix `agent/` und einigen Worten deines Auftrags sowie einen Ordner im App-Datenverzeichnis. Die Auswahl bleibt für das nächste Mal gespeichert.
-- **Snapshots**: Bei jeder gesendeten Nachricht speichert die App im Worktree einen Dateisnapshot, damit [Ab hier bearbeiten](#edit-from-here) den Zustand wiederherstellen kann.
+- **Snapshots**: Bei jeder gesendeten Nachricht speichert die App im Worktree einen Dateisnapshot, damit [Von hier aus bearbeiten](#edit-from-here) den Zustand wiederherstellen kann.
 - **Ansehen**: das Menü der Sitzung (⋯) → **Ordner und Code** → **Worktree: agent/…** zeigt den Branch und den, von dem er abstammt, seinen Ordner, um wie viele Commits er voraus oder zurück ist und nicht committete Änderungen, mit **Änderungen prüfen** und **In Git öffnen**.
 - **Entfernen**: Wähle nach Abschluss der Arbeit im selben Dialog **Worktree entfernen**. Der Ordner wird entfernt, der Sitzungsverlauf bleibt erhalten. Der Branch bleibt ebenfalls, sodass committete Arbeit erhalten bleibt, außer du aktivierst **Branch … ebenfalls löschen**. Ein Branch ohne eigene neue Änderungen wird ohnehin entfernt. Bei nicht committeten Änderungen musst du zuerst **Die … nicht committeten Änderungen verwerfen** aktivieren. Ein laufender Agent wird gestoppt. Abzweigungen und bearbeitete Unterhaltungskopien, die denselben Worktree verwenden, verlieren ihn ebenfalls.
 
