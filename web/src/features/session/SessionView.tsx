@@ -761,7 +761,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
           ) : (
             // Over the whole app, so the sidebar dims with the rest and its group headings stay behind.
             createPortal(
-              <div className="scrim fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+              <div className="scrim holds fixed inset-0 z-40 flex justify-end [--scrim:0.26]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
                 <div className="h-full w-full max-w-[440px] border-l border-line shadow-lg">
                   <Details s={summary} version={version} onClose={close} />
                 </div>

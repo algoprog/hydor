@@ -525,7 +525,7 @@ export function CommandPalette() {
 
   return createPortal(
     <div
-      className={cx('scrim fixed inset-0 z-[55] flex justify-center [--scrim:0.3]', mobile ? '' : 'px-3 pt-[11vh]')}
+      className={cx('scrim holds fixed inset-0 z-[55] flex justify-center [--scrim:0.3]', mobile ? '' : 'px-3 pt-[11vh]')}
       onPointerDown={(e) => e.target === e.currentTarget && close()}
     >
       <div

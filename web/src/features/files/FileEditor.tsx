@@ -120,6 +120,52 @@ function isDark() {
   return document.documentElement.classList.contains('dark');
 }
 
+/** How long a page may take to load before it shows anyway (a script or picture that never comes). */
+const PAGE_WAIT_MS = 1500;
+
+/**
+ * An HTML file as a page, in a sandboxed frame, shown once it has loaded: until then the loading mark shows, as the
+ * frame's white flashed before a dark page drew itself. When the file changes on disk, the page as it was stays until
+ * the new one has loaded, instead of going white and blank in between.
+ */
+function PageFrame({ url, version, title }: { url: string | null; version: number; title: string }) {
+  const [frames, setFrames] = useState<{ key: string; src: string; loaded: boolean }[]>([]);
+  const key = url ? `${url}:${version}` : null;
+  // A page that has loaded shows, and the ones before it go.
+  const loaded = (k: string) =>
+    setFrames((fs) => {
+      const i = fs.findIndex((f) => f.key === k);
+      return i < 0 || (i === 0 && fs[0].loaded) ? fs : fs.slice(i).map((f, j) => (j === 0 ? { ...f, loaded: true } : f));
+    });
+  useEffect(() => {
+    if (!key || !url) return;
+    // The new page loads over the one shown (kept until then); one still loading before it is dropped.
+    setFrames((fs) => (fs.some((f) => f.key === key) ? fs : [...fs.filter((f) => f.loaded).slice(-1), { key, src: url, loaded: false }]));
+    const t = setTimeout(() => loaded(key), PAGE_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [key]);
+  const shown = [...frames].reverse().find((f) => f.loaded);
+  return (
+    <div className="relative z-10 h-full w-full bg-bg">
+      {frames.map((f) => (
+        <iframe
+          key={f.key}
+          src={f.src}
+          title={title}
+          sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+          onLoad={() => loaded(f.key)}
+          className={cx('absolute inset-0 h-full w-full border-0 bg-white', f !== shown && 'pointer-events-none opacity-0')}
+        />
+      ))}
+      {!shown && (
+        <div className="absolute inset-0 flex items-center justify-center text-fg-3">
+          <Throbber size={34} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * `embedded`: shown inside a dialog, so there is no Back button (the dialog closes instead), nor a terminal
  * (it would open behind the dialog). A dialog opens Markdown and HTML straight into editing, unless
@@ -731,19 +777,7 @@ export function FileEditor({
             {bytes(file.size)}. Download it or open it in a terminal.
           </Empty>
         ) : mode === 'preview' && isHtml ? (
-          pageUrl ? (
-            <iframe
-              key={`${pageUrl}:${file.mtime}`}
-              src={pageUrl}
-              title={basename(path)}
-              sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
-              className="relative z-10 h-full w-full border-0 bg-white"
-            />
-          ) : (
-            <div className="relative z-10 flex h-full items-center justify-center bg-bg text-fg-3">
-              <Throbber size={34} />
-            </div>
-          )
+          <PageFrame url={pageUrl} version={file.mtime} title={basename(path)} />
         ) : mode === 'preview' ? (
           <div className="relative z-10 h-full overflow-auto bg-bg">
             <div className="mx-auto max-w-[860px] px-5 py-6">

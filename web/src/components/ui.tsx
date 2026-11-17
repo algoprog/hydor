@@ -569,7 +569,7 @@ export function Dialog({
     <div
       ref={ref}
       data-i18n={part}
-      className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      className="scrim holds fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
       onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
     >
@@ -616,7 +616,7 @@ export function Sheet({ open, onClose, children, label, width = 560 }: { open: b
   return createPortal(
     <div
       ref={ref}
-      className="scrim fixed inset-0 z-50 flex justify-end [--scrim:0.26]"
+      className="scrim holds fixed inset-0 z-50 flex justify-end [--scrim:0.26]"
       onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
       onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
     >
