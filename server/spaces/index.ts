@@ -384,6 +384,13 @@ export const spaces: Feature = {
       return { switches };
     });
     // Apply the complete snapshot in one write, or leave every switch unchanged.
+    // 0.71.0's route, kept for apps and machines on that version: the same as /bulk with on: false.
+    d.app.post('/api/projects/:id/skill-switches/off', async (req) => {
+      const s = space(req);
+      const switches = switchSpaceSkills(d.db, s.id, { ...body(req), on: false });
+      d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
+      return { switches };
+    });
     d.app.post('/api/projects/:id/skill-switches/bulk', async (req) => {
       const s = space(req);
       const switches = switchSpaceSkills(d.db, s.id, body(req));

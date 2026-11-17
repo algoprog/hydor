@@ -447,7 +447,6 @@ export function Picker({
         type="button"
         disabled={disabled}
         title={title}
-        translate={translate}
         onClick={() => setOpen((o) => !o)}
         className={cx(
           'inline-flex h-8 max-w-[11rem] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-50',
@@ -456,7 +455,7 @@ export function Picker({
         )}
       >
         {icon}
-        <span className="truncate">{value}</span>
+        <span translate={translate} className="truncate">{value}</span>
         <ChevronDown size={12} className="shrink-0 opacity-60 max-md:hidden" />
       </button>
       <Popover anchor={ref} open={open} onClose={close} width={width} prefer="above" sheet>
@@ -488,7 +487,6 @@ export const SettingChip = forwardRef<
         ref={ref}
         type="button"
         title={title}
-        translate={translate}
         disabled={disabled}
         onClick={onClick}
         aria-expanded={open}
@@ -500,7 +498,7 @@ export const SettingChip = forwardRef<
       >
         {icon && <span className="flex shrink-0 text-fg-3">{icon}</span>}
         <span className="shrink-0 text-fg-2">{label}</span>
-        <span className={cx('ml-auto min-w-0 truncate pl-3 font-medium', on ? 'text-accent' : 'text-fg')}>{value}</span>
+        <span translate={translate} className={cx('ml-auto min-w-0 truncate pl-3 font-medium', on ? 'text-accent' : 'text-fg')}>{value}</span>
         <ChevronDown size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
       </button>
     );
@@ -510,7 +508,6 @@ export const SettingChip = forwardRef<
       ref={ref}
       type="button"
       title={title}
-      translate={translate}
       disabled={disabled}
       onClick={onClick}
       aria-expanded={open}
@@ -522,7 +519,7 @@ export const SettingChip = forwardRef<
     >
       {icon && <span className="flex shrink-0 text-fg-3">{icon}</span>}
       <span className={bare ? 'sr-only' : 'shrink-0 text-fg-3'}>{label}</span>
-      <span className={cx('truncate transition-colors', !bare && 'font-medium', on ? 'text-accent' : 'text-fg-2 group-hover:text-fg', open && !on && 'text-fg')}>{value}</span>
+      <span translate={translate} className={cx('truncate transition-colors', !bare && 'font-medium', on ? 'text-accent' : 'text-fg-2 group-hover:text-fg', open && !on && 'text-fg')}>{value}</span>
       <ChevronDown size={12} className={cx('-ml-0.5 shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />
     </button>
   );
