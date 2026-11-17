@@ -13,7 +13,9 @@ import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
 import { useWikiSettings } from './spaceMemory';
-import { useWikiJob, WikiActions, WikiProgress } from './WikiActions';
+import { BuildFromHistoryPrompt, WikiActions } from './WikiActions';
+import { WikiJobProgress } from './WikiJobProgress';
+import { useBuildOffer, useWikiJob } from './wikiJob';
 
 type WikiFile = { path: string; content: string; sha256: string };
 
@@ -257,6 +259,7 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
   const on = view?.on !== false && view?.status !== 'off';
   const { updates, documents } = useWikiUpdates(id, !!view && on, version);
   const [job, refreshJob] = useWikiJob(id, !!view && on, version);
+  const offer = useBuildOffer(id, !!view && on, job);
   const fromDocuments = useWikiSettings()?.fromDocuments !== false;
   const openLink = (e: MouseEvent<HTMLDivElement>) => {
     const anchor = (e.target as Element).closest('a');
@@ -311,12 +314,14 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
       )}
       {view && on && view.unreadable && <p role="alert" className="text-[12px] text-fg-3">Some wiki documents could not be read.</p>}
       {view && on && view.status !== 'error' && !ready && !view.unreadable && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
+      {/* A new wiki (fewer than 10 articles, no build from history yet) that the project's files, notes, conversations, commits or documents can fill: say so, with the button, above the articles when there are some. */}
+      {view && on && view.status !== 'error' && <BuildFromHistoryPrompt id={id} offer={offer} job={job} onStarted={refreshJob} />}
       {view && on && view.root && (
         <p className="text-[12px] break-all text-fg-3">
           <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>
         </p>
       )}
-      {view && on && (onStart || view.root) && <div className="flex flex-wrap items-center gap-2">
+      {view && on && <div className="flex flex-wrap items-center gap-2">
         {onStart && <>
         {/* Each action opens an editable draft in the existing project chat flow. */}
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me add a source to this project's wiki. First ask me for the document or URL; do not add anything until I choose the source."))}>Add a source</Button>
@@ -325,9 +330,10 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me adopt a plan into this project's wiki. First ask me for the plan, then show existing plans and a preview. Save only after my approval; start implementation only on my separate instruction."))}>Adopt a plan</Button>
         </>}
         {/* Update now, Rebuild from sources…, Restore the previous wiki… */}
-        {view.root && <WikiActions id={id} job={job} refresh={refreshJob} />}
+        <WikiActions id={id} job={job} refresh={refreshJob} fresh={!!offer?.fresh} />
       </div>}
-      {view && on && <WikiProgress job={job} />}
+      {/* The panel while a build, rebuild or update runs; its stopped, failed or finished state stays until dismissed. */}
+      {view && on && <WikiJobProgress project={id} />}
       {error && (
         <div role="alert" translate="no" className="rounded-xl border border-line bg-panel p-4 text-[13px]">
           {error}

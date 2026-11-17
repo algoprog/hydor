@@ -7,16 +7,18 @@ import { linkPath } from './platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentAccount } from '../shared/types.ts';
+import type { AccountAgent, Agent, AgentAccount } from '../shared/types.ts';
+import { ACCOUNT_AGENT_NAMES } from '../shared/grok.ts';
 import { HttpError } from './auth.ts';
 import { agentRoots, config } from './config.ts';
+import { agentBaseEnv } from './env.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { claudeTranscriptPath, findClaudeTranscript } from './timeline.ts';
 import { deleteSecret, readSecret, saveSecret, secretView } from './connections/vault.ts';
 
 interface Stored {
   id: string;
-  agent: Agent;
+  agent: AccountAgent;
   name: string;
   dir: string;
   createdAt: number;
@@ -26,9 +28,45 @@ const ROOT = path.join(config.dataDir, 'accounts');
 const CLAUDE_HOME = path.dirname(config.claudeProjectsDir);
 
 // What an added account shares with the default one (linked, so changes apply to both).
-const SHARED: Record<'claude' | 'codex', { from: string; names: string[] }> = {
+/**
+ * Grok Build's own folder: GROK_HOME, else ~/.grok, as grok gets them (the app's own GROK_HOME, which the agents get too, else
+ * the agents' environment). It holds the sign-in, the settings, the sessions and the logs.
+ */
+export const grokHome = () => {
+  if (process.env.GROK_HOME) return process.env.GROK_HOME;
+  const env = agentBaseEnv();
+  return env.GROK_HOME || path.join(env.HOME || os.homedir(), '.grok');
+};
+
+const SHARED: Record<AccountAgent, { from: string; names: string[] }> = {
   claude: { from: CLAUDE_HOME, names: ['settings.json', 'CLAUDE.md', 'skills', 'agents', 'commands', 'output-styles', 'plugins', 'rules'] },
   codex: { from: config.codexHome, names: ['config.toml', 'AGENTS.md', 'AGENTS.override.md', 'prompts', 'rules', 'skills'] },
+  // Never the sign-in (auth.json), the sessions, the logs, agent_id, lock files or sockets.
+  grok: {
+    get from() {
+      return grokHome();
+    },
+    names: [
+      'config.toml',
+      'requirements.toml',
+      'managed_config.toml',
+      'sandbox.toml',
+      'trusted_folders.toml',
+      'AGENTS.md',
+      'AGENT.md',
+      'Agents.md',
+      'CLAUDE.md',
+      'rules',
+      'hooks',
+      'hooks-paths',
+      'skills',
+      'plugins',
+      'installed-plugins',
+      'personas',
+      'agents',
+      'mcp_credentials.json',
+    ],
+  },
 };
 
 let cache: Stored[] | null = null;
@@ -65,14 +103,14 @@ export function accountById(db: DB, id: string | null | undefined): Stored | nul
 }
 
 /** The environment that points an agent's CLI at an account (nothing for the default one). */
-export function accountEnv(db: DB, agent: Agent, id: string | null | undefined): Record<string, string> {
+export function accountEnv(db: DB, agent: AccountAgent, id: string | null | undefined): Record<string, string> {
   const a = accountById(db, id);
   if (!a) {
     if (id) throw new HttpError(404, 'That account was removed');
     return {};
   }
-  if (a.agent !== agent) throw new HttpError(400, `That is a ${a.agent === 'claude' ? 'Claude Code' : 'Codex'} account`);
-  return a.agent === 'claude' ? { CLAUDE_CONFIG_DIR: a.dir } : { CODEX_HOME: a.dir };
+  if (a.agent !== agent) throw new HttpError(400, `That is a ${ACCOUNT_AGENT_NAMES[a.agent]} account`);
+  return a.agent === 'claude' ? { CLAUDE_CONFIG_DIR: a.dir } : a.agent === 'codex' ? { CODEX_HOME: a.dir } : { GROK_HOME: a.dir };
 }
 
 /** The default Claude Code account's own settings: ~/.claude.json, or .claude.json in CLAUDE_CONFIG_DIR. */
@@ -140,6 +178,40 @@ function codexHomeOf(db: DB, id: string | null | undefined): string {
   return a?.agent === 'codex' ? a.dir : config.codexHome;
 }
 
+/** A Grok Build account's GROK_HOME: the added account's folder, else the program's own. */
+export function grokHomeOf(db: DB, id: string | null | undefined): string {
+  const a = accountById(db, id);
+  return a?.agent === 'grok' ? a.dir : grokHome();
+}
+
+/**
+ * Where a Grok Build session's own copy of its conversation goes when it moves between accounts (from → to): its folder
+ * sessions/<folder named for the cwd>/<session id>, found by scanning for the id so how Grok names the cwd's folder does not
+ * matter, and put in the same place under the other home. Null when there is no such folder (nothing to move). The index
+ * (session_search.sqlite) stays where it is.
+ */
+export function grokSessionMove(db: DB, grokSessionId: string, from: string | undefined, to: string | undefined): [string, string] | null {
+  if (!/^[\w.-]{1,100}$/.test(grokSessionId)) return null;
+  const [a, b] = [grokHomeOf(db, from), grokHomeOf(db, to)];
+  const root = path.join(a, 'sessions');
+  let src: string | null = null;
+  try {
+    for (const d of fs.readdirSync(root, { withFileTypes: true })) {
+      const f = path.join(root, d.name, grokSessionId);
+      if (d.isDirectory() && fs.existsSync(f)) {
+        src = f;
+        break;
+      }
+    }
+  } catch {
+    return null;
+  }
+  if (!src) return null;
+  const dst = path.join(b, 'sessions', path.relative(root, src));
+  if (fs.existsSync(dst)) throw new HttpError(409, `The other account already has ${dst}`);
+  return [src, dst];
+}
+
 /** Every account an agent can run as: the CLI's own (undefined), then the added ones. */
 /** Switch accounts at a limit: on until you turn it off. */
 export function autoSwitchOn(db: DB): boolean {
@@ -179,7 +251,7 @@ export function setApiKey(db: DB, id: string | undefined, key: string | null, la
   saveSecret(db, { name: apiKeyName(id), value: key, domains: ['api.anthropic.com'], note: `API credit for the Claude Code account ${label}, used when every account is at its usage limit` });
 }
 
-export function accountPool(db: DB, agent: Agent): (string | undefined)[] {
+export function accountPool(db: DB, agent: AccountAgent): (string | undefined)[] {
   return [undefined, ...stored(db).filter((a) => a.agent === agent).map((a) => a.id)];
 }
 
@@ -212,8 +284,8 @@ export function moveAcross(src: string, dst: string) {
   }
 }
 
-export function addAccount(db: DB, agent: Agent, name: string): AgentAccount {
-  if (agent !== 'claude' && agent !== 'codex') throw new HttpError(400, 'Pick Claude Code or Codex');
+export function addAccount(db: DB, agent: AccountAgent, name: string): AgentAccount {
+  if (agent !== 'claude' && agent !== 'codex' && agent !== 'grok') throw new HttpError(400, 'Pick Claude Code, Codex or Grok Build');
   const n = name.replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!n) throw new HttpError(400, 'Name the account (Work, Personal…)');
   const list = stored(db);
@@ -221,7 +293,7 @@ export function addAccount(db: DB, agent: Agent, name: string): AgentAccount {
   const id = crypto.randomBytes(4).toString('hex');
   const dir = path.join(ROOT, `${agent}-${id}`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const shared = SHARED[agent as 'claude' | 'codex'];
+  const shared = SHARED[agent];
   for (const f of shared.names) {
     const src = path.join(shared.from, f);
     if (fs.existsSync(src)) {

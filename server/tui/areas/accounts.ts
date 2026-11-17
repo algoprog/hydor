@@ -1,17 +1,21 @@
-// `hydor accounts`: Settings → Accounts, the Claude Code and Codex sign-ins every session uses. List them (and which one new
+// `hydor accounts`: Settings → Accounts, the Claude Code, Codex and Grok Build sign-ins every session uses. List them (and which one new
 // sessions start with), add another account and sign it in, sign in or out, remove an added account, and say which account new
 // sessions use. A sign-in is the page's: a link to open in your browser (printed, and opened with --browser), then a code or a
 // redirect address pasted back here, or a one-time code to enter there; this command follows the flow until it ends. Never run it
 // against a real account you do not mean to sign in or out of.
-import type { AccountStatus, AgentUsage, LoginFlow, ServerEvent } from '../../../shared/types.ts';
+import type { AccountAgent, AccountStatus, AgentUsage, LoginFlow, ServerEvent } from '../../../shared/types.ts';
+import { ACCOUNT_AGENT_NAMES, GROK_ID } from '../../../shared/grok.ts';
 import { enc } from '../client.ts';
 import { Cancelled, fields, mark, pickOne, str, table, UsageError, type Area, type Ctx } from './kit.ts';
 
 const ACCOUNT_HINT = 'hydor accounts lists them';
 const account = { name: 'account', kind: 'account', pick: true } as const;
 
-const PROGRAM = { claude: 'Claude Code', codex: 'Codex' } as const;
-type Program = keyof typeof PROGRAM;
+const PROGRAM = ACCOUNT_AGENT_NAMES;
+type Program = AccountAgent;
+
+/** What the start page keeps a program's picks under (Grok Build is an ACP agent there). */
+const runKey = (a: Program) => (a === 'grok' ? `acp:${GROK_ID}` : a);
 
 /** One sign-in: the program's own (main), or one that was added. */
 interface Entry {
@@ -32,8 +36,10 @@ export const wait = { ms: 20_000 };
 async function entries(ctx: Ctx): Promise<Entry[]> {
   const [r, boot] = await Promise.all([ctx.conn.api<any>('GET', '/api/accounts'), ctx.conn.api<any>('GET', '/api/bootstrap').catch(() => ({}))]);
   const runs = boot?.start?.runs ?? {};
-  const usedBy = (agent: Program) => String(runs?.[agent]?.account ?? '');
-  const mains: Entry[] = (['claude', 'codex'] as Program[]).map((a) => ({
+  const usedBy = (agent: Program) => String(runs?.[runKey(agent)]?.account ?? '');
+  // Grok Build is listed once it is set up (the API says so by sending its status).
+  const programs: Program[] = r.grok ? ['claude', 'codex', 'grok'] : ['claude', 'codex'];
+  const mains: Entry[] = programs.map((a) => ({
     ref: a,
     agent: a,
     main: true,
@@ -76,7 +82,8 @@ const programOf = (word: string): Program => {
     .replace(/[\s_]+/g, '-');
   if (w === 'claude' || w === 'claude-code') return 'claude';
   if (w === 'codex') return 'codex';
-  throw new UsageError(`An account is for claude or codex (it was “${word}”)`);
+  if (w === 'grok' || w === 'grok-build') return 'grok';
+  throw new UsageError(`An account is for claude, codex or grok (it was “${word}”)`);
 };
 
 const state = (s: AccountStatus) => (s.loggedIn ? [s.email, s.plan, s.method].filter(Boolean).join(' · ') || 'signed in' : (s.error ?? 'not signed in'));
@@ -154,8 +161,8 @@ export async function signIn(ctx: Ctx, e: Entry, method?: string): Promise<Login
 export const accounts: Area = {
   name: 'accounts',
   aliases: ['account'],
-  summary: 'Claude Code and Codex sign-ins',
-  help: 'The sign-ins sessions run as: each program’s own (claude, codex) and the accounts you added (a work and a personal one). Name one by its id, its name, or claude:name when two programs have one by the same name. New sessions start with one of them (accounts use). The API key for API credit and the switches at a usage limit are hydor settings (accounts.*).',
+  summary: 'Claude Code, Codex, Grok Build sign-ins',
+  help: 'The sign-ins sessions run as: each program’s own (claude, codex, grok) and the accounts you added (a work and a personal one). Name one by its id, its name, or claude:name when two programs have one by the same name. New sessions start with one of them (accounts use). The API key for API credit and the switches at a usage limit are hydor settings (accounts.*).',
   group: 'models',
   verbs: [
     {
@@ -197,7 +204,7 @@ export const accounts: Area = {
           ctx.conn.api<{ claude?: AgentUsage; codex?: AgentUsage; accounts?: Record<string, AgentUsage> }>('GET', '/api/usage', undefined, { timeoutMs: 30_000 }).catch(() => undefined),
           ctx.conn.api<{ autoSwitch?: boolean; apiCredit?: boolean }>('GET', '/api/app-settings').catch(() => undefined),
         ]);
-        const plan = e.main ? usage?.[e.agent] : usage?.accounts?.[e.ref];
+        const plan = e.agent === 'grok' ? undefined : e.main ? usage?.[e.agent] : usage?.accounts?.[e.ref];
         if (ctx.o.json) return ctx.json({ id: e.ref, agent: e.agent, name: e.name, main: e.main, status: e.status, newSessions: e.used, apiKey: e.apiKey, usage: plan, autoSwitch: app?.autoSwitch, apiCredit: app?.apiCredit });
         const { p } = ctx.look;
         const on = (b: boolean | undefined, yes: string, no: string) => (b === undefined ? undefined : b ? yes : no);
@@ -213,7 +220,7 @@ export const accounts: Area = {
             ['Signed in with', e.status.method],
             ['About', e.status.detail],
             ['New sessions', e.used ? `${mark(p, 'on')} start with it` : `do not start with it (hydor accounts use ${e.main ? e.ref : e.name.includes(' ') ? e.ref : e.name})`],
-            ['API key', e.agent === 'claude' ? (e.apiKey ? 'saved (API credit for when every account is at its limit)' : 'none') : 'not used by Codex'],
+            ['API key', e.agent === 'claude' ? (e.apiKey ? 'saved (API credit for when every account is at its limit)' : 'none') : `not used by ${PROGRAM[e.agent]}`],
             ['At a limit', on(app?.autoSwitch, 'carries on with another account that has usage left', 'stays with this account')],
             ['API credit', e.agent === 'claude' ? on(app?.apiCredit, e.apiKey ? 'on: carries on billed to its API key when every account is at its limit' : 'on, but this account has no API key', 'off') : undefined],
           ]),
@@ -233,8 +240,8 @@ export const accounts: Area = {
         method: { type: 'string', value: '<how>', desc: 'claude: claudeai or console; codex: device or browser', values: ['claudeai', 'console', 'device', 'browser'] },
       },
       summary: 'Add another account, and sign it in',
-      help: 'It gets a folder of its own (settings, instructions, skills and plugins are shared). Then it signs in as hydor accounts sign-in does: a link to open in your browser, then a code or an address pasted back.',
-      examples: ['hydor accounts add claude Work', 'hydor accounts add codex Personal --no-sign-in'],
+      help: 'It gets a folder of its own (settings, instructions, skills and plugins are shared). Then it signs in as hydor accounts sign-in does: a link to open in your browser, then a code or an address pasted back (Grok Build: a code to confirm there).',
+      examples: ['hydor accounts add claude Work', 'hydor accounts add codex Personal --no-sign-in', 'hydor accounts add grok Work'],
       async run(ctx, [word, ...name], v) {
         const agent = programOf(word);
         if (!name.length) throw new UsageError(`Give the account a name: ${ctx.usage}`);
@@ -256,7 +263,7 @@ export const accounts: Area = {
       args: [account],
       options: { method: { type: 'string', value: '<how>', desc: 'claude: claudeai or console; codex: device or browser', values: ['claudeai', 'console', 'device', 'browser'] } },
       summary: 'Sign an account in (or in again)',
-      help: 'Prints a link to open in your browser (--browser opens it). Claude Code shows a code there to paste back here; Codex’s device sign-in shows a code to enter there and is noticed here when you are done; its browser sign-in ends on a localhost address to paste back. Esc or Ctrl+C cancels it.',
+      help: 'Prints a link to open in your browser (--browser opens it). Claude Code shows a code there to paste back here; Codex’s device sign-in and Grok Build’s show a code to enter or confirm there and are noticed here when you are done; its browser sign-in ends on a localhost address to paste back. Esc or Ctrl+C cancels it.',
       examples: ['hydor accounts sign-in claude', 'hydor accounts sign-in work --browser', 'hydor accounts sign-in codex --method browser'],
       async run(ctx, [given], v) {
         const e = await findAccount(ctx, given);
@@ -299,7 +306,7 @@ export const accounts: Area = {
           return ctx.out('Not removed.');
         const r = await ctx.conn.api('DELETE', `/api/agent-accounts/${enc(e.ref)}${wipe ? '?wipe=1' : ''}`);
         // New sessions were to start with it: back to the program's own sign-in.
-        if (e.used) await ctx.conn.api('PUT', '/api/start', { runs: { [e.agent]: { account: '' } } }).catch(() => {});
+        if (e.used) await ctx.conn.api('PUT', '/api/start', { runs: { [runKey(e.agent)]: { account: '' } } }).catch(() => {});
         if (ctx.o.json) return ctx.json(r);
         ctx.out(`Removed “${e.name}”.`);
       },
@@ -309,12 +316,12 @@ export const accounts: Area = {
       aliases: ['switch'],
       args: [account],
       summary: 'Start new sessions with this account',
-      help: 'What the start page opens with next time, for that program, on every device. Sessions already running keep theirs. Name claude or codex to go back to the program’s own sign-in.',
+      help: 'What the start page opens with next time, for that program, on every device. Sessions already running keep theirs. Name claude, codex or grok to go back to the program’s own sign-in.',
       examples: ['hydor accounts use work', 'hydor accounts use claude'],
       async run(ctx, [given]) {
         const e = await findAccount(ctx, given);
         if (e.status.loggedIn === false && !(await ctx.confirm(`“${e.name}” is not signed in. Use it anyway?`))) return ctx.out('Left as it was.');
-        const r = await ctx.conn.api('PUT', '/api/start', { runs: { [e.agent]: { account: e.main ? '' : e.ref } } });
+        const r = await ctx.conn.api('PUT', '/api/start', { runs: { [runKey(e.agent)]: { account: e.main ? '' : e.ref } } });
         if (ctx.o.json) return ctx.json(r);
         ctx.out(`New ${PROGRAM[e.agent]} sessions start with ${e.main ? 'its own sign-in' : `“${e.name}”`}.`);
       },

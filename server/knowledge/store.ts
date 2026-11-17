@@ -140,10 +140,12 @@ export function releaseSpace(db: DB, space: string) {
   db.prepare('update kb_bases set space = null where space = ?').run(space);
 }
 
-/** How many documents each space's own bases hold. */
+/** How many documents each space's own bases hold, not counting the wiki's own. */
 export function docsBySpace(db: DB): Map<string, number> {
   knowledgeSchema(db);
-  const rows = db.prepare("select b.space as space, count(*) as n from kb_docs d join kb_bases b on b.id = d.base where b.space is not null and d.status = 'indexed' group by b.space").all() as { space: string; n: number }[];
+  // A wiki's own knowledge base (its articles and the sources it keeps) is not a document of the project.
+  const wiki = db.prepare("select 1 from sqlite_master where type = 'table' and name = 'kb_wiki_bindings'").get() ? ' and b.id not in (select base from kb_wiki_bindings)' : '';
+  const rows = db.prepare(`select b.space as space, count(*) as n from kb_docs d join kb_bases b on b.id = d.base where b.space is not null and d.status = 'indexed'${wiki} group by b.space`).all() as { space: string; n: number }[];
   return new Map(rows.map((r) => [r.space, r.n]));
 }
 

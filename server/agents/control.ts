@@ -340,10 +340,16 @@ export class ClaudeControl extends EventEmitter {
   private env = () => ({ ...agentBaseEnv(), ...this.extraEnv });
   private initCache: { at: number; init: Json } | null = null;
   private usageCache: AgentUsage | null = null;
-  /** When the resets may be read again (resetReads), how long the wait after the next refusal is, and whether the last read found the account at a limit. */
+  /** When the resets may be read again (resetReads), and how long the wait after the next refusal is. */
   private resetsNext = 0;
   private resetsWait = resetReads.every;
-  private atLimit = false;
+  /**
+   * The limit the last read of the resets found the account at (Anthropic's at_limit), kept on the usage reports after
+   * it that do not show it themselves, and until when: that limit's own reset time, or, when it is not known which limit
+   * it was, the time the next read is due. Never longer: the read is up to ten minutes old (more after a refusal), and
+   * an account whose limit has lifted would still look used up, so sessions would not switch to it.
+   */
+  private limitHold: { limited: NonNullable<AgentUsage['limited']>; until: number } | null = null;
   private inflight: Promise<{ init: Json | null; usage: Json | null }> | null = null;
   /** Why the last probe got no answer, in Claude Code's own words (EACCES: permission denied, mkdir …). */
   private probeError: string | null = null;
@@ -470,7 +476,9 @@ export class ClaudeControl extends EventEmitter {
           const r = await claudeResets(() => this.probe(), dir);
           this.resetsNext = Date.now() + resetReads.every;
           this.resetsWait = resetReads.every;
-          this.atLimit = !!r?.atLimit;
+          // Which limit it is: a full window now, or one a live session was refused at (its reset time not passed yet).
+          const known = u.limited ?? (prev?.limited?.resetsAt && prev.limited.resetsAt > Date.now() ? prev.limited : null);
+          this.limitHold = !r?.atLimit ? null : known?.resetsAt ? { limited: known, until: known.resetsAt } : { limited: known ?? { label: 'Usage limit', resetsAt: null }, until: this.resetsNext };
           // No claude.ai sign-in to read them with just now: the resets from the last read stand (report() kept them).
           if (r) {
             u.resetCredits = { available: r.available, items: r.items, nextAvailableAt: r.nextAvailableAt, cooldownUntil: r.cooldownUntil };
@@ -482,9 +490,9 @@ export class ClaudeControl extends EventEmitter {
           this.resetsWait = Math.min(this.resetsWait * 2, resetReads.longest);
         }
       }
-      // At a limit by the last read of the resets, until that limit's own reset time passes.
-      const held = prev?.limited;
-      if (this.atLimit && !u.limited && (!held?.resetsAt || held.resetsAt > Date.now())) u.limited = held ?? { label: 'Usage limit', resetsAt: null };
+      // At a limit by the last read of the resets, until that limit resets (or the next read is due).
+      if (this.limitHold && this.limitHold.until <= Date.now()) this.limitHold = null;
+      if (this.limitHold && !u.limited) u.limited = this.limitHold.limited;
       this.usageCache = u;
       return u;
     } catch (e) {
@@ -525,7 +533,7 @@ export class ClaudeControl extends EventEmitter {
     this.resetsWait = resetReads.every;
     const rc = this.usageCache?.resetCredits;
     if (rc && (r.outcome === 'reset' || r.outcome === 'already_used')) {
-      if (r.outcome === 'reset') this.atLimit = false;
+      if (r.outcome === 'reset') this.limitHold = null;
       const items = rc.items.flatMap((i) => (i.id !== id ? [i] : (i.left ?? 1) > 1 ? [{ ...i, left: (i.left ?? 1) - 1 }] : []));
       this.usageCache!.resetCredits = { ...rc, items, available: items.reduce((n, i) => n + (i.left ?? 1), 0) };
       keepResets(this.extraEnv.CLAUDE_CONFIG_DIR, this.usageCache!.resetCredits);

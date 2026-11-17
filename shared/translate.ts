@@ -7,7 +7,9 @@
 // "Use {0}") does not take in a long sentence it was never written for (a note, a description from elsewhere),
 // which would come out half translated. Also: a tooltip of several lines goes line by line, a line of facts
 // joined by " · " part by part, a word matches whether its first letter is a capital or not, and a value
-// with a number in it ("3m ago") or a list of the app's words ("Sun, Wed") is translated in its sentence.
+// with a number in it ("3m ago") or a list of the app's words ("Sun, Wed") is translated in its sentence. A value that
+// looks technical (a mode, a file or field name, code), or is in small letters where the dictionary has the word only
+// with a capital, stays as it is.
 
 export type Dictionary = Record<string, string>;
 
@@ -53,6 +55,9 @@ interface Pattern {
 /** A translator for a dictionary: the string in the other language, or null when it has none. */
 /** A lookup in one part of the app ("media::Speed"): see web/src/i18n/runtime.ts. */
 const PART = /^[a-z]+::/;
+
+/** Marks of something technical rather than words: a path, a file or field name, code, an address, a flag. */
+const TECHNICAL = /[_/\\@#=<>`|{}[\]~^$]|[A-Za-z]\.[A-Za-z]|^--?[A-Za-z]/;
 
 export function translator(dict: Dictionary): (s: string, split?: boolean) => string | null {
   const exact = new Map<string, string>();
@@ -105,6 +110,8 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       lead: parts[0] === '',
     });
   }
+  // The dictionary's own words, as it writes them (before the other-case aliases below).
+  const own = new Set(exact.keys());
   // The other case of each word's first letter ("on" for "On"), where the dictionary has only one of them.
   for (const [k, v] of [...exact]) if (cased(k[0]) && !exact.has(flip(k[0]) + k.slice(1))) exact.set(flip(k[0]) + k.slice(1), recase(v, flip(k[0])));
   // The more fixed text a pattern has, the surer its match: those first.
@@ -122,18 +129,31 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     return n <= (p.loose.length > 1 ? 3 : p.lead ? 4 : 6);
   };
 
+  /**
+   * The app's own phrase a value in a sentence is, translated, or undefined. A value that looks technical (a name with
+   * _ / . or the like, camelCase, a flag, words-joined-by-dashes in small letters) is never one: a mode, a parameter, a
+   * file or a project's name stays as it is. A value in small letters is one only when the dictionary has it so: the
+   * other case of a capitalised entry is for a label written with a capital ("Ready" for "ready"), not for a word in
+   * small letters that happens to be one of the app's labels ("hybrid", a search mode, is not the "Hybrid" of a job ad).
+   */
+  const appWord = (t: string): string | undefined => {
+    if (!t || TECHNICAL.test(t) || /[a-z][A-Z]/.test(t) || /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(t)) return undefined;
+    if (own.has(t)) return exact.get(t);
+    return cased(t[0]) && t[0] === t[0].toUpperCase() ? exact.get(t) : undefined;
+  };
+
   /** A list of the app's own words ("Sun, Wed"), each translated. */
   const list = (v: string) => {
     const items = v.split(', ');
     if (items.length < 2) return null;
-    const out = items.map((x) => exact.get(x));
+    const out = items.map((x) => appWord(x));
     return out.every((x) => x != null) ? out.join(', ') : null;
   };
 
   /** A value in a sentence: itself when it is one of the app's phrases or a list of them, or one with a number in it ("3m ago"). */
   const value = (v: string, depth: number) => {
     const t = v.trim();
-    const known = exact.get(t) ?? list(t) ?? (depth < 2 && /\d/.test(t) ? match(t, depth + 1) : null);
+    const known = appWord(t) ?? list(t) ?? (depth < 2 && /\d/.test(t) && !TECHNICAL.test(t) ? match(t, depth + 1) : null);
     return known == null ? v : `${/^\s*/.exec(v)![0]}${known}${/\s*$/.exec(v)![0]}`;
   };
 

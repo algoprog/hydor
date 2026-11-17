@@ -1,6 +1,6 @@
 // Script tests for wiki memory from a project's work: once a pass, the helper (a stand-in here) reads a project's recent
 // conversations and its wiki gets sources and articles; which sessions are skipped, where each session was read up to
-// (a session read is never read again, a session that goes on is read from its new turns), the caps, when a pass is due, and the one-time backfill of documents already in knowledge.
+// (a session read is never read again, a session that goes on is read from its new turns), the caps, when a pass is due, and the backfill of documents already in knowledge.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/wiki/digest/work-test.ts
 //   CUDA_VISIBLE_DEVICES= DATA_DIR=/tmp/hydor-test-wikiwork node dist/dev/work-test.js
 import assert from 'node:assert/strict';
@@ -378,7 +378,7 @@ test('when a pass is due: 20 hours since the last, and nobody writing for 10 min
   assert.equal(wikiWorkDue(db, t + 2000), true, 'never ran');
 });
 
-test('the backfill queues the documents of each place already indexed, once, newest first, never a wiki base', () => {
+test('the backfill queues the documents of each place already indexed, in read order, none twice while they wait, never a wiki base', () => {
   knowledgeSchema(db);
   const doc = db.prepare("insert into kb_docs (base, source, path, title, format, size, mtime, passages, status, indexed_at) values (?, 's', ?, ?, 'md', 1, 0, 1, ?, ?)");
   const base = createBase(db, { name: 'Alpha docs', space: alpha.space.id });
@@ -390,16 +390,23 @@ test('the backfill queues the documents of each place already indexed, once, new
   doc.run(base.id, '/d/broken.md', 'broken.md', 'error', 400);
   doc.run(own.base, '/wiki/a.md', 'a.md', 'indexed', 500);
   const queued: string[] = [];
-  const queue = { enqueue: (d: { path: string }) => void queued.push(d.path) };
+  const waits: { base: string; path: string; title: string }[] = [];
+  const queue = {
+    enqueue: (d: { base: string; path: string; title: string }) => {
+      queued.push(d.path);
+      waits.push(d);
+    },
+    waiting: () => [...waits],
+  };
   setEnabled(db, false);
   assert.equal(backfillDocuments(db, queue), 0);
-  assert.equal(kvGet(db, `wiki.digest.backfilled.${alpha.space.id}`), undefined, 'not marked while memory is off');
+  assert.equal(queued.length, 0, 'nothing while memory is off');
   setEnabled(db, true);
   assert.equal(backfillDocuments(db, queue), 3);
-  assert.deepEqual(queued, ['/d/new.md', '/d/mid.md', '/d/old.md']);
-  assert.equal(kvGet(db, `wiki.digest.backfilled.${alpha.space.id}`), '1');
-  assert.equal(kvGet(db, 'wiki.digest.backfilled.shared'), '1');
-  assert.equal(backfillDocuments(db, queue), 0);
+  // A place at a time (the project's, then the shared one), each in the order its wiki reads: same file time, so the later row first.
+  assert.deepEqual(queued, ['/d/new.md', '/d/old.md', '/d/mid.md']);
+  assert.equal(kvGet(db, `wiki.digest.backfilled.${alpha.space.id}`), undefined, 'no mark is kept');
+  assert.equal(backfillDocuments(db, queue), 0, 'what waits is not queued again');
   assert.equal(queued.length, 3);
 });
 

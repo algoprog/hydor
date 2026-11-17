@@ -154,7 +154,7 @@ Beim Seitenwechsel bleiben Nachricht, Anhänge und auf diesen Auftrag begrenzte 
 Oben in der Sitzung findest du:
 
 - Agentensymbol und Titel, den du per Doppelklick umbenennst, sowie bei einer [vertraulichen Sitzung](#keep-a-session-confidential) ein Schloss;
-- den Status **In Arbeit**, **Braucht dich**, **Bereit**, **Wird gestartet**, **Anhalten** oder bei extern laufenden Sitzungen „In VS Code geöffnet“. Läuft der Agent nicht mehr, steht dort das Ergebnis: **Abgeschlossen**, wenn der letzte Durchlauf beendet wurde, gegebenenfalls mit „· 2 Dateien erstellt“ oder „· 3 Dateien geändert“; **Angehalten**, wenn du ihn gestoppt hast oder er vorzeitig unterbrochen wurde; **Fehlgeschlagen** bei einem Fehler. Ein Hinweis beim Darüberfahren erklärt den nächsten Schritt;
+- den Status **In Arbeit**, **Braucht dich**, **Bereit**, **Wird gestartet**, **Memory wird erstellt**, **Anhalten** oder bei extern laufenden Sitzungen „In VS Code geöffnet“. Läuft der Agent nicht mehr, steht dort das Ergebnis: **Abgeschlossen**, wenn der letzte Durchlauf beendet wurde, gegebenenfalls mit „· 2 Dateien erstellt“ oder „· 3 Dateien geändert“; **Angehalten**, wenn du ihn gestoppt hast oder er vorzeitig unterbrochen wurde; **Fehlgeschlagen** bei einem Fehler. Ein Hinweis beim Darüberfahren erklärt den nächsten Schritt;
 - den Ordner, der per Klick in Dateien geöffnet wird, eine Pull-Request-Anzeige und bei zusätzlich hinterlegten Konten den Kontonamen. Auf breiten Bildschirmen stehen dort auch Git-Branch und Modell;
 - eine zur Situation passende Schaltfläche: **Stoppen** während eines Durchlaufs, **Fortsetzen** nach **Angehalten** oder **Fehlgeschlagen** und dezenter nach **Abgeschlossen**, weil auch eine neue Nachricht die Sitzung fortsetzt; beziehungsweise **Hier fortsetzen** bei Claude-Code-Sitzungen in VS Code oder einem Terminal;
 - **Details**, nach Dateiänderungen mit der Zahl hinzugefügter und entfernter Zeilen, zum Öffnen des [Detailbereichs](#the-details-panel-changes-commands-and-info);
@@ -234,6 +234,16 @@ Ein Klick öffnet die Details eines Schritts:
 - bei allen anderen Schritten: Anfrage des Agenten und zurückgeliefertes Ergebnis.
 
 Ein Schritt kann als **Hintergrund** für eine weiterlaufende Aufgabe oder **Automatisch** für eine Entscheidung des automatischen Custom-Modus markiert sein; die Begründung erscheint beim Darüberfahren. Fehlerhafte Exit-Codes erscheinen rot. Hintergrundaufgaben wie weiterlaufende Befehle, Überwachungen oder Workflows stehen zusammen mit Subagenten in einer Zeile über dem Nachrichtenfeld. Öffne sie für die Ausgabe bei Claude Code oder beende sie mit **Stoppen**, nach Rückfrage. Siehe [Subagenten](/guide/sessions#subagents).
+
+## Das Memory eines Projekts erstellen, bevor der Agent startet
+
+Startest du auf der Startseite eine Sitzung in einem Projekt, dessen [Wiki-Memory](/guide/wiki-memory) noch neu ist (weniger als 10 Artikel, noch kein Aufbau aus dem Verlauf) und für das es etwas zum Aufbauen gibt (Unterhaltungen, Commit-Nachrichten, Dokumente, Notizen, eine README oder einen Ordner docs/), fragt die Sitzung zuerst nach. Eine Karte unter deiner Nachricht fragt **Memory von <Projekt> zuerst erstellen?** und zeigt, was gelesen würde und wie lange es etwa dauert, bis der Agent startet. Die Sitzung zeigt **Braucht dich** (und du bekommst die Benachrichtigung), bis du dich entscheidest:
+
+- **Memory erstellen, dann starten**: Das Memory wird erstellt, die Karte wird zum Fortschritt, und die Sitzung zeigt **Memory wird erstellt**. Deine Nachricht wartet („Wird an den Agenten gesendet, sobald das Memory bereit ist“) und geht an den Agenten, sobald der wichtigste Teil geschrieben ist: ein Überblick über das Projekt aus seinen Dateien, seinen Notizen und den Unterhaltungen mit dem meisten Inhalt. Der Rest wird im Hintergrund weitererstellt, und Agenten finden ihn, sobald er da ist. **Jetzt starten** sendet deine Nachricht sofort und lässt das Erstellen weiterlaufen; **Erstellen stoppen** beendet es (Geschriebenes bleibt) und startet den Agenten. Du kannst die App schließen: Der Agent startet von selbst. Schlägt das Erstellen vor diesem Punkt fehl, sagt die Karte das, mit **Erneut versuchen** und **Trotzdem starten**. Wurde der Agent beendet, bevor er deine Nachricht je bekam (er ist abgestürzt oder der Computer wurde während des Wartens neu gestartet), und lässt er sich nicht erneut starten, bietet die Karte **In neuer Sitzung starten**: Eine neue Sitzung mit denselben Einstellungen bekommt deine Nachricht, übernimmt, was du inzwischen gesendet hast, und die leere wird archiviert.
+- **Ohne Memory starten**: Der Agent startet jetzt, und dieses Projekt fragt eine Woche lang nicht erneut.
+- **Für dieses Projekt nicht mehr fragen**: Für dieses Projekt wird nie wieder gefragt. **Build from history** bleibt auf der Memory-Seite des Projekts.
+
+Was du sendest, während es wartet, geht nach deiner ersten Nachricht an den Agenten. Es fragt nur, wenn du selbst auf der Startseite eine Sitzung startest, nie bei geplanten Läufen, Apps, Subagenten oder von Agenten gestarteten Sitzungen und nicht für ein Projekt, für das schon ein Aufbau lief.
 
 ## Aktionen des Agenten erlauben oder ablehnen
 
@@ -525,3 +535,4 @@ Die Schaltfläche ⋯ oben rechts in einer Sitzung öffnet ihr Menü. Manche Ein
 - „Warum kann meine vertrauliche Sitzung nicht im Web suchen, und was funktioniert weiterhin?“
 - „Zeige mit Formeln und einem Zahlenbeispiel, warum sich Attention-Gewichte zu 1 addieren.“
 - „Zeige das Blatt Umsatz meiner Tabelle Geschäftszahlen als Monatsdiagramm mit einer Linie pro Region und halte es aktuell.“
+- „Warum hat meine neue Sitzung gefragt, ob zuerst das Memory des Projekts erstellt werden soll, und was passiert bei Jetzt starten?“
