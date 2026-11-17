@@ -48,17 +48,18 @@ try {
   await assert.rejects(invoke('wiki_ingest_text', { content: 'Use AKIAIOSFODNN7EXAMPLE for the bucket.', origin: 'manual:x' }), /credentials/);
   await assert.rejects(invoke('wiki_ingest_text', { content: 'fine', origin: 'ssh://deploy:hunter2@host.example/repo' }), /credentials/);
   await assert.rejects(invoke('wiki_ingest_text', { content: 'fine', origin: 'https://example.org/hook/xoxb-123456789012-abcdefghijklmnop' }), /credentials/);
-  // An existing wiki in an unregistered folder stays bound to that folder, never silently to the hub.
+  // A folder that is not a project never gets a wiki of its own, whatever it holds: its sessions use the shared wiki.
   const unregistered = path.join(temp, 'unregistered');
   const localWiki = path.join(unregistered, '.wiki');
   fs.mkdirSync(localWiki, { recursive: true });
   const localCtx = { ...ctx, key: 'test:unregistered', cwd: unregistered };
-  assert.equal(projectWikiTarget(localCtx), fs.realpathSync(localWiki));
-  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, fs.realpathSync(localWiki));
-  fs.writeFileSync(path.join(unregistered, 'AGENTS.md'), '- Wiki: `../outside/_index.md`\n');
-  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, null, 'an unsafe binding does not fall back to the shared hub');
-  fs.writeFileSync(path.join(unregistered, 'AGENTS.md'), `- Wiki: \`../hub/_index.md\`\n`);
-  assert.equal(projectWikiTarget(localCtx), fs.realpathSync(hub), 'only an explicit binding to the configured shared hub is accepted');
+  assert.throws(() => projectWikiTarget(localCtx), /no project wiki/, 'plans need a project wiki');
+  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, fs.realpathSync(hub), 'a .wiki folder in a folder that is not a project is not its wiki');
+  fs.writeFileSync(path.join(unregistered, 'AGENTS.md'), '- Wiki: `.wiki/_index.md`\n');
+  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, fs.realpathSync(hub), 'nor is a Wiki line in its AGENTS.md');
+  await tool('wiki_ingest_text').run({ content: 'Source: shared.\n', origin: 'manual:shared' }, localCtx);
+  assert.deepEqual(fs.readdirSync(localWiki), [], 'nothing is written into that folder');
+  assert.equal(fs.existsSync(path.join(unregistered, '.gitignore')), false);
   setSessionExtra(db, localCtx.key, { wikiEnabled: false });
   await assert.rejects(tool('wiki_status').run({}, localCtx), /off for this chat/);
   // A session starting in the project: told about wiki memory, the agent asked to send checkpoints, the wiki bound as its knowledge and left bound.

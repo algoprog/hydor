@@ -14,10 +14,11 @@ const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-plan-a
 const root = path.join(temp, 'wiki');
 fs.mkdirSync(path.join(root, 'wiki', 'references'), { recursive: true });
 fs.mkdirSync(path.join(root, 'output', 'projects', 'existing'), { recursive: true });
+fs.mkdirSync(path.join(root, 'output', 'evidence', 'existing'), { recursive: true });
 const sourcePath = path.join(root, 'wiki', 'references', 'proposal.md');
 const source = '# Proposal\n\nWP-01: implement and test.\n\n';
 fs.writeFileSync(sourcePath, source);
-const registerPath = path.join(root, 'output', 'projects', 'existing', 'evidence.md');
+const registerPath = path.join(root, 'output', 'evidence', 'existing', 'evidence.md');
 fs.writeFileSync(registerPath, '# Evidence\nWP-01: blocked; acceptance pending.\n');
 const db = openDb(path.join(temp, 'app.db'));
 try {
@@ -36,7 +37,7 @@ try {
   const tools = planTools(() => root);
   const preview = tools.find((tool) => tool.name === 'wiki_plan_preview')!;
   const adopt = tools.find((tool) => tool.name === 'wiki_plan_adopt')!;
-  const args = { slug: 'new-plan', origin: 'User-selected proposal', sourcePath: 'wiki/references/proposal.md', registerPath: 'output/projects/existing/evidence.md' };
+  const args = { slug: 'new-plan', origin: 'User-selected proposal', sourcePath: 'wiki/references/proposal.md', registerPath: 'output/evidence/existing/evidence.md' };
   const planned = JSON.parse(String(await preview.run(args, ctx)));
   assert.equal(planned.sourcePath, args.sourcePath);
   assert.equal(planned.registerPath, args.registerPath);
@@ -69,6 +70,8 @@ try {
   const translated = previewPlan(root, { slug: 'deutsch', origin: 'Chat', content: '# Plan\nWP-03: Prüfen.\n', registerContent: '## Umsetzungskontrolle\nUmsetzung: offen.\nAuslieferung: nicht beauftragt.\nAbnahme: offen.' });
   assert.match(translated.content, /## Umsetzungskontrolle/);
   assert.doesNotMatch(translated.content, /Implementation: not started/);
+  // The register is evidence, never inside the plans area (where only these tools write).
+  for (const bad of ['output/projects/existing/evidence.md', 'wiki/references/proposal.md', 'output/evidence/../projects/existing/evidence.md', 'output/evidence/existing/missing.md']) assert.throws(() => previewPlan(root, { ...args, slug: 'other', registerPath: bad }), /execution register|not an active|Missing|ENOENT/, bad);
   assert.throws(() => previewPlan(root, { slug: 'wrong', origin: 'Chat', content: '# Plan\n## Evidence\nExisting\n' }), /appears to contain a register/);
   assert.throws(() => previewPlan(root, { slug: '../escape', origin: 'Chat', content: 'No' }), /valid plan folder/);
   assert.throws(() => previewPlan(root, { slug: 'wrong', origin: 'https://example.test/?token=secret', content: 'No' }), /origin/i);

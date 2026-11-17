@@ -17,7 +17,7 @@ const INSTRUCTIONS = [
   'Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, then the articles it names. Cite the articles you use.',
   'To keep something: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.',
   'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.',
-  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation.',
+  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write.',
 ].join(' ');
 
 /** Supply workflow instructions and tools to an agent only while wiki memory is on for its project. */

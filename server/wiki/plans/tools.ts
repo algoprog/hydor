@@ -9,6 +9,7 @@ import { applyWikiChanges, checkOrigin, readWiki, wikiHash } from '../core.ts';
 import { refreshWikiKnowledge } from '../knowledge/index.ts';
 import { wikiFileActive } from '../knowledge/bindings.ts';
 import { wikiSpaceOfSession } from '../roots.ts';
+import { EVIDENCE_AREA, inEvidenceArea, PLANS_AREA } from './area.ts';
 
 interface PlanInput { slug: string; origin: string; content?: string; sourcePath?: string; registerPath?: string; existingRegisterHeading?: string; registerContent?: string }
 interface PlanPreview {
@@ -33,7 +34,7 @@ export function previewPlan(root: string, args: PlanInput): PlanPreview {
   const source = args.sourcePath ? readWiki(root, args.sourcePath) : null;
   const text = source ? source.content : String(args.content ?? '');
   if (!text.trim() || Buffer.byteLength(text) > 60_000 || text.includes('\0') || secretIn(text)) throw new Error('Provide bounded plan text without credentials');
-  const target = `output/projects/${slug}/plan.md`;
+  const target = `${PLANS_AREA}/${slug}/plan.md`;
   const absolute = path.join(root, target);
   if (fs.existsSync(absolute)) throw new Error('This plan already exists; review it before updating');
   const listing = browseWiki(root);
@@ -42,7 +43,7 @@ export function previewPlan(root: string, args: PlanInput): PlanPreview {
   let registerPath = target;
   let registerHash: string | null = null;
   if (args.registerPath) {
-    if (!/^output\/projects\//.test(args.registerPath) || !/\.md$/i.test(args.registerPath)) throw new Error('The execution register must be in the project wiki');
+    if (!inEvidenceArea(args.registerPath) || !/\.md$/i.test(args.registerPath)) throw new Error(`The execution register must be a Markdown file in ${EVIDENCE_AREA}/: agents write evidence there, and nothing in ${PLANS_AREA}/ except through the plan tools`);
     if (!wikiFileActive(root, path.resolve(root, args.registerPath))) throw new Error('The execution register is not an active wiki document');
     const register = readWiki(root, args.registerPath);
     registerPath = register.path;
@@ -66,11 +67,11 @@ export function previewPlan(root: string, args: PlanInput): PlanPreview {
 /** Bind approval to the precise preview and reject changes before saving. */
 export function planTools(resolveTarget: (ctx: RunCtx) => string, guardProject?: (ctx: RunCtx, root: string) => Promise<unknown>): RunTool[] {
   const properties = {
-    slug: { type: 'string', description: 'Lowercase folder name for a new plan under output/projects.' },
+    slug: { type: 'string', description: `Lowercase folder name for a new plan under ${PLANS_AREA}.` },
     origin: { type: 'string', description: 'Non-sensitive provenance for this user-selected plan.' },
     content: { type: 'string', description: 'The exact plan text supplied by the user, when sourcePath is not used.' },
     sourcePath: { type: 'string', description: 'Existing active wiki document to adopt, when content is not supplied.' },
-    registerPath: { type: 'string', description: 'Optional existing authoritative execution register inside output/projects.' },
+    registerPath: { type: 'string', description: `Optional existing authoritative execution register: a Markdown file in ${EVIDENCE_AREA}/ (where wiki_write records evidence; it is never a plan).` },
     existingRegisterHeading: { type: 'string', description: 'Exact heading of the authoritative register if it is already part of the supplied plan.' },
     registerContent: { type: 'string', description: 'When a new register is needed, its Markdown content in the user language, with separate implementation, deployment and acceptance states and evidence or blockers.' },
   };
@@ -96,7 +97,7 @@ export function planTools(resolveTarget: (ctx: RunCtx) => string, guardProject?:
         const after = previewPlan(target, args as unknown as PlanInput);
         if (after.sha256 !== before.sha256) throw new Error('Plan preview changed; review it again');
         const gitIgnore = await guardProject?.(ctx, target);
-        const result = applyWikiChanges(target, [{ path: before.path, content: before.content, expectedSha256: null }]);
+        const result = applyWikiChanges(target, [{ path: before.path, content: before.content, expectedSha256: null }], { plans: true });
         refreshWikiKnowledge(ctx.deps.db, target);
         // Reuse the existing project Memory refresh event after an approved change.
         ctx.deps.broadcast?.({ t: 'feature', id: 'wiki', data: { space: wikiSpaceOfSession(ctx.deps.db, ctx.key, ctx.cwd) } });

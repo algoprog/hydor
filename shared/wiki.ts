@@ -59,7 +59,7 @@ export interface ProjectWikiView {
   root?: string;
   articles?: WikiItem[];
   sources?: WikiItem[];
-  /** Active project plans and execution evidence under output/projects/. */
+  /** Active project plans (output/projects/, changed only by the plan tools) and execution evidence (output/evidence/). */
   plans?: WikiItem[];
   truncated?: boolean;
   error?: string;

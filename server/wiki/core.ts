@@ -40,7 +40,7 @@ function filePath(root: string, relative: string, missing = false): string {
   if (!relative || relative.includes('\0') || relative.includes('\\') || path.posix.isAbsolute(relative)) throw new Error('Expected a relative wiki path');
   const parts = relative.split('/');
   if (parts.some((p) => !p || p.startsWith('.'))) throw new Error('Invalid or hidden wiki path');
-  const projectDocument = parts.length >= 4 && parts[0] === 'output' && parts[1] === 'projects' && /\.md$/i.test(relative);
+  const projectDocument = parts.length >= 4 && parts[0] === 'output' && (parts[1] === 'projects' || parts[1] === 'evidence') && /\.md$/i.test(relative);
   if (!projectDocument && (parts.length === 1 ? !/\.md$/i.test(parts[0]) : !['wiki', 'raw'].includes(parts[0]))) throw new Error('A wiki holds its files in wiki/, raw/, project plans and Markdown files at its root');
   const target = path.resolve(root, ...parts);
   noSymlinks(root, target);
@@ -52,10 +52,12 @@ function filePath(root: string, relative: string, missing = false): string {
 }
 
 /** Where a write may go: articles (wiki/**.md), the index and log at the root, and Markdown notes in raw/ (never existing ones). */
-function writable(relative: string): boolean {
+function writable(relative: string, plans = false): boolean {
   const parts = relative.split('/');
   if (parts.length === 1) return /^(?:index|log)\.md$/.test(parts[0]);
-  if (parts.length >= 4 && parts[0] === 'output' && parts[1] === 'projects') return /\.md$/i.test(relative);
+  // Plans (output/projects/) are written only by the plan workflows, which say so; evidence (output/evidence/) by anything.
+  if (parts.length >= 4 && parts[0] === 'output' && parts[1] === 'projects') return plans && /\.md$/i.test(relative);
+  if (parts.length >= 4 && parts[0] === 'output' && parts[1] === 'evidence') return /\.md$/i.test(relative);
   return ['wiki', 'raw'].includes(parts[0]) && /\.md$/i.test(relative);
 }
 
@@ -107,18 +109,18 @@ function applyOne(root: string, change: WikiChange): void {
 }
 
 /** Apply one change at a time; partial multi-file transactions are deliberately refused. */
-export function applyWikiChanges(root: string, changes: WikiChange[]): { paths: string[] } {
+export function applyWikiChanges(root: string, changes: WikiChange[], o: { plans?: boolean } = {}): { paths: string[] } {
   if (changes.length !== 1) throw new Error('Apply exactly one wiki file per operation');
-  if (!writable(changes[0].path)) throw new Error('A wiki is written only in wiki/, in index.md and log.md, and in raw/ by its ingestion');
+  if (!writable(changes[0].path, o.plans)) throw new Error('A wiki is written only in wiki/, in index.md and log.md, in output/evidence/, and in raw/ by its ingestion; plans (output/projects/) only by the plan tools');
   // The path is judged before the lock is taken, so a refused path never waits on (or leaves) a lock.
   filePath(root, changes[0].path, true);
   return locked(root, () => { applyOne(root, changes[0]); return { paths: [changes[0].path] }; });
 }
 
-/** Coordinate protected plan snapshots with the same cooperative lock as ordinary wiki writes. */
+/** Coordinate protected plan snapshots with the same cooperative lock as ordinary wiki writes. Only the plan revision workflow calls this: it may write plans. */
 export function withWikiWriteLock<T>(root: string, action: (apply: (change: WikiChange) => void) => T): T {
   return locked(root, () => action((change) => {
-    if (!writable(change.path)) throw new Error('This wiki path cannot be written');
+    if (!writable(change.path, true)) throw new Error('This wiki path cannot be written');
     applyOne(root, change);
   }));
 }
@@ -237,7 +239,7 @@ export function checkWiki(root: string): { checked: number; issues: { path: stri
       // Only content owned by this wiki is traversed, never sibling project wikis in the hub.
       if (entry.isDirectory()) {
         const rel = path.relative(root, file).split(path.sep).join('/');
-        if (dir === root ? ['wiki', 'raw', 'output'].includes(entry.name) : rel === 'output/projects' || rel.startsWith('output/projects/') || rel.startsWith('wiki/') || rel.startsWith('raw/')) visit(file);
+        if (dir === root ? ['wiki', 'raw', 'output'].includes(entry.name) : rel === 'output/projects' || rel.startsWith('output/projects/') || rel === 'output/evidence' || rel.startsWith('output/evidence/') || rel.startsWith('wiki/') || rel.startsWith('raw/')) visit(file);
         continue;
       }
       if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue;

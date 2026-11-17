@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { guardWikiFolder } from './settings/gitignore.ts';
+import { claimsToBePlan, EVIDENCE_AREA, inEvidenceArea, inPlansArea, PLANS_AREA } from './plans/area.ts';
 import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, wikiHash } from './core.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts';
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
@@ -133,7 +134,7 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_read',
-      description: 'Read one active article, source or project plan (wiki/…, raw/…, output/projects/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable.',
+      description: 'Read one active article, source, project plan or execution evidence (wiki/…, raw/…, output/projects/…, output/evidence/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable.',
       annotations: { readOnlyHint: true },
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, wiki: wikiArg }, required: ['path'] },
       async run(a, ctx) {
@@ -188,23 +189,17 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_write',
-      description: 'Write one article, project evidence document, index.md or log.md after reading it with wiki_read and giving its exact SHA-256, or null for a new file. Existing plans use the revision workflow. Raw sources and hidden files cannot be written here. On a conflict read again; never overwrite blindly.',
+      description: 'Write one article (wiki/…), execution evidence (output/evidence/<plan>/<name>.md: what was done, deployed or accepted, with evidence or blockers), index.md or log.md after reading it with wiki_read and giving its exact SHA-256, or null for a new file. Plans (output/projects/…) cannot be written here at all: they have their own tools (wiki_plan_preview and wiki_plan_adopt, wiki_plan_revision_preview and wiki_plan_revise). Raw sources and hidden files cannot be written here. On a conflict read again; never overwrite blindly.',
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, expectedSha256: { type: ['string', 'null'] }, wiki: wikiArg }, required: ['path', 'content', 'expectedSha256'] },
       async run(a, ctx) {
         if (typeof a.path !== 'string' || typeof a.content !== 'string' || !(a.expectedSha256 === null || (typeof a.expectedSha256 === 'string' && /^[a-f0-9]{64}$/.test(a.expectedSha256)))) throw new Error('Give path, content, and the exact expected SHA-256 or null');
         // Raw inputs and lesson captures have dedicated workflows, never a generic write shortcut.
         if (a.path.split(/[\\/]/)[0].toLowerCase() === 'raw') throw new Error('Use the source or lessons workflow to create raw material');
+        // The plans area (output/projects/, and output/ but for its evidence folder) is the plan tools' alone: whatever the
+        // file is called, whatever its header says, no generic write creates or changes anything there.
+        if (inPlansArea(a.path)) throw new Error(`Plans (${PLANS_AREA}/) are adopted with wiki_plan_preview and wiki_plan_adopt and changed with wiki_plan_revision_preview and wiki_plan_revise, which show the exact text, ask the user and keep earlier revisions. wiki_write cannot write there. Record what was done, deployed or accepted in ${EVIDENCE_AREA}/<plan>/<name>.md.`);
+        if (inEvidenceArea(a.path) && claimsToBePlan(a.content)) throw new Error(`A plan is not written in ${EVIDENCE_AREA}/: use the plan tools`);
         const root = wikiTarget(ctx, a.wiki);
-        if (a.expectedSha256 === null && /^output\/projects\//i.test(a.path)) {
-          const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(a.content)?.[1] ?? '';
-          if (/(?:^|[-_])(?:plan|planung|umsetzungsplan)\.md$/i.test(path.posix.basename(a.path)) || /^["']?document_kind["']?\s*:\s*["']?plan["']?\s*(?:#.*)?$/im.test(frontmatter)) throw new Error('Use the plan adoption workflow for new plans');
-        }
-        if (a.expectedSha256 !== null && /^output\/projects\//i.test(a.path)) {
-          const existing = readWiki(root, a.path);
-          // Existing identified plans must preserve their revision history.
-          const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(existing.content)?.[1] ?? '';
-          if (/(?:^|[-_])(?:plan|planung|umsetzungsplan)\.md$/i.test(path.posix.basename(a.path)) || /^["']?document_kind["']?\s*:\s*["']?plan["']?\s*(?:#.*)?$/im.test(frontmatter)) throw new Error('Use the plan revision workflow for existing plans');
-        }
         const guard = await guardProject(ctx, root);
         if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
         const result = applyWikiChanges(root, [{ path: a.path, content: a.content, expectedSha256: a.expectedSha256 }]);

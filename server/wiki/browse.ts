@@ -53,5 +53,6 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
   visit('wiki', articles);
   visit('raw', sources);
   visit('output/projects', plans);
+  visit('output/evidence', plans);
   return { articles, sources, plans, truncated };
 }

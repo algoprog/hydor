@@ -41,7 +41,7 @@ export const wikiBrowse: Feature = {
       try {
         const { root } = target(p.id);
         if (!root) throw new Error('No wiki');
-        if (!/^(?:wiki|raw|output\/projects)\//.test(relative) || !/\.md$/i.test(relative) || !wikiFileActive(root, path.resolve(root, relative))) throw new Error('Not an active wiki document');
+        if (!/^(?:wiki|raw|output\/projects|output\/evidence)\//.test(relative) || !/\.md$/i.test(relative) || !wikiFileActive(root, path.resolve(root, relative))) throw new Error('Not an active wiki document');
         return readWiki(root, relative);
       } catch { throw new HttpError(404, 'This wiki file is unavailable'); }
     });

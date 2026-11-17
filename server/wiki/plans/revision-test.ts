@@ -129,15 +129,15 @@ try {
   }
   assert.equal(fs.readFileSync(path.join(root, weakPath), 'utf8'), weakOriginal);
   const generic = wikiTools().find((tool) => tool.name === 'wiki_write')!;
-  await assert.rejects(() => generic.run({ path: args.path, content: '# Bypass', expectedSha256: second.expectedSha256 }, ctx), /plan revision workflow/);
+  await assert.rejects(() => generic.run({ path: args.path, content: '# Bypass', expectedSha256: second.expectedSha256 }, ctx), /wiki_plan_revise/);
   // Clearly named older plans and explicitly typed plans cannot bypass revision protection.
   const older = 'output/projects/sample/old-umsetzungsplan.md';
   fs.writeFileSync(path.join(root, older), '# Older plan\n');
-  await assert.rejects(() => generic.run({ path: older, content: '# Bypass', expectedSha256: wikiHash('# Older plan\n') }, ctx), /plan revision workflow/);
+  await assert.rejects(() => generic.run({ path: older, content: '# Bypass', expectedSha256: wikiHash('# Older plan\n') }, ctx), /wiki_plan_revise/);
   const quoted = 'output/projects/sample/custom.md';
   const quotedContent = '---\n"document_kind" : "plan"\n---\n# Plan\n';
   fs.writeFileSync(path.join(root, quoted), quotedContent);
-  await assert.rejects(() => generic.run({ path: quoted, content: '# Bypass', expectedSha256: wikiHash(quotedContent) }, ctx), /plan revision workflow/);
+  await assert.rejects(() => generic.run({ path: quoted, content: '# Bypass', expectedSha256: wikiHash(quotedContent) }, ctx), /wiki_plan_revise/);
   const quotedPreview = previewRevision(root, { ...args, path: quoted, content: `${quotedContent}\nNew work.\n`, expectedSha256: wikiHash(quotedContent) });
   assert.equal((quotedPreview.content.match(/document_kind\s*:/g) ?? []).length, 1);
   console.log('Plan revision preview, approvals, protection and concurrency passed');
