@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.79.0 · 17 November 2026
+
+Grok Build, xAI's coding agent, runs in Hydor, with your Grok subscription.
+
+- **Grok Build as an agent**: add it in **Settings → Agents → More agents**, beside Gemini CLI, OpenCode and the others,
+  with one click. The app installs it the first time it is needed, or uses the one you already have, and keeps it up to
+  date with the other agent programs. Its sessions use the app's own tools and approval cards, and Grok's models.
+- **Sign in with a Grok subscription**: once it is added, **Settings → Agents → Accounts** lists **Grok Build** beside
+  Claude Code and Codex. **Sign in** gives you a link and a one-time code: open the link on any device, sign in with your
+  Grok account and confirm the code, and the page notices when you are done. A session started while signed out says so
+  and where to sign in. An xAI API key in `XAI_API_KEY` works too.
+- **More than one Grok account**: **Add an account** offers Grok Build beside Claude Code and Codex. Each account keeps
+  its own sign-in and its own Grok history; your Grok settings, rules, skills and plugins are shared. Pick the account
+  for a new session under **Options → Account** on the start page, and move a session to another one with its
+  **Account** chip. Usage meters and switching accounts at a limit are still for Claude Code and Codex only.
+- A session whose agent can no longer reopen it (any agent that speaks ACP) now starts afresh, with a note, instead of
+  failing.
+
 ## 0.78.1 · 17 November 2026
 
 Translations leave technical words alone.
