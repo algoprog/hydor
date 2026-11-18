@@ -21,7 +21,8 @@ import type {
   TimelinePage,
   UpdateState,
 } from '@shared/types';
-import { api, enc } from './api';
+import { api, enc, post } from './api';
+import { stopRegistry, type Stop, type StopScope } from './stopping';
 import { live } from './ws';
 import { machineId, machineKey } from './machine';
 import { useMachines } from './machines';
@@ -194,7 +195,7 @@ export const useSessions = create<{
     for (const s of r.sessions) {
       const gone = removedAt.get(s.key) ?? 0;
       if (deleted.has(s.key) || (gone > started && gone >= (upsertedAt.get(s.key) ?? 0))) continue;
-      byKey[s.key] = (upsertedAt.get(s.key) ?? 0) > started && prev[s.key] ? prev[s.key] : s;
+      byKey[s.key] = (upsertedAt.get(s.key) ?? 0) > started && prev[s.key] ? prev[s.key] : stops.summary(s);
     }
     for (const [k, s] of Object.entries(prev)) if (!byKey[k] && (upsertedAt.get(k) ?? 0) > started) byKey[k] = s;
     set({ byKey, order: sortKeys(byKey), loaded: true, total: r.total });
@@ -204,7 +205,7 @@ export const useSessions = create<{
     const now = Date.now();
     for (const s of list) {
       if (deleted.has(s.key)) continue;
-      byKey[s.key] = s;
+      byKey[s.key] = stops.summary(s);
       upsertedAt.set(s.key, now);
     }
     set({ byKey, order: sortKeys(byKey) });
@@ -246,6 +247,7 @@ export const useTimeline = create<{
     try {
       const page = await api<TimelinePage>(`/api/sessions/${enc(key)}/timeline?limit=${PAGE}&whole=1`);
       set((s) => ({ byKey: { ...s.byKey, [key]: { items: page.items, start: page.start, total: page.total, loading: false, loadingEarlier: false } } }));
+      stops.items(key, page.items);
     } catch (e) {
       set((s) => ({ byKey: { ...s.byKey, [key]: { items: [], start: 0, total: 0, loading: false, loadingEarlier: false, error: (e as Error).message } } }));
     }
@@ -286,6 +288,7 @@ export const useTimeline = create<{
       }
     }
     set((s) => ({ byKey: { ...s.byKey, [key]: { ...cur, items: next, total: Math.max(total, cur.start + next.length) } } }));
+    stops.items(key, next);
   },
 }));
 
@@ -298,8 +301,80 @@ export const useLive = create<{
   set: (key: string, live: LiveState | null, overlay: LiveOverlay) => void;
 }>((set) => ({
   byKey: {},
-  set: (key, liveState, overlay) => set((s) => ({ byKey: { ...s.byKey, [key]: { live: liveState, overlay: overlay ?? emptyOverlay } } })),
+  set: (key, liveState, overlay) => {
+    // As it is, or as a stop shows it (below).
+    const shown = stops.live(key, liveState, overlay ?? emptyOverlay);
+    set((s) => ({ byKey: { ...s.byKey, [key]: shown } }));
+  },
 }));
+
+// ---- Stop shows at once ----------------------------------------------------------------
+
+/** The sessions that show a stop their agent has not confirmed yet: their conversation ends the stopped turn ("Stopped after …"). */
+export const useStops = create<{ byKey: Record<string, Stop> }>(() => ({ byKey: {} }));
+
+/**
+ * The stops this page shows (lib/stopping.ts): a session you stop shows stopped at once, in every store, while its agent
+ * takes a moment to stop; what the server says of it goes through them on its way in.
+ */
+const stops = stopRegistry({
+  session: (key) => {
+    const tl = useTimeline.getState().byKey[key];
+    return { live: useLive.getState().byKey[key], summary: useSessions.getState().byKey[key], items: tl ? (tl.loading && !tl.items.length ? null : tl.items) : undefined };
+  },
+  show: (key) => {
+    const lv = useLive.getState().byKey[key];
+    if (lv) useLive.getState().set(key, lv.live, lv.overlay);
+    const s = useSessions.getState().byKey[key];
+    if (s) useSessions.getState().upsert([s]);
+  },
+  refresh: (key) => {
+    api<{ summary: SessionSummary | null; live: LiveState | null; overlay: LiveOverlay }>(`/api/sessions/${enc(key)}`).then(
+      (r) => {
+        if (stops.has(key)) return;
+        if (r.summary) useSessions.getState().upsert([r.summary]);
+        if (useLive.getState().byKey[key]) useLive.getState().set(key, r.live, r.overlay);
+      },
+      () => {},
+    );
+  },
+  changed: (byKey) => useStops.setState({ byKey }),
+});
+
+/** The Hydor subagents under a session, theirs in turn. */
+function subagentsUnder(key: string): string[] {
+  const all = Object.values(useSessions.getState().byKey);
+  const seen = new Set([key]);
+  const out: string[] = [];
+  const walk = (k: string) => {
+    for (const s of all) {
+      if (s.extra?.parent !== k || seen.has(s.key)) continue;
+      seen.add(s.key);
+      out.push(s.key);
+      walk(s.key);
+    }
+  };
+  walk(key);
+  return out;
+}
+
+/**
+ * Stops a session's turn (`turn`: Stop in its header), or its turn and all it started (`all`: its background tasks and its
+ * Hydor subagents, theirs in turn: the Stop by its message box), and shows it stopped at once, though its agent takes a
+ * moment to stop. Should the server refuse, it shows as it is again.
+ */
+export async function stopSession(key: string, scope: StopScope): Promise<void> {
+  const shown = [key, ...(scope === 'all' ? subagentsUnder(key) : [])].filter((k) => stops.begin(k, scope, k !== key));
+  try {
+    await post(`/api/sessions/${enc(key)}/${scope === 'all' ? 'stop-all' : 'interrupt'}`);
+  } catch (e) {
+    for (const k of shown) stops.end(k);
+    toastError(e);
+  }
+}
+
+/** You sent a session a message: it shows as it is from now on, no longer with the stop you pressed a moment ago. */
+export const stopOverridden = (key: string) => stops.end(key);
 
 // ---- usage, login, system ---------------------------------------------------------------
 
@@ -552,10 +627,11 @@ export function handleEvent(e: ServerEvent) {
       break;
     case 'live': {
       useLive.getState().set(e.key, e.live, e.overlay);
-      // Keep the open session's row in the list in step with its header.
+      // Keep the open session's row in the list in step with its header (both as they show, with a stop they show).
       const cur = useSessions.getState().byKey[e.key];
+      const shown = useLive.getState().byKey[e.key]?.live ?? null;
       const tasks = (l: LiveState | null | undefined) => l?.backgroundTasks?.length ?? 0;
-      if (cur && (cur.live?.status !== e.live?.status || tasks(cur.live) !== tasks(e.live))) useSessions.getState().upsert([{ ...cur, live: e.live, external: e.live ? null : cur.external }]);
+      if (cur && (cur.live?.status !== shown?.status || tasks(cur.live) !== tasks(shown))) useSessions.getState().upsert([{ ...cur, live: e.live, external: e.live ? null : cur.external }]);
       break;
     }
     case 'usage':

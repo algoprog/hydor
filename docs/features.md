@@ -7,7 +7,9 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   waiting for you and respecting reduced-motion preferences. Once the turn is over, it stays, ring and all,
   while subagents or background tasks it started still run, and it stops all of them at once: the turn, the
   subagents, and the background tasks, with the ones they started (a stopped Hydor subagent does not report back and
-  wake its parent). Pointing at it says what it stops (“Stops this turn, 2 subagents and 1 background task”).
+  wake its parent). Pointing at it says what it stops (“Stops this turn, 2 subagents and 1 background task”). A
+  stopped session shows stopped the moment Stop is pressed (here or in the header), while its agent takes a few seconds
+  to finish, until the agent confirms it (or, still at work 20 seconds later, shows at work again).
 - The work tray, one line above the prompt bar, gathers what a session started: its subagents and its
   background tasks (commands, monitors, workflows). Folded, it sums them up (“2 subagents and 1 background
   task running”, “1 needs you”) with a **Stop all**; opened, every one is a row in the same look, with its state,

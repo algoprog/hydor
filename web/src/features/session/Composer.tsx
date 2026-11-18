@@ -8,7 +8,7 @@ import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
 import { openSession } from '../../lib/nav';
 import { LOCALE } from '../../i18n/locale';
-import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
+import { stopOverridden, toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
@@ -346,6 +346,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     if (move) return handOff(t);
     if ((!t && !atts.length) || busy || locked) return;
     if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
+    // Sent just after Stop: the session shows what it does with the message, no longer the stop.
+    stopOverridden(key);
     const queue = working && !takeover && (waitsMemory || (followUpPref() === 'queue') !== opposite);
     const list = atts;
     setBusy(true);

@@ -11,9 +11,8 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { findModel, modelLabel, useCatalog } from '../../components/AgentPickers';
 import { cx, IconButton } from '../../components/ui';
 import { isBusy, activityOf } from '../../lib/activity';
-import { enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
-import { toastError } from '../../lib/store';
+import { stopSession } from '../../lib/store';
 import { taskKindLabel, taskKindOf, taskState, type ProgramSub, type WorkState } from '../../lib/work';
 import { ActivityText, StatusDot } from '../sessions/SessionList';
 import { Elapsed } from './items';
@@ -230,5 +229,5 @@ export function TaskItem({ t, program, onOpen, onStop }: { t: BackgroundTask; /*
   return <WorkRow icon={<TaskWorkIcon t={t} />} title={t.description} kind={<TaskKindText kind={t.kind} program={program} />} status={<TaskStatus t={t} />} onOpen={onOpen} onStop={onStop} stopLabel={taskKindOf(t.kind) === 'subagent' ? 'Stop this subagent' : 'Stop this task'} />;
 }
 
-/** Stops a session and everything it started: its turn, its background tasks, and its Hydor subagents, theirs in turn (the server's stop-all). */
-export const stopEverything = (key: string) => post(`/api/sessions/${enc(key)}/stop-all`).catch(toastError);
+/** Stops a session and everything it started: its turn, its background tasks, and its Hydor subagents, theirs in turn (the server's stop-all), shown stopped at once. */
+export const stopEverything = (key: string) => stopSession(key, 'all');

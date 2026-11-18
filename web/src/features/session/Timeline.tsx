@@ -6,7 +6,8 @@ import { sentPicturesOf, useSentPictures, type SentPictures } from '../../lib/at
 import { copiesInConversation, onItsWay, sendingItems, sentShown, settlesAt, useOutgoing } from '../../lib/outgoing';
 import { basename, dirname, duration, prettyPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
-import { useApp, useSessions, useTimeline } from '../../lib/store';
+import { useApp, useSessions, useStops, useTimeline } from '../../lib/store';
+import { stoppedTurn } from '../../lib/stopping';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
@@ -1191,7 +1192,12 @@ export function Timeline({
   };
   // The same function from one render to the next: the turns read it through FollowCtx, and a new one drew them all again.
   const following = useCallback(() => stick.current, []);
-  const withLive = useMemo(() => mergeOverlay(tl?.items ?? [], overlay), [tl?.items, overlay]);
+  // A turn you stopped a moment ago shows stopped, "Stopped after …", until its agent says so itself (lib/stopping.ts).
+  const stop = useStops((x) => x.byKey[sessionKey]);
+  const withLive = useMemo(() => {
+    const all = mergeOverlay(tl?.items ?? [], overlay);
+    return stop?.turn ? stoppedTurn(all, stop) : all;
+  }, [tl?.items, overlay, stop]);
   // Messages sent from here show at once, before the session has them: each until its own copy shows (lib/outgoing.ts).
   const outgoing = useOutgoing((s) => s.byKey[sessionKey]);
   const saved = tl?.items.length ?? 0;
