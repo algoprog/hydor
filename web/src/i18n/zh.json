@@ -25895,5 +25895,16 @@
   "There are too few bookmarks to organize. The sites pinned on the bookmarks bar stay as they are.": "书签太少，无需整理。固定在书签栏上的网站保持不变。",
   "There is nothing to undo": "没有可撤销的内容",
   "Your bookmarks are being organized already": "你的书签正在整理中",
-  "Your bookmarks changed after they were organized, so Undo can’t put them back": "整理之后你的书签已有变动，所以无法撤销恢复"
+  "Your bookmarks changed after they were organized, so Undo can’t put them back": "整理之后你的书签已有变动，所以无法撤销恢复",
+  "{0} message": "{0} 条消息",
+  "{0} messages": "{0} 条消息",
+  "{0} person": "{0} 人",
+  "Last 4 weeks": "过去 4 周",
+  "Lately in the Library": "资料库中的最新内容",
+  "Latest sessions": "最新会话",
+  "Open the Library": "打开资料库",
+  "Quiet these 4 weeks: {0}": "过去 4 周没有动静：{0}",
+  "Quiet these 4 weeks: {0} and {1} more": "过去 4 周没有动静：{0} 及另外 {1} 个",
+  "Shared with people": "已与他人分享",
+  "Where the work went": "工作去了哪里"
 }

@@ -55,7 +55,7 @@ const tabPath = (id: string, t: SpaceTab) => `/projects/${id}${t === 'overview' 
 // ---- pieces ----------------------------------------------------------------------------------------------------
 
 /** A part of the page: its title (and how many it holds), what leads further, and what it holds. */
-function Card({ title, count, action, children, className }: { title: ReactNode; count?: number; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Card({ title, count, action, children, className }: { title: ReactNode; count?: number; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={cx('min-w-0 overflow-hidden rounded-2xl border border-line bg-panel', className)}>
       <header className="flex min-h-12 items-center gap-2 px-4 py-2.5">
@@ -70,7 +70,7 @@ function Card({ title, count, action, children, className }: { title: ReactNode;
 }
 
 /** The quiet link at a card's top right: "All 12", "Open in the Library". */
-function CardLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+export function CardLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-fg-3 hover:bg-bg-2 hover:text-fg">
       {children}

@@ -55,6 +55,27 @@ export interface SpaceView extends Space {
   skills: number;
   /** How many things it holds in the Library: pages, slides, documents, pictures and videos. */
   library: number;
+  /** How many people it is shared with now (links that work); absent when none. */
+  people?: number;
+}
+
+/** A project's work over the days asked for (the Projects page's Where the work went). */
+export interface SpaceActivity {
+  id: string;
+  /** How many of its sessions were at work in those days. */
+  sessions: number;
+  /** How many messages its sessions were sent in those days. */
+  prompts: number;
+  /** Messages per day, oldest first, one for each of `days`. */
+  byDay: number[];
+}
+
+/** The projects' work, day by day (GET /api/projects/activity). */
+export interface SpacesActivity {
+  /** The days, oldest first, the last one today in the time zone asked for: `key` "2026-11-18", `start` its date as UTC midnight (ms). */
+  days: { key: string; start: number }[];
+  /** The projects at work in those days, the busiest first; those with none are left out. */
+  projects: SpaceActivity[];
 }
 
 /** A space's colour, by name (as templates have theirs). */

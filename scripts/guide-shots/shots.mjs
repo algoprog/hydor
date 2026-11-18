@@ -1,6 +1,9 @@
 // Every screenshot in the guide: which page, what to open on it, and which part to keep. `take` returns the file's
 // size; `ctx.go` opens a page of the demo app, `ctx.file` is where the picture goes.
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { sleep } from './cdp.mjs';
+import { projectsWork } from './demo.mjs';
 
 /**
  * The part of the window right of the rail and of the sessions sidebar (on the start page and in sessions), down to
@@ -30,6 +33,28 @@ async function around(p, targets, pad = 16) {
   const x1 = Math.min(p.size.width, Math.max(...boxes.map((b) => b.x + b.width)) + pad);
   const y1 = Math.min(p.size.height, Math.max(...boxes.map((b) => b.y + b.height)) + pad);
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
+/** What the Projects picture shows beyond the demo: earlier work in the projects (demo.mjs) and the Thesis project shared with two people. Returns what takes them out again. */
+async function projectsExtras(ctx) {
+  const Database = createRequire(import.meta.url)('better-sqlite3');
+  const work = (on) => {
+    const db = new Database(path.join(ctx.home, '.hydor', 'hydor.db'));
+    db.pragma('busy_timeout = 5000');
+    try {
+      projectsWork(db, ctx.sessions, Date.now(), on);
+    } finally {
+      db.close();
+    }
+  };
+  work(true);
+  const thesis = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
+  const shares = [];
+  if (thesis) for (const name of ['Maria Lopez', 'Nikos Papas']) shares.push((await ctx.api('POST', `/api/projects/${thesis}/shares`, { name })).share.id);
+  return async () => {
+    work(false);
+    for (const id of shares) await ctx.api('DELETE', `/api/projects/${thesis}/shares/${id}`).catch(() => {});
+  };
 }
 
 /** The last element matching a selector, as a js: target. */
@@ -118,11 +143,22 @@ export const SHOTS = [
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),
   {
+    // All projects, beside the column that lists them: the overview across projects. Two things only this picture has,
+    // taken out again after it: four weeks of work in the projects, and a project shared with two people.
     id: 'projects',
+    height: 980,
     async take(p, ctx) {
-      await ctx.go('/projects', { settle: 1500 });
-      await p.park();
-      return p.shot(ctx.file, { clip: await main(p, await bottomOf(p, last('main .grid > *, .grid > button'), 36)) });
+      const undo = await projectsExtras(ctx);
+      try {
+        await ctx.go('/projects', { settle: 1800 });
+        // The Library's two pages show their pictures, which the app draws a moment after the demo made the pages.
+        await p.waitFor(`[...document.querySelectorAll('main img[src*="/thumb"]')].filter((i) => i.complete && i.naturalWidth).length >= 2`, { timeout: 30000 }).catch(() => {});
+        await p.park();
+        await sleep(400);
+        return await p.shot(ctx.file, { clip: await main(p, await bottomOf(p, 'js:[...document.querySelectorAll("main aside")].pop()?.parentElement', 16)) });
+      } finally {
+        await undo();
+      }
     },
   },
   {

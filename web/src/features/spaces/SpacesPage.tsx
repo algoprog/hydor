@@ -1,6 +1,9 @@
 // Spaces: each project's sessions, files, documents, Library, memory, guidelines, skills and assistant together.
 // The list (beside the shared knowledge, on the page's second tab): a card for each space with what it holds,
-// New session and its menu (as on its page), the folders worth a space of their own, and Group spaces together. A space's own page is SpacePage.
+// New session and its menu (as on its page), the folders worth a space of their own, and Group spaces together,
+// where no column beside the page lists the projects (a phone, a narrow window, the sidebar hidden) or while a search
+// or the share hint is up, or there is nothing yet to show across projects. With the column, which lists them already,
+// the page shows the overview across projects instead (Overview.tsx), then the folders worth a space. A space's own page is SpacePage.
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
 // a folder. Files dropped on a space's card go into its Library (pages/uploads.ts: each made what it is, any other file
 // in its folder); dropped elsewhere on the list, nothing happens.
@@ -13,12 +16,13 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useMediaQuery } from '../../components/ui';
 import { basename, tildify, timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { useApp } from '../../lib/store';
+import { useApp, useUI } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves } from '../pages/uploads';
 import { DropHint } from '../pages/UploadTray';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
+import { ProjectsOverview } from './Overview';
 import { ProjectsColumn } from './ProjectsColumn';
 import { memoryPath, SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
@@ -236,6 +240,12 @@ function List() {
   });
   const finding = wide && words.length > 0;
   const grid = finding ? shown : (spaces ?? []);
+  // With the column listing every project, the page shows the work across them; the cards stay where there is no column,
+  // while searching or showing the share hint, and while there is nothing to show across projects yet.
+  const sideOpen = useUI((x) => x.sideOpen);
+  const column = wide && sideOpen;
+  const overview = !!spaces?.length && !finding && !sharing && spaces.some((s) => s.sessions > 0 || s.library > 0);
+  const cards = !column || !overview;
   return (
     <div className="flex h-full min-h-0" onDragOver={refuse} onDrop={refuse}>
       {wide && <ProjectsColumn place="all" tip="spaces" />}
@@ -290,36 +300,41 @@ function List() {
               ) : !spaces.length ? (
                 <Intro onMake={make} />
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {sharing && (
-                    <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
-                      <UserPlus size={15} className="shrink-0 text-accent" />
-                      <span className="min-w-0 flex-1">
-                        To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
-                      </span>
-                      <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
-                        <X size={14} />
-                      </button>
+                <>
+                  {cards && (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {sharing && (
+                        <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
+                          <UserPlus size={15} className="shrink-0 text-accent" />
+                          <span className="min-w-0 flex-1">
+                            To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
+                          </span>
+                          <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                      {grid.map((s) => (
+                        <SpaceCard key={s.id} s={s} spaces={spaces} />
+                      ))}
+                      {finding && !shown.length && <div className="py-6 text-[13.5px] text-fg-3 sm:col-span-2 xl:col-span-3">No project matches what you typed</div>}
+                      {plain >= 2 && !finding && (
+                        <button
+                          type="button"
+                          onClick={() => setMade('group')}
+                          className="flex min-h-[180px] flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-line-2 px-5 py-4 text-left text-fg-2 transition-colors hover:bg-bg-1 hover:text-fg"
+                        >
+                          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
+                            <Layers size={17} />
+                          </span>
+                          <span className="text-[14px] font-semibold">Group projects together</span>
+                          <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its projects: their files, documents and guidelines</span>
+                        </button>
+                      )}
                     </div>
                   )}
-                  {grid.map((s) => (
-                    <SpaceCard key={s.id} s={s} spaces={spaces} />
-                  ))}
-                  {finding && !shown.length && <div className="py-6 text-[13.5px] text-fg-3 sm:col-span-2 xl:col-span-3">No project matches what you typed</div>}
-                  {plain >= 2 && !finding && (
-                    <button
-                      type="button"
-                      onClick={() => setMade('group')}
-                      className="flex min-h-[180px] flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-line-2 px-5 py-4 text-left text-fg-2 transition-colors hover:bg-bg-1 hover:text-fg"
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
-                        <Layers size={17} />
-                      </span>
-                      <span className="text-[14px] font-semibold">Group projects together</span>
-                      <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its projects: their files, documents and guidelines</span>
-                    </button>
-                  )}
-                </div>
+                  {overview && <ProjectsOverview spaces={spaces} onGroup={!cards && plain >= 2 ? () => setMade('group') : undefined} />}
+                </>
               )}
               {spaces && !finding && (
                 <Suggestions

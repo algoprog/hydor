@@ -31,7 +31,9 @@ import {
   spaceSkillText,
   spaceSwitches,
 } from '../skillpack/spaceSkills.ts';
+import { spacesActivity } from './activity.ts';
 import { createSpace, deleteSpace, sessionsIn, spaceById, spaces, spaceViews, updateSpace } from './index.ts';
+import { shareTables } from './share.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -463,6 +465,87 @@ test('folders sessions worked in, or changed files in, are suggested for a space
   deleteSpace(db, shop.id);
   deleteSpace(db, sp.id);
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('what the projects did lately: messages a day and sessions at work, the busiest first, by the session or its root', () => {
+  const a = createSpace(db, { name: 'Busy' });
+  const b = createSpace(db, { name: 'Calm' });
+  const seed = (key: string, extra: Record<string, unknown> | null) => {
+    db.prepare('insert into app_sessions (key, agent, created_at, updated_at) values (?, ?, 1, 1)').run(key, 'claude');
+    if (extra) setSessionExtra(db, key, extra);
+  };
+  seed('claude:act-a1', { space: a.id });
+  seed('claude:act-a2', { space: a.id });
+  seed('claude:act-b1', { space: b.id });
+  seed('claude:act-sub', null);
+  seed('claude:act-none', null);
+  const put = (key: string, root: string, at: number, prompts: number) => db.prepare("insert into activity (key, root, agent, hour, prompts) values (?, ?, 'claude', ?, ?)").run(key, root, Math.floor(at / 3_600_000), prompts);
+  const noon = (daysAgo: number) => {
+    const d = new Date();
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysAgo, 12);
+  };
+  put('claude:act-a1', 'claude:act-a1', noon(0), 4);
+  put('claude:act-a1', 'claude:act-a1', noon(2), 3);
+  put('claude:act-a2', 'claude:act-a2', noon(2), 0);
+  // A subagent's rows count for its root's project.
+  put('claude:act-sub', 'claude:act-b1', noon(1), 2);
+  put('claude:act-b1', 'claude:act-b1', noon(5), 1);
+  // Outside the window, in no project, and in a project that no longer exists.
+  put('claude:act-a1', 'claude:act-a1', noon(60), 50);
+  put('claude:act-none', 'claude:act-none', noon(1), 9);
+  seed('claude:act-gone', { space: 'spgone' });
+  put('claude:act-gone', 'claude:act-gone', noon(1), 9);
+  const got = spacesActivity(db, { tz: 'UTC' });
+  assert.equal(got.days.length, 28, 'the default is four weeks');
+  assert.equal(got.days.at(-1)!.key, new Date().toISOString().slice(0, 10), 'ending today');
+  assert.equal(got.days[0].start, got.days.at(-1)!.start - 27 * 86400_000);
+  assert.deepEqual(
+    got.projects.map((p) => p.id),
+    [a.id, b.id],
+    'the busiest first',
+  );
+  const [pa, pb] = got.projects;
+  assert.equal(pa.prompts, 7);
+  assert.equal(pa.sessions, 2, 'a session with no messages in the days is still at work');
+  assert.equal(pa.byDay.length, 28);
+  assert.deepEqual([pa.byDay[27], pa.byDay[25]], [4, 3]);
+  assert.equal(pa.byDay.reduce((x, y) => x + y, 0), 7, 'nothing from outside the window');
+  assert.equal(pb.prompts, 3);
+  assert.equal(pb.sessions, 1, 'the subagent and its root are one session');
+  assert.deepEqual([pb.byDay[26], pb.byDay[22]], [2, 1]);
+  assert.equal(spacesActivity(db, { tz: 'UTC', days: 7 }).days.length, 7);
+  assert.equal(spacesActivity(db, { tz: 'UTC', days: 7 }).projects.find((p) => p.id === b.id)!.prompts, 3, 'five days ago is in a week');
+  assert.equal(spacesActivity(db, { days: 1 }).days.length, 7, 'at least a week');
+  assert.equal(spacesActivity(db, { days: 500 }).days.length, 90, 'at most 90 days');
+  assert.equal(spacesActivity(db, { days: 90 }).projects.find((p) => p.id === a.id)!.prompts, 57, 'sixty days ago is in 90');
+  assert.deepEqual(spacesActivity(db, { tz: 'Not/AZone' }), spacesActivity(db, { tz: 'UTC' }), 'an unknown time zone is UTC');
+  assert.equal(spacesActivity(db, { tz: 'Pacific/Kiritimati' }).days.length, 28);
+  deleteSpace(db, a.id);
+  assert.deepEqual(
+    spacesActivity(db, {}).projects.map((p) => p.id),
+    [b.id],
+    'a deleted project is left out',
+  );
+  deleteSpace(db, b.id);
+  assert.deepEqual(spacesActivity(db, {}).projects, []);
+});
+
+test('a project says how many people it is shared with: links that work, none when none', () => {
+  const s = createSpace(db, { name: 'Shared with' });
+  assert.equal(spaceViews(db).find((x) => x.id === s.id)!.people, undefined);
+  assert.equal('people' in spaceViews(db).find((x) => x.id === s.id)!, false);
+  shareTables(db);
+  const share = (id: string, extra: { expires?: number | null; stopped?: number | null; item?: string | null }) =>
+    db
+      .prepare("insert into project_shares (id, space, name, role, hash, created_at, expires_at, stopped_at, item) values (?, ?, ?, 'comment', ?, 1, ?, ?, ?)")
+      .run(id, s.id, id, `hash-${id}`, extra.expires ?? null, extra.stopped ?? null, extra.item ?? null);
+  share('one', {});
+  share('two', { expires: Date.now() + 86400_000 });
+  share('ran-out', { expires: Date.now() - 1000 });
+  share('stopped', { stopped: Date.now() - 1000 });
+  share('a-page', { item: 'pg1' });
+  assert.equal(spaceViews(db).find((x) => x.id === s.id)!.people, 2);
+  deleteSpace(db, s.id);
 });
 
 for (const [name, fn] of tests) {

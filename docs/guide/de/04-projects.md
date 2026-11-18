@@ -2,7 +2,7 @@
 
 Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
 
-![Die Projektseite mit einer Karte je Projekt, Inhaltsübersicht und Neuer Sitzung](images/projects.webp)
+![Die Projektseite: die neuesten Sitzungen deiner Projekte, was sie in der Bibliothek ablegen und wohin die Arbeit ging](images/projects.webp)
 
 ## Was ein Projekt ist
 
@@ -31,7 +31,19 @@ Auf einem Computer hat die Seite wie die Bibliothek eine Spalte neben der Werkze
 
 Der Bereich, in dem du bist, ist in der Spalte markiert, und er bleibt es, wenn du ein Projekt öffnest, sodass du von einem Projekt zum anderen wechseln kannst, ohne zurückzugehen. **Seitenleiste ausblenden** (Strg+B, auf dem Mac ⌘B) blendet die Spalte aus, **Seitenleiste anzeigen** am Anfang der obersten Zeile der Seite holt sie zurück. Auf dem Smartphone und in einem schmalen Fenster gibt es keine Spalte: Die Seite hat dann eine Kopfzeile mit zwei Tabs, **Alle Projekte** und **Gemeinsames Wissen**, und **Neues Projekt** oben rechts.
 
-Die Seite neben der Spalte beginnt mit einer Zeile: **Alle Projekte** links und rechts ein Feld zum Suchen eines Projekts (**Projekt suchen**). Tippe einen Teil des Namens oder dessen, worum es im Projekt geht, und die Karten werden beim Tippen weniger; Esc oder ✕ leert das Feld. Darunter:
+Die Seite neben der Spalte beginnt mit einer Zeile: **Alle Projekte** links und rechts ein Feld zum Suchen eines Projekts (**Projekt suchen**). Tippe einen Teil des Namens oder dessen, worum es im Projekt geht, und die Seite zeigt die passenden Projekte als Karten; Esc oder ✕ leert das Feld.
+
+Die Spalte listet deine Projekte schon, darum zeigt die Seite daneben, was projektübergreifend passiert:
+
+- **Neueste Sitzungen**: die Sitzungen, die zuletzt in einem deiner Projekte gearbeitet haben, die neueste zuerst. Jede zeigt das Zeichen ihres Projekts, ihren Titel, den Namen des Projekts, was sie gerade tut, solange sie läuft („Arbeitet“, „Braucht dich“), und wie lange ihre letzte Arbeit her ist. Ein Klick öffnet sie. **Mehr anzeigen** listet bis zu 30 davon, **Weniger anzeigen** geht zurück auf 8.
+- **Zuletzt in der Bibliothek**: die sechs neuesten Dinge, die deine Projekte in der Bibliothek haben (Seiten, Folien, Dokumente, Bilder und Videos), jeweils mit dem Namen ihres Projekts. Ein Klick öffnet sie; **Bibliothek öffnen** zeigt alles.
+- **Wohin die Arbeit ging**: die letzten 4 Wochen, Tag für Tag. Jeder Balken ist ein Tag, so hoch wie die Zahl der Nachrichten, die die Sitzungen deiner Projekte an diesem Tag bekamen, in den Farben der Projekte, an die sie gingen; zeige auf einen Balken, um sein Datum und die Anzahl zu sehen. Über den Balken steht die Summe („86 Nachrichten · 14 Sitzungen“), darunter jedes Projekt, das gearbeitet hat, das aktivste zuerst, mit einer Linie so lang wie sein Anteil und der Zahl seiner Nachrichten. Ein Klick auf ein Projekt öffnet es. **Ruhig in diesen 4 Wochen** nennt die Projekte, in denen in dieser Zeit nichts lief.
+- **Mit anderen geteilt**: die Projekte, auf die andere Personen einen Link haben, mit der Zahl der Personen. Ein Klick zeigt, wer, und erlaubt, es zu ändern (siehe [Ein Projekt mit Personen teilen](#share-a-project-with-people)). Das erscheint nur, solange du ein Projekt teilst.
+- **Projekte gruppieren**, sobald du mindestens zwei Projekte hast, die keine Gruppen sind (siehe [Projekte zu einer Gruppe verbinden](#bring-projects-together-in-a-group)).
+
+Ein Teil, der nichts zu zeigen hat, entfällt.
+
+Die Projekte erscheinen als Karten überall dort, wo keine Spalte sie auflistet: auf dem Smartphone und in einem schmalen Fenster, solange die Spalte ausgeblendet ist, solange du ein Projekt suchst und solange keines deiner Projekte eine Sitzung oder etwas in der Bibliothek hat. Die Teile oben folgen dann unter den Karten.
 
 Jede Projektkarte zeigt:
 
@@ -44,7 +56,7 @@ Ein Klick auf die Karte oder auf die Zeile des Projekts in der Spalte öffnet da
 
 Ziehe lokale Dateien auf eine Projektkarte, um sie hinzuzufügen. Währenddessen steht etwa „Ablegen, um zu ‚Abschlussarbeit‘ hinzuzufügen“. Dokumente, Tabellen, Folien, LaTeX und Notebooks werden Bibliotheksseiten, Bilder, Videos und Audio werden dort gespeichert. Andere Dateien landen im Projektordner. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
 
-Unter den Projekten (nicht, während du eines suchst) listet **Ordner, in denen du arbeitest** Ordner auf, in denen du in letzter Zeit gearbeitet hast und die zu Projekten werden könnten (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
+Am Ende der Seite (nicht, während du ein Projekt suchst) listet **Ordner, in denen du arbeitest** Ordner auf, in denen du in letzter Zeit gearbeitet hast und die zu Projekten werden könnten (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Ein Projekt erstellen
 
@@ -268,7 +280,7 @@ Eine Gruppe ist ein Projekt, das mehrere andere für übergreifende Arbeit bünd
 
 ### Eine Gruppe erstellen
 
-1. Klicke auf der [Projektseite](/projects) auf **Projekte gruppieren**. Die Karte erscheint ab zwei gewöhnlichen Projekten.
+1. Klicke auf der [Projektseite](/projects) auf **Projekte gruppieren**. Das erscheint ab zwei gewöhnlichen Projekten.
 2. Gib unter **Neue Gruppe von Projekten** einen **Namen** ein, etwa „Arbeit“ oder „Alles zur Abschlussarbeit“.
 3. Tippe unter **Die Projekte, die es zusammenbringt** jedes Projekt an, das aufgenommen werden soll; tippe es noch einmal an, um es wieder herauszunehmen. Wähle mindestens eines aus.
 4. Fülle optional **Worum es geht** und die **Agentenrichtlinien** aus und wähle eine Farbe.

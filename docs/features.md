@@ -518,8 +518,14 @@ agents that speak ACP and take MCP servers.
   beside the rail, the same kind as the Library's (the logo, New project and Hide sidebar on top; then All projects with
   its count, Shared knowledge, and, under a Projects label, a row for each project with its mark and its sessions); it
   stays beside a project's own pages with that project lit, and beside Shared knowledge. All projects is under a row with
-  its name and a box to find a project by its name or what it is about; each is a card in its colour with
-  what it holds (sessions, things in the Library, documents, skills) and New session. A phone and a narrow window have
+  its name and a box to find a project by its name or what it is about. Beside the column, which lists the projects
+  already, it shows what goes on across them: the latest sessions of any project (its mark, the session's title, what a
+  running one is doing, how long ago), the newest things the projects hold in the Library, where the work went (the
+  last 4 weeks, a bar a day in the projects' colours as tall as the messages their sessions were sent, then each
+  project's share, the busiest first, and the ones that were quiet), the projects shared with people, and Group projects
+  together. Where no column lists the projects (a phone, a narrow window, the column hidden, a search, or nothing to show
+  across them yet), each is a card in its colour with what it holds (sessions, things in the Library, documents, skills)
+  and New session, with those parts under the cards. A phone and a narrow window have
   no column: the page's header has its two tabs, All projects and Shared knowledge. A project's own page opens at
   once under a band of its colour, with the way back on the left (when the column is not beside it), New session and one menu (its folder in Files,
   only its sessions in the sidebar, delete it), and its tabs under them (on a phone, those that do not fit under More

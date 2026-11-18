@@ -21,6 +21,7 @@ import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 import { repoRoot } from '../memory/store.ts';
+import { spacesActivity } from './activity.ts';
 import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, switchSpaceSkills, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
@@ -58,6 +59,7 @@ export function spaceViews(db: DB): SpaceView[] {
     ).map((r) => [r.space, r]),
   );
   const kept = libraryCounts(db);
+  const shared = peopleCounts(db);
   return allSpaces(db).map((s) => ({
     ...s,
     sessions: counts.get(s.id)?.n ?? 0,
@@ -65,7 +67,18 @@ export function spaceViews(db: DB): SpaceView[] {
     docs: docs.get(s.id) ?? 0,
     skills: skillsOf(s.id).length,
     library: kept.get(s.id) ?? 0,
+    ...(shared.get(s.id) ? { people: shared.get(s.id) } : {}),
   }));
+}
+
+/** How many people each space is shared with now: links that work (the table is made the first time someone shares). */
+function peopleCounts(db: DB): Map<string, number> {
+  const out = new Map<string, number>();
+  try {
+    const rows = db.prepare('select space, count(*) as n from project_shares where item is null and stopped_at is null and (expires_at is null or expires_at > ?) group by space').all(Date.now()) as { space: string; n: number }[];
+    for (const r of rows) out.set(r.space, r.n);
+  } catch {}
+  return out;
 }
 
 /** How many things each space holds in the Library: pages (an app's screens aside) and the pictures and videos kept. */
@@ -333,6 +346,11 @@ export const spaces: Feature = {
     });
     // Folders sessions worked in lately that no space has yet (server/spaces/suggest.ts).
     d.app.get('/api/projects/suggestions', async () => ({ folders: spaceSuggestions(d.db) }));
+    // What the projects' sessions did over the last days (server/spaces/activity.ts).
+    d.app.get('/api/projects/activity', async (req) => {
+      const q = req.query as { tz?: string; days?: string };
+      return spacesActivity(d.db, { tz: q.tz, days: q.days ? Number(q.days) : undefined });
+    });
     d.app.post('/api/projects/suggestions/hide', async (req) => {
       const folder = typeof body(req).folder === 'string' ? String(body(req).folder).trim() : '';
       if (!isAbsPath(folder)) throw new HttpError(400, 'Which folder?');

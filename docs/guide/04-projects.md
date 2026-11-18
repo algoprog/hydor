@@ -2,7 +2,7 @@
 
 A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
 
-![The Projects page: a card for each project, with what it holds and New session](images/projects.webp)
+![The Projects page: the latest sessions across your projects, what they keep in the Library, and where the work went](images/projects.webp)
 
 ## What a project is
 
@@ -31,7 +31,19 @@ On a computer the page has a column beside the rail, the same kind as the Librar
 
 The place you are in is lit in the column, and it stays there when you open a project, so you can move from one project to another without going back. **Hide sidebar** (Ctrl+B, or ⌘B on a Mac) hides the column; **Show sidebar** at the left of the page's top row brings it back. On a phone or in a narrow window, there is no column: the page has a header with two tabs, **All projects** and **Shared knowledge**, and **New project** at the top right.
 
-The page beside the column starts with a row: **All projects** at the left and, at the right, a box to find a project (**Find a project**). Type part of a name or of what a project is about, and the cards narrow down as you type; Esc or ✕ empties the box. Under the row:
+The page beside the column starts with a row: **All projects** at the left and, at the right, a box to find a project (**Find a project**). Type part of a name or of what a project is about, and the page shows the projects that match as cards; Esc or ✕ empties the box.
+
+The column already lists your projects, so the page beside it shows what goes on across them:
+
+- **Latest sessions**: the sessions last at work in any of your projects, the latest first. Each has its project's mark, its title, the project's name, what it is doing while it runs ("Working", "Needs you") and how long ago it was at work. Click one to open it. **Show more** lists up to 30 of them, and **Show fewer** goes back to 8.
+- **Lately in the Library**: the six newest things your projects hold in the Library (pages, slides, documents, pictures and videos), each with its project's name. Click one to open it; **Open the Library** shows everything.
+- **Where the work went**: the last 4 weeks, day by day. Each bar is a day, as tall as the messages your projects' sessions were sent that day, in the colours of the projects they went to; point at a bar for its date and how many. Above the bars is the total ("86 messages · 14 sessions"), and under them each project that was at work, the busiest first, with a line as long as its share and how many messages it got. Click a project to open it. **Quiet these 4 weeks** names the projects with no work in that time.
+- **Shared with people**: the projects other people have a link to, with how many people. Click one to see who, and to change it (see [Share a project with people](#share-a-project-with-people)). It shows only while you share a project.
+- **Group projects together**, once you have at least two projects that aren't groups (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
+
+A part with nothing to show is left out.
+
+The projects show as cards wherever no column lists them: on a phone or in a narrow window, while the column is hidden, while you are finding a project, and until one of your projects has a session or something in the Library. The parts above follow under the cards.
 
 Each project shows as a card:
 
@@ -44,7 +56,7 @@ Click a card, or its row in the column, to open the project's own page, or type 
 
 Drop files from your computer on a project's card to add them to the project ("Drop to add to “Thesis”" shows while they are over it): documents, spreadsheets, slides, LaTeX and notebooks become pages of the Library, pictures, videos and sounds are kept there, and any other file goes in the project's folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 
-Under the projects (not while you are finding one), **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
+At the end of the page (not while you are finding a project), **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Make a project
 
@@ -268,7 +280,7 @@ A group is a project that brings several projects together, for work that spans 
 
 ### Make a group
 
-1. On the [Projects page](/projects), click **Group projects together**. This card shows once you have at least two projects that aren't groups.
+1. On the [Projects page](/projects), click **Group projects together**. It shows once you have at least two projects that aren't groups.
 2. In **New group of projects**, give it a **Name**, such as "Work" or "Everything for the thesis".
 3. Under **The projects it brings together**, tap each project to bring in; tap one again to take it out. Pick at least one.
 4. Optionally, fill in **What it is about** and the **Agent Guidelines**, and pick a colour.

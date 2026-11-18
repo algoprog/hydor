@@ -503,9 +503,9 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
 
 const GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-3.5';
 
-function Grid({ items, showSpace, showFolder }: { items: Item[]; showSpace?: boolean; showFolder?: boolean }) {
+function Grid({ items, showSpace, showFolder, className }: { items: Item[]; showSpace?: boolean; showFolder?: boolean; className?: string }) {
   return (
-    <div className={GRID}>
+    <div className={className ?? GRID}>
       {items.map((it) => (
         <ItemCard key={it.key} it={it} showSpace={showSpace} showFolder={showFolder} />
       ))}
@@ -1212,6 +1212,29 @@ export function SpaceLibrary({ space, limit, framed = true }: { space: SpaceView
           <DropHint name={space.name} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** The newest things the projects hold in the Library, each naming its project (the Projects page's overview). Nothing while there are none. */
+export function ProjectsLibrary({ limit }: { limit: number }) {
+  const items = useItems();
+  useEffect(() => {
+    if (!usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(toastError);
+    useMedia.getState().ensure();
+  }, []);
+  if (!items)
+    return (
+      <div className="flex justify-center py-6 text-fg-3">
+        <Throbber size={22} />
+      </div>
+    );
+  const shown = items.filter((it) => it.space).slice(0, limit);
+  if (!shown.length) return null;
+  // Two across, and three where its card is wide enough; two rows either way, so the last two show only when three fit.
+  return (
+    <div className="@container">
+      <Grid items={shown} showSpace className="grid grid-cols-2 gap-2.5 sm:gap-3.5 @xl:grid-cols-3 [&>*:nth-child(n+5)]:hidden @xl:[&>*:nth-child(n+5)]:block" />
     </div>
   );
 }

@@ -25876,5 +25876,16 @@
   "There are too few bookmarks to organize. The sites pinned on the bookmarks bar stay as they are.": "Οι σελιδοδείκτες είναι πολύ λίγοι για οργάνωση. Οι ιστότοποι που είναι καρφιτσωμένοι στη γραμμή σελιδοδεικτών μένουν όπως είναι.",
   "There is nothing to undo": "Δεν υπάρχει τίποτα για αναίρεση",
   "Your bookmarks are being organized already": "Οι σελιδοδείκτες σας οργανώνονται ήδη",
-  "Your bookmarks changed after they were organized, so Undo can’t put them back": "Οι σελιδοδείκτες σας άλλαξαν μετά την οργάνωση, οπότε η Αναίρεση δεν μπορεί να τους επαναφέρει"
+  "Your bookmarks changed after they were organized, so Undo can’t put them back": "Οι σελιδοδείκτες σας άλλαξαν μετά την οργάνωση, οπότε η Αναίρεση δεν μπορεί να τους επαναφέρει",
+  "{0} message": "{0} μήνυμα",
+  "{0} messages": "{0} μηνύματα",
+  "{0} person": "{0} άτομο",
+  "Last 4 weeks": "Τελευταίες 4 εβδομάδες",
+  "Lately in the Library": "Πρόσφατα στη Βιβλιοθήκη",
+  "Latest sessions": "Πιο πρόσφατες συνεδρίες",
+  "Open the Library": "Άνοιγμα της Βιβλιοθήκης",
+  "Quiet these 4 weeks: {0}": "Χωρίς δραστηριότητα τις τελευταίες 4 εβδομάδες: {0}",
+  "Quiet these 4 weeks: {0} and {1} more": "Χωρίς δραστηριότητα τις τελευταίες 4 εβδομάδες: {0} και {1} ακόμα",
+  "Shared with people": "Κοινοποιημένα σε άτομα",
+  "Where the work went": "Πού πήγε η δουλειά"
 }

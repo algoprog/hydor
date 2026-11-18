@@ -887,6 +887,35 @@ export function awayData(db, s, now) {
   }
 }
 
+/**
+ * Four weeks of earlier work in Alex's projects, for the Projects page's Where the work went (the sessions' own
+ * transcripts are a message or two from the last days): the hours the app keeps of each session's work, under keys of
+ * their own that count for a project through one of its sessions (`root`), so the app never writes over them. They
+ * are only in the Projects picture (shots.mjs puts them in and takes them out: `on` false), since the Usage page
+ * would count them too.
+ */
+export function projectsWork(db, s, now, on = true) {
+  db.prepare("delete from activity where key like 'demo-work:%'").run();
+  if (!on) return;
+  const add = db.prepare("insert or ignore into activity (key, root, agent, hour, prompts, turns, messages) values (?, ?, 'claude', ?, ?, ?, ?)");
+  // Each project's session, and the messages of a day: `d` days ago, `work` on a working day.
+  const plans = {
+    checkout: (d, work) => (work ? 3 + ((d * 7) % 5) : d % 2), // the shop: every working day
+    thesis: (d, work) => (d % 3 === 0 ? 0 : work ? 1 + ((d * 5) % 4) : 2), // most days, a little
+    garden: (d, work) => (work ? 0 : 1 + (d % 3)), // weekends
+    taxes: (d) => (d >= 12 && d <= 18 ? 2 + ((d * 3) % 4) : 0), // one busy week
+  };
+  for (const [name, plan] of Object.entries(plans)) {
+    if (!s[name]) continue;
+    for (let d = 27; d >= 2; d--) {
+      const at = now - d * DAY;
+      const day = new Date(at).getDay();
+      const n = plan(d, day !== 0 && day !== 6);
+      if (n > 0) add.run(`demo-work:${name}:${d}`, s[name].key, Math.floor(at / HOUR), n, n, n * 6);
+    }
+  }
+}
+
 /** What new and changed documents did to the Thesis project's memory (its Memory tab → Wiki → Recent updates), as the app keeps it. */
 export function wikiData(db, spaces, now) {
   db.exec(`create table if not exists wiki_updates (
