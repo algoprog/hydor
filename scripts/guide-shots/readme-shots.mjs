@@ -9,6 +9,9 @@
 import { lisbonDeck, tripRun } from './demo.mjs';
 import { sleep } from './cdp.mjs';
 
+/** The desktop app's windows, with the Browser in the rail (a phone's screen stays a phone's). */
+export const desktop = true;
+
 const session = (ctx, name) => `/s/${encodeURIComponent(ctx.sessions[name].key)}`;
 
 /** The Lisbon session's Trip planner run, done, with its card under the reply; and the slides made from its plan. */

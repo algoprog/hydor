@@ -37,7 +37,8 @@ function args() {
 
 const o = args();
 // Another list of shots (the website's, website/shots.mjs) instead of the guide's. It may also add to the demo what
-// only its own pictures show (prepare: the README's planned trip and deck).
+// only its own pictures show (prepare: the README's planned trip and deck), and ask for the desktop app's look
+// (desktop: its window pictures get the Browser in the rail, which only the desktop app has).
 const LIST = o.shots ? await import(pathToFileURL(path.resolve(o.shots)).href) : null;
 const SHOTS = LIST ? LIST.SHOTS : GUIDE_SHOTS;
 if (!fs.existsSync(path.join(o.root, 'dist/server/index.js')) || !fs.existsSync(path.join(o.root, 'dist/web/index.html')))
@@ -121,6 +122,10 @@ function apiFor(cookie) {
 }
 
 /** Before the app's own scripts: the theme, no caret, and the socket's news for the faked sessions held back. */
+/** The desktop app's bridge, as far as the page's look goes: its own browser, whose every call does nothing. With it the
+ * rail shows the Browser, as in the app on a computer. */
+const DESKTOP = `window.hydorDesktop = { browser: new Proxy({}, { get: (_, k) => (typeof k !== 'string' || k === 'then' ? undefined : k.startsWith('on') ? () => () => {} : async () => null) }) };`;
+
 const pageScript = (theme, live) => `
 (() => {
   try {
@@ -214,6 +219,7 @@ async function main() {
       // Made afresh for each picture, so a card has waited seconds, not the minutes the run takes.
       const fake = overrides(sessions, Date.now());
       await p.initScript(pageScript(theme, fake.live));
+      if (LIST?.desktop && !shot.phone) await p.initScript(DESKTOP);
       await route(p, api, fake);
       const file = path.join(o.out, `${shot.id}${theme === 'light' ? '-light' : ''}.webp`);
       try {

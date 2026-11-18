@@ -10,6 +10,9 @@ import { deckShot, tripShot } from '../scripts/guide-shots/readme-shots.mjs';
 
 export { prepare } from '../scripts/guide-shots/readme-shots.mjs';
 
+/** The desktop app's windows, with the Browser in the rail (a phone's screen stays a phone's). */
+export const desktop = true;
+
 const session = (ctx, name) => `/s/${encodeURIComponent(ctx.sessions[name].key)}`;
 
 /** The whole window on a page (a path, or a function of the demo's context for a session's), with `typed` in its

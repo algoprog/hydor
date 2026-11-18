@@ -27,6 +27,9 @@ gives the windows their rounded corners and puts the phone over the session's di
 A list of shots may export `prepare(ctx)`, which run.mjs calls once the demo is seeded (with its API and its database) to
 add what only its pictures show: the README's and the website's add the Trip planner's run in the Lisbon session (its
 card, on the map) and the trip's slides in the Library (`tripRun` and `lisbonDeck` in demo.mjs).
+A list may also export `desktop = true`, as those two do: its window pictures then show the desktop app, with the
+Browser in the rail, which only the desktop app has (run.mjs gives each page a stand-in for the desktop app's bridge;
+a phone's screen stays a phone's). The guide's own pictures show the app as a web browser does.
 
 To take a shot from uncommitted changes, apply them to the worktree before building. `--out <dir>` writes the
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
