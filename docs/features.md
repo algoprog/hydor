@@ -243,9 +243,15 @@ agents that speak ACP and take MCP servers.
     the page: it narrows to make room.
   - **The tab column**: the sites on your bookmarks bar pinned as tiles (five to a row, two rows, a **…** tile for the
     rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
-    open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ×, a speaker to mute,
+    open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ⋯, ×, a speaker to mute,
     middle click to close, **New tab**), resized by its edge like every column; a title too long fades at its end and rolls to
-    show the rest under the pointer.
+    show the rest under the pointer. **A tab's menu** (right-click, or its ⋯): close it, the others or the ones below;
+    duplicate, reload, copy its address, bookmark; add it to a group or take it out. **Tab groups**: a header with a colour
+    (one of seven), a name and the tab count, folded or opened by a click, its tabs under it (drag a tab on or off a group);
+    the header's menu renames, colours, opens a new tab in it, ungroups or closes it. Groups are kept with the tabs for the next
+    start. **Group my tabs with AI** (the sparkles in the **Tabs** row, or the ⋯ menu) sends the titles and addresses of the
+    tabs in no group, without what follows a ? or #, to the helper model, only when pressed, and makes the groups it answers
+    with, with **Undo**.
   - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
     agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site

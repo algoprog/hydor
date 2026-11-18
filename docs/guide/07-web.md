@@ -268,7 +268,7 @@ A bar runs across the top of the page. At its left, over the tab column, are the
 - **Save** keeps a readable copy of the page in the Library: a note says "Saved to the Library", with **Open**. It lands among the Library's **Web pages**. The Library's **Bookmarks**, **Downloads** and **History** chips list the same bookmarks, downloads and history as this page (see [Library](/guide/library)).
 - **Ask** opens the column beside the page to ask about it (see [Ask beside the page](/guide/web#ask-beside-the-page)); it shows lit while that column is there.
 - The buttons of your extensions come next, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
-- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser** and **Do this here…** (see [Do this here](/guide/web#do-this-here)), then **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
+- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser**, **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
 
 A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
 
@@ -292,7 +292,33 @@ The column at the left of the page lists, from the top (**Hide tabs**, or Ctrl+B
 
 - **Pinned sites**: the items of your bookmarks bar as tiles, five to a row and two rows at most (a **…** tile lists the rest). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it. Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**. With nothing on the bookmarks bar there are no tiles; the star puts the page there (see [Bookmarks](/guide/web#bookmarks)).
 - **Agents at work**, while an agent has a browser open: a row for each, with its icon and a dot (blue while it works, amber when it waits for you or you drive), the session's title and what it is doing. Click one to see it (see [Agents at work](/guide/web#agents-at-work)). Its arrow folds the list.
-- **Tabs**: a row for each tab, with its icon, title and **×** (on the open tab, and on the one you point at). A title too long for the column fades out at its end, and rolls along to show the rest while you point at its row. The open tab is the marked row; click a row to show that tab, and a middle click closes it. A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker. **New tab** at the end opens your home page. Closing the last tab leaves a blank one.
+- **Tabs**: a row for each tab, with its icon, title, **⋯** and **×** (on the open tab, and on the one you point at). A title too long for the column fades out at its end, and rolls along to show the rest while you point at its row. The open tab is the marked row; click a row to show that tab, and a middle click closes it. Right-click a row, or press its **⋯**, for the tab's menu (see [Tab groups and the tab menu](/guide/web#tab-groups-and-the-tab-menu)). Tabs you put in a group sit under the group's header, and the sparkles button at the end of the **Tabs** label groups your tabs with AI. A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker. **New tab** at the end opens your home page. Closing the last tab leaves a blank one.
+
+### Tab groups and the tab menu
+
+Right-click a tab (or press the **⋯** on a row you point at, or the menu key on a row you have focused) for its menu:
+
+- **Close tab**, **Close other tabs** and **Close tabs below** (the tabs under it in the column, as they are listed). Your browser always keeps one tab open.
+- **Duplicate** opens the same address in a new tab beside it, in the same group, and shows it. **Reload** reloads that tab, not only the one you have open.
+- **Copy address** and **Bookmark** (**Remove the bookmark** when it is bookmarked), which puts the page on the bookmarks bar.
+- **Add to group**, which lists your groups (the one the tab is in is ticked) and **New group…**, which makes a group of the tab and opens its name for you to type; and **Remove from group**.
+
+A group keeps tabs that belong together. It has a name, one of seven colours (grey, blue, green, amber, orange, red or purple) and is open or folded. In the column it is a header with its colour, its name ("Unnamed group" until you give one) and how many tabs it has; its tabs sit under it with a line in its colour down their side, and the tabs that are in no group come after the groups. Click the header to fold the group away or open it again; a folded group hides its tabs, except the one you have open. Double-click the name (or press F2) to rename it. You can drag a tab onto a group to put it in, and onto the tabs in no group to take it out. Right-click the header, or press its **⋯**, for the group's menu:
+
+- **Rename** and **Colour**.
+- **New tab in group** opens your home page in a new tab in it.
+- **Ungroup** takes the group apart and leaves its tabs where they are.
+- **Close group** closes the group and all its tabs.
+
+A group with no tab left is gone. Groups are kept with your tabs, so they come back with them when the browser opens again. On a phone the tabs are a list in the bar, without groups.
+
+### Group my tabs with AI
+
+When you have many tabs open, the sparkles button at the end of the **Tabs** label (it shows when you point at the label), or **Menu** (⋯) → **Group my tabs with AI**, sorts the tabs that are in no group by what they are for. It needs at least three of them; tabs already in a group stay where they are.
+
+**What is sent, and to which model.** Only when you press the button, the title and address of each of those tabs (up to 60) go to the app's helper model, the one that writes session titles and memory notes ([Settings → Agents → Models → Helper model](/settings?s=models&find=Helper%20model)). On Automatic that is Claude Haiku through Claude Code, else Codex, both online; a model of your own on this computer keeps them here. An address goes without anything after a **?** or **#**, and a file's address as its name only. The pages' text and pictures are never sent, and nothing is sent at any other time. If a title is private, do not press it (or put a model on this computer as the helper).
+
+The model answers with groups of tabs, each with a short name and a colour, and the app makes them at once. A message says how many groups it made, with **Undo**, which puts the groups back as they were. If no tabs go together, it says so and changes nothing. Agents never see your tabs, and the app does not let them use this.
 
 ### The column beside the page
 
@@ -590,6 +616,7 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "How do I allow ads on one site in my browser?" (the padlock's **Allow ads on this site**)
 - "How do I clear my browsing history and cookies?" (**Browser settings** → **Clear browsing data**; the time range counts for the history, and the list of downloads kept with it, alone)
 - "Why does the address bar suggest a page I visited that has none of the words I typed?" (with search by meaning on, it also offers pages about what you typed)
+- "How do I put my tabs in groups, and what does Group my tabs with AI send?" (right-click a tab → **Add to group**; the AI button sends tab titles and addresses, without what follows a ? or #, to the helper model, only when you press it)
 - "How do I reopen a tab I closed?" (**Ctrl+Shift+T**, or **Recently closed** in the history)
 - "Does my browser block ads, and where do its lists come from?"
 - "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")

@@ -268,7 +268,7 @@ Oben über die Seite verläuft eine Leiste. Links, über der Tab-Spalte, stehen 
 - **Speichern** legt eine lesbare Kopie der Seite in der Bibliothek ab: Ein Hinweis sagt „In der Bibliothek gespeichert“, mit **Öffnen**. Sie landet unter den **Webseiten** der Bibliothek. Die Chips **Lesezeichen**, **Downloads** und **Verlauf** der Bibliothek zeigen dieselben Lesezeichen, Downloads und denselben Verlauf wie diese Seite (siehe [Bibliothek](/guide/library)).
 - **Fragen** öffnet die Spalte neben der Seite, um zu ihr zu fragen (siehe [Neben der Seite fragen](/guide/web#ask-beside-the-page)); es leuchtet, solange die Spalte da ist.
 - Danach kommen die Schaltflächen deiner Erweiterungen und, wenn der geöffnete Tab die Chrome-Web-Store-Seite einer Erweiterung ist, **Zu Hydor hinzufügen** (siehe [Chrome-Erweiterungen](/guide/web#chrome-extensions)).
-- **Menü** (⋯) bietet **Auf der Seite suchen**, **Drucken …**, **In deinem Standardbrowser öffnen** und **Hier erledigen lassen …** (siehe [Hier erledigen lassen](/guide/web#do-this-here)), dann **Verlauf**, **Downloads**, **Lesezeichen**, **Erweiterungen**, **Website-Berechtigungen** und **Einstellungen**, die sich in der Spalte rechts von der Seite öffnen (siehe [Die Spalte neben der Seite](/guide/web#the-column-beside-the-page)). **In deinem Standardbrowser öffnen** öffnet die Seite in dem Browser, den dein Computer für Links verwendet.
+- **Menü** (⋯) bietet **Auf der Seite suchen**, **Drucken …**, **In deinem Standardbrowser öffnen**, **Hier erledigen lassen …** (siehe [Hier erledigen lassen](/guide/web#do-this-here)) und **Meine Tabs mit KI gruppieren** (siehe [Meine Tabs mit KI gruppieren](/guide/web#group-my-tabs-with-ai)), dann **Verlauf**, **Downloads**, **Lesezeichen**, **Erweiterungen**, **Website-Berechtigungen** und **Einstellungen**, die sich in der Spalte rechts von der Seite öffnen (siehe [Die Spalte neben der Seite](/guide/web#the-column-beside-the-page)). **In deinem Standardbrowser öffnen** öffnet die Seite in dem Browser, den dein Computer für Links verwendet.
 
 Ein Link auf `/browser?url=https://example.com` öffnet die Seite Browser mit dieser Adresse in einem neuen Tab.
 
@@ -292,7 +292,33 @@ Die Spalte links von der Seite listet von oben nach unten auf (**Tabs ausblenden
 
 - **Angepinnte Websites**: die Einträge deiner Lesezeichenleiste als Kacheln, fünf pro Reihe und höchstens zwei Reihen (eine Kachel **…** listet den Rest). Klicke auf eine, um sie im geöffneten Tab zu öffnen; Strg+Klick (⌘+Klick auf dem Mac) oder ein Mittelklick öffnet sie in einem neuen Tab. Ein Ordner öffnet eine Liste seines Inhalts. Rechtsklick auf eine Kachel bietet **Öffnen**, **In neuem Tab öffnen**, **Bearbeiten** (**Umbenennen** bei einem Ordner) und **Löschen**. Ist die Lesezeichenleiste leer, gibt es keine Kacheln; der Stern legt die Seite dort ab (siehe [Lesezeichen](/guide/web#bookmarks)).
 - **Agenten bei der Arbeit**, solange ein Agent einen Browser offen hat: eine Zeile für jeden, mit seinem Symbol und einem Punkt (blau, solange er arbeitet, bernsteinfarben, wenn er auf dich wartet oder du steuerst), dem Titel der Sitzung und dem, was er gerade tut. Klicke auf eine, um ihn zu sehen (siehe [Agenten bei der Arbeit](/guide/web#agents-at-work)). Ihr Pfeil klappt die Liste zu.
-- **Tabs**: eine Zeile für jeden Tab, mit Symbol, Titel und **×** (beim geöffneten Tab und bei dem, auf den du zeigst). Ein Titel, der zu lang für die Spalte ist, blendet an seinem Ende aus und läuft durch, solange du auf seine Zeile zeigst, damit du den Rest siehst. Der geöffnete Tab ist die markierte Zeile; ein Klick auf eine Zeile zeigt diesen Tab, ein Mittelklick schließt ihn. Ein Tab, der Ton abspielt, zeigt einen Lautsprecher: Klicke darauf, um den Tab stummzuschalten, und noch einmal, um ihn wieder zu hören. Ein stummgeschalteter Tab behält seinen Lautsprecher. **Neuer Tab** am Ende öffnet deine Startseite. Schließt du den letzten Tab, bleibt ein leerer.
+- **Tabs**: eine Zeile für jeden Tab, mit Symbol, Titel, **⋯** und **×** (beim geöffneten Tab und bei dem, auf den du zeigst). Ein Titel, der zu lang für die Spalte ist, blendet an seinem Ende aus und läuft durch, solange du auf seine Zeile zeigst, damit du den Rest siehst. Der geöffnete Tab ist die markierte Zeile; ein Klick auf eine Zeile zeigt diesen Tab, ein Mittelklick schließt ihn. Rechtsklicke eine Zeile oder drücke ihr **⋯** für das Menü des Tabs (siehe [Tab-Gruppen und das Tab-Menü](/guide/web#tab-groups-and-the-tab-menu)). Tabs, die du in eine Gruppe legst, stehen unter dem Kopf der Gruppe, und der Funkel-Button am Ende der Beschriftung **Tabs** gruppiert deine Tabs mit KI. Ein Tab, der Ton abspielt, zeigt einen Lautsprecher: Klicke darauf, um den Tab stummzuschalten, und noch einmal, um ihn wieder zu hören. Ein stummgeschalteter Tab behält seinen Lautsprecher. **Neuer Tab** am Ende öffnet deine Startseite. Schließt du den letzten Tab, bleibt ein leerer.
+
+### Tab-Gruppen und das Tab-Menü
+
+Rechtsklicke einen Tab (oder drücke das **⋯** auf einer Zeile, auf die du zeigst, oder die Menütaste auf einer fokussierten Zeile) für sein Menü:
+
+- **Tab schließen**, **Andere Tabs schließen** und **Tabs darunter schließen** (die Tabs unter ihm in der Spalte, so wie sie aufgelistet sind). Dein Browser behält immer einen Tab offen.
+- **Duplizieren** öffnet dieselbe Adresse in einem neuen Tab daneben, in derselben Gruppe, und zeigt ihn. **Neu laden** lädt genau diesen Tab neu, nicht nur den geöffneten.
+- **Adresse kopieren** und **Lesezeichen** (**Lesezeichen entfernen**, wenn die Seite eins hat), das die Seite in die Lesezeichenleiste legt.
+- **Zu Gruppe hinzufügen**, das deine Gruppen auflistet (die Gruppe des Tabs ist abgehakt) und **Neue Gruppe …**, das aus dem Tab eine Gruppe macht und ihren Namen zum Eintippen öffnet; und **Aus Gruppe entfernen**.
+
+Eine Gruppe hält Tabs zusammen, die zusammengehören. Sie hat einen Namen, eine von sieben Farben (Grau, Blau, Grün, Bernstein, Orange, Rot oder Lila) und ist offen oder eingeklappt. In der Spalte ist sie ein Kopf mit ihrer Farbe, ihrem Namen („Unbenannte Gruppe“, bis du einen vergibst) und der Zahl ihrer Tabs; ihre Tabs stehen darunter, mit einer Linie in ihrer Farbe an der Seite, und die Tabs ohne Gruppe kommen nach den Gruppen. Ein Klick auf den Kopf klappt die Gruppe ein oder wieder auf; eine eingeklappte Gruppe verbirgt ihre Tabs, außer dem, den du geöffnet hast. Doppelklicke den Namen (oder drücke F2), um ihn umzubenennen. Du kannst einen Tab auf eine Gruppe ziehen, um ihn hineinzulegen, und auf die Tabs ohne Gruppe, um ihn herauszunehmen. Rechtsklicke den Kopf oder drücke sein **⋯** für das Menü der Gruppe:
+
+- **Umbenennen** und **Farbe**.
+- **Neuer Tab in der Gruppe** öffnet deine Startseite in einem neuen Tab darin.
+- **Gruppierung aufheben** löst die Gruppe auf und lässt ihre Tabs, wo sie sind.
+- **Gruppe schließen** schließt die Gruppe und alle ihre Tabs.
+
+Eine Gruppe ohne Tab ist weg. Gruppen werden mit deinen Tabs gespeichert und kommen mit ihnen wieder, wenn der Browser erneut geöffnet wird. Auf einem Handy sind die Tabs eine Liste in der Leiste, ohne Gruppen.
+
+### Meine Tabs mit KI gruppieren
+
+Hast du viele Tabs offen, sortiert der Funkel-Button am Ende der Beschriftung **Tabs** (er erscheint, wenn du auf die Beschriftung zeigst) oder **Menü** (⋯) → **Meine Tabs mit KI gruppieren** die Tabs ohne Gruppe danach, wofür sie da sind. Es braucht mindestens drei davon; Tabs, die schon in einer Gruppe sind, bleiben, wo sie sind.
+
+**Was gesendet wird, und an welches Modell.** Nur wenn du den Button drückst, gehen Titel und Adresse jedes dieser Tabs (bis zu 60) an das Hilfsmodell der App, das auch Sitzungstitel und Memory-Notizen schreibt ([Einstellungen → Agenten → Modelle → Hilfsmodell](/settings?s=models&find=Helper%20model)). Bei „Automatisch“ ist das Claude Haiku über Claude Code, sonst Codex, beide online; ein eigenes Modell auf diesem Computer behält sie hier. Eine Adresse geht ohne alles nach einem **?** oder **#**, die Adresse einer Datei nur als ihr Name. Text und Bilder der Seiten werden nie gesendet, und zu keiner anderen Zeit wird etwas gesendet. Ist ein Titel privat, drücke ihn nicht (oder nimm ein Modell auf diesem Computer als Hilfsmodell).
+
+Das Modell antwortet mit Gruppen von Tabs, jede mit einem kurzen Namen und einer Farbe, und die App legt sie sofort an. Eine Meldung sagt, wie viele Gruppen sie gemacht hat, mit **Rückgängig machen**, das die Gruppen wieder so herstellt, wie sie waren. Passen keine Tabs zusammen, sagt sie das und ändert nichts. Agenten sehen deine Tabs nie, und die App lässt sie das nicht benutzen.
 
 ### Die Spalte neben der Seite
 
@@ -590,6 +616,7 @@ Stoppen beendet die Aktion und entzieht allen Sitzungen die Freigabe. Für erneu
 - „Wie erlaube ich Werbung auf einer Website in meinem Browser?“ (**Werbung auf dieser Website erlauben** am Schloss)
 - „Wie lösche ich meinen Browserverlauf und meine Cookies?“ (**Browser-Einstellungen** → **Browserdaten löschen**; der Zeitraum gilt nur für den Verlauf und die dazugehörige Download-Liste)
 - „Warum schlägt die Adressleiste eine Seite vor, die ich besucht habe und die keines der getippten Wörter enthält?“ (bei eingeschalteter Bedeutungssuche bietet sie auch Seiten an, in denen es um das Getippte geht)
+- „Wie lege ich meine Tabs in Gruppen, und was sendet Meine Tabs mit KI gruppieren?“ (Rechtsklick auf einen Tab → **Zu Gruppe hinzufügen**; der KI-Button sendet Tab-Titel und Adressen, ohne alles nach einem ? oder #, an das Hilfsmodell, nur wenn du ihn drückst)
 - „Wie öffne ich einen Tab wieder, den ich geschlossen habe?“ (**Strg+Umschalt+T** oder **Zuletzt geschlossen** im Verlauf)
 - „Blockiert mein Browser Werbung, und woher stammen seine Listen?“
 - „Importiere meine Lesezeichen aus Chrome und Firefox in die Seite Browser.“ (oder: „Warum kann ich meine Safari-Lesezeichen nicht importieren?“)
