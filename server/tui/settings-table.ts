@@ -87,7 +87,7 @@ export interface Row {
   /** A command that has this option's list or button (kind command). */
   command?: string;
   /** A device setting's key; `terminal` ones are the chat's own. */
-  device?: { key: 'theme' | 'language' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions'; terminal?: boolean };
+  device?: { key: 'theme' | 'language' | 'motion' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions'; terminal?: boolean };
   /** What an action's yes and no read as, when it has a state to show (a permission: allowed or not). */
   states?: [string, string];
   /** What the terminal cannot do here, or what to know. */
@@ -120,6 +120,7 @@ row('general', 'Appearance', 'device', { device: { key: 'theme' }, note: 'Dark, 
 row('general', 'New theme', 'page', { note: 'The theme editor is a page.' });
 row('general', 'Import', 'page', { note: 'Importing a theme file is done on the page.' });
 row('general', 'Language', 'device', { device: { key: 'language' }, note: 'The language the app is shown in.' });
+row('general', 'Motion', 'device', { device: { key: 'motion' }, note: 'How much of the app moves: full, calm or none.' });
 row('general', 'Sending while an agent works', 'device', {
   device: { key: 'enter', terminal: true },
   choices: [
