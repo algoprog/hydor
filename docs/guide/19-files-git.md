@@ -297,10 +297,11 @@ The file viewer shows files as they look:
 - **PDFs**: in your browser's own PDF viewer, with **Highlight** at the top to read them in the app's own reader, highlight them and keep notes beside them (see [Read and highlight a PDF](#read-and-highlight-a-pdf)), and **Fill & sign** to fill them in and sign them (see [Fill in and sign a PDF](#fill-in-and-sign-a-pdf)). A PDF you highlighted opens in the reader.
 - **Video** (MP4, WebM, MOV and M4V; MKV and OGV where your browser plays them): in the app's own player (see [Watch a video](#watch-a-video) below); **Edit** at the top opens an MP4, MOV, M4V or WebM one in the video editor. **Audio** (MP3, WAV, OGG) plays in place.
 - **Office documents**: PowerPoint (.pptx, .ppt), older Word and Excel files (.doc, .xls and the like), OpenDocument (.odt, .ods, .odp), RTF and EPUB; and Word (.docx) and Excel (.xlsx) files from **More** (⋯) → **Show as a preview** in their editors. A switch at the top picks the view:
+  - **Slides** (PowerPoint files: .pptx and its macro, slide-show and template kinds): each slide as it looks, drawn as the Library draws slides, with its pictures, shapes, tables, charts and background in place, its number above it and its speaker notes under it. Where this computer lacks a font the deck uses, the words of a box that need more room than it has are made a little smaller, so none are cut off.
   - **Pages**: the document as LibreOffice lays it out, page by page ("Laying out the pages…" the first time). This view is there only when LibreOffice is installed on this computer, and not for EPUB books.
   - **Text**: its text, sheets and slides as the app reads them.
 
-  Phones start on **Text**, which scrolls and zooms better there. If a document can't be read, it says "No preview for this file": download it instead.
+  A PowerPoint file opens on **Slides**, on a phone too. Other documents open on **Pages** when LibreOffice is installed, but phones start on **Text**, which scrolls and zooms better there. If a deck's slides can't be drawn, it opens on **Text** and says why. If a document can't be read, it says "No preview for this file": download it instead.
 - **Markdown** and **HTML**: see **Preview** and **Show as a page** above.
 
 **Download** is always in the bar.

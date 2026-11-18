@@ -1098,6 +1098,7 @@ These routes serve the app’s own pages, need the user’s browser, or are the 
 - `GET /api/browser/sessions/:key/steps/:n` — a step's picture as a raw JPEG; `<n>.json` says where the step acted on it, for its marks: `{ marks: [{ x, y — fractions of the picture, act: click|double|move|type|select|scroll|…, box? — the field typed into, dir? — a scroll's way }] }`.
 - `GET /api/computer/sessions/:key/steps/:n` — a computer step's picture of the screen as a raw JPEG; `<n>.json` where its actions were on it, the same way (a drag with `from`).
 - `GET /api/documents/preview?path=` — reads a file's contents for the file viewer.
+- `GET /api/documents/deck?path=` — reads a PowerPoint file (.pptx, .pptm, .ppsx, .potx) as a deck of slides for the file viewer to draw, as the Library reads one: its pictures are kept apart (each from `GET /api/pages/assets/:sha`). Returns: `{ deck, notes: string[] — what the reading says of it, pages: boolean — LibreOffice is installed }`. 404 when there is no such file, 413 over 200 MB, 415 for any other kind of file, 422 when it can't be read.
 - `POST /api/documents/pages` — has LibreOffice lay an Office file out as pages for the viewer.
 - `GET /api/documents/pages.pdf` — sends that PDF file itself (raw file).
 - `GET /api/pdf/info?path=` — a PDF's pages, form fields (each with its kind, value, choices, the words printed beside it and its boxes) and protections, for Files' **Fill & sign**. Agents use pdf_form and pdf_look.

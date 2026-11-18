@@ -6,6 +6,7 @@
 //   pdf_look, pdf_form, pdf_fill, pdf_write, pdf_pages   PDFs seen, filled, written on and changed (pdf/tools.ts)
 // Routes for the file viewer:
 //   GET  /api/documents/preview?path=   the document read into blocks, sheets and slides (DocPreview)
+//   GET  /api/documents/deck?path=      a PowerPoint file as a deck, for the viewer to draw its slides (deck.ts)
 //   POST /api/documents/pages {path}    laid out as PDF pages by LibreOffice (when it is here), cached
 //   GET  /api/documents/pages.pdf?path= that PDF
 //   /api/pdf/info, /api/pdf/page, /api/pdf/save   Files' Fill & sign (pdf/routes.ts)
@@ -18,6 +19,7 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
+import { deckPreview } from './deck.ts';
 import { canRead, extractText, readDocument } from './extract.ts';
 import { madeRoutes } from './made.ts';
 import { pdfRoutes } from './pdf/routes.ts';
@@ -213,6 +215,7 @@ export const documents: Feature = {
       if (!doc) throw new HttpError(415, 'This kind of file has no preview');
       return { doc, pages: !!soffice() && doc.format !== 'csv' && doc.format !== 'tsv' && doc.format !== 'epub' };
     });
+    app.get('/api/documents/deck', async (req) => deckPreview(db, (req.query as Record<string, string>).path));
     app.post('/api/documents/pages', async (req) => {
       const file = resolvePath(String((req.body as { path?: string })?.path ?? ''));
       const { v } = await pagesPdf(file);

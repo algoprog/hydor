@@ -2,6 +2,7 @@
 // content as blocks, sheets as cells and slides with their notes. The server reads it
 // (server/documents), agents get it as Markdown-ish text, the file viewer shows it as a preview.
 import type { TexFileKind } from './latex-files.ts';
+import type { Deck } from './slides.ts';
 
 /** A run of text, bold or italic, or a link. */
 export interface Span {
@@ -58,6 +59,20 @@ export interface DocPreview {
   /** LibreOffice is here: the file can be shown as laid-out pages too. */
   pages: boolean;
 }
+
+/**
+ * What the file viewer gets to show a PowerPoint file as its slides (GET /api/documents/deck): the file read as the
+ * Library reads one (its pictures kept by the app, as a deck's are), what the reading says of it, and whether
+ * LibreOffice is here to lay out its pages too.
+ */
+export interface DeckPreview {
+  deck: Deck;
+  notes: string[];
+  pages: boolean;
+}
+
+/** The PowerPoint files the viewer shows as their slides (the old binary .ppt is not one: only its text shows). */
+export const isDeckFile = (path: string) => /\.(pptx|pptm|ppsx|potx)$/i.test(path);
 
 /** File types the viewer previews (besides PDF, which it shows itself). */
 export const PREVIEW_EXTS = ['docx', 'docm', 'dotx', 'xlsx', 'xlsm', 'xltx', 'pptx', 'pptm', 'potx', 'ppsx', 'odt', 'ott', 'ods', 'ots', 'odp', 'otp', 'epub', 'doc', 'xls', 'ppt', 'rtf'];

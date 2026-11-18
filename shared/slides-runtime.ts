@@ -289,7 +289,7 @@ export function slidesRuntime(win: Window, fonts: FontTable, libs: RuntimeLibs =
     '.ns-txt{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;overflow-wrap:break-word;word-break:normal;counter-reset:ns0 ns1 ns2 ns3 ns4;outline:none}',
     '.ns-txt[data-valign=middle]{justify-content:center}.ns-txt[data-valign=bottom]{justify-content:flex-end}',
     '.ns-txt[contenteditable]{overflow:visible;cursor:text;user-select:text;-webkit-user-select:text}',
-    '.ns-p{margin:0;padding:0;white-space:pre-wrap;min-height:1lh;position:relative}',
+    '.ns-p{margin:0;padding:0;white-space:pre-wrap;min-height:1lh;position:relative;flex-shrink:0}',
     '.ns-p:not([data-list]){counter-reset:ns0 ns1 ns2 ns3 ns4}',
     '.ns-p[data-list]{padding-left:calc(var(--lvl,0) * 1.5em + 1.25em)}',
     '.ns-p:not([data-list]){padding-left:calc(var(--lvl,0) * 1.5em)}',

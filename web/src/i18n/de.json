@@ -24381,5 +24381,11 @@
   "The words you marked on web pages, by page, with your notes, to open, copy or delete, or to ask an agent about (desktop app); agents never see it": "Die Wörter, die du auf Webseiten markiert hast, nach Seite, mit deinen Notizen, zum Öffnen, Kopieren oder Löschen oder um einen Agenten dazu zu fragen (Desktop-App); Agenten sehen sie nie",
   "Those words cannot be highlighted": "Diese Wörter lassen sich nicht markieren",
   "Your highlights stay on this computer. Agents only see them when you ask about them.": "Deine Markierungen bleiben auf diesem Computer. Agenten sehen sie nur, wenn du danach fragst.",
-  "browser::Highlights": "Markierungen"
+  "browser::Highlights": "Markierungen",
+  "It is over {0} MB, too large to show as slides": "Es ist über {0} MB groß und zu groß, um es als Folien anzuzeigen",
+  "Its slides could not be drawn: {0}.": "Die Folien konnten nicht dargestellt werden: {0}.",
+  "Its slides could not be read: {0}": "Die Folien konnten nicht gelesen werden: {0}",
+  "Its slides, as the app draws them": "Die Folien, wie die App sie darstellt",
+  "Its words and speaker notes": "Text und Sprechernotizen",
+  "Only PowerPoint files (.pptx, .pptm, .ppsx, .potx) show as slides": "Nur PowerPoint-Dateien (.pptx, .pptm, .ppsx, .potx) werden als Folien angezeigt"
 }

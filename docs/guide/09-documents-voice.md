@@ -147,11 +147,12 @@ File names and paths in a reply are links. A name or path in code (`report.tex`,
 The file viewer shows documents from a card, from the Files page, or from a link in a reply (see [System: files, Git, Terminal and Preview](/guide/files-git)).
 
 - **PDFs** show as they are, in the browser's own PDF view, with **Fill & sign** to fill them in and sign them ([Fill in and sign a PDF](/guide/files-git#fill-in-and-sign-a-pdf)).
+- **PowerPoint** files (.pptx, and its macro, slide-show and template kinds) open on **Slides**: "Its slides, as the app draws them". Each slide shows as it looks, as the Library shows slides (its pictures, shapes, tables, charts, background and footer in place), one under the other with its number and its speaker notes, on a phone too. A font the deck uses that this computer lacks is stood in for by another; where that one needs more room, a box's words are made a little smaller to fit, so none are cut off. **Text** ("Its words and speaker notes") shows the slides' words, and **Pages** shows them laid out by LibreOffice when it is installed. If the slides can't be drawn, the viewer opens on **Text** and says why.
 - **Word, Excel, PowerPoint, OpenDocument, EPUB and RTF** files (old .doc, .xls and .ppt too) show as a preview. When LibreOffice is installed, a switch at the top offers two views:
   - **Pages**: "As LibreOffice lays it out", each page as it would print. The first time takes a moment ("Laying out the pages…"); after that the pages open at once until the file changes.
   - **Text**: "Its text, sheets and slides", as the app reads them. A text document shows as a page of paper; a workbook as a grid with column letters, row numbers and a tab for each sheet at the bottom (hidden sheets marked with a crossed-out eye); slides as cards, each with its number and its speaker notes under it. Pictures show as a box with their description. A line at the top says when something was left out ("Shows the first 1000 rows").
 - Without LibreOffice there is only the **Text** view. EPUB books always open in it.
-- On a phone the preview opens on **Text**, which scrolls and zooms better on a small screen; the switch shows the pages.
+- On a phone the preview opens on **Text** (a PowerPoint file on **Slides**), which scrolls and zooms better on a small screen; the switch shows the pages.
 
 If LibreOffice can't lay a file out, the viewer says so and its text is still under **Text**. A file with no preview says "No preview for this file": download it to open it on your device. The viewer's download button is always there.
 

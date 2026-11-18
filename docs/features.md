@@ -549,7 +549,10 @@ agents that speak ACP and take MCP servers.
   documents (its Memory tab, under Documents) by its sessions alone, which search the shared knowledge too unless the project
   turns that off. A new or changed document also updates the project's notes and wiki memory (above), or the shared wiki for shared knowledge.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
-  app's document skills; the file viewer previews them, and finished files show as cards to open or download.
+  app's document skills; the file viewer previews them (a PowerPoint file as its slides, drawn as the Library draws
+  decks, with its pictures, shapes, tables, charts, backgrounds and speaker notes, a box's words made smaller where a
+  font this computer lacks needs more room; others as LibreOffice lays out their pages, when it is installed, or as
+  their text), and finished files show as cards to open or download.
   Under every reply the documents the agent made or changed in the turn (PDF, Word, Excel, PowerPoint, OpenDocument,
   CSV and TSV, LaTeX, notebooks, EPUB, Markdown) show as cards marked New or Updated, handed over or not (the finished
   ones before their sources, four first), and file names and paths in the reply are links that open the file in the

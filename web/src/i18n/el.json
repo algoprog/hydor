@@ -25635,5 +25635,11 @@
   "The words you marked on web pages, by page, with your notes, to open, copy or delete, or to ask an agent about (desktop app); agents never see it": "Οι λέξεις που επισημάνατε σε ιστοσελίδες, ανά σελίδα, με τις σημειώσεις σας, για άνοιγμα, αντιγραφή ή διαγραφή, ή για να ρωτήσετε έναν πράκτορα γι' αυτές (εφαρμογή υπολογιστή)· οι πράκτορες δεν τις βλέπουν ποτέ",
   "Those words cannot be highlighted": "Αυτές οι λέξεις δεν μπορούν να επισημανθούν",
   "Your highlights stay on this computer. Agents only see them when you ask about them.": "Οι επισημάνσεις σας μένουν σε αυτόν τον υπολογιστή. Οι πράκτορες τις βλέπουν μόνο όταν ρωτήσετε γι' αυτές.",
-  "browser::Highlights": "Επισημάνσεις"
+  "browser::Highlights": "Επισημάνσεις",
+  "It is over {0} MB, too large to show as slides": "Ξεπερνά τα {0} MB: είναι πολύ μεγάλο για να εμφανιστεί ως διαφάνειες",
+  "Its slides could not be drawn: {0}.": "Οι διαφάνειές του δεν μπόρεσαν να σχεδιαστούν: {0}.",
+  "Its slides could not be read: {0}": "Οι διαφάνειές του δεν ήταν δυνατό να διαβαστούν: {0}",
+  "Its slides, as the app draws them": "Οι διαφάνειές του, όπως τις σχεδιάζει η εφαρμογή",
+  "Its words and speaker notes": "Το κείμενο και οι σημειώσεις ομιλητή του",
+  "Only PowerPoint files (.pptx, .pptm, .ppsx, .potx) show as slides": "Μόνο τα αρχεία PowerPoint (.pptx, .pptm, .ppsx, .potx) εμφανίζονται ως διαφάνειες"
 }
