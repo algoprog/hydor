@@ -34,7 +34,7 @@ const TEXT = {
       'Every section of Settings and what is in it, in the order the app shows them, with a link to each and to the part of this guide that explains it. Use it to find where something is set; the topics explain how to use it.',
     layout: 'How Settings is laid out',
     layoutText: [
-      'Open **Settings** from the rail. On a computer, Settings has three tabs at the top: **App** (the app itself), **Agents** (the agents and what they read) and **Capabilities** (what the app adds to every agent: search, the browser, memory and the rest). Each tab lists its sections on the left, and the open section fills the page. On a phone, Settings lists every section in one list; tap one to open it, and the arrow at the top to go back.',
+      'Open **Settings** from the rail. On a computer, Settings has a column at the left, the same kind as the Library’s, with every section in one list under three headings: **App** (the app itself), **Agents** (the agents and what they read) and **Capabilities** (what the app adds to every agent: search, the browser, memory and the rest). Click a section and it fills the page, under its title. **Hide sidebar** (Ctrl+B) hides the column, and **Show sidebar** at the start of the title brings it back. On a phone, Settings lists every section in one list; tap one to open it, and the arrow at the top to go back.',
       'You don’t have to know where an option lives: type what you want in the search box (Ctrl+K, ⌘K on a Mac), such as "dark mode" or "notifications", and pick it. The app opens the right section and points at the option. You can also ask any agent to change a setting for you ([Let agents work the app for you](/guide/ask-agents)).',
     ],
     more: 'More in',
@@ -51,7 +51,7 @@ const TEXT = {
       'Hier findest du sämtliche Einstellungsbereiche in der Reihenfolge der App, jeweils mit einem direkten Link und einem Verweis auf den passenden Hilfeartikel. Nutze diese Übersicht, um eine Einstellung zu finden. Die verlinkten Artikel erklären ihre Verwendung.',
     layout: 'Aufbau der Einstellungen',
     layoutText: [
-      'Öffne **Einstellungen** in der Werkzeugleiste. Am Computer gibt es oben drei Tabs: **App** für die Anwendung selbst, **Agenten** für die Agenten und ihre Anweisungen sowie **Funktionen** für gemeinsame Ergänzungen wie Suche, Browser und Memory. Links stehen die Bereiche des gewählten Tabs, rechts der geöffnete Bereich. Auf dem Handy erscheinen alle Bereiche in einer Liste. Tippe einen an, um ihn zu öffnen; der Pfeil oben führt zurück.',
+      'Öffne **Einstellungen** in der Werkzeugleiste. Am Computer hat Einstellungen links eine Spalte wie die Bibliothek, mit allen Bereichen in einer Liste unter drei Überschriften: **App** für die Anwendung selbst, **Agenten** für die Agenten und ihre Anweisungen sowie **Funktionen** für gemeinsame Ergänzungen wie Suche, Browser und Memory. Klicke einen Bereich an, dann füllt er die Seite unter seinem Titel. **Seitenleiste ausblenden** (Strg+B) blendet die Spalte aus, und **Seitenleiste anzeigen** vor dem Titel holt sie zurück. Auf dem Handy erscheinen alle Bereiche in einer Liste. Tippe einen an, um ihn zu öffnen; der Pfeil oben führt zurück.',
       'Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem Mac ⌘K) beispielsweise „dunkles Design“ oder „Benachrichtigungen“ ein und wähle den Treffer. Die App öffnet den richtigen Bereich und hebt die Option hervor. Du kannst auch einen Agenten mit der Änderung beauftragen ([Agenten die App bedienen lassen](/guide/ask-agents)).',
     ],
     more: 'Mehr dazu unter',
@@ -67,7 +67,7 @@ const TEXT = {
     intro: '设置中的每个部分及其内容，按应用中的顺序排列，每项都链接到设置中的位置，以及本指南中讲解它的部分。用它查找某项在哪里设置；各主题会讲解如何使用。',
     layout: '设置的布局',
     layoutText: [
-      '从工具栏打开**设置**。在电脑上，设置顶部有三个标签页：**应用**（应用本身）、**智能体**（智能体以及它们读取的内容）和**功能**（应用为每个智能体添加的能力：搜索、浏览器、记忆等）。每个标签页在左侧列出它的部分，打开的部分占满页面。在手机上，设置把所有部分列在一个列表中；点一下即可打开，点顶部的箭头返回。',
+      '从工具栏打开**设置**。在电脑上，设置在左侧有一栏，和资料库的那一栏同类，把所有部分列在一个列表里，分在三个标题下：**应用**（应用本身）、**智能体**（智能体以及它们读取的内容）和**功能**（应用为每个智能体添加的能力：搜索、浏览器、记忆等）。点一个部分，它就在自己的标题下占满页面。**隐藏侧边栏**（Ctrl+B）会隐藏这一栏，标题开头的**显示侧边栏**可以把它找回来。在手机上，设置把所有部分列在一个列表中；点一下即可打开，点顶部的箭头返回。',
       '你不必知道某个选项在哪里：在搜索框（Ctrl+K，Mac 上为 ⌘K）中输入你想要的内容，例如“深色模式”或“通知”，然后选中它。应用会打开正确的部分并指向该选项。你也可以让任何智能体替你更改设置（[让智能体替你操作应用](/guide/ask-agents)）。',
     ],
     more: '详见',
@@ -84,7 +84,7 @@ const TEXT = {
       'Κάθε ενότητα των Ρυθμίσεων και ό,τι περιέχει, με τη σειρά που τις δείχνει η εφαρμογή, με σύνδεσμο προς την καθεμία και προς το μέρος αυτού του οδηγού που την εξηγεί. Χρησιμοποιήστε τη για να βρείτε πού ρυθμίζεται κάτι· τα θέματα εξηγούν πώς χρησιμοποιείται.',
     layout: 'Πώς είναι οργανωμένες οι Ρυθμίσεις',
     layoutText: [
-      'Ανοίξτε τις **Ρυθμίσεις** από τη μπάρα εργαλείων. Σε υπολογιστή, οι Ρυθμίσεις έχουν τρεις καρτέλες επάνω: **Εφαρμογή** (η ίδια η εφαρμογή), **Πράκτορες** (οι πράκτορες και ό,τι διαβάζουν) και **Δυνατότητες** (ό,τι προσθέτει η εφαρμογή σε κάθε πράκτορα: αναζήτηση, πρόγραμμα περιήγησης, μνήμη και τα υπόλοιπα). Κάθε καρτέλα δείχνει τις ενότητές της αριστερά, και η ενότητα που ανοίγετε γεμίζει τη σελίδα. Σε κινητό, οι Ρυθμίσεις δείχνουν όλες τις ενότητες σε μία λίστα· πατήστε μία για να ανοίξει, και το βέλος επάνω για να επιστρέψετε.',
+      'Ανοίξτε τις **Ρυθμίσεις** από τη μπάρα εργαλείων. Σε υπολογιστή, οι Ρυθμίσεις έχουν αριστερά μια στήλη, του ίδιου είδους με της Βιβλιοθήκης, με όλες τις ενότητες σε μία λίστα κάτω από τρεις επικεφαλίδες: **Εφαρμογή** (η ίδια η εφαρμογή), **Πράκτορες** (οι πράκτορες και ό,τι διαβάζουν) και **Δυνατότητες** (ό,τι προσθέτει η εφαρμογή σε κάθε πράκτορα: αναζήτηση, πρόγραμμα περιήγησης, μνήμη και τα υπόλοιπα). Πατήστε μια ενότητα και γεμίζει τη σελίδα, κάτω από τον τίτλο της. Το **Απόκρυψη πλευρικής στήλης** (Ctrl+B) κρύβει τη στήλη, και το **Εμφάνιση πλευρικής στήλης** στην αρχή του τίτλου την επαναφέρει. Σε κινητό, οι Ρυθμίσεις δείχνουν όλες τις ενότητες σε μία λίστα· πατήστε μία για να ανοίξει, και το βέλος επάνω για να επιστρέψετε.',
       'Δεν χρειάζεται να ξέρετε πού βρίσκεται μια επιλογή: γράψτε αυτό που θέλετε στο πλαίσιο αναζήτησης (Ctrl+K, ⌘K σε Mac), για παράδειγμα «σκοτεινό θέμα» ή «ειδοποιήσεις», και επιλέξτε το. Η εφαρμογή ανοίγει τη σωστή ενότητα και δείχνει την επιλογή. Μπορείτε επίσης να ζητήσετε από οποιονδήποτε πράκτορα να αλλάξει μια ρύθμιση για εσάς ([Αφήστε τους πράκτορες να χειρίζονται την εφαρμογή για εσάς](/guide/ask-agents)).',
     ],
     more: 'Περισσότερα στο',

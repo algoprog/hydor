@@ -21,7 +21,6 @@
 // videos both: the old Media tab's ?tab=media too; bookmarks, downloads and history in the desktop app), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook|diagram opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
-import { Wordmark } from '../../components/Logo';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
@@ -81,6 +80,7 @@ import { toast, toastError, useUI } from '../../lib/store';
 import { tr, trIn } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
+import { SideColumn } from '../layout/SideColumn';
 import { ownBrowserHere } from '../browser/browsing';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
@@ -963,19 +963,12 @@ export function Library() {
   return (
     <>
       <div className="flex h-full min-h-0" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-        {/* The Library's own column: its places, and New. The sidebar (Ctrl+B) hides it. */}
-        {wide && sideOpen && (
-          <aside className="flex w-[260px] shrink-0 flex-col border-r border-line bg-sidebar pt-[var(--safe-top)]">
-            <div className="flex h-14 shrink-0 items-center gap-2 pr-3 pl-4">
-              {/* The rail names the section: the column shows the app's logo, as every column does. */}
-              <h1 className="sr-only">Library</h1>
-              <span data-tip="library" className="flex min-w-0 flex-1 items-center text-fg">
-                <Wordmark height={16} tide />
-              </span>
-              {newButton}
-            </div>
+        {/* The Library's column: its places, and New. The sidebar (Ctrl+B) hides it. The rail names the section: the column shows the app's logo, as every column does. */}
+        {wide && (
+          <SideColumn label="Library" tip="library" actions={newButton}>
+            <h1 className="sr-only">Library</h1>
             <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">{items && <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} idle={!!browserShow} />}</div>
-          </aside>
+          </SideColumn>
         )}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {!wide && (

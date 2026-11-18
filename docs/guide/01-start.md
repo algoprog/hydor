@@ -10,9 +10,9 @@ Hydor runs AI agents on your own computer, and you use them from any browser, at
 
 ## Find your way around
 
-The screen has three parts: the **rail**, a narrow strip of tools at the far left; the **sidebar** beside it, with your sessions; and the page you are on (the start page, a session, Settings…). The rail is always there on a computer. On a phone there is no rail: the sidebar is a drawer that slides in and holds the tools too (see [Use the app on a phone](#use-the-app-on-a-phone)).
+The screen has three parts: the **rail**, a narrow strip of tools at the far left; a **column** beside it on some pages, the **sidebar** with your sessions on the start page and in a session, or the Library's or Settings' own list; and the page you are on (the start page, a session, Settings…). The rail is always there on a computer. On a phone there is no rail: the sidebar is a drawer that slides in and holds the tools too (see [Use the app on a phone](#use-the-app-on-a-phone)).
 
-On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels: drag its right edge, or click the edge and press the left and right arrow keys. The width is kept in this browser.
+On a computer you can make the column wider or narrower, from 180 to 560 pixels: drag its right edge, or click the edge and press the left and right arrow keys. The width is the same for every column and is kept in this browser.
 
 ### The rail
 
@@ -39,13 +39,13 @@ Further down, after some space:
 
 The sections come in the order Browser, Library, Projects, Apps, Agents, and the tools below the Inbox in the order Search, Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools under the Inbox). The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
 
-The **Browser** page and the **Library**'s front page show a column of their own beside the rail (the browser's tabs, the library's folders) in place of the sessions sidebar. **Sessions** on the rail brings the sidebar back for the other pages. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the sidebar, or at the top of the rail when no sidebar is showing (it is hidden, or the Browser or Library page has a column of its own).
+The sidebar with your sessions shows only on the start page, in a session and in its review; every other page (Projects, Apps, Agents, Inbox, Usage, System, Help…) uses the whole width. The **Library** and **Settings** have a column of the same kind, with the logo, their own list (the Library's places, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
 
 ### The sidebar
 
 The sidebar is the column beside the rail. It holds:
 
-- The **HYDΩR** logo, with the **Filter and group sessions** button and **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of each page shows it again, and the rail stays. On a phone the drawer has the logo, the inbox, the filter button and **Close menu** here instead.
+- The **HYDΩR** logo, with the **Filter and group sessions** button and **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of the page shows it again, and the rail stays. On a phone the drawer has the logo, the inbox, the filter button and **Close menu** here instead.
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - To find a session, use the search box: **Search** on the rail (on a phone, **Search** among the tools at the bottom of the drawer), or Ctrl+K (⌘K on a Mac). It finds sessions by their title, their folder and the words said in them, archived sessions too, marked **Archived** and listed after the others (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
@@ -248,7 +248,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 | Keys | What it does | Where |
 | --- | --- | --- |
 | Ctrl+K | Opens or closes the search box | Anywhere, except while typing in a code editor or terminal |
-| Ctrl+B | Shows or hides the sidebar (the rail stays) | Anywhere on a computer, except in a code editor |
+| Ctrl+B | Shows or hides the column beside the rail: the sidebar, the Library's or Settings' (the rail stays) | Anywhere on a computer, except in a code editor |
 | Ctrl+` | Shows or hides the terminal panel at the bottom | On a computer |
 | Ctrl+P | Quick open: jump to a file by part of its name, in the folder the Files page shows | Anywhere |
 | Ctrl+Z | Undoes a pin, unpin, archive, unarchive or snooze, within 8 seconds | Outside text fields |

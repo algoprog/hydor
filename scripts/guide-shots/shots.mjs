@@ -3,12 +3,12 @@
 import { sleep } from './cdp.mjs';
 
 /**
- * The part of the window right of the rail and the sessions sidebar, down to `bottom` (CSS pixels) when given. A page
- * with a column of its own (the Library's, an `<aside>` too) has the rail only: the sessions sidebar is `aside[data-tour="sidebar"]`.
+ * The part of the window right of the rail and of the page's column (the sessions', the Library's, Settings': an `<aside data-column>`;
+ * the other pages have none), down to `bottom` (CSS pixels) when given.
  */
 async function main(p, bottom) {
   const rail = await p.box('nav[data-rail]');
-  const side = await p.box('aside[data-tour="sidebar"]');
+  const side = await p.box('aside[data-column]');
   const x = Math.round(Math.max(rail ? rail.x + rail.width : 0, side ? side.x + side.width : 0));
   return { x, y: 0, width: p.size.width - x, height: Math.min(p.size.height, bottom ?? p.size.height) };
 }

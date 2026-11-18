@@ -17,7 +17,7 @@ import { isStartingKey } from '../../lib/starting';
 import { useApp, useSessions, useUI } from '../../lib/store';
 import { cx, Kbd, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { openPalette } from '../palette/CommandPalette';
-import { ownColumn } from './column';
+import { columnOf } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
 
@@ -217,7 +217,7 @@ export const Rail = memo(function Rail() {
   }, [session]);
   const inSessions = loc === '/' || loc.startsWith('/s/') || loc.startsWith('/review/');
   const sideOpen = useUI((s) => s.sideOpen);
-  const sidebarShows = sideOpen && !ownColumn(loc);
+  const columnShows = sideOpen && !!columnOf(loc);
 
   const tools = useTools(go, openPalette, true);
   const [tip, tipApi] = useRailTip();
@@ -265,8 +265,8 @@ export const Rail = memo(function Rail() {
   return (
     <nav data-rail data-tour="tools" data-i18n="nav" aria-label="Tools" className="flex h-full w-[56px] shrink-0 flex-col border-r border-line bg-sidebar pt-[calc(var(--safe-top)+8px)]">
       <TipCtx.Provider value={tipApi}>
-      {/* Offline: said beside the logo at the top of the sidebar, or here while no sidebar shows it. */}
-      {!connected && !sidebarShows && (
+      {/* Offline: said beside the logo at the top of the column, or here while no column shows it. */}
+      {!connected && !columnShows && (
         <span title="Reconnecting…" className="flex h-8 shrink-0 items-center justify-center text-warn">
           <WifiOff size={15} />
         </span>

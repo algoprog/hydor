@@ -4,7 +4,7 @@ Every section of Settings and what is in it, in the order the app shows them, wi
 
 ## How Settings is laid out
 
-Open **Settings** from the rail. On a computer, Settings has three tabs at the top: **App** (the app itself), **Agents** (the agents and what they read) and **Capabilities** (what the app adds to every agent: search, the browser, memory and the rest). Each tab lists its sections on the left, and the open section fills the page. On a phone, Settings lists every section in one list; tap one to open it, and the arrow at the top to go back.
+Open **Settings** from the rail. On a computer, Settings has a column at the left, the same kind as the Library’s, with every section in one list under three headings: **App** (the app itself), **Agents** (the agents and what they read) and **Capabilities** (what the app adds to every agent: search, the browser, memory and the rest). Click a section and it fills the page, under its title. **Hide sidebar** (Ctrl+B) hides the column, and **Show sidebar** at the start of the title brings it back. On a phone, Settings lists every section in one list; tap one to open it, and the arrow at the top to go back.
 
 You don’t have to know where an option lives: type what you want in the search box (Ctrl+K, ⌘K on a Mac), such as "dark mode" or "notifications", and pick it. The app opens the right section and points at the option. You can also ask any agent to change a setting for you ([Let agents work the app for you](/guide/ask-agents)).
 

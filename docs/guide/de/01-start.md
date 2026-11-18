@@ -10,9 +10,9 @@ Hydor führt KI-Agenten auf deinem eigenen Computer aus. Du bedienst sie in eine
 
 ## Die Oberfläche kennenlernen
 
-Der Bildschirm besteht aus drei Teilen: der **Werkzeugleiste**, einem schmalen Streifen mit Werkzeugen ganz links, der **Seitenleiste** daneben mit deinen Sitzungen und der geöffneten Seite, etwa Startseite, Sitzung oder Einstellungen. Die Werkzeugleiste ist am Computer immer da. Auf dem Smartphone gibt es sie nicht: Dort lässt sich die Seitenleiste als Menü einblenden und enthält auch die Werkzeuge (siehe [Die App auf dem Smartphone verwenden](#use-the-app-on-a-phone)).
+Der Bildschirm besteht aus drei Teilen: der **Werkzeugleiste**, einem schmalen Streifen mit Werkzeugen ganz links, einer **Spalte** daneben, die manche Seiten haben, nämlich der **Seitenleiste** mit deinen Sitzungen auf der Startseite und in einer Sitzung oder der eigenen Liste von Bibliothek und Einstellungen, und der geöffneten Seite, etwa Startseite, Sitzung oder Einstellungen. Die Werkzeugleiste ist am Computer immer da. Auf dem Smartphone gibt es sie nicht: Dort lässt sich die Seitenleiste als Menü einblenden und enthält auch die Werkzeuge (siehe [Die App auf dem Smartphone verwenden](#use-the-app-on-a-phone)).
 
-Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstellen: Ziehe ihren rechten Rand oder klicke darauf und verwende die linke und rechte Pfeiltaste. Der Browser merkt sich die Breite.
+Am Computer kannst du die Spalte zwischen 180 und 560 Pixel breit einstellen: Ziehe ihren rechten Rand oder klicke darauf und verwende die linke und rechte Pfeiltaste. Die Breite ist für alle Spalten gleich, und der Browser merkt sie sich.
 
 ### Die Werkzeugleiste
 
@@ -39,13 +39,13 @@ Weiter unten, nach etwas Abstand:
 
 Die Bereiche stehen in der Reihenfolge Browser, Bibliothek, Projekte, Apps, Agenten, die Werkzeuge unter dem Posteingang in der Reihenfolge Suchen, Nutzung, System, Einstellungen, Hilfe: Das ist die Standardreihenfolge. Zum Ändern ziehst du eine Kachel an eine andere Position innerhalb ihrer Gruppe (der Bereiche oder der Werkzeuge unter dem Posteingang). Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt ein Rechtsklick auf eine Kachel und **Standardreihenfolge wiederherstellen** alles zurück. In einem zu niedrigen Fenster lässt sich die Werkzeugleiste scrollen.
 
-Die Seite **Browser** und die Startseite der **Bibliothek** zeigen neben der Werkzeugleiste eine eigene Spalte (die Tabs des Browsers, die Ordner der Bibliothek) statt der Seitenleiste mit den Sitzungen. **Sitzungen** in der Werkzeugleiste holt die Seitenleiste für die anderen Seiten zurück. Während die Seite sich erneut mit der App verbindet, erscheint ein durchgestrichenes WLAN-Symbol neben dem Logo oben in der Seitenleiste oder oben in der Werkzeugleiste, wenn keine Seitenleiste zu sehen ist (sie ist ausgeblendet, oder die Seite Browser oder Bibliothek hat eine eigene Spalte).
+Die Seitenleiste mit deinen Sitzungen gibt es nur auf der Startseite, in einer Sitzung und in deren Review; jede andere Seite (Projekte, Apps, Agenten, Posteingang, Nutzung, System, Hilfe …) nutzt die ganze Breite. Die **Bibliothek** und die **Einstellungen** haben eine Spalte derselben Art, mit dem Logo, ihrer eigenen Liste (die Bereiche der Bibliothek, die Bereiche der Einstellungen) und **Seitenleiste ausblenden**; die Seite **Browser** zeigt ihre Tabs in einer eigenen Spalte. **Strg+B** blendet die Spalte der Seite ein oder aus, auf der du bist, und alle Spalten sind gleich breit. Während die Seite sich erneut mit der App verbindet, erscheint ein durchgestrichenes WLAN-Symbol neben dem Logo oben in der Spalte oder oben in der Werkzeugleiste, wenn keine Spalte zu sehen ist (sie ist ausgeblendet, oder die Seite hat keine).
 
 ### Die Seitenleiste
 
 Die Seitenleiste ist die Spalte neben der Werkzeugleiste. Sie enthält:
 
-- Das **HYDΩR**-Logo, am Ende **Sitzungen filtern und gruppieren** und **Seitenleiste ausblenden** (Strg+B). Bei ausgeblendeter Seitenleiste zeigt die Schaltfläche oben links auf jeder Seite sie wieder an; die Werkzeugleiste bleibt. Auf dem Smartphone stehen hier stattdessen das Logo, der Posteingang, die Filterschaltfläche und **Menü schließen**.
+- Das **HYDΩR**-Logo, am Ende **Sitzungen filtern und gruppieren** und **Seitenleiste ausblenden** (Strg+B). Bei ausgeblendeter Seitenleiste zeigt die Schaltfläche oben links auf der Seite sie wieder an; die Werkzeugleiste bleibt. Auf dem Smartphone stehen hier stattdessen das Logo, der Posteingang, die Filterschaltfläche und **Menü schließen**.
 - Eine Computerauswahl, sobald du unter [Einstellungen → Computer](/settings?s=machines) weitere Computer hinzugefügt hast. Sie nennt den angezeigten Computer und zeigt einen Punkt, wenn Sitzungen anderswo deine Antwort benötigen. Siehe [Smartphones, andere Computer und Freigaben](/guide/devices).
 - **Neue Sitzung** öffnet die [Startseite](#the-start-page).
 - Um eine Sitzung zu finden, nutze die Suche: **Suchen** in der Werkzeugleiste (auf dem Smartphone **Suchen** bei den Werkzeugen unten im Menü) oder Strg+K (⌘K auf dem Mac). Sie sucht nach Titel, Ordner und Nachrichteninhalt, auch in archivierten Sitzungen, die mit **Archiviert** markiert sind und nach den übrigen stehen. Siehe [Alles mit Strg+K durchsuchen](#search-everything-with-ctrlk).
@@ -248,7 +248,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 | Tasten | Funktion | Wo |
 | --- | --- | --- |
 | Strg+K | Suche öffnen oder schließen | Überall außer beim Tippen in Codeeditoren oder Terminals |
-| Strg+B | Seitenleiste ein- oder ausblenden (die Werkzeugleiste bleibt) | Am Computer außer im Codeeditor |
+| Strg+B | Die Spalte neben der Werkzeugleiste ein- oder ausblenden: die Seitenleiste, die der Bibliothek oder die der Einstellungen (die Werkzeugleiste bleibt) | Am Computer außer im Codeeditor |
 | Strg+` | Unteren Terminalbereich ein- oder ausblenden | Am Computer |
 | Strg+P | Datei im Ordner der Dateien-Seite über einen Teil ihres Namens schnell öffnen | Überall |
 | Strg+Z | Anheften, Lösen, Archivieren, Wiederherstellen oder Zurückstellen innerhalb von 8 Sekunden rückgängig machen | Außerhalb von Textfeldern |

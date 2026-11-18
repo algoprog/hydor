@@ -4,10 +4,9 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, Folders, Inbox, ListFilter, PanelLeftClose, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
+import { Boxes, Folders, Inbox, ListFilter, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
-import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
@@ -18,6 +17,7 @@ import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
+import { SideColumn } from './SideColumn';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
 
@@ -108,38 +108,38 @@ function ToolGrid({ nav, close }: { nav: (path: string) => void; close: () => vo
 
   return (
     <>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={({ active }) => {
-          setDragId(active.id as SidebarTool);
-          setToolMenu(false);
-        }}
-        onDragEnd={onToolDrop}
-        onDragCancel={() => setDragId(null)}
-        accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
-      >
-        {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
-        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
-          <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
-            {tools.map((t) => (
-              <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
-            ))}
-          </SortableContext>
-        </nav>
-        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
-      </DndContext>
-      <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
-        <MenuItem
-          icon={<RotateCcw size={14} />}
-          onClick={() => {
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={({ active }) => {
+            setDragId(active.id as SidebarTool);
             setToolMenu(false);
-            setToolOrder([]);
           }}
+          onDragEnd={onToolDrop}
+          onDragCancel={() => setDragId(null)}
+          accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
         >
-          Back to the usual order
-        </MenuItem>
-      </Popover>
+          {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
+          <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
+            <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
+              {tools.map((t) => (
+                <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
+              ))}
+            </SortableContext>
+          </nav>
+          {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
+        </DndContext>
+        <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
+          <MenuItem
+            icon={<RotateCcw size={14} />}
+            onClick={() => {
+              setToolMenu(false);
+              setToolOrder([]);
+            }}
+          >
+            Back to the usual order
+          </MenuItem>
+        </Popover>
     </>
   );
 }
@@ -158,10 +158,10 @@ function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) =
 }
 
 /**
- * Navigation: the sessions, with new session and their filters (search is the rail's, Ctrl+K). A column beside the rail on a computer (`column`: its tools and
- * the inbox are on the rail, Rail.tsx); on phones a drawer that has them all, the tools in a grid under the sessions.
+ * Navigation: the sessions, with new session and their filters (search is the rail's, Ctrl+K). On a computer the sessions' column beside the rail (SideColumn;
+ * its tools and the inbox are on the rail, Rail.tsx); on phones a drawer that has them all, the tools in a grid under the sessions.
  */
-export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: boolean; column?: boolean }) {
+export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [loc] = useLocation();
   const filter = useUI((s) => s.agentFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
@@ -182,83 +182,65 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
     if (mobile) close();
   };
 
-  return (
-    <aside
-      data-tour="sidebar"
-      className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile ? 'select-none [-webkit-touch-callout:none] [&_input]:select-text' : 'border-r border-line')}
-    >
-      <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-1 pr-2 pl-4">
-        <span className="flex min-w-0 flex-1 items-center text-fg">
-          <Wordmark height={16} tide />
-        </span>
-        {!connected && (
-          <span title="Reconnecting…" className="px-1 text-warn">
-            <WifiOff size={15} />
-          </span>
-        )}
-        {!column && <InboxButton active={loc === '/inbox'} onGo={nav} />}
-        {/* Search is the rail's (and Ctrl+K's): it finds sessions with the rest. What stays here narrows the list itself. */}
-        <IconButton ref={filterRef} label="Filter and group sessions" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
-          <ListFilter size={16} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
-        </IconButton>
-        <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
-          {(
-            [
-              ['all', 'All agents', null],
-              ['claude', 'Claude Code', <AgentIcon key="c" agent="claude" size={14} />],
-              ['codex', 'Codex', <AgentIcon key="x" agent="codex" size={14} />],
-            ] as const
-          ).map(([v, label, icon]) => (
+  // What narrows the list: the column's own action, and a button of the drawer's header on phones.
+  const filterButton = (
+    <>
+      {/* Search is the rail's (and Ctrl+K's): it finds sessions with the rest. What stays here narrows the list itself. */}
+      <IconButton ref={filterRef} label="Filter and group sessions" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
+        <ListFilter size={16} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
+      </IconButton>
+      <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
+        {(
+          [
+            ['all', 'All agents', null],
+            ['claude', 'Claude Code', <AgentIcon key="c" agent="claude" size={14} />],
+            ['codex', 'Codex', <AgentIcon key="x" agent="codex" size={14} />],
+          ] as const
+        ).map(([v, label, icon]) => (
+          <MenuItem
+            key={v}
+            icon={icon}
+            checked={filter === v}
+            onClick={() => {
+              useUI.getState().set({ agentFilter: v });
+              setFilterOpen(false);
+            }}
+          >
+            {label}
+          </MenuItem>
+        ))}
+        {!!spaces?.length && (
+          <>
+            <MenuSep />
+            <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
+              Every project
+            </MenuItem>
+            {spaces.slice(0, 8).map((sp) => (
+              <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
+                {sp.name}
+              </MenuItem>
+            ))}
             <MenuItem
-              key={v}
-              icon={icon}
-              checked={filter === v}
+              icon={<Boxes size={14} />}
               onClick={() => {
-                useUI.getState().set({ agentFilter: v });
                 setFilterOpen(false);
+                nav('/projects');
               }}
             >
-              {label}
+              Projects
             </MenuItem>
-          ))}
-          {!!spaces?.length && (
-            <>
-              <MenuSep />
-              <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
-                Every project
-              </MenuItem>
-              {spaces.slice(0, 8).map((sp) => (
-                <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
-                  {sp.name}
-                </MenuItem>
-              ))}
-              <MenuItem
-                icon={<Boxes size={14} />}
-                onClick={() => {
-                  setFilterOpen(false);
-                  nav('/projects');
-                }}
-              >
-                Projects
-              </MenuItem>
-            </>
-          )}
-          <MenuSep />
-          <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
-            Group by folder or project
-          </MenuItem>
-        </Popover>
-        {mobile ? (
-          <IconButton label="Close menu" onClick={close}>
-            <X size={18} />
-          </IconButton>
-        ) : (
-          <IconButton label={`Hide sidebar (${MOD}B)`} onClick={() => useUI.getState().set({ sideOpen: false })}>
-            <PanelLeftClose size={17} />
-          </IconButton>
+          </>
         )}
-      </div>
-
+        <MenuSep />
+        <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
+          Group by folder or project
+        </MenuItem>
+      </Popover>
+    </>
+  );
+  // Machine, New session and the sessions: under the header of the column, or of the drawer.
+  const list = (
+    <>
       <div data-tour="sidebar-search" className="space-y-2 px-3 pb-3">
         <MachineSwitcher onGo={mobile ? close : undefined} />
         <button
@@ -281,8 +263,37 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
       >
         <SessionList query="" />
       </div>
+    </>
+  );
 
-      {mobile && <ToolGrid nav={nav} close={close} />}
+  if (!mobile)
+    return (
+      <SideColumn label="Sessions" tour="sidebar" actions={filterButton}>
+        {list}
+      </SideColumn>
+    );
+
+  return (
+    <aside data-tour="sidebar" className="flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)] select-none [-webkit-touch-callout:none] [&_input]:select-text">
+      <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-1 pr-2 pl-4">
+        <span className="flex min-w-0 flex-1 items-center text-fg">
+          <Wordmark height={16} tide />
+        </span>
+        {!connected && (
+          <span title="Reconnecting…" className="px-1 text-warn">
+            <WifiOff size={15} />
+          </span>
+        )}
+        <InboxButton active={loc === '/inbox'} onGo={nav} />
+        {filterButton}
+        <IconButton label="Close menu" onClick={close}>
+          <X size={18} />
+        </IconButton>
+      </div>
+
+      {list}
+
+      <ToolGrid nav={nav} close={close} />
     </aside>
   );
 });

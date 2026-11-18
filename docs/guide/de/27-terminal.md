@@ -275,7 +275,7 @@ hydor connections connect notion --browser
 
 ### Einstellungen
 
-`hydor settings` erreicht jede Option der [Einstellungen](/settings), in ihren drei Tabs (**App**, **Agenten**, **Funktionen**) und deren Abschnitten. Jede Option hat eine ID, etwa `general.resume-after-usage-limits`: ihr Abschnitt, dann ihre Wörter. Du kannst eine über diese ID nennen, über ihren Abschnitt und den Anfang ihrer Wörter (`general.resume`) oder nur über ihre Wörter, wenn nur eine passt; Tab vervollständigt sie.
+`hydor settings` erreicht jede Option der [Einstellungen](/settings), in ihren drei Gruppen (**App**, **Agenten**, **Funktionen**) und deren Abschnitten. Jede Option hat eine ID, etwa `general.resume-after-usage-limits`: ihr Abschnitt, dann ihre Wörter. Du kannst eine über diese ID nennen, über ihren Abschnitt und den Anfang ihrer Wörter (`general.resume`) oder nur über ihre Wörter, wenn nur eine passt; Tab vervollständigt sie.
 
 In einem Terminal öffnet `hydor settings` allein einen Browser: Wähle einen Abschnitt, dann eine Option. **↑** und **↓** und Tippen finden sie, die **Eingabetaste** öffnet einen Abschnitt oder ändert eine Option (ein Schalter wird umgelegt, eine Auswahl bietet ihre Werte an, eine Zahl oder ein Text wird getippt, eine Schaltfläche fragt zuerst nach), und **Esc** geht zurück. Per Pipe aufgerufen, listet er jede Option auf. Für Skripte und schnelle Änderungen:
 

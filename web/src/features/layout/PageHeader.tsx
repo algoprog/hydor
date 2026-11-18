@@ -4,12 +4,15 @@ import { ArrowLeft, Menu, PanelLeftOpen } from 'lucide-react';
 import { MOD } from '../../lib/format';
 import { useUI } from '../../lib/store';
 import { cx, IconButton, useIsMobile } from '../../components/ui';
+import { useLocation } from 'wouter';
+import { columnOf } from './column';
 
-/** Opens the navigation: the drawer on phones, the hidden sidebar on desktop. */
+/** Opens the navigation: the drawer on phones; on a computer the hidden column of the page (the sessions', the Library's, Settings'), and nothing on a page that has none. */
 export function NavButton() {
   const mobile = useIsMobile();
   const sideOpen = useUI((s) => s.sideOpen);
-  if (!mobile && sideOpen) return null;
+  const [loc] = useLocation();
+  if (!mobile && (sideOpen || !columnOf(loc))) return null;
   return mobile ? (
     <IconButton label="Menu" onClick={() => useUI.getState().set({ drawerOpen: true })}>
       <Menu size={19} />

@@ -1,6 +1,7 @@
 // Settings, in one place: the app (theme, notifications, password) and the agents (their accounts,
-// instruction files, MCP servers, skills and plugins). On wide screens a tab per group, with its
-// sections in a menu beside the open one; on phones a list, each section on its own page.
+// instruction files, MCP servers, skills and plugins). On a computer the sections are the rows of the column
+// beside the rail (the same kind of column as the sessions' and the Library's), grouped, the open one on the
+// right under its title; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
 import { Bell, Blocks, Bot, Cable, CalendarClock, ChevronRight, Cpu, GitPullRequest, KeyRound, MessagesSquare, Plug, ScrollText, Server, Signature, SlidersHorizontal, Smartphone, Sparkles, type LucideIcon, UserRound } from 'lucide-react';
@@ -11,8 +12,9 @@ import type { Agent } from '@shared/types';
 import { go } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { FolderChip } from '../../components/FolderPicker';
-import { cx, Tabs, useIsMobile } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { cx, useIsMobile } from '../../components/ui';
+import { NavButton, PageHeader } from '../layout/PageHeader';
+import { SideColumn } from '../layout/SideColumn';
 import { InstructionsSettings, McpSettings } from './AgentSettings';
 import { SkillsSettings } from '../skillpack/SkillsPage';
 import { PluginsSettings } from '../plugins/PluginsSettings';
@@ -200,36 +202,32 @@ function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
   );
 }
 
-/** The group a section is in: on wide screens, its tab. */
-const groupOf = (id: SettingsSection | null) => groups().find((g) => g.items.some((d) => d.id === id)) ?? groups()[0];
-
-/** The section last open under each tab, so going back to a tab opens it again. */
-const lastOpen: Record<string, SettingsSection> = {};
-
-/** Wide screens: the open tab's sections, beside the open one. Short enough to need no scrolling of its
- * own, it stays in place while the section scrolls. */
-function SectionMenu({ items, current, onOpen }: { items: SectionDef[]; current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
+/** A computer: every section as a row of the column, under its group's name; the rows look as the Library's places do. */
+function SectionRows({ current, onOpen }: { current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
   return (
-    // Only a window too short for all of a tab's sections scrolls them on their own.
-    // Wide enough for the longest section's name ("Images, video and audio") in full.
-    <nav className="sticky top-0 max-h-[calc(100dvh-94px)] w-[216px] shrink-0 overflow-y-auto py-6" aria-label="Settings sections">
-      {items.map((d) => {
-        const on = d.id === current;
-        return (
-          <button
-            key={d.id}
-            onClick={() => onOpen(d.id)}
-            aria-current={on ? 'page' : undefined}
-            className={cx(
-              'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors',
-              on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg',
-            )}
-          >
-            <d.icon size={16} className={cx('shrink-0', on ? 'text-fg' : 'text-fg-3')} />
-            <span className="truncate">{d.label}</span>
-          </button>
-        );
-      })}
+    <nav aria-label="Settings sections" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pt-1 pb-4">
+      {groups().map((g, i) => (
+        <div key={g.label} className="space-y-0.5">
+          <div className={cx('px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase', i ? 'pt-4' : 'pt-1')}>{g.label}</div>
+          {g.items.map((d) => {
+            const on = d.id === current;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => onOpen(d.id)}
+                aria-current={on ? 'page' : undefined}
+                className={cx('flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg')}
+              >
+                <span className="flex w-5 shrink-0 justify-center">
+                  <d.icon size={15} className="text-fg-3" />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{d.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -268,11 +266,9 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     </HeaderSlot.Provider>
   );
   const folder = page?.folder ? <FolderScope cwd={cwd} onChange={(c) => go(url({ cwd: c }), true)} /> : null;
-  // Wide screens: the tab is the open section's group, and each section opens at its top.
-  const tab = groupOf(current);
+  // Each section opens at its top.
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (current) lastOpen[groupOf(current).label] = current;
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [current]);
   // From the search box (`find=`): the option that says those words (in the section, or its switch beside the title), scrolled to and lit up.
@@ -314,37 +310,33 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     );
   }
 
-  // A tab per group (App, Agents, Capabilities), its sections in a menu beside the open one, and one
-  // scroll for the page. The tabs line up with the menu: under the title, and on a screen wider than
-  // 1280px together with it in the middle.
+  // The sections are the column's rows, and the open one fills the rest under its title, with one scroll for the page.
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Settings">
-        <div className="mx-auto max-w-[1248px]">
-          <Tabs value={tab.label} onChange={(t) => open(lastOpen[t] ?? groups().find((g) => g.label === t)!.items[0].id)} options={groups().map((g) => ({ value: g.label, label: g.label }))} />
-        </div>
-      </PageHeader>
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-[1280px] items-start gap-9 px-4">
-          <SectionMenu items={tab.items} current={current} onOpen={open} />
-          {def && (
-            <div key={def.id} data-settings-section className="max-w-[760px] min-w-0 flex-1 pt-7 pb-14">
-              <header className="mb-7 flex flex-wrap items-start gap-x-4 gap-y-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-[22px] leading-tight font-semibold tracking-tight">
-                    <span data-tip={SECTION_TIPS[def.id]}>{def.label}</span>
-                  </h2>
-                  <p className="mt-1 text-[13.5px] leading-snug text-fg-3">
-                    {def.sub} <LearnMore id={def.id} />
-                  </p>
-                </div>
-                {folder}
-                <div ref={setSlot} className="flex shrink-0 items-center gap-2 pt-0.5 empty:hidden" />
-              </header>
-              {body}
-            </div>
-          )}
-        </div>
+    <div className="flex h-full min-h-0">
+      <SideColumn label="Settings">
+        <SectionRows current={current} onOpen={open} />
+      </SideColumn>
+      <div ref={scroller} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        {def && (
+          <div key={def.id} data-settings-section className="mx-auto max-w-[808px] min-w-0 px-6 pt-7 pb-14">
+            <header className="mb-7 flex flex-wrap items-start gap-x-3 gap-y-3">
+              <span className="-ml-2 mt-px empty:hidden">
+                <NavButton />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[22px] leading-tight font-semibold tracking-tight">
+                  <span data-tip={SECTION_TIPS[def.id]}>{def.label}</span>
+                </h1>
+                <p className="mt-1 text-[13.5px] leading-snug text-fg-3">
+                  {def.sub} <LearnMore id={def.id} />
+                </p>
+              </div>
+              {folder}
+              <div ref={setSlot} className="flex shrink-0 items-center gap-2 pt-0.5 empty:hidden" />
+            </header>
+            {body}
+          </div>
+        )}
       </div>
     </div>
   );
