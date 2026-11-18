@@ -3,6 +3,14 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.84.1 · 18 November 2026
+
+The sidebar keeps to the subagents that are at work or waiting for you.
+
+- **Subagents in the sidebar**: under a session, only its subagents at work or waiting for you show, with the line on
+  how many and what they are doing. One that finishes leaves the sidebar, unless you have it open, and stays on its
+  card in the conversation and in the line above the message box.
+
 ## 0.84.0 · 18 November 2026
 
 A new look for the whole app: a rail of icons down the left edge, the same kind of column beside every page that has a
