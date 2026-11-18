@@ -42,6 +42,7 @@ import {
   Star,
   VenetianMask,
   WandSparkles,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
@@ -49,7 +50,7 @@ import { enc, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { canReveal, revealLabel } from '../../lib/reveal';
-import { toastError, useToasts, useUI } from '../../lib/store';
+import { toastError, useApp, useToasts, useUI } from '../../lib/store';
 import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Sheet, Throbber, useIsMobile } from '../../components/ui';
 import { live as socket } from '../../lib/ws';
 import { useAskRun } from '../guide/ask';
@@ -210,19 +211,32 @@ export function BrowserPage() {
   return ownBrowserHere() ? <OwnBrowser /> : <NotHere />;
 }
 
-/** The tab column's top bar part: the app's logo, a new tab, and the fold of the column (Ctrl+B). */
+/**
+ * The tab column's top, in the bar: placed as every column's top is (SideColumn): the app's logo, Reconnecting… while
+ * the app is offline, New tab and Hide tabs (Ctrl+B), in a row 56 px tall level with the rail's first tile, and no line
+ * under it, so the column reads as one from the top (the bar's line runs under the toolbar only). With the column
+ * hidden, New tab and Show tabs start the bar, the line under them too.
+ */
 function BarLead({ open }: { open: boolean }) {
   // Over the tab column, as wide as it (every column's width).
   const { width } = useNavWidth();
+  const connected = useApp((s) => s.connected);
   return (
-    <div className={cx('flex h-full shrink-0 items-center gap-0.5 border-r border-line pr-2', open ? 'pl-3.5' : 'pl-2')} style={open ? { width } : undefined}>
+    // As tall as the toolbar beside it, whose 56 px have their line under them: the row keeps 56 px above that pixel.
+    <div className={cx('flex shrink-0 items-center gap-1 border-r border-line pr-2', open ? 'pb-px pl-4' : 'border-b pl-2')} style={open ? { width } : undefined}>
       {open && (
         <>
           {/* The rail names the section: the column shows the app's logo, as every column does. */}
           <h1 className="sr-only">Browser</h1>
-          <span className="flex min-w-0 flex-1 items-center pl-0.5 text-fg">
+          <span className="flex min-w-0 flex-1 items-center text-fg">
             <Wordmark height={16} tide />
           </span>
+          {/* Offline: said here, as at the top of every column (the rail leaves it to the column). */}
+          {!connected && (
+            <span title="Reconnecting…" className="px-1 text-warn">
+              <WifiOff size={15} />
+            </span>
+          )}
         </>
       )}
       <IconButton label={`New tab (${MOD}T)`} onClick={() => void newTab()}>
@@ -723,9 +737,10 @@ function OwnBrowser() {
 
   return (
     <div data-i18n="browser" className="flex h-full min-h-0 flex-col bg-bg">
-      <div className={cx('flex shrink-0 items-center border-b border-line bg-sidebar', mobile ? 'h-12' : 'h-[52px]')}>
+      {/* On a computer the toolbar is 56 px as every page's header is, with its line under it; the tab column's top beside it has none. */}
+      <div className={cx('flex shrink-0 bg-sidebar', mobile && 'h-12 items-center border-b border-line')}>
         {!mobile && <BarLead open={sideOpen} />}
-        <div className={cx('flex min-w-0 flex-1 items-center gap-1', mobile ? 'px-2' : 'pr-3 pl-2.5')}>
+        <div className={cx('flex min-w-0 flex-1 items-center gap-1', mobile ? 'px-2' : 'box-content h-14 border-b border-line pr-3 pl-2.5')}>
           {mobile && <NavButton />}
           {mobile && !watching && <TabMenu view={view} />}
           {!watching && (

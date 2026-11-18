@@ -15919,7 +15919,7 @@
 "Recompile (Ctrl+Enter)":"web/src/features/pages/latex/LatexEditor.tsx",
 "Recompile as you type":"web/src/features/pages/latex/LatexEditor.tsx",
 "Recompile now":"web/src/features/pages/latex/LatexEditor.tsx",
-"Reconnecting…":"web/src/features/layout/Rail.tsx",
+"Reconnecting…":"web/src/features/browser/BrowserPage.tsx",
 "Record":"web/src/features/mediaedit/audio/SoundEditor.tsx",
 "Record a video":"web/src/features/pages/slides/PresentMore.tsx",
 "Record a voice-over with the microphone":"web/src/features/mediaedit/video/MediaPanel.tsx",
