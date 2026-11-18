@@ -647,6 +647,16 @@ html:not([data-motion=off]) .press:active:not(:has(button:active, a:active, [rol
   transform: scale(0.97);
   transition-duration: 80ms;
 }
+/* A Library card dips as a whole, a little less (it is large), while its picture (its first button) is pressed. */
+html:not([data-motion=off]) .press-card {
+  transition:
+    transform 160ms var(--ease-app),
+    border-color 150ms ease;
+}
+html:not([data-motion=off]) .press-card:has(> button:first-of-type:active) {
+  transform: scale(0.985);
+  transition-duration: 80ms;
+}
 
 /* Rail icons (and any icon in a .group): the inbox's tray dips. */
 @keyframes ico-dip {

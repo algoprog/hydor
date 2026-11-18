@@ -340,7 +340,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
     <div
       draggable={CAN_DRAG}
       onDragStart={(e) => dragThing(e, { kind: p ? 'page' : 'media', id: p ? p.id : m!.id })}
-      className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2"
+      className="press-card group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-2"
     >
       {/* A sound's picture is its shape, with a button to play it where it is (beside the one that opens it, not in it). */}
       {m?.kind === 'audio' ? (

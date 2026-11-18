@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { PanelLeftClose, WifiOff } from 'lucide-react';
 import { MOD } from '../../lib/format';
+import { motionFull } from '../../lib/motion';
 import { useApp, useUI } from '../../lib/store';
 import { Wordmark } from '../../components/Logo';
-import { IconButton } from '../../components/ui';
+import { cx, IconButton } from '../../components/ui';
 import { RAIL_WIDTH } from './Rail';
 
 /** The column's width, one for every page that has one (the sessions', the Library's, Settings'): kept in the settings, bounded by the window. */
@@ -33,10 +34,39 @@ export function SideColumn({ label, actions, tour, tip, children }: { label: str
   const sideOpen = useUI((s) => s.sideOpen);
   const connected = useApp((s) => s.connected);
   const { width, max, set } = useNavWidth();
-  if (!sideOpen) return null;
+  // Hiding and showing it slides it (Motion: Full): the column keeps its width inside and its box eases to it or to
+  // nothing, clipping it only while it moves (so its resize handle keeps its grip, and dragging it is never eased).
+  const [shown, setShown] = useState(sideOpen);
+  const [wide, setWide] = useState(sideOpen);
+  const [moving, setMoving] = useState(false);
+  useLayoutEffect(() => {
+    if (sideOpen === shown && sideOpen === wide) return;
+    if (!motionFull()) {
+      setShown(sideOpen);
+      setWide(sideOpen);
+      setMoving(false);
+      return;
+    }
+    setMoving(true);
+    let frame = 0;
+    if (sideOpen) {
+      setShown(true);
+      frame = requestAnimationFrame(() => setWide(true));
+    } else setWide(false);
+    const done = window.setTimeout(() => {
+      setMoving(false);
+      if (!sideOpen) setShown(false);
+    }, 200);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(done);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideOpen]);
+  if (!shown) return null;
   return (
-    <div className="relative shrink-0" style={{ width }}>
-      <aside aria-label={label} data-column data-tour={tour} className="flex h-full w-full flex-col border-r border-line bg-sidebar pt-[var(--safe-top)]">
+    <div className={cx('relative shrink-0', moving && 'col-slide overflow-hidden')} style={{ width: wide ? width : 0 }}>
+      <aside aria-label={label} data-column data-tour={tour} className="flex h-full flex-col border-r border-line bg-sidebar pt-[var(--safe-top)]" style={{ width }}>
         <div data-tour={tour ? `${tour}-top` : undefined} className="flex h-14 shrink-0 items-center gap-1 pr-2 pl-4">
           <span data-tip={tip} className="flex min-w-0 flex-1 items-center text-fg">
             <Wordmark height={16} tide />
