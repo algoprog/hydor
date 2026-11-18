@@ -3,12 +3,13 @@
 import { sleep } from './cdp.mjs';
 
 /**
- * The part of the window right of the rail and of the page's column (the sessions', the Library's, Settings': an `<aside data-column>`;
- * the other pages have none), down to `bottom` (CSS pixels) when given.
+ * The part of the window right of the rail and of the sessions sidebar (on the start page and in sessions), down to
+ * `bottom` (CSS pixels) when given. A page's own column (the Library's places, Settings' sections) stays in: it is part of
+ * the page the guide shows.
  */
 async function main(p, bottom) {
   const rail = await p.box('nav[data-rail]');
-  const side = await p.box('aside[data-column]');
+  const side = await p.box('aside[data-tour="sidebar"]');
   const x = Math.round(Math.max(rail ? rail.x + rail.width : 0, side ? side.x + side.width : 0));
   return { x, y: 0, width: p.size.width - x, height: Math.min(p.size.height, bottom ?? p.size.height) };
 }
@@ -35,6 +36,8 @@ async function around(p, targets, pad = 16) {
 const last = (sel) => `js:[...document.querySelectorAll(${JSON.stringify(sel)})].pop()`;
 /** The innermost button whose text starts with `text`. */
 const button = (text) => `js:[...document.querySelectorAll('button')].filter((b) => b.textContent.trim().startsWith(${JSON.stringify(text)})).pop()`;
+/** A button or an element that acts as one (a row with role=button) whose text starts with `text`. */
+const anyButton = (text) => `js:[...document.querySelectorAll('button, [role="button"]')].filter((b) => b.textContent.trim().startsWith(${JSON.stringify(text)})).pop()`;
 
 /** The card (or row) holding an element whose own text is `text`. */
 const cardWith = (text, cls = '.rounded-2xl') =>
@@ -140,7 +143,7 @@ export const SHOTS = [
       await ctx.go('/library', { settle: 2500 });
       await p.park();
       await sleep(600);
-      return p.shot(ctx.file, { clip: await main(p, 700) });
+      return p.shot(ctx.file, { clip: await main(p, 857) });
     },
   },
   {
@@ -195,9 +198,9 @@ export const SHOTS = [
       await p.click(chip('[role="dialog"]', 'Deep research'), { wait: 700 });
     },
   }),
-  settingsShot('guidelines', 'guidelines', { until: button('The garden') }),
+  settingsShot('guidelines', 'guidelines', { until: anyButton('The garden') }),
   // The switches and the first notes fit in one picture.
-  settingsShot('memory', 'memory', { height: 900 }),
+  settingsShot('memory', 'memory', { height: 1101 }),
   {
     // A project's Memory tab on its Wiki part: the articles of its wiki memory by area, an area's hub open, and what new documents did lately.
     id: 'wiki-memory',
@@ -214,8 +217,8 @@ export const SHOTS = [
   },
   // The list's card, by the first of the demo's tasks there: those due within three hours are left out (demo.mjs).
   settingsShot('tasks', 'tasks', { until: cardWithAny(['Water the greenhouse reminder', 'Weekly shop report', 'Ridge E5 price watch', 'Morning brief'], '.rounded-xl') }),
-  settingsShot('skills', 'skills'),
-  settingsShot('plugins', 'plugins'),
+  settingsShot('skills', 'skills', { height: 979 }),
+  settingsShot('plugins', 'plugins', { height: 979 }),
   {
     // System → Experiments: the queue's line, the GPUs (made up: demo.mjs) and the demo's runs, by experiment.
     id: 'experiments',
@@ -261,7 +264,7 @@ export const SHOTS = [
       return p.shot(ctx.file, { clip: await main(p) });
     },
   },
-  settingsShot('custom', 'models', { height: 900 }),
+  settingsShot('custom', 'models', { height: 1101 }),
   settingsShot('app', 'general', { until: button('Import') }),
 ];
 
