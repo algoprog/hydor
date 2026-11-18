@@ -699,6 +699,21 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text: words.slice(0, QUOTE_MAX), url });
   }
 
+  /** Pages that keep your highlights: websites and files (not a blank page, an error page or an extension's). */
+  const marksOn = (u) => /^(https?|file):\/\//i.test(String(u || ''));
+
+  /** The highlight where you clicked (the id on its marks, or ''), asked of the page in a world of its own, which its scripts cannot see. */
+  async function highlightAt(t, params) {
+    try {
+      const z = t.wc.getZoomFactor() || 1;
+      const code = `(() => { const e = document.elementFromPoint(${Number(params.x) / z}, ${Number(params.y) / z}); const m = e && e.closest && e.closest('mark.hydor-hl'); return m ? String(m.getAttribute('data-hydor-hl')) : ''; })()`;
+      const id = await withTimeout(t.wc.executeJavaScriptInIsolatedWorld(1000, [{ code }]), 1000, 'The highlight');
+      return /^[0-9a-f-]{36}$/.test(id) ? id : '';
+    } catch {
+      return '';
+    }
+  }
+
   /**
    * The items of the menu for a click in one of your tabs, as a template for Menu.buildFromTemplate: what the page offers
    * where you clicked (a link, an image, selected text, a field) and what any page has.
@@ -751,6 +766,12 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (!params.isEditable) items.push({ label: 'Copy', click: () => wc.copy() });
       items.push({ label: `Search ${eng.name} for “${short(text)}”`, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
       items.push({ label: `Ask an agent about “${short(text)}”`, click: () => void askAbout(t, text, page) });
+      if (!params.isEditable && marksOn(page)) items.push({ label: 'Highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'highlight', target: t.id, url: page, title: wc.getTitle() }) });
+      sep();
+    }
+    // Where a highlight of yours is (popupMenu looked): taking it away.
+    if (params.hydorHighlight && marksOn(page)) {
+      items.push({ label: 'Remove highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'unhighlight', id: params.hydorHighlight, url: page }) });
       sep();
     }
     if (!params.isEditable && !text) {
@@ -772,6 +793,11 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (t.gone || t.wc.isDestroyed()) return;
     // The engine is only asked for when words are selected: that is the one item that needs it.
     if (String(params.selectionText || '').trim()) await readEngine();
+    // Whether the click is on one of your highlights (a page of a site or a file, not in a field).
+    const here = params.pageURL || t.wc.getURL();
+    const hl = marksOn(here) && !params.isEditable ? await highlightAt(t, params) : '';
+    if (t.gone || t.wc.isDestroyed()) return;
+    if (hl) params = { ...params, hydorHighlight: hl };
     const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : mainWindow();
     if (!win || win.isDestroyed() || t.gone || t.wc.isDestroyed()) return;
     try {
@@ -1790,6 +1816,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     // For desktop/scripts/browser-ipc-check.cjs, which calls what the page's messages call.
     handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal },
     menuTemplate,
+    highlightAt,
     shortcut,
     adblock,
     conns,

@@ -1,9 +1,10 @@
-// What your own browser keeps, as lists in the Library (its chips Bookmarks, Read later, Downloads and History, in the desktop app):
+// What your own browser keeps, as lists in the Library (its chips Bookmarks, Read later, Downloads, History and Highlights, in the desktop app):
 // never copied into the Library, never in Everything or a project's count, and shown only to you (agents are refused
 // the routes). Each row is a site's icon, a title and a muted line, with what can be done to it at the right on hover.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, Check, Clock, ExternalLink, FileDown, FolderOpen, History as HistoryIcon, Lock, RotateCcw, X } from 'lucide-react';
+import { Bookmark, Check, Clock, ExternalLink, FileDown, FolderOpen, Highlighter, History as HistoryIcon, Lock, RotateCcw, Sparkles, X } from 'lucide-react';
 import type { BookmarkNode, DownloadEntry, HistoryEntry } from '@shared/browser';
+import type { PageHighlight } from '@shared/highlights';
 import { api, del, enc } from '../../lib/api';
 import { sepOf } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -12,11 +13,12 @@ import { toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
 import { Button, cx, Empty, IconButton, Throbber } from '../../components/ui';
-import { deleteHistory, laterShown, loadBookmarks, loadHistory, loadLater, markLater, removeBookmark, removeLater, showDownload, useBookmarks, useLater } from '../browser/browsing';
+import { deleteHistory, laterShown, loadBookmarks, loadHistory, loadLater, markLater, removeBookmark, removeLater, showDownload, showHighlight, useBookmarks, useLater } from '../browser/browsing';
+import { askAboutHighlights, HighlightRow } from '../browser/Highlights';
 import { hostOfTab, SiteIcon } from '../browser/TabStrip';
 
-export type BrowserKind = 'bookmarks' | 'later' | 'downloads' | 'history';
-export const BROWSER_KINDS: BrowserKind[] = ['bookmarks', 'later', 'downloads', 'history'];
+export type BrowserKind = 'bookmarks' | 'later' | 'downloads' | 'history' | 'highlights';
+export const BROWSER_KINDS: BrowserKind[] = ['bookmarks', 'later', 'downloads', 'history', 'highlights'];
 export const isBrowserKind = (v: string | null | undefined): v is BrowserKind => !!v && (BROWSER_KINDS as string[]).includes(v);
 
 const PAGE = 100;
@@ -412,7 +414,109 @@ function Downloads({ q }: { q: string }) {
   );
 }
 
+// ---- highlights, by page ------------------------------------------------------------------------------------------
+
+const dayShort = new Intl.DateTimeFormat(LOCALE, { year: 'numeric', month: 'short', day: 'numeric' });
+
+interface PageGroup {
+  key: string;
+  url: string;
+  title: string;
+  at: number;
+  items: PageHighlight[];
+}
+
+/** The highlights grouped by the page they are on: the pages with the newest highlight first, each page's in the order they were made. */
+function byPage(all: PageHighlight[]): PageGroup[] {
+  const groups = new Map<string, PageGroup>();
+  for (const h of all) {
+    const g = groups.get(h.key);
+    if (g) {
+      g.items.push(h);
+      g.title = g.title || h.title;
+    } else groups.set(h.key, { key: h.key, url: h.url, title: h.title, at: h.at, items: [h] });
+  }
+  return [...groups.values()].map((g) => ({ ...g, items: g.items.sort((a, b) => a.at - b.at) })).sort((a, b) => b.at - a.at);
+}
+
+function Highlights({ q }: { q: string }) {
+  const [items, setItems] = useState<PageHighlight[] | null>(null);
+  const first = useRef(true);
+  useEffect(() => {
+    let live = true;
+    const t = window.setTimeout(
+      () => {
+        api<{ highlights: PageHighlight[] }>(`/api/browser/browsing/highlights?q=${enc(q)}&limit=1000`).then(
+          (r) => live && setItems(r.highlights),
+          (e) => {
+            if (!live) return;
+            setItems([]);
+            toastError(e);
+          },
+        );
+      },
+      first.current ? 0 : 200,
+    );
+    first.current = false;
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [q]);
+  const groups = useMemo(() => byPage(items ?? []), [items]);
+  if (!items) return <Loading />;
+  if (!items.length)
+    return q ? (
+      <p className="py-8 text-center text-[13px] text-fg-3">{tr(`No highlight matches “${q}”.`)}</p>
+    ) : (
+      <Empty icon={<Highlighter size={22} />} title="No highlights yet">
+        Select words on a page in your Browser, right-click and choose Highlight: they are marked each time you open the page, and listed here by page. Agents never see them unless you ask about them.
+      </Empty>
+    );
+  const open = async (h: PageHighlight) => {
+    if (await showHighlight(h.id)) go('/browser');
+  };
+  return (
+    <div>
+      <Private>Only you see your highlights. They are not copied into the Library.</Private>
+      {groups.map((g) => (
+        <section key={g.key} className="mb-4 overflow-hidden rounded-[12px] border border-line bg-bg-1">
+          <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-bg">
+              <SiteIcon url={g.url} size={16} />
+            </span>
+            <button type="button" onClick={() => openInBrowser(g.url)} title={g.url} className="min-w-0 flex-1 text-left">
+              <span translate="no" className="block truncate text-[13.5px] leading-5 font-medium text-fg">
+                {g.title || shown(g.url)}
+              </span>
+              <span className="block truncate text-[12px] leading-4 text-fg-3">
+                <span translate="no">{hostOfTab(g.url) || shown(g.url)}</span>
+                {` · ${tr(`${g.items.length} highlight${g.items.length === 1 ? '' : 's'}`)} · ${dayShort.format(g.at)}`}
+              </span>
+            </button>
+            <Button size="sm" variant="ghost" icon={<Sparkles size={14} />} onClick={() => void askAboutHighlights({ url: g.url, title: g.title }, g.items)}>
+              Ask an agent about these
+            </Button>
+          </div>
+          <div className="divide-y divide-line">
+            {g.items.map((h) => (
+              <HighlightRow
+                key={h.id}
+                h={h}
+                open="Open"
+                onOpen={() => void open(h)}
+                onChange={(n) => setItems((e) => e?.map((x) => (x.id === n.id ? n : x)) ?? null)}
+                onGone={(id) => setItems((e) => e?.filter((x) => x.id !== id) ?? null)}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** What one of the browser's chips shows; `q`: the words in the toolbar's search box. */
 export function BrowserList({ kind, q }: { kind: BrowserKind; q: string }) {
-  return kind === 'bookmarks' ? <Bookmarks q={q} /> : kind === 'later' ? <ReadLater q={q} /> : kind === 'history' ? <History q={q} /> : <Downloads q={q} />;
+  return kind === 'bookmarks' ? <Bookmarks q={q} /> : kind === 'later' ? <ReadLater q={q} /> : kind === 'history' ? <History q={q} /> : kind === 'highlights' ? <Highlights q={q} /> : <Downloads q={q} />;
 }

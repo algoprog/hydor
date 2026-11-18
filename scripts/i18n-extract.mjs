@@ -318,6 +318,7 @@ const NO_WORDS = new Set([
   'shared/code-colours.ts',
   'shared/content-asks.ts',
   'shared/comment-asks.ts',
+  'shared/highlight-asks.ts',
   // The Slack app's manifest and the Discord invitation: what is pasted into those services, not the app's words.
   'shared/chat-apps.ts',
   // A diagram's shapes, routes, layouts and drawing: their notes go to agents, the rest is code (the model's names of

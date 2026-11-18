@@ -73,7 +73,9 @@ export type PageCommand =
   | { cmd: 'later'; url: string; title: string }
   | { cmd: 'save-image'; path: string; name: string; url: string; title: string }
   | { cmd: 'ask-image'; path: string; name: string; url: string; title: string }
-  | { cmd: 'picture-failed'; message: string };
+  | { cmd: 'picture-failed'; message: string }
+  | { cmd: 'highlight'; target: string; url: string; title: string }
+  | { cmd: 'unhighlight'; id: string; url: string };
 
 export interface PageFrame {
   jpeg: ArrayBuffer;

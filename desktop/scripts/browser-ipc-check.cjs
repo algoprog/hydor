@@ -78,6 +78,7 @@ document.onmousemove=()=>{};
   // A page of another machine the window shows (the Machines feature forwards its server under /m/<id>/).
   '/m/other/app': '<!doctype html><title>other machine</title><body>',
   '/own': '<!doctype html><title>own page</title><body style="margin:0;background:rgb(255,0,0)"><h1 style="color:#fff">mine</h1>',
+  '/marked': '<!doctype html><title>marked</title><body style="margin:0"><p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="11111111-1111-1111-1111-111111111111" style="font-size:30px">marked words</mark> plain<p id="bad" style="margin:0;padding:10px"><mark data-hydor-hl="22222222-2222-2222-2222-222222222222">not ours</mark>',
   '/words': '<!doctype html><title>words</title><body style="margin:0"><p>alpha beta alpha gamma alpha</p>',
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
   '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
@@ -637,7 +638,7 @@ app.whenReady().then(async () => {
       // Only an address the app can read is offered for the Library or a question (not a file: or chrome: picture).
       assert.ok(!labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'file:///tmp/a.png' })).includes('Save image to Library'));
       const sel = browser.menuTemplate(t, { ...base, selectionText: 'hello world' });
-      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
+      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Highlight', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       const long = labels(browser.menuTemplate(t, { ...base, selectionText: 'x'.repeat(100) }))[1];
       assert.ok(long.length < 60 && long.includes('…'), long);
       const field = browser.menuTemplate(t, { ...base, isEditable: true, misspelledWord: 'helo', dictionarySuggestions: ['hello', 'help'], editFlags: { canUndo: true, canCut: true, canCopy: true, canPaste: true, canSelectAll: true } });
@@ -652,8 +653,21 @@ app.whenReady().then(async () => {
       sel.find((i) => /^Ask an agent/.test(i.label)).click();
       await until(async () => (await page('__cmds.length')) === 1, 2000, 'the ask command');
       sel.find((i) => i.label === 'Bookmark this page').click();
-      await until(async () => (await page('__cmds.length')) === 2, 2000, 'the menu’s commands');
-      assert.deepEqual(await page('__cmds'), [{ cmd: 'ask', text: 'hello world', url: `${appOrigin}/words` }, { cmd: 'bookmark', url: `${appOrigin}/words`, title: 'words' }]);
+      sel.find((i) => i.label === 'Highlight').click();
+      // Where a highlight of yours is, there is its removal (popupMenu found the highlight and passes it on); not in a field.
+      const hid = '11111111-1111-1111-1111-111111111111';
+      const onMark = browser.menuTemplate(t, { ...base, hydorHighlight: hid });
+      assert.deepEqual(labels(onMark).slice(0, 1), ['Remove highlight']);
+      onMark.find((i) => i.label === 'Remove highlight').click();
+      assert.ok(!labels(browser.menuTemplate(t, { ...base, selectionText: 'x', pageURL: 'about:blank' })).includes('Highlight'), 'no highlights on a blank page');
+      assert.ok(!labels(browser.menuTemplate(t, { ...base, selectionText: 'x', isEditable: true })).includes('Highlight'), 'none for words in a field');
+      await until(async () => (await page('__cmds.length')) === 4, 2000, 'the menu’s commands');
+      assert.deepEqual(await page('__cmds'), [
+        { cmd: 'ask', text: 'hello world', url: `${appOrigin}/words` },
+        { cmd: 'bookmark', url: `${appOrigin}/words`, title: 'words' },
+        { cmd: 'highlight', target: t.id, url: `${appOrigin}/words`, title: 'words' },
+        { cmd: 'unhighlight', id: hid, url: `${appOrigin}/words` },
+      ]);
       const mark = events.length;
       browser.menuTemplate(t, { ...base, linkURL: `${appOrigin}/popped` }).find((i) => i.label === 'Open link in new tab').click();
       const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && /popped|blank/.test(m.params.targetInfo.url || 'blank'));
@@ -710,6 +724,17 @@ app.whenReady().then(async () => {
       } finally {
         await t.wc.executeJavaScript(`document.body.innerHTML = ${JSON.stringify(was)}; getSelection().removeAllRanges(); 1`, true);
       }
+    });
+
+    await check('the right-click menu finds a highlight of yours under the click, in a world of its own', async () => {
+      const t = ownT();
+      await goTo(own, `${appOrigin}/marked`);
+      // The point is in the mark's own text (found by the page, in CSS pixels); the menu gives it in the view's.
+      const r = await t.wc.executeJavaScript('(() => { const b = document.querySelector("mark.hydor-hl").getBoundingClientRect(); const o = document.getElementById("bad").getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), ox: Math.round(o.left + 5), oy: Math.round(o.top + 5) }; })()', true);
+      assert.equal(await browser.highlightAt(t, { x: r.x, y: r.y }), '11111111-1111-1111-1111-111111111111');
+      assert.equal(await browser.highlightAt(t, { x: 2, y: r.oy }), '', 'elsewhere on the page: none');
+      assert.equal(await browser.highlightAt(t, { x: r.ox, y: r.oy }), '', 'a mark that is not one of ours (no class): none');
+      assert.equal(await browser.highlightAt(t, { x: 'x', y: 'y' }), '', 'nonsense: none');
     });
 
     await check('full-screen video: the window and the page fill the screen, and leaving puts both back', async () => {

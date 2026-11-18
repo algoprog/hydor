@@ -13,8 +13,8 @@
 // folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
 // Saved web pages (a page with the address it came from, kept from the Browser's Save) are a kind of their own, Web
-// pages, among the rest. In the desktop app three more chips at the row's end, after a divider, show what your own browser
-// keeps as lists (BrowserLists.tsx): Bookmarks, Read later, Downloads and History, for every project, never copied into the Library.
+// pages, among the rest. In the desktop app five more chips at the row's end, after a divider, show what your own browser
+// keeps as lists (BrowserLists.tsx): Bookmarks, Read later, Downloads, History and Highlights, for every project, never copied into the Library.
 // On a wide screen the page draws its own column on the left (the app's sidebar gives way to its rail here): the places
 // and New, shown while the sidebar is open (Ctrl+B).
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (web, image, video and audio each, media pictures and
@@ -43,6 +43,7 @@ import {
   FolderPlus,
   FolderTree,
   Globe,
+  Highlighter,
   History as HistoryIcon,
   ImageIcon,
   Layers,
@@ -162,6 +163,7 @@ const BROWSER_SHOWS: { value: BrowserKind; label: string; icon: ReactNode; searc
   { value: 'later', label: 'Read later', icon: <Clock size={13} />, search: 'Search your Read later list' },
   { value: 'downloads', label: 'Downloads', icon: <FileDown size={13} />, search: 'Search your downloads' },
   { value: 'history', label: 'History', icon: <HistoryIcon size={13} />, search: 'Search your history' },
+  { value: 'highlights', label: 'Highlights', icon: <Highlighter size={13} />, search: 'Search your highlights' },
 ];
 const showOf = (v: Show) => SHOWS.find((s) => s.value === v) ?? BOTH;
 
@@ -1092,7 +1094,7 @@ export function Library() {
                               <>
                                 <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 bg-line-2" />
                                 {BROWSER_SHOWS.map((b) => (
-                                  <button key={b.value} type="button" aria-pressed={show === b.value} onClick={() => toShow(b.value, current)} className={chipCls(show === b.value)}>
+                                  <button key={b.value} type="button" data-i18n="browser" aria-pressed={show === b.value} onClick={() => toShow(b.value, current)} className={chipCls(show === b.value)}>
                                     {b.icon}
                                     {b.label}
                                   </button>

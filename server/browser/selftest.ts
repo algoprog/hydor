@@ -17,6 +17,7 @@ import type { AgentPointer } from '../../shared/pointer.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures } from '../features/registry.ts';
+import { applyScript, removeScript, selectScript } from './highlights-page.ts';
 import { jpegWidth } from './jpeg.ts';
 import { act, askUser, open, read, tabs, upload, type OpCtx } from './ops.ts';
 import { browserOf, closeAll, GLIDE_MS, setBrowserDeps } from './session.ts';
@@ -326,6 +327,81 @@ async function main() {
     assert.match(r.text, /The page says 42\./);
     assert.match(answered, /<page>[\s\S]*The meaning of life is 42[\s\S]*Tea \| 3 EUR/);
   });
+
+  await check('highlights: marked, found again by their words and taken away in a world of the page’s own (as in your own browsing)', async () => {
+    await open(ctx, `${base}/article`, false, false);
+    const t = browserOf(KEY)!.active!;
+    const id = '33333333-3333-3333-3333-333333333333';
+    const before = await t.evaluate<string>('document.body.innerHTML');
+    await t.evaluate(`(() => { const p = document.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+    const made = await t.evaluate<{ text?: string; prefix?: string; suffix?: string; error?: string }>(selectScript(id));
+    assert.equal(made.text, 'The meaning of life is 42, says the book.');
+    assert.equal(await t.evaluate<number>(`document.querySelectorAll('mark.hydor-hl[data-hydor-hl="${id}"]').length`), 1);
+    assert.equal(await t.evaluate(removeScript(id)), 1);
+    assert.equal(await t.evaluate<string>('document.body.innerHTML'), before, 'the page is as it was');
+    // Marked again from what was kept (a page that loads again).
+    const again = await t.evaluate<{ ids: string[]; missing: string[] }>(applyScript([{ id, text: made.text!, prefix: made.prefix ?? '', suffix: made.suffix ?? '', note: 'n' }]));
+    assert.deepEqual(again.ids, [id]);
+    assert.equal(await t.evaluate<string>(`document.querySelector('mark.hydor-hl').title`), 'n');
+    await t.evaluate(removeScript(id));
+  });
+
+  // Your own browsing is the desktop app's: its routes make a highlight from a tab's selection, put it back when the page
+  // loads again, show it from the list and take it away.
+  if (DESKTOP) {
+    await check('your own browsing: a highlight made from the selection is marked again when the page loads, shown from its list, and goes with its delete', async () => {
+      const { default: Fastify } = await import('fastify');
+      const { HttpError } = await import('../auth.ts');
+      const { browsingRoutes } = await import('./browsing.ts');
+      const { BROWSING_KEY } = await import('../../shared/browser.ts');
+      const app = Fastify();
+      app.setErrorHandler((err: Error, _req, reply) => void reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message }));
+      browsingRoutes({ ...deps, app } as unknown as Deps);
+      const call = async (method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) => {
+        const r = await app.inject({ method, url, ...(payload ? { payload } : {}) });
+        return { status: r.statusCode, body: r.body ? JSON.parse(r.body) : {} };
+      };
+      const open1 = await call('POST', '/api/browser/browsing/open', { url: `${base}/article` });
+      assert.equal(open1.status, 200, JSON.stringify(open1.body));
+      const mine = browserOf(BROWSING_KEY)!;
+      const tab = mine.active!;
+      await tab.waitLoad(5000);
+      assert.ok(tab.url.endsWith('/article'), tab.url);
+      const marksOn = (t: typeof tab) => t.evaluate<number>(`document.querySelectorAll('mark.hydor-hl').length`).catch(() => -1);
+      const until = async (t: typeof tab, want: number, ms = 6000) => {
+        for (let t0 = Date.now(); Date.now() - t0 < ms; ) {
+          if ((await marksOn(t)) === want) return;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        assert.equal(await marksOn(t), want);
+      };
+      // Nothing selected: said so.
+      assert.equal((await call('POST', '/api/browser/browsing/highlights', { tab: tab.targetId })).status, 409);
+      await tab.evaluate(`(() => { const p = document.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+      const made = await call('POST', '/api/browser/browsing/highlights', { tab: tab.targetId });
+      assert.equal(made.status, 200, JSON.stringify(made.body));
+      assert.equal(made.body.highlight.text, 'The meaning of life is 42, says the book.');
+      assert.equal(made.body.count, 1);
+      assert.equal(await marksOn(tab), 1);
+      const id = made.body.highlight.id as string;
+      // The page loads again: the highlight is found and marked, by the server, without anyone asking.
+      await tab.navigate(`${base}/article?utm_source=x#again`);
+      await until(tab, 1);
+      // Another page of the site has none.
+      await tab.navigate(`${base}/links`);
+      await until(tab, 0);
+      // Shown from its list: the page opens (here already in the tab) and the words are marked.
+      const shown = await call('POST', `/api/browser/browsing/highlights/${id}/open`);
+      assert.equal(shown.status, 200, JSON.stringify(shown.body));
+      const here = mine.tabs.find((t) => t.url.includes('/article'))!;
+      assert.ok(here, 'its page is open');
+      await until(here, 1);
+      // Deleted: the marks go from the page open now.
+      assert.deepEqual((await call('DELETE', `/api/browser/browsing/highlights/${id}`)).body, { removed: true });
+      assert.equal(await marksOn(here), 0);
+      await app.close();
+    });
+  }
 
   await check('find looks through the whole page without a model', async () => {
     await open(ctx, `${base}/links`, false, false);

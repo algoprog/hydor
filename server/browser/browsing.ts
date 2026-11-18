@@ -23,6 +23,8 @@ import { isArticle, saveReaderPage } from '../pages/reader.ts';
 import { loadBookmarks } from './bookmarks.ts';
 import { checkProposal, cleanGroupName, isGroupColor, MAX_GROUPS } from './groups.ts';
 import { clearDownloads, listDownloads, removeDownload } from './downloads.ts';
+import { HighlightsLive } from './highlights-live.ts';
+import { highlightRoutes } from './highlights-routes.ts';
 import { clearHistory, HistoryRecorder, historyUrl, listHistory, removeHistory, suggest } from './history.ts';
 import { shownUrl } from './outline.ts';
 import { browserOf, downloadsFolder, ensureBrowser, handOver, onBrowserView, openBrowsers, outsideSessions, siteOfUrl, takeBack, takeClosedTab, viewOf, type SessionBrowser } from './session.ts';
@@ -836,6 +838,10 @@ export function browsingRoutes(d: Deps) {
     if (!Number.isInteger(id)) throw new HttpError(400, 'Send the id of the download');
     return { removed: removeDownload(db, id) };
   });
+  // Highlights: your marks on web pages, put back when a page loads (highlights-live.ts).
+  const marks = new HighlightsLive(db, () => browserOf(BROWSING_KEY)?.tabs ?? []);
+  highlightRoutes(d, marks, async (url) => go(await browsing(false), url, { newTab: true }));
+
   app.post('/api/browser/browsing/history/clear', async (req) => {
     const since = sinceOf(B(req).since);
     return { removed: clearHistory(db, since) };
@@ -1020,6 +1026,7 @@ export function browsingRoutes(d: Deps) {
     if (k !== BROWSING_KEY) return;
     keeper.seen(view);
     recorder?.seen(view);
+    marks.seen(view);
     const b = browserOf(BROWSING_KEY);
     desk.prune((target) => !!b && !b.closed && b.tabs.some((t) => t.targetId === target));
   });

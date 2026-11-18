@@ -1,6 +1,7 @@
 // What the Browser page (BrowserPage.tsx) shares between its parts: the browser of your own (key 'browsing') as
 // the server's routes have it, your bookmarks and extensions, the agents' browsers open now, the desktop app's
 // bridge to its pages, and the plain words for what a site may ask for.
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import {
   BROWSING_KEY,
@@ -15,6 +16,7 @@ import {
   type LaterItem,
   type SuggestResult,
 } from '@shared/browser';
+import type { PageHighlight } from '@shared/highlights';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { openFile, openSession } from '../../lib/nav';
@@ -515,6 +517,54 @@ export function listenTabs(onCommand: (c: import('./PageView').PageCommand) => v
     off2();
   };
 }
+
+// ---- highlights -------------------------------------------------------------------------------------------------
+
+/** Changes whenever a highlight is made, changed or deleted, so what shows them reads them again. */
+const useHighlightTick = create<{ tick: number }>(() => ({ tick: 0 }));
+const bumpHighlights = () => useHighlightTick.setState((s) => ({ tick: s.tick + 1 }));
+
+/** The highlights of the page in a tab (null while they load, and for a page that cannot have them), kept up to date. */
+export function usePageHighlights(url: string | undefined): PageHighlight[] | null {
+  const tick = useHighlightTick((s) => s.tick);
+  const [list, setList] = useState<{ url: string; items: PageHighlight[] } | null>(null);
+  const page = isWebPage(url) ? url : undefined;
+  useEffect(() => {
+    if (!page) return;
+    let live = true;
+    api<{ highlights: PageHighlight[] }>(`/api/browser/browsing/highlights?url=${enc(page)}`).then(
+      (r) => live && setList({ url: page, items: r.highlights }),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [page, tick]);
+  return page && list?.url === page ? list.items : null;
+}
+
+/** Highlights what is selected in a tab (the right-click menu's Highlight). */
+export async function highlightSelection(tab: string): Promise<PageHighlight | null> {
+  try {
+    const r = await post<{ highlight: PageHighlight }>('/api/browser/browsing/highlights', { tab });
+    bumpHighlights();
+    return r.highlight;
+  } catch (e) {
+    toastError(e);
+    return null;
+  }
+}
+
+/** Takes a highlight away (and its marks from the pages open now). */
+export const deleteHighlight = (id: string) => del(`/api/browser/browsing/highlights/${enc(id)}`).then(() => (bumpHighlights(), true), (e) => (toastError(e), false));
+
+/** A highlight's note (empty takes it away). */
+export const noteHighlight = (id: string, note: string) =>
+  patch<{ highlight: PageHighlight }>(`/api/browser/browsing/highlights/${enc(id)}`, { note }).then((r) => (bumpHighlights(), r.highlight), (e) => (toastError(e), null));
+
+/** Shows a highlight in your Browser: its page in the tab it is open in, or a new one, scrolled to the words. */
+export const showHighlight = (id: string) =>
+  post<{ view?: BrowserView }>(`/api/browser/browsing/highlights/${enc(id)}/open`).then((r) => (takeView(r.view), true), (e) => (toastError(e), false));
 
 // ---- asking an agent ------------------------------------------------------------------------------------------------
 

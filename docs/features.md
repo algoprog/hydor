@@ -255,11 +255,11 @@ agents that speak ACP and take MCP servers.
     with, with **Undo**.
   - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
-    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site
+    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Highlights**, **Extensions**, **Site
     permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
   - **Save** keeps a reader copy of the page in the Library as a Web page (the article as Mozilla's Readability finds it,
-    with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads and
-    History chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
+    with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads, History and
+    Highlights chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
     kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
@@ -284,13 +284,21 @@ agents that speak ACP and take MCP servers.
   - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
     padlock's popover counts what was blocked on the page and lets you **Allow ads on this site**. An extension's own
     request blocking may not run while it is on.
+  - **Highlights**: select words on a page, right-click and choose Highlight, and they are marked in a soft yellow and kept;
+    each time you open the page they are found by their words (and the words round them) and marked again, once the
+    page has loaded and again a moment later. Right-click one for Remove highlight. A page that has some shows a small
+    yellow mark on the menu, whose **Highlights** item says how many and opens the column beside the page with them: show
+    one on the page, copy it, add a note, delete it, or ask an agent about them together (the page's address and the
+    highlights go to a new session, only when you ask). Kept privately on this computer by the page's address (without its
+    #fragment and tracking parameters); agents are refused them.
   - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
     **Forget**.
   - **A right-click menu** on pages: Back, Forward, Reload; for a link, open it in a new tab or your default browser
     and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to
     Library** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
     about this image** (opens Ask beside the page with the picture attached); for selected text, Copy, Search with your
-    engine and Ask an agent about it (opens Ask beside the page, quoting up to 4,000 characters); in a field, spelling
+    engine, Ask an agent about it (opens Ask beside the page, quoting up to 4,000 characters) and Highlight; on a highlight of
+    yours, Remove highlight; in a field, spelling
     suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this page, Read this page later, Print… and Inspect.
   - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
     the Library's **Read later** chip beside Bookmarks; each page has **Mark as read** (it leaves the list; **Show read**
@@ -522,10 +530,10 @@ agents that speak ACP and take MCP servers.
   page with its site and when it was saved, in Everything and in its project, under a Web pages chip of its own (not
   counted among the Pages or Documents); the ▾ beside Save picks the project and folder it goes in (the last pick is kept
   on the device); More → Open the original page opens the address it came from. A saved page is a Library item like
-  the rest, so agents can read it. In the desktop app four more chips, Bookmarks,
-  Read later, Downloads and History, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
-  Mark as read, Show in folder and Remove from the list or history, Show read on Read later, and History and Downloads by
-  day with Show older), for every project,
+  the rest, so agents can read it. In the desktop app five more chips, Bookmarks,
+  Read later, Downloads, History and Highlights, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
+  Mark as read, Show in folder and Remove from the list or history, Show read on Read later, History and Downloads by
+  day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project,
   never copied into the Library or counted in it; agents are refused them. A picture kept from a page with Save image
   to Library is different: it is a Library picture like any other (with the page it came from as its source).
 - **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the

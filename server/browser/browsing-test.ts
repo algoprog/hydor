@@ -15,6 +15,7 @@ import { HttpError } from '../auth.ts';
 import { openDb, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
+import { addHighlight } from './highlights.ts';
 import { addressOf, addressSent, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, groupWithAi, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
 import { pickChrome } from './chrome.ts';
 import { checkProposal, TabGroups } from './groups.ts';
@@ -356,6 +357,40 @@ async function main() {
     for (const [m, u] of [['GET', '/api/browser/browsing/downloads'], ['DELETE', '/api/browser/browsing/downloads/1'], ['POST', '/api/browser/browsing/tabs/x/save-page']] as const) {
       assert.equal(ruleFor(m, u).level, 'refuse', `${m} ${u}`);
     }
+    await app.close();
+  });
+  await check('highlights: the routes list a page’s or all of them with words, change a note, delete; a tab is needed to make one; agents are refused', async () => {
+    fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
+    const db = openDb(path.join(process.env.DATA_DIR!, 'browsing-highlights.db'));
+    const a = addHighlight(db, { url: 'https://a.example/post?utm_source=x#top', title: 'A post', text: 'the first words' }, 100)!;
+    const b = addHighlight(db, { url: 'https://b.example/', title: 'B', text: 'other words about otters' }, 200)!;
+    const app = Fastify();
+    app.setErrorHandler((err: Error, _req, reply) => void reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message }));
+    const deps = { app, db, sessions: { summary: () => null, list: () => ({ sessions: [], total: 0 }) }, scheduler: { list: () => [] }, models: null, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://localhost' } as unknown as Deps;
+    browsingRoutes(deps);
+    const call = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?: object) => {
+      const r = await app.inject({ method, url, ...(payload ? { payload } : {}) });
+      return { status: r.statusCode, body: r.body ? JSON.parse(r.body) : {} };
+    };
+    const list = async (qs = '') => ((await call('GET', `/api/browser/browsing/highlights${qs}`)).body.highlights as { id: string }[]).map((h) => h.id);
+    assert.deepEqual(await list(), [b.id, a.id], 'newest first');
+    assert.deepEqual(await list('?q=OTTERS'), [b.id]);
+    assert.deepEqual(await list('?limit=1'), [b.id]);
+    assert.deepEqual(await list(`?before=200`), [a.id]);
+    assert.equal((await call('GET', '/api/browser/browsing/highlights?before=soon')).status, 400);
+    const page = await call('GET', `/api/browser/browsing/highlights?url=${encodeURIComponent('http://www.a.example/post/#else')}`);
+    assert.deepEqual([page.body.highlights.map((h: { id: string }) => h.id), page.body.count], [[a.id], 1], 'a page is found by any address of it');
+    assert.equal((await call('PATCH', `/api/browser/browsing/highlights/${a.id}`, { note: 5 as unknown as string })).status, 400);
+    assert.equal((await call('PATCH', '/api/browser/browsing/highlights/nope', { note: 'x' })).status, 404);
+    assert.equal((await call('PATCH', `/api/browser/browsing/highlights/${a.id}`, { note: ' keep this ' })).body.highlight.note, 'keep this');
+    assert.deepEqual(await list('?q=keep'), [a.id], 'the note is searched');
+    // Making one needs one of your tabs; opening one needs the highlight.
+    assert.equal((await call('POST', '/api/browser/browsing/highlights', {})).status, 400);
+    assert.equal((await call('POST', '/api/browser/browsing/highlights', { tab: 'nope' })).status, 404);
+    assert.equal((await call('POST', '/api/browser/browsing/highlights/nope/open')).status, 404);
+    assert.deepEqual((await call('DELETE', `/api/browser/browsing/highlights/${a.id}`)).body, { removed: true });
+    assert.deepEqual((await call('DELETE', `/api/browser/browsing/highlights/${a.id}`)).body, { removed: false });
+    assert.deepEqual(await list(), [b.id]);
     await app.close();
   });
   // Last: it sets up your browsing's routes on a database of its own, which the real-browser checks above must not share.

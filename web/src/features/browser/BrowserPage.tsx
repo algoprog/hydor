@@ -21,6 +21,7 @@ import {
   ExternalLink,
   FileDown,
   Globe,
+  Highlighter,
   History,
   Home,
   PanelLeftClose,
@@ -64,6 +65,8 @@ import {
   addFromStore,
   answerPermission,
   closeTab,
+  deleteHighlight,
+  highlightSelection,
   isNative,
   isWebPage,
   KEY,
@@ -80,6 +83,7 @@ import {
   reopenClosed,
   storePage,
   switchTab,
+  usePageHighlights,
   useBookmarks,
   desktopBrowser,
   goTo,
@@ -90,6 +94,7 @@ import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
 import { FindBar } from './FindBar';
 import { HandOffPopover, startDo } from './HandOff';
+import { HighlightsPanel } from './Highlights';
 import { HistoryPanel } from './History';
 import { Omnibox } from './Omnibox';
 import { KeyRow } from './Dock';
@@ -102,8 +107,8 @@ import { SlideColumn } from '../../components/SlideColumn';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'settings';
-const isPanel = (v: unknown): v is PanelId => v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'settings';
+type PanelId = 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings';
+const isPanel = (v: unknown): v is PanelId => v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -298,6 +303,8 @@ function OwnBrowser() {
   const marked = useMemo(() => (tab?.url ? nodes.filter((n) => n.url === tab.url) : []), [nodes, tab?.url]);
   const canHand = !!tab && /^https?:/i.test(tab.url);
   const canAsk = !!tab && isWebPage(tab.url);
+  // How many highlights this page has (the Highlights item of the menu says it).
+  const pageMarks = usePageHighlights(tab?.url);
 
   // Without a native page, the picture is laid out for the room it has here (as the page does when a phone drives).
   const latest = useRef({ native, open: !!view?.open, watching });
@@ -481,7 +488,13 @@ function OwnBrowser() {
           pickForAsk(t.id, { text: '', url: c.url, image: { path: c.path, name: c.name } });
           setPanel(null);
           setAskOpen(true);
-        } else if (c.cmd === 'picture-failed') toastError(new Error(c.message));
+        } else if (c.cmd === 'picture-failed') {
+          toastError(new Error(c.message));
+        } else if (c.cmd === 'highlight') {
+          void highlightSelection(c.target);
+        } else if (c.cmd === 'unhighlight') {
+          void deleteHighlight(c.id);
+        }
       }),
     [],
   );
@@ -582,6 +595,9 @@ function OwnBrowser() {
       <MenuItem icon={<Bookmark size={14} />} checked={panel === 'bookmarks'} onClick={() => (setMenu(false), togglePanel('bookmarks'))}>
         Bookmarks
       </MenuItem>
+      <MenuItem icon={<Highlighter size={14} />} checked={panel === 'highlights'} hint={pageMarks?.length ? String(pageMarks.length) : undefined} onClick={() => (setMenu(false), togglePanel('highlights'))}>
+        Highlights
+      </MenuItem>
       <MenuItem icon={<Puzzle size={14} />} checked={panel === 'extensions'} onClick={() => (setMenu(false), togglePanel('extensions'))}>
         Extensions
       </MenuItem>
@@ -596,7 +612,11 @@ function OwnBrowser() {
 
   const menuButton = (
     <IconButton ref={menuRef} label="Menu" active={menu} onClick={() => setMenu((m) => !m)}>
-      <Ellipsis size={18} />
+      <span className="relative flex">
+        <Ellipsis size={18} />
+        {/* A page with highlights of yours: a small yellow mark; the menu's Highlights says how many. */}
+        {!!pageMarks?.length && <span aria-hidden className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#ffd60a]" />}
+      </span>
     </IconButton>
   );
 
@@ -614,6 +634,8 @@ function OwnBrowser() {
         <DownloadsPanel onClose={close} />
       ) : panel === 'permissions' ? (
         <PermissionsPanel onClose={close} />
+      ) : panel === 'highlights' ? (
+        <HighlightsPanel tab={tab} onClose={close} />
       ) : panel === 'history' ? (
         <HistoryPanel tab={tab?.id} onClose={close} onClear={() => (setClearAt(true), openPanel('settings'))} />
       ) : (
@@ -624,7 +646,7 @@ function OwnBrowser() {
   const rightIsPanel = !watching && !!panel;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg">
+    <div data-i18n="browser" className="flex h-full min-h-0 flex-col bg-bg">
       <div className={cx('flex shrink-0 items-center border-b border-line bg-sidebar', mobile ? 'h-12' : 'h-[52px]')}>
         {!mobile && <BarLead open={sideOpen} />}
         <div className={cx('flex min-w-0 flex-1 items-center gap-1', mobile ? 'px-2' : 'pr-3 pl-2.5')}>
