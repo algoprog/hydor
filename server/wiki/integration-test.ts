@@ -44,7 +44,7 @@ try {
   // The index follows every article written, so the new article is listed there and not an orphan (check-test.ts covers orphans).
   assert.match((await invoke('wiki_read', { path: 'index.md' })).content, /\]\(wiki\/concepts\/sky\.md\)/, 'the index lists the article just written');
   assert.ok(!(await invoke('wiki_check', {})).issues.some((issue: { path: string; detail: string }) => issue.path === 'wiki/concepts/sky.md' && /no incoming/i.test(issue.detail)));
-  await assert.rejects(invoke('wiki_write', { path: 'raw/notes/lesson.md', content: 'private', expectedSha256: null }), /lessons workflow/);
+  await assert.rejects(invoke('wiki_write', { path: 'raw/notes/lesson.md', content: 'private', expectedSha256: null }), /wiki_ingest/);
   await assert.rejects(invoke('wiki_write', { path: read.path, content: 'stale', expectedSha256: '0'.repeat(64) }), /conflict/);
   // Secrets are not kept: not in pasted text, not in an origin.
   await assert.rejects(invoke('wiki_ingest_text', { content: 'Use AKIAIOSFODNN7EXAMPLE for the bucket.', origin: 'manual:x' }), /credentials/);
@@ -62,8 +62,8 @@ try {
   await tool('wiki_ingest_text').run({ content: 'Source: shared.\n', origin: 'manual:shared' }, localCtx);
   assert.deepEqual(fs.readdirSync(localWiki), [], 'nothing is written into that folder');
   assert.equal(fs.existsSync(path.join(unregistered, '.gitignore')), false);
-  setSessionExtra(db, localCtx.key, { wikiEnabled: false });
-  await assert.rejects(tool('wiki_status').run({}, localCtx), /off for this chat/);
+  setSessionExtra(db, localCtx.key, { confidential: true });
+  await assert.rejects(tool('wiki_status').run({}, localCtx), /unavailable in confidential sessions/, 'a Confidential chat has no wiki');
   // A session starting in the project: told about wiki memory, the agent asked to send checkpoints, the wiki bound as its knowledge and left bound.
   const deps = { db } as unknown as Parameters<NonNullable<typeof wiki.spawn>>[1];
   const info = { agent: 'claude' as const, key: 'claude:s1', cwd: project, runId: 'r1', resume: false, extra: { space: space.id } };

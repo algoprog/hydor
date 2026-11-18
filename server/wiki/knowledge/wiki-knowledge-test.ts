@@ -30,9 +30,8 @@ try {
   kvSet(db, 'wiki.hubPath', hub);
   kvSet(db, 'memory.meaning', '0');
   const binding = ensureWikiKnowledge(db, { root: hub, space: null });
-  setSessionExtra(db, 'codex:wiki-off', { wikiEnabled: false });
-  setSessionExtra(db, 'codex:wiki-on', { wikiEnabled: true });
-  assert.equal(basesOfSession(db, 'codex:wiki-off').some((b) => b.id === binding.base), false);
+  setSessionExtra(db, 'codex:wiki-off', { confidential: true });
+  assert.equal(basesOfSession(db, 'codex:wiki-off').some((b) => b.id === binding.base), false, 'a Confidential chat gets no wiki');
   assert.equal(basesOfSession(db, 'codex:wiki-on').some((b) => b.id === binding.base), true);
   const again = ensureWikiKnowledge(db, { root: hub, space: null });
   assert.equal(binding.base, again.base);

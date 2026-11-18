@@ -8,8 +8,6 @@ import { preferred } from '../../shared/i18n.ts';
 import type { RunCtx } from '../features/types.ts';
 import { setWikiSettings } from './settings/settings.ts';
 import { wikiTools } from './tools.ts';
-import { previewLessons } from './lessons/lessons.ts';
-import { wordsForLang } from '../language/index.ts';
 
 const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-language-')));
 const db = openDb(path.join(temp, 'app.db'));
@@ -32,13 +30,6 @@ try {
   await source.run({ content: original, origin: 'manual:one', language: 'el' }, ctx);
   assert.equal(fs.readFileSync(path.join(root, chinese.path), 'utf8'), note);
   assert.equal(preferred(['el-GR', 'en']), 'el');
-  const items = [{ kind: 'user' as const, id: 'u1', seq: 1, text: 'Keep evidence.' }];
-  const candidates = [{ title: 'Test', lesson: 'Keep evidence.', evidence: 'User request', sourceIds: ['u1'] }];
-  const zh = previewLessons({ session: 'test', target: root, items, candidates, date: '2026-01-01', translate: wordsForLang('zh') });
-  const el = previewLessons({ session: 'test', target: root, items, candidates, date: '2026-01-01', translate: wordsForLang('el') });
-  assert.match(zh.content, /经验总结/);
-  assert.match(el.content, /Διδάγματα/);
-  assert.match(zh.content, /Keep evidence\./);
   console.log('Wiki language follows Hydor settings or an explicit choice without altering sources');
 } finally {
   db.close();

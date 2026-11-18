@@ -280,9 +280,6 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['POST', '/api/outbox/h1/send'],
     ['POST', '/api/outbox/send-all'],
     ['POST', '/api/skillpack/proposals/p1/approve'],
-    // A lesson suggestion from a chat is kept or dismissed by the user alone.
-    ['POST', '/api/wiki-lessons/n1/save'],
-    ['POST', '/api/wiki-lessons/n1/dismiss'],
     ['POST', '/api/mcp/tokens'],
     ['POST', '/api/access-tokens'],
     ['POST', '/api/connections/secrets'],
@@ -489,31 +486,6 @@ test('app_api: never the user’s own things', async () => {
     assert.equal(r.isError, true, `${method} ${p}`);
     assert.match(r.text, why, `${method} ${p}: ${r.text}`);
   }
-  await app.close();
-});
-
-test('app_api: a chat’s Wiki memory switches ask in every mode; a lesson suggestion is kept or dismissed by the user alone', async () => {
-  const app = await testApp();
-  const full = session('bypassPermissions', () => ({ decision: 'accept' }));
-  let r;
-  // The switches (and their defaults for chats) ask, in Full access as well.
-  for (const [method, p, body] of [['PATCH', '/api/sessions/claude:other/extra', { wikiEnabled: true }], ['PATCH', '/api/sessions/this/extra', { wikiAutoLessons: true }], ['PATCH', '/api/sessions/this/extra', { wikiEnabled: false, wikiAutoLessons: false }], ['PUT', '/api/wiki/settings', { defaultAutoLessons: true }], ['PUT', '/api/wiki/settings', { defaultChatEnabled: false }]] as const) {
-    const before = full.cards.length;
-    await appApi({ method, path: p, body }, ctxOf(app, full));
-    assert.equal(full.cards.length, before + 1, `${method} ${p} ${JSON.stringify(body)} asks`);
-    assert.match(full.cards[before].card.detail!, /Wiki memory/);
-    assert.deepEqual(full.cards[before].card.options.map((o) => o.id), ['accept', 'deny'], 'never allowed for the rest of the session');
-  }
-  const settled = full.cards.length;
-  r = await appApi({ method: 'PUT', path: '/api/wiki/settings', body: { fromDocuments: false } }, ctxOf(app, full));
-  assert.equal(full.cards.length, settled, 'the other Wiki memory settings ask nothing in Full access');
-  // Lesson suggestions are kept or dismissed by the user alone, in no mode.
-  for (const id of ['save', 'dismiss']) {
-    r = await appApi({ method: 'POST', path: `/api/wiki-lessons/n1/${id}`, body: { sha256: 'x' } }, ctxOf(app, full));
-    assert.equal(r.isError, true);
-    assert.match(r.text, /Only the user keeps or dismisses a lesson suggestion/);
-  }
-  assert.equal(full.cards.length, settled, 'refused without a card');
   await app.close();
 });
 

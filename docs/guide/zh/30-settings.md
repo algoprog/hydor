@@ -242,8 +242,6 @@
 
 - [**记忆**](/settings?s=memory&find=Memory)：智能体开始时会带上之前会话记下的内容，并在你要求时保存笔记。
 - [**Wiki 记忆**](/settings?s=memory&find=Wiki%20memory)：智能体为每个项目根据其文档和工作保存的文章：对每个项目都开启，除非项目自己的设置另有规定。
-- [**默认在聊天中启用 Wiki 记忆**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
-- [**默认在聊天中自动建议经验总结**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
 - [**从新文档中学习**](/settings?s=memory&find=Learn%20from%20new%20documents)：新添加和修改的文档会添加记忆笔记，并用辅助模型更新 wiki。
 - [**最多读入 wiki 的文档数**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki)：文档多于此数时，项目的 wiki 会读取其中置顶的、最常用的和最新的：智能体会搜索全部文档。
 - [**Wiki 文件夹**](/settings?s=memory&find=Wiki%20folder)：共享 wiki 保存的位置，以及下面没有另行设置时项目 wiki 保存的位置。

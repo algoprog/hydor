@@ -39,5 +39,5 @@ export function basesFor(db: DB, space: string | null, includeWiki = true): (Bas
 /** The bases the session of a tool call searches. */
 export const basesOfSession = (db: DB, key: string) => {
   const extra = sessionExtra(db, key);
-  return basesFor(db, spaceOfSession(db, extra), wikiChatEnabled(db, extra));
+  return basesFor(db, spaceOfSession(db, extra), wikiChatEnabled(extra));
 };

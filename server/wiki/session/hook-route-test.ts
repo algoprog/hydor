@@ -47,12 +47,10 @@ try {
   assert.ok(fs.existsSync(path.join(hub, '.sessions', 'digests')), 'the first hook creates a missing configured hub');
   await call({ ...event, hook_event_name: 'PostCompact' });
   assert.equal((await status()).event, 'PreCompact', 'retaining a pre-compaction summary does not report a post-compaction write');
-  setSessionExtra(db, key, { wikiEnabled: false });
+  setSessionExtra(db, key, { memory: false });
   assert.equal((await status()).status, 'disabled');
-  prepare = async () => { throw new Error('disabled chat was read'); };
+  prepare = async () => { throw new Error('a chat with memory off was read'); };
   await call(event);
-  setSessionExtra(db, key, { wikiEnabled: true, memory: false });
-  assert.equal((await status()).status, 'disabled');
   setSessionExtra(db, key, { memory: true, confidential: true });
   assert.equal((await status()).status, 'disabled');
   setSessionExtra(db, key, { confidential: null });

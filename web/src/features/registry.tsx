@@ -29,7 +29,6 @@ import { imagesFeature } from './images/feature';
 import { mediaFeature } from './media/feature';
 import { knowledgeFeature } from './knowledge/feature';
 import { memoryFeature } from './memory/feature';
-import { wikiChatFeature } from './wiki/feature';
 import { opinionFeature } from './opinion/feature';
 import { outboxFeature } from './outbox/feature';
 import { pagesFeature } from './pages/feature';
@@ -138,7 +137,6 @@ export const features = (): WebFeature[] =>
     computerFeature,
     confidentialFeature,
     memoryFeature,
-    wikiChatFeature,
     knowledgeFeature,
     spacesFeature,
     childrenFeature,

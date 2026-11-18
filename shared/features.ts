@@ -8,10 +8,6 @@ import type { ResearchSettings } from './research.ts';
 export interface SessionExtra {
   /** Memory: false turns it off for this session. */
   memory?: boolean;
-  /** Override Wiki memory for this chat, without changing its project setting. */
-  wikiEnabled?: boolean;
-  /** Override automatic reviewable lesson suggestions for this chat. */
-  wikiAutoLessons?: boolean;
   /** The assistant it started as (Researcher, Writer…). */
   assistant?: string;
   /** Most this session may spend, in US dollars (API prices); none when unset. */

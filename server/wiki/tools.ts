@@ -66,7 +66,7 @@ function resolveTarget(ctx: RunCtx, name: string | undefined, create: boolean): 
   const db = ctx.deps.db;
   const space = wikiSpaceOfSession(db, ctx.key, ctx.cwd);
   if (!wikiMemoryOn(db, space)) throw new Error(OFF);
-  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   if (!name) {
     return wikiRoot(db, space, { create });
   }
@@ -137,7 +137,7 @@ export async function guardProject(ctx: RunCtx, root: string): Promise<{ changed
   const space = wikiSpaceOfSession(db, ctx.key, ctx.cwd);
   const guarded = await guardWikiFolder(db, space, root);
   // A session switch can change while the Git guard waits for filesystem work.
-  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   return guarded;
 }
 
@@ -231,8 +231,8 @@ export function wikiTools(): RunTool[] {
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, expectedSha256: { type: ['string', 'null'] }, wiki: wikiArg }, required: ['path', 'content', 'expectedSha256'] },
       async run(a, ctx) {
         if (typeof a.path !== 'string' || typeof a.content !== 'string' || !(a.expectedSha256 === null || (typeof a.expectedSha256 === 'string' && /^[a-f0-9]{64}$/.test(a.expectedSha256)))) throw new Error('Give path, content, and the exact expected SHA-256 or null');
-        // Raw inputs and lesson captures have dedicated workflows, never a generic write shortcut.
-        if (a.path.split(/[\\/]/)[0].toLowerCase() === 'raw') throw new Error('Use the source or lessons workflow to create raw material');
+        // Raw sources come in only through ingestion (wiki_ingest_document, wiki_ingest_text), never a generic write.
+        if (a.path.split(/[\\/]/)[0].toLowerCase() === 'raw') throw new Error('Sources (raw/) are added with wiki_ingest_document or wiki_ingest_text');
         // The plans area (output/projects/, and output/ but for its evidence folder) is the plan tools' alone: whatever the
         // file is called, whatever its header says, no generic write creates or changes anything there.
         if (inPlansArea(a.path)) throw new Error(`Plans (${PLANS_AREA}/) are adopted with wiki_plan_preview and wiki_plan_adopt and changed with wiki_plan_revision_preview and wiki_plan_revise, which show the exact text, ask the user and keep earlier revisions. wiki_write cannot write there. Record what was done, deployed or accepted in ${EVIDENCE_AREA}/<plan>/<name>.md.`);

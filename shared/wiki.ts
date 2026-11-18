@@ -26,10 +26,6 @@ export interface WikiMemorySettings {
   projectPath: string;
   /** Add a project-local wiki folder to the project's .gitignore, in Git repositories only. Default on. */
   gitIgnore: boolean;
-  /** Wiki access for chats without a session-specific choice. Default on. */
-  defaultChatEnabled: boolean;
-  /** Automatically suggest lessons in chats without a session-specific choice. Default off. */
-  defaultAutoLessons: boolean;
 }
 
 /** How many documents a place's knowledge holds against the most its wiki reads (GET /api/projects/:id/wiki/updates, GET /api/wiki/updates). */

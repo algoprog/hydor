@@ -131,7 +131,7 @@ export const knowledge: Feature = {
   // searches only the session's own bases (a new session's space may not be saved yet when tools are listed).
   tools: (ctx) => (baseRows(ctx.deps.db).length ? knowledgeTools() : []),
   spawn: (s, d) => {
-    const t = knowledgeInstructions(d.db, spaceOfSession(d.db, s.extra), wikiChatEnabled(d.db, s.extra));
+    const t = knowledgeInstructions(d.db, spaceOfSession(d.db, s.extra), wikiChatEnabled(s.extra));
     return t ? { instructions: [t] } : undefined;
   },
   event(e, d) {

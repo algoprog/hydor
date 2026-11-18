@@ -65,7 +65,6 @@ test('wiki lines: the articles that stand out for a request, one line each, neve
   for (let i = 0; i < 300 && (docsOf(db, binding.base).length < 4 || progress.size); i++) await new Promise((r) => setTimeout(r, 20));
   assert.equal(wikiDeliverySpace(db, { cwd: folder, extra: {} }), space.id);
   assert.equal(wikiDeliverySpace(db, { cwd: folder, extra: { confidential: true } }), null, 'never in a confidential session');
-  assert.equal(wikiDeliverySpace(db, { cwd: folder, extra: { wikiEnabled: false } }), null, 'nor with wiki memory off for the chat');
   const lines = await wikiLines(db, { space: space.id, query: 'how do stripe webhooks and refunds work here', limit: 3, vector: null });
   assert.deepEqual(
     lines.map((l) => l.path),

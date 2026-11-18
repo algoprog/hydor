@@ -15,7 +15,6 @@ import { queryTable, scale, scoreAt } from '../memory/vectors.ts';
 import { activeWikiDocument } from './core.ts';
 import { areaNameOf, areaNames } from './areas/registry.ts';
 import { wikiKnowledgeSchema } from './knowledge/bindings.ts';
-import { wikiChatEnabled } from './access.ts';
 import { claimsToBePlan, PLANS_AREA } from './plans/area.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 
@@ -33,11 +32,11 @@ export interface WikiLine {
 }
 
 /**
- * The project whose wiki may be given to a session's agent: wiki memory on for the project and the chat, the session
- * not confidential. Null otherwise, and for a session in no project (the shared wiki is not given unasked).
+ * The project whose wiki may be given to a session's agent: wiki memory on for the project, the session not confidential
+ * and its memory not off. Null otherwise, and for a session in no project (the shared wiki is not given unasked).
  */
 export function wikiDeliverySpace(db: DB, o: { key?: string; cwd?: string; extra: SessionExtra }): string | null {
-  if (isConfidential(o.extra) || o.extra.memory === false || !wikiChatEnabled(db, o.extra)) return null;
+  if (isConfidential(o.extra) || o.extra.memory === false) return null;
   const space = typeof o.extra.space === 'string' ? o.extra.space : wikiSpaceOfSession(db, o.key ?? '', o.cwd);
   return space && wikiMemoryOn(db, space) ? space : null;
 }

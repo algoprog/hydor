@@ -14,9 +14,9 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-settings-'));
 const dbPath = path.join(temp, 'app.db');
 let db = openDb(dbPath);
 try {
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false, defaultChatEnabled: true, defaultAutoLessons: false }, 'on by default; project wikis in the hub; .gitignore left alone');
-  setWikiSettings(db, { defaultChatEnabled: false, defaultAutoLessons: true });
-  assert.deepEqual([wikiSettings(db).projectWikis, wikiSettings(db).gitIgnore, wikiSettings(db).defaultChatEnabled, wikiSettings(db).defaultAutoLessons], ['hub', false, false, true], 'explicit preferences override defaults; the project settings stay');
+  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false }, 'on by default; project wikis in the hub; .gitignore left alone');
+  setWikiSettings(db, { projectWikis: 'folder', gitIgnore: true });
+  assert.deepEqual([wikiSettings(db).projectWikis, wikiSettings(db).gitIgnore], ['folder', true], 'explicit preferences override defaults');
   setWikiSettings(db, { enabled: false });
   assert.equal(wikiSettings(db).enabled, false);
   setWikiSettings(db, { enabled: true });
@@ -44,7 +44,7 @@ try {
   setWikiSettings(db, { documentLimit: 100 });
   db.close();
   db = openDb(dbPath);
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false, defaultChatEnabled: false, defaultAutoLessons: true });
+  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false });
   const project = path.join(temp, 'project');
   const hubFolder = path.join(temp, 'hub');
   fs.mkdirSync(path.join(project, '.wiki'), { recursive: true });

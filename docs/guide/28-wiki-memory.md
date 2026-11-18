@@ -28,7 +28,7 @@ Wiki memory is on for every project unless you turn it off. Two places decide:
 
 With wiki memory off for a project, its Memory tab says "Wiki memory is off for this project", agents' wiki tools there say it is off, and nothing is written. What is already in the folder stays.
 
-In chat options, **Wiki memory** and **Auto lessons learned** apply to that chat. Their defaults are in **Settings → Memory → Wiki memory**. Automatic lesson suggestions also need Memory; saving a reviewed suggestion needs your confirmation. A native agent started before Wiki memory was turned on needs a restart to register its checkpoint hook.
+Every chat in a project with Wiki memory on uses it, except a Confidential chat, which never does. A chat has no switch of its own: Wiki memory is set only in **Settings → Memory → Wiki memory** and in each project's **Settings** tab. A native agent started before Wiki memory was turned on needs a restart to register its checkpoint hook.
 
 Learning from documents, learning from a project's work and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
 
@@ -189,7 +189,7 @@ In a project, an agent gets a few tools for the project's wiki, and nothing for 
 - It can name "the shared wiki" to work in that one instead, when it is on.
 - It finds what is in a wiki with its ordinary document search, so an answer can cite the article, and with the wiki search, which is more flexible (see below).
 - It can read just one section of an article (by its heading) or a range of lines, instead of the whole file, with the lines numbered. A page that was folded into another one (a redirect) is followed to where it went.
-- It can read another project's wiki, only to read, by that project's name: its articles, sources and where it is. A project that keeps itself to itself (its **Searchable from other projects** switch is off) or has wiki memory off refuses. Writing stays with each project's own agents: no tool writes in another project's wiki, and the plan and lesson tools only work in the project they are in. The search across your projects (see [Search beyond one project](/guide/memory#search-beyond-one-project)) names these articles, each with the project it is in.
+- It can read another project's wiki, only to read, by that project's name: its articles, sources and where it is. A project that keeps itself to itself (its **Searchable from other projects** switch is off) or has wiki memory off refuses. Writing stays with each project's own agents: no tool writes in another project's wiki, and the plan tools only work in the project they are in. The search across your projects (see [Search beyond one project](/guide/memory#search-beyond-one-project)) names these articles, each with the project it is in.
 
 **Searching the wiki.** An agent has a search made for the wiki alone, `wiki_search`, and each result says exactly where it is: the article, the section and its lines, and how to open it with the wiki tool. It can search in four ways: by **words and meaning** together (the default, the way document search works), by **words** alone, for the **exact text** as written (upper and lower case aside unless it asks otherwise, with the lines around each match, like `grep`) or for a **pattern** (a regular expression, one line at a time; a pattern that is not valid is refused with the reason). It can look for areas, whole articles or single sections; keep to one area (by its name, its id or an old name, sub-areas included) or to a folder or a name pattern such as `wiki/crawl-*`; and look in the articles (the default), in the sources kept in `raw/` or in the plans and evidence in `output/`. With **project** it searches another project's wiki or all of them, only those that are open to other projects, as the search across your projects allows. An answer holds at most 10,000 characters and at most 50 results. It never looks in hidden folders, at retired articles or at a page that only points to another one. It is only for reading, so it needs no OK from you, and like the other wiki tools it is not there in a Confidential session or in a chat with wiki memory off.
 
@@ -197,15 +197,11 @@ In a project, an agent gets a few tools for the project's wiki, and nothing for 
 
 What it cannot do: write in another project's wiki; read or write hidden files and folders, Git and archive folders, retired or archived articles, or a link that leads out of the wiki; keep text with passwords or keys in it; or use wiki memory at all in a Confidential session. Ask the agent to check the wiki and it reports a basic problem list; it does not change the files for that.
 
-## Checkpoints and lessons learned
+## Checkpoints
 
 With wiki memory and memory both on, Hydor's Custom agent can save a checkpoint of a session when it compacts its own context, to carry on from afterwards. There is one checkpoint per session, written over each time, in the shared wiki folder. It holds a redacted summary or only the event: never a full transcript. For Claude Code and Codex, Hydor attempts a checkpoint when you start compaction from Hydor and, when its native hook is registered, before automatic compaction. Existing or hidden hooks, plugins, policy or unavailable hook discovery can prevent registration. Just before an automatic compaction, the last messages of the session go to the helper model to write the summary, which can take up to about 14 seconds; the compaction waits for it, and goes on without a checkpoint when it takes longer. A checkpoint can contain only metadata when no summary is available. For Codex, Hydor trusts only its own hook (an exact command it made itself, handed to that session alone); a hook of yours is never trusted this way, and Hydor looks for it once for each Codex version rather than at every start. Check the session details to see its latest outcome. A failed checkpoint does not stop compaction. Turning memory off for a session, or all of it, prevents checkpoints and their use; existing ones stay.
 
 Hydor uses the checkpoint to carry a session on. When you resume a Claude Code or Codex session after its context was condensed, the first message it gets carries the checkpoint: where to read it, and its summary, up to 3,000 characters, once. Custom, after it condenses its own conversation, is given the checkpoint with memory read again for your latest message; its share is sized to its model: at most 8% of the model's context, and never more than 16,000 characters, with where to read the rest (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)).
-
-Ask an agent to preview lessons learned from a session: it writes nothing. It uses the indexed messages, so the latest may be missing. Saving selected lessons asks for your confirmation first.
-
-With **Auto lessons learned** on for a chat, the helper looks at each turn's last exchange (about once a minute at most, never in a Confidential chat or with memory off) and, when it finds something worth keeping, adds a suggestion as a card in the chat: the lessons, with their evidence and the place they would go. Nothing is written until you keep it there, and what you keep is exactly what you saw; or you dismiss it. Agents cannot keep or dismiss a suggestion for you, and they ask you before they change either of a chat's two switches. The switch is off at first: turn it on for every chat in Settings, or for one chat in its options.
 
 ## Move the wiki folder
 
@@ -236,7 +232,6 @@ When the current **Wiki folder** has files, changing it opens a review. You can 
 - "Which articles in this project's wiki are marked out of date, and why?"
 - "What did the wiki learn from this project's commits this week?"
 - "Show me what changed in the architecture article when it was revised, and what it replaced."
-- "Preview the lessons learned in this session, and save the first two."
 - "Reorganise this project's wiki now."
 - "What areas does this project's wiki have, and what is still in Other?"
 - "Read me the hub of the Crawling area."

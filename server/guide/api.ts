@@ -27,7 +27,6 @@ type Rule = [methods: string, path: RegExp, level: Level, why?: string];
 const YOUR_TOOLS = 'Use your own tools for that (files, commands, git): they ask the user as the session’s permissions say.';
 const CAP = 'This changes a spending cap: how much may be spent before the work stops.';
 const PERMISSIONS = 'This changes what the agent may do without asking you.';
-const WIKI_SWITCH = 'This changes whether Wiki memory, and automatic lesson suggestions from the conversation, are used in chats: a chat’s own choice (Memory options of the chat) or the default for chats (Settings → Memory → Wiki memory).';
 const TOOL_STATES = 'This changes which of a connected account’s tools agents may use, and which wait for your OK in the Outbox first.';
 
 /** The first rule that matches decides. */
@@ -48,8 +47,6 @@ const RULES: Rule[] = [
   // A call held for the user's OK (Ask first) is sent by the user alone, or Ask first would mean nothing.
   ['POST', /^\/api\/outbox\/(send-all|[^/]+\/send)$/, 'refuse', 'Only the user sends a held call: it waits in their Outbox (in the Inbox) for their OK. Tell them it waits there.'],
   ['W', /^\/api\/(skillpack\/proposals|automations\/proposals|sites\/requests|connections\/requests)\//, 'refuse', 'Only the user decides on these cards.'],
-  // A lesson suggestion the app made from a chat is kept in the wiki, or dismissed, by the user alone; an agent proposes lessons with its own tools, which ask.
-  ['W', /^\/api\/wiki-lessons\//, 'refuse', 'Only the user keeps or dismisses a lesson suggestion, on its card in the chat.'],
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],
@@ -139,9 +136,6 @@ function askedFor(path: string, body: Json): { level: Level; why: string } | nul
   const s = /^\/api\/sessions\/[^/]+(\/[^/]+)$/.exec(path);
   if (s?.[1] === '/config' && body.mode !== undefined) return { level: 'ask', why: PERMISSIONS };
   if (s?.[1] === '/extra' && body.capUsd !== undefined) return { level: 'ask', why: CAP };
-  // A chat's Wiki memory and automatic lessons switches, and their defaults for chats: what the conversation is learned from is the user's say, in every mode.
-  if (s?.[1] === '/extra' && (body.wikiEnabled !== undefined || body.wikiAutoLessons !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
-  if (path === '/api/wiki/settings' && (body.defaultChatEnabled !== undefined || body.defaultAutoLessons !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
   // A connected account's tools On, Ask first or Off: the user's say over what goes out without their OK.
   if (/^\/api\/connections\/[^/]+$/.test(path) && !/^\/api\/connections\/(catalog|secrets|requests|session|flows)$/.test(path) && body.tools !== undefined) return { level: 'ask', why: TOOL_STATES };
   return null;

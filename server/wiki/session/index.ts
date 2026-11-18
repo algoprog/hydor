@@ -21,7 +21,7 @@ const EVENTS = new Set<WikiEvent>(['SessionStart', 'PostToolUse', 'PreCompact', 
 
 /** Enforce both project-level wiki memory and the chat's own privacy controls. */
 function enabled(d: Deps, key: string, cwd?: string): boolean {
-  return wikiChatEnabled(d.db, sessionExtra(d.db, key)) && wikiMemoryOn(d.db, wikiSpaceOfSession(d.db, key, cwd)) && sessionMemoryOn(d.db, key) && !confidentialKey(d.db, key);
+  return wikiMemoryOn(d.db, wikiSpaceOfSession(d.db, key, cwd)) && sessionMemoryOn(d.db, key) && !confidentialKey(d.db, key);
 }
 
 /** Stop waiting before the native hook times out, so late summaries cannot be recorded as pre-compaction. */
@@ -74,7 +74,7 @@ export const wikiSession: Feature = {
   id: 'wiki-session',
   spawn(s, d) {
     const space = typeof s.extra.space === 'string' ? s.extra.space : wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
-    if (!wikiChatEnabled(d.db, s.extra) || !wikiMemoryOn(d.db, space) || s.extra.memory === false || !sessionMemoryOn(d.db, s.key)) return undefined;
+    if (!wikiChatEnabled(s.extra) || !wikiMemoryOn(d.db, space) || s.extra.memory === false || !sessionMemoryOn(d.db, s.key)) return undefined;
     const out: SpawnAdditions = {};
     // The project's plans in progress, in the instructions: the same for its sessions while the plans stay as they are.
     // (Custom reads them with its context, below.)

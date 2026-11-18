@@ -101,8 +101,8 @@ async function notes(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: nu
 }
 
 async function wiki(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: number, vector: Float32Array | null): Promise<string[]> {
-  // Wiki memory is off for the chat (every confidential one), or not at all.
-  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) return [];
+  // A Confidential chat gets no wiki memory.
+  if (!wikiChatEnabled(sessionExtra(db, ctx.key))) return [];
   const rows: { project: string; rel: string; title: string; summary: string; stale: string[]; area: string | null; score: number }[] = [];
   for (const t of scope.chosen) {
     if (!wikiMemoryOn(db, t.id)) continue;

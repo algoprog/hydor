@@ -1,22 +1,16 @@
-// Resolve per-chat controls without replacing project-level wiki memory settings.
+// Wiki memory is set for every project (Settings → Memory → Wiki memory) and in each project's own settings; a chat has no switch of its own.
 import type { SessionExtra } from '../../shared/features.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import type { DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { wikiMemoryOn, wikiSpaceOfSession } from './roots.ts';
-import { wikiSettings } from './settings/settings.ts';
 
-/** A chat setting supplements the project's existing Wiki memory setting. */
-export function wikiChatEnabled(db: DB, extra: SessionExtra): boolean {
-  return !isConfidential(extra) && (typeof extra.wikiEnabled === 'boolean' ? extra.wikiEnabled : wikiSettings(db).defaultChatEnabled);
+/** Every chat may use wiki memory but a Confidential one. */
+export function wikiChatEnabled(extra: SessionExtra): boolean {
+  return !isConfidential(extra);
 }
 
-/** Automatic suggestions use the same session choice and installation defaults. */
-export function wikiAutoLessonsEnabled(db: DB, extra: SessionExtra): boolean {
-  return wikiChatEnabled(db, extra) && (typeof extra.wikiAutoLessons === 'boolean' ? extra.wikiAutoLessons : wikiSettings(db).defaultAutoLessons);
-}
-
-/** Every access must also respect the existing per-project wiki setting. */
+/** A session uses wiki memory while its project (or the shared wiki) has it on, unless the chat is Confidential. */
 export function wikiEnabledForSession(db: DB, key: string, cwd?: string): boolean {
-  return wikiChatEnabled(db, sessionExtra(db, key)) && wikiMemoryOn(db, wikiSpaceOfSession(db, key, cwd));
+  return wikiChatEnabled(sessionExtra(db, key)) && wikiMemoryOn(db, wikiSpaceOfSession(db, key, cwd));
 }

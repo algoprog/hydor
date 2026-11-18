@@ -84,7 +84,6 @@ test('every condition of the project must hold', async () => {
   assert.equal(await ask(), null, 'memory off');
   reset();
   assert.equal(await ask({ memory: false }), null, 'memory off for this session');
-  assert.equal(await ask({ wikiEnabled: false }), null, 'wiki memory off for this chat');
   assert.equal(await ask({ confidential: true }), null, 'confidential');
   updateSpace(db, space.id, { wikiMemory: false });
   assert.equal(await ask(), null, 'wiki memory off for the project');

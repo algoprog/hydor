@@ -436,13 +436,10 @@ test('other projects: by name, all, as memory_search allows them (Gamma keeps it
   assert.ok(filtered.includes('Alpha · Crawling · wiki/crawl-31.md') && /Beta: it has no areas yet/.test(filtered), filtered);
 });
 
-test('a session outside a project searches the shared wiki; wiki memory off for the chat or a confidential session is refused', async () => {
+test('a session outside a project searches the shared wiki; a confidential session is refused it', async () => {
   assert.match(await search({ query: 'quokka' }, outside), /^Searched the shared wiki \(articles, hybrid\) for “quokka”\.\nNothing found\.\nThe wiki is still empty/);
   const allOut = await search({ query: 'quokka', project: 'all', mode: 'exact' }, outside);
   assert.ok(allOut.includes('Beta · wiki/blog.md'), allOut);
-  const off = ctxIn('claude:off', alphaDir, { space: alpha.id, wikiEnabled: false });
-  await assert.rejects(search({ query: 'quokka' }, off), /Wiki memory is off for this chat/);
-  await assert.rejects(search({ query: 'quokka', project: 'Beta' }, off), /Wiki memory is off for this chat/);
   const secret = ctxIn('claude:secret', alphaDir, { space: alpha.id, confidential: true, memory: false });
   await assert.rejects(search({ query: 'quokka' }, secret), /unavailable in confidential sessions/);
   await assert.rejects(search({ query: 'quokka', project: 'Beta' }, secret), /unavailable in confidential sessions/);

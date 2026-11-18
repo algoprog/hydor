@@ -31,7 +31,6 @@ import { wikiSettingsFeature } from '../wiki/settings/index.ts';
 import { wikiSession } from '../wiki/session/index.ts';
 import { wiki } from '../wiki/index.ts';
 import { wikiBrowse } from '../wiki/browse-feature.ts';
-import { autoLessons } from '../wiki/lessons/auto.ts';
 import { wikiDigest } from '../wiki/digest/index.ts';
 import { language } from '../language/index.ts';
 import { media } from '../media/index.ts';
@@ -69,4 +68,4 @@ import { slack } from '../chatapps/slack.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, autoLessons, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, outbox, mail, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips, telegram, discord, slack];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, browserHandoff, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, knowledge, wikiSettingsFeature, wikiSession, wiki, wikiBrowse, wikiDigest, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, outbox, mail, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips, telegram, discord, slack];

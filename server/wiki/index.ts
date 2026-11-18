@@ -1,9 +1,8 @@
 // Wiki memory: the project's articles (with sources, kept from its documents and its work), as part of memory.
-import type { Feature, RunCtx } from '../features/types.ts';
+import type { Feature } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { sessionMemoryOn } from '../memory/store.ts';
-import { lessonsTools } from './lessons/tools.ts';
-import { guardProject, projectWikiTarget, wikiTarget, wikiTools } from './tools.ts';
+import { guardProject, projectWikiTarget, wikiTools } from './tools.ts';
 import { planTools } from './plans/tools.ts';
 import { revisionTools } from './plans/revision-tools.ts';
 import { wikiChatEnabled, wikiEnabledForSession } from './access.ts';
@@ -30,21 +29,21 @@ const LOOK =
  */
 const KEEP =
   'To keep something in the wiki: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.';
-const CHECK = 'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.';
+const CHECK = 'wiki_check finds missing sources and broken links.';
 const PLANS =
   'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write.';
 const KEEP_TOOLS = ['wiki_ingest_document', 'wiki_ingest_text', 'wiki_write'];
-const CHECK_TOOLS = ['wiki_check', 'wiki_lessons_preview', 'wiki_lessons_save'];
+const CHECK_TOOLS = ['wiki_check'];
 const PLAN_TOOLS = ['wiki_plan_adopt', 'wiki_plan_preview', 'wiki_plan_revision_preview', 'wiki_plan_revise'];
 
 /** Supply workflow instructions and tools to an agent only while wiki memory is on for its project. */
 export const wiki: Feature = {
   id: 'wiki',
   tools: (ctx) => !confidentialRun(ctx) && wikiEnabledForSession(ctx.deps.db, ctx.key, ctx.cwd)
-    ? [...wikiTools(), ...planTools(projectWikiTarget, guardProject), ...revisionTools(projectWikiTarget, guardProject), ...(sessionMemoryOn(ctx.deps.db, ctx.key) ? lessonsTools((c: RunCtx) => wikiTarget(c), guardProject) : [])]
+    ? [...wikiTools(), ...planTools(projectWikiTarget, guardProject), ...revisionTools(projectWikiTarget, guardProject)]
     : [],
   spawn: (s, d) => {
-    if (!wikiChatEnabled(d.db, s.extra)) return undefined;
+    if (!wikiChatEnabled(s.extra)) return undefined;
     // A new Codex session has no key yet: the project picked for it on the start page is its project, wherever it works.
     const picked = !s.key && typeof s.extra.space === 'string' ? spaceById(d.db, s.extra.space) : null;
     const space = picked?.id ?? wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
@@ -62,7 +61,7 @@ export const wiki: Feature = {
     if (!wikiMemoryOn(d.db, space)) return undefined;
     // Custom's own agent asks the app for compaction checkpoints only when this is set.
     const language = LANGS.find((item) => item.id === userLang(d.db))!.english;
-    const write = `Write new wiki articles, source notes, lessons, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`;
+    const write = `Write new wiki articles, source notes, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`;
     // The wiki's areas, in one line that changes only when they do (not for a model of a small context).
     let areas: string | null = null;
     // A session that waits for its project's memory to be built (extra.memoryBuild, set while it is created and cleared when its first message goes) is told too.

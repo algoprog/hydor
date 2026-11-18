@@ -8,7 +8,6 @@ import { isConfidential } from '../../shared/confidential.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { memoryOn } from '../memory/store.ts';
 import { spaceById } from '../spaces/index.ts';
-import { wikiChatEnabled } from './access.ts';
 import { buildOffer, historyBuilt, startBuild, type BuildOffer } from './areas/build.ts';
 import { jobRunning, stopJob } from './areas/jobs.ts';
 import { wikiMemoryOn } from './roots.ts';
@@ -59,7 +58,7 @@ export async function askFor(db: DB, o: { extra: SessionExtra | undefined; space
   if (!space || !startedByPerson(extra) || isConfidential(extra)) return null;
   const project = spaceById(db, space);
   if (!project) return null;
-  if (!memoryOn(db) || extra?.memory === false || !wikiChatEnabled(db, extra ?? {}) || !wikiMemoryOn(db, space)) return null;
+  if (!memoryOn(db) || extra?.memory === false || !wikiMemoryOn(db, space)) return null;
   if (askedNot(db, space, o.now)) return null;
   if (jobRunning(space) || historyBuilt(db, space)) return null;
   const offer = await buildApi.offer(db, space).catch(() => null);

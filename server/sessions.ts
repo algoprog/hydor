@@ -63,7 +63,6 @@ import { sessionCaptureEnabled } from './wiki/session/store.ts';
 import { captureWithStatus, clearCheckpointStatus } from './wiki/session/status.ts';
 import { wikiHookToken } from './wiki/session/hook-auth.ts';
 import { codexWikiHookCommand } from './wiki/session/codex-hook.ts';
-import { wikiChatEnabled } from './wiki/access.ts';
 import { wikiSettings } from './wiki/settings/settings.ts';
 import { helper } from './helper.ts';
 import { countSubagents, isAgentTask, leadOf, pendingClaudeSubagent, pendingSummary, refuseSubagent, runningTask, subagentKeyOf, subagentLive, subagentMeta, type Leads } from './subagents.ts';
@@ -2460,7 +2459,7 @@ export class SessionManager extends EventEmitter {
     const enabled = () => {
       const extra = sessionExtra(this.db, key);
       const cwd = this.lives.get(key)?.cwd ?? this.summary(key)?.cwd;
-      if (!wikiChatEnabled(this.db, extra) || !wikiMemoryOn(this.db, wikiSpaceOfSession(this.db, key, cwd)) || !sessionMemoryOn(this.db, key) || isConfidential(extra)) return false;
+      if (!wikiMemoryOn(this.db, wikiSpaceOfSession(this.db, key, cwd)) || !sessionMemoryOn(this.db, key) || isConfidential(extra)) return false;
       try { return sessionCaptureEnabled(wikiSettings(this.db).hubPath); } catch { return false; }
     };
     if (!enabled()) return '';
@@ -2483,11 +2482,11 @@ export class SessionManager extends EventEmitter {
     if (l.adapter.state.status === 'working' || l.adapter.state.status === 'waiting') throw new HttpError(409, 'Wait for the turn to end, or stop it, then compact');
     // Prepare a bounded redacted summary, without copying the transcript to the wiki.
     const wikiSpace = () => wikiSpaceOfSession(this.db, key, l.cwd);
-    if (wikiMemoryOn(this.db, wikiSpace()) && wikiChatEnabled(this.db, sessionExtra(this.db, key)) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
+    if (wikiMemoryOn(this.db, wikiSpace()) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
       try {
         const originalHub = wikiSettings(this.db).hubPath;
         const summary = await this.wikiCheckpointSummary(key);
-        if (wikiSettings(this.db).hubPath === originalHub && wikiMemoryOn(this.db, wikiSpace()) && wikiChatEnabled(this.db, sessionExtra(this.db, key)) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key)) && sessionCaptureEnabled(originalHub)) {
+        if (wikiSettings(this.db).hubPath === originalHub && wikiMemoryOn(this.db, wikiSpace()) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key)) && sessionCaptureEnabled(originalHub)) {
           const saved = captureWithStatus(this.db, hubDir(this.db, { create: true })!, key, 'PreCompact', 0, redactVault(summary));
           if (saved && !summary.trim()) this.emit('toast', { level: 'info', text: 'Wiki memory saved a checkpoint with event metadata only; a conversation summary was unavailable.' });
         }

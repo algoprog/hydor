@@ -58,7 +58,7 @@ try {
     assert.equal(fs.readFileSync(path.join(wiki, dot), 'utf8'), 'hidden');
   }
   fs.rmSync(path.join(wiki, '.hydor-wiki-write.lock'), { recursive: true });
-  // Writes only go to wiki/**/*.md, index.md and log.md (and raw notes by the lessons workflow); never settings or other folders.
+  // Writes only go to wiki/**/*.md, index.md and log.md (and raw sources by ingestion); never settings or other folders.
   for (const bad of ['wikis.json', 'config.md', 'notes.md', 'wiki/data.json', 'wiki/page.txt', 'other/a.md', 'projects/x/wiki/a.md', 'raw/articles/x.pdf', 'index.md/x.md']) {
     assert.throws(() => applyWikiChanges(wiki, [{ path: bad, content: 'x', expectedSha256: null }]), /written only|Invalid|hidden|holds its files/, `write ${bad}`);
   }

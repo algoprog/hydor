@@ -292,8 +292,8 @@ test('wiki_status and wiki_read with project: another project’s wiki, read onl
   updateSpace(db, delta.id, { wikiMemory: false });
   await assert.rejects(call(here, 'wiki_read', { project: 'Delta', path: 'wiki/deploys.md' }), /Wiki memory is off for the project “Delta”/);
   updateSpace(db, delta.id, { wikiMemory: null });
-  setSessionExtra(db, 'claude:nowiki', { wikiEnabled: false, space: alpha.id });
-  await assert.rejects(call(ctxIn('claude:nowiki', alphaDir), 'wiki_read', { project: 'Beta', path: 'wiki/deploys.md' }), /off for this chat/);
+  setSessionExtra(db, 'claude:conf-wiki', { confidential: true, space: alpha.id });
+  await assert.rejects(call(ctxIn('claude:conf-wiki', alphaDir), 'wiki_read', { project: 'Beta', path: 'wiki/deploys.md' }), /unavailable in confidential sessions/, 'a Confidential chat has no wiki');
   // This project's own Wiki memory switch counts too, as for its own wiki: turned off while a session runs, another project's wiki is closed to it.
   updateSpace(db, alpha.id, { wikiMemory: false });
   await assert.rejects(call(here, 'wiki_read', { project: 'Beta', path: 'wiki/deploys.md' }), /off for this chat or project/);
