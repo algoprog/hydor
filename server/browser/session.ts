@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { TabGroups } from './groups.ts';
 import { BROWSING_KEY, BROWSING_PROFILE, DESKTOP_CHROME, type BrowserAsk, type BrowserDialog, type BrowserInput, type BrowserNote, type BrowserPermissionAsk, type BrowserView, type ChromeInfo, type ClosedTab } from '../../shared/browser.ts';
 import type { AgentPointer, PointerAct, Way } from '../../shared/pointer.ts';
 import { HttpError } from '../auth.ts';
@@ -555,6 +556,8 @@ const counters = new Map<string, number>();
 
 export class SessionBrowser implements TabOwner {
   tabs: Tab[] = [];
+  /** The groups of its tabs (your own browsing's: the tab column shows them). */
+  groups = new TabGroups();
   active: Tab | null = null;
   driver: 'agent' | 'user' = 'agent';
   asks: BrowserAsk[] = [];
@@ -667,6 +670,7 @@ export class SessionBrowser implements TabOwner {
       closedTabs.length = Math.min(closedTabs.length, MAX_CLOSED_TABS);
     }
     this.tabs = this.tabs.filter((t) => t !== tab);
+    this.groups.forget(tab.targetId);
     for (const [id, r] of this.refs) if (r.tab === tab) this.refs.delete(id);
     if (this.active === tab) this.setActive(this.tabs[this.tabs.length - 1] ?? null);
     // Your own browsing is never left without a tab (it is not closed by closing the last one, as an agent's is).
@@ -709,6 +713,7 @@ export class SessionBrowser implements TabOwner {
 
   view(): BrowserView {
     const prof = this.profile ? profiles(d().db).find((p) => p.id === this.profile) : undefined;
+    const groups = this.key === BROWSING_KEY ? this.groups.list(this.tabs.map((t) => t.targetId)) : [];
     return {
       key: this.key,
       open: !this.closed,
@@ -723,6 +728,7 @@ export class SessionBrowser implements TabOwner {
         ...(t.favicon ? { favicon: t.favicon } : {}),
         ...(t.canGoBack ? { canGoBack: true } : {}),
         ...(t.canGoForward ? { canGoForward: true } : {}),
+        ...(groups.length && this.groups.groupOf(t.targetId) ? { group: this.groups.groupOf(t.targetId) } : {}),
       })),
       driver: this.driver,
       busy: this.busy,
@@ -735,6 +741,7 @@ export class SessionBrowser implements TabOwner {
       ...(this.handedFrom ? { handedFrom: this.handedFrom } : {}),
       ...(this.permission ? { permission: this.permission } : {}),
       ...(this.key === BROWSING_KEY && closedTabs.length ? { closed: closedTabList() } : {}),
+      ...(groups.length ? { groups } : {}),
     };
   }
 

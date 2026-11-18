@@ -9,14 +9,15 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { BROWSING_KEY, type BrowserPermissionAsk } from '../../shared/browser.ts';
+import { BROWSING_KEY, inTabOrder, type BrowserPermissionAsk } from '../../shared/browser.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { openDb, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
-import { addressOf, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
+import { addressOf, addressSent, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, groupWithAi, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
 import { pickChrome } from './chrome.ts';
+import { checkProposal, TabGroups } from './groups.ts';
 import { addDownload, downloadCount } from './downloads.ts';
 import { ruleFor } from '../guide/api.ts';
 import { initPages, listPages, pageSource } from '../pages/store.ts';
@@ -24,7 +25,7 @@ import { browserRoutes } from './routes.ts';
 import { addVisit, listHistory } from './history.ts';
 import { find } from '../find/index.ts';
 import { internalHeaders } from '../internal.ts';
-import { browserOf, closeAll, ensureBrowser, setBrowserDeps } from './session.ts';
+import { browserOf, closeAll, ensureBrowser, setBrowserDeps, takeClosedTab } from './session.ts';
 import { setBrowserSettings, sessionOptions } from './settings.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -148,6 +149,79 @@ async function main() {
     k.seen(v(['https://c.com/']));
     k.seen(v([], false));
     assert.deepEqual(written.map((j) => JSON.parse(j).tabs).at(-1), ['https://c.com/'], 'closing writes what it had, not the empty list it shows');
+  });
+
+  await check('tab groups: kept with the tabs by place, checked when read back, none when no tab is in one', () => {
+    const t = (url: string, group?: string, active = false) => ({ url, active, group });
+    const groups = [
+      { id: 'g1', name: 'Trip', color: 'green' as const },
+      { id: 'g2', name: 'Work', color: 'blue' as const, folded: true },
+      { id: 'g3', name: 'Empty', color: 'red' as const },
+    ];
+    const kept = savableTabs([t('https://a.com/', 'g2'), t('about:blank', 'g1'), t('https://b.com/'), t('https://c.com/', 'g1', true), t('https://d.com/', 'g2')], groups);
+    assert.deepEqual(kept.tabs, ['https://a.com/', 'https://b.com/', 'https://c.com/', 'https://d.com/']);
+    assert.deepEqual(kept.groups, [groups[0], groups[1]], 'a group with no tab left is not kept');
+    assert.deepEqual(kept.of, [1, null, 0, 1]);
+    assert.equal(kept.active, 2);
+    assert.deepEqual(savableTabs([t('https://a.com/')], groups), { tabs: ['https://a.com/'], active: 0 }, 'no tab in a group: nothing of groups is written');
+    const back = savedTabs(JSON.stringify(kept));
+    assert.deepEqual(back.groups?.map((g) => [g.id, g.name, g.color, !!g.folded]), [['g1', 'Trip', 'green', false], ['g2', 'Work', 'blue', true]]);
+    assert.deepEqual(back.of, [1, null, 0, 1]);
+    // A tab dropped for its address leaves its place out; a place that is no group is none; a bad colour is grey, a long name is cut.
+    const odd = savedTabs('{"tabs":["https://a.com/","javascript:x","https://b.com/"],"active":0,"groups":[{"id":"x","name":"' + 'n'.repeat(80) + '","color":"pink"}],"of":[0,0,7]}');
+    assert.deepEqual(odd.of, [0, null]);
+    assert.equal(odd.groups?.[0].color, 'grey');
+    assert.equal(odd.groups?.[0].name.length, 40);
+    assert.equal(savedTabs('{"tabs":["https://a.com/"],"active":0,"groups":[{"id":"x"}],"of":[]}').groups, undefined, 'places that do not match the tabs: none');
+  });
+  await check('tab groups: made, renamed, moved, folded, taken apart, and gone with their last tab', () => {
+    const g = new TabGroups();
+    const a = g.create(['t1', 't2'], { name: '  Reading \n list ', color: 'amber' });
+    assert.equal(a.name, 'Reading list');
+    const b = g.create(['t3']);
+    assert.notEqual(b.color, 'grey');
+    assert.notEqual(b.color, 'amber', 'a colour not in use yet');
+    assert.throws(() => g.create(['t4'], { color: 'pink' }), refused(400, /colour/));
+    g.put(['t2'], b.id);
+    assert.equal(g.groupOf('t2'), b.id);
+    assert.deepEqual(g.list(['t1', 't2', 't3']).map((x) => x.id), [a.id, b.id]);
+    assert.deepEqual(g.list(['t3']).map((x) => x.id), [b.id], 'a group with no open tab is gone');
+    g.update(b.id, { name: 'Mail', color: 'red', folded: true });
+    assert.deepEqual(g.list(['t3']), [{ id: b.id, name: 'Mail', color: 'red', folded: true }]);
+    g.update(b.id, { folded: false });
+    assert.equal(g.list(['t3'])[0].folded, undefined);
+    assert.throws(() => g.update(b.id, { folded: 'yes' }), refused(400, /true or false/));
+    assert.throws(() => g.update('nope', {}), refused(404, /No such group/));
+    assert.throws(() => g.put(['t1'], 'nope'), refused(404, /No such group/));
+    const snap = g.snapshot();
+    assert.deepEqual(g.ungroup(b.id).sort(), ['t2', 't3']);
+    assert.equal(g.groupOf('t3'), undefined);
+    g.restore(snap, new Set(['t3']));
+    assert.equal(g.groupOf('t3'), b.id);
+    assert.equal(g.groupOf('t1'), undefined, 'a tab that is not open any more is not put back');
+    for (let i = 0; i < 25; i++) if (g.groups.length < 20) g.create([`x${i}`]);
+    assert.throws(() => g.create(['y']), refused(409, /20 groups/));
+  });
+  await check('tab groups: the tab column order is each group with its tabs, then the others', () => {
+    const tabs = [{ id: '1' }, { id: '2', group: 'b' }, { id: '3' }, { id: '4', group: 'a' }, { id: '5', group: 'b' }, { id: '6', group: 'gone' }];
+    const groups = [{ id: 'a', name: 'A', color: 'blue' as const }, { id: 'b', name: 'B', color: 'red' as const }, { id: 'c', name: 'C', color: 'grey' as const }];
+    assert.deepEqual(
+      inTabOrder(tabs, groups).map((x) => [x.group?.id ?? null, x.tabs.map((t) => t.id)]),
+      [['a', ['4']], ['b', ['2', '5']], [null, ['1', '3', '6']]],
+    );
+    assert.deepEqual(inTabOrder(tabs).map((x) => x.tabs.length), [6]);
+  });
+  await check('group my tabs: what the helper is sent, and its answer checked', () => {
+    assert.equal(addressSent('https://shop.example/cart/1?token=secret#pay'), 'https://shop.example/cart/1');
+    assert.equal(addressSent('file:///home/me/secret/plan.pdf?x=1'), 'file:plan.pdf', 'a file: its name only');
+    assert.equal(addressSent('nonsense'), '');
+    const known = new Set(['a', 'b', 'c', 'd', 'e']);
+    assert.deepEqual(
+      checkProposal({ groups: [{ name: ' Trip ', color: 'green', tabs: ['a', 'b', 'zz', 'a'] }, { name: 'Dup', color: 'pink', tabs: ['b', 'c'] }, { name: 'Lone', tabs: ['d'] }, { name: 'Rest', color: 'red', tabs: ['c', 'd', 'e'] }, 'junk'] }, known),
+      [{ name: 'Trip', color: 'green', tabs: ['a', 'b'] }, { name: 'Rest', color: 'red', tabs: ['c', 'd', 'e'] }],
+      'ids it was not sent are dropped, a tab is in one group only, one tab does not make a group, a colour it made up is left to the app',
+    );
+    assert.deepEqual(checkProposal('nope', known), []);
   });
 
   // ---- a copy of a page ----
@@ -656,6 +730,90 @@ async function realBrowser() {
       await assert.rejects(call('DELETE', '/api/browser/browsing/history/abc'), /id/);
       assert.deepEqual(await call('POST', '/api/browser/browsing/history/clear', { since: Date.now() + 3600_000 }), { removed: 0 });
       await assert.rejects(call('POST', '/api/browser/browsing/history/clear', { since: 'yesterday' }), /milliseconds/);
+    });
+    await check('real: tab groups through the routes: made, shown on the view, moved, folded, a copy of a tab, closing several, Group my tabs, Undo', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      const url = (t: { targetId: string }) => b.tabs.find((x) => x.targetId === t.targetId)?.url;
+      const x1 = await b.newTab();
+      await x1.navigate(`${base}/mail`);
+      const x2 = await b.newTab();
+      await x2.navigate(`${base}/other`);
+      const x3 = await b.newTab();
+      await x3.navigate(`${base}/home`);
+      await until('the pages', () => [x1, x2, x3].every((t) => t.title !== '' && !t.navigating));
+      const ids = [x1, x2].map((t) => t.targetId);
+      await assert.rejects(call('POST', '/api/browser/browsing/groups', { tabs: ['nope'] }), /No such tab/);
+      await assert.rejects(call('POST', '/api/browser/browsing/groups', { tabs: [] }), /list of tab ids/);
+      await assert.rejects(call('POST', '/api/browser/browsing/groups', { tabs: ids, color: 'pink' }), /colour/);
+      const made = await call('POST', '/api/browser/browsing/groups', { tabs: ids, name: 'Mail and more' });
+      assert.equal(made.view.groups.length, 1);
+      assert.equal(made.view.groups[0].name, 'Mail and more');
+      assert.deepEqual(made.view.tabs.filter((t: { group?: string }) => t.group === made.group.id).map((t: { id: string }) => t.id), ids);
+      assert.equal(made.view.tabs.find((t: { id: string }) => t.id === x3.targetId).group, undefined);
+      await call('PATCH', `/api/browser/browsing/groups/${made.group.id}`, { name: 'Reading', color: 'purple', folded: true });
+      let v = (await call('GET', '/api/browser/sessions/browsing')).view;
+      assert.deepEqual(v.groups, [{ id: made.group.id, name: 'Reading', color: 'purple', folded: true }]);
+      await assert.rejects(call('PATCH', '/api/browser/browsing/groups/nope', { name: 'x' }), /No such group/);
+      // Moved in, and out.
+      v = (await call('POST', '/api/browser/browsing/tabs/group', { tabs: [x3.targetId], group: made.group.id })).view;
+      assert.equal(v.tabs.filter((t: { group?: string }) => t.group).length, 3);
+      v = (await call('POST', '/api/browser/browsing/tabs/group', { tabs: [x3.targetId], group: null })).view;
+      assert.equal(v.tabs.find((t: { id: string }) => t.id === x3.targetId).group, undefined);
+      await assert.rejects(call('POST', '/api/browser/browsing/tabs/group', { tabs: [x3.targetId], group: 'nope' }), /No such group/);
+      // A copy of a tab sits beside it, in its group, and loads the same page.
+      const n = b.tabs.length;
+      v = (await call('POST', `/api/browser/browsing/tabs/${x1.targetId}/duplicate`)).view;
+      assert.equal(v.tabs.length, n + 1);
+      const at = v.tabs.findIndex((t: { id: string }) => t.id === x1.targetId);
+      assert.equal(v.tabs[at + 1].group, made.group.id);
+      assert.equal(v.tabs[at + 1].active, true);
+      const copy = b.tabs[at + 1];
+      await until('the copy loads', () => url(copy) === `${base}/mail`);
+      await call('POST', `/api/browser/browsing/tabs/${copy.targetId}/reload`);
+      await assert.rejects(call('POST', '/api/browser/browsing/tabs/nope/reload'), /No such tab/);
+      // Closing several at once; the group goes with its last tab.
+      v = (await call('POST', '/api/browser/browsing/tabs/close', { tabs: [copy.targetId, x3.targetId] })).view;
+      await until('closed', () => b.tabs.length === n - 1);
+      assert.equal(v.groups.length, 1);
+      // Taken apart: the tabs stay. Closed with its tabs: they go.
+      v = (await call('DELETE', `/api/browser/browsing/groups/${made.group.id}`)).view;
+      assert.equal(v.groups, undefined);
+      assert.ok(v.tabs.some((t: { id: string }) => t.id === x1.targetId));
+      const again = await call('POST', '/api/browser/browsing/groups', { tabs: ids });
+      await call('DELETE', `/api/browser/browsing/groups/${again.group.id}?close=1`);
+      await until('the group’s tabs closed', () => !b.tabs.some((t) => ids.includes(t.targetId)));
+      // Group my tabs: the answer is applied, and Undo puts the old grouping back.
+      const y = [await b.newTab(), await b.newTab(), await b.newTab()];
+      for (const [i, t] of y.entries()) await t.navigate(`${base}/${['mail', 'other', 'home'][i]}`);
+      await until('the pages', () => y.every((t) => t.title !== '' && !t.navigating));
+      let sent = '';
+      const ask = (async (_db: unknown, q: { prompt: string }) => {
+        sent = q.prompt;
+        return { groups: [{ name: 'Test pages', color: 'green', tabs: [y[0].targetId, y[1].targetId, 'unknown'] }] };
+      }) as unknown as Parameters<typeof groupWithAi>[2];
+      const r = await groupWithAi(db, b, ask);
+      assert.equal(r.applied, 1);
+      assert.match(sent, new RegExp(`"id":"${y[0].targetId}"`));
+      assert.ok(!sent.includes('?'), 'no query strings are sent');
+      const grouped = b.view();
+      assert.deepEqual(grouped.tabs.filter((t) => t.group).map((t) => t.id), [y[0].targetId, y[1].targetId]);
+      assert.equal(grouped.groups?.[0].name, 'Test pages');
+      const undone = await call('POST', '/api/browser/browsing/groups/restore', r.before);
+      assert.equal(undone.view.groups, undefined);
+      assert.equal(undone.view.tabs.filter((t: { group?: string }) => t.group).length, 0);
+      // Too few tabs to group: nothing is asked.
+      await call('POST', '/api/browser/browsing/tabs/close', { tabs: b.tabs.slice(2).map((t) => t.targetId) });
+      await until('closed', () => b.tabs.length <= 2);
+      while (takeClosedTab()) {
+        // What this test closed is not for the test of closed tabs after it.
+      }
+      let asked = false;
+      await assert.rejects(groupWithAi(db, b, (async () => ((asked = true), {})) as unknown as Parameters<typeof groupWithAi>[2]), refused(409, /three tabs/));
+      assert.equal(asked, false);
+      // And agents never use any of it.
+      for (const [m, u] of [['POST', '/api/browser/browsing/groups'], ['PATCH', '/api/browser/browsing/groups/x'], ['DELETE', '/api/browser/browsing/groups/x'], ['POST', '/api/browser/browsing/groups/restore'], ['POST', '/api/browser/browsing/tabs/group'], ['POST', '/api/browser/browsing/tabs/close'], ['POST', '/api/browser/browsing/tabs/x/duplicate'], ['POST', '/api/browser/browsing/tabs/x/reload'], ['POST', '/api/browser/browsing/tabs/group-with-ai']] as const) {
+        assert.equal(ruleFor(m, u).level, 'refuse', `${m} ${u}`);
+      }
     });
     await check('real: closed tabs are remembered (newest first, 25), and opened again', async () => {
       const b = browserOf(BROWSING_KEY)!;

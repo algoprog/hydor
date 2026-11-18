@@ -14,6 +14,32 @@ export interface BrowserTab {
   favicon?: string;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  /** The group it is in (your own browsing's tabs), by its id in the view's `groups`. */
+  group?: string;
+}
+
+/** The colours a tab group may have: the app's own (blue, green, amber, red and purple are its info, ok, warn, err and codex colours, orange its claude colour). */
+export const GROUP_COLORS = ['grey', 'blue', 'green', 'amber', 'orange', 'red', 'purple'] as const;
+export type GroupColor = (typeof GROUP_COLORS)[number];
+
+/** A group of your own browsing's tabs: a name and a colour, folded (its tabs hidden in the tab column) or open. */
+export interface BrowserGroup {
+  id: string;
+  name: string;
+  color: GroupColor;
+  folded?: boolean;
+}
+
+/** The tabs as the tab column shows them: each group (in the order they were made) with its tabs, then the tabs in no group. */
+export function inTabOrder<T extends { id: string; group?: string }>(tabs: T[], groups: BrowserGroup[] = []): { group: BrowserGroup | null; tabs: T[] }[] {
+  const out: { group: BrowserGroup | null; tabs: T[] }[] = [];
+  for (const g of groups) {
+    const mine = tabs.filter((t) => t.group === g.id);
+    if (mine.length) out.push({ group: g, tabs: mine });
+  }
+  const loose = tabs.filter((t) => !t.group || !groups.some((g) => g.id === t.group));
+  if (loose.length) out.push({ group: null, tabs: loose });
+  return out;
 }
 
 /**
@@ -76,6 +102,8 @@ export interface BrowserView {
   downloads: { name: string; path: string; done: boolean; failed?: boolean; at: number }[];
   /** Tabs you closed lately (your own browsing), newest first: to open again (Ctrl+Shift+T). */
   closed?: ClosedTab[];
+  /** The groups your tabs are in (your own browsing), in the order they were made; a tab says which one is its own. */
+  groups?: BrowserGroup[];
   /** Where the agent's pointer rests, as fractions of the page: the live view shows it there until the agent acts again. */
   pointer?: { x: number; y: number };
   /** Which browser runs it (shown as the page itself in the desktop app's window when `desktop`). */
