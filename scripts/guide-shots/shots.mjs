@@ -248,11 +248,18 @@ export const SHOTS = [
     height: 900,
     async take(p, ctx) {
       await ctx.go('/settings?s=tasks', { settle: 1500 });
-      const group = `js:[...document.querySelectorAll('h3')].find((h) => h.textContent.trim() === 'Engineering')?.parentElement`;
-      await p.eval(`(${group.slice(3)})?.scrollIntoView({ block: 'center' })`);
+      // The examples are one group, "Start from an example", showing a few until "Show all examples" is pressed.
+      await p.eval(`(${button('Show all examples').slice(3)})?.scrollIntoView({ block: 'center' })`);
+      await sleep(300);
+      await p.click(button('Show all examples'));
+      await sleep(600);
+      // The five engineering examples sit together in the list: keep just those rows.
+      const first = anyButton('Review new pull requests');
+      const lastRow = anyButton('Incident first responder');
+      await p.eval(`(${first.slice(3)})?.scrollIntoView({ block: 'center' })`);
       await sleep(500);
       await p.park();
-      return p.shot(ctx.file, { clip: await around(p, [group], 12) });
+      return p.shot(ctx.file, { clip: await around(p, [first, lastRow], 12) });
     },
   },
   {
