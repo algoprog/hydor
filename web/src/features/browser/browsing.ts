@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import {
   BROWSING_KEY,
   type BookmarkNode,
+  type BrowserGroup,
   type BrowserPermissionAsk,
   type BrowserTab,
   type BrowserView,
@@ -18,7 +19,7 @@ import { machineId } from '../../lib/machine';
 import { openFile, openSession } from '../../lib/nav';
 import { canReveal, reveal } from '../../lib/reveal';
 import { agentKey, lastAgent, startSettings } from '../../lib/start';
-import { toast, toastError, useApp } from '../../lib/store';
+import { toast, toastError, useApp, useToasts } from '../../lib/store';
 import { desktopBrowser, nativePages, type TabStateChange } from './PageView';
 import { useBrowser } from './store';
 
@@ -88,11 +89,13 @@ export async function goTo(text: string, o: { tab?: string; newTab?: boolean } =
   }
 }
 
-export async function newTab(url?: string) {
+/** Opens a new tab (at `url`, else the home page); the view after it, which has the new tab in front. */
+export async function newTab(url?: string): Promise<BrowserView | null> {
   try {
-    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/tabs', url ? { url } : {})).view);
+    return takeView((await post<{ view: BrowserView }>('/api/browser/browsing/tabs', url ? { url } : {})).view);
   } catch (e) {
     toastError(e);
+    return null;
   }
 }
 
@@ -106,6 +109,90 @@ export async function closeTab(id: string) {
     takeView((await post<{ view: BrowserView }>(`/api/browser/sessions/${enc(KEY)}/tab`, { id, close: true })).view);
   } catch (e) {
     toastError(e);
+  }
+}
+
+/** Closes several tabs at once (your browsing keeps at least one). */
+export async function closeTabs(ids: string[]) {
+  if (!ids.length) return;
+  try {
+    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/tabs/close', { tabs: ids })).view);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** A copy of a tab beside it (in its group), in front. */
+export const duplicateTab = (id: string) => post<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/duplicate`).then((r) => void takeView(r.view), toastError);
+
+/** Reloads one tab, not only the one in front. */
+export const reloadTab = (id: string) => post<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/reload`).then((r) => void takeView(r.view), toastError);
+
+// ---- tab groups ------------------------------------------------------------------------------------------------
+
+/** Makes a group of tabs; its id (so that its name can be typed in at once), or null when it could not. */
+export async function groupTabs(tabs: string[], o: { name?: string; color?: BrowserGroup['color'] } = {}): Promise<string | null> {
+  try {
+    const r = await post<{ group: BrowserGroup; view: BrowserView }>('/api/browser/browsing/groups', { tabs, ...o });
+    takeView(r.view);
+    return r.group.id;
+  } catch (e) {
+    toastError(e);
+    return null;
+  }
+}
+
+/** Puts tabs in a group, or in none (`null`). */
+export const moveToGroup = (tabs: string[], group: string | null) =>
+  post<{ view: BrowserView }>('/api/browser/browsing/tabs/group', { tabs, group }).then((r) => void takeView(r.view), toastError);
+
+/** Renames a group, changes its colour, folds it or opens it. */
+export const editGroup = (id: string, change: { name?: string; color?: BrowserGroup['color']; folded?: boolean }) => {
+  // Shown at once; the server's answer follows.
+  useBrowser.setState((s) => {
+    const v = s.views[KEY];
+    if (!v?.groups) return s;
+    const groups = v.groups.map((g) => {
+      if (g.id !== id) return g;
+      const { folded: _f, ...rest } = g;
+      const next = { ...rest, ...(change.name !== undefined ? { name: change.name } : {}), ...(change.color ? { color: change.color } : {}) };
+      return (change.folded ?? g.folded) ? { ...next, folded: true } : next;
+    });
+    return { views: { ...s.views, [KEY]: { ...v, groups } } };
+  });
+  return patch<{ view: BrowserView }>(`/api/browser/browsing/groups/${enc(id)}`, change).then((r) => void takeView(r.view), toastError);
+};
+
+/** Takes a group apart (its tabs stay), or closes it with its tabs. */
+export const removeGroup = (id: string, closeToo = false) =>
+  del<{ view: BrowserView }>(`/api/browser/browsing/groups/${enc(id)}${closeToo ? '?close=1' : ''}`).then((r) => void takeView(r.view), toastError);
+
+/** A new tab in a group. */
+export async function newTabIn(group: string) {
+  const v = await newTab();
+  const t = v?.tabs.find((x) => x.active);
+  if (t) await moveToGroup([t.id], group);
+}
+
+/** Whether Group my tabs is waiting for the helper model's answer. */
+export const useGrouping = create<{ busy: boolean }>(() => ({ busy: false }));
+
+/** Group my tabs with AI: the helper model is sent the titles and addresses of the tabs in no group (nothing of the pages); the groups are made, with Undo. */
+export async function groupWithAi() {
+  if (useGrouping.getState().busy) return;
+  useGrouping.setState({ busy: true });
+  try {
+    const r = await post<{ applied: number; before: unknown; view: BrowserView }>('/api/browser/browsing/tabs/group-with-ai', {});
+    takeView(r.view);
+    if (!r.applied) return void toast('No tabs go together to make a group', 'info');
+    useToasts.getState().push('ok', r.applied === 1 ? 'Made 1 group of your tabs' : `Made ${r.applied} groups of your tabs`, {
+      label: 'Undo',
+      run: () => void post<{ view: BrowserView }>('/api/browser/browsing/groups/restore', r.before).then((x) => void takeView(x.view), toastError),
+    });
+  } catch (e) {
+    toastError(e);
+  } finally {
+    useGrouping.setState({ busy: false });
   }
 }
 

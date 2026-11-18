@@ -54,6 +54,8 @@ import { BookmarksPanel } from './Bookmarks';
 import {
   activeTab,
   addBookmark,
+  groupWithAi,
+  useGrouping,
   addFromStore,
   answerPermission,
   closeTab,
@@ -230,6 +232,7 @@ function OwnBrowser() {
   const [find, setFind] = useState(false);
   const [findTick, setFindTick] = useState(0);
   const [menu, setMenu] = useState(false);
+  const grouping = useGrouping((s) => s.busy);
   const [doOpen, setDoOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   // The history's "Clear browsing data…" opens the settings at that section.
@@ -543,6 +546,9 @@ function OwnBrowser() {
       </MenuItem>
       <MenuItem icon={<WandSparkles size={14} />} disabled={!canHand} onClick={() => (setMenu(false), setDoOpen(true))}>
         Do this here…
+      </MenuItem>
+      <MenuItem icon={<Sparkles size={14} />} disabled={grouping || view.tabs.length < 3} onClick={() => (setMenu(false), void groupWithAi())}>
+        Group my tabs with AI
       </MenuItem>
       <MenuSep />
       <MenuItem icon={<History size={14} />} checked={panel === 'history'} hint={mobile ? undefined : <Kbd>{MOD}H</Kbd>} onClick={() => (setMenu(false), togglePanel('history'))}>
