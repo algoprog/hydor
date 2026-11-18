@@ -3,6 +3,15 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.86.1 · 18 November 2026
+
+Links in an agent's reply to the app's own pages now take you there.
+
+- **Links to the app's pages**: a link in an agent's reply to a place in the app, such as **Settings → Agents →
+  Models** or a topic of the guide, opens that page (at the option it names, if it names one) instead of a window
+  saying "Could not open the file". Links to files on this computer still open the file, even when its path starts
+  the same way as a page's (a drive under /media, a folder called projects).
+
 ## 0.86.0 · 18 November 2026
 
 Custom can use the models of your Claude and ChatGPT plans with nothing to set up, and the subagents a turn starts
