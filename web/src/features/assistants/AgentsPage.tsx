@@ -702,7 +702,7 @@ export function AgentsPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {header}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className={cx('mx-auto max-w-[1120px] px-3 sm:px-6', wide ? (id ? 'py-6' : 'pb-10') : 'py-5 sm:py-6')}>
+          <div className={cx('mx-auto max-w-[1120px] px-3 sm:px-6', wide ? (id ? 'py-6' : 'pt-3 pb-10') : 'py-5 sm:py-6')}>
             {toolbar}
             <div className={cx('space-y-6', wide && !id && 'pt-3')}>
               {schedules ? (

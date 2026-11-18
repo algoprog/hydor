@@ -69,7 +69,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
-- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide); every other page (Projects, Apps, Agents, Inbox, Usage, System, Help…) uses the whole width. The Library and Settings have a column of the same kind (the logo, their own list, Hide), and the Browser its own tab column. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept.
+- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). The Library, Apps, Projects, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
@@ -1620,7 +1620,7 @@ programs shows each program's version and what is out, with Check now, Update no
   for runs at the next chance; the desktop apps keep the computer awake from a few minutes before a run is due until
   it starts. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
-  Schedules (the Agents page's tab, Settings → Scheduled tasks → Week view) shows everything that runs by itself,
+  Schedules (a place in the Agents page's column, a tab on a phone; Settings → Scheduled tasks → Week view) shows everything that runs by itself,
   scheduled tasks, agents' and apps' schedules, board cards' refreshes, watchers and webhooks, on a week or a month in your time zone: each
   run that happened as a block at its time coloured by how it went (opening its session or its app run), the runs to
   come drawn faintly with their names, what runs more than eight times a day, watchers and webhooks as one band a
