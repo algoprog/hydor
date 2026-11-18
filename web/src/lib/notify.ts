@@ -41,6 +41,7 @@ interface DesktopBridge {
   notices?: () => Promise<SystemNotices | null>;
   testNotice?: (title: string, body: string) => Promise<{ ok: boolean; error: string } | null>;
   noticeSettings?: () => Promise<boolean>;
+  fullDiskAccess?: () => Promise<boolean>;
 }
 /** Whether the system shows the desktop app's notifications: null before the first; `error`, what it said when not. */
 export interface SystemNotices {
@@ -70,6 +71,12 @@ export async function turnOnSystemNotices(): Promise<'on' | 'settings' | 'off'> 
   const opened = await (bridge?.noticeSettings?.() ?? Promise.resolve(false)).catch(() => false);
   return opened ? 'settings' : 'off';
 }
+
+/** Whether the desktop app can open where a Mac gives Hydor Full Disk Access (older apps cannot; elsewhere it does nothing). */
+export const canOpenFullDiskAccess = typeof bridge?.fullDiskAccess === 'function';
+
+/** Opens System Settings → Privacy & Security → Full Disk Access on a Mac; false when it did not. */
+export const openFullDiskAccess = (): Promise<boolean> => (bridge?.fullDiskAccess?.() ?? Promise.resolve(false)).catch(() => false);
 
 /** Calls `fn` when the window is in front again after it was not (back from the system's settings). Returns how to stop. */
 export function whenBack(fn: () => void): () => void {

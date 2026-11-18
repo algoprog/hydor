@@ -119,6 +119,7 @@ export const DEFAULT_PREFS: BrowsingPrefs = {
   darkPages: false,
   darkExcept: [],
   autoplay: false,
+  importOffered: false,
   reader: READER_DEFAULTS,
 };
 
@@ -209,6 +210,7 @@ export function browsingPrefs(db: DB): BrowsingPrefs {
     darkPages: typeof v.darkPages === 'boolean' ? v.darkPages : DEFAULT_PREFS.darkPages,
     darkExcept: cleanSites(v.darkExcept),
     autoplay: typeof v.autoplay === 'boolean' ? v.autoplay : DEFAULT_PREFS.autoplay,
+    importOffered: typeof v.importOffered === 'boolean' ? v.importOffered : DEFAULT_PREFS.importOffered,
     reader: keptReader(v.reader),
   };
 }
@@ -234,7 +236,7 @@ export function setBrowsingPrefs(db: DB, patch: Record<string, unknown>): Browsi
     next.engine = patch.engine as SearchEngine;
   }
   if (next.engine === 'custom' && !next.customSearch) throw new HttpError(400, 'Give your own search page: a web address with %s where the words go');
-  for (const k of ['suggest', 'adblock', 'cookieBanners', 'translateOffer', 'darkPages', 'autoplay'] as const) {
+  for (const k of ['suggest', 'adblock', 'cookieBanners', 'translateOffer', 'darkPages', 'autoplay', 'importOffered'] as const) {
     if (patch[k] === undefined) continue;
     if (typeof patch[k] !== 'boolean') throw new HttpError(400, `${k} should be true or false`);
     next[k] = patch[k] as boolean;

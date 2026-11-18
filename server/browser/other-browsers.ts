@@ -178,3 +178,8 @@ export async function readCopy<T>(file: string, read: (db: Database.Database) =>
     await fs.promises.rm(tmp, { recursive: true, force: true });
   }
 }
+
+/** A browser's files that macOS keeps from Hydor until you give it Full Disk Access (Safari's): the message says where. */
+export class NeedsAccess extends Error {
+  readonly needs = 'full-disk-access' as const;
+}

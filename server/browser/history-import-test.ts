@@ -29,6 +29,7 @@ process.env.APPDATA = path.join(home, 'AppData', 'Roaming');
 delete process.env.XDG_CONFIG_HOME;
 const { bookmarkRoutes } = await import('./bookmarks.ts');
 const { historyImportRoutes } = await import('./history-import.ts');
+const { NeedsAccess } = await import('./other-browsers.ts');
 const { listHistory, historyCount } = await import('./history.ts');
 
 const chromeDir = process.platform === 'darwin' ? path.join(home, 'Library/Application Support/Google/Chrome') : process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA, 'Google/Chrome/User Data') : path.join(home, '.config/google-chrome');
@@ -118,6 +119,14 @@ test('sources: each browser profile with web history, named as the bookmarks nam
     { id: 'chrome:Profile 1', browser: 'Google Chrome', profile: 'Work', count: 1 },
     { id: 'firefox:abc.default-release', browser: 'Firefox', count: 2 },
   ]);
+});
+
+test('sources: a browser that could be read has no needs, and NeedsAccess says what it needs', async () => {
+  assert.equal((await sources()).every((x) => !('needs' in x)), true);
+  const e = new NeedsAccess('x');
+  assert.ok(e instanceof Error);
+  assert.equal(e.needs, 'full-disk-access');
+  assert.equal(e.message, 'x');
 });
 
 test('sources: the ids are the bookmark sources’ ids for the same profiles, with the same names', async () => {

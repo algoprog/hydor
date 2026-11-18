@@ -93,6 +93,8 @@ if (own) {
     testNotice: (title, body) => ipcRenderer.invoke('hydor:notice-test', { title: String(title), body: String(body) }),
     /** Opens the system's settings where you allow the app's notifications (a Mac's, Windows'): whether it could. */
     noticeSettings: () => ipcRenderer.invoke('hydor:notice-settings'),
+    /** Opens the system's settings where you give the app Full Disk Access (a Mac's): whether it could. Safari's bookmarks and history need it. */
+    fullDiskAccess: () => ipcRenderer.invoke('hydor:files-settings'),
     browser: {
       /** Your own tab's page over this place of the window (CSS pixels of this page); false when it is not one of the app's own tabs. */
       show: (target, rect) => ipcRenderer.invoke('hydor:browser-show', { target: String(target), rect: rectOf(rect) }),

@@ -228,6 +228,7 @@ test('sources: Chrome profiles with their names and counts, Firefox, none withou
   assert.equal(byId['firefox:abc.default-release'].count, 3);
   assert.equal(byId['firefox:abc.default-release'].profile, undefined, 'one profile: no name');
   assert.equal(s.every((x) => !x.error), true);
+  assert.equal(s.every((x) => !('needs' in x)), true, 'a source that could be read has no needs');
 });
 
 test('import from Chrome: one new folder at the end of the bar, bar items first, other roots as folders', async () => {

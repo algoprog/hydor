@@ -26,6 +26,7 @@ import {
   Highlighter,
   History,
   Home,
+  Import,
   Languages,
   Moon,
   PanelLeftClose,
@@ -47,6 +48,8 @@ import {
 } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import { enc, post } from '../../lib/api';
+import { LOCALE } from '../../i18n/locale';
+import { machineId } from '../../lib/machine';
 import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { canReveal, revealLabel } from '../../lib/reveal';
@@ -111,17 +114,20 @@ import { HistoryPanel } from './History';
 import { Omnibox } from './Omnibox';
 import { KeyRow } from './Dock';
 import type { LiveViewApi } from './LiveView';
+import { ImportPanel, loadBrowsers } from './ImportBrowsers';
 import { Panel } from './Panel';
 import { PermissionsPanel } from './Permissions';
 import { PageView } from './PageView';
 import { isTranslated, openTranslatePopover, openTranslateText, togglePageTranslation, TranslatePopover, TranslateTextDialog, useTranslateUI } from './Translate';
 import { TabColumn } from './TabColumn';
+import { tourOpen } from '../tour/Tour';
+import { DESKTOP_APP } from '../tour/setup';
 import { SlideColumn } from '../../components/SlideColumn';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings';
-const isPanel = (v: unknown): v is PanelId => v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings';
+type PanelId = 'import' | 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings';
+const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -148,6 +154,26 @@ function PermissionBar({ view }: { view: BrowserView }) {
         </Button>
         <Button size="sm" variant="primary" disabled={busy} onClick={() => void answer(true)}>
           Allow
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Once, the page offers to bring in the other browsers' bookmarks and history: Import… opens the panel for it. */
+function ImportBar({ names, onNo, onImport }: { names: string[]; onNo: () => void; onImport: () => void }) {
+  const list = new Intl.ListFormat(LOCALE, { type: 'conjunction' }).format(names);
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bg-1 px-3 py-2">
+      <Import size={16} className="shrink-0 text-fg-2" />
+      {/* One sentence, translated whole (the names may go elsewhere in another language). */}
+      <div className="min-w-[min(100%,220px)] flex-1 text-[13.5px] leading-snug">{`Bring in your bookmarks and history from ${list}?`}</div>
+      <div className="ml-auto flex items-center gap-1.5">
+        <Button size="sm" variant="ghost" onClick={onNo}>
+          No thanks
+        </Button>
+        <Button size="sm" variant="primary" onClick={onImport}>
+          Import…
         </Button>
       </div>
     </div>
@@ -380,6 +406,22 @@ function OwnBrowser() {
       ro.disconnect();
     };
   }, [view?.open, native, watching, error]);
+
+  // The offer to bring in the other browsers' bookmarks and history, made once on a computer's desktop app: the names it holds, decided
+  // when it first shows (and kept for this visit until it is answered).
+  const prefs = usePrefs((s) => s.prefs);
+  const [offer, setOffer] = useState<string[] | null>(null);
+  const offerable = DESKTOP_APP && !machineId && !!prefs && !prefs.importOffered && !watching && !tourOpen();
+  const offerAsked = useRef(false);
+  useEffect(() => {
+    if (!offerable || offerAsked.current) return;
+    offerAsked.current = true;
+    void loadBrowsers().then((rows) => {
+      if (!rows.length || latest.current.watching || tourOpen()) return;
+      setOffer([...new Set(rows.map((r) => r.browser))]);
+      void savePrefs({ importOffered: true });
+    });
+  }, [offerable]);
 
   const openPanel = (p: PanelId | null) => {
     setAskOpen(false);
@@ -685,6 +727,9 @@ function OwnBrowser() {
       <MenuItem icon={<Bookmark size={14} />} checked={panel === 'bookmarks'} onClick={() => (setMenu(false), togglePanel('bookmarks'))}>
         Bookmarks
       </MenuItem>
+      <MenuItem icon={<Import size={14} />} checked={panel === 'import'} onClick={() => (setMenu(false), togglePanel('import'))}>
+        Import bookmarks and history…
+      </MenuItem>
       <MenuItem icon={<Highlighter size={14} />} checked={panel === 'highlights'} hint={pageMarks?.length ? String(pageMarks.length) : undefined} onClick={() => (setMenu(false), togglePanel('highlights'))}>
         Highlights
       </MenuItem>
@@ -716,7 +761,9 @@ function OwnBrowser() {
   else if (!watching && panel) {
     const close = () => openPanel(null);
     right =
-      panel === 'bookmarks' ? (
+      panel === 'import' ? (
+        <ImportPanel onClose={close} />
+      ) : panel === 'bookmarks' ? (
         <BookmarksPanel onClose={close} />
       ) : panel === 'extensions' ? (
         <ExtensionsPanel onClose={close} />
@@ -820,6 +867,13 @@ function OwnBrowser() {
         {!mobile && sideOpen && <TabColumn view={view} watching={watching} onWatch={watch} onLeave={leave} />}
         <div className="flex min-w-0 flex-1 flex-col">
           {!watching && <PermissionBar view={view} />}
+          {!watching && offer && (
+            <ImportBar
+              names={offer}
+              onNo={() => setOffer(null)}
+              onImport={() => (setOffer(null), openPanel('import'))}
+            />
+          )}
           {find && !watching && <FindBar onClose={closeFind} focusTick={findTick} tab={tab?.id} native={native} />}
           {watching ? (
             <AgentBody k={watching} onBack={leave} />

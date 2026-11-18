@@ -33,7 +33,10 @@ does more of what you expect of a browser.
   Firefox, Safari and the other browsers on this computer, its latest 20,000 pages, so the address bar suggests the
   sites you know. Importing again adds nothing twice.
 - **Your browsers, in the welcome tour**: in the desktop apps, the tour asks **Bring in your bookmarks and history?**
-  when it finds other browsers on this computer, and brings in what you pick, one browser at a time.
+  when it finds other browsers on this computer, and brings in what you pick, one browser at a time. If you took the
+  tour before, the Browser page offers it once instead; any time, it is at ⋯ → **Import bookmarks and history…**. On a
+  Mac, **Open System Settings** on Safari's row takes you to where you give Hydor Full Disk Access, and Hydor checks
+  again when you come back.
 
 ## 0.86.3 · 18 November 2026
 

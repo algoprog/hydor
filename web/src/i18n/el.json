@@ -25852,5 +25852,16 @@
   "That browser’s history is not here any more.": "Το ιστορικό αυτού του προγράμματος περιήγησης δεν υπάρχει πια.",
   "The pages you visited in your own browser, by day, with a search box and the tabs you closed lately, and importing the history of the other browsers on this computer: Chrome, Firefox, Safari, Edge, Brave and more (desktop app)": "Οι σελίδες που επισκεφθήκατε στο δικό σας πρόγραμμα περιήγησης, ανά ημέρα, με πλαίσιο αναζήτησης και τις καρτέλες που κλείσατε πρόσφατα, και η εισαγωγή του ιστορικού των άλλων προγραμμάτων περιήγησης σε αυτόν τον υπολογιστή: Chrome, Firefox, Safari, Edge, Brave και άλλα (εφαρμογή υπολογιστή)",
   "There is no history to import there.": "Εκεί δεν υπάρχει ιστορικό για εισαγωγή.",
-  "Your history has all of it already": "Το ιστορικό σας τα έχει ήδη όλα"
+  "Your history has all of it already": "Το ιστορικό σας τα έχει ήδη όλα",
+  "Allowed it? macOS may want Hydor reopened first: quit Hydor and open it again.": "Το επιτρέψατε; Το macOS μπορεί να θέλει πρώτα επανεκκίνηση του Hydor: κλείστε το Hydor και ανοίξτε το ξανά.",
+  "Bookmarks come into a new folder at the end of the bookmarks bar, and history joins yours. It all stays on this computer.": "Οι σελιδοδείκτες μπαίνουν σε έναν νέο φάκελο στο τέλος της γραμμής σελιδοδεικτών και το ιστορικό προστίθεται στο δικό σας. Όλα μένουν σε αυτόν τον υπολογιστή.",
+  "Bring in the bookmarks and history of the other browsers on this computer: Chrome, Firefox, Safari, Edge, Brave and more, with a button for Safari’s Full Disk Access on a Mac (desktop app)": "Εισαγωγή των σελιδοδεικτών και του ιστορικού των άλλων προγραμμάτων περιήγησης σε αυτόν τον υπολογιστή: Chrome, Firefox, Safari, Edge, Brave και άλλα, με κουμπί για την πλήρη πρόσβαση στον δίσκο του Safari σε Mac (εφαρμογή υπολογιστή)",
+  "Bring in your bookmarks and history from {0}?": "Εισαγωγή σελιδοδεικτών και ιστορικού από {0};",
+  "Import bookmarks and history": "Εισαγωγή σελιδοδεικτών και ιστορικού",
+  "Import bookmarks and history…": "Εισαγωγή σελιδοδεικτών και ιστορικού…",
+  "import bookmarks history bring in other browsers chrome firefox safari edge brave arc opera vivaldi chromium favourites favorites pages offer full disk access system settings macos permission": "εισαγωγή σελιδοδείκτες ιστορικό άλλα προγράμματα περιήγησης chrome firefox safari edge brave arc opera vivaldi chromium αγαπημένα σελίδες πρόταση πλήρης πρόσβαση στον δίσκο ρυθμίσεις συστήματος macos άδεια",
+  "Import…": "Εισαγωγή…",
+  "No other browser was found on this computer.": "Δεν βρέθηκε άλλο πρόγραμμα περιήγησης σε αυτόν τον υπολογιστή.",
+  "No thanks": "Όχι, ευχαριστώ",
+  "Open System Settings": "Άνοιγμα ρυθμίσεων συστήματος"
 }

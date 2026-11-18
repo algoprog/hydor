@@ -259,7 +259,7 @@ agents that speak ACP and take MCP servers.
     with, with **Undo**.
   - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
-    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Highlights**, **Extensions**, **Site
+    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Import bookmarks and history**, **Highlights**, **Extensions**, **Site
     permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
   - **Save** keeps a reader copy of the page in the Library as a Web page (the article as Mozilla's Readability finds it,
     with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads, History and
@@ -284,7 +284,9 @@ agents that speak ACP and take MCP servers.
     profile by its name, with how many pages would come in): each keeps its title, last visit, visits and typed visits,
     so the address bar ranks them as that browser did; pages you have keep the later visit and larger counts, so
     importing again adds nothing twice. A browser that locks its history while it is open asks you to close it (Firefox
-    can stay open); Safari needs Full Disk Access. What the
+    can stay open); Safari needs Full Disk Access, and while macOS keeps Hydor out, its row has **Open System Settings** in
+    place of **Import** (it opens Full Disk Access; coming back checks again, and the row says to reopen Hydor if it still
+    can't read Safari). What the
     browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
     the history, the files staying where they are.
   - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
@@ -357,7 +359,11 @@ agents that speak ACP and take MCP servers.
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
   Arc and Safari, each profile by its name, into one new folder that keeps the browser's own folders; Safari needs Full Disk
   Access) or from an exported bookmarks file, and export them as a file Chrome, Firefox and Safari import. The desktop
-  app's welcome tour offers both, bookmarks and history, from those browsers.
+  app's welcome tour offers both, bookmarks and history, from those browsers. Someone who took the tour before it had
+  that page, or skipped it, is offered them once, in a bar above the Browser page the first time it opens with other
+  browsers on the computer (**No thanks**, or **Import…**, which opens the **Import bookmarks and history** panel);
+  the panel stays at Menu → Import bookmarks and history… (`/browser?panel=import`), with a switch for Bookmarks and
+  one for History and a row for each browser and profile with its counts and **Import**.
 - **Chrome extensions** in your own browser (the desktop app's browser runs them): from the Chrome Web Store by link or
   id, or the **Add to Hydor** button on a Web Store page, from a folder (loaded where it is), or from the Chrome-based
   browsers on this computer; toolbar buttons with popups and badges, options pages, a switch to turn one off, **Remove**,
@@ -1889,7 +1895,8 @@ programs shows each program's version and what is out, with Check now, Update no
   is on this computer, one more page, "Coming from another agent?", names what it found and opens
   Bring in over the tour. In the desktop apps, when other browsers are on this computer, "Bring in your bookmarks and
   history?" lists them, each with how many bookmarks and pages of history it has, and **Import** beside one brings in
-  what is switched on (Bookmarks, History); Next goes on without. Help shows it again.
+  what is switched on (Bookmarks, History), or **Open System Settings** on a Mac while macOS keeps Hydor from reading
+  Safari (the tour comes back to this page if Hydor has to reopen); Next goes on without. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the

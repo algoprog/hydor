@@ -5,10 +5,12 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, FileUp, Folder
 import type { BookmarkNode, BookmarkSource } from '@shared/browser';
 import { api, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
+import { canOpenFullDiskAccess } from '../../lib/notify';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, IconButton, Throbber } from '../../components/ui';
 import { RenameDialog, openBookmark, useDeleteBookmark } from './BookmarkBar';
 import { addBookmark, childrenOf, editBookmark, loadBookmarks, useBookmarks, withinFolder } from './browsing';
+import { OpenSettings, REOPEN_NOTE } from './ImportBrowsers';
 import { Note, Panel } from './Panel';
 
 interface Row {
@@ -171,17 +173,26 @@ export function BookmarksPanel({ onClose }: { onClose: () => void }) {
 function ImportBox() {
   const [sources, setSources] = useState<BookmarkSource[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Read again once the window is back from System Settings (Full Disk Access), and whether that was done.
+  const [again, setAgain] = useState(0);
+  const [retried, setRetried] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   useEffect(() => {
     let live = true;
     api<{ sources: BookmarkSource[] }>('/api/browser/bookmarks/sources').then(
-      (r) => live && setSources(r.sources),
+      (r) => {
+        if (!live) return;
+        setSources(r.sources);
+        if (again) setRetried(true);
+      },
       () => live && setSources([]),
     );
     return () => {
       live = false;
     };
-  }, []);
+  }, [again]);
+  // Safari, until Hydor has Full Disk Access: a button opens where a Mac gives it.
+  const access = (s: BookmarkSource) => s.needs === 'full-disk-access' && canOpenFullDiskAccess;
 
   const bring = async (id: string, body: { source: string } | { html: string }) => {
     setBusy(id);
@@ -217,10 +228,15 @@ function ImportBox() {
               {s.profile ? ` · ${s.profile}` : ''}
             </div>
             <div className={cx('text-[12px]', s.error ? 'text-warn' : 'text-fg-3')}>{s.error ? s.error : `${s.count} bookmark${s.count === 1 ? '' : 's'}`}</div>
+            {access(s) && retried && <div className="text-[12px] text-fg-3">{REOPEN_NOTE}</div>}
           </div>
-          <Button size="sm" disabled={!!s.error || !s.count || busy !== null} onClick={() => void bring(s.id, { source: s.id })}>
-            {busy === s.id ? 'Importing…' : 'Import'}
-          </Button>
+          {access(s) ? (
+            <OpenSettings onBack={() => setAgain((n) => n + 1)} />
+          ) : (
+            <Button size="sm" disabled={!!s.error || !s.count || busy !== null} onClick={() => void bring(s.id, { source: s.id })}>
+              {busy === s.id ? 'Importing…' : 'Import'}
+            </Button>
+          )}
         </div>
       ))}
       {sources?.length === 0 && <Note>No other browser with bookmarks was found on this computer.</Note>}

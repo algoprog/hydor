@@ -644,6 +644,9 @@ const awake = createAwake({
  */
 const NOTICE_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.notifications?id=com.hydor.app' : WIN ? 'ms-settings:notifications' : null;
 
+/** Where a Mac lets you give the app Full Disk Access (System Settings → Privacy & Security → Full Disk Access), which Safari's bookmarks and history need. */
+const FILES_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles' : null;
+
 // What the page in the window asks (preload.cjs): only the app's own pages.
 const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
 
@@ -700,6 +703,15 @@ ipcMain.handle('hydor:notice-settings', async (e) => {
   if (!fromOwnPage(e) || !NOTICE_SETTINGS) return false;
   try {
     await shell.openExternal(NOTICE_SETTINGS);
+    return true;
+  } catch {
+    return false;
+  }
+});
+ipcMain.handle('hydor:files-settings', async (e) => {
+  if (!fromOwnPage(e) || !FILES_SETTINGS) return false;
+  try {
+    await shell.openExternal(FILES_SETTINGS);
     return true;
   } catch {
     return false;

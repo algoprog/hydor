@@ -405,6 +405,8 @@ export interface BookmarkSource {
   count: number;
   /** Why it cannot be read now, when it cannot (Safari without Full Disk Access, Firefox's file locked…). */
   error?: string;
+  /** What you must allow first: 'full-disk-access' when macOS keeps Hydor from reading it (Safari, until Hydor has Full Disk Access). */
+  needs?: 'full-disk-access';
 }
 
 /** The history of another browser on this computer (or of one of its profiles) that can be imported. */
@@ -419,6 +421,8 @@ export interface HistorySource {
   count: number;
   /** Why it cannot be read now, when it cannot (Safari without Full Disk Access, its file held by the browser while it runs…). */
   error?: string;
+  /** What you must allow first: 'full-disk-access' when macOS keeps Hydor from reading it (Safari, until Hydor has Full Disk Access). */
+  needs?: 'full-disk-access';
 }
 
 /** What importing another browser's history did. */
@@ -517,6 +521,8 @@ export interface BrowsingPrefs {
   autoplay: boolean;
   /** How reader view shows articles. */
   reader: ReaderPrefs;
+  /** The Browser page has offered once to bring in the other browsers' bookmarks and history (in the desktop app; the welcome tour's page counts too). */
+  importOffered: boolean;
 }
 
 /** A page you visited in your own browser. */

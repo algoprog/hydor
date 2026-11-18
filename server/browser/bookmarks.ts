@@ -11,7 +11,7 @@ import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { syncBookmarkVectors } from './meaning.ts';
-import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, readCopy, readJson, type Dirs } from './other-browsers.ts';
+import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, NeedsAccess, readCopy, readJson, type Dirs } from './other-browsers.ts';
 
 const KEY = 'browser.bookmarks';
 export const MAX_BOOKMARKS = 20_000;
@@ -418,7 +418,7 @@ function safariCandidates(h: Dirs): Candidate[] {
       load: () =>
         new Promise<Imp[]>((resolve, reject) => {
           execFile('plutil', ['-convert', 'xml1', '-o', '-', file], { maxBuffer: 256 * 1024 * 1024 }, (err, out) => {
-            if (err) return reject(new Error(SAFARI_DENIED));
+            if (err) return reject(new NeedsAccess(SAFARI_DENIED));
             try {
               resolve(safariTree(parsePlist(out)));
             } catch {
@@ -443,7 +443,7 @@ export async function bookmarkSources(): Promise<BookmarkSource[]> {
       const count = countLinks(tidy(await c.load()));
       if (count > 0) out.push({ ...c.info, count });
     } catch (e) {
-      out.push({ ...c.info, count: 0, error: (e as Error).message });
+      out.push({ ...c.info, count: 0, error: (e as Error).message, ...(e instanceof NeedsAccess ? { needs: e.needs } : {}) });
     }
   }
   return out;

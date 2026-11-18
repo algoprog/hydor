@@ -52,7 +52,7 @@ const check = async (name: string, fn: () => Promise<void> | void) => {
 };
 const refused = (status: number, re: RegExp) => (e: unknown) => e instanceof HttpError && e.status === status && re.test(e.message);
 /** The settings that came with private tabs and the new browser settings, as they are before you change any (the app in English). */
-const NEWER = { cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, reader: READER_DEFAULTS };
+const NEWER = { cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, importOffered: false, reader: READER_DEFAULTS };
 
 async function main() {
   // ---- the address bar ----
@@ -141,6 +141,13 @@ async function main() {
     assert.deepEqual([p.cookieBanners, p.darkPages, p.translateOffer, p.autoplay], [false, true, true, false]);
     assert.throws(() => setBrowsingPrefs(db, { autoplay: true, darkPages: 'x' }), refused(400, /true or false/));
     assert.equal(browsingPrefs(db).autoplay, false, 'a bad change keeps none of its parts');
+  });
+  await check('prefs: importOffered is off until you change it, and a value that is not true or false keeps the one it had', () => {
+    const { db } = mem();
+    assert.equal(browsingPrefs(db).importOffered, false);
+    assert.equal(setBrowsingPrefs(db, { importOffered: true }).importOffered, true);
+    assert.throws(() => setBrowsingPrefs(db, { importOffered: 'yes' }), refused(400, /true or false/));
+    assert.equal(browsingPrefs(db).importOffered, true, 'the bad change kept nothing');
   });
   await check('prefs: translateTo is one of the languages pages can be translated into', () => {
     const { db } = mem();

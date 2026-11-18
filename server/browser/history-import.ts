@@ -8,7 +8,7 @@ import type { HistorySource } from '../../shared/browser.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { MAX_HISTORY, mergeHistory } from './history.ts';
-import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, readCopy, type Dirs } from './other-browsers.ts';
+import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, NeedsAccess, readCopy, type Dirs } from './other-browsers.ts';
 
 const SAFARI_DENIED = 'Hydor may not read Safari’s history: allow it in System Settings → Privacy & Security → Full Disk Access';
 const UNREADABLE = 'Its history cannot be read.';
@@ -40,7 +40,7 @@ function explain(e: unknown, browser: string): Error {
   const code = (e as NodeJS.ErrnoException)?.code;
   // The browser holds the file while it runs (Windows refuses a copy of it with a permission error).
   if (code === 'EBUSY' || (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES'))) return new Error(`Close ${browser}, then try again: it locks its history while it is open`);
-  if (browser === 'Safari' && (code === 'EPERM' || code === 'EACCES')) return new Error(SAFARI_DENIED);
+  if (browser === 'Safari' && (code === 'EPERM' || code === 'EACCES')) return new NeedsAccess(SAFARI_DENIED);
   return new Error(UNREADABLE);
 }
 
@@ -140,7 +140,7 @@ export async function historySources(): Promise<HistorySource[]> {
       const count = await c.count();
       if (count > 0) out.push({ ...c.info, count });
     } catch (e) {
-      out.push({ ...c.info, count: 0, error: (e as Error).message });
+      out.push({ ...c.info, count: 0, error: (e as Error).message, ...(e instanceof NeedsAccess ? { needs: e.needs } : {}) });
     }
   }
   return out;
