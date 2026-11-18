@@ -243,7 +243,7 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 **Library** on the rail ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac).
 
-In a wide window the Library has a column of its own at the left, with its name, **New** (see [Make a page](#make-a-page)) and its places. **Ctrl+B** (⌘B on a Mac) hides it together with the sidebar, and **Show sidebar** at the start of the row above the cards brings it back. In a narrower window or on a phone the places are a row of chips above the cards, and **New** is at the top right. Each place shows how many things it holds:
+In a wide window the Library has a column of its own at the left, with the app's logo, **New** (see [Make a page](#make-a-page)) and its places. **Ctrl+B** (⌘B on a Mac) hides it together with the sidebar, and **Show sidebar** at the start of the row above the cards brings it back. In a narrower window or on a phone the places are a row of chips above the cards, and **New** is at the top right. Each place shows how many things it holds:
 
 - **Everything**: all you kept. With projects, each project's things show together under its name, the one changed most lately first, each with **See all** to show only that project, then those **Not in a project**.
 - Your **Projects**, each by its mark and name: what agents saved in its sessions and what you put there (see [Sort it by project](#sort-it-by-project)). **Open the project**, beside its name, goes to the project's own page.

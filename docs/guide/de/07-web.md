@@ -260,7 +260,7 @@ Sie hat oben eine Leiste mit einem Feld, das sucht, öffnet, fragt und einem Age
 
 ### Leiste und Feld
 
-Oben über die Seite verläuft eine Leiste. Links, über der Tab-Spalte, stehen der Name der Seite, **Neuer Tab** (+) und **Tabs ausblenden** (dasselbe wie Strg+B), das die Tab-Spalte wegklappt, bis **Tabs einblenden** sie zurückholt. Der Rest der Leiste gehört der Seite, auf der du bist:
+Oben über die Seite verläuft eine Leiste. Links, über der Tab-Spalte, stehen das **HYDΩR**-Logo, **Neuer Tab** (+) und **Tabs ausblenden** (dasselbe wie Strg+B), das die Tab-Spalte wegklappt, bis **Tabs einblenden** sie zurückholt. Der Rest der Leiste gehört der Seite, auf der du bist:
 
 - **Zurück**, **Vorwärts** und **Neu laden** stehen links vom Feld. Während eine Seite lädt, wird aus Neu laden **Stoppen**. Eine Schaltfläche Startseite gibt es nicht: **Neuer Tab** öffnet deine Startseite.
 - Das Feld in der Mitte ist die Adressleiste. In Ruhe zeigt es die Adresse der Seite als ihre Website, den Rest der Adresse in blasserer Farbe, und die Erinnerung **Strg+L**. Klicke hinein oder drücke Strg+L, dann zeigt es die ganze Adresse zum Ändern. Gib eine Adresse mit oder ohne https:// ein (`example.com`, `localhost:3000`, `192.168.1.5`, eine `file://`-Adresse) und drücke Enter, um sie zu öffnen. Alles andere, was du eingibst, wird mit deiner Suchmaschine gesucht (zuerst Google; siehe [Browser-Einstellungen](/guide/web#browser-settings)). **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet es stattdessen in einem neuen Tab. Was es beim Tippen anbietet, steht unter [Vorschläge](/guide/web#suggestions). Links steht sein Schloss, rechts sein Stern.

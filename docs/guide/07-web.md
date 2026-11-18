@@ -260,7 +260,7 @@ It has a bar across the top with a box that searches, opens, asks and tells an a
 
 ### The bar and the box
 
-A bar runs across the top of the page. At its left, over the tab column, are the page's name, **New tab** (+) and **Hide tabs** (the same as Ctrl+B), which folds the tab column away until **Show tabs** brings it back. The rest of the bar is for the page you are on:
+A bar runs across the top of the page. At its left, over the tab column, are the app's logo, **New tab** (+) and **Hide tabs** (the same as Ctrl+B), which folds the tab column away until **Show tabs** brings it back. The rest of the bar is for the page you are on:
 
 - **Back**, **Forward** and **Reload** are at the left of the box. While a page loads, Reload is **Stop**. There is no Home button: **New tab** opens your home page.
 - The box in the middle is the address bar. At rest it shows the page's address as its site, with the rest of the address in a paler colour, and the reminder **Ctrl+L**. Click it, or press Ctrl+L, and it shows the whole address to change. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead. What it offers as you type is under [Suggestions](/guide/web#suggestions). Its padlock is at the left and its star at the right.

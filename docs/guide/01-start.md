@@ -18,7 +18,6 @@ On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels
 
 The rail is a column of tiles, each with an icon over its name; point at one to see its name and shortcut. The tile for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
 
-- The app's mark, **Ω**. A crossed-out Wi-Fi icon appears under it while the page reconnects to the app.
 - **New**: opens the [start page](#the-start-page) for a new session.
 - **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
 
@@ -41,21 +40,21 @@ Further down, after some space:
 
 The sections come in the order Browser, Library, Projects, Apps, Agents, and the tools below the Inbox in the order Search, Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools under the Inbox). The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
 
-The **Browser** page and the **Library**'s front page show a column of their own beside the rail (the browser's tabs, the library's folders) in place of the sessions sidebar. **Sessions** on the rail brings the sidebar back for the other pages.
+The **Browser** page and the **Library**'s front page show a column of their own beside the rail (the browser's tabs, the library's folders) in place of the sessions sidebar. **Sessions** on the rail brings the sidebar back for the other pages. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the sidebar, or at the top of the rail when no sidebar is showing (it is hidden, or the Browser or Library page has a column of its own).
 
 ### The sidebar
 
 The sidebar is the column beside the rail. It holds:
 
-- **Sessions**, its title, with **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of each page shows it again, and the rail stays. On a phone the drawer has the app's name **Hydor**, the inbox and **Close menu** here instead.
+- The **HYDΩR** logo, with the **Filter and group sessions** button and **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of each page shows it again, and the rail stays. On a phone the drawer has the logo, the inbox, the filter button and **Close menu** here instead.
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
-- **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
-- The filter button at the end of that field (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/projects).
+- To find a session, use the search box: **Search** on the rail (on a phone, **Search** among the tools at the bottom of the drawer), or Ctrl+K (⌘K on a Mac). It finds sessions by their title, their folder and the words said in them, archived sessions too, marked **Archived** and listed after the others (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
+- The filter button in the header (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/projects).
 
 ### The session list
 
-Under the search field is every session, in groups:
+Under **New session** is every session, in groups:
 
 - **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. Sessions stopped by a usage limit stay here while scheduled to resume automatically; cancelling that resume restores the five-minute rule. Sessions whose background agents, commands or monitors are still running stay here too, however quiet, until those end. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
@@ -73,7 +72,7 @@ Sessions you had in Claude Code or Codex outside Hydor (in VS Code, a terminal, 
 
 To list the sessions by day only, as before, untick **Group by folder or project** in the filter button's menu, or find **Group sessions by folder or project** in the search box; it switches back the same way. While the list shows one project, its sessions go by day.
 
-Archived sessions are not listed, but **Search sessions** still finds them. "No sessions yet." shows before your first one.
+Archived sessions are not listed, but the search box (Ctrl+K) still finds them, marked **Archived**. "No sessions yet." shows before your first one.
 
 Each row shows the agent's icon with a status dot, the session's title, and a second line. While the agent runs, the second line says what it is doing ("Working · 2m 10s", with how long it has worked in all after earlier turns, "Working · 2m 10s (47m)"; "Needs you", "Ready", "Working · 1 in background", "Open in VS Code"). Otherwise it shows the folder ("Home folder" for yours), how long ago the session was active, and how many lines it added and removed. Under **Projects**, where the group names the folder already, a row takes one line: the title, then how long ago the session was active (after a worktree's branch), or what the agent is doing while it works or needs you. Small marks can follow the title:
 
@@ -165,7 +164,7 @@ Next: [Sessions](/guide/sessions) explains everything you can do in a session.
 
 ## Search everything with Ctrl+K
 
-The search box finds anything in the app as you type, like Spotlight on a Mac. Open it with Ctrl+K (⌘K on a Mac) from any page, except while you type in a code editor or a terminal. The **Search** tile on the rail and the Ctrl+K badge in **Search sessions** open it too. Press Ctrl+K again, or Esc, to close it.
+The search box finds anything in the app as you type, like Spotlight on a Mac. Open it with Ctrl+K (⌘K on a Mac) from any page, except while you type in a code editor or a terminal. The **Search** tile on the rail (on a phone, **Search** among the tools in the drawer) opens it too. Press Ctrl+K again, or Esc, to close it.
 
 ### What it finds
 
@@ -173,7 +172,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or project, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.
-- **Sessions**: by title, folder, branch and first message (not archived ones). Opening one opens it.
+- **Sessions**: by title, folder, branch and first message, archived ones too, marked **Archived** and after the others. Opening one opens it.
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
 - **Projects**: your projects, by name and description. Opening one opens the project.
@@ -205,8 +204,6 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - What you pick, with what you typed. Type the same words again and that result comes first, at once.
 - The places you visit, however you got there: pages, Settings sections, sessions, apps, files. Among the results that match, the ones you use come up, more the better they match what you typed, and less as time passes.
 - The app keeps this for you, so your phone and your computer learn together.
-
-The sidebar's **Search sessions** field is a simpler search: it lists only sessions, by title, folder and the words in their messages, archived ones included.
 
 ## Use the app on a phone
 

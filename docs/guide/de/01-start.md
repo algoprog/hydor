@@ -18,7 +18,6 @@ Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstell
 
 Die Werkzeugleiste ist eine Spalte aus Kacheln, jeweils mit dem Symbol über dem Namen; zeigst du auf eine, siehst du Name und Tastenkürzel. Die Kachel der geöffneten Seite ist hervorgehoben, daneben sitzt am Bildschirmrand ein Balken in der Akzentfarbe. Von oben nach unten:
 
-- Das Zeichen der App, **Ω**. Während einer erneuten Verbindung zur App erscheint darunter ein durchgestrichenes WLAN-Symbol.
 - **Neu**: öffnet die [Startseite](#the-start-page) für eine neue Sitzung.
 - **Sitzungen**: zeigt deine Sitzungen in der Seitenleiste. Auf der Startseite oder in einer Sitzung blendet die Kachel die Seitenleiste ein oder aus (wie Strg+B). Von jeder anderen Seite zeigt sie die Seitenleiste und bringt dich zur Sitzung, die du zuletzt in diesem Fenster geöffnet hattest, sonst zur Startseite.
 
@@ -41,21 +40,21 @@ Weiter unten, nach etwas Abstand:
 
 Die Bereiche stehen in der Reihenfolge Browser, Bibliothek, Projekte, Apps, Agenten, die Werkzeuge unter dem Posteingang in der Reihenfolge Suchen, Nutzung, System, Einstellungen, Hilfe: Das ist die Standardreihenfolge. Zum Ändern ziehst du eine Kachel an eine andere Position innerhalb ihrer Gruppe (der Bereiche oder der Werkzeuge unter dem Posteingang). Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt ein Rechtsklick auf eine Kachel und **Standardreihenfolge wiederherstellen** alles zurück. In einem zu niedrigen Fenster lässt sich die Werkzeugleiste scrollen.
 
-Die Seite **Browser** und die Startseite der **Bibliothek** zeigen neben der Werkzeugleiste eine eigene Spalte (die Tabs des Browsers, die Ordner der Bibliothek) statt der Seitenleiste mit den Sitzungen. **Sitzungen** in der Werkzeugleiste holt die Seitenleiste für die anderen Seiten zurück.
+Die Seite **Browser** und die Startseite der **Bibliothek** zeigen neben der Werkzeugleiste eine eigene Spalte (die Tabs des Browsers, die Ordner der Bibliothek) statt der Seitenleiste mit den Sitzungen. **Sitzungen** in der Werkzeugleiste holt die Seitenleiste für die anderen Seiten zurück. Während die Seite sich erneut mit der App verbindet, erscheint ein durchgestrichenes WLAN-Symbol neben dem Logo oben in der Seitenleiste oder oben in der Werkzeugleiste, wenn keine Seitenleiste zu sehen ist (sie ist ausgeblendet, oder die Seite Browser oder Bibliothek hat eine eigene Spalte).
 
 ### Die Seitenleiste
 
 Die Seitenleiste ist die Spalte neben der Werkzeugleiste. Sie enthält:
 
-- **Sitzungen** als Titel und am Ende **Seitenleiste ausblenden** (Strg+B). Bei ausgeblendeter Seitenleiste zeigt die Schaltfläche oben links auf jeder Seite sie wieder an; die Werkzeugleiste bleibt. Auf dem Smartphone stehen hier stattdessen der App-Name **Hydor**, der Posteingang und **Menü schließen**.
+- Das **HYDΩR**-Logo, am Ende **Sitzungen filtern und gruppieren** und **Seitenleiste ausblenden** (Strg+B). Bei ausgeblendeter Seitenleiste zeigt die Schaltfläche oben links auf jeder Seite sie wieder an; die Werkzeugleiste bleibt. Auf dem Smartphone stehen hier stattdessen das Logo, der Posteingang, die Filterschaltfläche und **Menü schließen**.
 - Eine Computerauswahl, sobald du unter [Einstellungen → Computer](/settings?s=machines) weitere Computer hinzugefügt hast. Sie nennt den angezeigten Computer und zeigt einen Punkt, wenn Sitzungen anderswo deine Antwort benötigen. Siehe [Smartphones, andere Computer und Freigaben](/guide/devices).
 - **Neue Sitzung** öffnet die [Startseite](#the-start-page).
-- **Sitzungen suchen** sucht nach Titel, Ordner und Nachrichteninhalt, auch in archivierten Sitzungen. Escape leert das Feld. Am Computer öffnet **Strg+K** am Feldende stattdessen die übergreifende Suche. Siehe [Alles mit Strg+K durchsuchen](#search-everything-with-ctrlk).
-- **Sitzungen filtern und gruppieren** am Feldende grenzt die Liste auf **Alle Agenten**, **Claude Code** oder **Codex** ein. Sobald Projekte vorhanden sind, gibt es außerdem **Alle Projekte** oder eines von bis zu acht aufgelisteten Projekten sowie **Projekte** zum Öffnen der Projektseite. Ein aktiver Filter färbt die Schaltfläche in der Akzentfarbe. **Nach Ordner oder Projekt gruppieren** schaltet die Gruppen ein oder aus; siehe [Die Sitzungsliste](#the-session-list) und [Projekte und Wissen](/guide/projects).
+- Um eine Sitzung zu finden, nutze die Suche: **Suchen** in der Werkzeugleiste (auf dem Smartphone **Suchen** bei den Werkzeugen unten im Menü) oder Strg+K (⌘K auf dem Mac). Sie sucht nach Titel, Ordner und Nachrichteninhalt, auch in archivierten Sitzungen, die mit **Archiviert** markiert sind und nach den übrigen stehen. Siehe [Alles mit Strg+K durchsuchen](#search-everything-with-ctrlk).
+- **Sitzungen filtern und gruppieren** in der Kopfzeile grenzt die Liste auf **Alle Agenten**, **Claude Code** oder **Codex** ein. Sobald Projekte vorhanden sind, gibt es außerdem **Alle Projekte** oder eines von bis zu acht aufgelisteten Projekten sowie **Projekte** zum Öffnen der Projektseite. Ein aktiver Filter färbt die Schaltfläche in der Akzentfarbe. **Nach Ordner oder Projekt gruppieren** schaltet die Gruppen ein oder aus; siehe [Die Sitzungsliste](#the-session-list) und [Projekte und Wissen](/guide/projects).
 
 ### Die Sitzungsliste
 
-Unter der Suche stehen alle Sitzungen in Gruppen:
+Unter **Neue Sitzung** stehen alle Sitzungen in Gruppen:
 
 - **Aktiv**: Sitzungen mit Aktivität in den letzten fünf Minuten, hier, in VS Code oder einem Terminal, auch bereits abgeschlossene. Nach fünf Minuten ohne Aktivität wechseln sie in ihre normale Gruppe, selbst wenn das Agentenprogramm noch offen ist. Durch Nutzungslimits gestoppte Sitzungen bleiben hier, solange ihre automatische Fortsetzung geplant ist; brichst du diese ab, gilt wieder die Fünf-Minuten-Regel. Laufende Hintergrundagenten, Befehle oder Überwachungen halten eine Sitzung ebenfalls hier, unabhängig von zwischenzeitlicher Stille. Die Einträge behalten ihre Position; per Ziehen änderst du sie.
 - **Angepinnt**: deine angehefteten Sitzungen in frei veränderbarer Reihenfolge. Ziehe eine Sitzung aus einer unteren Gruppe hierher, um sie anzuheften.
@@ -73,7 +72,7 @@ Auch außerhalb von Hydor gestartete Claude-Code- und Codex-Sitzungen erscheinen
 
 Für eine reine Tagesansicht deaktiviere **Nach Ordner oder Projekt gruppieren** im Filtermenü oder suche nach **Sitzungen nach Ordner oder Projekt gruppieren**. Auf dieselbe Weise aktivierst du die Gruppen wieder. Bei einem Filter auf ein einzelnes Projekt werden dessen Sitzungen nach Tagen angezeigt.
 
-Archivierte Sitzungen erscheinen nicht in der Liste, bleiben aber über **Sitzungen suchen** auffindbar. Vor der ersten Sitzung steht dort „Noch keine Sitzungen“.
+Archivierte Sitzungen erscheinen nicht in der Liste, bleiben aber über die Suche (Strg+K) auffindbar, mit **Archiviert** markiert. Vor der ersten Sitzung steht dort „Noch keine Sitzungen“.
 
 Jede Zeile zeigt das Symbol des Agenten mit einem Statuspunkt, den Titel der Sitzung und eine zweite Zeile. Solange der Agent läuft, steht in der zweiten Zeile, was er gerade tut („Arbeitet · 2 Min. 10 Sek.“; wenn er nach früheren Durchläufen insgesamt schon länger gearbeitet hat, steht dort auch diese Gesamtzeit, „Arbeitet · 2 Min. 10 Sek. (47 Min.)“; „Braucht dich“, „Bereit“, „Arbeitet · 1 im Hintergrund“, „In VS Code öffnen“). Sonst zeigt die Zeile den Ordner („Persönlicher Ordner“ bei deinem eigenen), wie lange die Sitzung zuletzt aktiv war und wie viele Zeilen der Agent hinzugefügt und entfernt hat. Unter **Projekte**, wo schon die Gruppe den Ordner nennt, hat eine Zeile nur eine Zeile mit dem Titel, dann (nach dem Branch eines Worktrees) wie lange die Sitzung zuletzt aktiv war, oder was der Agent gerade tut, solange er arbeitet oder dich braucht. Hinter dem Titel können kleine Symbole stehen:
 
@@ -165,7 +164,7 @@ Weiter geht es mit [Sitzungen](/guide/sessions), wo alle Sitzungsfunktionen besc
 
 ## Alles mit Strg+K durchsuchen
 
-Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suchen** in der Werkzeugleiste und das Strg+K-Symbol bei **Sitzungen suchen** öffnen sie. Erneutes Strg+K oder Esc schließt sie.
+Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suchen** in der Werkzeugleiste (auf dem Smartphone **Suchen** bei den Werkzeugen im Menü) öffnet sie. Erneutes Strg+K oder Esc schließt sie.
 
 ### Was die Suche findet
 
@@ -173,7 +172,7 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 - **Aktionen**: Take a tour, Sprachmodus, Versionshinweise, helles oder dunkles Design, Seitenleiste ein- oder ausblenden, Sitzungen nach Ordner oder Projekt gruppieren und Terminalbereich ein- oder ausblenden.
 - **Einstellungen**: alle Einstellungsbereiche und ihre Optionen. Ein Treffer öffnet den Bereich und hebt die Option hervor.
 - **Designs**: integrierte und eigene Designs. Die Auswahl aktiviert das Design.
-- **Sitzungen**: Titel, Ordner, Branch und erste Nachricht, ohne archivierte Sitzungen. Ein Treffer öffnet die Sitzung.
+- **Sitzungen**: Titel, Ordner, Branch und erste Nachricht, auch archivierte Sitzungen, mit **Archiviert** markiert und nach den übrigen. Ein Treffer öffnet die Sitzung.
 - **In Nachrichten**: Nachrichten mit deinen Suchwörtern. Ein Treffer öffnet die Sitzung an der passenden Stelle mit vorbereiteter Suchleiste.
 - **Memory**: deine Memory-Notizen. Ein Treffer öffnet Einstellungen → Memory bei der Notiz.
 - **Projekte**: Projektname und Beschreibung. Ein Treffer öffnet das Projekt.
@@ -205,8 +204,6 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 - Sie merkt sich ausgewählte Treffer samt Suchtext. Suchst du erneut mit denselben Wörtern, steht der Treffer sofort oben.
 - Sie berücksichtigt besuchte Seiten, Einstellungsbereiche, Sitzungen, Apps und Dateien unabhängig vom Zugangsweg. Häufig verwendete passende Treffer rücken nach oben, stärker bei guter Textübereinstimmung und mit der Zeit wieder schwächer.
 - Die App speichert dies geräteübergreifend, sodass Smartphone und Computer gemeinsam lernen.
-
-**Sitzungen suchen** in der Seitenleiste bleibt eine einfachere Suche ausschließlich nach Sitzungen, anhand von Titel, Ordner und Nachrichtentext, einschließlich archivierter Sitzungen.
 
 ## Die App auf dem Smartphone verwenden
 
