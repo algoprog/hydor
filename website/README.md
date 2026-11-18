@@ -9,7 +9,9 @@ JavaScript with no framework, dark like the app's own dark theme, and nothing th
   licence files) and the pictures in `img/`.
 - `build.mjs` copies `src/` to `dist/website`, writes in the version people download (GitHub's latest release)
   with its date and the line that sums it up in `CHANGELOG.md`, hashes the page's inline script for the
-  Content-Security-Policy, and adds the app's tour film from `docs/media/hydor-intro.mp4`.
+  Content-Security-Policy, and adds the app's tour film from `docs/media/hydor-intro.mp4`. Every page asks for the
+  pictures and the film with `?v=` and a hash of what they hold: Cloudflare and browsers keep `/img/` and `/media/`
+  for a week, so without it a picture taken again under the same name would show the old one until then.
 - `docs.mjs` makes the docs (`/docs`) from the repository's Markdown: a page for each topic of the guide
   (`docs/guide`, in Help's groups, with Help's icons and lines from `web/src/features/guide/topics.ts`), for each
   document the README lists, and the release notes (`CHANGELOG.md`). It reads them with the app's own parser

@@ -75,7 +75,32 @@ async function build() {
   const docs = await buildDocs({ root: ROOT, out: OUT, indexHtml: html });
   const urls = ['/', '/docs/', ...docs].map((u) => `  <url><loc>https://hydor.app${u}</loc></url>`).join('\n');
   fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
-  console.log(`built ${path.relative(ROOT, OUT)} for Hydor ${version}${date ? ` (${date})` : ''}, with ${docs.length} docs pages`);
+  const n = versionFiles();
+  console.log(`built ${path.relative(ROOT, OUT)} for Hydor ${version}${date ? ` (${date})` : ''}, with ${docs.length} docs pages and ${n} pictures and films asked for by their hash`);
+}
+
+/** Every page asks for the pictures and the film with ?v= and a hash of what they hold. Cloudflare and browsers keep
+ * /img/ and /media/ for a week (_headers), so a picture taken again under the same name would otherwise go on showing
+ * the old one for that long (hydor.app showed the old layout's pictures for days after they were taken again). */
+function versionFiles() {
+  const hashes = new Map();
+  const hashOf = (file) => {
+    if (!hashes.has(file)) hashes.set(file, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 10));
+    return hashes.get(file);
+  };
+  // In an attribute, a string or url(…): img/x.webp beside the page, or /img/x.webp and https://hydor.app/img/x.webp
+  // from the site's root; one with a query already is left as it is.
+  const ref = /(?<=["'(])(https:\/\/hydor\.app\/|\/)?((?:img|media|docs\/images)\/[\w.-]+\.(?:webp|jpe?g|png|gif|svg|avif|mp4|webm))(?![\w.?-])/g;
+  const pages = fs.readdirSync(OUT, { recursive: true }).filter((f) => /\.(html|css|js)$/.test(f));
+  for (const page of pages.map((f) => path.join(OUT, f))) {
+    const text = fs.readFileSync(page, 'utf8');
+    const next = text.replace(ref, (m, root, rel) => {
+      const file = root ? path.join(OUT, rel) : path.join(path.dirname(page), rel);
+      return fs.existsSync(file) ? `${m}?v=${hashOf(file)}` : m;
+    });
+    if (next !== text) fs.writeFileSync(page, next);
+  }
+  return hashes.size;
 }
 
 const TYPES = {
