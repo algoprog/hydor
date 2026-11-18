@@ -198,10 +198,13 @@ export function GuidePage() {
   const toolbar = column && (
     <div className={cx('mx-auto flex min-h-8.5 items-center gap-x-3 px-4 pt-5 sm:px-6', topic ? 'max-w-[820px]' : 'max-w-[980px]')}>
       <NavButton />
-      <h2 translate={topic ? 'no' : undefined} className="flex min-w-0 items-center gap-2.5 text-[17px] font-semibold tracking-tight">
-        {topic && <TopicIcon id={topic.id} size="sm" />}
-        <span className="truncate">{topic ? topic.title : 'Help'}</span>
-      </h2>
+      {/* A topic's title; the first page has its own big question, so no title here. */}
+      {topic && (
+        <h2 translate="no" className="flex min-w-0 items-center gap-2.5 text-[17px] font-semibold tracking-tight">
+          <TopicIcon id={topic.id} size="sm" />
+          <span className="truncate">{topic.title}</span>
+        </h2>
+      )}
       <span className="flex-1" />
       {topic ? (
         <AskBox bar topics={topics} onOpen={open} topic={topic.id} className="min-w-[180px] flex-1 lg:max-w-[280px]" />
