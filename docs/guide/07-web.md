@@ -361,7 +361,7 @@ On the Browser page, from inside a page too, with Ctrl on Windows and Linux and 
 
 ### Right-click menu
 
-A right click in a page opens a menu, in English, with what applies where you clicked:
+A right click in a page opens a menu with what applies where you clicked, in the app's own look and language like its other menus (**Esc** or a click outside closes it):
 
 - In a text field: spelling suggestions for a misspelt word, with **Add to dictionary**; then **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select all**.
 - On a link: **Open link in new tab**, **Open link in your default browser**, **Copy link address** and **Read link later** (see [Read later](/guide/web#read-later)).
@@ -403,7 +403,7 @@ Mark words on a page and they stay marked. Select some words, right-click and ch
 - A page is the same page whatever follows its address: a `#fragment` or tracking parameters (`utm_…`, `fbclid` and the like) do not matter, and `http`, `https` and `www.` count as one. Each highlight keeps its words, a little of the text before and after them (to find the right place when the same words come up twice), the page's title, when you made it and, if you add one, a note.
 - A page that has highlights shows a small yellow mark on **Menu** (⋯), and **Menu** (⋯) → **Highlights** says how many. It opens the column beside the page with that page's highlights, or go to [Highlights](/browser?panel=highlights). **Show on the page** scrolls to one, **Copy** copies its words, **Add a note** (or **Edit the note**) writes a note that shows when you point at the highlight on the page, and **Delete** takes it away. **Ask an agent about these** starts a session with the page's address and its highlights quoted, with your notes.
 - The Library's **Highlights** chip lists all of them by page, newest first (see [Lists of what your browser keeps](/guide/library#lists-of-what-your-browser-keeps)).
-- Words that cannot be found any more (the page changed) stay in the list and are just not marked. A highlight holds up to 5,000 characters and a page up to 500 highlights. Words in a text field, and the parts of a page that are hidden, are not marked.
+- Words that cannot be found any more (the page changed) stay in the list and are just not marked. A highlight holds up to 5,000 characters and a page up to 500 highlights. Words in a text field, and the parts of a page that are hidden, are not marked. Nor are words in a frame inside the page (another page shown in it): there the menu has no **Highlight**. Words inside a page's own components are marked as any others.
 
 Your highlights stay on this computer, in the app's own database, and agents never see them: the routes for them refuse agents. They reach an agent only when you press **Ask an agent about these**, and then only that page's address and its highlights go.
 

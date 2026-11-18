@@ -25,6 +25,8 @@ export interface MenuAction {
   danger?: boolean;
   /** More words Search the menus finds it by ("search replace"). */
   also?: string;
+  /** Its words as they are, never translated: not the app's own (a word the spelling checker suggests). */
+  asIs?: boolean;
   run?: () => void;
   /** A list that opens in the menu's place instead. */
   items?: MenuEntry[];
@@ -130,7 +132,7 @@ function MenuList({ items, close, title, keyed: fromKeys = false }: { items: Men
                   it.run?.();
                 }}
               >
-                {it.label}
+                {it.asIs ? <span translate="no">{it.label}</span> : it.label}
               </MenuItem>
             </div>
           </Fragment>

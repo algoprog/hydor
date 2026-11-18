@@ -16,11 +16,14 @@
 //   - what people expect of a browser, for your own tab: zoom (keys and the preload), find with its match count, mute, the
 //     larger list of shortcuts, the right-click menu's items for a link, a selection and a field (and what its items ask of
 //     the app), full-screen video, opening in the default browser (refused but for http and https), clearing browsing data;
+//   - the right-click menu drawn by the window's page in the app's own look: its items, the point and a picture of the tab
+//     reach the page that draws menus, what it picks is done once (a stale or a stranger's pick is refused), and without
+//     such a page the system's own menu shows; no Highlight for words in a frame, and a highlight inside a shadow root is found;
 //   - the ad blocker: a request to a test ad host (a tiny list of its own, no network) fails while it is on, goes through when
 //     it is off or the site is one you allowed ads on, the count of what a page had blocked reaches the window's page, and
 //     the saved engine is kept a week, made again when older, and kept when the lists cannot be fetched.
 'use strict';
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -80,6 +83,7 @@ document.onmousemove=()=>{};
   '/own': '<!doctype html><title>own page</title><body style="margin:0;background:rgb(255,0,0)"><h1 style="color:#fff">mine</h1>',
   '/marked': '<!doctype html><title>marked</title><body style="margin:0"><p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="11111111-1111-1111-1111-111111111111" style="font-size:30px">marked words</mark> plain<p id="bad" style="margin:0;padding:10px"><mark data-hydor-hl="22222222-2222-2222-2222-222222222222">not ours</mark>',
   '/words': '<!doctype html><title>words</title><body style="margin:0"><p>alpha beta alpha gamma alpha</p>',
+  '/marked-shadow': '<!doctype html><title>marked shadow</title><body style="margin:0"><div id="host"></div><script>host.attachShadow({ mode: "open" }).innerHTML = \'<p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="33333333-3333-3333-3333-333333333333" style="font-size:30px">marked words</mark></p>\'</script>',
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
   '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
 };
@@ -661,6 +665,15 @@ app.whenReady().then(async () => {
       onMark.find((i) => i.label === 'Remove highlight').click();
       assert.ok(!labels(browser.menuTemplate(t, { ...base, selectionText: 'x', pageURL: 'about:blank' })).includes('Highlight'), 'no highlights on a blank page');
       assert.ok(!labels(browser.menuTemplate(t, { ...base, selectionText: 'x', isEditable: true })).includes('Highlight'), 'none for words in a field');
+      assert.ok(!labels(browser.menuTemplate(t, { ...base, selectionText: 'x', frame: {} })).includes('Highlight'), 'none for words in a frame inside the page');
+      assert.ok(labels(browser.menuTemplate(t, { ...base, selectionText: 'x', frame: t.wc.mainFrame })).includes('Highlight'), 'the page’s own words have it');
+      // Every item has an id of its own (the window's page draws them by it).
+      for (const tpl of [sel, field, plain, onMark, browser.menuTemplate(t, { ...base, linkURL: 'https://example.com/a', mediaType: 'image', srcURL: 'https://example.com/i.png' })]) {
+        const ids = tpl.filter((i) => i.type !== 'separator').map((i) => i.id);
+        assert.ok(ids.every((id) => typeof id === 'string' && id), JSON.stringify(ids));
+        assert.equal(new Set(ids).size, ids.length, JSON.stringify(ids));
+      }
+      assert.deepEqual(sel.find((i) => i.id === 'search').args, { engine: 'Google', text: 'hello world' });
       await until(async () => (await page('__cmds.length')) === 4, 2000, 'the menu’s commands');
       assert.deepEqual(await page('__cmds'), [
         { cmd: 'ask', text: 'hello world', url: `${appOrigin}/words` },
@@ -735,6 +748,80 @@ app.whenReady().then(async () => {
       assert.equal(await browser.highlightAt(t, { x: 2, y: r.oy }), '', 'elsewhere on the page: none');
       assert.equal(await browser.highlightAt(t, { x: r.ox, y: r.oy }), '', 'a mark that is not one of ours (no class): none');
       assert.equal(await browser.highlightAt(t, { x: 'x', y: 'y' }), '', 'nonsense: none');
+      // One inside a web component's shadow root (the page's own answer is the component).
+      await goTo(own, `${appOrigin}/marked-shadow`);
+      const s = await t.wc.executeJavaScript('(() => { const b = document.getElementById("host").shadowRoot.querySelector("mark").getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()', true);
+      assert.equal(await browser.highlightAt(t, s), '33333333-3333-3333-3333-333333333333');
+    });
+
+    await check('the right-click menu in the app’s own look: the page that draws menus gets its items, the point and a picture; a pick is done once; without such a page the system’s menu shows', async () => {
+      const t = ownT();
+      await goTo(own, `${appOrigin}/words`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:100,y:80,w:640,h:400})`);
+      await sleep(400);
+      await page('window.__menus = []; window.__offMenus = hydorDesktop.browser.onMenu((m) => __menus.push(m)); 1');
+      const r = await t.wc.executeJavaScript('(() => { const n = document.querySelector("p").firstChild; const g = document.createRange(); g.setStart(n, 0); g.setEnd(n, 10); const a = g.getBoundingClientRect(); return { x1: Math.round(a.left + 1), x2: Math.round(a.right - 1), y: Math.round(a.top + a.height / 2) }; })()', true);
+      // Words selected with the mouse, and a right-click on them: real input.
+      const rightClick = (x, y) => {
+        t.wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'right', clickCount: 1 });
+        t.wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'right', clickCount: 1 });
+      };
+      t.wc.focus();
+      t.wc.sendInputEvent({ type: 'mouseDown', x: r.x1, y: r.y, button: 'left', clickCount: 1 });
+      for (let i = 1; i <= 8; i++) t.wc.sendInputEvent({ type: 'mouseMove', x: r.x1 + Math.round(((r.x2 - r.x1) * i) / 8), y: r.y, modifiers: ['leftButtonDown'] });
+      t.wc.sendInputEvent({ type: 'mouseUp', x: r.x2, y: r.y, button: 'left', clickCount: 1 });
+      await sleep(200);
+      assert.equal(await t.wc.executeJavaScript('String(getSelection())', true), 'alpha beta');
+      const mx = Math.round((r.x1 + r.x2) / 2);
+      rightClick(mx, r.y);
+      await until(async () => (await page('__menus.length')) === 1, 5000, 'the menu at the page');
+      const m = (await page('__menus'))[0];
+      assert.equal(m.target, t.id);
+      assert.deepEqual(m.items.map((i) => i.id || '-'), ['copy', 'search', 'ask', 'highlight', '-', 'bookmark', 'read-later', 'print', '-', 'inspect']);
+      assert.deepEqual(m.items.find((i) => i.id === 'search'), { id: 'search', label: 'Search Google for “alpha beta”', enabled: true, args: { engine: 'Google', text: 'alpha beta' } });
+      assert.ok(Math.abs(m.x - (100 + mx)) <= 1 && Math.abs(m.y - (80 + r.y)) <= 1, `the point: ${m.x}, ${m.y}`);
+      assert.match(m.still, /^data:image\/jpeg;base64,/);
+      // The words stay selected while the menu is open (the page is taken away meanwhile), and Highlight reaches the app once.
+      await page(`hydorDesktop.browser.hide(${JSON.stringify(own.targetId)})`);
+      assert.equal(await t.wc.executeJavaScript('String(getSelection())', true), 'alpha beta');
+      const pick = (menu, item, target = t.id) => page(`hydorDesktop.browser.menuPick(${JSON.stringify(target)}, ${menu}, ${JSON.stringify(item)})`);
+      assert.equal(await pick(m.menu + 1, 'highlight'), false, 'not that menu');
+      assert.equal(await pick(m.menu, 'highlight', 'nope'), false, 'not that tab');
+      const n = await page('__cmds.length');
+      assert.equal(await pick(m.menu, 'highlight'), true);
+      await until(async () => (await page('__cmds.length')) === n + 1, 2000, 'the highlight command');
+      assert.deepEqual((await page('__cmds')).at(-1), { cmd: 'highlight', target: t.id, url: `${appOrigin}/words`, title: 'words' });
+      assert.equal(await pick(m.menu, 'highlight'), false, 'done once');
+      // Asked for the keys while it is away, the page gets them when it is back.
+      await page(`hydorDesktop.browser.focus(${JSON.stringify(own.targetId)})`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:100,y:80,w:640,h:400})`);
+      assert.equal(ownT().focusAt, 0);
+      // Closed with nothing picked: nothing is done; an item that cannot be used now is not done either.
+      await t.wc.executeJavaScript('getSelection().removeAllRanges()', true);
+      rightClick(2, 300);
+      await until(async () => (await page('__menus.length')) === 2, 5000, 'the second menu');
+      const m2 = (await page('__menus'))[1];
+      assert.deepEqual(m2.items.filter((i) => i.id).map((i) => [i.id, i.enabled]).slice(0, 3), [['back', t.wc.navigationHistory.canGoBack()], ['forward', false], ['reload', true]]);
+      assert.equal(await pick(m2.menu, 'forward'), false, 'Forward cannot be used');
+      rightClick(2, 300);
+      await until(async () => (await page('__menus.length')) === 3, 5000, 'the third menu');
+      const m3 = (await page('__menus'))[2];
+      assert.equal(await pick(m3.menu, null), true);
+      assert.equal(await pick(m3.menu, 'reload'), false, 'closed');
+      // Nobody draws menus any more: the system's own shows.
+      await page('__offMenus(); 1');
+      await sleep(100);
+      const build = Menu.buildFromTemplate;
+      let native = null;
+      Menu.buildFromTemplate = (tpl) => (native = build.call(Menu, tpl));
+      try {
+        rightClick(2, 300);
+        await until(() => native, 5000, 'the system’s menu');
+        native.closePopup(win);
+      } finally {
+        Menu.buildFromTemplate = build;
+      }
+      assert.equal(await page('__menus.length'), 3, 'the page heard of no other menu');
     });
 
     await check('full-screen video: the window and the page fill the screen, and leaving puts both back', async () => {

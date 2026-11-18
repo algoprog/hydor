@@ -709,7 +709,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   async function highlightAt(t, params) {
     try {
       const z = t.wc.getZoomFactor() || 1;
-      const code = `(() => { const e = document.elementFromPoint(${Number(params.x) / z}, ${Number(params.y) / z}); const m = e && e.closest && e.closest('mark.hydor-hl'); return m ? String(m.getAttribute('data-hydor-hl')) : ''; })()`;
+      const x = Number(params.x) / z;
+      const y = Number(params.y) / z;
+      // Into open shadow roots too (a mark inside a web component): the page's own answer is the component.
+      const code = `(() => { let e = document.elementFromPoint(${x}, ${y}); for (let i = 0; e && e.shadowRoot && i < 32; i++) { const d = e.shadowRoot.elementFromPoint(${x}, ${y}); if (!d || d === e) break; e = d; } const m = e && e.closest && e.closest('mark.hydor-hl'); return m ? String(m.getAttribute('data-hydor-hl')) : ''; })()`;
       const id = await withTimeout(t.wc.executeJavaScriptInIsolatedWorld(1000, [{ code }]), 1000, 'The highlight');
       return /^[0-9a-f-]{36}$/.test(id) ? id : '';
     } catch {
@@ -719,7 +722,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   /**
    * The items of the menu for a click in one of your tabs, as a template for Menu.buildFromTemplate: what the page offers
-   * where you clicked (a link, an image, selected text, a field) and what any page has.
+   * where you clicked (a link, an image, selected text, a field) and what any page has. Each has an id (the window's page
+   * draws the menu by them, in the app's own look and language: menuInPage), and those whose words change have them in
+   * `args` too.
    */
   function menuTemplate(t, params, eng = engine) {
     const { wc } = t;
@@ -728,68 +733,139 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const flags = params.editFlags || {};
     const text = String(params.selectionText || '').trim();
     const page = params.pageURL || wc.getURL();
+    // Words selected in a frame inside the page (another page shown in it) are not the page's own: no highlight of them.
+    const inFrame = !!params.frame && params.frame !== wc.mainFrame;
     // Spelling comes first in a field: the word's suggestions, and adding it to the dictionary.
     if (params.isEditable && params.misspelledWord) {
-      for (const w of (params.dictionarySuggestions || []).slice(0, 5)) items.push({ label: w, click: () => wc.replaceMisspelling(w) });
-      if (!(params.dictionarySuggestions || []).length) items.push({ label: 'No suggestions', enabled: false });
-      items.push({ label: 'Add to dictionary', click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord) });
+      (params.dictionarySuggestions || []).slice(0, 5).forEach((w, i) => items.push({ id: `spell-${i}`, label: w, click: () => wc.replaceMisspelling(w) }));
+      if (!(params.dictionarySuggestions || []).length) items.push({ id: 'no-suggestions', label: 'No suggestions', enabled: false });
+      items.push({ id: 'add-to-dictionary', label: 'Add to dictionary', click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord) });
       sep();
     }
     if (params.linkURL) {
       if (web(params.linkURL)) {
-        items.push({ label: 'Open link in new tab', click: () => void openTab(params.linkURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
-        items.push({ label: 'Open link in your default browser', click: () => void shell.openExternal(params.linkURL).catch(() => {}) });
+        items.push({ id: 'open-link', label: 'Open link in new tab', click: () => void openTab(params.linkURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+        items.push({ id: 'open-link-external', label: 'Open link in your default browser', click: () => void shell.openExternal(params.linkURL).catch(() => {}) });
       }
-      items.push({ label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) });
-      if (web(params.linkURL)) items.push({ label: 'Read link later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: params.linkURL, title: String(params.linkText || '').trim() }) });
+      items.push({ id: 'copy-link', label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) });
+      if (web(params.linkURL)) items.push({ id: 'read-link-later', label: 'Read link later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: params.linkURL, title: String(params.linkText || '').trim() }) });
       sep();
     }
     if (params.mediaType === 'image' && params.srcURL) {
-      if (web(params.srcURL)) items.push({ label: 'Open image in new tab', click: () => void openTab(params.srcURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
-      items.push({ label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
+      if (web(params.srcURL)) items.push({ id: 'open-image', label: 'Open image in new tab', click: () => void openTab(params.srcURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+      items.push({ id: 'save-image-as', label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
       if (readable(params.srcURL)) {
-        items.push({ label: 'Save image to Library', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
-        items.push({ label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
+        items.push({ id: 'save-image-library', label: 'Save image to Library', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
+        items.push({ id: 'ask-image', label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
       }
-      items.push({ label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });
-      items.push({ label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) });
+      items.push({ id: 'copy-image', label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });
+      items.push({ id: 'copy-image-address', label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) });
       sep();
     }
     if (params.isEditable) {
-      items.push({ label: 'Undo', enabled: !!flags.canUndo, click: () => wc.undo() });
-      items.push({ label: 'Redo', enabled: !!flags.canRedo, click: () => wc.redo() });
+      items.push({ id: 'undo', label: 'Undo', enabled: !!flags.canUndo, click: () => wc.undo() });
+      items.push({ id: 'redo', label: 'Redo', enabled: !!flags.canRedo, click: () => wc.redo() });
       items.push({ type: 'separator' });
-      items.push({ label: 'Cut', enabled: !!flags.canCut, click: () => wc.cut() });
-      items.push({ label: 'Copy', enabled: !!flags.canCopy, click: () => wc.copy() });
-      items.push({ label: 'Paste', enabled: !!flags.canPaste, click: () => wc.paste() });
-      items.push({ label: 'Select all', enabled: !!flags.canSelectAll, click: () => wc.selectAll() });
+      items.push({ id: 'cut', label: 'Cut', enabled: !!flags.canCut, click: () => wc.cut() });
+      items.push({ id: 'copy', label: 'Copy', enabled: !!flags.canCopy, click: () => wc.copy() });
+      items.push({ id: 'paste', label: 'Paste', enabled: !!flags.canPaste, click: () => wc.paste() });
+      items.push({ id: 'select-all', label: 'Select all', enabled: !!flags.canSelectAll, click: () => wc.selectAll() });
       sep();
     }
     if (text) {
-      if (!params.isEditable) items.push({ label: 'Copy', click: () => wc.copy() });
-      items.push({ label: `Search ${eng.name} for “${short(text)}”`, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
-      items.push({ label: `Ask an agent about “${short(text)}”`, click: () => void askAbout(t, text, page) });
-      if (!params.isEditable && marksOn(page)) items.push({ label: 'Highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'highlight', target: t.id, url: page, title: wc.getTitle() }) });
+      if (!params.isEditable) items.push({ id: 'copy', label: 'Copy', click: () => wc.copy() });
+      const words = short(text);
+      items.push({ id: 'search', label: `Search ${eng.name} for “${words}”`, args: { engine: eng.name, text: words }, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+      items.push({ id: 'ask', label: `Ask an agent about “${words}”`, args: { text: words }, click: () => void askAbout(t, text, page) });
+      if (!params.isEditable && !inFrame && marksOn(page)) items.push({ id: 'highlight', label: 'Highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'highlight', target: t.id, url: page, title: wc.getTitle() }) });
       sep();
     }
     // Where a highlight of yours is (popupMenu looked): taking it away.
     if (params.hydorHighlight && marksOn(page)) {
-      items.push({ label: 'Remove highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'unhighlight', id: params.hydorHighlight, url: page }) });
+      items.push({ id: 'remove-highlight', label: 'Remove highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'unhighlight', id: params.hydorHighlight, url: page }) });
       sep();
     }
     if (!params.isEditable && !text) {
       const nav = wc.navigationHistory;
-      items.push({ label: 'Back', enabled: nav.canGoBack(), click: () => nav.goBack() });
-      items.push({ label: 'Forward', enabled: nav.canGoForward(), click: () => nav.goForward() });
-      items.push({ label: 'Reload', click: () => wc.reload() });
+      items.push({ id: 'back', label: 'Back', enabled: nav.canGoBack(), click: () => nav.goBack() });
+      items.push({ id: 'forward', label: 'Forward', enabled: nav.canGoForward(), click: () => nav.goForward() });
+      items.push({ id: 'reload', label: 'Reload', click: () => wc.reload() });
       sep();
     }
-    items.push({ label: 'Bookmark this page', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'bookmark', url: page, title: wc.getTitle() }) });
-    if (web(page)) items.push({ label: 'Read this page later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: page, title: wc.getTitle() }) });
-    items.push({ label: 'Print…', click: () => wc.print({ printBackground: true }) });
+    items.push({ id: 'bookmark', label: 'Bookmark this page', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'bookmark', url: page, title: wc.getTitle() }) });
+    if (web(page)) items.push({ id: 'read-later', label: 'Read this page later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: page, title: wc.getTitle() }) });
+    items.push({ id: 'print', label: 'Print…', click: () => wc.print({ printBackground: true }) });
     items.push({ type: 'separator' });
-    items.push({ label: 'Inspect', click: () => wc.inspectElement(params.x, params.y) });
+    items.push({ id: 'inspect', label: 'Inspect', click: () => wc.inspectElement(params.x, params.y) });
     return items;
+  }
+
+  // ---- the menu drawn by the window's page ---------------------------------------------------------------------------
+
+  /** The window pages (their webContents) that draw your tabs' right-click menus themselves, in the app's own look. */
+  const menuPages = new Set();
+  const menuHooked = new WeakSet();
+  /** The menu such a page shows now, at most one: { id, t, ui, items: Map(id → template item) }. */
+  let openMenu = null;
+  let menuSeq = 0;
+
+  /** A window's page says it draws the menus itself (on), or no longer does; a page loaded there again says so again. */
+  function menusFrom(e, on) {
+    if (!fromOwnPage(e)) return;
+    const ui = e.sender;
+    if (!on) return void menuPages.delete(ui);
+    menuPages.add(ui);
+    if (menuHooked.has(ui)) return;
+    menuHooked.add(ui);
+    ui.on('did-navigate', () => menuPages.delete(ui));
+    ui.once('destroyed', () => menuPages.delete(ui));
+  }
+
+  /**
+   * The menu for the window's page that shows the tab, when that page draws menus: its items (id, words, whether they can
+   * be used, and the words that change), where the click was in the page's own pixels, and a picture of the tab as it is
+   * now, which the page shows in the tab's place while its menu lies over it (the tab's own page always draws over the
+   * window's). Its keys go to the window's page meanwhile. False when the system's own menu is to show instead.
+   */
+  async function menuInPage(t, params, tpl) {
+    const ui = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn.webContents : null;
+    if (!ui || ui.isDestroyed() || !menuPages.has(ui)) return false;
+    const id = ++menuSeq;
+    const items = new Map();
+    const list = [];
+    for (const it of tpl) {
+      if (it.type === 'separator') list.push({ type: 'separator' });
+      else {
+        items.set(it.id, it);
+        list.push({ id: it.id, label: it.label, enabled: it.enabled !== false, ...(it.args ? { args: it.args } : {}) });
+      }
+    }
+    openMenu = { id, t, ui, items };
+    const still = await stillOf(t);
+    if (!openMenu || openMenu.id !== id || t.gone || t.wc.isDestroyed() || ui.isDestroyed()) return true;
+    const b = t.view.getBounds();
+    const z = ui.getZoomFactor() || 1;
+    ui.send('hydor:browser-menu', { target: t.id, menu: id, x: (b.x + (Number(params.x) || 0)) / z, y: (b.y + (Number(params.y) || 0)) / z, items: list, still });
+    ui.focus();
+    return true;
+  }
+
+  /** What was picked in the menu the window's page drew (an item's id), or null when it closed with nothing picked. */
+  function menuPick(e, target, menu, item) {
+    if (!fromOwnPage(e)) return false;
+    const m = openMenu;
+    if (!m || m.id !== Number(menu) || m.t.id !== String(target) || m.ui !== e.sender) return false;
+    openMenu = null;
+    if (item === null || item === undefined) return true;
+    const it = m.items.get(String(item));
+    if (!it || it.enabled === false || typeof it.click !== 'function' || m.t.gone || m.t.wc.isDestroyed()) return false;
+    try {
+      it.click();
+    } catch (err) {
+      log('a menu item failed', String((err && err.message) || err));
+      return false;
+    }
+    return true;
   }
 
   async function popupMenu(t, params) {
@@ -801,10 +877,13 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const hl = marksOn(here) && !params.isEditable ? await highlightAt(t, params) : '';
     if (t.gone || t.wc.isDestroyed()) return;
     if (hl) params = { ...params, hydorHighlight: hl };
+    const tpl = menuTemplate(t, params);
+    // In the app's own look when the window's page draws it; the system's menu for a page that does not (an older one).
+    if (await menuInPage(t, params, tpl).catch(() => false)) return;
     const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : mainWindow();
     if (!win || win.isDestroyed() || t.gone || t.wc.isDestroyed()) return;
     try {
-      Menu.buildFromTemplate(menuTemplate(t, params)).popup({ window: win });
+      Menu.buildFromTemplate(tpl).popup({ window: win });
     } catch (e) {
       log('the menu did not open', String((e && e.message) || e));
     }
@@ -1391,6 +1470,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       // A page that is full screen fills the window, wherever the Browser page says its place is.
       if (t.fs) t.fs.fit();
       else setBoundsOnce(t, t.wanted.bounds);
+      if (t.focusAt) {
+        if (Date.now() - t.focusAt < 3000) t.wc.focus();
+        t.focusAt = 0;
+      }
     } catch (e) {
       log('a page could not be shown', String((e && e.message) || e));
     }
@@ -1431,7 +1514,12 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   async function still(e, target) {
     if (!fromOwnPage(e)) return null;
     const t = ownTab(target);
-    if (!t || !t.shownIn || t.shownIn.isDestroyed() || t.wc.isDestroyed()) return null;
+    return t ? stillOf(t) : null;
+  }
+
+  /** A picture of a tab of yours as it is shown now (a JPEG data URL), or null: see still. */
+  async function stillOf(t) {
+    if (!t.shownIn || t.shownIn.isDestroyed() || t.wc.isDestroyed()) return null;
     try {
       let img = await withTimeout(t.wc.capturePage(), 400, 'The picture');
       if (img.isEmpty()) return null;
@@ -1678,7 +1766,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   function focus(e, target) {
     if (!fromOwnPage(e)) return;
     const t = ownTab(target);
-    if (t && !t.wc.isDestroyed()) t.wc.focus();
+    if (!t || t.wc.isDestroyed()) return;
+    // Taken away for a while (a menu of the window's page over it): it gets the keys when it is back, if that is soon.
+    if (!t.shownIn) t.focusAt = Date.now();
+    else t.wc.focus();
   }
 
   async function popupOf(e, extension, rect) {
@@ -1806,6 +1897,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     ipcMain.handle('hydor:browser-mute', (e, a) => mute(e, a && a.target, a && a.muted));
     ipcMain.handle('hydor:browser-open-external', (e, url) => openExternal(e, url));
     ipcMain.on('hydor:browser-frame-ack', (e, target) => frameTaken(e, target));
+    ipcMain.on('hydor:browser-menus', (e, on) => menusFrom(e, !!on));
+    ipcMain.handle('hydor:browser-menu-pick', (e, a) => menuPick(e, a && a.target, a && a.menu, a && a.item));
   }
 
   return {
@@ -1817,7 +1910,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     /** What the app tells the extensions (a stand-in for tests, and for the window's page). */
     browsingSession,
     // For desktop/scripts/browser-ipc-check.cjs, which calls what the page's messages call.
-    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal },
+    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal, menuPick },
     menuTemplate,
     highlightAt,
     shortcut,

@@ -129,7 +129,9 @@ async function main() {
       calls: 0,
       async evaluate<T>(expr: string) {
         this.calls++;
-        ran.push(`${id}:${expr.includes('.apply(') ? 'apply' : expr.includes('.remove(') ? 'remove' : expr.includes('.note(') ? 'note' : 'other'}`);
+        // Which of the page code's calls it is: the one after the code itself (its own text calls apply too).
+        const call = /\}\)\(\)\.(\w+)\(/.exec(expr)?.[1];
+        ran.push(`${id}:${call === 'apply' || call === 'remove' || call === 'note' ? call : 'other'}`);
         return { ids: [h.id], missing: [], shown: false } as T;
       },
     });
@@ -230,6 +232,12 @@ const PAGE = `<!doctype html><html><head><title>t</title><style>.gone{display:no
 <textarea id="ta">words in a box</textarea>
 <script>window.late = false; setTimeout(() => { const p = document.createElement('p'); p.id = 'late'; p.textContent = 'content that arrived late'; document.body.appendChild(p); window.late = true; }, 300);</script>
 </article></body></html>`;
+
+const COMPONENTS = `<!doctype html><html><head><title>c</title></head><body>
+<main style="display:contents"><div><p id="c1">Words inside a main that has display contents.</p></div></main>
+<div id="host"><span id="slotted">slotted middle words</span></div>
+<script>document.getElementById('host').attachShadow({ mode: 'open' }).innerHTML = '<p id="sp">Shadow words before <slot></slot> and shadow words after.</p><p id="sp2">A second paragraph inside the component.</p>';</script>
+</body></html>`;
 
 async function pageScript() {
   const chrome = findChromes().find((c) => c.source !== 'desktop');
@@ -334,6 +342,55 @@ async function pageScript() {
       assert.equal(r.shown, true);
       assert.equal(await ev<boolean>(scrollScript(h.id)), true);
       assert.equal(await ev<boolean>(scrollScript('bbbbbbbb-0000-0000-0000-00000000ffff')), false);
+    });
+
+    // Pages built of components: a <main> with display: contents (MDN's, BBC's, Reddit's), words inside an open shadow
+    // root, and words a slot draws between the component's own.
+    await send('Page.navigate', { url: `data:text/html;charset=utf-8,${encodeURIComponent(COMPONENTS)}` });
+    await wait(400);
+    const inShadow = (expr: string) => ev(`(() => { const sr = document.getElementById('host').shadowRoot; return ${expr}; })()`);
+    const shadowHtml0 = await inShadow('sr.innerHTML');
+    const componentsHtml0 = await ev<string>('document.body.innerHTML');
+
+    await check('page: words inside an element with display: contents are read and marked (its box is its children’s)', async () => {
+      await ev(`(() => { const n = document.getElementById('c1').firstChild; getSelection().setBaseAndExtent(n, 0, n, n.length); })()`);
+      const r = await ev<{ text?: string; error?: string }>(selectScript('cccccccc-0000-0000-0000-000000000001'));
+      assert.equal(r.error, undefined);
+      assert.equal(r.text, 'Words inside a main that has display contents.');
+      assert.equal(await marked('cccccccc-0000-0000-0000-000000000001'), 'Words inside a main that has display contents.');
+      assert.equal(await ev(removeScript('cccccccc-0000-0000-0000-000000000001')), 1);
+    });
+
+    await check('page: words selected inside a component’s shadow root are marked there, found again, and taken away', async () => {
+      const id = 'cccccccc-0000-0000-0000-000000000002';
+      await inShadow(`(() => { const n = sr.getElementById('sp2').firstChild; getSelection().setBaseAndExtent(n, 2, n, 18); })()`);
+      const r = await ev<{ text?: string; prefix?: string; error?: string }>(selectScript(id));
+      assert.equal(r.error, undefined);
+      assert.equal(r.text, 'second paragraph');
+      assert.ok(r.prefix?.endsWith('shadow words after. A '), r.prefix);
+      assert.equal(await inShadow(`[...sr.querySelectorAll('mark.hydor-hl')].map((m) => m.textContent).join('|')`), 'second paragraph');
+      await ev(noteScript(id, 'in the component'));
+      assert.equal(await inShadow(`sr.querySelector('mark.hydor-hl').title`), 'in the component');
+      assert.equal(await ev<boolean>(scrollScript(id)), true);
+      // Found again by its words (a page that loads again), and not twice.
+      assert.equal(await ev(removeScript(id)), 1);
+      assert.equal(await inShadow('sr.innerHTML'), shadowHtml0, 'the component is as it was');
+      const h = { id, text: r.text!, prefix: r.prefix ?? '', suffix: '', note: '' };
+      assert.deepEqual((await ev<{ ids: string[] }>(applyScript([h]))).ids, [id]);
+      assert.deepEqual((await ev<{ ids: string[] }>(applyScript([h]))).ids, [id]);
+      assert.equal(await inShadow(`sr.querySelectorAll('mark.hydor-hl').length`), 1);
+      assert.equal(await ev(removeScript(id)), 1);
+    });
+
+    await check('page: words a slot draws among the component’s own are read in the order they are drawn', async () => {
+      const id = 'cccccccc-0000-0000-0000-000000000003';
+      const r = await ev<{ ids: string[]; missing: string[] }>(applyScript([{ id, text: 'before slotted middle words and shadow', prefix: 'Shadow words ', suffix: ' words after.', note: '' }]));
+      assert.deepEqual(r.ids, [id]);
+      assert.equal(await inShadow(`[...sr.querySelectorAll('mark.hydor-hl')].map((m) => m.textContent).join('|')`), 'before | and shadow');
+      assert.equal(await marked(id), 'slotted middle words');
+      assert.equal(await ev(removeScript(id)), 3);
+      assert.equal(await inShadow('sr.innerHTML'), shadowHtml0);
+      assert.equal(await ev<string>('document.body.innerHTML'), componentsHtml0, 'the page is as it was');
     });
   } finally {
     cdp.close();

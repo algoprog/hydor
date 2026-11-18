@@ -1,7 +1,8 @@
 // A browser's page in the app. In the desktop app, your own tabs (fit 'fill') are the page itself: a native view the
 // app's window lays over the place of this box. The native page always draws over the app's own page, so while a menu,
 // a dialog or a toast floats over the box, or the box is out of sight, the page is taken away and a picture of it as
-// it was (taken just before, by the desktop app) shows there until that is over. An agent's tab (fit 'scale') is drawn off screen by the
+// it was (taken just before, by the desktop app) shows there until that is over; so it is under the page's right-click menu,
+// which is drawn here in the app's own look (PageMenu). An agent's tab (fit 'scale') is drawn off screen by the
 // desktop app, which sends its frames here (about 30 a second) to a canvas, and the mouse, wheel and keys go straight
 // to the page. Everywhere else, and for a tab the desktop app does not have, the live picture (LiveView), as before.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
@@ -10,6 +11,7 @@ import { MOD, type BrowserInput, type BrowserView } from '@shared/browser';
 import { cx } from '../../components/ui';
 import { AgentPointer } from './AgentPointer';
 import { KEYCODES, LiveView, mods, type LiveViewApi } from './LiveView';
+import { PageMenu } from './PageMenu';
 import { hostOf } from './store';
 
 /** A place in the app's window, in CSS pixels of the app's page. */
@@ -52,6 +54,10 @@ export interface DesktopBrowserBridge {
   onTabState(fn: (s: TabStateChange) => void): () => void;
   /** What the right-click menu of a page asks of the app; the function it returns stops listening. */
   onCommand(fn: (c: PageCommand) => void): () => void;
+  /** The right-click menu of one of your tabs, for this page to draw in the app's own look (while anything listens, the system's menu does not show); the function it returns stops listening. An older app does not have it. */
+  onMenu?(fn: (m: PageMenuRequest) => void): () => void;
+  /** What was picked in that menu (an item's id), or null when it closed with nothing picked; whether it was done. */
+  menuPick?(target: string, menu: number, item: string | null): Promise<boolean>;
   /** Which search engine the right-click menu searches with (an older app does not have it). */
   setPrefs?(prefs: { engine: string; customSearch?: string }): Promise<void> | void;
 }
@@ -76,6 +82,19 @@ export type PageCommand =
   | { cmd: 'picture-failed'; message: string }
   | { cmd: 'highlight'; target: string; url: string; title: string }
   | { cmd: 'unhighlight'; id: string; url: string };
+
+/** An item of a page's right-click menu: what the desktop app offers where you clicked (its id names it), or a line. */
+export type PageMenuItem = { type: 'separator' } | { id: string; label: string; enabled: boolean; args?: { engine?: string; text?: string } };
+
+/** A page's right-click menu for the app to draw: the point clicked (in the app's own pixels), its items, and a picture of the page as it was. */
+export interface PageMenuRequest {
+  target: string;
+  menu: number;
+  x: number;
+  y: number;
+  items: PageMenuItem[];
+  still: string | null;
+}
 
 export interface PageFrame {
   jpeg: ArrayBuffer;
@@ -192,6 +211,10 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
   const shown = useRef(false);
   // What hides the page once its picture is drawn in its place (Still calls it), while a picture is going in.
   const drawn = useRef<(() => void) | null>(null);
+  // The page's right-click menu, drawn here in the app's own look while it is open (the page goes away under it).
+  const [menu, setMenu] = useState<PageMenuRequest | null>(null);
+  // The last press in the app's page while that menu is open, outside it: on the page's picture, or on something of the app.
+  const pressOn = useRef<'page' | 'app' | null>(null);
 
   useEffect(() => {
     const bridge = desktopBrowser();
@@ -357,7 +380,15 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     const pressed = (e: PointerEvent) => {
       kick();
       if (at && !taking && bridge.still && !el.contains(e.target as Node)) early = { pic: bridge.still(target).catch(() => null), at: performance.now() };
+      if (!(e.target as Element | null)?.closest?.('[role="menu"]')) pressOn.current = el.contains(e.target as Node) ? 'page' : 'app';
     };
+    // The page's right-click menu: the picture taken as it was asked for lets the page go as soon as the menu is drawn.
+    const offMenu = bridge.onMenu?.((m) => {
+      if (gone || m.target !== target) return;
+      if (m.still && at && !taking) early = { pic: Promise.resolve(m.still), at: performance.now() };
+      pressOn.current = null;
+      setMenu(m);
+    });
     window.addEventListener('resize', kick);
     window.addEventListener('scroll', scrolled, true);
     document.addEventListener('visibilitychange', kick);
@@ -377,6 +408,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       ro.disconnect();
       lo.disconnect();
       mo.disconnect();
+      offMenu?.();
       window.removeEventListener('resize', kick);
       window.removeEventListener('scroll', scrolled, true);
       document.removeEventListener('visibilitychange', kick);
@@ -391,8 +423,22 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, target, fit]);
 
-  // A picture of another page is not this one's.
-  useEffect(() => setStill(null), [k, target]);
+  // A picture of another page is not this one's, nor is its menu.
+  useEffect(() => {
+    setStill(null);
+    setMenu(null);
+  }, [k, target]);
+
+  // What was picked (or that nothing was) goes to the desktop app, which does it. The page had the keys (you right-clicked
+  // in it) and gets them back when it shows again, unless the menu closed with a press on something else of the app,
+  // which has them now. An item that opens a field of the app (Ask) takes them after.
+  const menuEnded = (item: string | null) => {
+    const bridge = desktopBrowser();
+    if (!bridge || !menu) return;
+    void bridge.menuPick?.(target, menu.menu, item).catch(() => false);
+    if (item === null && pressOn.current === 'app') return;
+    void bridge.focus(target).catch(() => {});
+  };
 
   // You take over: the page gets the keyboard.
   useEffect(() => {
@@ -409,6 +455,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       style={scale ? { aspectRatio: ratio, width: maxH ? `min(100%, calc(${maxH} * ${ratio}))` : undefined } : undefined}
     >
       {away && <Still src={still} view={view} target={target} small={small} onDrawn={() => drawn.current?.()} />}
+      {menu && <PageMenu key={menu.menu} req={menu} onPick={menuEnded} onDone={() => setMenu(null)} />}
     </div>
   );
 }

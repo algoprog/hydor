@@ -14,8 +14,8 @@
 // back to it as real input (input, edit). popup and onBadge are the extensions' toolbar, onKey the shortcuts a page you
 // use would otherwise keep to itself, showFile the system's file manager. What people expect of a browser for your own tabs:
 // find (with its match count), zoom, print, mute, openExternal (the default browser), onTabState (a tab's sound, zoom,
-// blocked ads and full screen as they change) and onCommand (what the right-click menu asks of the app: ask an agent about
-// the selection, bookmark the page).
+// blocked ads and full screen as they change), onCommand (what the right-click menu asks of the app: ask an agent about
+// the selection, bookmark the page), and onMenu and menuPick (the page draws that menu itself, in the app's own look).
 'use strict';
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
@@ -26,6 +26,18 @@ function listen(channel, fn) {
   const h = (_e, v) => fn(v);
   ipcRenderer.on(channel, h);
   return () => void ipcRenderer.removeListener(channel, h);
+}
+
+/** Who draws your tabs' right-click menus in this page: one message listener for all, and the main process hears of the first and the last. */
+const menuListeners = new Set();
+if (own) {
+  ipcRenderer.on('hydor:browser-menu', (_e, m) => {
+    for (const fn of [...menuListeners]) {
+      try {
+        fn(m);
+      } catch {}
+    }
+  });
 }
 
 /** Who watches which agent's tab in this page: one message listener for all, and the main process hears of the first and the last. */
@@ -135,6 +147,21 @@ if (own) {
       onTabState: (fn) => listen('hydor:browser-tab-state', fn),
       /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in the Library, or ask about it), { cmd: 'picture-failed', message }, { cmd: 'highlight', target, url, title } (mark the selection in that tab), { cmd: 'unhighlight', id, url }. */
       onCommand: (fn) => listen('hydor:browser-command', fn),
+      /**
+       * The right-click menu of one of your tabs, for this page to draw in the app's own look: { target, menu, x, y (the
+       * point, in this page's pixels), items: [{ id, label, enabled, args? } or { type: 'separator' }], still (a picture of
+       * the tab as it is, for its place while the menu lies over it) }. While anything listens, the system's menu does not show.
+       */
+      onMenu: (fn) => {
+        menuListeners.add(fn);
+        if (menuListeners.size === 1) ipcRenderer.send('hydor:browser-menus', true);
+        return () => {
+          if (!menuListeners.delete(fn) || menuListeners.size) return;
+          ipcRenderer.send('hydor:browser-menus', false);
+        };
+      },
+      /** What was picked in that menu (an item's id; null: it closed with nothing picked); whether it was done. */
+      menuPick: (target, menu, item) => ipcRenderer.invoke('hydor:browser-menu-pick', { target: String(target), menu: Number(menu), item: item === null || item === undefined ? null : String(item) }),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
     },

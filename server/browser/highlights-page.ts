@@ -1,7 +1,9 @@
 // The code that runs in a page of your own browsing for highlights, in an isolated world (Tab.evaluate: the page's own
 // scripts cannot see it or change what it does). It marks words by wrapping their text in <mark class="hydor-hl"> (the page's
 // text is not changed, only wrapped), finds them again by their words and the words round them (a text-quote anchor), and
-// takes the marks away. Text is read as a reader sees it: spaces gathered, hidden parts left out, a space between blocks.
+// takes the marks away. Text is read as a reader sees it: spaces gathered, hidden parts left out, a space between blocks,
+// and as it is drawn: the words inside a web component's open shadow root where the component shows them, and what a slot
+// takes in its place.
 import { HIGHLIGHT_CONTEXT, HIGHLIGHT_MAX } from '../../shared/highlights.ts';
 
 /** The class the marks have, and the attribute with the highlight's id. */
@@ -18,26 +20,54 @@ const LIB = String.raw`(function () {
 
   function isSpace(c) { return c === 32 || c === 9 || c === 10 || c === 13 || c === 12 || c === 160; }
 
+  // Where a node is drawn: in the slot that takes it, in its parent, or (at the top of a shadow root) in the element the root belongs to.
+  function up(n) { return n.assignedSlot || n.parentElement || (n.parentNode && n.parentNode.host) || null; }
+
+  // A node's children as they are drawn: an element with an open shadow root shows that root's, a slot what is put in it
+  // (or its own when nothing is). Children of a component that no slot takes are not drawn, and not reached.
+  function kids(n) {
+    if (n.shadowRoot) return n.shadowRoot.childNodes;
+    if (n.tagName === 'SLOT' && n.assignedNodes) { var a = n.assignedNodes(); if (a.length) return a; }
+    return n.childNodes;
+  }
+
+  // Whether what is in an element is read: not a script, a box's own text or what is hidden. An element with display:
+  // contents has no box of its own, so checkVisibility says no, but what is in it is drawn (a site's whole <main> can be
+  // one, and a slot is): it is looked into, its children answering for themselves.
+  function shown(e) {
+    if (SKIP[e.tagName.toUpperCase()]) return false;
+    if (e.checkVisibility && !e.checkVisibility()) return getComputedStyle(e).display === 'contents';
+    return true;
+  }
+
+  // Every open shadow root of the page, those inside others too.
+  function shadowRoots() {
+    var out = [], todo = [document];
+    for (var i = 0; i < todo.length; i++) {
+      var all = todo[i].querySelectorAll('*');
+      for (var k = 0; k < all.length; k++) { var r = all[k].shadowRoot; if (r) { out.push(r); todo.push(r); } }
+    }
+    return out;
+  }
+
   // The page's text as a reader sees it, with where each character is: nodes[i] and offs[i] (a null node is a space put between blocks).
   function collect() {
     var root = document.body || document.documentElement;
     var nodes = [], offs = [], buf = '', last = true, prev = null;
     var blocks = new Map();
-    var w = document.createTreeWalker(root, 5, {
-      acceptNode: function (n) {
-        if (n.nodeType === 1) {
-          if (SKIP[n.tagName.toUpperCase()]) return 2;
-          if (n.checkVisibility && !n.checkVisibility()) return 2;
-          return 3;
-        }
-        return 1;
+    var stack = [{ list: kids(root), i: 0 }];
+    while (stack.length && buf.length < MAXCHARS) {
+      var top = stack[stack.length - 1];
+      if (top.i >= top.list.length) { stack.pop(); continue; }
+      var n = top.list[top.i++];
+      if (n.nodeType === 1) {
+        if (shown(n)) stack.push({ list: kids(n), i: 0 });
+        continue;
       }
-    });
-    for (var n = w.nextNode(); n && buf.length < MAXCHARS; n = w.nextNode()) {
       if (n.nodeType !== 3) continue;
-      var v = n.nodeValue, p = n.parentElement;
+      var v = n.nodeValue, p = up(n);
       var b = blocks.get(p);
-      if (b === undefined) { b = p; while (b && !BLOCK[b.tagName]) b = b.parentElement; b = b || root; blocks.set(p, b); }
+      if (b === undefined) { b = p; while (b && !BLOCK[b.tagName]) b = up(b); b = b || root; blocks.set(p, b); }
       if (b !== prev) {
         if (prev && !last) { buf += ' '; nodes.push(null); offs.push(0); last = true; }
         prev = b;
@@ -52,6 +82,26 @@ const LIB = String.raw`(function () {
       }
     }
     return { text: buf, nodes: nodes, offs: offs };
+  }
+
+  // What is selected, as a range (null when nothing is). Words inside a shadow root come as a range there: the page's
+  // own selection gives only the element the root belongs to, collapsed. A selection from one tree into another (the page
+  // into a component) is taken as the page has it.
+  function selected(s) {
+    if (!s || !s.rangeCount) return null;
+    var roots = s.getComposedRanges ? shadowRoots() : [];
+    if (roots.length) {
+      var c = null;
+      try { c = s.getComposedRanges({ shadowRoots: roots })[0]; } catch (e) { try { c = s.getComposedRanges.apply(s, roots)[0]; } catch (e2) {} }
+      if (c && !c.collapsed && c.startContainer.getRootNode() === c.endContainer.getRootNode()) {
+        var r = document.createRange();
+        r.setStart(c.startContainer, c.startOffset);
+        r.setEnd(c.endContainer, c.endOffset);
+        if (!r.collapsed) return r;
+      }
+    }
+    var d = s.getRangeAt(0);
+    return d.collapsed ? null : d;
   }
 
   function sharedSuffix(a, b) { var i = 0; while (i < a.length && i < b.length && a.charAt(a.length - 1 - i) === b.charAt(b.length - 1 - i)) i++; return i; }
@@ -99,7 +149,14 @@ const LIB = String.raw`(function () {
     return made;
   }
 
-  function marks(id) { return document.querySelectorAll('mark.' + CLS + '[' + ATTR + '="' + id + '"]'); }
+  // A highlight's marks, in the page and in its open shadow roots (roots: those, when they are already found).
+  function marks(id, roots) {
+    var q = 'mark.' + CLS + '[' + ATTR + '="' + id + '"]';
+    var out = Array.prototype.slice.call(document.querySelectorAll(q));
+    roots = roots || shadowRoots();
+    for (var i = 0; i < roots.length; i++) out.push.apply(out, roots[i].querySelectorAll(q));
+    return out;
+  }
 
   function scroll(id) {
     var ms = marks(id);
@@ -119,8 +176,8 @@ const LIB = String.raw`(function () {
     // Marks what is selected: { text, prefix, suffix } of it, or { error }.
     select: function (id) {
       var s = getSelection();
-      if (!s || !s.rangeCount || s.isCollapsed) return { error: 'Select some words on the page first' };
-      var r = s.getRangeAt(0);
+      var r = selected(s);
+      if (!r) return { error: 'Select some words on the page first' };
       var c = collect();
       var inside = new Map();
       var si = -1, ei = -1;
@@ -153,10 +210,10 @@ const LIB = String.raw`(function () {
     // Marks the highlights it can find (those already marked are left); { ids: marked or already there, missing }, and scrolls to focus.
     apply: function (list, focus) {
       var ids = [], missing = [];
-      var c = null;
+      var c = null, roots = shadowRoots();
       for (var i = 0; i < list.length; i++) {
         var h = list[i];
-        if (marks(h.id).length) { ids.push(h.id); continue; }
+        if (marks(h.id, roots).length) { ids.push(h.id); continue; }
         if (!c) c = collect();
         var at = find(c.text, h);
         if (at < 0) { missing.push(h.id); continue; }

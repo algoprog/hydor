@@ -286,14 +286,15 @@ agents that speak ACP and take MCP servers.
     request blocking may not run while it is on.
   - **Highlights**: select words on a page, right-click and choose Highlight, and they are marked in a soft yellow and kept;
     each time you open the page they are found by their words (and the words round them) and marked again, once the
-    page has loaded and again a moment later. Right-click one for Remove highlight. A page that has some shows a small
+    page has loaded and again a moment later (words inside a page's components too; not those in a frame inside it).
+    Right-click one for Remove highlight. A page that has some shows a small
     yellow mark on the menu, whose **Highlights** item says how many and opens the column beside the page with them: show
     one on the page, copy it, add a note, delete it, or ask an agent about them together (the page's address and the
     highlights go to a new session, only when you ask). Kept privately on this computer by the page's address (without its
     #fragment and tracking parameters); agents are refused them.
   - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
     **Forget**.
-  - **A right-click menu** on pages: Back, Forward, Reload; for a link, open it in a new tab or your default browser
+  - **A right-click menu** on pages, in the app's own look and language: Back, Forward, Reload; for a link, open it in a new tab or your default browser
     and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to
     Library** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
     about this image** (opens Ask beside the page with the picture attached); for selected text, Copy, Search with your
