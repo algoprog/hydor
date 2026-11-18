@@ -31,6 +31,7 @@ import { dbSeed, mustPage, pageSource, storageMap } from './store.ts';
 import { wordFonts } from './word-fonts.ts';
 import { isDesignHtml } from '../../shared/design.ts';
 import { exportDesign } from './design-export.ts';
+import { picturesInside } from './kept-pictures.ts';
 import { videosInside } from './page-videos.ts';
 import { diagramRasterFile, diagramSvgFile, readDiagram } from './diagrams.ts';
 
@@ -246,10 +247,10 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
   }
 
   // Its videos inside it, those small enough to carry.
-  if (o.format === 'html') return out(pageFileHtml(videosInside(db, src.text), dbSeed(db, id)), 'html');
+  if (o.format === 'html') return out(pageFileHtml(picturesInside(db, videosInside(db, src.text), { bytes: 12 * 1024 * 1024 }), dbSeed(db, id)), 'html');
   if (o.format === 'pdf') {
     if (!canCapture()) throw noBrowser();
-    const html = injectHead(src.text, pageHead(db, id));
+    const html = injectHead(picturesInside(db, src.text, { bytes: 12 * 1024 * 1024 }), pageHead(db, id));
     // On paper, what a toggle folds away shows too.
     const data = await withTab({ html, width: 1024, height: 800, settleMs: 900, blockPrivate: true }, async (tab) => {
       await tab.evaluate('(() => { for (const d of document.querySelectorAll("details")) d.open = true; return true; })()').catch(() => {});
@@ -259,7 +260,7 @@ export async function exportPage(db: DB, id: string, o: { format: ExportFormat; 
   }
   if (o.format === 'docx') {
     if (!canCapture()) throw noBrowser();
-    return out(await docxOfPage(injectHead(src.text, pageHead(db, id)), { title, paper: o.paper ?? 'a4' }), 'docx');
+    return out(await docxOfPage(injectHead(picturesInside(db, src.text, { bytes: 12 * 1024 * 1024 }), pageHead(db, id)), { title, paper: o.paper ?? 'a4' }), 'docx');
   }
   throw new HttpError(400, 'A page exports as a PDF, a Word document (docx) or a web page (html)');
 }

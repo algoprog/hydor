@@ -5,6 +5,8 @@ import { CdpError, CdpSession } from './cdp.ts';
 import { captureJpeg, jpegWidth } from './jpeg.ts';
 import { keyEvents, parseKey } from './keys.ts';
 import { buildOutline, SNAPSHOT_STYLES, type AxInfo, type El, type FrameSnap, type Outline } from './outline.ts';
+import type { ReaderRaw } from '../pages/reader.ts';
+import { readerScript } from './reader-script.ts';
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -506,6 +508,11 @@ export class Tab {
       if (/context|Cannot find/i.test((e as Error).message)) this.world = null;
       throw e;
     }
+  }
+
+  /** The page's article as Mozilla's Readability finds it (its HTML, title, byline…), or null when it finds none. */
+  reader(): Promise<ReaderRaw | null> {
+    return this.evaluate<ReaderRaw | null>(readerScript());
   }
 
   /** The page's readable text: headings, paragraphs, lists, tables, and where links go. */

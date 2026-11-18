@@ -30,3 +30,7 @@ unchanged, under the SIL Open Font License 1.1, which it keeps beside it.
 Some of the bundled skills (in skills/) are adapted from Magnus Hedemark's
 agent-skills collection, under the MIT License; each keeps that licence in
 its own LICENSE.txt.
+
+The reader copy of a web page saved from the Browser is made with Mozilla's Readability
+(server/browser/readability/), Copyright (c) 2010 Arc90 Inc, unchanged, under the Apache License 2.0,
+which it keeps beside it.

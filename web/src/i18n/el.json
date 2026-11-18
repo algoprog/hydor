@@ -25603,5 +25603,9 @@
   "browser web tabs tab column pinned sites address bar search websites bookmarks extensions downloads find in page chrome sign in your own browsing history google home page ad blocker zoom print right click menu autocomplete save library save image ask about this image read later ask about this page agents at work": "πρόγραμμα περιήγησης περιηγητής ιστός καρτέλες στήλη καρτελών καρφιτσωμένοι ιστότοποι γραμμή διευθύνσεων αναζήτηση ιστότοποι σελιδοδείκτες επεκτάσεις λήψεις εύρεση στη σελίδα chrome σύνδεση δικό σας ιστορικό περιήγησης google αρχική σελίδα αποκλεισμός διαφημίσεων ζουμ εκτύπωση δεξί κλικ μενού αυτόματη συμπλήρωση αποθήκευση βιβλιοθήκη ερώτηση για αυτή τη σελίδα πράκτορες σε λειτουργία browser αποθήκευση εικόνας ερώτηση για αυτή την εικόνα ανάγνωση αργότερα",
   "Read later in the Library": "Ανάγνωση αργότερα στη Βιβλιοθήκη",
   "read later reading list set aside pages articles to read mark as read unread show read remove your own browsing browser list library desktop app": "ανάγνωση αργότερα λίστα ανάγνωσης παραμερισμός σελίδες άρθρα για διάβασμα σήμανση ως αναγνωσμένο μη αναγνωσμένο εμφάνιση αναγνωσμένων αφαίρεση δικό σας περιήγηση πρόγραμμα περιήγησης λίστα βιβλιοθήκη εφαρμογή υπολογιστή",
-  "The pages you set aside in your browser to read later, to open, mark as read or remove (desktop app); agents never see it": "Οι σελίδες που κρατήσατε στο πρόγραμμα περιήγησης για να τις διαβάσετε αργότερα, για να τις ανοίξετε, να τις σημειώσετε ως αναγνωσμένες ή να τις αφαιρέσετε (εφαρμογή υπολογιστή)· οι πράκτορες δεν τις βλέπουν ποτέ"
+  "The pages you set aside in your browser to read later, to open, mark as read or remove (desktop app); agents never see it": "Οι σελίδες που κρατήσατε στο πρόγραμμα περιήγησης για να τις διαβάσετε αργότερα, για να τις ανοίξετε, να τις σημειώσετε ως αναγνωσμένες ή να τις αφαιρέσετε (εφαρμογή υπολογιστή)· οι πράκτορες δεν τις βλέπουν ποτέ",
+  "Choose where to save": "Επιλογή θέσης αποθήκευσης",
+  "Save a readable copy to {0}": "Αποθήκευση αναγνώσιμου αντιγράφου στο {0}",
+  "Save to": "Αποθήκευση σε",
+  "Saved to {0}": "Αποθηκεύτηκε στο {0}"
 }

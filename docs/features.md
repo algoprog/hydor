@@ -257,8 +257,10 @@ agents that speak ACP and take MCP servers.
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
     agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site
     permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
-  - **Save** keeps a readable copy of the page in the Library as a Web page, whose Bookmarks, Read later, Downloads and
-    History chips list this browser's own.
+  - **Save** keeps a reader copy of the page in the Library as a Web page (the article as Mozilla's Readability finds it,
+    with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads and
+    History chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
+    kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
     search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words), **Do it in a tab of
@@ -511,10 +513,16 @@ agents that speak ACP and take MCP servers.
   video or a sound, on its page (and through the API for agents); each picture, video or sound keeps the last five it
   was when saved over (in an editor, by an agent or through a link), to look at, download or bring back.
 - **Web pages saved from your browser**: in the desktop app, Save in your own browser keeps the page you are looking at in
-  the Library as a readable document (its title, the address and date it was saved from, what you had selected, and its
-  text), shown as a Web page with its site and when it was saved, in Everything and in its project, under a Web pages
-  chip of its own (not counted among the Documents); More → Open the original page opens the address it came from. A
-  saved page is a Library item like the rest, so agents can read it. In the desktop app four more chips, Bookmarks,
+  the Library as a reader copy, as a browser's reader view shows it: the article's title, who wrote it, its site and day,
+  the address and date it was saved from, what you had selected quoted above, then the article in a column of readable
+  width with its headings, lists, tables, quotes, code, pictures with captions and videos (YouTube and Vimeo play over the
+  page from their picture; a few other sites' players are framed with a link; video files play). The site's menus, ads,
+  comments and scripts are left out. Its pictures are downloaded and kept with the page (up to 40, 8 MB each, 60 MB in
+  all), so it lasts when the site's go. A page with no article is kept as a document of its text. It is shown as a Web
+  page with its site and when it was saved, in Everything and in its project, under a Web pages chip of its own (not
+  counted among the Pages or Documents); the ▾ beside Save picks the project and folder it goes in (the last pick is kept
+  on the device); More → Open the original page opens the address it came from. A saved page is a Library item like
+  the rest, so agents can read it. In the desktop app four more chips, Bookmarks,
   Read later, Downloads and History, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
   Mark as read, Show in folder and Remove from the list or history, Show read on Read later, and History and Downloads by
   day with Show older), for every project,

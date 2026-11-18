@@ -19,6 +19,7 @@ import { helperJson } from '../helper.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { saveWebPage } from '../pages/webpage.ts';
+import { isArticle, saveReaderPage } from '../pages/reader.ts';
 import { loadBookmarks } from './bookmarks.ts';
 import { checkProposal, cleanGroupName, isGroupColor, MAX_GROUPS } from './groups.ts';
 import { clearDownloads, listDownloads, removeDownload } from './downloads.ts';
@@ -935,13 +936,24 @@ export function browsingRoutes(d: Deps) {
     if (!/^(https?|file):/i.test(t.url)) throw new HttpError(409, 'That tab shows no page to save');
     const { space, folder } = B(req);
     await t.waitLoad(3000);
-    let text = '';
     let selected = '';
     try {
-      text = await t.readable(200_000);
       selected = (await t.evaluate<string>('String(getSelection() || "")')).slice(0, 20_000);
+    } catch {}
+    // The article as Readability finds it, with its pictures, as a page of the Library; a page with no article keeps its readable text.
+    const raw = await t.reader().catch(() => null);
+    if (isArticle(raw)) {
+      try {
+        return { id: (await saveReaderPage(d, { raw, title: t.title, url: t.url, selected, space, folder })).id };
+      } catch (e) {
+        console.error(`[browser] no reader copy of ${shownUrl(t.url)}: ${(e as Error).message}`);
+      }
+    }
+    let text = '';
+    try {
+      text = await t.readable(200_000);
     } catch (e) {
-      if (!text) throw new HttpError(502, `Could not read the page: ${(e as Error).message}`);
+      throw new HttpError(502, `Could not read the page: ${(e as Error).message}`);
     }
     return { id: saveWebPage(d, { title: t.title, url: t.url, selected, text, space, folder }).id };
   });

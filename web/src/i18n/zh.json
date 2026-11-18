@@ -25619,5 +25619,9 @@
   "browser web tabs tab column pinned sites address bar search websites bookmarks extensions downloads find in page chrome sign in your own browsing history google home page ad blocker zoom print right click menu autocomplete save library save image ask about this image read later ask about this page agents at work": "浏览器 网页 标签页 标签页列 固定的网站 地址栏 搜索 网站 书签 扩展程序 下载 在页面中查找 chrome 登录 自己的浏览 历史记录 google 主页 广告拦截器 缩放 打印 右键 菜单 自动补全 保存 资料库 就这个页面提问 工作中的智能体 browser 保存图片 就这张图片提问 稍后阅读",
   "Read later in the Library": "资料库中的稍后阅读",
   "read later reading list set aside pages articles to read mark as read unread show read remove your own browsing browser list library desktop app": "稍后阅读 阅读列表 搁置 页面 文章 待读 标记为已读 未读 显示已读 移除 自己的浏览 浏览器 列表 资料库 桌面应用",
-  "The pages you set aside in your browser to read later, to open, mark as read or remove (desktop app); agents never see it": "你在浏览器中留着稍后阅读的页面，可以打开、标记为已读或移除（桌面应用）；智能体永远看不到"
+  "The pages you set aside in your browser to read later, to open, mark as read or remove (desktop app); agents never see it": "你在浏览器中留着稍后阅读的页面，可以打开、标记为已读或移除（桌面应用）；智能体永远看不到",
+  "Choose where to save": "选择保存位置",
+  "Save a readable copy to {0}": "将可读的副本保存到 {0}",
+  "Save to": "保存到",
+  "Saved to {0}": "已保存到 {0}"
 }

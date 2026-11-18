@@ -393,7 +393,14 @@ async function realBrowser() {
   const page = (title: string, body: string) => `<!doctype html><html><head><title>${title}</title><link rel="icon" href="/icon.png"></head><body>${body}</body></html>`;
   const site = http.createServer((req, res) => {
     const u = new URL(req.url ?? '/', 'http://x');
+    if (u.pathname === '/pic.png') return void res.writeHead(200, { 'content-type': 'image/png' }).end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    if (u.pathname === '/article') {
+      const para = 'The reader copy keeps what an article is made of, and leaves the rest of the page behind. '.repeat(8);
+      return void res.end(
+        `<!doctype html><html lang="en"><head><title>The Story | Example News</title><meta property="og:site_name" content="Example News"><meta name="author" content="Ada Lovelace"><meta property="article:published_time" content="2026-11-02T10:00:00Z"></head><body><nav><a href="/other">Menu item</a></nav><article><h1>The Story</h1><p>${para}</p><figure><img data-src="/pic.png" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Lazy one"><figcaption>A caption</figcaption></figure><p>${para} <a href="/other">a link</a></p><p>${para}</p><script>var changedByScript = 1</script></article><aside class="comments">Comment spam goes here</aside><footer>Footer links</footer></body></html>`,
+      );
+    }
     if (u.pathname === '/other') return void res.end(page('Other', '<p>Another page.</p>'));
     if (u.pathname === '/mail') return void res.end(page('Inbox', '<h1>Inbox</h1><p>Hello Hello hello. <b>Hello</b> again.</p><p style="display:none">hello hidden</p><script>var hello = 1</script><a href="/other">other</a><button>Send</button>'));
     res.end(page('Home', '<h1>Home</h1>'));
@@ -547,6 +554,27 @@ async function realBrowser() {
       assert.match(text, /What you selected/);
       assert.match(text, /Hello Hello hello/);
       assert.doesNotMatch(text, /hello hidden/);
+    });
+    await check('real: Save keeps an article as a page of the Library: its text and pictures, none of the page around it', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/article`, tab: b.active!.targetId });
+      await until('the article', () => !!b.active?.title.startsWith('The Story'));
+      const r = await call('POST', `/api/browser/browsing/tabs/${b.active!.targetId}/save-page`, {});
+      const page = listPages(db).find((p) => p.id === r.id)!;
+      assert.equal(page.kind, undefined, 'a page of HTML');
+      assert.equal(page.source?.url, `${base}/article`);
+      assert.equal(page.source?.site, '127.0.0.1');
+      assert.equal(page.title, 'The Story');
+      const html = pageSource(db, r.id)!.text;
+      assert.match(html, /<h1>The Story<\/h1>/);
+      assert.match(html, /Ada Lovelace · Example News · 2026-11-02/);
+      assert.match(html, /The reader copy keeps what an article is made of/);
+      assert.match(html, /<a href="http:\/\/127\.0\.0\.1:\d+\/other" rel="noopener noreferrer" target="_blank">a link<\/a>/);
+      assert.match(html, /<img src="\/pg\/pic\/[a-f0-9]{40}\/[\w-]{32}" alt="Lazy one"/, 'its lazy picture is kept with the page');
+      assert.match(html, /A caption/);
+      assert.doesNotMatch(html, /Menu item|Comment spam|Footer links|<script|changedByScript/);
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/mail`, tab: b.active!.targetId });
+      await until('the inbox again', () => b.active?.title === 'Inbox');
     });
     await check('real: the size from the page lays out every tab, new ones too', async () => {
       const b = browserOf(BROWSING_KEY)!;

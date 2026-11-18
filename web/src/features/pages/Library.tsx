@@ -12,7 +12,7 @@
 // A place (a project, or none) holds folders too (folders.tsx): its folders show first, as tiles, then its things; a
 // folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
-// Saved web pages (a document with the address it came from, kept from the Browser's Save) are a kind of their own, Web
+// Saved web pages (a page with the address it came from, kept from the Browser's Save) are a kind of their own, Web
 // pages, among the rest. In the desktop app three more chips at the row's end, after a divider, show what your own browser
 // keeps as lists (BrowserLists.tsx): Bookmarks, Read later, Downloads and History, for every project, never copied into the Library.
 // On a wide screen the page draws its own column on the left (the app's sidebar gives way to its rail here): the places
@@ -105,7 +105,7 @@ import { DropHint } from './UploadTray';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-/** `web`: a document saved from the Browser (it has the address it came from). */
+/** `web`: a page saved from the Browser (it has the address it came from, whatever its kind). */
 type ItemKind = 'page' | 'slides' | 'doc' | 'web' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
 type Show = 'all' | 'page' | 'slides' | 'doc' | 'web' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio' | 'media' | BrowserKind;
@@ -172,7 +172,7 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: 'made', label: 'Newest made' },
 ];
 
-const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.kind === 'doc' && p.source ? 'web' : (p.kind ?? 'page'), title: p.title, space: p.space, folder: p.folder, at: p.updatedAt, made: p.createdAt, page: p });
+const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.source ? 'web' : (p.kind ?? 'page'), title: p.title, space: p.space, folder: p.folder, at: p.updatedAt, made: p.createdAt, page: p });
 const fromMedia = (m: MediaItem): Item => ({ key: `m:${m.id}`, kind: m.kind, title: m.title, space: m.space, folder: m.folder, at: m.updatedAt, made: m.createdAt, media: m });
 
 /** Everything kept, the last changed first; with the spaces as they are now (a space deleted: in none) and the folders (one gone: at the top). */

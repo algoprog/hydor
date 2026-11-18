@@ -53,7 +53,7 @@ const byName = (a: LibFolder, b: LibFolder) => a.name.localeCompare(b.name, unde
 export const placeTopName = (space: string | null, spaces: SpaceView[] | null) => (space ? (spaces?.find((s) => s.id === space)?.name ?? 'Project') : spaces?.length ? 'Not in a project' : 'Everything');
 
 /** A place's folders as a tree, in order (each with how deep it is: 0 at the top). */
-function asTree(list: LibFolder[]): { f: LibFolder; depth: number }[] {
+export function asTree(list: LibFolder[]): { f: LibFolder; depth: number }[] {
   const out: { f: LibFolder; depth: number }[] = [];
   const ids = new Set(list.map((f) => f.id));
   const walk = (parent: string | null, depth: number) => {

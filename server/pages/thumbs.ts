@@ -14,6 +14,7 @@ import { dataStamp, pageHtml, pageInfo, pageSource, storageMap } from './store.t
 import { mustKind } from './kinds.ts';
 import { isDesignHtml } from '../../shared/design.ts';
 import { designThumbHtml } from './design-export.ts';
+import { picturesInside } from './kept-pictures.ts';
 
 const DIR = path.join(config.dataDir, 'pages', 'thumbs');
 const fileOf = (id: string, stamp: string) => path.join(DIR, `${id}-${stamp}.webp`);
@@ -90,7 +91,8 @@ async function take(d: Deps, id: string) {
     const head = kitHead({ n: '', theme: 'light', max: { key: STORAGE_LIMITS.key, value: STORAGE_LIMITS.value }, seed: storageMap(db, id) });
     // A design: its first artboard whole.
     const design = isDesignHtml(page.html) ? designThumbHtml(page.html) : null;
-    shot = await capture({ html: design ?? injectHead(page.html, head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true, offline });
+    // (the first few of its kept pictures go inside it: the picture shows no more than its top)
+    shot = await capture({ html: design ?? injectHead(picturesInside(db, page.html, { max: 6, bytes: 600_000 }), head), width: 880, height: 550, outWidth: 528, format: 'webp', quality: 74, settleMs: 700, blockPrivate: true, offline });
   }
   fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
   // Only one picture per page: the others are out of date.

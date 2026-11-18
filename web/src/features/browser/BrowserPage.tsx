@@ -37,6 +37,7 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
+import { tr } from '../../i18n/runtime';
 import { enc, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -53,6 +54,7 @@ import { askAboutTab, BrowserAskPanel, pickForAsk } from './BrowserAsk';
 import { toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
 import { keepPicture } from './pictures';
+import { SaveButton, useSavePlace } from './SaveButton';
 import {
   activeTab,
   addBookmark,
@@ -359,13 +361,15 @@ function OwnBrowser() {
     if (key) started(key);
   };
   const star = () => tab && void toggleBookmark(tab.url, tab.title, marked);
+  const where = useSavePlace();
   const save = async () => {
     if (!tab || saving) return;
     setSaving(true);
     try {
-      const r = await post<{ id?: string; page?: { id: string } }>(`/api/browser/browsing/tabs/${enc(tab.id)}/save-page`, {});
+      const { place, name } = where;
+      const r = await post<{ id?: string; page?: { id: string } }>(`/api/browser/browsing/tabs/${enc(tab.id)}/save-page`, { space: place.space, ...(place.folder ? { folder: place.folder } : {}) });
       const id = r.page?.id ?? r.id;
-      useToasts.getState().push('ok', 'Saved to the Library', id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
+      useToasts.getState().push('ok', name ? tr(`Saved to ${name}`) : 'Saved to the Library', id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
     } catch (e) {
       toastError(e);
     } finally {
@@ -661,9 +665,7 @@ function OwnBrowser() {
             ) : (
               <>
                 {!mobile && (
-                  <Button size="sm" icon={<BookmarkPlus size={14} />} disabled={!canAsk || saving} title="Save a readable copy to the Library" onClick={() => void save()}>
-                    Save
-                  </Button>
+                  <SaveButton where={where} disabled={!canAsk} saving={saving} onSave={() => void save()} />
                 )}
                 {!mobile && (
                   <Button size="sm" icon={<Sparkles size={14} />} aria-pressed={askOpen && !panel} disabled={!tab} onClick={() => (askOpen && !panel ? setAskOpen(false) : openAsk())} className={cx(askOpen && !panel && '!bg-accent-soft !text-accent')}>

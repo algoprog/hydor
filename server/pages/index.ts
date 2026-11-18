@@ -29,7 +29,7 @@
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
 // Routes whose token is the permission (no sign-in, never the app's cookies at work):
 //   GET /pg/:token (the page's own address), /pg/:token/html, /pg/:token/manifest.webmanifest, POST /pg/:token/storage,
-//   GET /pg/video/:sha/:sig (a deck's video, its signed address the permission)
+//   GET /pg/video/:sha/:sig (a deck's video, its signed address the permission), GET /pg/pic/:sha/:sig (a saved web page's picture, the same)
 //   GET /site/:token/* (published sites, sandboxed)
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -56,6 +56,7 @@ import { pageFilesRoutes, sweepPageFiles } from './page-files.ts';
 import { pageToolsRoutes } from './page-tools.ts';
 import { pagePictures } from './page-pictures.ts';
 import { videoStillOf } from './video-still.ts';
+import { pictureAddressOk } from './kept-pictures.ts';
 import { getVideo, sendVideo, takeVideoPiece, videoAddressOk } from './videos.ts';
 import { videoSrc } from '../../shared/slides.ts';
 import { exportPage, EXPORT_TYPES, type ExportFormat } from './export.ts';
@@ -1479,6 +1480,14 @@ function routes(d: Deps) {
     const { sha, sig } = P(req);
     reply.header('X-Robots-Tag', 'noindex, nofollow');
     return videoAddressOk(sha, sig) ? sendVideo(req, reply, getVideo(db, sha)) : reply.code(404).send({ error: 'No such video' });
+  });
+  // A picture kept with a saved web page (kept-pictures.ts), the same way.
+  app.get('/pg/pic/:sha/:sig', async (req, reply) => {
+    const { sha, sig } = P(req);
+    reply.header('X-Robots-Tag', 'noindex, nofollow');
+    const a = pictureAddressOk(sha, sig) ? getAsset(db, sha) : null;
+    if (!a) return reply.code(404).send({ error: 'No such picture' });
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
   });
   app.post('/pg/:token/storage', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
     if (!sameOrigin(req)) return reply.code(403).send({ error: 'Cross-origin request refused' });
