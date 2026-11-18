@@ -16,6 +16,18 @@ import { useProgramSubagentsOf } from './program';
  * that ran program subagents has a nest as well, with no children of its own to put in it. A program subagent is never
  * listed itself: it shows in its lead's nest.
  */
+/**
+ * Subagents under their parent, in the order the sidebar shows them: those at work or waiting for you first, then the
+ * ones active most lately (the newest first).
+ */
+export function liveThenRecent(a: SessionSummary, b: SessionSummary): number {
+  const live = (s: SessionSummary) => {
+    const act = activityOf(s);
+    return isWorking(act) || act?.status === 'waiting' ? 1 : 0;
+  };
+  return live(b) - live(a) || (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0) || a.key.localeCompare(b.key);
+}
+
 export function nestChildren(byKey: Record<string, SessionSummary>, listed: (s: SessionSummary) => boolean): { under: Set<string>; byParent: Map<string, SessionSummary[]> } {
   const under = new Set<string>();
   const byParent = new Map<string, SessionSummary[]>();
@@ -27,7 +39,7 @@ export function nestChildren(byKey: Record<string, SessionSummary>, listed: (s: 
     under.add(s.key);
     byParent.set(p, [...(byParent.get(p) ?? []), s]);
   }
-  for (const list of byParent.values()) list.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.key.localeCompare(b.key));
+  for (const list of byParent.values()) list.sort(liveThenRecent);
   return { under, byParent };
 }
 
@@ -47,7 +59,7 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
   const open = unfolded.has(parent) || holdsActive;
   const fetched = useProgramSubagentsOf(parent, open, programs, programsRunning);
   const byKey = useSessions((x) => x.byKey);
-  // Hydor's and the program's together, oldest first; a program subagent as the store has it when that is as new.
+  // Hydor's and the program's together, those at work or waiting first, then the latest; a program subagent as the store has it when that is as new.
   const rows = useMemo(() => {
     const list = [...kids];
     for (const f of fetched ?? []) {
@@ -55,7 +67,7 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
       list.push(known && (known.updatedAt ?? 0) >= (f.updatedAt ?? 0) ? known : f);
     }
     if (activeProgram && !list.some((k) => k.key === activeProgram.key)) list.push(activeProgram);
-    return list.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.key.localeCompare(b.key));
+    return list.sort(liveThenRecent);
   }, [kids, fetched, byKey, activeProgram]);
   const total = kids.length + Math.max(programs, rows.length - kids.length);
   const working = kids.filter((k) => isWorking(activityOf(k))).length + programsRunning;
