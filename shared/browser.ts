@@ -10,6 +10,8 @@ export interface BrowserTab {
   url: string;
   active: boolean;
   loading?: boolean;
+  /** When its page last finished loading (ms): a reload too quick to be seen loading still shows as a new load. */
+  loadedAt?: number;
   /** The page's icon (an address, or a data: URL), when it has one. */
   favicon?: string;
   canGoBack?: boolean;

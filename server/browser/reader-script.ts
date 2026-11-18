@@ -31,6 +31,9 @@ try {
       }
     }
   });
+  // Your highlights are the app's marks, not the article's: the copy has the words without them.
+  doc.querySelectorAll('mark.hydor-hl').forEach((m) => m.replaceWith(...Array.from(m.childNodes)));
+  if (doc.body) doc.body.normalize();
   const art = new Readability(doc, { keepClasses: false }).parse();
   if (!art || !art.content) return null;
   return { title: art.title || '', byline: art.byline || '', siteName: art.siteName || '', excerpt: art.excerpt || '', lang: art.lang || document.documentElement.lang || '', publishedTime: art.publishedTime || '', content: String(art.content).slice(0, 3000000), length: art.length || 0 };

@@ -725,6 +725,7 @@ export class SessionBrowser implements TabOwner {
         url: t.url,
         active: t === this.active,
         loading: t.navigating || undefined,
+        ...(t.loadedAt ? { loadedAt: t.loadedAt } : {}),
         ...(t.favicon ? { favicon: t.favicon } : {}),
         ...(t.canGoBack ? { canGoBack: true } : {}),
         ...(t.canGoForward ? { canGoForward: true } : {}),

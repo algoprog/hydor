@@ -154,15 +154,25 @@ async function main() {
     live.seen({ open: true, tabs: [{ id: 'a', url: a.url }] });
     await wait(120);
     assert.equal(a.calls, 4);
+    // A reload too quick to be seen loading (the view waits a moment between looks): its new load time is a new pass.
+    live.seen({ open: true, tabs: [{ id: 'a', url: a.url, loadedAt: 1000 }] });
+    await wait(120);
+    assert.equal(a.calls, 6, 'a load time it had not seen');
+    live.seen({ open: true, tabs: [{ id: 'a', url: a.url, loadedAt: 1000 }] });
+    await wait(80);
+    assert.equal(a.calls, 6, 'the same load time: no new pass');
+    live.seen({ open: true, tabs: [{ id: 'a', url: a.url, loadedAt: 2000 }] });
+    await wait(120);
+    assert.equal(a.calls, 8, 'loaded again');
     // Moving on to another page without loading (a single-page app): looked at again.
     a.url = 'https://other.example/';
     live.seen({ open: true, tabs: [{ id: 'a', url: a.url }] });
     await wait(80);
-    assert.equal(a.calls, 4, 'that page has none');
+    assert.equal(a.calls, 8, 'that page has none');
     a.url = 'https://a.example/post';
     live.seen({ open: true, tabs: [{ id: 'a', url: a.url }] });
     await wait(120);
-    assert.equal(a.calls, 6);
+    assert.equal(a.calls, 10);
     // Delete and note reach the open tabs showing the page.
     ran.length = 0;
     await live.removed(h);

@@ -650,11 +650,14 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const dir = pictureDir(what);
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     const name = `${pictureName(src, t.wc.getTitle())}.${kind}`;
-    const file = path.join(dir, `${crypto.randomBytes(4).toString('hex')}-${name}`);
+    // A folder of its own, so the file keeps the picture's own name (the Library names the picture after it).
+    const own = path.join(dir, crypto.randomBytes(4).toString('hex'));
+    await fs.promises.mkdir(own, { recursive: true, mode: 0o700 });
+    const file = path.join(own, name);
     await fs.promises.writeFile(file, bytes, { mode: 0o600 });
     // What is old goes now, and this one too once the app has taken it (a picture of a question stays: the agent may open it again).
     void sweepPictures(what);
-    if (what === 'library') setTimeout(() => fs.promises.rm(file, { force: true }).catch(() => {}), PICTURE_KEEP.library).unref();
+    if (what === 'library') setTimeout(() => fs.promises.rm(own, { recursive: true, force: true }).catch(() => {}), PICTURE_KEEP.library).unref();
     return { path: file, name };
   }
 
@@ -665,7 +668,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       for (const f of await fs.promises.readdir(dir)) {
         const p = path.join(dir, f);
         const st = await fs.promises.stat(p).catch(() => null);
-        if (st && now - st.mtimeMs > PICTURE_KEEP[what]) await fs.promises.rm(p, { force: true });
+        if (st && now - st.mtimeMs > PICTURE_KEEP[what]) await fs.promises.rm(p, { recursive: true, force: true });
       }
     } catch {}
   }

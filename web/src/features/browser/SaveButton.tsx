@@ -81,12 +81,15 @@ export function SaveButton({ where, disabled, saving, onSave }: { where: ReturnT
   };
   const here = (space: string | null, folder: string | null) => place.space === space && place.folder === folder;
   const rows = (space: string | null) =>
+    // A place's folders sit under it, one step in for each level.
     asTree(placeFolders(folders, space)).map(({ f, depth }) => (
-      <MenuItem key={f.id} icon={<Folder size={14} />} checked={here(space, f.id)} onClick={() => choose({ space, folder: f.id })}>
-        <span translate="no" className="block truncate" style={{ paddingLeft: depth * 12 }}>
-          {f.name}
-        </span>
-      </MenuItem>
+      <div key={f.id} style={{ paddingLeft: (depth + 1) * 14 }}>
+        <MenuItem icon={<Folder size={14} />} checked={here(space, f.id)} onClick={() => choose({ space, folder: f.id })}>
+          <span translate="no" className="block truncate">
+            {f.name}
+          </span>
+        </MenuItem>
+      </div>
     ));
   return (
     <>

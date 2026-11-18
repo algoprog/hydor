@@ -21,6 +21,8 @@ export interface LiveTab {
 interface Seen {
   key: string | null;
   loading: boolean;
+  /** When its page last finished loading, as the view said. */
+  loadedAt?: number;
   applied: boolean;
 }
 
@@ -36,7 +38,7 @@ export class HighlightsLive {
   ) {}
 
   /** The view of your browsing changed: pages that have just loaded, or are another page now, get their highlights. */
-  seen(view: { open: boolean; tabs: { id: string; url: string; loading?: boolean }[] }) {
+  seen(view: { open: boolean; tabs: { id: string; url: string; loading?: boolean; loadedAt?: number }[] }) {
     if (!view.open) {
       for (const id of [...this.seenTabs.keys()]) this.forget(id);
       return;
@@ -48,7 +50,8 @@ export class HighlightsLive {
       const loading = t.loading === true;
       const prev = this.seenTabs.get(t.id);
       let applied = prev?.applied ?? false;
-      if (!prev || prev.key !== key || (loading && !prev.loading)) {
+      // Another page, a page that started loading, or one that loaded again between two looks (a quick reload).
+      if (!prev || prev.key !== key || (loading && !prev.loading) || (!loading && t.loadedAt !== undefined && t.loadedAt !== prev.loadedAt)) {
         applied = false;
         // Another page: the pass for the last one is over.
         if (prev) this.clearTimers(t.id);
@@ -57,7 +60,7 @@ export class HighlightsLive {
         applied = true;
         this.schedule(t.id);
       }
-      this.seenTabs.set(t.id, { key, loading, applied });
+      this.seenTabs.set(t.id, { key, loading, loadedAt: t.loadedAt, applied });
     }
     for (const id of [...this.seenTabs.keys()]) if (!live.has(id)) this.forget(id);
   }
