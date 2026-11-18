@@ -377,7 +377,8 @@ function Connected({ onBrowse, onReconnect }: { onBrowse: () => void; onReconnec
 }
 
 /** The Connected apps part of the Apps page; `tab` from the address (none: what is connected, or the marketplace when nothing is). */
-export function ConnectedApps({ tab: asked, onTab }: { tab?: ConnTab | null; onTab: (t: ConnTab) => void }) {
+/** `underTitle`: the Apps page's own row with the title (Connected apps) is right above, so less room over the first card. */
+export function ConnectedApps({ tab: asked, onTab, underTitle }: { tab?: ConnTab | null; onTab: (t: ConnTab) => void; underTitle?: boolean }) {
   const connections = useConn((s) => s.connections);
   const secrets = useConn((s) => s.secrets);
   const [first, setFirst] = useState<Tab | null>(null);
@@ -408,7 +409,7 @@ export function ConnectedApps({ tab: asked, onTab }: { tab?: ConnTab | null; onT
   });
   const current = tab ?? 'market';
   return (
-    <div className="@container mx-auto max-w-[1120px] space-y-5 px-4 py-6 sm:px-6 sm:py-7">
+    <div className={cx('@container mx-auto max-w-[1120px] space-y-5 px-4 sm:px-6', underTitle ? 'pt-2 pb-6 sm:pb-7' : 'py-6 sm:py-7')}>
       <section className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2 rounded-3xl border border-line bg-panel px-5 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-7 sm:py-5">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent sm:row-span-2">
           <PlugZap size={21} />

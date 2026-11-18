@@ -25523,5 +25523,17 @@
   "motion::Full": "Πλήρης",
   "Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins": "Πλήρης, Ήρεμο (τίποτα δεν γλιστρά ή σβήνει καθώς ανοίγεις μια σελίδα) ή Ανενεργό. Η ρύθμιση «Μείωση κίνησης» της συσκευής σου υπερισχύει πάντα",
   "How much of the app moves: full, calm (nothing slides or fades as you open a page), or none": "Πόσο κινείται η εφαρμογή: πλήρως, ήρεμα (τίποτα δεν γλιστρά ή σβήνει καθώς ανοίγεις μια σελίδα) ή καθόλου",
-  "animation animations reduce motion calm full off transitions movement fade slide": "animation κινούμενα κίνηση μείωση κίνησης ήρεμο πλήρης ανενεργό μεταβάσεις σβήσιμο ολίσθηση"
+  "animation animations reduce motion calm full off transitions movement fade slide": "animation κινούμενα κίνηση μείωση κίνησης ήρεμο πλήρης ανενεργό μεταβάσεις σβήσιμο ολίσθηση",
+  "app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file view chart map weather recipes quiz find kinds research planning shopping all apps": "εφαρμογή εφαρμογές πρακτόρων συλλογή πρότυπα έτοιμες εργασίες εργαλεία φόρμες εγκατάσταση απεγκατάσταση λήψη αρχείο προβολή γράφημα χάρτης καιρός συνταγές κουίζ εύρεση κατηγορίες έρευνα σχεδιασμός αγορές όλες οι εφαρμογές",
+  "Apps you run show up here": "Οι εφαρμογές που εκτελείτε εμφανίζονται εδώ",
+  "Kinds": "Κατηγορίες",
+  "my own apps made installed from a file sort most used a to z newest make an app": "δικές μου εφαρμογές φτιαγμένες εγκατεστημένες από αρχείο ταξινόμηση πιο χρησιμοποιούμενες Α έως Ω νεότερες φτιάξτε μια εφαρμογή",
+  "Pinned apps": "Καρφιτσωμένες εφαρμογές",
+  "pinned pin apps favourites unpin top tiles": "καρφιτσωμένες καρφίτσωμα εφαρμογές αγαπημένες ξεκαρφίτσωμα κορυφή πλακίδια",
+  "Places in Apps": "Θέσεις στις Εφαρμογές",
+  "Recently used apps": "Εφαρμογές που χρησιμοποιήθηκαν πρόσφατα",
+  "recently used apps latest runs run again last run result": "χρησιμοποιήθηκαν πρόσφατα εφαρμογές πρόσφατες εκτελέσεις νέα εκτέλεση τελευταία εκτέλεση αποτέλεσμα",
+  "The apps you made or installed from a file": "Οι εφαρμογές που φτιάξατε ή εγκαταστήσατε από αρχείο",
+  "The apps you pinned to the top of the Apps page, in the order you put them": "Οι εφαρμογές που καρφιτσώσατε στην κορυφή της σελίδας των εφαρμογών, με τη σειρά που τους δώσατε",
+  "The apps you ran lately, with how each last run went and Run again": "Οι εφαρμογές που εκτελέσατε πρόσφατα, με το πώς πήγε η τελευταία εκτέλεση της καθεμιάς και το Νέα εκτέλεση"
 }

@@ -24269,5 +24269,17 @@
   "motion::Full": "Voll",
   "Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins": "Voll, Ruhig (beim Öffnen einer Seite gleitet oder blendet nichts) oder Aus. Die Einstellung „Bewegung reduzieren“ deines Geräts hat immer Vorrang",
   "How much of the app moves: full, calm (nothing slides or fades as you open a page), or none": "Wie viel sich in der App bewegt: voll, ruhig (beim Öffnen einer Seite gleitet oder blendet nichts) oder gar nicht",
-  "animation animations reduce motion calm full off transitions movement fade slide": "animation animationen bewegung reduzieren ruhig voll aus übergänge überblenden gleiten"
+  "animation animations reduce motion calm full off transitions movement fade slide": "animation animationen bewegung reduzieren ruhig voll aus übergänge überblenden gleiten",
+  "app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file view chart map weather recipes quiz find kinds research planning shopping all apps": "App Apps Agent Apps Galerie Vorlagen vorgefertigte Aufgaben Tools Formulare installieren deinstallieren Datei herunterladen Diagramm anzeigen Karte Wetter Rezepte Quiz finden Arten Forschung Planung Einkaufen alle Apps",
+  "Apps you run show up here": "Apps, die du ausführst, erscheinen hier",
+  "Kinds": "Arten",
+  "my own apps made installed from a file sort most used a to z newest make an app": "eigene Apps selbst gemacht installiert aus einer Datei sortieren am häufigsten A bis Z neueste App erstellen",
+  "Pinned apps": "Angeheftete Apps",
+  "pinned pin apps favourites unpin top tiles": "angeheftet anheften Apps Favoriten lösen oben Kacheln",
+  "Places in Apps": "Bereiche in Apps",
+  "Recently used apps": "Zuletzt verwendete Apps",
+  "recently used apps latest runs run again last run result": "zuletzt verwendete Apps neueste Läufe erneut ausführen letzter Lauf Ergebnis",
+  "The apps you made or installed from a file": "Die Apps, die du erstellt oder aus einer Datei installiert hast",
+  "The apps you pinned to the top of the Apps page, in the order you put them": "Die Apps, die du oben auf der Apps-Seite angeheftet hast, in der Reihenfolge, die du festgelegt hast",
+  "The apps you ran lately, with how each last run went and Run again": "Die Apps, die du zuletzt ausgeführt hast, mit dem Verlauf des jeweils letzten Laufs und Erneut ausführen"
 }

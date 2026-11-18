@@ -25539,5 +25539,17 @@
   "motion::Full": "完整",
   "Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins": "完整、平静（打开页面时不滑动、不淡入淡出）或关闭。设备上的“减少动态效果”设置始终优先",
   "How much of the app moves: full, calm (nothing slides or fades as you open a page), or none": "应用里有多少东西会动：完整、平静（打开页面时不滑动、不淡入淡出）或完全不动",
-  "animation animations reduce motion calm full off transitions movement fade slide": "动画 动效 减少动态效果 平静 完整 关闭 过渡 淡入淡出 滑动"
+  "animation animations reduce motion calm full off transitions movement fade slide": "动画 动效 减少动态效果 平静 完整 关闭 过渡 淡入淡出 滑动",
+  "app apps agent apps gallery templates ready-made tasks tools forms install uninstall download file view chart map weather recipes quiz find kinds research planning shopping all apps": "应用 智能体应用 图库 模板 现成 任务 工具 表单 安装 卸载 下载 文件 视图 图表 地图 天气 食谱 测验 查找 类别 研究 规划 购物 所有应用",
+  "Apps you run show up here": "你运行的应用会显示在这里",
+  "Kinds": "类别",
+  "my own apps made installed from a file sort most used a to z newest make an app": "自己的应用 自己制作 从文件安装 排序 最常用 按名称 最新 制作应用",
+  "Pinned apps": "已置顶的应用",
+  "pinned pin apps favourites unpin top tiles": "已置顶 置顶 应用 收藏 取消置顶 顶部 图块",
+  "Places in Apps": "应用中的位置",
+  "Recently used apps": "最近使用的应用",
+  "recently used apps latest runs run again last run result": "最近使用 应用 最近的运行 再运行一次 上次运行 结果",
+  "The apps you made or installed from a file": "你制作或从文件安装的应用",
+  "The apps you pinned to the top of the Apps page, in the order you put them": "你置顶在应用页面顶部的应用，按你排好的顺序",
+  "The apps you ran lately, with how each last run went and Run again": "你最近运行过的应用，以及它们上次运行的情况，还有再运行一次"
 }

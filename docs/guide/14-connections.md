@@ -16,9 +16,9 @@ MCP (the Model Context Protocol) is the common way a service offers tools to age
 
 ## Open Connected apps
 
-Open **Apps** from the rail and pick its **Connected apps** tab, or go to [Apps → Connected apps](/apps/connected). (They were in Settings before, as Connections: an old link to them comes here.) Under a line on what they are for, with **Connect a service**, it has three tabs:
+Open **Apps** from the rail and pick **Connected apps** in its column (on a phone, its **Connected apps** tab), or go to [Apps → Connected apps](/apps/connected). (They were in Settings before, as Connections: an old link to them comes here.) Under a line on what they are for, with **Connect a service**, it has three tabs:
 
-- **Connected**: the accounts you connected, and how each one is doing. The number on the tab counts them; the **Connected apps** tab counts them too.
+- **Connected**: the accounts you connected, and how each one is doing. The number on the tab counts them; **Connected apps** in the column (or its tab on a phone) counts them too.
 - **Marketplace**: every service you can connect.
 - **Keys**: the vault. The number on the tab counts your keys.
 

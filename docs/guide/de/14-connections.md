@@ -16,9 +16,9 @@ MCP, das Model Context Protocol, ist ein gemeinsamer Standard für Agentenwerkze
 
 ## Verbundene Apps öffnen
 
-Öffne **Apps** in der Werkzeugleiste und den Tab **Verbundene Apps** oder direkt [Apps → Verbundene Apps](/apps/connected). Frühere Links zum Einstellungsbereich Verbindungen führen ebenfalls hierher. Unter Erklärung und **Dienst verbinden** stehen drei Tabs:
+Öffne **Apps** in der Werkzeugleiste und wähle in der Spalte **Verbundene Apps** (auf einem Smartphone den Tab **Verbundene Apps**) oder gehe direkt zu [Apps → Verbundene Apps](/apps/connected). Frühere Links zum Einstellungsbereich Verbindungen führen ebenfalls hierher. Unter Erklärung und **Dienst verbinden** stehen drei Tabs:
 
-- **Verbunden**: die Konten, die du verbunden hast, und wie es jedem geht. Die Zahl auf dem Tab zählt sie; auch der Tab **Verbundene Apps** zählt sie.
+- **Verbunden**: die Konten, die du verbunden hast, und wie es jedem geht. Die Zahl auf dem Tab zählt sie; auch **Verbundene Apps** in der Spalte (auf einem Smartphone sein Tab) zählt sie.
 - **Marktplatz** enthält verfügbare Dienste.
 - **Keys** öffnet den Tresor und zählt gespeicherte Keys.
 

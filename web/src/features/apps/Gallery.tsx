@@ -1,7 +1,10 @@
-// The Apps page, in two parts. Agent apps (/apps): small tools that find things out and show them clearly, each for one
+// The Apps page: on a computer a column of places beside the rail (as the Library's), and the open one in the page. Its
+// places: All apps, Pinned, Recently used, Your own apps, one for each kind of app (Research, Planning…), and Connected
+// apps; the address keeps the place (/apps, /apps?place=pinned|recent|own, /apps?kind=Research, /apps/connected). On a
+// phone and a narrow window, the page header with its two tabs and the kinds as chips, as before.
+// Agent apps (/apps): small tools that find things out and show them clearly, each for one
 // job. At its very top the apps you pinned (big tiles, in the order you drag them into, the same on every device); then
-// a box that finds any app as you type (Enter opens the first), staying at the top as the page scrolls, and its kinds
-// as chips with their counts; the apps you ran lately (each once: how it went, Open the result, Run again), with the
+// a box that finds any app as you type (Enter opens the first), staying at the top as the page scrolls; the apps you ran lately (each once: how it went, Open the result, Run again), with the
 // latest runs folded beside them; for someone who has run none yet, four ready-made apps to start with and a line on
 // what apps are; your own apps (sorted as you like); the ready-made ones (which come installed), by kind; those you
 // uninstalled, to install again; and building blocks, apps made to be steps of others, folded at the end. Each card
@@ -11,7 +14,7 @@
 // their marketplace and the keys in the vault.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowRight, ArrowUpDown, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, KeyRound, LayoutDashboard, LayoutGrid, MessagesSquare, MoreHorizontal, Plus, Puzzle, Search, Sparkles, TextCursorInput, X } from 'lucide-react';
+import { ArrowRight, ArrowUpDown, ChevronDown, ChevronRight, Download, FilePlus2, FileUp, Globe, History, KeyRound, LayoutDashboard, LayoutGrid, MessagesSquare, MoreHorizontal, Pin, Plug, Plus, Puzzle, Search, Sparkles, TextCursorInput, User, X } from 'lucide-react';
 import type { AppDef, AppRun } from '@shared/apps';
 import { APP_COLORS, inputsLine, isActive, madeForSessions, RECENT_APPS, USED_SOURCES } from '@shared/apps';
 import { pagesFor } from '@shared/app-ui';
@@ -21,14 +24,17 @@ import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Button, cx, Empty, IconButton, MenuItem, Popover, Tabs, Throbber } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { Button, cx, Empty, IconButton, MenuItem, Popover, Tabs, Throbber, useMediaQuery } from '../../components/ui';
+import { NavButton, PageHeader } from '../layout/PageHeader';
+import { PlaceRow, PlacesLabel } from '../layout/PlaceRow';
+import { SideColumn } from '../layout/SideColumn';
 import { ConnectedApps, type ConnTab } from '../connections/ConnectedApps';
 import { useConn } from '../connections/store';
 import { InstallReadyDialog } from './About';
 import { appPath, runPath, useRunEvents, type Gallery, type ReadyApp } from './api';
 import { AppIcon } from './AppIcon';
 import { findWords, fitOf } from './find';
+import { kindIcon } from './kinds';
 import { DownloadDialog, InstallFromFile, type InstallHandle } from './Install';
 import { PinMenuItem, PinnedRow } from './Pinned';
 import { gotPins, usePins } from './pins';
@@ -297,15 +303,22 @@ function sorted(list: OwnApp[], sort: Sort): OwnApp[] {
 }
 
 /** The order your own apps show in: one quiet button and its menu. */
-function SortMenu({ value, onChange }: { value: Sort; onChange: (s: Sort) => void }) {
+function SortMenu({ value, onChange, toolbar }: { value: Sort; onChange: (s: Sort) => void; toolbar?: boolean }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <button ref={btn} type="button" onClick={() => setOpen((o) => !o)} title="Sort your apps" className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
-        <ArrowUpDown size={13} />
-        {SORTS.find((s) => s.value === value)!.label}
-      </button>
+      {toolbar ? (
+        // In the row with the place's title, as the Library's sort.
+        <Button ref={btn} size="sm" variant="ghost" icon={<ArrowUpDown size={13} />} title="Sort your apps" onClick={() => setOpen((o) => !o)}>
+          <span className="max-sm:hidden">{SORTS.find((s) => s.value === value)!.label}</span>
+        </Button>
+      ) : (
+        <button ref={btn} type="button" onClick={() => setOpen((o) => !o)} title="Sort your apps" className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+          <ArrowUpDown size={13} />
+          {SORTS.find((s) => s.value === value)!.label}
+        </button>
+      )}
       <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={180}>
         {SORTS.map((s) => (
           <MenuItem key={s.value} checked={s.value === value} onClick={() => (setOpen(false), onChange(s.value))}>
@@ -317,6 +330,49 @@ function SortMenu({ value, onChange }: { value: Sort; onChange: (s: Sort) => voi
   );
 }
 
+// ---- the places in the column --------------------------------------------------------------------------------------
+
+/** Where the page is: the whole gallery, one part of it, one kind of app (`kind:Research`), or Connected apps. */
+type Place = 'all' | 'pinned' | 'recent' | 'own' | 'connected' | `kind:${string}`;
+
+const kindOfPlace = (p: Place) => (p.startsWith('kind:') ? p.slice(5) : null);
+
+/** The address that keeps a place (so a link opens it): /apps, /apps?place=pinned, /apps?kind=Research, /apps/connected. */
+function addressOf(p: Place): string {
+  if (p === 'all') return '/apps';
+  if (p === 'connected') return '/apps/connected';
+  const kind = kindOfPlace(p);
+  return kind !== null ? `/apps?kind=${encodeURIComponent(kind)}` : `/apps?place=${p}`;
+}
+
+const PLACE_TITLES: Record<string, string> = { all: 'All apps', pinned: 'Pinned', recent: 'Recently used', own: 'Your own apps', connected: 'Connected apps' };
+
+/**
+ * The list in the Apps page's column, as the Library's places: All apps; the parts of it that have something (Pinned,
+ * Recently used) and Your own apps; the kinds of apps, each with its count; and, after a divider, Connected apps.
+ */
+function Places({ place, onPlace, counts, kinds, connected }: { place: Place; onPlace: (p: Place) => void; counts: { all: number; pinned: number; recent: number; own: number }; kinds: [string, number][]; connected?: number }) {
+  return (
+    <nav aria-label="Places in Apps" className="space-y-0.5">
+      <PlaceRow on={place === 'all'} icon={<LayoutGrid size={15} className="text-fg-3" />} label="All apps" count={counts.all} onClick={() => onPlace('all')} />
+      {(counts.pinned > 0 || place === 'pinned') && <PlaceRow on={place === 'pinned'} icon={<Pin size={15} className="text-fg-3" />} label="Pinned" count={counts.pinned} onClick={() => onPlace('pinned')} />}
+      {(counts.recent > 0 || place === 'recent') && <PlaceRow on={place === 'recent'} icon={<History size={15} className="text-fg-3" />} label="Recently used" count={counts.recent} onClick={() => onPlace('recent')} />}
+      <PlaceRow on={place === 'own'} icon={<User size={15} className="text-fg-3" />} label="Your own apps" count={counts.own} onClick={() => onPlace('own')} />
+      {kinds.length > 1 && (
+        <>
+          <PlacesLabel>Kinds</PlacesLabel>
+          {kinds.map(([k, n]) => {
+            const Icon = kindIcon(k);
+            return <PlaceRow key={k} on={place === `kind:${k}`} icon={<Icon size={15} className="text-fg-3" />} label={k} count={n} onClick={() => onPlace(`kind:${k}`)} />;
+          })}
+        </>
+      )}
+      <div className="mx-2.5 my-3 border-t border-line" />
+      <PlaceRow on={place === 'connected'} icon={<Plug size={15} className="text-fg-3" />} label="Connected apps" count={connected} onClick={() => onPlace('connected')} />
+    </nav>
+  );
+}
+
 // ---- the page ----------------------------------------------------------------------------------------------------
 
 /** Where the guide says what apps are. */
@@ -324,8 +380,9 @@ const GUIDE = '/guide/apps#what-an-app-is';
 
 export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
   const [g, setG] = useState<Gallery | null>(null);
-  const [cat, setCat] = useState('All');
   const [find, setFind] = useState('');
+  // On a computer the page has its column (as the Library); narrower, the page header, its tabs and the kinds as chips.
+  const wide = useMediaQuery('(min-width: 1024px)');
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
   const [adding, setAdding] = useState<ReadyApp | null>(null);
@@ -349,8 +406,9 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       if (x.pins) gotPins(x.pins);
     }, toastError);
   useEffect(() => {
-    if (tab === 'agent') load();
-  }, [tab]);
+    // The column's counts need the apps on Connected apps too.
+    if (tab === 'agent' || wide) load();
+  }, [tab, wide]);
   const pins = usePins((s) => s.ids);
   // The connected services, for their tab's count (and the part itself).
   const connections = useConn((s) => s.connections);
@@ -358,7 +416,17 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
     void useConn.getState().loadCatalog();
     void useConn.getState().load();
   }, []);
-  const connTab = new URLSearchParams(useSearch()).get('tab');
+  const search = new URLSearchParams(useSearch());
+  const connTab = search.get('tab');
+  // The place is in the address; narrower, only the kinds are places (the chips), the rest of the gallery is one page.
+  const asked = search.get('kind') !== null ? (`kind:${search.get('kind')}` as Place) : search.get('place');
+  const place: Place = tab === 'connected' ? 'connected' : asked?.startsWith('kind:') ? (asked as Place) : wide && (asked === 'pinned' || asked === 'recent' || asked === 'own') ? asked : 'all';
+  const cat = kindOfPlace(place) ?? 'All';
+  const toPlace = (p: Place) => {
+    // On a computer a new place starts with an empty find box (it finds across the place's own apps); the chips keep the words.
+    if (wide) setFind('');
+    go(addressOf(p), true);
+  };
   // An app file dropped anywhere on the page: the card that installs it.
   const installer = useRef<InstallHandle>(null);
   const [dropping, setDropping] = useState(false);
@@ -465,21 +533,115 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       />
     </PageHeader>
   );
-  if (tab === 'connected')
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        {header}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <ConnectedApps tab={connTab === 'market' || connTab === 'keys' || connTab === 'connected' ? (connTab as ConnTab) : null} onTab={(t) => go(`/apps/connected?tab=${t}`, true)} />
-        </div>
+  // The column (a computer): the places, with New app in the row of the logo. Counts need the gallery; until it is there, none show.
+  const column = wide && (
+    <SideColumn label="Apps" tip={tab === 'connected' ? 'connections' : 'apps'} actions={<NewAppMenu />}>
+      <h1 className="sr-only">Apps</h1>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+        <Places place={place} onPlace={toPlace} counts={{ all: g ? own.length + ready.length : 0, pinned: pinned.length, recent: used.length || runs.length, own: own.length }} kinds={kinds.slice(1)} connected={connections?.length} />
       </div>
+    </SideColumn>
+  );
+  const frame = (main: ReactNode) => (
+    <div className="flex h-full min-h-0">
+      {column}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {!wide && header}
+        {main}
+      </div>
+      {adding && <InstallReadyDialog t={adding} open onClose={() => setAdding(null)} />}
+      <InstallFromFile ref={installer} trigger={() => null} />
+    </div>
+  );
+  // The row at the top of the page, as the Library's: the place's name at the left, the find box at the right (its size and look the same), and what the place has beside it (a sort, the latest runs).
+  const title = kindOfPlace(place) ?? PLACE_TITLES[place];
+  const toolbar = (withFind: boolean, controls?: ReactNode) => (
+    <>
+      {wide && <NavButton />}
+      <h2 className="min-w-0 truncate text-[17px] font-semibold tracking-tight max-sm:hidden">{title}</h2>
+      <span className="flex-1 max-lg:hidden" />
+      {withFind && (
+        <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 focus-within:border-accent/60 lg:max-w-[280px]">
+          <Search size={14} className="shrink-0 text-fg-3" />
+          <input
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            onKeyDown={keys}
+            placeholder="Find an app: weather, recipes, a trip…"
+            enterKeyHint="go"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
+          />
+          {find && (
+            <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
+              <X size={13} />
+            </button>
+          )}
+        </label>
+      )}
+      {controls}
+    </>
+  );
+  if (tab === 'connected')
+    return frame(
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {wide && <div className="mx-auto max-w-[1120px] px-4 pt-5 sm:px-6">
+            <div className="flex min-h-8.5 flex-wrap items-center gap-x-3 gap-y-2">{toolbar(false)}</div>
+          </div>}
+        <ConnectedApps underTitle={wide} tab={connTab === 'market' || connTab === 'keys' || connTab === 'connected' ? (connTab as ConnTab) : null} onTab={(t) => go(`/apps/connected?tab=${t}`, true)} />
+      </div>,
     );
 
-  const nothing = !!g && (finding ? !found.length : !ownShown.length && !readyShown.length);
   const browsing = !finding && cat === 'All';
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      {header}
+  // One part of the gallery alone (a computer's Pinned, Recently used, Your own apps); the places All apps and the kinds show it all, as the page did.
+  const single = wide && (place === 'pinned' || place === 'recent' || place === 'own');
+  // Ready-made apps to install and the building blocks come with the whole page, not with a kind.
+  const whole = !wide || place === 'all';
+  const nothing = !!g && (finding ? !found.length : !single && !ownShown.length && !readyShown.length);
+  const latest = (inToolbar?: boolean) =>
+    used.length > 0 && runs.length > 0 ? (
+      inToolbar ? (
+        <Button size="sm" variant="ghost" onClick={() => setRunsOpen((o) => !o)} aria-expanded={runsOpen}>
+          Latest runs
+          <ChevronDown size={14} className={cx('transition-transform', runsOpen && 'rotate-180')} />
+        </Button>
+      ) : (
+        <button type="button" onClick={() => setRunsOpen((o) => !o)} aria-expanded={runsOpen} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+          Latest runs
+          <ChevronDown size={14} className={cx('transition-transform', runsOpen && 'rotate-180')} />
+        </button>
+      )
+    ) : undefined;
+  const recentBody = (
+    <>
+      {used.length > 0 && <RecentlyUsed used={used} faces={faces} />}
+      {(runsOpen || !used.length) && (
+        <div className={cx('overflow-hidden rounded-2xl border border-line bg-panel', used.length > 0 && 'mt-3')}>
+          {runs.map((r) => (
+            <RecentRun key={r.id} r={r} a={faces[r.app]} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+  // Pinned tiles come with the whole page (and, on a computer, not while finding); Pinned shows them alone.
+  const pinnedShown = pinned.length > 0 && (!wide || (place === 'all' && !finding));
+  const pinHint = 'Pin the ones you use most from their ⋯ menu to keep them at the top';
+  const ownGrid = ownShown.length > 0 ? (
+    <div className={cx(COLS, 'gap-3')}>
+      <div className={cx(GRID, 'sm:contents')}>
+        {ownShown.map((a) => (
+          <YourApp key={a.id} a={a} />
+        ))}
+      </div>
+      {cat === 'All' && <NewTile />}
+    </div>
+  ) : (
+    <NewTile row />
+  );
+  // What the toolbar has beside the find box: Your own apps' sort, Recently used's latest runs.
+  const controls = single && place === 'own' && own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} toolbar /> : single && place === 'recent' ? latest(true) : undefined;
+  return frame(
+    <>
       <div className="relative min-h-0 flex-1 overflow-y-auto" {...drop}>
         {dropping && (
           <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-3xl border-2 border-dashed border-accent bg-accent/8 backdrop-blur-[1px]">
@@ -495,37 +657,18 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
             <Throbber size={28} />
           </div>
         ) : (
-          <div className="@container mx-auto max-w-[1120px] px-4 pt-5 pb-10 sm:px-6 sm:pt-6">
+          <div className={cx('@container mx-auto max-w-[1120px] px-4 pb-10 sm:px-6', wide ? 'pt-3' : 'pt-5 sm:pt-6')}>
             {/* As in the Library: the title at the left, the find box at the right of its row (it stays at the top while the
-                page scrolls), the kinds under it as the Library's chips. */}
-            <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">
-              <h2 className="min-w-0 truncate text-[17px] font-semibold tracking-tight max-sm:hidden">{cat === 'All' ? 'All apps' : cat}</h2>
-              <span className="flex-1 max-lg:hidden" />
-              <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 focus-within:border-accent/60 lg:max-w-[280px]">
-                <Search size={14} className="shrink-0 text-fg-3" />
-                <input
-                  value={find}
-                  onChange={(e) => setFind(e.target.value)}
-                  onKeyDown={keys}
-                  placeholder="Find an app: weather, recipes, a trip…"
-                  enterKeyHint="go"
-                  className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
-                />
-                {find && (
-                  <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
-                    <X size={13} />
-                  </button>
-                )}
-              </label>
-            </div>
-            {kinds.length > 2 && (
+                page scrolls). On a computer the kinds are the column's; narrower, they are chips under it. */}
+            <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">{toolbar(true, controls)}</div>
+            {!wide && kinds.length > 2 && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
                 {kinds.map(([k, n]) => (
                   <button
                     key={k}
                     type="button"
                     aria-pressed={cat === k}
-                    onClick={() => setCat(k)}
+                    onClick={() => toPlace(k === 'All' ? 'all' : `kind:${k}`)}
                     className={cx('flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors', cat === k ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
                   >
                     {k}
@@ -534,7 +677,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                 ))}
               </div>
             )}
-            {pinned.length > 0 && (
+            {pinnedShown && (
               <div className="mt-5">
                 <Part title="Pinned" sub={pinned.length > 1 ? <span className="max-sm:hidden">Drag to change the order</span> : undefined}>
                   <PinnedRow ids={pinned} faces={faces} />
@@ -542,8 +685,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
               </div>
             )}
 
-
-            <div className="mt-8 space-y-9">
+            <div className={cx('space-y-9', wide && !pinnedShown ? 'mt-3' : 'mt-8')}>
               {finding ? (
                 found.length > 0 && (
                   <div className={GRID}>
@@ -552,29 +694,31 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                     ))}
                   </div>
                 )
+              ) : place === 'pinned' && single ? (
+                pinned.length > 0 ? (
+                  <div>
+                    {pinned.length > 1 && <p className="mb-3 text-[13px] text-fg-3">Drag to change the order</p>}
+                    <PinnedRow ids={pinned} faces={faces} />
+                  </div>
+                ) : (
+                  <p className="py-8 text-center text-[13px] text-fg-3">{pinHint}</p>
+                )
+              ) : place === 'recent' && single ? (
+                used.length > 0 || runs.length > 0 ? (
+                  <div>
+                    {used.length > 0 && !pinned.length && <p className="mb-3 text-[13px] text-fg-3">{pinHint}</p>}
+                    {recentBody}
+                  </div>
+                ) : (
+                  <p className="py-8 text-center text-[13px] text-fg-3">Apps you run show up here</p>
+                )
+              ) : place === 'own' && single ? (
+                ownGrid
               ) : (
                 <>
                   {browsing && (used.length > 0 || runs.length > 0) && (
-                    <Part
-                      title={used.length ? 'Recently used' : 'Latest runs'}
-                      sub={used.length > 0 && !pinned.length ? <span className="max-sm:hidden">Pin the ones you use most from their ⋯ menu to keep them at the top</span> : undefined}
-                      action={
-                        used.length > 0 && runs.length > 0 ? (
-                          <button type="button" onClick={() => setRunsOpen((o) => !o)} aria-expanded={runsOpen} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-fg-3 hover:text-fg">
-                            Latest runs
-                            <ChevronDown size={14} className={cx('transition-transform', runsOpen && 'rotate-180')} />
-                          </button>
-                        ) : undefined
-                      }
-                    >
-                      {used.length > 0 && <RecentlyUsed used={used} faces={faces} />}
-                      {(runsOpen || !used.length) && (
-                        <div className={cx('overflow-hidden rounded-2xl border border-line bg-panel', used.length > 0 && 'mt-3')}>
-                          {runs.map((r) => (
-                            <RecentRun key={r.id} r={r} a={faces[r.app]} />
-                          ))}
-                        </div>
-                      )}
+                    <Part title={used.length ? 'Recently used' : 'Latest runs'} sub={used.length > 0 && !pinned.length ? <span className="max-sm:hidden">{pinHint}</span> : undefined} action={latest()}>
+                      {recentBody}
                     </Part>
                   )}
 
@@ -592,18 +736,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
 
                   {(ownShown.length > 0 || cat === 'All') && (
                     <Part title="Your own apps" sub={ownShown.length ? tr(`${ownShown.length}`) : undefined} action={own.length >= SORT_FROM ? <SortMenu value={sort} onChange={setSort} /> : undefined}>
-                      {ownShown.length > 0 ? (
-                        <div className={cx(COLS, 'gap-3')}>
-                          <div className={cx(GRID, 'sm:contents')}>
-                            {ownShown.map((a) => (
-                              <YourApp key={a.id} a={a} />
-                            ))}
-                          </div>
-                          {cat === 'All' && <NewTile />}
-                        </div>
-                      ) : (
-                        <NewTile row />
-                      )}
+                      {ownGrid}
                     </Part>
                   )}
 
@@ -647,7 +780,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                 </div>
               )}
 
-              {removed.length > 0 && !finding && (
+              {removed.length > 0 && !finding && whole && (
                 <Part title="Ready-made apps to install" sub="The ones you uninstalled: install one again to have it back">
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {removed.map((t) => (
@@ -657,7 +790,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                 </Part>
               )}
 
-              {(blocks.length > 0 || ownBlocks.length > 0) && !finding && (
+              {(blocks.length > 0 || ownBlocks.length > 0) && !finding && whole && (
                 <section className="rounded-2xl border border-line">
                   <button type="button" onClick={() => setBlocksOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left" aria-expanded={blocksOpen}>
                     <Puzzle size={17} className="shrink-0 text-fg-3" />
@@ -691,8 +824,6 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
           </div>
         )}
       </div>
-      {adding && <InstallReadyDialog t={adding} open onClose={() => setAdding(null)} />}
-      <InstallFromFile ref={installer} trigger={() => null} />
-    </div>
+    </>,
   );
 }
