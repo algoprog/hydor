@@ -256,17 +256,19 @@ In the desktop app, an agent's browser does not need the app's window: it keeps 
 
 The **Browser** page is a browser of your own inside the desktop app (Mac, Windows, Linux), next to the one agents use: open **Browser** on the rail, or go to [Browser](/browser). It is part of the desktop app only: the web app in a browser, and a phone, have no **Browser** button, and the address [Browser](/browser) there says so. The agents' browsers work everywhere, and you can watch them in their sessions.
 
-It has tabs, an address bar that completes what you type and searches, a Home button, back, forward and reload, bookmarks, history, Chrome extensions, an ad and tracker blocker, find in page, zoom, print, downloads, and a list of the agents' tabs. Its tabs are real pages in the app's window, with the speed and keys of any browser, and they connect to sites directly, as in any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say). If the browser can't start, the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
+It has a bar across the top with a box that searches, opens, asks and tells an agent what to do; a column of your tabs, with the sites you pinned and the agents at work, at the left of the page; and, at the right, a column for asking about the page, for an agent's conversation and for the history, downloads, bookmarks, extensions and settings. It has back, forward and reload, bookmarks, history, Chrome extensions, an ad and tracker blocker, find in page, zoom, print and downloads. Its tabs are real pages in the app's window, with the speed and keys of any browser, and they connect to sites directly, as in any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say). If the browser can't start, the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
 
-### Tabs and the address bar
+### The bar and the box
 
-- The tab strip above the address bar shows each tab's icon, title and **×**. **+** (**New tab**) opens your home page. A middle click closes a tab. Closing the last tab leaves a blank one.
-- A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker.
-- The address bar shows the page's address. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead.
-- **Back**, **Forward**, **Reload** and **Home** are at the left of the address bar. While a page loads, Reload is **Stop**. **Home** opens your home page in the open tab.
-- The star at the end of the address bar bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away.
-- **Menu** (⋯) has **Ask about this page**, **Do this here**, **Find in page**, **Print…**, **Open in your default browser**, **Bookmarks**, **History**, **Extensions**, **Downloads**, **Agents’ tabs**, **Site permissions** and **Settings**. **Open in your default browser** opens the page in the browser your computer uses for links.
-- When the open tab is a Chrome Web Store page of an extension, an **Add to Hydor** button appears in the bar (see [Chrome extensions](/guide/web#chrome-extensions)).
+A bar runs across the top of the page. At its left, over the tab column, are the page's name, **New tab** (+) and **Hide tabs** (the same as Ctrl+B), which folds the tab column away until **Show tabs** brings it back. The rest of the bar is for the page you are on:
+
+- **Back**, **Forward** and **Reload** are at the left of the box. While a page loads, Reload is **Stop**. There is no Home button: **New tab** opens your home page.
+- The box in the middle is the address bar. At rest it shows the page's address as its site, with the rest of the address in a paler colour, and the reminder **Ctrl+L**. Click it, or press Ctrl+L, and it shows the whole address to change. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead. What it offers as you type is under [Suggestions](/guide/web#suggestions). Its padlock is at the left and its star at the right.
+- The star at the end of the box bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away. The sites on the bar show as tiles at the top of the tab column.
+- **Save** keeps a readable copy of the page in the Library: a note says "Saved to the Library", with **Open**. It lands among the Library's **Web pages**. The Library's **Bookmarks**, **Downloads** and **History** chips list the same bookmarks, downloads and history as this page (see [Library](/guide/library)).
+- **Ask** opens the column beside the page to ask about it (see [Ask beside the page](/guide/web#ask-beside-the-page)); it shows lit while that column is there.
+- The buttons of your extensions come next, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
+- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser** and **Do this here…** (see [Do this here](/guide/web#do-this-here)), then **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
 
 A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
 
@@ -279,9 +281,28 @@ As you type in the address bar, a list under it offers, with the words you typed
 - with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, bookmarks and pages of your history that are about what you typed even when their titles and addresses do not hold its words, after the ones that do (they show without bold words). The model that finds them runs on this computer, from a vector made of each page's title and address (without its query string) and kept in the app's database apart from everything else; it goes when the page does,
 - what you typed, as a search ("Search Google") or, when it looks like an address, as that address,
 - the search engine's own suggestions, when [Search suggestions](/guide/web#browser-settings) is on,
+- below those, when the open tab is a web page, **Ask about this page: “…”**, which opens Ask beside the page with what you typed as the question, and **Do it in a tab of its own: “…”**, which gives the tab to an agent that does what you typed there (see [Do this here](/guide/web#do-this-here)); it is the one of Claude Code and Custom you used last, Claude Code at first,
 - last, **Ask an agent: “…”**, which starts a session with what you typed as its first message, on the agent and model the start page used last, and takes you to it.
 
 The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab. The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
+
+### The tab column
+
+The column at the left of the page lists, from the top (**Hide tabs**, or Ctrl+B, folds it away):
+
+- **Pinned sites**: the items of your bookmarks bar as tiles, five to a row and two rows at most (a **…** tile lists the rest). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it. Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**. With nothing on the bookmarks bar there are no tiles; the star puts the page there (see [Bookmarks](/guide/web#bookmarks)).
+- **Agents at work**, while an agent has a browser open: a row for each, with its icon and a dot (blue while it works, amber when it waits for you or you drive), the session's title and what it is doing. Click one to see it (see [Agents at work](/guide/web#agents-at-work)). Its arrow folds the list.
+- **Tabs**: a row for each tab, with its icon, title and **×** (on the open tab, and on the one you point at). The open tab is the marked row; click a row to show that tab, and a middle click closes it. A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker. **New tab** at the end opens your home page. Closing the last tab leaves a blank one.
+
+### The column beside the page
+
+At the right of the page there is a column, shown only when something is in it, with one of these at a time: **Ask** about the page (see [Ask beside the page](/guide/web#ask-beside-the-page)); an agent's conversation, while you watch its tab (see [Agents at work](/guide/web#agents-at-work)); or the panel of **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** or **Settings**. Each has a **×** to close it, and picking another replaces it. Nothing is laid over the page: it gets narrower to make room, and wide again when the column closes. The addresses [History](/browser?panel=history), [Downloads](/browser?panel=downloads), [Bookmarks](/browser?panel=bookmarks), [Extensions](/browser?panel=extensions), [Site permissions](/browser?panel=permissions) and [Settings](/browser?panel=settings) open the Browser page with that panel there. In a narrow window the tabs are a list in the bar, and the column is a sheet over the page.
+
+### Ask beside the page
+
+**Ask** in the bar (or **Ask about this page: “…”** in the box's list, or **Ask an agent about** in the right-click menu) opens the column for the tab you are on. Write what you want to know, or press **Summarise**, **Key points** or **Explain it simply**, then **Ask** (**Ctrl+Enter**, ⌘+Enter on a Mac). The line under the box says which agent and model answer: the ones the start page used last. A new session starts on a copy of the page as it is now (see [Ask about this page](/guide/web#ask-about-this-page)), and its conversation fills the column, so you can go on asking there.
+
+Each tab has its own question: switch tabs and the column shows that tab's conversation. **Open as a session** takes you to it among your sessions, and **New question** forgets this tab's conversation here (the session stays) so you can ask again. It works on pages of websites and files.
 
 ### Keyboard shortcuts
 
@@ -296,6 +317,7 @@ On the Browser page, from inside a page too, with Ctrl on Windows and Linux and 
 - **Ctrl+F** opens find in page, and **Esc** closes it.
 - **Ctrl+D** bookmarks the page.
 - **Ctrl+H** opens the history, and **Ctrl+J** the downloads.
+- **Ctrl+B** folds the tab column away, and brings it back.
 - **Ctrl+P** prints the page.
 - **Ctrl+Shift+Delete** opens the settings at **Clear browsing data**.
 - **Ctrl** with **+**, **−** and **0** zoom in, zoom out and go back to 100 % (see [Zoom, print and full screen](/guide/web#zoom-print-and-full-screen)).
@@ -317,7 +339,7 @@ A right click in a page opens a menu, in English, with what applies where you cl
 - In a text field: spelling suggestions for a misspelt word, with **Add to dictionary**; then **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select all**.
 - On a link: **Open link in new tab**, **Open link in your default browser** and **Copy link address**.
 - On a picture: **Open image in new tab**, **Save image as…**, **Copy image** and **Copy image address**.
-- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens the **Ask about this page** box with the selected words and the page's address filled in (see [Ask about this page](/guide/web#ask-about-this-page)).
+- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens **Ask** beside the page with the selected words and the page's address ready to go with your question (see [Ask beside the page](/guide/web#ask-beside-the-page)).
 - On the page itself, away from a field or selected text: **Back**, **Forward** and **Reload**.
 - Always: **Bookmark this page**, **Print…** and **Inspect**, which opens the page's developer tools.
 
@@ -368,7 +390,7 @@ When a page in your own browser asks to use your camera, your microphone, your l
 
 ## Bookmarks
 
-The bookmarks bar sits under the address bar once you have a bookmark on it (on a phone it is left out; your bookmarks are in the menu). Click a bookmark to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it, and a bar longer than the page scrolls, with **»** listing everything. Right-click an item for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**.
+The sites on the bookmarks bar are pinned at the top of the tab column once you have a bookmark on it (on a phone there is no tab column; your bookmarks are in the menu). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it, and ten tiles are the most it shows (a **…** tile lists the rest). Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**.
 
 For all of them, press **Menu** (⋯) → **Bookmarks**, or go to [Bookmarks](/browser?panel=bookmarks). The panel has two places, **Bookmarks bar** and **Other bookmarks**, and the folders in them open and close.
 
@@ -412,11 +434,11 @@ The desktop app's browser has part of what Chrome gives extensions. Content that
 
 ## Hand a page to an agent
 
-An agent never gets your own browser. You can give it one page of it, in two ways. Open **Menu** (⋯) and pick **Ask about this page** or **Do this here**: they work on a page of a website, and each opens a small box under the menu where you write what you want and send with **Ctrl+Enter** (⌘+Enter on a Mac).
+An agent never gets your own browser. You can give it one page of it, in two ways: **Ask about this page** gives it a copy to read, and **Do this here** gives it the tab. They work on a page of a website. **Ask** in the bar asks about the page (see [Ask beside the page](/guide/web#ask-beside-the-page)); **Do this here…** is in **Menu** (⋯) and opens a small box under the menu where you write what you want and send with **Ctrl+Enter** (⌘+Enter on a Mac). The box in the bar does both with what you type: its rows **Ask about this page: “…”** and **Do it in a tab of its own: “…”**.
 
 ### Ask about this page
 
-The box asks "What do you want to know about this page?"; press **Ask**. The agent gets a copy of the page, a file with its title, address, what you had selected on it and its readable text (up to 200,000 characters), and a new session starts with your question, on the agent and model the start page used last. You land in the session. The agent can't touch the page or see your sign-ins: it reads the copy. Let the page finish loading first, since the copy is what the tab shows now.
+The agent gets a copy of the page, a file with its title, address, what you had selected on it and its readable text (up to 200,000 characters), and a new session starts with your question, on the agent and model the start page used last. The answer shows in the column beside the page, and **Open as a session** takes you to it. The agent can't touch the page or see your sign-ins: it reads the copy. Let the page finish loading first, since the copy is what the tab shows now.
 
 ### Do this here
 
@@ -427,15 +449,21 @@ The box asks "What should an agent do on this page?", and says what the agent ge
 - **Only the browser**: no commands, no files, no web search, no other apps, no memory and no subagents. A session like this can't be continued in another agent, and a fork of it stays kept to the browser.
 - **A stop before sending**: it asks, as above, before it presses a button that sends, posts, deletes or transfers something, and it is told to ask you when it is unsure (see [Buttons that send, post or delete](/guide/web#buttons-that-send-post-or-delete)). Paying is yours, as always.
 
-The agent's first message tells it that your page is open in its browser, and that it works there alone. The browser has to be on in Settings (**A browser for agents**). After you press **Start**, **Agents’ tabs** opens, where the session's browser shows.
+The agent's first message tells it that your page is open in its browser, and that it works there alone. The browser has to be on in Settings (**A browser for agents**). After you press **Start**, the agent's tab shows in the page's place, with its conversation beside it (see [Agents at work](/guide/web#agents-at-work)).
 
 ### Take the page back
 
-On an agent's browser that got your page, the panel above its message box says "Your tab from example.com" with **Take back**, and so do **Agents’ tabs** and the bar over its page. Press it to close the agent's tab and open the page as a new tab of yours, in front. The agent is told "I took the page back: it is mine again". Its browser closes with its last tab, and otherwise as any session's does when the session ends (see [When the browser closes](/guide/web#when-the-browser-closes)).
+On an agent's browser that got your page, the panel above its message box says "Your tab from example.com" with **Take back**, and so does the bar while you watch it. Press it to close the agent's tab and open the page as a new tab of yours, in front. The agent is told "I took the page back: it is mine again". Its browser closes with its last tab, and otherwise as any session's does when the session ends (see [When the browser closes](/guide/web#when-the-browser-closes)).
 
-## Agents’ tabs
+## Agents at work
 
-**Menu** (⋯) → **Agents’ tabs** lists the agents' browsers that are open now, with the number of them beside it. Each shows the session's title and agent, what it is doing ("Clicking “Sign in”", "Waiting for you", "You are driving: the agent waits"), and its tabs (the first six). It is kept up to date, and there is a note when none is open. Press **Show** to see that browser in the page's place, with a thin bar above it: **Back to your tabs**, the session's title, **Open the conversation**, **Take over** (or **Hand back**), and **Take back** for a page you handed it. In the desktop app, click into its page to use it yourself; the agent waits, as in [Take over to log in, solve a check or pay](/guide/web#take-over-to-log-in-solve-a-check-or-pay).
+While an agent has a browser open, the tab column lists it under **Agents at work**, one row for each, with the session's title and what it is doing ("Clicking “Sign in”", "Waiting for you", "You are driving: the agent waits"). The list is kept up to date, and there is no such part when no agent has a browser open. Click a row to see that browser in the page's place:
+
+- The page shows with the agent's questions above it, as in [Take over to log in, solve a check or pay](/guide/web#take-over-to-log-in-solve-a-check-or-pay), and a ring round it: amber while it waits for you, blue while you drive. The box shows a chip with the agent and the session's title (its **×**, **Back to your tabs**, goes back) and the address of the agent's tab.
+- The bar has **Stop** while the agent works, **Take over** (or **Hand back**, when you drive), **Take back** for a page you handed it, and **Open the session**. In the desktop app, click into its page to use it yourself; the agent waits.
+- The column at the right shows the session's conversation, live, with its message box: watch it work, answer it, or send it a message. **Open the session** and **×** are at its top.
+
+**Esc**, the chip's **×**, **Back to your tabs** or a click on one of your tabs goes back to your own tabs; the column at the right shows what it showed before, or closes.
 
 ## Set up the browser
 

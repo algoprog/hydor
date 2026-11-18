@@ -414,7 +414,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   /**
    * A page you use takes keys itself, and the app's shortcuts would never reach the app's page: those go to it (Ctrl or ⌘
-   * with T, W, L, R, F, P, D, H, J, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl or ⌘+Shift+T and Shift+Delete; F5; Alt with the
+   * with T, W, L, R, F, P, D, H, J, B (the tab column), 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl or ⌘+Shift+T and Shift+Delete; F5; Alt with the
    * arrows, and ⌘ with [ and ] on a Mac). Zoom (Ctrl or ⌘ with + − 0) is the app's own, done here.
    */
   function shortcut(t, input) {
@@ -423,7 +423,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const lower = k.toLowerCase();
     if (mod && !input.alt && zoomKey(k)) return { zoom: zoomKey(k) };
     const hit =
-      (mod && !input.alt && /^[twlrfpdhj]$/.test(lower)) ||
+      (mod && !input.alt && /^[twlrfpdhjb]$/.test(lower)) ||
       (mod && !input.alt && /^[1-9]$/.test(k)) ||
       (input.control && !input.alt && k === 'Tab') ||
       (mod && input.shift && !input.alt && k === 'Delete') ||

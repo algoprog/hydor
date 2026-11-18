@@ -1,4 +1,5 @@
-// The tabs of your own browser: a strip above the address bar (a dropdown on a phone).
+// What the tabs of your own browser share: their site icons, the speaker of one that plays sound, and the dropdown that
+// lists them on a phone (on a computer the tab column does, TabColumn).
 import { useRef, useState } from 'react';
 import { ChevronDown, Globe, Plus, Volume2, VolumeX, X } from 'lucide-react';
 import type { BrowserTab, BrowserView } from '@shared/browser';
@@ -33,7 +34,7 @@ export function SiteIcon({ url, size = 14 }: { url: string; size?: number }) {
 }
 
 /** A speaker on a tab that plays sound (or that you muted): a click mutes it or lets it be heard. */
-function Speaker({ tab }: { tab: BrowserTab }) {
+export function Speaker({ tab }: { tab: BrowserTab }) {
   const st = useTabState((s) => s.byTab[tab.id]);
   if (!desktopBrowser() || (!st?.audible && !st?.muted)) return null;
   const muted = !!st.muted;
@@ -51,48 +52,6 @@ function Speaker({ tab }: { tab: BrowserTab }) {
     >
       {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
     </button>
-  );
-}
-
-export function TabStrip({ view }: { view: BrowserView }) {
-  return (
-    <div role="tablist" className="flex h-9 shrink-0 items-end gap-0.5 overflow-x-auto bg-bg-1 px-2 pt-1 [&::-webkit-scrollbar]:hidden">
-      {view.tabs.map((t) => (
-        <div
-          key={t.id}
-          role="tab"
-          aria-selected={t.active}
-          tabIndex={0}
-          title={t.title || t.url}
-          onClick={() => !t.active && void switchTab(t.id)}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), void switchTab(t.id))}
-          // A middle click closes it, as in other browsers.
-          onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-          onAuxClick={(e) => e.button === 1 && (e.preventDefault(), void closeTab(t.id))}
-          className={cx(
-            'group flex h-8 max-w-[220px] min-w-[44px] flex-1 basis-[180px] cursor-default items-center gap-2 rounded-t-[10px] pr-1 pl-2.5 text-[12.5px] transition-colors select-none',
-            t.active ? 'bg-bg text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg',
-          )}
-        >
-          <Favicon tab={t} />
-          <span translate="no" className="min-w-0 flex-1 truncate">
-            {tabName(t)}
-          </span>
-          <Speaker tab={t} />
-          <button
-            aria-label="Close tab"
-            title="Close tab"
-            onClick={(e) => (e.stopPropagation(), void closeTab(t.id))}
-            className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg-3 hover:bg-bg-3 hover:text-fg', !t.active && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
-          >
-            <X size={13} />
-          </button>
-        </div>
-      ))}
-      <button aria-label="New tab" title="New tab" onClick={() => void newTab()} className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-bg-2 hover:text-fg">
-        <Plus size={16} />
-      </button>
-    </div>
   );
 }
 

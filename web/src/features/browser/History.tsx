@@ -128,7 +128,7 @@ export function HistoryPanel({ onClose, onClear, tab }: { onClose: () => void; o
         <>
           {days.map((g) => (
             <div key={g.day}>
-              <div className="sticky top-0 z-10 flex items-center gap-2 bg-bg px-4 pt-3 pb-1 text-[12px] font-medium text-fg-2">
+              <div className="sticky top-0 z-10 flex items-center gap-2 bg-bg-1 px-4 pt-3 pb-1 text-[12px] font-medium text-fg-2">
                 <HistoryIcon size={13} className="text-fg-3" />
                 {g.day === 'Today' || g.day === 'Yesterday' ? g.day : <span translate="no">{g.day}</span>}
               </div>

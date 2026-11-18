@@ -102,8 +102,11 @@ function Starting({ question }: { question: string }) {
   );
 }
 
-/** The session's conversation, live, as its own page shows it (also beside a page in Pages). */
-export function Conversation({ sessionKey }: { sessionKey: string }) {
+/**
+ * The session's conversation, live, as its own page shows it (also beside a page in Pages). `docks` false leaves out the
+ * live views an agent's session shows over its message box (the Browser page shows the browser itself beside it).
+ */
+export function Conversation({ sessionKey, docks = true }: { sessionKey: string; docks?: boolean }) {
   const s = useSessions((x) => x.byKey[sessionKey]);
   const lv = useLive((x) => x.byKey[sessionKey]);
   useEffect(() => {
@@ -137,7 +140,7 @@ export function Conversation({ sessionKey }: { sessionKey: string }) {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} />
       </div>
-      <FeatureDock s={summary} />
+      {docks && <FeatureDock s={summary} />}
       <Composer s={summary} />
     </SessionCtx.Provider>
   );

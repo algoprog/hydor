@@ -221,21 +221,36 @@ agents that speak ACP and take MCP servers.
   German, Greek, Chinese, French and Spanish; **Ask before sending on signed-in sites** turns it off), as it always
   stops before paying. The desktop app's own browser is in Settings → Browser's list and chosen first; with it,
   **Show a window** and the download of a Chrome are not shown.
-- **Your own browser** (the **Browser** tool on the rail, in the desktop app only: the web app and a phone have no
-  Browser button, and `/browser` there says it is part of the desktop app; the agents' browsers work everywhere): its
-  tabs are real pages in the app's window, connecting to sites directly like any browser, kept between visits (up to
-  30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open addresses on your own
-  network.
+- **Your own browser** (the **Browser** tool on the rail, in the desktop app only: the web app and a
+  phone have no Browser button, and `/browser` there says it is part of the desktop app; the agents' browsers work
+  everywhere): its tabs are real pages in the app's window, connecting to sites directly like any browser, kept between
+  visits (up to 30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open
+  addresses on your own network.
+  - **A bar and three columns**: a bar across the top (back, forward, reload, the address box, **Save**, **Ask**, your
+    extensions' buttons, **Add to Hydor** on a Web Store page, and a ⋯ menu), under it the **tab column** (Ctrl/⌘+B folds
+    it away), the page, and a **column beside the page** that shows only when something is in it. Nothing is laid over
+    the page: it narrows to make room.
+  - **The tab column**: the sites on your bookmarks bar pinned as tiles (five to a row, two rows, a **…** tile for the
+    rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
+    open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ×, a speaker to mute,
+    middle click to close, **New tab**).
+  - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
+    start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
+    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site
+    permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
+  - **Save** keeps a readable copy of the page in the Library as a Web page, whose Bookmarks, Downloads and History
+    chips list this browser's own.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
-    search engine's suggestions and **Ask an agent**, which starts a session with your words; the rest of an address
+    search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words), **Do it in a tab of
+    its own** (an agent does what you typed in this tab) and **Ask an agent**, which starts a session with your words; the rest of an address
     completes in place (Tab or → takes it, found by words alone); Shift+Delete forgets a history suggestion. With search
     by meaning on, pages of your history and bookmarks that are about what you typed also show, after the ones with its
     words, even when theirs differ (the model runs on your computer, from a vector of each page's title and address,
     kept apart from everything else and gone with the page); the list keeps at least two of your pages and two of the
     engine's suggestions when it must be cut to fit. An address opens with or without https://, `localhost:3000` and
     files work, Alt+Enter or Ctrl/⌘+Enter opens in a new tab.
-  - **A home page and a search engine**: a Home button and new tabs open your home page (Google at first); the address
+  - **A home page and a search engine**: new tabs open your home page (Google at first); the address
     bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search address of your own, with search
     suggestions you can turn off.
   - **History**: a panel with a search box, by day, a way to delete one page, **Recently closed** and **Clear browsing
@@ -252,15 +267,15 @@ agents that speak ACP and take MCP servers.
     **Forget**.
   - **A right-click menu** on pages: Back, Forward, Reload; for a link, open it in a new tab or your default browser
     and copy it; for a picture, open, save, copy it and its address; for selected text, Copy, Search with your engine
-    and Ask an agent about it; in a field, spelling suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this
+    and Ask an agent about it (opens Ask beside the page); in a field, spelling suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this
     page, Print… and Inspect.
   - **Zoom** (Ctrl/⌘ with + − 0, and Ctrl and the wheel, with a chip that resets it), **print**, full-screen video,
     **find in page** (Ctrl/⌘+F, "3 of 12", Match case), a speaker on a tab that plays sound to mute it, and **Open in
     your default browser**.
-  - A star and a bookmarks bar (folders, a » menu for a long bar, right-click to edit), downloads into your Downloads
+  - A star and the bookmarks bar as pinned tiles (folders, right-click to edit), downloads into your Downloads
     folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and Allow,
     remembered for the site), a page's pop-up questions.
-  - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
+  - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, B, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
     Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→).
 - **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
@@ -272,11 +287,13 @@ agents that speak ACP and take MCP servers.
   and **Also in agents’ browsers** (those that use a profile) off until you turn it on. Electron lacks part of Chrome's extension features, so
   each extension's row names the parts that may not work (blocking or changing requests, cookies, history, the side
   panel…). Changing an extension through the API asks you every time.
-- **Hand a page to an agent**: **Ask about this page** starts a session with a copy of the page's text (the agent cannot
-  touch the page); **Do this here** gives Claude Code or Custom one tab of its own at your page, signed in as you on that
-  site, kept to that site, with the browser's tools and nothing else, asking before it sends, posts, deletes or
-  transfers; **Take back** closes the agent's tab and opens the page in yours. **Agents’ tabs** lists the browsers agents
-  have open, to watch, take over or open the conversation.
+- **Hand a page to an agent**: **Ask about this page** (**Ask** in the bar) starts a session with a copy of the page's
+  text (the agent cannot touch the page); **Do this here** (the ⋯ menu, or the box's **Do it in a tab of its own**) gives
+  Claude Code or Custom one tab of its own at your page, signed in as you on that site, kept to that site, with the
+  browser's tools and nothing else, asking before it sends, posts, deletes or transfers; **Take back** closes the agent's
+  tab and opens the page in yours. **Agents at work** in the tab column lists the browsers agents have open: click one to
+  see its tab in the page's place, ringed while it waits for you or you drive, with its conversation beside it, and
+  **Stop**, **Take over** or **Hand back**, **Take back** and **Open the session** in the bar.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
   lasting that the files don't say, one fact per note written to be found again, with how it is known (you said so,
   checked, or not checked yet), some only until a date, and a chip under the reply shows

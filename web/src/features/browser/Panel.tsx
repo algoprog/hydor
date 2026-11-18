@@ -1,5 +1,6 @@
-// The panel beside the page (bookmarks, extensions, downloads, the agents' tabs): a column on a computer, so the page
-// keeps what room is left; full screen on a phone.
+// What the right column shows besides Ask and an agent's conversation (history, downloads, bookmarks, extensions, site
+// permissions, settings): it fills the column (the page's right column holds it, so the page keeps what room is left);
+// a sheet over the page on a phone.
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { IconButton, Sheet, useIsMobile } from '../../components/ui';
@@ -25,9 +26,9 @@ export function Panel({ title, onClose, actions, children, width = 360 }: { titl
       </Sheet>
     );
   return (
-    <aside style={{ width }} className="flex h-full shrink-0 flex-col border-l border-line bg-bg" aria-label={title}>
+    <section className="flex h-full min-w-0 flex-1 flex-col bg-bg-1" aria-label={title}>
       {body}
-    </aside>
+    </section>
   );
 }
 

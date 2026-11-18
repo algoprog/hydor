@@ -1,12 +1,15 @@
-// The address bar: what you type is completed in place, and a list under it offers your open tabs, bookmarks and
-// history, what you typed as an address, the search engine's suggestions and, last, asking an agent. Enter opens
-// the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your history.
-// A padlock opens what the page's site may do; a chip shows a zoom other than 100 %; a star bookmarks the page.
+// The box in the bar: search, open, ask, or tell an agent what to do. What you type is completed in place, and a list
+// under it offers your open tabs, bookmarks and history, what you typed as an address, the search engine's suggestions
+// and, last, asking about the page you are on, doing something in it (an agent in a tab of its own) and asking an agent.
+// Enter opens the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your
+// history. At rest it shows the address as its site and the rest. A padlock opens what the page's site may do; a chip
+// shows a zoom other than 100 %; a star bookmarks the page.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star } from 'lucide-react';
+import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star, WandSparkles } from 'lucide-react';
 import type { BrowserTab, Suggestion } from '@shared/browser';
-import { cx } from '../../components/ui';
+import { MOD } from '../../lib/format';
+import { cx, Kbd } from '../../components/ui';
 import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
 import { fitRows } from './omniboxFit';
 import { connectionOf, SiteInfo } from './SiteInfo';
@@ -14,7 +17,7 @@ import { connectionOf, SiteInfo } from './SiteInfo';
 /** One row of the list. */
 interface Row {
   id: string;
-  kind: Suggestion['kind'] | 'ask';
+  kind: Suggestion['kind'] | 'ask' | 'askpage' | 'do';
   /** Its main words, and the address under them. */
   title: string;
   url?: string;
@@ -48,9 +51,41 @@ function Marked({ text, words }: { text: string; words: string[] }) {
   );
 }
 
-const ICONS: Record<Row['kind'], typeof Globe> = { tab: PanelTop, bookmark: Star, history: Clock, url: Globe, search: Search, ask: Sparkles };
+const ICONS: Record<Row['kind'], typeof Globe> = { tab: PanelTop, bookmark: Star, history: Clock, url: Globe, search: Search, ask: Sparkles, askpage: Sparkles, do: WandSparkles };
 
-export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { inputRef: React.RefObject<HTMLInputElement | null>; tab?: BrowserTab; starred: boolean; canStar: boolean; onStar: () => void; compact?: boolean }) {
+/** An address as its site and the rest of it (what the box shows at rest); an address that is not a web one is all one. */
+function splitAddress(url: string): { site: string; rest: string } {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { site: shownAddress(url), rest: '' };
+    const rest = `${u.pathname === '/' ? '' : u.pathname}${u.search}${u.hash}`;
+    return { site: u.host.replace(/^www\./, ''), rest };
+  } catch {
+    return { site: shownAddress(url), rest: '' };
+  }
+}
+
+export function Omnibox({
+  inputRef,
+  tab,
+  starred,
+  canStar,
+  onStar,
+  compact,
+  onAskPage,
+  onDoHere,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  tab?: BrowserTab;
+  starred: boolean;
+  canStar: boolean;
+  onStar: () => void;
+  compact?: boolean;
+  /** Ask about the page the tab is on (given for a web page): what was typed is the question. */
+  onAskPage?: (question: string) => void;
+  /** Have an agent do what was typed in a tab of its own (given for a web page). */
+  onDoHere?: (what: string) => void;
+}) {
   const url = tab?.url ?? '';
   const [typed, setTyped] = useState('');
   const [completion, setCompletion] = useState('');
@@ -86,10 +121,14 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
     });
     // As many as fit on the screen without scrolling, some of your pages and some of the engine's among them; asking an agent stays last.
     const fit = Math.max(2, Math.floor(((at?.room ?? 440) - 12) / ROW));
-    return [...fitRows(out, fit - 1), { id: 'ask', kind: 'ask', title: q, text: q }];
-  }, [q, result, at?.room]);
+    const tail: Row[] = [];
+    if (onAskPage) tail.push({ id: 'askpage', kind: 'askpage', title: q, text: q });
+    if (onDoHere) tail.push({ id: 'do', kind: 'do', title: q, text: q });
+    tail.push({ id: 'ask', kind: 'ask', title: q, text: q });
+    return [...fitRows(out, Math.max(1, fit - tail.length)), ...tail];
+  }, [q, result, at?.room, !!onAskPage, !!onDoHere]); // eslint-disable-line react-hooks/exhaustive-deps
   const words = useMemo(() => q.split(/\s+/).filter((w) => w.length > 0), [q]);
-  const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'search' ? (r.text ?? '') : shownAddress(r.url));
+  const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'do' || r.kind === 'search' ? (r.text ?? '') : shownAddress(r.url));
   const row = sel >= 0 ? rows[sel] : undefined;
   const value = !editing ? shownAddress(url) : row ? fill(row) : typed + completion;
 
@@ -155,6 +194,8 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
     finish();
     if (r?.kind === 'tab' && r.tab && !inNew) return void switchTab(r.tab).then(() => toPage(r.tab));
     if (r?.kind === 'ask') return void askAgent(r.text ?? text);
+    if (r?.kind === 'askpage') return onAskPage?.(r.text ?? text);
+    if (r?.kind === 'do') return onDoHere?.(r.text ?? text);
     const target = r ? (r.kind === 'search' ? r.text : r.url) : text;
     if (!target) return;
     void goTo(target, inNew ? { newTab: true } : { tab: tab?.id }).then(() => !inNew && toPage(tab?.id));
@@ -165,11 +206,14 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
     noInline.current = true;
   };
 
+  const shown = splitAddress(url);
+  // At rest (not being typed in) an address shows as its site and the rest; the input is still there to click into.
+  const atRest = !editing && !!url && url !== 'about:blank';
   const kind = connectionOf(url);
   const secure = kind === 'secure';
 
   return (
-    <div ref={box} className="relative flex h-9 min-w-0 flex-1 items-center rounded-full border border-line-2 bg-bg-2 focus-within:border-accent/60 focus-within:bg-bg-1 focus-within:ring-3 focus-within:ring-accent/15">
+    <div ref={box} className="relative flex h-9 min-w-0 flex-1 items-center rounded-[10px] bg-bg-2 ring-1 ring-line-2 transition-shadow focus-within:ring-accent/60">
       {url && url !== 'about:blank' ? (
         <button
           ref={lock}
@@ -177,7 +221,7 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
           title={secure ? 'The connection is secure' : kind === 'insecure' ? 'Not secure' : 'Site information'}
           disabled={kind === 'other'}
           onClick={() => setInfo((i) => !i)}
-          className={cx('ml-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] hover:bg-bg-3 disabled:pointer-events-none', info && 'bg-bg-3')}
+          className={cx('ml-1 flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] hover:bg-bg-3 disabled:pointer-events-none', info && 'bg-bg-3')}
         >
           {secure ? <Lock size={14} className="text-fg-2" /> : kind === 'insecure' ? <LockOpen size={14} className="text-warn" /> : <Info size={14} className="text-fg-3" />}
           {kind === 'insecure' && !editing && !compact && <span className="text-warn">Not secure</span>}
@@ -185,6 +229,7 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
       ) : (
         <Search size={14} className="mx-3 shrink-0 text-fg-3" />
       )}
+      <div className="relative h-full min-w-0 flex-1">
       <input
         ref={inputRef}
         value={value}
@@ -246,17 +291,25 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
             setSel(-1);
           } else if (e.key === 'Backspace' || e.key === 'Delete') noInline.current = true;
         }}
-        placeholder="Search or enter an address"
+        placeholder="Search, open, ask, or tell an agent what to do"
         aria-label="Address"
         translate="no"
-        className="h-full min-w-0 flex-1 bg-transparent px-2 text-[13.5px] outline-none placeholder:text-fg-3"
+        className={cx('h-full w-full min-w-0 bg-transparent px-2 text-[13.5px] outline-none placeholder:text-fg-3', atRest && 'text-transparent')}
       />
+      {atRest && (
+        <div translate="no" aria-hidden className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-[13.5px] whitespace-nowrap">
+          <span className="shrink-0 text-fg">{shown.site}</span>
+          <span className="min-w-0 truncate text-fg-3">{shown.rest}</span>
+        </div>
+      )}
+    </div>
+    {!editing && !compact && <Kbd>{MOD}L</Kbd>}
       {percent !== 100 && tab && (
         <button
           aria-label="Back to 100 %"
           title="Back to 100 %"
           onClick={() => void desktopBrowser()?.zoom(tab.id, 'reset').then((z) => useTabState.setState((s) => ({ byTab: { ...s.byTab, [tab.id]: { ...s.byTab[tab.id], zoom: z } } })))}
-          className="tnum mr-0.5 flex h-6 shrink-0 items-center rounded-full bg-bg-3 px-2 text-[11.5px] text-fg-2 hover:text-fg"
+          className="tnum mx-0.5 flex h-6 shrink-0 items-center rounded-full bg-bg-3 px-2 text-[11.5px] text-fg-2 hover:text-fg"
         >
           {percent}%
         </button>
@@ -266,7 +319,7 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
         title={starred ? 'Remove the bookmark' : 'Bookmark this page'}
         disabled={!canStar}
         onClick={onStar}
-        className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-fg-3 hover:bg-bg-3 hover:text-fg disabled:pointer-events-none disabled:opacity-40"
+        className="mr-1 ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-bg-3 hover:text-fg disabled:pointer-events-none disabled:opacity-40"
       >
         <Star size={15} className={cx(starred && 'fill-warn text-warn')} />
       </button>
@@ -298,10 +351,18 @@ function RowView({ r, active, words, engine, onHover, onPick }: { r: Row; active
   const Icon = ICONS[r.kind];
   return (
     <div role="option" aria-selected={active} onMouseMove={onHover} onClick={onPick} style={{ height: ROW }} className={cx('flex cursor-default items-center gap-2.5 rounded-lg px-2.5 text-[13.5px]', active ? 'bg-bg-3' : '')}>
-      <Icon size={15} className={cx('shrink-0', r.kind === 'ask' ? 'text-accent' : 'text-fg-3')} />
+      <Icon size={15} className={cx('shrink-0', r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'do' ? 'text-accent' : 'text-fg-3')} />
       {r.kind === 'ask' ? (
         <span className="min-w-0 flex-1 truncate">
           Ask an agent: <span translate="no">“{r.title}”</span>
+        </span>
+      ) : r.kind === 'askpage' ? (
+        <span className="min-w-0 flex-1 truncate">
+          Ask about this page: <span translate="no">“{r.title}”</span>
+        </span>
+      ) : r.kind === 'do' ? (
+        <span className="min-w-0 flex-1 truncate">
+          Do it in a tab of its own: <span translate="no">“{r.title}”</span>
         </span>
       ) : r.kind === 'search' ? (
         <>

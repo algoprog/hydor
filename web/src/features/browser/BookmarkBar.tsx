@@ -1,10 +1,13 @@
-// The bookmarks bar under the address bar: the items of the bookmarks bar root, folders opening a list of theirs.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronsRight, ExternalLink, Folder, FolderOpen, Globe, Pencil, SquareArrowOutUpRight, Trash2 } from 'lucide-react';
+// The sites pinned at the top of the tab column: the items of the bookmarks bar, folders opening a list of theirs; and the
+// parts of bookmarks that the bookmarks panel shares (opening one, renaming, deleting).
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { Ellipsis, ExternalLink, Folder, FolderOpen, Pencil, SquareArrowOutUpRight, Trash2 } from 'lucide-react';
 import type { BookmarkNode } from '@shared/browser';
-import { Button, Dialog, inputCls, MenuItem, Popover, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, MenuItem, Popover, useConfirm } from '../../components/ui';
 import { activeTab, addBookmark, childrenOf, countIn, editBookmark, goTo, KEY, newTab, removeBookmark, useBookmarks } from './browsing';
 import { useBrowser } from './store';
+import { SiteIcon } from './TabStrip';
 
 /** Opens a bookmark here, or in a new tab (Ctrl or ⌘ held, or the middle button). */
 export function openBookmark(n: BookmarkNode, inNew: boolean) {
@@ -65,17 +68,16 @@ export function useDeleteBookmark() {
   return [remove, confirmNode] as const;
 }
 
-/** A folder's items as a list, its own folders opening in place; a click goes to the bookmark. */
-function FolderList({ nodes, parent, onPick, depth = 0 }: { nodes: BookmarkNode[]; parent: string; onPick: (n: BookmarkNode, inNew: boolean) => void; depth?: number }) {
+/** Items as a list, their own folders opening in place; a click goes to the bookmark. */
+function NodeList({ nodes, all, onPick, depth = 0 }: { nodes: BookmarkNode[]; all: BookmarkNode[]; onPick: (n: BookmarkNode, inNew: boolean) => void; depth?: number }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const items = childrenOf(nodes, parent);
-  if (!items.length) return <div className="px-2.5 py-2 text-[12.5px] text-fg-3">Empty</div>;
+  if (!nodes.length) return <div className="px-2.5 py-2 text-[12.5px] text-fg-3">Empty</div>;
   return (
     <>
-      {items.map((n) =>
+      {nodes.map((n) =>
         n.url ? (
           <div key={n.id} style={{ paddingLeft: depth * 14 }} translate="no">
-            <MenuItem icon={<Globe size={14} />} onClick={() => onPick(n, false)}>
+            <MenuItem icon={<SiteIcon url={n.url} size={14} />} onClick={() => onPick(n, false)}>
               {n.title || n.url}
             </MenuItem>
           </div>
@@ -86,7 +88,7 @@ function FolderList({ nodes, parent, onPick, depth = 0 }: { nodes: BookmarkNode[
                 {n.title || 'Folder'}
               </MenuItem>
             </div>
-            {open[n.id] && <FolderList nodes={nodes} parent={n.id} onPick={onPick} depth={depth + 1} />}
+            {open[n.id] && <NodeList nodes={childrenOf(all, n.id)} all={all} onPick={onPick} depth={depth + 1} />}
           </div>
         ),
       )}
@@ -94,8 +96,22 @@ function FolderList({ nodes, parent, onPick, depth = 0 }: { nodes: BookmarkNode[
   );
 }
 
-/** One item of the bar: a bookmark, or a folder that opens a list. */
-function BarItem({ n, nodes, onMenu }: { n: BookmarkNode; nodes: BookmarkNode[]; onMenu: (n: BookmarkNode, el: HTMLElement) => void }) {
+/** A folder's items as a list. */
+function FolderList({ nodes, parent, onPick }: { nodes: BookmarkNode[]; parent: string; onPick: (n: BookmarkNode, inNew: boolean) => void }) {
+  return <NodeList nodes={childrenOf(nodes, parent)} all={nodes} onPick={onPick} />;
+}
+
+/**
+ * A clear layer under a list that floats over the page: the page (the desktop app's own view) is taken away for a still
+ * picture of itself only when something is found over several places of it, which a small list is not; this covers them
+ * all. A press on it closes the list.
+ */
+function Scrim({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return open ? createPortal(<div className="fixed inset-0 z-40" onPointerDown={onClose} aria-hidden />, document.body) : null;
+}
+
+/** One pinned site: a 40 px tile with its icon, or a folder opening a list of its own. */
+function Tile({ n, nodes, onMenu }: { n: BookmarkNode; nodes: BookmarkNode[]; onMenu: (n: BookmarkNode, el: HTMLElement) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -104,16 +120,15 @@ function BarItem({ n, nodes, onMenu }: { n: BookmarkNode; nodes: BookmarkNode[];
         ref={ref}
         data-bar-item={n.id}
         title={n.url ? `${n.title}\n${n.url}` : n.title}
+        aria-label={n.title || n.url || 'Folder'}
         onClick={(e) => (n.url ? openBookmark(n, e.ctrlKey || e.metaKey) : setOpen((o) => !o))}
         onAuxClick={(e) => e.button === 1 && (e.preventDefault(), openBookmark(n, true))}
         onContextMenu={(e: ReactMouseEvent<HTMLButtonElement>) => (e.preventDefault(), onMenu(n, e.currentTarget))}
-        className="flex h-7 max-w-[170px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
+        className={cx('flex h-10 w-10 items-center justify-center rounded-[10px] bg-bg-2 transition-colors hover:bg-bg-3', open && 'bg-bg-3')}
       >
-        {n.url ? <Globe size={13} className="shrink-0 text-fg-3" /> : <Folder size={13} className="shrink-0 text-fg-3" />}
-        <span translate="no" className="truncate">
-          {n.title || n.url || 'Folder'}
-        </span>
+        {n.url ? <SiteIcon url={n.url} size={20} /> : <Folder size={19} className="text-fg-2" />}
       </button>
+      {!n.url && <Scrim open={open} onClose={() => setOpen(false)} />}
       {!n.url && (
         <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={280}>
           <div className="max-h-[60vh] overflow-y-auto">
@@ -132,55 +147,53 @@ function BarItem({ n, nodes, onMenu }: { n: BookmarkNode; nodes: BookmarkNode[];
   );
 }
 
-export function BookmarkBar() {
+/** Tiles to a row, and rows before the rest go under a "…" tile. */
+const PER_ROW = 5;
+const ROWS = 2;
+
+/**
+ * The sites pinned in the tab column: the items of the bookmarks bar as tiles, five to a row, two rows at most (then a
+ * "…" tile lists the rest). A click opens the site in this tab, a middle or Ctrl click in a new one, a right click edits it.
+ */
+export function PinnedTiles() {
   const nodes = useBookmarks((s) => s.nodes);
   const items = useMemo(() => childrenOf(nodes, 'bar'), [nodes]);
-  const row = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const [more, setMore] = useState(false);
-  const [over, setOver] = useState(false);
   const [menu, setMenu] = useState<BookmarkNode | null>(null);
   const [rename, setRename] = useState<BookmarkNode | null>(null);
   const menuAt = useRef<HTMLElement | null>(null);
   const [remove, confirmNode] = useDeleteBookmark();
 
-  // A long bar scrolls; the » button then lists every item.
-  useLayoutEffect(() => {
-    const el = row.current;
-    if (!el) return;
-    const measure = () => setOver(el.scrollWidth > el.clientWidth + 1);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [items]);
-
   if (!items.length) return null;
+  const cap = PER_ROW * ROWS;
+  const over = items.length > cap;
+  const shown = over ? items.slice(0, cap - 1) : items;
+  const rest = over ? items.slice(cap - 1) : [];
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-line bg-bg px-2">
-      <div ref={row} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-        {items.map((n) => (
-          <BarItem
-            key={n.id}
-            n={n}
-            nodes={nodes}
-            onMenu={(x, el) => {
-              menuAt.current = el;
-              setMenu(x);
-            }}
-          />
-        ))}
-      </div>
+    <div className="grid grid-cols-5 gap-2.5 px-2.5 pt-3 pb-1">
+      {shown.map((n) => (
+        <Tile
+          key={n.id}
+          n={n}
+          nodes={nodes}
+          onMenu={(x, el) => {
+            menuAt.current = el;
+            setMenu(x);
+          }}
+        />
+      ))}
       {over && (
         <>
-          <button ref={moreRef} aria-label="More bookmarks" title="More bookmarks" onClick={() => setMore((o) => !o)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-3 hover:bg-bg-2 hover:text-fg">
-            <ChevronsRight size={15} />
+          <button ref={moreRef} aria-label="More pinned sites" title="More pinned sites" onClick={() => setMore((o) => !o)} className={cx('flex h-10 w-10 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg', more && 'bg-bg-3')}>
+            <Ellipsis size={18} />
           </button>
-          <Popover anchor={moreRef} open={more} onClose={() => setMore(false)} align="end" width={300}>
+          <Scrim open={more} onClose={() => setMore(false)} />
+          <Popover anchor={moreRef} open={more} onClose={() => setMore(false)} width={300}>
             <div className="max-h-[60vh] overflow-y-auto">
-              <FolderList
-                nodes={nodes}
-                parent="bar"
+              <NodeList
+                nodes={rest}
+                all={nodes}
                 onPick={(b, inNew) => {
                   setMore(false);
                   openBookmark(b, inNew);
@@ -190,6 +203,7 @@ export function BookmarkBar() {
           </Popover>
         </>
       )}
+      <Scrim open={!!menu} onClose={() => setMenu(null)} />
       <Popover anchor={menuAt} open={!!menu} onClose={() => setMenu(null)} width={220}>
         {menu && (
           <>
