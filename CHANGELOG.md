@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.88.0 · 18 November 2026
+
+Experiments shows what matters about your runs: the curves you care about, how far each run has got, and a tidier
+list.
+
+- **The right charts**: a run's page charts the metrics it prints again and again, the most telling first (losses and
+  scores before the learning rate, speed and memory), and lists the numbers it prints once (its settings at the start,
+  its results at the end) as **Values**, with **All** and a box to find one. A run that prints more than 100 numbers
+  keeps its curves first, so a long list of settings at its start no longer crowds out its loss; runs already
+  recorded that way get their curves back from their logs.
+- **How far a run has got**: while a run goes, its row and its page show a bar, the steps done of all of them and about
+  how long is left, when its output says so (a progress bar, "step 120/1000", or a total of steps it prints).
+- **A tidier list**: each run's name has the whole width; under it, its status with how long it took ("Done after
+  1 h 47 min"), its key metrics (never bookkeeping such as token counts), and where it runs only when your runs are in
+  more than one place. In each experiment the runs going now come first, then those waiting, in the order they will
+  start. Click an experiment's name to fold it away; a long one shows its first 10 runs, with **Show more**. The box to
+  tick a run shows when you point at it.
+- **Waiting, in plain words**: a job without a GPU waiting for its turn says **Waiting for a run to end**, no longer
+  "Waiting for a GPU".
+- **Compare** charts what changes over steps, and puts the values the runs printed once side by side, the best of each
+  row in bold.
+
 ## 0.87.0 · 18 November 2026
 
 Your own browser translates pages, opens private tabs, shows articles in reader view and pages in dark colours, and
