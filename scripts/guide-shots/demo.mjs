@@ -1005,6 +1005,11 @@ export function overrides(s, now) {
   /** Settings → Models as on a desktop with one graphics card: OpenRouter's models picked, two run here. */
   const models = (real) => ({
     ...real,
+    // Alex's Claude and ChatGPT plans, which Custom can use through Claude Code's and Codex's sign-ins.
+    subscriptions: [
+      { provider: 'claude', program: 'Claude Code', installed: true, signedIn: true, models: ['Opus 5.5', 'Fable 5.2', 'Sonnet 5.5', 'Haiku 5.5'].map((n) => ({ id: `claude/${n.split(' ')[0].toLowerCase()}`, label: `Claude ${n}` })) },
+      { provider: 'codex', program: 'Codex', installed: true, signedIn: true, models: ['Sol', 'Terra', 'Luna'].map((n) => ({ id: `codex/gpt-6-${n.toLowerCase()}`, label: `GPT-6-${n}` })) },
+    ],
     openrouter: {
       keyHint: 'sk-or-…7f3c',
       pinned: [
