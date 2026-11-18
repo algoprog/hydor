@@ -293,7 +293,7 @@ function ForkedFrom({ s }: { s: SessionSummary }) {
     <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-1.5 text-[12.5px] text-fg-3 sm:px-6">
       <GitFork size={13} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">
-        Forked from <span className="text-fg-2">{parent?.title ?? 'another session'}</span>
+        Forked from <span className="text-fg-2">{parent?.title ?? s.forkFromTitle ?? 'another session'}</span>
         {s.agent === 'codex' && ', where the earlier conversation is'}
       </span>
       <button onClick={() => go(sessionPath(s.forkFrom!))} className="shrink-0 text-accent hover:underline">

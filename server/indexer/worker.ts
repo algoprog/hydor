@@ -10,6 +10,7 @@ import { CodexParser } from '../history/codex.ts';
 import { AcpParser } from '../history/acp.ts';
 import { PARSE_VERSION } from '../history/common.ts';
 import { LineSplitter } from '../runner/frames.ts';
+import { onePerSession } from './copies.ts';
 import { keep, keptPath, restore } from './kept.ts';
 import { searchSessions } from './search.ts';
 import type { SearchHit } from '../../shared/types.ts';
@@ -148,6 +149,7 @@ function refreshCodexNames(): boolean {
 // ---- parsing ---------------------------------------------------------------
 
 const getRow = db.prepare('select key, size, mtime, offset, head, parse_version, state from sessions where path = ?');
+const pathOf = db.prepare('select path from sessions where key = ?');
 const upsert = db.prepare(`
   insert into sessions (key, agent, id, path, size, mtime, offset, head, parse_version, state, cwd, git_branch, title,
     first_prompt, last_prompt, model, source, cli_version, created_at, updated_at, user_msgs, assistant_msgs, tool_calls,
@@ -319,12 +321,14 @@ async function pass(initial: boolean) {
           keep(f.path, k);
         } catch {}
     }
+    // A session with copies of its transcript in two places (copies.ts) is read from one of them.
+    const reading = onePerSession(files, (key) => (pathOf.get(key) as { path: string } | undefined)?.path);
     // Newest first, so a cold start shows recent sessions right away.
-    files.sort((a, b) => (urgent.has(b.path) ? 1 : 0) - (urgent.has(a.path) ? 1 : 0) || b.mtime - a.mtime);
+    reading.sort((a, b) => (urgent.has(b.path) ? 1 : 0) - (urgent.has(a.path) ? 1 : 0) || b.mtime - a.mtime);
     urgent.clear();
     let changed: string[] = [];
     let done = 0;
-    for (const f of files) {
+    for (const f of reading) {
       try {
         const key = await indexFile(f);
         if (key) changed.push(key);
@@ -332,8 +336,10 @@ async function pass(initial: boolean) {
         port.postMessage({ type: 'error', path: f.path, message: (e as Error).message });
       }
       done++;
+      // What a busy pass found goes out in parts too, but only the first read of everything is a run of the indexer (pages
+      // read the whole list again when one ends).
       if (changed.length >= 25 || (initial && done % 50 === 0)) {
-        port.postMessage({ type: 'updated', keys: changed, done, total: files.length, running: true });
+        port.postMessage({ type: 'updated', keys: changed, done, total: reading.length, running: initial });
         changed = [];
       }
       if (urgent.size) break;
@@ -364,7 +370,7 @@ async function pass(initial: boolean) {
         }
       })();
     }
-    port.postMessage({ type: 'updated', keys: changed, removed: gone.map((r) => r.key), done: files.length, total: files.length, running: false });
+    port.postMessage({ type: 'updated', keys: changed, removed: gone.map((r) => r.key), done: reading.length, total: reading.length, running: false });
   } finally {
     busy = false;
     // A poke arrived mid-pass: serve it now rather than at the next tick.

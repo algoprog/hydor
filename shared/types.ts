@@ -447,6 +447,8 @@ export interface SessionSummary {
   handoffTo?: string;
   /** A fork of that session (Codex forks show only what came after; the rest is there). */
   forkFrom?: string;
+  /** That session's title, as a page's list of sessions leaves it out once it is archived. */
+  forkFromTitle?: string;
   /** When a turn last finished, and when the session was last looked at: newer `doneAt` means unread. */
   doneAt?: number;
   seenAt?: number;

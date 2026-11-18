@@ -203,6 +203,12 @@ type Phase = 'working' | 'waiting' | 'idle' | 'error' | 'off';
 const HELD_GRACE_MS = 15_000;
 
 /** Where a session stands for notifications: running here, running elsewhere, or not running. */
+/** A session's title: the one given here, its subagent's, its transcript's, or its first message. */
+function titleOfRow(r: Row, sub: { title?: string } | null): string {
+  const title = r.app_title || sub?.title || r.title || r.first_prompt || r.app_first_prompt || 'New session';
+  return title.length > 200 ? title.slice(0, 199) + '…' : title;
+}
+
 function phaseOf(s: SessionSummary): Phase {
   const l = s.live;
   if (l && l.status !== 'exited') return l.status === 'error' ? 'error' : l.status === 'waiting' ? 'waiting' : l.status === 'working' ? 'working' : 'idle';
@@ -492,14 +498,13 @@ export class SessionManager extends EventEmitter {
     // A subagent of the session's own program: named as its transcript's neighbours say, and working while its lead's agent runs it.
     const lead = r.parent_key;
     const sub = lead ? subagentMeta(r.key, r.path) : null;
-    const title = r.app_title || sub?.title || r.title || r.first_prompt || r.app_first_prompt || 'New session';
     const prefs: SessionPrefs | undefined =
       r.pref_model || r.pref_effort || r.pref_mode ? { model: r.pref_model ?? undefined, effort: r.pref_effort ?? undefined, mode: r.pref_mode ?? undefined } : undefined;
     return {
       key: r.key,
       agent,
       id: r.id,
-      title: title.length > 200 ? title.slice(0, 199) + '…' : title,
+      title: titleOfRow(r, sub),
       firstPrompt: r.first_prompt ?? r.app_first_prompt ?? undefined,
       lastPrompt: r.last_prompt ?? undefined,
       cwd: r.cwd ?? r.app_cwd ?? undefined,
@@ -539,6 +544,8 @@ export class SessionManager extends EventEmitter {
       handoffFrom: r.handoff_from ?? undefined,
       handoffTo: r.handoff_to ?? undefined,
       forkFrom: r.fork_from ?? undefined,
+      // Named here, as the session list a page holds leaves that session out once it is archived.
+      forkFromTitle: r.fork_from ? this.titleOf(r.fork_from) : undefined,
       doneAt: r.done_at ?? undefined,
       seenAt: r.seen_at ?? undefined,
       endedAt: r.ended_at ?? undefined,
@@ -557,6 +564,12 @@ export class SessionManager extends EventEmitter {
       createdByApp: !!r.created_by_app,
       prefs,
     };
+  }
+
+  /** A session's title as its summary gives it; undefined when there is no such session. */
+  private titleOf(key: string): string | undefined {
+    const r = this.row(key);
+    return r ? titleOfRow(r, r.parent_key ? subagentMeta(r.key, r.path) : null) : undefined;
   }
 
   /** How many program subagents a session has: those in the index, and (Claude Code) those its running agent lists that are not there yet. */
@@ -3184,6 +3197,8 @@ export class SessionManager extends EventEmitter {
     if (l && t) await l.adapter.rename(t);
     else if (agent === 'codex' && t) await this.codex.setThreadName(key.slice(6), t).catch(() => {});
     this.queueSummary(key);
+    // Its forks name it too.
+    for (const f of this.db.prepare('select key from app_sessions where fork_from = ?').all(key) as { key: string }[]) this.queueSummary(f.key);
   }
 
   /** Saves a sidebar group's order as dragged: each key gets its position (1..n). */
