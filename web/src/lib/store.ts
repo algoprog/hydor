@@ -490,6 +490,8 @@ interface UIState {
   detailsFocus: string | null;
   /** Width of the desktop navigation, distinct from the file tree. */
   navigationWidth: number;
+  /** Width of the Browser page's right column on a computer (Ask, an agent's conversation, the panels): dragged at its edge. */
+  browserColumnWidth: number;
   sideWidth: number;
   panelOpen: boolean;
   panelHeight: number;
@@ -543,6 +545,7 @@ export const useUI = create<UIState>((set, get) => ({
   detailsTab: 'changes',
   detailsFocus: null,
   navigationWidth: 280,
+  browserColumnWidth: 400,
   sideWidth: 300,
   panelOpen: false,
   panelHeight: 280,

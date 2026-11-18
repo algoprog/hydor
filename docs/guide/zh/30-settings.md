@@ -226,7 +226,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、翻译、深色网页、广告拦截器、历史记录，以及清除它保存的内容。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷词、页面缩放、拼写检查、翻译、深色网页、广告拦截器、历史记录，以及清除它保存的内容。
 
 ### 电脑操控
 

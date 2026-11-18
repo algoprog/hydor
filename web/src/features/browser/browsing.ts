@@ -86,8 +86,8 @@ export async function openBrowsing(url?: string): Promise<BrowserView> {
   return r.view;
 }
 
-/** What was typed in the address bar: an address is opened, anything else searched. */
-export async function goTo(text: string, o: { tab?: string; newTab?: boolean; private?: boolean } = {}) {
+/** What was typed in the address bar: a shortcut's site searched, an address opened, anything else searched; `plain`: always searched with your engine. */
+export async function goTo(text: string, o: { tab?: string; newTab?: boolean; private?: boolean; plain?: boolean } = {}) {
   try {
     takeView((await post<{ view: BrowserView }>('/api/browser/browsing/go', { text, ...o, ...(o.private ? { private: true } : {}) })).view);
   } catch (e) {

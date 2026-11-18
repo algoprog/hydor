@@ -1,11 +1,11 @@
-// The browser settings' groups for translating pages and for how pages are shown (dark pages, sound by themselves).
+// The browser settings' groups for translating pages and for how pages are shown (zoom, spell checking, dark pages, sound by themselves).
 import { useRef, useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
-import { TRANSLATE_LANGS } from '@shared/browser';
+import { PAGE_ZOOMS, TRANSLATE_LANGS } from '@shared/browser';
 import { go } from '../../lib/nav';
 import { Button, OptionRow, Popover, Switch } from '../../components/ui';
 import { Group, Row, Select } from '../settings/kit';
-import { savePrefs, usePrefs } from './browsing';
+import { savePrefs, usePrefs, zoomPercent } from './browsing';
 import { langChoice, langLabel } from './languages';
 import { LANG_OPTIONS } from './Translate';
 
@@ -90,13 +90,23 @@ export function TranslationGroup() {
   );
 }
 
-/** Pages: dark pages (and the sites shown as they are) and whether sites may play sound by themselves. */
+/** Pages: how big they are, spell checking, dark pages (and the sites shown as they are) and whether sites may play sound by themselves. */
 export function PagesGroup() {
   const prefs = usePrefs((s) => s.prefs);
   if (!prefs) return null;
   const except = prefs.darkExcept ?? [];
   return (
     <Group title="Pages">
+      <Row
+        label="Page zoom"
+        hint="How big pages are, unless you zoom a site yourself"
+        control={<Select<string> label="Page zoom" value={String(prefs.zoom)} options={PAGE_ZOOMS.map((z) => ({ value: String(z), label: `${zoomPercent(z)} %` }))} onChange={(v) => void savePrefs({ zoom: Number(v) })} width={120} />}
+      />
+      <Row
+        label="Check spelling"
+        hint="Underlines misspelled words as you type, with suggestions in the right-click menu"
+        control={<Switch on={prefs.spellcheck} label="Check spelling" onChange={(v) => void savePrefs({ spellcheck: v })} />}
+      />
       <Row
         label="Dark pages"
         hint="Pages that have no dark look of their own are shown in dark colours. Some may look odd: turn it off for a site from its padlock."

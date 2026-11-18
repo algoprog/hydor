@@ -108,7 +108,7 @@ export function carriedBrowserOnly(db: DB, key: string): SessionExtra | undefine
 /** A change to a session's settings (PATCH /api/sessions/:key/extra) may not turn browser-only on or off after the start. Throws. */
 export function checkBrowserOnlyChange(db: DB, key: string, patch: Record<string, unknown>) {
   if (!('browserOnly' in patch) || (patch.browserOnly === true) === browserOnlyKey(db, key)) return;
-  throw new HttpError(400, browserOnlyKey(db, key) ? 'A session that works in one browser tab stays that way. Start a new session for other work.' : 'A session is browser-only from its start: use Do this here on the Browser page.');
+  throw new HttpError(400, browserOnlyKey(db, key) ? 'A session that works in one browser tab stays that way. Start a new session for other work.' : 'A session is browser-only from its start: on the Browser page, open Ask, pick Do and say what to do on the page.');
 }
 
 export const browserHandoff: Feature = {

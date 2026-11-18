@@ -1,17 +1,18 @@
 // The box in the bar: search, open, ask, or tell an agent what to do. What you type is completed in place, and a list
 // under it offers your open tabs, bookmarks and history, what you typed as an address, the search engine's suggestions
-// and, last, asking about the page you are on, doing something in it (an agent in a tab of its own) and asking an agent.
+// and, last, asking about the page you are on (or having an agent do it there, when Do is picked in Ask) and asking an agent.
 // Enter opens the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your
 // history. At rest it shows the address as its site and the rest. What you typed stays while the window is behind another;
 // a click into the page ends it, as in any browser. A padlock opens what the page's site may do; a chip
-// shows a zoom other than 100 %; a star bookmarks the page.
+// shows a zoom other than the default; a star bookmarks the page.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star, WandSparkles } from 'lucide-react';
-import type { BrowserTab, Suggestion } from '@shared/browser';
+import { matchShortcut, type BrowserTab, type Suggestion } from '@shared/browser';
 import { MOD } from '../../lib/format';
 import { cx, Kbd } from '../../components/ui';
 import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
+import { useAskMode } from './BrowserAsk';
 import { fitRows } from './omniboxFit';
 import { PrivateChip } from './Private';
 import { ReaderButtons } from './Reader';
@@ -21,11 +22,11 @@ import { TranslateButton } from './Translate';
 /** One row of the list. */
 interface Row {
   id: string;
-  kind: Suggestion['kind'] | 'ask' | 'askpage' | 'do';
+  kind: Suggestion['kind'] | 'ask' | 'askpage' | 'shortcut';
   /** Its main words, and the address under them. */
   title: string;
   url?: string;
-  /** For a tab: which one. For a search or asking: the words. */
+  /** For a tab: which one. For a search, a shortcut or asking: the words. */
   tab?: string;
   text?: string;
   /** Found by what it is about, not by the words typed: nothing in it is marked. */
@@ -55,7 +56,7 @@ function Marked({ text, words }: { text: string; words: string[] }) {
   );
 }
 
-const ICONS: Record<Row['kind'], typeof Globe> = { tab: PanelTop, bookmark: Star, history: Clock, url: Globe, search: Search, ask: Sparkles, askpage: Sparkles, do: WandSparkles };
+const ICONS: Record<Row['kind'], typeof Globe> = { tab: PanelTop, bookmark: Star, history: Clock, url: Globe, search: Search, ask: Sparkles, askpage: Sparkles, shortcut: Search };
 
 /** An address as its site and the rest of it (what the box shows at rest); an address that is not a web one is all one. */
 function splitAddress(url: string): { site: string; rest: string } {
@@ -77,7 +78,6 @@ export function Omnibox({
   onStar,
   compact,
   onAskPage,
-  onDoHere,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   tab?: BrowserTab;
@@ -85,10 +85,11 @@ export function Omnibox({
   canStar: boolean;
   onStar: () => void;
   compact?: boolean;
-  /** Ask about the page the tab is on (given for a web page): what was typed is the question. */
+  /**
+   * Ask about the page the tab is on (given for a web page): what was typed is the question, or what an agent is to do
+   * there when Do is picked in Ask (the row says which).
+   */
   onAskPage?: (question: string) => void;
-  /** Have an agent do what was typed in a tab of its own (given for a web page). */
-  onDoHere?: (what: string) => void;
 }) {
   const url = tab?.url ?? '';
   const [typed, setTyped] = useState('');
@@ -112,6 +113,7 @@ export function Omnibox({
   const prefs = usePrefs((s) => s.prefs);
   const zoom = useTabState((s) => (tab ? s.byTab[tab.id]?.zoom : undefined));
   const percent = zoom ? zoomPercent(zoom) : 100;
+  const usual = zoomPercent(prefs?.zoom ?? 1);
   const q = typed.trim();
 
   // The list, for what is typed: what you typed first (as a search, unless it is an address), then what was found.
@@ -120,6 +122,9 @@ export function Omnibox({
     const found = result?.q === q ? result.items : [];
     const out: Row[] = [];
     const lower = q.toLowerCase();
+    // A site's shortcut and words ("yt lofi") come first: searching that site.
+    const hit = matchShortcut(prefs?.shortcuts ?? [], q);
+    if (hit) out.push({ id: 'shortcut', kind: 'shortcut', title: hit.words, url: hit.url, text: hit.shortcut.name });
     if (!found.some((i) => i.kind === 'url') && !found.some((i) => i.kind === 'search' && i.text.toLowerCase() === lower)) out.push({ id: 'typed', kind: 'search', title: q, text: q });
     found.forEach((i, n) => {
       if (i.kind === 'search') out.push({ id: `s${n}`, kind: 'search', title: i.text, text: i.text });
@@ -130,12 +135,11 @@ export function Omnibox({
     const fit = Math.max(2, Math.floor(((at?.room ?? 440) - 12) / ROW));
     const tail: Row[] = [];
     if (onAskPage) tail.push({ id: 'askpage', kind: 'askpage', title: q, text: q });
-    if (onDoHere) tail.push({ id: 'do', kind: 'do', title: q, text: q });
     tail.push({ id: 'ask', kind: 'ask', title: q, text: q });
     return [...fitRows(out, Math.max(1, fit - tail.length)), ...tail];
-  }, [q, result, at?.room, !!onAskPage, !!onDoHere]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, result, prefs?.shortcuts, at?.room, !!onAskPage]); // eslint-disable-line react-hooks/exhaustive-deps
   const words = useMemo(() => q.split(/\s+/).filter((w) => w.length > 0), [q]);
-  const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'do' || r.kind === 'search' ? (r.text ?? '') : shownAddress(r.url));
+  const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'search' ? (r.text ?? '') : r.kind === 'shortcut' ? q : shownAddress(r.url));
   const row = sel >= 0 ? rows[sel] : undefined;
   const value = !editing ? shownAddress(url) : row ? fill(row) : typed + completion;
 
@@ -206,10 +210,11 @@ export function Omnibox({
     if (r?.kind === 'tab' && r.tab && !inNew) return void switchTab(r.tab).then(() => toPage(r.tab));
     if (r?.kind === 'ask') return void askAgent(r.text ?? text);
     if (r?.kind === 'askpage') return onAskPage?.(r.text ?? text);
-    if (r?.kind === 'do') return onDoHere?.(r.text ?? text);
     const target = r ? (r.kind === 'search' ? r.text : r.url) : text;
     if (!target) return;
-    void goTo(target, inNew ? { newTab: true, ...(tab?.private ? { private: true } : {}) } : { tab: tab?.id }).then(() => !inNew && toPage(tab?.id));
+    // A search row (what you typed, or the engine's suggestion) whose words start with a shortcut is searched with your engine, not taken for the shortcut.
+    const plain = r?.kind === 'search' && !!matchShortcut(prefs?.shortcuts ?? [], target);
+    void goTo(target, { ...(inNew ? { newTab: true, ...(tab?.private ? { private: true } : {}) } : { tab: tab?.id }), ...(plain ? { plain: true } : {}) }).then(() => !inNew && toPage(tab?.id));
   };
   const take = () => {
     setTyped(typed + completion);
@@ -328,10 +333,10 @@ export function Omnibox({
       )}
     </div>
     {!editing && !compact && <Kbd>{MOD}L</Kbd>}
-      {percent !== 100 && tab && (
+      {percent !== usual && tab && (
         <button
-          aria-label="Back to 100 %"
-          title="Back to 100 %"
+          aria-label={`Back to ${usual} %`}
+          title={`Back to ${usual} %`}
           onClick={() => void desktopBrowser()?.zoom(tab.id, 'reset').then((z) => useTabState.setState((s) => ({ byTab: { ...s.byTab, [tab.id]: { ...s.byTab[tab.id], zoom: z } } })))}
           className="tnum mx-0.5 flex h-6 shrink-0 items-center rounded-full bg-bg-3 px-2 text-[11.5px] text-fg-2 hover:text-fg"
         >
@@ -374,21 +379,30 @@ export function Omnibox({
 }
 
 function RowView({ r, active, words, engine, onHover, onPick }: { r: Row; active: boolean; words: string[]; engine: string; onHover: () => void; onPick: (e: React.MouseEvent) => void }) {
-  const Icon = ICONS[r.kind];
+  // The page's row does what Ask does, as picked there: ask about the page, or have an agent do it there.
+  const doing = useAskMode((s) => s.mode) === 'do';
+  const Icon = r.kind === 'askpage' && doing ? WandSparkles : ICONS[r.kind];
   return (
     <div role="option" aria-selected={active} onMouseMove={onHover} onClick={onPick} style={{ height: ROW }} className={cx('flex cursor-default items-center gap-2.5 rounded-lg px-2.5 text-[13.5px]', active ? 'bg-bg-3' : '')}>
-      <Icon size={15} className={cx('shrink-0', r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'do' ? 'text-accent' : 'text-fg-3')} />
+      <Icon size={15} className={cx('shrink-0', r.kind === 'ask' || r.kind === 'askpage' || r.kind === 'shortcut' ? 'text-accent' : 'text-fg-3')} />
       {r.kind === 'ask' ? (
         <span className="min-w-0 flex-1 truncate">
           Ask an agent: <span translate="no">“{r.title}”</span>
         </span>
       ) : r.kind === 'askpage' ? (
+        doing ? (
+          <span className="min-w-0 flex-1 truncate">
+            Do it on this page: <span translate="no">“{r.title}”</span>
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate">
+            Ask about this page: <span translate="no">“{r.title}”</span>
+          </span>
+        )
+      ) : r.kind === 'shortcut' ? (
+        // One sentence, translated whole (another language may put the site's name elsewhere).
         <span className="min-w-0 flex-1 truncate">
-          Ask about this page: <span translate="no">“{r.title}”</span>
-        </span>
-      ) : r.kind === 'do' ? (
-        <span className="min-w-0 flex-1 truncate">
-          Do it in a tab of its own: <span translate="no">“{r.title}”</span>
+          {`Search ${r.text} for`} <span translate="no">“{r.title}”</span>
         </span>
       ) : r.kind === 'search' ? (
         <>

@@ -528,6 +528,37 @@ export interface ExtensionsState {
 export const SEARCH_ENGINES = ['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'startpage', 'custom'] as const;
 export type SearchEngine = (typeof SEARCH_ENGINES)[number];
 
+/** A word that searches one site from the address bar: "yt lofi" opens YouTube's results for lofi. */
+export interface SearchShortcut {
+  /** What you type first (one word, lowercase). */
+  key: string;
+  name: string;
+  /** The site's search page, with %s where your words go. */
+  url: string;
+}
+
+/** The shortcuts before you change any. */
+export const SEARCH_SHORTCUTS: SearchShortcut[] = [
+  { key: 'yt', name: 'YouTube', url: 'https://www.youtube.com/results?search_query=%s' },
+  { key: 'wiki', name: 'Wikipedia', url: 'https://en.wikipedia.org/w/index.php?search=%s' },
+  { key: 'gh', name: 'GitHub', url: 'https://github.com/search?q=%s' },
+  { key: 'scholar', name: 'Google Scholar', url: 'https://scholar.google.com/scholar?q=%s' },
+  { key: 'arxiv', name: 'arXiv', url: 'https://arxiv.org/search/?query=%s&searchtype=all' },
+  { key: 'hf', name: 'Hugging Face', url: 'https://huggingface.co/models?search=%s' },
+];
+
+/** The shortcut that what is typed starts with ("yt lofi": YouTube, with "lofi" and the address of its results), or null. */
+export function matchShortcut(shortcuts: SearchShortcut[], text: string): { shortcut: SearchShortcut; words: string; url: string } | null {
+  const m = /^\s*(\S+)\s+(\S[\s\S]*)$/.exec(text);
+  const shortcut = m && shortcuts.find((s) => s.key === m[1].toLowerCase());
+  if (!m || !shortcut) return null;
+  const words = m[2].trim();
+  return { shortcut, words, url: shortcut.url.split('%s').join(encodeURIComponent(words)) };
+}
+
+/** How big pages can be shown by default (1 is 100 %): the steps of the browser's own zoom. */
+export const PAGE_ZOOMS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+
 /** Your own browser's settings (the Browser page's settings panel). */
 export interface BrowsingPrefs {
   /** The home page: the Home button, new tabs and a first start open it (Google unless you change it). */
@@ -538,6 +569,12 @@ export interface BrowsingPrefs {
   customSearch?: string;
   /** Search suggestions from the engine as you type (what you type goes to it, as in any browser). */
   suggest: boolean;
+  /** Words that search one site from the address bar (the usual ones until you change them). */
+  shortcuts: SearchShortcut[];
+  /** How big pages are shown, unless you zoomed a site yourself (one of PAGE_ZOOMS; 1 at first). */
+  zoom: number;
+  /** Underline misspelled words as you type in pages, with suggestions in the right-click menu. On at first. */
+  spellcheck: boolean;
   /** Block ads and trackers (the desktop app's own blocker). */
   adblock: boolean;
   /** Sites where ads are allowed (hosts, without www.). */

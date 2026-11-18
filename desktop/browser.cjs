@@ -28,7 +28,8 @@
 // the browsing connection only): a partition that is never saved (`hydor-private-<id>`), so its cookies and storage go when
 // the context is disposed of or the browser closes. The ad blocker works there too; extensions do not. The server's
 // `browser-prefs` also bring whether pages are shown dark (`darkPages`, except `darkExcept`), whether sound may play by
-// itself (`autoplay`: it decides the policy of tabs made after it) and whether cookie notices are hidden (`cookieBanners`).
+// itself (`autoplay`: it decides the policy of tabs made after it), whether cookie notices are hidden (`cookieBanners`), the zoom
+// pages have unless you zoomed their site yourself (`zoom`) and whether misspelled words are underlined (`spellcheck`).
 'use strict';
 const { BrowserWindow, Menu, WebContentsView, ClipboardItem, app, clipboard, ipcMain, nativeImage, nativeTheme, screen, session, shell } = require('electron');
 const crypto = require('node:crypto');
@@ -275,7 +276,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   let host = null;
   let ua = null;
   /** What the server's `browser-prefs` say that this module acts on (the blocker has its own). */
-  const settings = { darkPages: false, darkExcept: [], autoplay: false };
+  const settings = { darkPages: false, darkExcept: [], autoplay: false, zoom: 1, spellcheck: true };
+  /** The sites you zoomed yourself (`<partition>|<host>`): they keep that zoom, and the others have the default one. */
+  const zoomedByYou = new Set();
   /** The ad blocker of the browsing profile, when this app has it (adblock.cjs). */
   let adblock = null;
   if (adblockOptions) {
@@ -342,7 +345,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (!extended.has(ses)) {
       extended.add(ses);
       guardSession(ses);
-      if (adblock && conn.profile === BROWSING && (ctx.private || (ctx.persistent && !ctx.id))) adblock.attach(ses);
+      if (ownSession(ctx)) {
+        if (adblock) adblock.attach(ses);
+        ses.setSpellCheckerEnabled(settings.spellcheck);
+      }
       if (ctx.persistent && ext) {
         try {
           ext.prepare(ses);
@@ -353,6 +359,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
     return ctx;
   }
+
+  /** Whether a context's session is for your own browsing: its profile and its private tabs (not agents' pages, whose spell checking is off). */
+  const ownSession = (ctx) => ctx.conn.profile === BROWSING && (ctx.private || ctx.persistent);
 
   /** The handlers of a session: permissions and downloads, answered for whichever connection has the session now. */
   function guardSession(ses) {
@@ -586,12 +595,17 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   }
 
   const zoomOf = (t) => Math.round((t.wc.isDestroyed() ? 1 : t.wc.getZoomFactor()) * 100) / 100;
-  /** Chrome's steps: the next one up or down from where the page is now, or back to 100 %. */
+  /** The key of a tab's site in the ones you zoomed yourself. */
+  const zoomSite = (t, url) => `${t.ctx.partition}|${hostOf(url ?? t.wc.getURL())}`;
+  /** Chrome's steps: the next one up or down from where the page is now, or back to the default zoom (100 % unless you chose another). */
   function zoom(t, op) {
     const now = t.wc.getZoomFactor();
-    let next = 1;
+    let next = settings.zoom;
     if (op === 'in') next = ZOOMS.find((z) => z > now + 0.001) ?? ZOOMS[ZOOMS.length - 1];
     else if (op === 'out') next = [...ZOOMS].reverse().find((z) => z < now - 0.001) ?? ZOOMS[0];
+    // A site you zoomed is kept as you left it; Reset gives it back to the default.
+    if (op === 'reset') zoomedByYou.delete(zoomSite(t));
+    else zoomedByYou.add(zoomSite(t));
     t.wc.setZoomFactor(next);
     const z = zoomOf(t);
     tabState(t, { zoom: z });
@@ -649,6 +663,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       void applyDark(t, d.url);
     });
     wc.on('did-navigate', () => {
+      // A site you did not zoom has the default zoom.
+      if (!zoomedByYou.has(zoomSite(t)) && Math.abs(t.wc.getZoomFactor() - settings.zoom) > 0.001) t.wc.setZoomFactor(settings.zoom);
       tabState(t, { zoom: zoomOf(t) });
       void applyDark(t);
     });
@@ -666,7 +682,12 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     wc.on('context-menu', (_e, params) => void popupMenu(t, params));
   }
 
-  /** The window goes full screen and the page fills it, while a video (or any page) is shown full screen. */
+  /**
+   * While a video (or any page) is shown full screen, the page fills the window. Electron takes the window in and out of
+   * full screen itself (the page's owner window, which is the one showing it): doing it here too queues a second change
+   * on macOS, where it is animated, and a change queued behind one that does nothing is never made, so the window stayed
+   * full screen with the video back in its place. `was`: the window was full screen already, as far as it says now.
+   */
   function enterFullScreen(t) {
     const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : null;
     if (!win || t.fs) return;
@@ -678,7 +699,6 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     bubbleOff(t);
     t.fs = { win, was: win.isFullScreen(), fit };
     try {
-      if (!t.fs.was) win.setFullScreen(true);
       // Laid over everything of the window (adding a view again brings it to the front).
       win.contentView.addChildView(t.view);
       fit();
@@ -688,6 +708,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
     tabState(t, { fullscreen: true });
   }
+  /** The page left full screen (Electron takes the window out of it, when the page put it there): back to its place. */
   function leaveFullScreen(t) {
     const fs = t.fs;
     if (!fs) return;
@@ -695,7 +716,6 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     try {
       fs.win.removeListener('resize', fs.fit);
       if (!fs.win.isDestroyed()) {
-        if (!fs.was) fs.win.setFullScreen(false);
         // The place the Browser page asked for (it may have moved while the page was full screen).
         if (t.wanted && t.shownIn === fs.win) place(t, fs.win);
       }
@@ -1789,6 +1809,21 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (m.type === 'browser-prefs') {
       if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds, cookieBanners: m.cookieBanners });
       if (typeof m.autoplay === 'boolean') settings.autoplay = m.autoplay;
+      if (typeof m.spellcheck === 'boolean' && m.spellcheck !== settings.spellcheck) {
+        settings.spellcheck = m.spellcheck;
+        for (const conn of conns.values()) for (const ctx of [conn.defaultCtx, ...conn.contexts.values()]) if (ownSession(ctx)) ctx.ses.setSpellCheckerEnabled(settings.spellcheck);
+      }
+      if (typeof m.zoom === 'number' && m.zoom > 0 && m.zoom !== settings.zoom) {
+        settings.zoom = m.zoom;
+        // Every one of your tabs on a site you did not zoom takes the new default.
+        for (const conn of conns.values()) {
+          for (const t of conn.targets.values()) {
+            if (t.offscreen || t.gone || t.wc.isDestroyed() || zoomedByYou.has(zoomSite(t))) continue;
+            t.wc.setZoomFactor(settings.zoom);
+            tabState(t, { zoom: zoomOf(t) });
+          }
+        }
+      }
       if (typeof m.darkPages === 'boolean' || Array.isArray(m.darkExcept)) {
         if (typeof m.darkPages === 'boolean') settings.darkPages = m.darkPages;
         if (Array.isArray(m.darkExcept)) settings.darkExcept = [...new Set(m.darkExcept.map(plainHost).filter(Boolean))];
@@ -1879,8 +1914,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   function watchWindow(win) {
     if (watched.has(win)) return;
     watched.add(win);
+    // A page shown full screen stays: macOS says a window is hidden while it is only covered for a moment, as when it
+    // moves to a space of its own to go full screen, and parking the page then took it out of full screen at once.
     const away = () => {
-      for (const t of shownIn(win)) park(t);
+      for (const t of shownIn(win)) if (!t.fs) park(t);
     };
     const back = () => {
       for (const t of shownIn(win, true)) place(t, win);

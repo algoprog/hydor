@@ -1,8 +1,9 @@
 // The settings of your own browser, in a panel beside the page: its home page, the search engine of the address bar
-// and whether it suggests as you type, the ad blocker, and clearing what the browser kept (history, cookies, cached
-// files). Settings → Browser has a row that opens it.
+// and whether it suggests as you type, the shortcuts that search one site, the ad blocker, how pages are shown, and
+// clearing what the browser kept (history, cookies, cached files). Settings → Browser has a row that opens it.
 import { useEffect, useRef, useState } from 'react';
-import { SEARCH_ENGINES, type SearchEngine } from '@shared/browser';
+import { Plus, X } from 'lucide-react';
+import { SEARCH_ENGINES, SEARCH_SHORTCUTS, type SearchEngine, type SearchShortcut } from '@shared/browser';
 import { toast } from '../../lib/store';
 import { Button, inputCls, Switch, Throbber } from '../../components/ui';
 import { Group, Row, Select, Stack } from '../settings/kit';
@@ -25,6 +26,67 @@ function Check({ on, onChange, children }: { on: boolean; onChange: (v: boolean)
       <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 shrink-0 accent-[var(--accent)]" />
       {children}
     </label>
+  );
+}
+
+/** The shortcuts that search one site from the address bar: the list, adding one, and putting the usual ones back. */
+function ShortcutsRow({ shortcuts }: { shortcuts: SearchShortcut[] }) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ key: '', name: '', url: '' });
+  const usual = JSON.stringify(shortcuts) === JSON.stringify(SEARCH_SHORTCUTS);
+  const field = (k: keyof typeof draft, label: string, placeholder: string) => (
+    <input value={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} placeholder={placeholder} spellCheck={false} aria-label={label} translate="no" className={inputCls} />
+  );
+  const add = async () => {
+    if (await savePrefs({ shortcuts: [...shortcuts, { key: draft.key.trim(), name: draft.name.trim(), url: draft.url.trim() }] })) {
+      setDraft({ key: '', name: '', url: '' });
+      setAdding(false);
+    }
+  };
+  return (
+    <Row label="Search shortcuts" hint="Type a shortcut, a space and your words in the address bar to search that site">
+      <ul className="mt-2 space-y-1">
+        {shortcuts.map((s) => (
+          <li key={s.key} className="flex h-7 items-center gap-2 text-[13px]">
+            <span translate="no" className="tnum rounded-md bg-bg-3 px-1.5 py-0.5 text-[12px] text-fg-2">
+              {s.key}
+            </span>
+            <span translate="no" className="min-w-0 flex-1 truncate">
+              {s.name}
+            </span>
+            <button type="button" aria-label={`Remove ${s.key}`} title={`Remove ${s.key}`} onClick={() => void savePrefs({ shortcuts: shortcuts.filter((x) => x.key !== s.key) })} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-fg-3 hover:bg-bg-3 hover:text-fg">
+              <X size={13} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {adding ? (
+        <div className="mt-2 space-y-2">
+          {field('key', 'Shortcut', 'yt')}
+          {field('name', 'Name', 'YouTube')}
+          {field('url', 'Address, with %s where your words go', 'https://www.youtube.com/results?search_query=%s')}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={!draft.key.trim() || !draft.name.trim() || !draft.url.trim()} onClick={() => void add()}>
+              Add
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
+            Add a shortcut
+          </Button>
+          {!usual && (
+            <Button size="sm" variant="secondary" onClick={() => void savePrefs({ shortcuts: SEARCH_SHORTCUTS })}>
+              Put back the usual ones
+            </Button>
+          )}
+        </div>
+      )}
+    </Row>
   );
 }
 
@@ -133,6 +195,7 @@ export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: 
                 )}
               </Row>
               <Row label="Search suggestions" hint="What you type in the address bar goes to your search engine, as in any browser" control={<Switch on={prefs.suggest} label="Search suggestions" onChange={(v) => void savePrefs({ suggest: v })} />} />
+              <ShortcutsRow shortcuts={prefs.shortcuts} />
             </Group>
             <Group title="Ads">
               <Row label="Block ads and trackers" hint="Extensions that block ads may not run while this is on" control={<Switch on={prefs.adblock} label="Block ads and trackers" onChange={(v) => void savePrefs({ adblock: v })} />} />

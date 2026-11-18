@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { BROWSING_KEY, inTabOrder, READER_DEFAULTS, type BrowserPermissionAsk } from '../../shared/browser.ts';
+import { BROWSING_KEY, inTabOrder, PAGE_ZOOMS, READER_DEFAULTS, SEARCH_SHORTCUTS, type BrowserPermissionAsk } from '../../shared/browser.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { openDb, type DB } from '../db.ts';
@@ -52,7 +52,7 @@ const check = async (name: string, fn: () => Promise<void> | void) => {
 };
 const refused = (status: number, re: RegExp) => (e: unknown) => e instanceof HttpError && e.status === status && re.test(e.message);
 /** The settings that came with private tabs and the new browser settings, as they are before you change any (the app in English). */
-const NEWER = { cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, importOffered: false, reader: READER_DEFAULTS };
+const NEWER = { shortcuts: SEARCH_SHORTCUTS, zoom: 1, spellcheck: true, cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, importOffered: false, reader: READER_DEFAULTS };
 
 async function main() {
   // ---- the address bar ----
@@ -131,7 +131,7 @@ async function main() {
   });
   await check('prefs: the new yes-or-no settings are kept, and anything else is 400 with nothing kept', () => {
     const { db } = mem();
-    for (const k of ['cookieBanners', 'translateOffer', 'darkPages', 'autoplay'] as const) {
+    for (const k of ['cookieBanners', 'translateOffer', 'darkPages', 'autoplay', 'spellcheck'] as const) {
       assert.throws(() => setBrowsingPrefs(db, { [k]: 'yes' }), refused(400, /true or false/), k);
       assert.throws(() => setBrowsingPrefs(db, { [k]: 0 }), refused(400, /true or false/), k);
       assert.equal(setBrowsingPrefs(db, { [k]: !DEFAULT_PREFS[k] })[k], !DEFAULT_PREFS[k], k);
@@ -220,6 +220,61 @@ async function main() {
     for (const engine of ['duckduckgo', 'bing', 'brave', 'ecosia', 'startpage'] as const) assert.match(searchUrl({ ...p, engine }, 'x y'), /^https:\/\/[^/]+\/.*[?&]q=x%20y$/, engine);
     assert.equal(searchUrl({ ...p, engine: 'custom', customSearch: 'https://s.example/?q=%s&again=%s' }, ' hi there '), 'https://s.example/?q=hi%20there&again=hi%20there');
     assert.equal(searchUrl({ ...p, engine: 'custom' }, 'x'), 'https://www.google.com/search?q=x', 'custom without its page is Google');
+  });
+  await check('prefs: search shortcuts are the usual ones until changed, checked, lowercase and unique', () => {
+    const { db, store } = mem();
+    assert.deepEqual(browsingPrefs(db).shortcuts, SEARCH_SHORTCUTS);
+    assert.notEqual(browsingPrefs(db).shortcuts, SEARCH_SHORTCUTS, 'a copy: the usual ones are never changed');
+    const mine = { key: ' Mdn ', name: 'MDN', url: 'https://developer.mozilla.org/search?q=%s' };
+    assert.deepEqual(setBrowsingPrefs(db, { shortcuts: [mine] }).shortcuts, [{ key: 'mdn', name: 'MDN', url: mine.url }], 'trimmed and lowercase');
+    assert.deepEqual(setBrowsingPrefs(db, { shortcuts: [] }).shortcuts, [], 'none at all is allowed');
+    const ok = { key: 'a', name: 'A', url: 'http://a.example/?q=%s' };
+    const bad: [string, unknown, RegExp][] = [
+      ['not a list', 'yt', /list of at most 50/],
+      ['51 of them', Array.from({ length: 51 }, (_, i) => ({ ...ok, key: `k${i}` })), /at most 50/],
+      ['no key', [{ ...ok, key: '' }], /1 to 24/],
+      ['a key with a space', [{ ...ok, key: 'a b' }], /no spaces/],
+      ['a long key', [{ ...ok, key: 'k'.repeat(25) }], /1 to 24/],
+      ['no name', [{ ...ok, name: ' ' }], /name/],
+      ['a long name', [{ ...ok, name: 'n'.repeat(61) }], /1 to 60/],
+      ['no %s', [{ ...ok, url: 'https://a.example/' }], /%s/],
+      ['not http', [{ ...ok, url: 'ftp://a.example/%s' }], /web address/],
+      ['a long address', [{ ...ok, url: `https://a.example/${'x'.repeat(2000)}?q=%s` }], /web address/],
+      ['the same key twice', [ok, { ...ok, key: 'A' }], /twice/],
+      ['not an object', [7], /1 to 24/],
+    ];
+    for (const [what, shortcuts, re] of bad) assert.throws(() => setBrowsingPrefs(db, { shortcuts }), refused(400, re), what);
+    assert.equal(browsingPrefs(db).shortcuts.length, 0, 'the bad changes kept nothing');
+    assert.equal(setBrowsingPrefs(db, { shortcuts: Array.from({ length: 50 }, (_, i) => ({ ...ok, key: `k${i}` })) }).shortcuts.length, 50);
+    // What is kept is checked when read: the wrong ones are dropped.
+    store.set('browser.browsing.prefs', JSON.stringify({ shortcuts: [ok, { key: 'b', name: '', url: 'x' }, { ...ok, key: 'A' }, 3] }));
+    assert.deepEqual(browsingPrefs(db).shortcuts, [ok]);
+    store.set('browser.browsing.prefs', JSON.stringify({ shortcuts: 'x' }));
+    assert.deepEqual(browsingPrefs(db).shortcuts, SEARCH_SHORTCUTS);
+  });
+  await check('prefs: the page zoom is one of the steps (1 at first), and spell checking is on or off', () => {
+    const { db, store } = mem();
+    assert.equal(browsingPrefs(db).zoom, 1);
+    assert.equal(browsingPrefs(db).spellcheck, true);
+    for (const z of PAGE_ZOOMS) assert.equal(setBrowsingPrefs(db, { zoom: z }).zoom, z, String(z));
+    for (const z of [0, 0.3, 1.2, 3, '1.25', null, NaN]) assert.throws(() => setBrowsingPrefs(db, { zoom: z }), refused(400, /zoom/), String(z));
+    assert.equal(browsingPrefs(db).zoom, 2, 'a bad change kept nothing');
+    store.set('browser.browsing.prefs', JSON.stringify({ zoom: 7, spellcheck: 'no' }));
+    assert.deepEqual([browsingPrefs(db).zoom, browsingPrefs(db).spellcheck], [1, true], 'what is kept is checked when read');
+    assert.equal(setBrowsingPrefs(db, { spellcheck: false }).spellcheck, false);
+  });
+  await check('the address bar: a shortcut and words search that site, and plain searches the whole text', () => {
+    const p = { ...DEFAULT_PREFS };
+    assert.equal(barTarget(p, 'yt lofi beats'), 'https://www.youtube.com/results?search_query=lofi%20beats');
+    assert.equal(barTarget(p, '  YT   lofi & co  '), 'https://www.youtube.com/results?search_query=lofi%20%26%20co', 'any case, any spaces');
+    assert.equal(barTarget(p, 'arxiv attention'), 'https://arxiv.org/search/?query=attention&searchtype=all');
+    assert.equal(barTarget(p, 'yt'), 'https://www.google.com/search?q=yt', 'a shortcut alone is a search');
+    assert.equal(barTarget(p, 'ytx lofi'), 'https://www.google.com/search?q=ytx%20lofi', 'only a whole first word');
+    assert.equal(barTarget(p, 'example.com'), 'https://example.com/');
+    assert.equal(barTarget({ ...p, shortcuts: [{ key: 'mdn', name: 'MDN', url: 'https://m.example/?q=%s&again=%s' }] }, 'mdn fetch api'), 'https://m.example/?q=fetch%20api&again=fetch%20api');
+    assert.equal(barTarget({ ...p, shortcuts: [] }, 'yt lofi'), 'https://www.google.com/search?q=yt%20lofi', 'removed ones no longer work');
+    assert.equal(barTarget(p, 'yt lofi', true), 'https://www.google.com/search?q=yt%20lofi', 'plain: the engine, whatever it starts with');
+    assert.equal(barTarget(p, 'example.com', true), 'https://www.google.com/search?q=example.com', 'plain: never an address');
   });
   await check('your own browser is in the desktop app: 409 elsewhere', () => {
     assert.equal(desktopGate.inside(), false, 'these tests do not run in the desktop app');

@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
-import { BROWSING_KEY, BROWSING_PROFILE, GROUP_COLORS, isTranslateLang, READER_DEFAULTS, SEARCH_ENGINES, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type ReaderPrefs, type SearchEngine } from '../../shared/browser.ts';
+import { BROWSING_KEY, BROWSING_PROFILE, GROUP_COLORS, isTranslateLang, matchShortcut, PAGE_ZOOMS, READER_DEFAULTS, SEARCH_ENGINES, SEARCH_SHORTCUTS, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type ReaderPrefs, type SearchEngine, type SearchShortcut } from '../../shared/browser.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -108,6 +108,9 @@ export const DEFAULT_PREFS: BrowsingPrefs = {
   home: 'https://www.google.com/',
   engine: 'google',
   suggest: true,
+  shortcuts: SEARCH_SHORTCUTS,
+  zoom: 1,
+  spellcheck: true,
   adblock: true,
   allowAds: [],
   cookieBanners: true,
@@ -177,6 +180,50 @@ export function customTemplate(v: unknown): string | null {
   return t;
 }
 
+const MAX_SHORTCUTS = 50;
+
+/** One shortcut as given, checked (key lowercase), or the sentence that says what is wrong with it. */
+function checkedShortcut(v: unknown): SearchShortcut | string {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  const key = typeof o?.key === 'string' ? o.key.trim().toLowerCase() : '';
+  if (!key || key.length > 24 || /\s/.test(key)) return 'A shortcut should be 1 to 24 characters, with no spaces';
+  const name = typeof o?.name === 'string' ? o.name.trim() : '';
+  if (!name || name.length > 60) return `The name of the shortcut “${key}” should be 1 to 60 characters`;
+  const url = typeof o?.url === 'string' ? o.url.trim() : '';
+  const bad = `The address of the shortcut “${key}” should be a web address (http:// or https://) with %s where the words go`;
+  if (url.length > 2000 || !url.includes('%s') || !/^https?:\/\/[^\s/?#]+/i.test(url)) return bad;
+  try {
+    new URL(url.split('%s').join('x'));
+  } catch {
+    return bad;
+  }
+  return { key, name, url };
+}
+
+/** The shortcuts in a change, or a 400 when they are not a list of at most 50 valid ones with different keys. */
+function givenShortcuts(v: unknown): SearchShortcut[] {
+  if (!Array.isArray(v) || v.length > MAX_SHORTCUTS) throw new HttpError(400, `shortcuts should be a list of at most ${MAX_SHORTCUTS} shortcuts: { key, name, url }`);
+  const out: SearchShortcut[] = [];
+  for (const x of v) {
+    const c = checkedShortcut(x);
+    if (typeof c === 'string') throw new HttpError(400, c);
+    if (out.some((o) => o.key === c.key)) throw new HttpError(400, `The shortcut “${c.key}” is there twice`);
+    out.push(c);
+  }
+  return out;
+}
+
+/** The shortcuts as kept: the valid ones, once each (anything else is dropped); the usual ones when none were ever kept. */
+function keptShortcuts(v: unknown): SearchShortcut[] {
+  if (!Array.isArray(v)) return SEARCH_SHORTCUTS.map((x) => ({ ...x }));
+  const out: SearchShortcut[] = [];
+  for (const x of v.slice(0, MAX_SHORTCUTS)) {
+    const c = checkedShortcut(x);
+    if (typeof c !== 'string' && !out.some((o) => o.key === c.key)) out.push(c);
+  }
+  return out;
+}
+
 /** The settings as kept, not yet checked. */
 function storedPrefs(db: DB): Record<string, unknown> {
   try {
@@ -198,6 +245,9 @@ export function browsingPrefs(db: DB): BrowsingPrefs {
     engine: engine === 'custom' && !custom ? DEFAULT_PREFS.engine : engine,
     ...(custom ? { customSearch: custom } : {}),
     suggest: typeof v.suggest === 'boolean' ? v.suggest : DEFAULT_PREFS.suggest,
+    shortcuts: keptShortcuts(v.shortcuts),
+    zoom: PAGE_ZOOMS.includes(v.zoom as number) ? (v.zoom as number) : DEFAULT_PREFS.zoom,
+    spellcheck: typeof v.spellcheck === 'boolean' ? v.spellcheck : DEFAULT_PREFS.spellcheck,
     adblock: typeof v.adblock === 'boolean' ? v.adblock : DEFAULT_PREFS.adblock,
     allowAds: cleanSites(v.allowAds),
     cookieBanners: typeof v.cookieBanners === 'boolean' ? v.cookieBanners : DEFAULT_PREFS.cookieBanners,
@@ -236,10 +286,15 @@ export function setBrowsingPrefs(db: DB, patch: Record<string, unknown>): Browsi
     next.engine = patch.engine as SearchEngine;
   }
   if (next.engine === 'custom' && !next.customSearch) throw new HttpError(400, 'Give your own search page: a web address with %s where the words go');
-  for (const k of ['suggest', 'adblock', 'cookieBanners', 'translateOffer', 'darkPages', 'autoplay', 'importOffered'] as const) {
+  for (const k of ['suggest', 'spellcheck', 'adblock', 'cookieBanners', 'translateOffer', 'darkPages', 'autoplay', 'importOffered'] as const) {
     if (patch[k] === undefined) continue;
     if (typeof patch[k] !== 'boolean') throw new HttpError(400, `${k} should be true or false`);
     next[k] = patch[k] as boolean;
+  }
+  if (patch.shortcuts !== undefined) next.shortcuts = givenShortcuts(patch.shortcuts);
+  if (patch.zoom !== undefined) {
+    if (!PAGE_ZOOMS.includes(patch.zoom as number)) throw new HttpError(400, `The page zoom should be one of: ${PAGE_ZOOMS.join(', ')}`);
+    next.zoom = patch.zoom as number;
   }
   if (patch.allowAds !== undefined) next.allowAds = cleanSites(patch.allowAds);
   if (patch.translateNeverSites !== undefined) next.translateNeverSites = cleanSites(patch.translateNeverSites);
@@ -292,9 +347,10 @@ export function searchUrl(prefs: BrowsingPrefs, text: string): string {
   return template.split('%s').join(encodeURIComponent(text.trim()));
 }
 
-/** What you typed in the address bar, as the address to open. */
-export function barTarget(prefs: BrowsingPrefs, text: string): string {
-  return addressOf(text) ?? searchUrl(prefs, text);
+/** What you typed in the address bar, as the address to open: a shortcut's search ("yt lofi"), an address, or a search. `plain`: always a search with your engine. */
+export function barTarget(prefs: BrowsingPrefs, text: string, plain = false): string {
+  if (plain) return searchUrl(prefs, text);
+  return matchShortcut(prefs.shortcuts, text)?.url ?? addressOf(text) ?? searchUrl(prefs, text);
 }
 
 // ---- your own browser is in the desktop app -------------------------------------------------------------------
@@ -676,7 +732,7 @@ export function browsingRoutes(d: Deps) {
   /** Tells the app how to block ads (once the browser has started, and at each change of the settings). */
   const tellPrefs = () => {
     const p = browsingPrefs(db);
-    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds, cookieBanners: p.cookieBanners, darkPages: p.darkPages, darkExcept: p.darkExcept, autoplay: p.autoplay });
+    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds, cookieBanners: p.cookieBanners, darkPages: p.darkPages, darkExcept: p.darkExcept, autoplay: p.autoplay, zoom: p.zoom, spellcheck: p.spellcheck });
   };
   /**
    * Your browsing, started when it is not running, with the tabs it had last time (and the home page when it had none,
@@ -726,8 +782,8 @@ export function browsingRoutes(d: Deps) {
   };
   const blankOnly = (b: SessionBrowser) => b.tabs.length === 1 && b.tabs[0].url === 'about:blank';
   /** `typed`: it came from the address bar (its page counts as typed in the history). */
-  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean; typed?: boolean; private?: boolean }): Promise<Tab> => {
-    const target = barTarget(browsingPrefs(db), text);
+  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean; typed?: boolean; private?: boolean; plain?: boolean }): Promise<Tab> => {
+    const target = barTarget(browsingPrefs(db), text, o.plain);
     let t: Tab | undefined;
     if (o.tab) {
       t = b.tabs.find((x) => x.targetId === o.tab);
@@ -737,7 +793,7 @@ export function browsingRoutes(d: Deps) {
     else t = await b.tab();
     b.setActive(t);
     // Typing the address of the page you are on reloads it: not another visit.
-    if (o.typed && addressOf(text) && historyUrl(target)?.replace(/#.*$/s, '') !== historyUrl(t.url)?.replace(/#.*$/s, '')) recorder?.typed(t.targetId, t.incognito);
+    if (o.typed && !o.plain && addressOf(text) && historyUrl(target)?.replace(/#.*$/s, '') !== historyUrl(t.url)?.replace(/#.*$/s, '')) recorder?.typed(t.targetId, t.incognito);
     // A page that cannot load shows the browser's own error page: nothing more to say here.
     await t.navigate(target).catch(() => null);
     b.changed();
@@ -773,7 +829,7 @@ export function browsingRoutes(d: Deps) {
     if (typeof text !== 'string' || !text.trim()) throw new HttpError(400, 'Type an address or something to search for');
     const priv = privateOf(B(req).private);
     const b = await browsing(false);
-    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab, typed: true, private: priv });
+    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab, typed: true, private: priv, plain: B(req).plain === true });
     return { view: b.view() };
   });
 

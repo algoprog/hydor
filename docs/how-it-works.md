@@ -31,7 +31,7 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   on a server, or for a phone looking at one, the server starts a Chromium and the app shows an agent's pages as pictures
   (your own browser is in the desktop app only: streaming its pages made it lag). Every connection of an agent's browser
   passes a checkpoint of the server's that keeps it off this computer's network; your own tabs connect directly, as in any
-  browser (an agent's tab in your browser, from **Do this here**, is still checked page by page).
+  browser (an agent's tab in your browser, from **Do** in Ask, is still checked page by page).
 - **Your own browsing's history, suggestions and ad blocker.** The server records the page each of your own tabs ends up
   on (web pages and files, with their titles and how often you typed their addresses) in a table of the app's database,
   the last 20,000, and ranks it with your open tabs and bookmarks for the address bar (`server/browser/history.ts`); the

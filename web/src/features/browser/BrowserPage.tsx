@@ -20,14 +20,15 @@ import {
   Clock,
   Download,
   Ellipsis,
-  ExternalLink,
   FileDown,
   Globe,
   Highlighter,
   History,
   Home,
   Import,
+  Keyboard,
   Languages,
+  Minus,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -42,9 +43,9 @@ import {
   Sparkles,
   Star,
   VenetianMask,
-  WandSparkles,
   WifiOff,
   X,
+  ZoomIn,
 } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import { enc, post } from '../../lib/api';
@@ -61,7 +62,7 @@ import { NavButton } from '../layout/PageHeader';
 import { useNavWidth } from '../layout/SideColumn';
 import { AgentBody, AgentDialog, useAgentsRefresh } from './AgentTabs';
 import { AgentBar, AgentBox, AgentConversation } from './AgentView';
-import { askAboutTab, BrowserAskPanel, pickForAsk } from './BrowserAsk';
+import { askAboutTab, BrowserAskPanel, canDoOn, doOnTab, pickForAsk, useAskMode } from './BrowserAsk';
 import { toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
 import { keepPicture } from './pictures';
@@ -104,11 +105,12 @@ import {
   goTo,
   showDownload,
   usePrefs,
+  useTabState,
+  zoomPercent,
 } from './browsing';
 import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
 import { FindBar } from './FindBar';
-import { HandOffPopover, startDo } from './HandOff';
 import { HighlightsPanel } from './Highlights';
 import { HistoryPanel } from './History';
 import { Omnibox } from './Omnibox';
@@ -116,18 +118,19 @@ import { KeyRow } from './Dock';
 import type { LiveViewApi } from './LiveView';
 import { ImportPanel, loadBrowsers } from './ImportBrowsers';
 import { Panel } from './Panel';
+import { ShortcutsPanel } from './Shortcuts';
 import { PermissionsPanel } from './Permissions';
 import { PageView } from './PageView';
+import { RightColumn } from './RightColumn';
 import { isTranslated, openTranslatePopover, openTranslateText, togglePageTranslation, TranslatePopover, TranslateTextDialog, useTranslateUI } from './Translate';
 import { TabColumn } from './TabColumn';
 import { tourOpen } from '../tour/Tour';
 import { DESKTOP_APP } from '../tour/setup';
-import { SlideColumn } from '../../components/SlideColumn';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'import' | 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings';
-const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings';
+type PanelId = 'import' | 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings' | 'shortcuts';
+const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings' || v === 'shortcuts';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -295,7 +298,6 @@ function OwnBrowser() {
   const [findTick, setFindTick] = useState(0);
   const [menu, setMenu] = useState(false);
   const grouping = useGrouping((s) => s.busy);
-  const [doOpen, setDoOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   // The history's "Clear browsing data…" opens the settings at that section.
   const [clearAt, setClearAt] = useState(false);
@@ -357,12 +359,23 @@ function OwnBrowser() {
   }, [view?.open, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tab = activeTab(view);
+  // The tab's zoom as the desktop app reports it (100 % until it says otherwise), for the menu's Zoom row.
+  const zoom = useTabState((s) => (tab ? s.byTab[tab.id]?.zoom : undefined));
+  // Zooms the tab in, out or back to 100 %, and keeps the factor the app answers with.
+  const zoomTab = (op: 'in' | 'out' | 'reset') => {
+    if (!tab) return;
+    void desktopBrowser()?.zoom(tab.id, op).then((z) => useTabState.setState((s) => ({ byTab: { ...s.byTab, [tab.id]: { ...s.byTab[tab.id], zoom: z } } })));
+  };
+  const canZoom = !!tab && !!desktopBrowser()?.zoom;
   // The home page (Browser settings), for the Home button.
   const home = usePrefs((s) => s.prefs?.home);
   const native = isNative(view);
   const marked = useMemo(() => (tab?.url ? nodes.filter((n) => n.url === tab.url) : []), [nodes, tab?.url]);
   const canHand = !!tab && /^https?:/i.test(tab.url);
   const canAsk = !!tab && isWebPage(tab.url);
+  // Ask answers from a copy of the page, Do has an agent work in it: the address bar's row for the page follows the one picked in Ask.
+  const askMode = useAskMode((s) => s.mode);
+  const canAskPage = askMode === 'do' ? !!tab && canDoOn(tab.url) : canAsk;
   const prefsNow = usePrefs((s) => s.prefs);
   const priv = !!tab?.private;
   // Asking about a page is for tabs agents can get: not a private one (its column closes).
@@ -442,12 +455,6 @@ function OwnBrowser() {
     setPanel(null);
     setAskOpen(true);
   };
-  // Ask about the page: its column opens with the question already on its way.
-  const askAbout = (q: string) => {
-    if (!tab || tab.private) return;
-    openAsk();
-    void askAboutTab(tab, q, run);
-  };
   const leave = () => setWatching(null);
   const watch = (key: string) => {
     setWatching(key);
@@ -458,10 +465,12 @@ function OwnBrowser() {
     watch(key);
     for (const ms of [600, 2000, 5000]) window.setTimeout(() => void loadAgentBrowsers(), ms);
   };
-  const doHere = async (what: string) => {
-    if (!tab) return;
-    const key = await startDo(tab.id, what);
-    if (key) started(key);
+  // Ask about the page (or, with Do picked in Ask, have it done there): its column opens with the request already on its way.
+  const askAbout = (q: string) => {
+    if (!tab || tab.private) return;
+    openAsk();
+    if (useAskMode.getState().mode === 'do') void doOnTab(tab, q).then((key) => key && started(key));
+    else void askAboutTab(tab, q, run);
   };
   const star = () => tab && void toggleBookmark(tab.url, tab.title, marked);
   const where = useSavePlace();
@@ -695,6 +704,27 @@ function OwnBrowser() {
       <MenuItem icon={<Moon size={14} />} checked={!!prefsNow?.darkPages} disabled={!prefsNow} onClick={() => (setMenu(false), void savePrefs({ darkPages: !prefsNow?.darkPages }))}>
         Dark pages
       </MenuItem>
+      {/* The menu stays open while you zoom, so you can press + or − again. */}
+      <div role="group" aria-label="Zoom" className="flex h-8.5 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] text-fg">
+        <ZoomIn size={14} />
+        <span>Zoom</span>
+        <span className="flex-1" />
+        <IconButton size="sm" label={`Zoom out (${MOD}−)`} disabled={!canZoom} onClick={() => zoomTab('out')}>
+          <Minus size={14} />
+        </IconButton>
+        <button
+          title={`Reset zoom (${MOD}0)`}
+          aria-label="Reset zoom"
+          disabled={!canZoom}
+          onClick={() => zoomTab('reset')}
+          className="tnum flex h-7 min-w-12 items-center justify-center rounded-lg px-1.5 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:pointer-events-none disabled:opacity-40"
+        >
+          {zoom ? zoomPercent(zoom) : 100}%
+        </button>
+        <IconButton size="sm" label={`Zoom in (${MOD}+)`} disabled={!canZoom} onClick={() => zoomTab('in')}>
+          <Plus size={14} />
+        </IconButton>
+      </div>
       <MenuSep />
       <MenuItem icon={<Printer size={14} />} disabled={!tab || !canHand} hint={mobile ? undefined : <Kbd>{MOD}P</Kbd>} onClick={() => (setMenu(false), tab && void desktopBrowser()?.print(tab.id))}>
         Print…
@@ -709,14 +739,8 @@ function OwnBrowser() {
         Save as PDF…
       </MenuItem>
       <MenuSep />
-      <MenuItem icon={<ExternalLink size={14} />} disabled={!tab || !canHand} onClick={() => (setMenu(false), tab && void desktopBrowser()?.openExternal(tab.url))}>
-        Open in your default browser
-      </MenuItem>
       <MenuItem icon={<Clock size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), tab && void addLater(tab.url, tab.title || tab.url))}>
         Read this page later
-      </MenuItem>
-      <MenuItem icon={<WandSparkles size={14} />} disabled={!canHand || priv} onClick={() => (setMenu(false), setDoOpen(true))}>
-        Do this here…
       </MenuItem>
       <MenuItem icon={<Sparkles size={14} />} disabled={grouping || view.tabs.filter((t) => !t.private).length < 3} onClick={() => (setMenu(false), void groupWithAi())}>
         Group my tabs with AI
@@ -745,6 +769,9 @@ function OwnBrowser() {
       </MenuItem>
       <MenuItem icon={<Settings size={14} />} checked={panel === 'settings'} onClick={() => (setMenu(false), togglePanel('settings'))}>
         Settings
+      </MenuItem>
+      <MenuItem icon={<Keyboard size={14} />} checked={panel === 'shortcuts'} onClick={() => (setMenu(false), togglePanel('shortcuts'))}>
+        Keyboard shortcuts
       </MenuItem>
     </>
   );
@@ -779,10 +806,12 @@ function OwnBrowser() {
         <HighlightsPanel tab={tab} onClose={close} />
       ) : panel === 'history' ? (
         <HistoryPanel tab={tab?.id} onClose={close} onClear={() => (setClearAt(true), openPanel('settings'))} />
+      ) : panel === 'shortcuts' ? (
+        <ShortcutsPanel onClose={close} />
       ) : (
         <BrowserSettingsPanel focusClear={clearAt} focusTranslation={translationAt} onClose={close} />
       );
-  } else if (!watching && askOpen && tab && !priv) right = <BrowserAskPanel tab={tab} onClose={() => setAskOpen(false)} />;
+  } else if (!watching && askOpen && tab && !priv) right = <BrowserAskPanel tab={tab} onClose={() => setAskOpen(false)} onStarted={started} onWatch={watch} />;
   // On a phone every one of them is a sheet over the page (the panels bring their own).
   const rightIsPanel = !watching && !!panel;
 
@@ -820,7 +849,7 @@ function OwnBrowser() {
             {watching ? (
               <AgentBox k={watching} onBack={leave} />
             ) : (
-              <Omnibox inputRef={address} tab={tab} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} compact={mobile} onAskPage={canAsk && !priv ? askAbout : undefined} onDoHere={canHand && !priv ? (w) => void doHere(w) : undefined} />
+              <Omnibox inputRef={address} tab={tab} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} compact={mobile} onAskPage={canAskPage && !priv ? askAbout : undefined} />
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -903,10 +932,8 @@ function OwnBrowser() {
             </Sheet>
           ))
         ) : (
-          // Slides open and shut (Motion: Full); the page beside it follows.
-          <SlideColumn open={!!right} width={400}>
-            {right ? <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg-1">{right}</aside> : null}
-          </SlideColumn>
+          // Slides open and shut (Motion: Full), as wide as you drag it; the page beside it follows.
+          <RightColumn>{right}</RightColumn>
         )}
       </div>
 
@@ -915,7 +942,6 @@ function OwnBrowser() {
       </Popover>
       {tab && <TranslatePopover anchor={menuRef} open={translateAt === 'menu'} onClose={() => useTranslateUI.setState({ at: null })} tab={tab} />}
       <TranslateTextDialog />
-      {tab && <HandOffPopover anchor={menuRef} open={doOpen} tab={tab.id} title={tab.title || tab.url} onClose={() => setDoOpen(false)} onStarted={started} />}
     </div>
   );
 }

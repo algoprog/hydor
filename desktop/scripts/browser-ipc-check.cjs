@@ -876,6 +876,15 @@ app.whenReady().then(async () => {
       // The Browser page asking for another place while it is full screen does not take the page out of it.
       await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:10,y:10,w:100,h:100})`);
       assert.deepEqual(t.view.getBounds(), { x: 0, y: 0, width: w, height: h });
+      // macOS says a window is hidden while it is only covered for a moment (as when it moves to a space of its own to go full
+      // screen): a page shown full screen stays, still in that window and filling it.
+      win.emit('hide');
+      win.emit('show');
+      await sleep(300);
+      assert.ok(t.fs, 'the window hiding for a moment took the page out of full screen');
+      assert.ok(win.contentView.children.includes(t.view), 'the page was parked');
+      assert.equal(t.view.getBounds().width, win.getContentSize()[0]);
+      assert.ok(fills(), 'the page no longer fills the window');
       await t.wc.executeJavaScript('document.exitFullscreen().then(()=>1)', true);
       await until(() => !t.fs, 3000, 'the page to leave full screen');
       assert.deepEqual(t.view.getBounds(), { x: 10, y: 10, width: 100, height: 100 });
@@ -883,6 +892,69 @@ app.whenReady().then(async () => {
       await until(() => stateFor(own.targetId, (s) => s.fullscreen === false), 2000, 'the left full screen news');
       await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:50,y:60,w:400,h:300})`);
       void before;
+    });
+
+    const sitePrefs = (more) => browser.message({ type: 'browser-prefs', adblock: true, allowAds: [], cookieBanners: true, darkPages: false, darkExcept: [], autoplay: false, ...more });
+    await check('default page zoom: a site you did not zoom has it on each page, a site you zoomed keeps its own, and reset goes to the default', async () => {
+      const t = ownT();
+      const factor = () => Math.round(t.wc.getZoomFactor() * 100) / 100;
+      const zoomOp = (op) => page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, ${JSON.stringify(op)})`);
+      const other = `http://localhost:${sitePort}`;
+      await goTo(own, `${appOrigin}/own`);
+      assert.equal(factor(), 1);
+      // A new default reaches the open page at once, and the window's page is told.
+      sitePrefs({ zoom: 1.25 });
+      assert.equal(factor(), 1.25);
+      await until(() => stateFor(own.targetId, (s) => s.zoom === 1.25), 2000, 'the zoom news');
+      // Each page of a site you did not zoom has it.
+      await goTo(own, `${other}/own`);
+      assert.equal(factor(), 1.25, 'another site');
+      await goTo(own, `${appOrigin}/words`);
+      assert.equal(factor(), 1.25, 'and back');
+      t.wc.setZoomFactor(1);
+      await goTo(own, `${appOrigin}/own`);
+      assert.equal(factor(), 1.25, 'a page that came with another zoom');
+      // A site you zoomed keeps what you chose, over a new default and over visits to other sites; the others follow the default.
+      assert.equal(await zoomOp('in'), 1.5);
+      sitePrefs({ zoom: 1.1 });
+      assert.equal(factor(), 1.5, 'your zoom stays over a new default');
+      await goTo(own, `${other}/own`);
+      assert.equal(factor(), 1.1, 'a site you did not zoom has the new default');
+      await goTo(own, `${appOrigin}/own`);
+      assert.equal(factor(), 1.5, 'the site you zoomed has its zoom still');
+      // Reset goes to the default, not to 100 %, and the site follows the default from then on.
+      assert.equal(await zoomOp('reset'), 1.1);
+      sitePrefs({ zoom: 0.8 });
+      assert.equal(factor(), 0.8);
+      // Zooming out is yours too.
+      assert.equal(await zoomOp('out'), 0.75);
+      sitePrefs({ zoom: 1.5 });
+      assert.equal(factor(), 0.75);
+      sitePrefs({ zoom: 1 });
+      assert.equal(factor(), 0.75);
+      assert.equal(await zoomOp('reset'), 1);
+      assert.equal(factor(), 1);
+    });
+
+    await check('check spelling: your own sessions follow the setting, when they are made and when it changes', async () => {
+      const ses = ownT().wc.session;
+      assert.equal(ses.isSpellCheckerEnabled(), true, 'on at first');
+      assert.equal(ses, browser.browsingSession(), 'your own tab is in the browsing profile');
+      sitePrefs({ spellcheck: false });
+      assert.equal(ses.isSpellCheckerEnabled(), false, 'turned off');
+      // A private tab's session is made while it is off, and follows it back on.
+      const { browserContextId } = await cdp('Target.createBrowserContext', { hydorPrivate: true });
+      const priv = await openTab(`${appOrigin}/own`, { browserContextId });
+      const sp = browser.conns.get(CONN).targets.get(priv.targetId).wc.session;
+      assert.equal(sp.isSpellCheckerEnabled(), false, 'a new private session starts as the setting says');
+      sitePrefs({ spellcheck: true });
+      assert.equal(ses.isSpellCheckerEnabled(), true);
+      assert.equal(sp.isSpellCheckerEnabled(), true);
+      sitePrefs({ spellcheck: false });
+      assert.equal(sp.isSpellCheckerEnabled(), false);
+      await cdp('Target.disposeBrowserContext', { browserContextId });
+      sitePrefs({ spellcheck: true });
+      assert.equal(ses.isSpellCheckerEnabled(), true);
     });
 
     await check('openExternal takes http and https addresses only; print and the rest refuse what is not your tab', async () => {

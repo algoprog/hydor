@@ -2,7 +2,7 @@
 // at work, and your tabs, one row each. Ctrl+B folds it away. An agent's row shows its browser in the page's place
 // (the page column and the right column take it over); a click on one of your tabs leaves it again.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, Check, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Palette, Pencil, Plus, RotateCcw, RotateCw, Sparkles, Ungroup, VenetianMask, X, XCircle } from 'lucide-react';
+import { Bookmark, Check, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Link, Palette, Pencil, Plus, RotateCcw, RotateCw, Sparkles, Ungroup, VenetianMask, X, XCircle } from 'lucide-react';
 import { GROUP_COLORS, inTabOrder, type BrowserGroup, type BrowserView, type GroupColor, type LaterItem } from '@shared/browser';
 import { Throbber } from '../../components/ui';
 import { ContextMenu, isMenuKey, type ContextMenuAt, type MenuEntry } from '../pages/common/menus';
@@ -18,6 +18,13 @@ import { Favicon, SiteIcon, Speaker } from './TabStrip';
 import { useRowPhases } from '../../lib/flip';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { ColumnResizer, useNavWidth } from '../layout/SideColumn';
+
+/** A link in Markdown: [title](url), with the brackets of the title escaped and the parts of the address that would end the link written as %-codes. */
+function markdownLink(title: string, url: string): string {
+  const text = title.replace(/[[\]]/g, (c) => `\\${c}`);
+  const href = url.replace(/[()\s]/g, (c) => (c === '(' ? '%28' : c === ')' ? '%29' : '%20'));
+  return `[${text}](${href})`;
+}
 
 /** A section's label with a chevron that folds it, and buttons at its end (`actions`: they show when you point at the label). */
 function Label({ children, open, onToggle, hint, actions, icon, tone }: { children: string; open: boolean; onToggle: () => void; hint?: string; actions?: ReactNode; icon?: ReactNode; tone?: string }) {
@@ -339,6 +346,7 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
       { label: 'Duplicate', icon: <CopyPlus size={14} />, run: () => void duplicateTab(t.id) },
       { label: 'Reload', icon: <RotateCw size={14} />, run: () => void reloadTab(t.id) },
       { label: 'Copy address', icon: <Copy size={14} />, disabled: !t.url || t.url === 'about:blank', run: () => void navigator.clipboard?.writeText(t.url).then(() => toast('Copied the address', 'ok'), () => {}) },
+      { label: 'Copy as Markdown link', icon: <Link size={14} />, disabled: !t.url || t.url === 'about:blank', run: () => void navigator.clipboard?.writeText(markdownLink(t.title || t.url, t.url)).then(() => toast('Copied a Markdown link', 'ok'), () => {}) },
       { label: marked.length ? 'Remove the bookmark' : 'Bookmark', icon: <Bookmark size={14} />, disabled: !isWebPage(t.url), run: () => void toggleBookmark(t.url, t.title, marked) },
       !t.private && '-',
       !t.private && {

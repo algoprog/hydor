@@ -243,7 +243,8 @@ agents that speak ACP and take MCP servers.
     the extensions you pinned, **Extensions** (the puzzle piece: every extension that is on, to use, pin or unpin), **Add to Hydor** on a Web Store page, and a ⋯ menu), a purple **Private** chip in a private tab, and
     the translate and reader view buttons at the end of the address box when a page can use them, under it the **tab column** (Ctrl/⌘+B folds
     it away), the page, and a **column beside the page** that shows only when something is in it. Nothing is laid over
-    the page: it narrows to make room.
+    the page: it narrows to make room. Drag the column's left edge (or focus it and press ← →) to make it wider or
+    narrower, at least 340 px and leaving the page 360 px; a double-click puts back its 400 px; kept on this device.
   - **The tab column**: the sites on your bookmarks bar pinned as tiles (five to a row, two rows, a **…** tile for the
     rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
     open browser with a dot for working or waiting for you), a purple **Private** section while private tabs are open
@@ -251,24 +252,27 @@ agents that speak ACP and take MCP servers.
     middle click to close, **New tab**), resized by its edge like every column; a title too long fades at its end and rolls to
     show the rest under the pointer; and **Read later**, a quiet section under the tabs, folded while nothing waits.
     **A tab's menu** (right-click, or its ⋯): close it, the others or the ones below;
-    duplicate, reload, copy its address, bookmark; add it to a group or take it out. **Tab groups**: a header with a colour
+    duplicate, reload, copy its address or **Copy as Markdown link**, bookmark; add it to a group or take it out. **Tab groups**: a header with a colour
     (one of seven), a name and the tab count, folded or opened by a click, its tabs under it (drag a tab on or off a group);
     the header's menu renames, colours, opens a new tab in it, ungroups or closes it. Groups are kept with the tabs for the next
     start. **Group my tabs with AI** (the sparkles in the **Tabs** row, or the ⋯ menu) sends the titles and addresses of the
     tabs in no group (never a private tab), without what follows a ? or #, to the helper model, only when pressed, and makes the groups it answers
     with, with **Undo**.
-  - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
-    start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
-    agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Import bookmarks and history**, **Highlights**, **Extensions**, **Site
-    permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
+  - **The column beside the page**: **Ask**, with a switch at its top, **Ask** or **Do** (kept on this device): Ask about the
+    page (a copy of its text goes to a new session with the agent the start page used last, each tab with its own
+    question, its conversation right there, **Open as a session**), or Do, to have an agent work in the page (see
+    **Hand a page to an agent**); an agent's conversation while you watch its tab; or **History**, **Downloads**,
+    **Bookmarks**, **Import bookmarks and history**, **Highlights**, **Extensions**, **Site permissions**, **Settings**
+    or **Keyboard shortcuts** (the keys the browser answers, by group), still open by `?panel=`. A sheet over the page in a narrow window.
   - **Save** keeps a reader copy of the page in the Library as a Web page (the article as Mozilla's Readability finds it,
     with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads, History and
     Highlights chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
     kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
-    you go to often and lately first, typed addresses counting most, a bookmark as twenty visits), what you typed as an address or a search, the
-    search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words), **Do it in a tab of
-    its own** (an agent does what you typed in this tab) and **Ask an agent**, which starts a session with your words; the rest of an address
+    you go to often and lately first, typed addresses counting most, a bookmark as twenty visits), what you typed as an address or a search (a **search shortcut** such as `yt` before your words, `yt lofi`, searches that
+    site first: "Search YouTube for “lofi”"), the
+    search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words; **Do it on this page**
+    while Do is picked in Ask, which has an agent do what you typed there) and **Ask an agent**, which starts a session with your words; the rest of an address
     completes in place (Tab or → takes it, found by words alone); Shift+Delete forgets a history suggestion. With search
     by meaning on, pages of your history and bookmarks that are about what you typed also show, after the ones with its
     words, even when theirs differ (the model runs on your computer, from a vector of each page's title and address,
@@ -291,9 +295,10 @@ agents that speak ACP and take MCP servers.
     can't read Safari). What the
     browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
     the history, the files staying where they are.
-  - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
+  - **Browser settings**: home page (**Use the current page**), search engine, **Search shortcuts** (`yt`, `wiki`, `gh`,
+    `scholar`, `arxiv` and `hf` at first; add your own, up to 50, with %s where your words go), search suggestions, **Block ads and
     trackers**, **Hide cookie banners**, **Translation** (what to translate into, the offer, languages to always or never
-    translate, sites never translated), **Pages** (**Dark pages**, **Sites shown as they are**, **Let sites play sound by
+    translate, sites never translated), **Pages** (**Page zoom**, **Check spelling**, **Dark pages**, **Sites shown as they are**, **Let sites play sound by
     themselves**) and **Clear browsing data** (history with the list of downloads, cookies and site data, cached files,
     with a time range for the history).
   - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
@@ -307,8 +312,8 @@ agents that speak ACP and take MCP servers.
     closes or the app quits; their pages are not kept in history, in **Recently closed** or among the tabs that open
     again at the next start; their downloads are saved but not listed in the Library's Downloads; extensions do not run
     in them; a site's permission answers are asked again and forgotten; bookmarks, Read later, highlights and Save
-    still keep what you ask for. They can't be grouped, and agents never get them: no **Ask**, **Do this here** or
-    Ask items in the right-click menu, and the server refuses a copy of their page.
+    still keep what you ask for. They can't be grouped, and agents never get them: no **Ask**
+    or Ask items in the right-click menu, and the server refuses a copy of their page.
   - **Translate a page**: a button in the address bar when a page is in another language than the one you translate
     into (the app's own at first); the popover has **Translate** / **Show original** / **Try again** with a progress line,
     **Translate into**, **Always translate** and **Never translate** for the language, **Never translate** for the site
@@ -348,15 +353,16 @@ agents that speak ACP and take MCP servers.
   - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
     the Library's **Read later** chip beside Bookmarks; each page has **Mark as read** (it leaves the list; **Show read**
     brings the read ones back) and **Remove**. It is yours alone: agents are refused its routes.
-  - **Zoom** (Ctrl/⌘ with + − 0, and Ctrl and the wheel, with a chip that resets it), **print**, full-screen video,
-    **find in page** (Ctrl/⌘+F, "3 of 12", Match case), a speaker on a tab that plays sound to mute it, and **Open in
-    your default browser**.
+  - **Zoom** (Ctrl/⌘ with + − 0, Ctrl and the wheel, and a **Zoom** row in the ⋯ menu with − and + and the percent; the
+    **Page zoom** setting is what a site you did not zoom shows at, and a chip in the address bar resets one you did),
+    **print**, full-screen video, **find in page** (Ctrl/⌘+F, "3 of 12", Match case) and a speaker on a tab that plays
+    sound to mute it.
   - A star and the bookmarks bar as pinned tiles (folders, right-click to edit), downloads into your Downloads
     folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and Allow,
     remembered for the site), a page's pop-up questions.
   - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, B, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
     Ctrl/⌘+Shift+N for a private tab;
-    Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→).
+    Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→), all listed in the ⋯ menu's **Keyboard shortcuts** panel.
 - **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. A search
   box at the top finds bookmarks by every word in their names and addresses, and folders by name (Enter opens the first
   bookmark found), and **Organize with AI** (also in the search box, Ctrl+K, as "Organize bookmarks with AI") sorts them
@@ -384,8 +390,9 @@ agents that speak ACP and take MCP servers.
   button; extensions that use the `browser` object (Firefox's name) get them too. Each extension's row names the parts
   that may still not work (blocking or changing requests, signing in with an account, history…), and pressing the button
   of one that is not running says so. Changing an extension through the API asks you every time.
-- **Hand a page to an agent**: **Ask about this page** (**Ask** in the bar) starts a session with a copy of the page's
-  text (the agent cannot touch the page); **Do this here** (the ⋯ menu, or the box's **Do it in a tab of its own**) gives
+- **Hand a page to an agent**: **Ask** in the bar opens the column beside the page with a switch. **Ask** starts a
+  session with a copy of the page's text (the agent cannot touch the page); **Do** (also the address box's **Do it on this
+  page** row while it is picked) gives
   Claude Code or Custom one tab of its own at your page, signed in as you on that site, kept to that site, with the
   browser's tools and nothing else, asking before it sends, posts, deletes or transfers; **Take back** closes the agent's
   tab and opens the page in yours. **Agents at work** in the tab column lists the browsers agents have open: click one to

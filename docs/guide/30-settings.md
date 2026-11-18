@@ -226,7 +226,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Ask before sending on signed-in sites**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Before an agent sends, posts, deletes or transfers anything on a site it’s signed in to.
 - [**Bookmarks**](/settings?s=browser&find=Bookmarks): Yours, with those from the other browsers on this computer.
 - [**Extensions**](/settings?s=browser&find=Extensions): Chrome extensions, in the desktop app.
-- [**Browser settings**](/settings?s=browser&find=Browser%20settings): Home page, search engine, translation, dark pages, ad blocker, history and clearing what it kept.
+- [**Browser settings**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker, history and clearing what it kept.
 
 ### Computer use
 
