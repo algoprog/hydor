@@ -1,6 +1,7 @@
 // Subagents in the sidebar: Hydor's (child sessions) and the ones Claude Code and Codex run themselves, under their
-// parent, folded by default, with a line on how many there are and what they are doing. Open while one of them is on
-// screen.
+// parent, folded by default, with a line on how many there are and what they are doing. Only those at work or waiting
+// for you show (and the one on screen): a finished one is on its card in the session and in its work tray. Open while
+// one of them is on screen.
 import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { swarmMode } from '@shared/swarm';
@@ -21,11 +22,13 @@ import { useProgramSubagentsOf } from './program';
  * ones active most lately (the newest first).
  */
 export function liveThenRecent(a: SessionSummary, b: SessionSummary): number {
-  const live = (s: SessionSummary) => {
-    const act = activityOf(s);
-    return isWorking(act) || act?.status === 'waiting' ? 1 : 0;
-  };
-  return live(b) - live(a) || (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0) || a.key.localeCompare(b.key);
+  return Number(live(b)) - Number(live(a)) || (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0) || a.key.localeCompare(b.key);
+}
+
+/** A subagent at work or waiting for you: the ones the sidebar shows. */
+function live(s: SessionSummary | undefined): boolean {
+  const act = activityOf(s);
+  return isWorking(act) || act?.status === 'waiting';
 }
 
 export function nestChildren(byKey: Record<string, SessionSummary>, listed: (s: SessionSummary) => boolean): { under: Set<string>; byParent: Map<string, SessionSummary[]> } {
@@ -67,11 +70,13 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
       list.push(known && (known.updatedAt ?? 0) >= (f.updatedAt ?? 0) ? known : f);
     }
     if (activeProgram && !list.some((k) => k.key === activeProgram.key)) list.push(activeProgram);
-    return list.sort(liveThenRecent);
-  }, [kids, fetched, byKey, activeProgram]);
-  const total = kids.length + Math.max(programs, rows.length - kids.length);
+    return list.filter((k) => live(k) || k.key === activeKey).sort(liveThenRecent);
+  }, [kids, fetched, byKey, activeProgram, activeKey]);
   const working = kids.filter((k) => isWorking(activityOf(k))).length + programsRunning;
   const waiting = kids.filter((k) => activityOf(k)?.status === 'waiting').length;
+  // The one on screen, when it has finished: it stays while you look at it.
+  const total = working + waiting + (holdsActive && !live(active) ? 1 : 0);
+  if (!total) return null;
   const toggle = (e: MouseEvent) => {
     // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
     e.stopPropagation();

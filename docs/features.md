@@ -607,7 +607,8 @@ agents that speak ACP and take MCP servers.
   a payment) or before each event in a connected calendar (see Scheduled tasks).
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
   session of its own that Hydor starts, with any agent and model, each a card in its conversation that opens to
-  the reply; it shows under its parent in the sidebar and in the work tray above the prompt bar, and you can talk to
+  the reply; it shows under its parent in the sidebar while it works or waits for you (and while you have it open), and
+  in the work tray above the prompt bar, and you can talk to
   it. A Claude Code or Codex subagent is one the program runs inside the session, and it shows the same way: a card
   under the turn that started it (the program's icon, its title, its kind and model, how it stands, **Open**, and a
   stop button for Claude Code's, which asks first), one line with the Hydor ones under its lead in the sidebar
