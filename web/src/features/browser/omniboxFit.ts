@@ -6,7 +6,8 @@ const KEEP = 2;
 /**
  * At most `n` rows: what you typed (always first) stays; when the rest has to be cut, the side with more rows loses its
  * last ones first (the engine's suggestions on a tie, as they come after your pages), and each side that is there keeps
- * at least two. Where even that does not fit, the end goes.
+ * at least two. Your pages lose the pages of your history before your bookmarks and tabs, which you chose. Where even
+ * that does not fit, the end goes.
  */
 export function fitRows<T extends { id: string; kind: string }>(rows: T[], n: number): T[] {
   if (rows.length <= n) return rows;
@@ -19,7 +20,8 @@ export function fitRows<T extends { id: string; kind: string }>(rows: T[], n: nu
     const other = side === searches ? pages : searches;
     const cut = side.length > KEEP ? side : other.length > KEEP ? other : side.length >= other.length ? side : other;
     if (!cut.length) break;
-    cut.pop();
+    const at = cut === pages ? pages.findLastIndex((r) => r.kind === 'history') : -1;
+    cut.splice(at >= 0 ? at : cut.length - 1, 1);
     total--;
   }
   const keep = new Set([...lead, ...pages, ...searches]);

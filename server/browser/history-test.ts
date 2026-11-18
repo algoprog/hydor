@@ -180,6 +180,26 @@ async function main() {
     assert.equal(byUrl.get('https://docs.example/faq')?.kind, 'history');
   });
 
+  await check('suggestions: a big history does not hide your bookmarks: at least two that hold the words, in place of its last pages', async () => {
+    const db = fresh();
+    for (let i = 0; i < 12; i++) for (let k = 0; k < 30; k++) addVisit(db, `https://docs.python.org/3/library/m${i}.html`, `Python module ${i}`, false, NOW - DAY);
+    const marks = [bookmark('Python Weekly', 'https://www.pythonweekly.com/'), bookmark('Real Python — Python Tutorials', 'https://realpython.com/'), bookmark('PEP 8 – Style Guide for Python Code', 'https://peps.python.org/pep-0008/'), bookmark('Sourdough', 'https://bread.example/')];
+    const r = await suggest(db, input('python', { bookmarks: marks }));
+    assert.equal(r.items.length, 10);
+    assert.deepEqual(r.items.map((i) => i.kind), [...Array(8).fill('history'), 'bookmark', 'bookmark'], JSON.stringify(urls(r)));
+    assert.deepEqual(urls(r).slice(8), ['bookmark:https://www.pythonweekly.com/', 'bookmark:https://realpython.com/'], 'the best of them, in their order');
+    // With the engine's suggestions there is room for five pages: two of them are still bookmarks.
+    clearSuggestCache();
+    const fetch: Fetch = async () => ({ ok: true, text: async () => JSON.stringify(['python', ['python 3', 'python tutorial', 'python download', 'python online', 'python ide']]) });
+    const s = await suggest(db, input('python', { bookmarks: marks, prefs: { engine: 'google', suggest: true }, fetch }));
+    assert.deepEqual(s.items.map((i) => i.kind), ['history', 'history', 'history', 'bookmark', 'bookmark', ...Array(5).fill('search')]);
+    // Bookmarks that rank in by themselves are not moved, and nothing is added when none holds the words.
+    const few = fresh();
+    addVisit(few, 'https://docs.python.org/3/', 'Python docs', false, NOW - DAY);
+    assert.deepEqual(urls(await suggest(few, input('python', { bookmarks: marks }))), ['bookmark:https://www.pythonweekly.com/', 'bookmark:https://realpython.com/', 'bookmark:https://peps.python.org/pep-0008/', 'history:https://docs.python.org/3/']);
+    assert.deepEqual(urls(await suggest(db, input('module 11', { bookmarks: marks }))), ['history:https://docs.python.org/3/library/m11.html']);
+  });
+
   await check('suggestions: what you typed as an address comes first, as the page it is when you have been there', async () => {
     const db = fresh();
     const r1 = await suggest(db, input('example.com'));

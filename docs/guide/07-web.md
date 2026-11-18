@@ -277,14 +277,14 @@ A link to `/browser?url=https://example.com` opens the Browser page with that ad
 As you type in the address bar, a list under it offers, with the words you typed in bold:
 
 - your open tabs ("Switch to tab": pick one to go to it instead of opening the page again; your private tabs are among them while they are open, and nothing about them is kept afterwards),
-- your bookmarks and the pages of your history that match the words in their titles and addresses, the ones you go to often and lately first (addresses you typed yourself count most),
+- your bookmarks and the pages of your history that match the words in their titles and addresses, the ones you go to often and lately first (addresses you typed yourself count most, and a bookmark counts as twenty visits). When bookmarks match the words you typed, at least two of them are always among the pages offered, in place of the last pages of your history, so a big history, such as one brought in from another browser, never hides them,
 - with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, bookmarks and pages of your history that are about what you typed even when their titles and addresses do not hold its words, after the ones that do (they show without bold words). The model that finds them runs on this computer, from a vector made of each page's title and address (without its query string) and kept in the app's database apart from everything else; it goes when the page does,
 - what you typed, as a search ("Search Google") or, when it looks like an address, as that address,
 - the search engine's own suggestions, when [Search suggestions](/guide/web#browser-settings) is on,
 - below those, when the open tab is a web page (and not a private tab, which agents never get), **Ask about this page: “…”**, which opens Ask beside the page with what you typed as the question, and **Do it in a tab of its own: “…”**, which gives the tab to an agent that does what you typed there (see [Do this here](/guide/web#do-this-here)); it is the one of Claude Code and Custom you used last, Claude Code at first,
 - last, **Ask an agent: “…”**, which starts a session with what you typed as its first message, on the agent and model the start page used last, and takes you to it.
 
-The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab (a private one, when you are in a private tab). The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
+The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. When the list has to be cut to fit a short window, pages of your history go before your bookmarks and open tabs. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab (a private one, when you are in a private tab). The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
 
 ### The tab column
 
@@ -540,9 +540,37 @@ The sites on the bookmarks bar are pinned at the top of the tab column once you 
 
 For all of them, press **Menu** (⋯) → **Bookmarks**, or go to [Bookmarks](/browser?panel=bookmarks). The panel has two places, **Bookmarks bar** and **Other bookmarks**, and the folders in them open and close.
 
+- **Search your bookmarks** (the box at the top) finds a bookmark by its words (see [Search your bookmarks](/guide/web#search-your-bookmarks)).
 - **New folder** (at the top) adds a folder to the bar and asks for its name.
+- **Organize with AI** (the sparkles button at the top, beside **New folder**) sorts your bookmarks into folders by topic (see [Organize with AI](/guide/web#organize-with-ai)).
 - Point at a row for **Move up**, **Move down**, **Edit** (**Rename** for a folder) and **Delete**. You can also drag a row: onto the middle of a folder to put it inside, or between rows to place it there. A folder can't go into itself. Deleting a folder asks first, and takes what is in it.
 - A bookmark's address starts with http://, https://, file:// or chrome-extension://. You can keep up to 20,000.
+
+### Search your bookmarks
+
+At the top of the panel, the box **Search your bookmarks** finds bookmarks by every word you type, in their names and addresses (capitals and accents don't matter), and folders by their names. While the box has words, the panel shows **Folders** (up to 20) and **Bookmarks** (up to 200) instead of the folders, and each bookmark shows its site and where it is, such as "Bookmarks bar › Imported from Chrome › Research".
+
+- Click a folder to see it among your folders: the search clears and the folder opens.
+- Click a bookmark to open it; Ctrl+click (⌘+click on a Mac) opens it in a new tab.
+- Point at a bookmark for **Show in folder**, **Edit** and **Delete**.
+- **Enter** opens the first bookmark found, and **Esc** clears the search.
+
+The Library's **Bookmarks** list has a search box too (see [Library](/guide/library)).
+
+### Organize with AI
+
+With many bookmarks, the sparkles button **Organize with AI** at the top of the panel, beside **New folder**, sorts them into folders by topic. You can also search for "Organize bookmarks with AI" in the search box (Ctrl+K), or go to [Organize with AI](/browser?panel=bookmarks&organize=1). It opens **Organize your bookmarks with AI**, where you pick how:
+
+- **Keep my folders** (chosen at first): your folders, and the bookmarks in them, stay as they are. Loose bookmarks go into the folder that fits: one of yours or a new one. Loose means in **Other bookmarks** itself, or in a folder that only collects bookmarks, such as an import's "Imported from Chrome" and the "Other bookmarks" or "Mobile bookmarks" folders inside it (the helper model tells them apart from folders of your own, in any language). A collecting folder that the sorting empties is removed (one that was empty already stays); no other folder is removed, renamed or moved. New folders go at the end of **Other bookmarks**, or inside one of your folders.
+- **Start over**: every bookmark goes into new folders by topic, in **Other bookmarks**, and your old folders are removed. The new folders come first in **Other bookmarks**, by name, with up to one level of subfolders; a folder left with a bookmark the model could not place stays.
+
+Either way, the sites pinned on your bookmarks bar (the bar's own links) stay where they are.
+
+**What is sent, and to which model.** Only when you press **Organize**, the titles and addresses of your bookmarks (without what follows a **?** or **#**) and the names of your folders go to the app's helper model, the one that writes session titles and memory notes ([Settings → Agents → Models → Helper model](/settings?s=models&find=Helper%20model)). On Automatic that is Claude Haiku through Claude Code; a model of your own on this computer keeps them here. Nothing is sent at any other time. If a bookmark's title is private, do not press it (or put a model on this computer as the helper).
+
+It works in two steps: it first works out the folders, then sorts the bookmarks into them, 150 at a time; a few hundred bookmarks take a minute or two. While it works, the top of the panel says "Working out the folders…", then "Sorting your bookmarks… 150 of 412" with a bar, and **Stop**, which changes nothing. When it is done it says what it did, such as "Sorted 412 bookmarks into 14 new folders. Removed 3 empty folders.", and the folders show closed so the new ones read at a glance. **Undo** puts every bookmark back as it was, as long as you have not changed your bookmarks since; the X closes the note. If it fails, nothing is changed, and **Try again** opens it again.
+
+Agents can't organize your bookmarks for you: your own browsing is yours alone. Ask one, and it tells you where the button is.
 
 ### Bring in bookmarks
 
@@ -747,6 +775,8 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "How do I read an article without the clutter, in a bigger font?" (the book button in the address bar, then **Aa**)
 - "Show web pages dark, except one site." (**Menu** → **Dark pages**, then that site's padlock → **Dark pages on this site**)
 - "How do I save a whole web page as a picture or a PDF?" (**Menu** → **Screenshot of the whole page** or **Save as PDF…**; both go to Downloads)
+- "How do I sort my bookmarks into folders with AI, and what does it send?" (**Organize with AI** in the Bookmarks panel; the titles and addresses of your bookmarks, without what follows a ? or #, and your folders' names go to the helper model, only when you press **Organize**; **Undo** puts them back)
+- "How do I find a bookmark?" (**Search your bookmarks** at the top of the Bookmarks panel, or the Library's **Bookmarks** list)
 - "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")
 - "Bring my Chrome history into the Browser page." (or: "Why can't I import my Safari history?")
 - "Which Chrome extensions are in my browser, and which of them run in the agents' browsers too?"

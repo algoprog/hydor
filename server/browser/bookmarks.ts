@@ -10,10 +10,13 @@ import { BOOKMARK_ROOTS, type BookmarkNode, type BookmarkSource } from '../../sh
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
+import { organizeRoutes } from './bookmark-organize.ts';
 import { syncBookmarkVectors } from './meaning.ts';
 import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, NeedsAccess, readCopy, readJson, type Dirs } from './other-browsers.ts';
 
 const KEY = 'browser.bookmarks';
+/** Where the bookmarks are kept in the key-value store (Organize with AI tells by it whether they changed since). */
+export const BOOKMARKS_KEY = KEY;
 export const MAX_BOOKMARKS = 20_000;
 const MAX_HTML = 20 * 1024 * 1024;
 const TITLE_MAX = 300;
@@ -49,7 +52,7 @@ export function loadBookmarks(db: DB): BookmarkNode[] {
 }
 
 /** Puts every folder's items in order and numbers them from 0, then keeps them. Equal places keep the order they have. */
-function save(db: DB, nodes: BookmarkNode[]): BookmarkNode[] {
+export function saveBookmarks(db: DB, nodes: BookmarkNode[]): BookmarkNode[] {
   const order = new Map(nodes.map((n, i) => [n, i]));
   const by = new Map<string, BookmarkNode[]>();
   for (const n of nodes) by.set(n.parent, [...(by.get(n.parent) ?? []), n]);
@@ -139,7 +142,7 @@ export function addBookmark(db: DB, b: { title?: unknown; url?: unknown; parent?
   if (url) node.url = url;
   nodes.push(node);
   place(nodes, node, parent, wantedPos(b.pos));
-  return { node, nodes: save(db, nodes) };
+  return { node, nodes: saveBookmarks(db, nodes) };
 }
 
 export function changeBookmark(db: DB, id: string, b: { title?: unknown; url?: unknown; parent?: unknown; pos?: unknown }): BookmarkNode[] {
@@ -160,7 +163,7 @@ export function changeBookmark(db: DB, id: string, b: { title?: unknown; url?: u
     if (parent === node.id || descendants(nodes, node.id).has(parent)) throw new HttpError(400, 'A folder cannot go into itself.');
     place(nodes, node, parent, pos);
   }
-  return save(db, nodes);
+  return saveBookmarks(db, nodes);
 }
 
 export function removeBookmark(db: DB, id: string): BookmarkNode[] {
@@ -168,7 +171,7 @@ export function removeBookmark(db: DB, id: string): BookmarkNode[] {
   if (!nodes.some((n) => n.id === id)) throw new HttpError(404, 'That bookmark is not there.');
   const gone = descendants(nodes, id);
   gone.add(id);
-  return save(
+  return saveBookmarks(
     db,
     nodes.filter((n) => !gone.has(n.id)),
   );
@@ -234,7 +237,7 @@ export function importInto(db: DB, name: string, items: Imp[]): { added: number;
     }
   };
   graft(tree, folder.id);
-  return { added, folder, nodes: save(db, nodes) };
+  return { added, folder, nodes: saveBookmarks(db, nodes) };
 }
 
 // ---- the other browsers on this computer -----------------------------------------------------------
@@ -664,6 +667,8 @@ export function bookmarkRoutes(d: Deps) {
   app.post('/api/browser/bookmarks', async (req) => addBookmark(db, B(req)));
   app.patch('/api/browser/bookmarks/:id', async (req) => ({ nodes: changeBookmark(db, (req.params as { id: string }).id, B(req)) }));
   app.delete('/api/browser/bookmarks/:id', async (req) => ({ nodes: removeBookmark(db, (req.params as { id: string }).id) }));
+
+  organizeRoutes(d);
 
   app.get('/api/browser/bookmarks/sources', async () => ({ sources: await bookmarkSources() }));
 

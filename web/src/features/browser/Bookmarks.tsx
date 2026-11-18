@@ -1,17 +1,22 @@
-// The bookmarks panel: the tree (folders open and close; drag a row to move it, or use its arrows), adding a folder,
-// renaming and deleting, and bringing bookmarks in from the browsers on this computer or from a file, or out.
+// The bookmarks panel: the tree (folders open and close; drag a row to move it, or use its arrows), searching it, sorting it
+// into folders with the helper model (Organize with AI), adding a folder, renaming and deleting, and bringing bookmarks in
+// from the browsers on this computer or from a file, or out.
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, FileUp, Folder, FolderOpen, FolderPlus, Globe, Pencil, Trash2 } from 'lucide-react';
+import { useSearch } from 'wouter';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, FileUp, Folder, FolderOpen, FolderPlus, FolderSearch, Globe, Pencil, Search, Sparkles, Trash2, X } from 'lucide-react';
 import type { BookmarkNode, BookmarkSource } from '@shared/browser';
+import { tr } from '../../i18n/runtime';
 import { api, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
+import { go } from '../../lib/nav';
 import { canOpenFullDiskAccess } from '../../lib/notify';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, IconButton, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, Throbber, useIsMobile } from '../../components/ui';
 import { RenameDialog, openBookmark, useDeleteBookmark } from './BookmarkBar';
-import { addBookmark, childrenOf, editBookmark, loadBookmarks, useBookmarks, withinFolder } from './browsing';
+import { addBookmark, childrenOf, editBookmark, loadBookmarks, loadOrganize, startOrganize, stopOrganize, undoOrganize, useBookmarks, useOrganize, watchOrganize, withinFolder } from './browsing';
 import { OpenSettings, REOPEN_NOTE } from './ImportBrowsers';
 import { Note, Panel } from './Panel';
+import { SiteIcon, hostOfTab } from './TabStrip';
 
 interface Row {
   node: BookmarkNode;
@@ -24,27 +29,210 @@ interface Row {
 /** Where a drag would put the row: before or after another, or inside a folder (at its end). */
 type Drop = { id: string; where: 'before' | 'after' | 'into' } | { id: 'bar' | 'other'; where: 'into' };
 
+/** A bookmark or folder with where it is: the root, and the names of the folders around it, the outermost first. */
+interface Found {
+  node: BookmarkNode;
+  root: 'bar' | 'other';
+  folders: string[];
+}
+
+const MAX_BOOKMARKS = 200;
+const MAX_FOLDERS = 20;
+
+/** Text as it is searched: lower case, without accents. */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/** Every bookmark and folder in the order of the tree (the bookmarks bar first), each with its place. */
+function flattenAll(nodes: BookmarkNode[]): Found[] {
+  const byParent = new Map<string, BookmarkNode[]>();
+  for (const n of nodes) {
+    const l = byParent.get(n.parent);
+    if (l) l.push(n);
+    else byParent.set(n.parent, [n]);
+  }
+  const out: Found[] = [];
+  const walk = (root: 'bar' | 'other', parent: string, folders: string[], seen: Set<string>) => {
+    for (const n of (byParent.get(parent) ?? []).sort((a, b) => a.pos - b.pos)) {
+      if (seen.has(n.id)) continue;
+      out.push({ node: n, root, folders });
+      if (!n.url && folders.length < 12) walk(root, n.id, [...folders, n.title], new Set(seen).add(n.id));
+    }
+  };
+  walk('bar', 'bar', [], new Set());
+  walk('other', 'other', [], new Set());
+  return out;
+}
+
+/** What is searched in a node: a bookmark's title and its address without the scheme, a folder's name. */
+const textOf = (n: BookmarkNode) => fold(n.url ? `${n.title}\n${n.url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')}` : n.title);
+
+/** The places in `text` the words are at, as ranges of the text itself (the words match without regard to case and accents). */
+function marks(text: string, words: string[]): [number, number][] {
+  let folded = '';
+  const at: number[] = []; // for each character of the folded text, where it came from in `text`
+  let i = 0;
+  for (const ch of text) {
+    const f = fold(ch);
+    for (let k = 0; k < f.length; k++) at.push(i);
+    folded += f;
+    i += ch.length;
+  }
+  at.push(text.length);
+  const out: [number, number][] = [];
+  for (const w of words) {
+    for (let from = folded.indexOf(w); from >= 0; from = folded.indexOf(w, from + w.length)) {
+      const start = at[from];
+      const last = at[from + w.length - 1];
+      // To the end of the character the last folded one came from.
+      let end = at[from + w.length] ?? text.length;
+      if (end === last) end = last + 1;
+      out.push([start, end]);
+    }
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const m of out) {
+    const l = merged[merged.length - 1];
+    if (l && m[0] <= l[1]) l[1] = Math.max(l[1], m[1]);
+    else merged.push([m[0], m[1]]);
+  }
+  return merged;
+}
+
+/** Text with the words searched for in bold. */
+function Marked({ text, words }: { text: string; words: string[] }) {
+  const ranges = marks(text, words);
+  if (!ranges.length) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let at = 0;
+  ranges.forEach(([a, b], i) => {
+    if (a > at) parts.push(text.slice(at, a));
+    parts.push(
+      <b key={i} className="font-semibold text-fg">
+        {text.slice(a, b)}
+      </b>,
+    );
+    at = b;
+  });
+  if (at < text.length) parts.push(text.slice(at));
+  return <>{parts}</>;
+}
+
+/** Where something is, as a line: "Bookmarks bar › Folder › Sub" (the folder names are what people wrote). */
+function Place({ root, folders }: { root: 'bar' | 'other'; folders: string[] }) {
+  return (
+    <>
+      {root === 'bar' ? tr('Bookmarks bar') : tr('Other bookmarks')}
+      {folders.length > 0 && <span translate="no">{` › ${folders.join(' › ')}`}</span>}
+    </>
+  );
+}
+
+const shown = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+
 export function BookmarksPanel({ onClose }: { onClose: () => void }) {
   const nodes = useBookmarks((s) => s.nodes);
   const loaded = useBookmarks((s) => s.loaded);
+  const mobile = useIsMobile();
+  // Folders opened or closed by hand; the others are open, or all closed once a sort has made new folders.
   const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const [foldAll, setFoldAll] = useState(false);
   const [rename, setRename] = useState<BookmarkNode | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
   const [remove, confirmNode] = useDeleteBookmark();
+  const [q, setQ] = useState('');
+  // A row shown to the person (a folder or bookmark found by searching) and the one lit for a moment; `tick` makes each ask count.
+  const [reveal, setReveal] = useState<{ id: string; tick: number } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const tree = useRef<HTMLDivElement>(null);
   useEffect(() => void loadBookmarks(), []);
+  // Organize with AI: how it stands, and asked again while it runs.
+  const job = useOrganize((s) => s.state);
+  useEffect(() => {
+    void loadOrganize();
+    return watchOrganize();
+  }, []);
+  useEffect(() => {
+    if (!mobile) input.current?.focus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A job that finishes while this is open: every folder closes, so the new ones show at a glance.
+  const status = job?.status;
+  const was = useRef(status);
+  useEffect(() => {
+    if (was.current === 'running' && status === 'done') (setClosed({}), setFoldAll(true));
+    was.current = status;
+  }, [status]);
+
+  const isOpen = (id: string) => !(closed[id] ?? foldAll);
   const rowsOf = (parent: string, depth: number): Row[] => {
     const items = childrenOf(nodes, parent);
-    return items.flatMap((node, index) => [{ node, depth, index, count: items.length }, ...(!node.url && !closed[node.id] ? rowsOf(node.id, depth + 1) : [])]);
+    return items.flatMap((node, index) => [{ node, depth, index, count: items.length }, ...(!node.url && isOpen(node.id) ? rowsOf(node.id, depth + 1) : [])]);
   };
-  const bar = useMemo(() => rowsOf('bar', 0), [nodes, closed]); // eslint-disable-line react-hooks/exhaustive-deps
-  const other = useMemo(() => rowsOf('other', 0), [nodes, closed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bar = useMemo(() => rowsOf('bar', 0), [nodes, closed, foldAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  const other = useMemo(() => rowsOf('other', 0), [nodes, closed, foldAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newFolder = async () => {
     const r = await addBookmark({ title: 'New folder', parent: 'bar' });
     if (r?.node) setRename(r.node);
   };
+
+  // Searching: every word has to be in the text.
+  const words = useMemo(() => fold(q).split(/\s+/).filter(Boolean), [q]);
+  const everything = useMemo(() => flattenAll(nodes), [nodes]);
+  const found = useMemo(() => {
+    if (!words.length) return null;
+    const hit = (f: Found) => {
+      const t = textOf(f.node);
+      return words.every((w) => t.includes(w));
+    };
+    const folders: Found[] = [];
+    const marksFound: Found[] = [];
+    let total = 0;
+    for (const f of everything) {
+      if (f.node.url) {
+        if (hit(f)) (total++, marksFound.length < MAX_BOOKMARKS && marksFound.push(f));
+      } else if (folders.length < MAX_FOLDERS && hit(f)) folders.push(f);
+    }
+    return { folders, bookmarks: marksFound, total };
+  }, [everything, words]);
+
+  // Opens a folder and those around it, scrolls to a row and lights it: the folder itself, or a bookmark in it.
+  const show = (folder: string, row: string) => {
+    const open: Record<string, boolean> = {};
+    for (let id = folder, n = 0; n < 40; n++) {
+      const f = nodes.find((x) => x.id === id);
+      if (!f || f.url) break;
+      open[f.id] = false;
+      id = f.parent;
+    }
+    setQ('');
+    setClosed((c) => ({ ...c, ...open }));
+    setReveal((r) => ({ id: row, tick: (r?.tick ?? 0) + 1 }));
+  };
+  useEffect(() => {
+    if (!reveal) return;
+    const el = [...(tree.current?.querySelectorAll<HTMLElement>('[data-bm]') ?? [])].find((e) => e.dataset.bm === reveal.id);
+    el?.scrollIntoView({ block: 'center' });
+    setFlash(reveal.id);
+    const t = window.setTimeout(() => setFlash(null), 1200);
+    return () => window.clearTimeout(t);
+  }, [reveal]);
+
+  // The address can ask for the dialog (?panel=bookmarks&organize=1): it opens once, and the address forgets it.
+  const search = useSearch();
+  const asked = new URLSearchParams(search).get('organize') === '1' && new URLSearchParams(search).get('panel') === 'bookmarks';
+  const canOrganize = job?.status !== 'running' && nodes.filter((n) => n.url && n.parent !== 'bar').length >= 3;
+  useEffect(() => {
+    if (!asked || !loaded) return;
+    const p = new URLSearchParams(window.location.search);
+    p.delete('organize');
+    go(`/browser${p.size ? `?${p}` : ''}`, true);
+    if (canOrganize) setAsking(true);
+  }, [asked, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Where a drag over a row lands: a folder's middle takes it in, the edges put it before or after.
   const over = (e: DragEvent<HTMLElement>, n: BookmarkNode) => {
@@ -77,11 +265,12 @@ export function BookmarksPanel({ onClose }: { onClose: () => void }) {
 
   const renderRow = (r: Row) => {
     const n = r.node;
-    const isOpen = !closed[n.id];
+    const open = isOpen(n.id);
     const hot = drop?.id === n.id ? drop.where : null;
     return (
       <div
         key={n.id}
+        data-bm={n.id}
         draggable
         onDragStart={(e) => (e.dataTransfer.setData('text/plain', n.id), (e.dataTransfer.effectAllowed = 'move'), setDragging(n.id))}
         onDragOver={(e) => over(e, n)}
@@ -89,7 +278,8 @@ export function BookmarksPanel({ onClose }: { onClose: () => void }) {
         onDragEnd={() => (setDragging(null), setDrop(null))}
         style={{ paddingLeft: 8 + r.depth * 16 }}
         className={cx(
-          'group relative flex h-9 items-center gap-1.5 pr-1.5 text-[13px] hover:bg-bg-2',
+          'group relative flex h-9 items-center gap-1.5 pr-1.5 text-[13px] transition-colors duration-500 hover:bg-bg-2',
+          flash === n.id && 'bg-accent/10',
           dragging === n.id && 'opacity-40',
           hot === 'into' && 'bg-accent/10 ring-1 ring-accent/40 ring-inset',
           hot === 'before' && 'before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:rounded before:bg-accent',
@@ -99,16 +289,16 @@ export function BookmarksPanel({ onClose }: { onClose: () => void }) {
         {n.url ? (
           <span className="w-4 shrink-0" />
         ) : (
-          <button aria-label={isOpen ? 'Close folder' : 'Open folder'} onClick={() => setClosed((c) => ({ ...c, [n.id]: isOpen }))} className="flex h-5 w-4 shrink-0 items-center justify-center text-fg-3 hover:text-fg">
-            {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <button aria-label={open ? 'Close folder' : 'Open folder'} onClick={() => setClosed((c) => ({ ...c, [n.id]: open }))} className="flex h-5 w-4 shrink-0 items-center justify-center text-fg-3 hover:text-fg">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
         )}
         <button
-          onClick={(e) => (n.url ? openBookmark(n, e.ctrlKey || e.metaKey) : setClosed((c) => ({ ...c, [n.id]: isOpen })))}
+          onClick={(e) => (n.url ? openBookmark(n, e.ctrlKey || e.metaKey) : setClosed((c) => ({ ...c, [n.id]: open })))}
           title={n.url ? `${n.title}\n${n.url}` : n.title}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
-          {n.url ? <Globe size={14} className="shrink-0 text-fg-3" /> : isOpen ? <FolderOpen size={14} className="shrink-0 text-fg-3" /> : <Folder size={14} className="shrink-0 text-fg-3" />}
+          {n.url ? <Globe size={14} className="shrink-0 text-fg-3" /> : open ? <FolderOpen size={14} className="shrink-0 text-fg-3" /> : <Folder size={14} className="shrink-0 text-fg-3" />}
           <span translate="no" className="min-w-0 flex-1 truncate">
             {n.title || n.url}
           </span>
@@ -141,31 +331,272 @@ export function BookmarksPanel({ onClose }: { onClose: () => void }) {
     );
   };
 
+  /** What searching found: folders to show in the tree, and bookmarks to open. */
+  const results = () => {
+    if (!found) return null;
+    const none = !found.folders.length && !found.bookmarks.length;
+    return (
+      <div className="pb-4">
+        {none && <Note>{tr(`No bookmark matches “${q.trim()}”.`)}</Note>}
+        {found.folders.length > 0 && (
+          <div>
+            <div className="px-4 pt-3 pb-1 text-[11.5px] font-medium text-fg-3">Folders</div>
+            {found.folders.map((f) => (
+              <button key={f.node.id} onClick={() => show(f.node.id, f.node.id)} className="flex min-h-11 w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-bg-2">
+                <Folder size={14} className="shrink-0 text-fg-3" />
+                <span className="min-w-0 flex-1">
+                  <span translate="no" className="block truncate text-[13.5px]">
+                    <Marked text={f.node.title} words={words} />
+                  </span>
+                  <span className="block truncate text-[12px] text-fg-3">
+                    <Place root={f.root} folders={f.folders} />
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {found.bookmarks.length > 0 && (
+          <div>
+            <div className="px-4 pt-3 pb-1 text-[11.5px] font-medium text-fg-3">
+              Bookmarks
+              <span className="ml-1.5 tabular-nums">{found.total}</span>
+            </div>
+            {found.bookmarks.map((f) => (
+              <div key={f.node.id} className="group flex min-h-11 items-center pr-1.5 pl-4 hover:bg-bg-2">
+                <button
+                  onClick={(e) => openBookmark(f.node, e.ctrlKey || e.metaKey)}
+                  onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+                  onAuxClick={(e) => e.button === 1 && (e.preventDefault(), openBookmark(f.node, true))}
+                  title={`${f.node.title}\n${f.node.url}`}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 py-1.5 text-left"
+                >
+                  <SiteIcon url={f.node.url!} size={16} />
+                  <span className="min-w-0 flex-1">
+                    <span translate="no" className="block truncate text-[13.5px]">
+                      <Marked text={f.node.title || shown(f.node.url!)} words={words} />
+                    </span>
+                    <span className="block truncate text-[12px] text-fg-3">
+                      <span translate="no">{hostOfTab(f.node.url!) || shown(f.node.url!)}</span>
+                      {' · '}
+                      <Place root={f.root} folders={f.folders} />
+                    </span>
+                  </span>
+                </button>
+                <span className="flex shrink-0 items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100">
+                  <IconButton label="Show in folder" size="sm" onClick={() => show(f.node.parent, f.node.id)}>
+                    <FolderSearch size={13} />
+                  </IconButton>
+                  <IconButton label="Edit" size="sm" onClick={() => setRename(f.node)}>
+                    <Pencil size={13} />
+                  </IconButton>
+                  <IconButton label="Delete" size="sm" onClick={() => void remove(f.node)}>
+                    <Trash2 size={13} />
+                  </IconButton>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {found.total > MAX_BOOKMARKS && <Note>Showing the first 200. Type more words to narrow it down.</Note>}
+      </div>
+    );
+  };
+
+  const searchKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' && q) (e.preventDefault(), e.stopPropagation(), setQ(''));
+    else if (e.key === 'Enter' && found?.bookmarks[0]) (e.preventDefault(), openBookmark(found.bookmarks[0].node, e.ctrlKey || e.metaKey));
+  };
+
   return (
     <Panel
       title="Bookmarks"
       onClose={onClose}
       actions={
-        <IconButton label="New folder" size="sm" onClick={() => void newFolder()}>
-          <FolderPlus size={16} />
-        </IconButton>
+        <>
+          <IconButton label="Organize with AI" title="Organize with AI: sort your bookmarks into folders by topic" size="sm" disabled={!canOrganize} onClick={() => setAsking(true)}>
+            <Sparkles size={16} />
+          </IconButton>
+          <IconButton label="New folder" size="sm" onClick={() => void newFolder()}>
+            <FolderPlus size={16} />
+          </IconButton>
+        </>
       }
     >
-      {!loaded ? (
-        <div className="flex justify-center py-10">
-          <Throbber size={24} />
-        </div>
-      ) : (
-        <>
-          {section('bar', 'Bookmarks bar', bar)}
-          {section('other', 'Other bookmarks', other)}
-          {!nodes.length && <Note>Click the star in the address bar to bookmark a page, or bring in the bookmarks of another browser below.</Note>}
-        </>
-      )}
-      <ImportBox />
+      <div className="sticky top-0 z-10 border-b border-line bg-bg-1 p-3">
+        <Search size={15} className="pointer-events-none absolute top-1/2 left-6 -translate-y-1/2 text-fg-3" />
+        <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={searchKeys} placeholder="Search your bookmarks" aria-label="Search your bookmarks" translate="no" className={cx(inputCls, 'h-9 pr-9 pl-9 text-[13.5px]')} />
+        {q && (
+          <IconButton label="Clear" size="sm" onClick={() => (setQ(''), input.current?.focus())} className="absolute top-1/2 right-4.5 -translate-y-1/2">
+            <X size={14} />
+          </IconButton>
+        )}
+      </div>
+      <OrganizeStatus onAgain={() => setAsking(true)} />
+      <div ref={tree}>
+        {!loaded ? (
+          <div className="flex justify-center py-10">
+            <Throbber size={24} />
+          </div>
+        ) : found ? (
+          results()
+        ) : (
+          <>
+            {section('bar', 'Bookmarks bar', bar)}
+            {section('other', 'Other bookmarks', other)}
+            {!nodes.length && <Note>Click the star in the address bar to bookmark a page, or bring in the bookmarks of another browser below.</Note>}
+          </>
+        )}
+      </div>
+      {!found && <ImportBox />}
+      <OrganizeDialog open={asking} onClose={() => setAsking(false)} />
       <RenameDialog node={rename} onClose={() => setRename(null)} />
       {confirmNode}
     </Panel>
+  );
+}
+
+/** How sorting the bookmarks with the helper model stands: at work (with Stop), done (with Undo), or failed. */
+function OrganizeStatus({ onAgain }: { onAgain: () => void }) {
+  const job = useOrganize((s) => s.state);
+  if (!job || job.status === 'idle') return null;
+  const close = (
+    <IconButton label="Close" size="sm" onClick={() => void stopOrganize()}>
+      <X size={14} />
+    </IconButton>
+  );
+  if (job.status === 'running') {
+    const done = job.done ?? 0;
+    const total = job.total ?? 0;
+    return (
+      <div role="status" className="border-b border-line px-4 py-3">
+        <div className="flex items-center gap-2 text-[13px]">
+          <Throbber size={14} />
+          <span className="min-w-0 flex-1">{job.step === 'sort' ? <>Sorting your bookmarks… {done} of {total}</> : 'Working out the folders…'}</span>
+          <Button size="sm" variant="ghost" onClick={() => void stopOrganize()}>
+            Stop
+          </Button>
+        </div>
+        {job.step === 'sort' && (
+          <div className="mt-2 h-1 overflow-hidden rounded bg-bg-3">
+            <div className="h-full rounded bg-accent transition-[width] duration-500" style={{ width: `${total ? Math.min(100, Math.round((done / total) * 100)) : 0}%` }} />
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (job.status === 'failed')
+    return (
+      <div role="status" className="flex items-start gap-2 border-b border-line px-4 py-3 text-[13px]">
+        <span className="min-w-0 flex-1 text-warn">{job.error}</span>
+        <Button size="sm" variant="ghost" onClick={onAgain}>
+          Try again
+        </Button>
+        {close}
+      </div>
+    );
+  const moved = job.moved ?? 0;
+  const made = job.made ?? 0;
+  const removed = job.removed ?? 0;
+  const left = job.left ?? 0;
+  return (
+    <div role="status" className="flex items-start gap-2 border-b border-line px-4 py-3 text-[13px]">
+      <span className="min-w-0 flex-1 leading-relaxed">
+        {moved === 0 ? (
+          <span>Nothing to sort: your bookmarks are all in folders already.</span>
+        ) : made > 0 ? (
+          <span>{`Sorted ${moved} bookmark${moved === 1 ? '' : 's'} into ${made} new folder${made === 1 ? '' : 's'}.`}</span>
+        ) : (
+          <span>{`Sorted ${moved} bookmark${moved === 1 ? '' : 's'} into your folders.`}</span>
+        )}
+        {removed > 0 && <> <span>{`Removed ${removed} empty folder${removed === 1 ? '' : 's'}.`}</span></>}
+        {left > 0 && <> <span>{`${left} could not be sorted and stay where they were.`}</span></>}
+      </span>
+      {job.canUndo && (
+        <Button size="sm" variant="ghost" onClick={() => void undoOrganize()}>
+          Undo
+        </Button>
+      )}
+      {close}
+    </div>
+  );
+}
+
+/** Choosing how to sort the bookmarks, and what goes to the helper model. */
+function OrganizeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [keep, setKeep] = useState(true);
+  const cards = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => {
+    if (open) setKeep(true);
+  }, [open]);
+  const choose = (k: boolean) => {
+    setKeep(k);
+    cards.current[k ? 0 : 1]?.focus();
+  };
+  const keys = (e: React.KeyboardEvent) => {
+    // Two choices: any arrow goes to the other.
+    if (['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'].includes(e.key)) (e.preventDefault(), choose(!keep));
+  };
+  const options = [
+    { keep: true, title: 'Keep my folders', body: 'Your folders, and the bookmarks in them, stay as they are. Loose bookmarks go into the folder that fits: one of yours or a new one.' },
+    { keep: false, title: 'Start over', body: 'Every bookmark goes into new folders by topic, in Other bookmarks, and your old folders are removed.' },
+  ];
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Organize your bookmarks with AI"
+      width={480}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              onClose();
+              void startOrganize(keep);
+            }}
+          >
+            Organize
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-[13.5px] leading-relaxed">The helper model sorts your bookmarks into folders by topic.</p>
+        <div role="radiogroup" aria-label="How to sort your bookmarks" className="space-y-2" onKeyDown={keys}>
+          {options.map((o, i) => (
+            <button
+              key={o.title}
+              ref={(el) => void (cards.current[i] = el)}
+              type="button"
+              role="radio"
+              aria-checked={keep === o.keep}
+              tabIndex={keep === o.keep ? 0 : -1}
+              onClick={() => setKeep(o.keep)}
+              className={cx('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors', keep === o.keep ? 'border-accent/60 bg-accent/5 ring-1 ring-accent/30' : 'border-line-2 hover:bg-bg-2')}
+            >
+              <span className={cx('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', keep === o.keep ? 'border-accent' : 'border-line-2')} aria-hidden>
+                {keep === o.keep && <span className="h-2 w-2 rounded-full bg-accent" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-medium">{o.title}</span>
+                <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-3">{o.body}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[12.5px] leading-snug text-fg-3">
+          The sites pinned on your bookmarks bar stay where they are. The titles and addresses of your bookmarks (without what follows a ? or #) and your folders’ names go to the{' '}
+          <button type="button" className="text-accent hover:underline" onClick={() => (onClose(), go('/settings?s=models&find=Helper%20model'))}>
+            helper model
+          </button>
+          , only now. You can undo it afterwards.
+        </p>
+      </div>
+    </Dialog>
   );
 }
 

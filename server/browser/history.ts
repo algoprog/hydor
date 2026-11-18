@@ -432,9 +432,15 @@ interface Cand {
 }
 const RANK = { tab: 0, bookmark: 1, history: 2 } as const;
 
-/** Bookmarks and open tabs weigh in as pages you chose: a bookmark as eight visits, a tab you have open as four. */
-const BOOKMARK_WEIGHT = 8;
+/** Bookmarks and open tabs weigh in as pages you chose: a bookmark as twenty visits, a tab you have open as four. */
+const BOOKMARK_WEIGHT = 20;
 const TAB_WEIGHT = 4;
+/**
+ * At least this many of your bookmarks that hold the words are among the pages offered, when that many do: they take
+ * the places of the last pages of your history, so a big history (one brought in from another browser) never hides
+ * what you chose to keep.
+ */
+export const MIN_BOOKMARKS = 2;
 
 /**
  * Words and meaning, fused by their ranks: a page's score is 1 / (8 + its place among the pages that hold the words) plus
@@ -615,10 +621,18 @@ export async function suggest(db: DB, o: SuggestInput): Promise<SuggestResult> {
     if (at >= 0) items.push(asItem(ranked.splice(at, 1)[0]));
     else items.push({ kind: 'url', url: o.address });
   }
-  for (const c of ranked) {
-    if (items.length >= room) break;
-    items.push(asItem(c));
+  // The best pages there is room for; then, when fewer than MIN_BOOKMARKS of them are bookmarks that hold the words and
+  // more such bookmarks were found, the next best of those take the places of the last pages of your history.
+  const pages = ranked.slice(0, Math.max(0, room - items.length));
+  const marked = (c: Cand) => c.kind === 'bookmark' && !c.meaning;
+  const wanted = Math.min(MIN_BOOKMARKS, ranked.filter(marked).length) - pages.filter(marked).length;
+  for (const b of ranked.slice(pages.length).filter(marked).slice(0, Math.max(0, wanted))) {
+    const at = pages.findLastIndex((c) => c.kind === 'history');
+    if (at < 0) break;
+    pages.splice(at, 1);
+    pages.push(b);
   }
+  for (const c of pages) items.push(asItem(c));
   for (const text of searches) items.push({ kind: 'search', text });
   return { ...(inline ? { inline } : {}), items: items.slice(0, MAX_SUGGESTIONS) };
 }

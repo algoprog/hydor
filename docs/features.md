@@ -266,14 +266,16 @@ agents that speak ACP and take MCP servers.
     Highlights chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
     kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
-    you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
+    you go to often and lately first, typed addresses counting most, a bookmark as twenty visits), what you typed as an address or a search, the
     search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words), **Do it in a tab of
     its own** (an agent does what you typed in this tab) and **Ask an agent**, which starts a session with your words; the rest of an address
     completes in place (Tab or → takes it, found by words alone); Shift+Delete forgets a history suggestion. With search
     by meaning on, pages of your history and bookmarks that are about what you typed also show, after the ones with its
     words, even when theirs differ (the model runs on your computer, from a vector of each page's title and address,
     kept apart from everything else and gone with the page); the list keeps at least two of your pages and two of the
-    engine's suggestions when it must be cut to fit. An address opens with or without https://, `localhost:3000` and
+    engine's suggestions when it must be cut to fit, and always shows at least two matching bookmarks (they take the place of
+    the last pages of the history, so a big imported history never hides them); a short window cuts pages of the history
+    before bookmarks and open tabs. An address opens with or without https://, `localhost:3000` and
     files work, Alt+Enter or Ctrl/⌘+Enter opens in a new tab.
   - **A home page and a search engine**: new tabs open your home page (Google at first); the address
     bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search address of your own, with search
@@ -355,7 +357,14 @@ agents that speak ACP and take MCP servers.
   - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, B, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
     Ctrl/⌘+Shift+N for a private tab;
     Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→).
-- **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
+- **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. A search
+  box at the top finds bookmarks by every word in their names and addresses, and folders by name (Enter opens the first
+  bookmark found), and **Organize with AI** (also in the search box, Ctrl+K, as "Organize bookmarks with AI") sorts them
+  into folders by topic with the helper model, sending only titles, addresses without their ? or # parts and folder names,
+  when you press **Organize**: **Keep my folders** files only the loose bookmarks (in Other bookmarks, or in a folder that
+  only collects, such as an import's) into the folder that fits, one of yours or a new one; **Start over** puts every
+  bookmark into new folders by topic and removes the old ones; the bar's own links stay either way, **Stop** changes
+  nothing and **Undo** puts everything back (`/browser?panel=bookmarks&organize=1`; agents are not given it). Bring them
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
   Arc and Safari, each profile by its name, into one new folder that keeps the browser's own folders; Safari needs Full Disk
   Access) or from an exported bookmarks file, and export them as a file Chrome, Firefox and Safari import. The desktop

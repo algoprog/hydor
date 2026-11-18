@@ -277,14 +277,14 @@ Ein Link auf `/browser?url=https://example.com` öffnet die Seite Browser mit di
 Während du in die Adressleiste tippst, bietet eine Liste darunter an, mit den getippten Wörtern fett:
 
 - deine geöffneten Tabs („Zum Tab wechseln“: Wähle einen, um zu ihm zu gehen, statt die Seite erneut zu öffnen; deine privaten Tabs sind darunter, solange sie offen sind, und nichts über sie wird danach behalten),
-- deine Lesezeichen und die Seiten deines Verlaufs, die zu den Wörtern in ihren Titeln und Adressen passen, die du oft und zuletzt besucht hast zuerst (Adressen, die du selbst getippt hast, zählen am meisten),
+- deine Lesezeichen und die Seiten deines Verlaufs, die zu den Wörtern in ihren Titeln und Adressen passen, die du oft und zuletzt besucht hast zuerst (Adressen, die du selbst getippt hast, zählen am meisten, und ein Lesezeichen zählt wie zwanzig Besuche). Passen Lesezeichen zu den getippten Wörtern, sind immer mindestens zwei davon unter den angebotenen Seiten, anstelle der letzten Seiten deines Verlaufs, sodass ein großer Verlauf, etwa einer aus einem anderen Browser, sie nie verdeckt,
 - bei eingeschaltetem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) Lesezeichen und Seiten deines Verlaufs, in denen es um das Getippte geht, auch wenn ihre Titel und Adressen dessen Wörter nicht enthalten, nach denen, die sie enthalten (sie erscheinen ohne fette Wörter). Das Modell, das sie findet, läuft auf diesem Computer, mit einem Vektor aus Titel und Adresse jeder Seite (ohne ihren Query-String), den die App getrennt von allem anderen in ihrer Datenbank aufbewahrt; er verschwindet mit der Seite,
 - das, was du getippt hast, als Suche („Mit Google suchen“) oder, wenn es wie eine Adresse aussieht, als diese Adresse,
 - die eigenen Vorschläge der Suchmaschine, wenn [Suchvorschläge](/guide/web#browser-settings) eingeschaltet ist,
 - darunter, wenn der geöffnete Tab eine Webseite ist (und kein privater Tab, den Agenten nie bekommen), **Zu dieser Seite fragen: „…“**, das „Fragen“ neben der Seite mit dem Getippten als Frage öffnet, und **In einem eigenen Tab erledigen lassen: „…“**, das den Tab einem Agenten gibt, der dort erledigt, was du getippt hast (siehe [Hier erledigen lassen](/guide/web#do-this-here)); es ist der von Claude Code und Custom, den du zuletzt benutzt hast, zuerst Claude Code,
 - zuletzt **Agenten fragen: „…“**, das eine Sitzung mit dem Getippten als erster Nachricht startet, mit dem Agenten und Modell, die die Startseite zuletzt verwendet hat, und dich dorthin bringt.
 
-Die Liste zeigt so viele Einträge, wie auf den Bildschirm passen, darunter mindestens zwei deiner Seiten und zwei Vorschläge der Suchmaschine, soweit es so viele gibt. Die Pfeiltasten bewegen sich darin, und **Enter** öffnet den markierten (das Getippte, wenn keiner markiert ist); **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet ihn in einem neuen Tab (in einem privaten, wenn du in einem privaten Tab bist). Die Adressleiste vervollständigt auch an Ort und Stelle: Beginnt etwas, wohin du gegangen bist, mit dem Getippten, steht der Rest markiert hinter deinem Cursor (gefunden über die getippten Wörter, nie über die Bedeutung), und **Tab** oder **→** übernimmt ihn. Löschst du das Getippte, wird die Vervollständigung ausgeschaltet. **Umschalt+Entf** bei einem Verlaufsvorschlag vergisst diese Seite, und **Esc** schließt die Liste.
+Die Liste zeigt so viele Einträge, wie auf den Bildschirm passen, darunter mindestens zwei deiner Seiten und zwei Vorschläge der Suchmaschine, soweit es so viele gibt. Muss die Liste für ein niedriges Fenster gekürzt werden, gehen Seiten deines Verlaufs vor deinen Lesezeichen und geöffneten Tabs. Die Pfeiltasten bewegen sich darin, und **Enter** öffnet den markierten (das Getippte, wenn keiner markiert ist); **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet ihn in einem neuen Tab (in einem privaten, wenn du in einem privaten Tab bist). Die Adressleiste vervollständigt auch an Ort und Stelle: Beginnt etwas, wohin du gegangen bist, mit dem Getippten, steht der Rest markiert hinter deinem Cursor (gefunden über die getippten Wörter, nie über die Bedeutung), und **Tab** oder **→** übernimmt ihn. Löschst du das Getippte, wird die Vervollständigung ausgeschaltet. **Umschalt+Entf** bei einem Verlaufsvorschlag vergisst diese Seite, und **Esc** schließt die Liste.
 
 ### Die Tab-Spalte
 
@@ -540,9 +540,37 @@ Die Websites der Lesezeichenleiste sind oben in der Tab-Spalte angepinnt, sobald
 
 Für alle drücke **Menü** (⋯) → **Lesezeichen** oder gehe zu [Lesezeichen](/browser?panel=bookmarks). Der Bereich hat zwei Orte, **Lesezeichenleiste** und **Andere Lesezeichen**, und die Ordner darin öffnen und schließen sich.
 
+- **Lesezeichen durchsuchen** (das Feld oben) findet ein Lesezeichen anhand seiner Wörter (siehe [Lesezeichen durchsuchen](/guide/web#search-your-bookmarks)).
 - **Neuer Ordner** (oben) fügt der Leiste einen Ordner hinzu und fragt nach seinem Namen.
+- **Mit KI organisieren** (der Funkel-Button oben, neben **Neuer Ordner**) sortiert deine Lesezeichen nach Thema in Ordner (siehe [Mit KI organisieren](/guide/web#organize-with-ai)).
 - Fahre über eine Zeile für **Nach oben verschieben**, **Nach unten**, **Bearbeiten** (**Umbenennen** bei einem Ordner) und **Löschen**. Du kannst eine Zeile auch ziehen: auf die Mitte eines Ordners, um sie hineinzulegen, oder zwischen Zeilen, um sie dort einzusortieren. Ein Ordner kann nicht in sich selbst liegen. Das Löschen eines Ordners fragt vorher und nimmt mit, was darin ist.
 - Die Adresse eines Lesezeichens beginnt mit http://, https://, file:// oder chrome-extension://. Du kannst bis zu 20.000 behalten.
+
+### Lesezeichen durchsuchen
+
+Oben im Bereich findet das Feld **Lesezeichen durchsuchen** Lesezeichen anhand jedes Worts, das du tippst, in ihren Namen und Adressen (Groß- und Kleinschreibung und Akzente spielen keine Rolle) und Ordner anhand ihrer Namen. Solange das Feld Wörter enthält, zeigt der Bereich statt der Ordner **Ordner** (bis zu 20) und **Lesezeichen** (bis zu 200), und jedes Lesezeichen zeigt seine Website und wo es liegt, etwa „Lesezeichenleiste › Imported from Chrome › Research“.
+
+- Klicke auf einen Ordner, um ihn unter deinen Ordnern zu sehen: Die Suche wird geleert und der Ordner öffnet sich.
+- Klicke auf ein Lesezeichen, um es zu öffnen; Strg+Klick (⌘+Klick auf dem Mac) öffnet es in einem neuen Tab.
+- Fahre über ein Lesezeichen für **Im Ordner anzeigen**, **Bearbeiten** und **Löschen**.
+- **Enter** öffnet das erste gefundene Lesezeichen, und **Esc** leert die Suche.
+
+Auch die Liste **Lesezeichen** der Bibliothek hat ein Suchfeld (siehe [Bibliothek](/guide/library)).
+
+### Mit KI organisieren
+
+Hast du viele Lesezeichen, sortiert der Funkel-Button **Mit KI organisieren** oben im Bereich, neben **Neuer Ordner**, sie nach Thema in Ordner. Du kannst auch im Suchfeld (Strg+K) nach „Lesezeichen mit KI organisieren“ suchen oder zu [Mit KI organisieren](/browser?panel=bookmarks&organize=1) gehen. Es öffnet **Deine Lesezeichen mit KI organisieren**, wo du wählst, wie:
+
+- **Meine Ordner behalten** (zuerst gewählt): Deine Ordner und die Lesezeichen darin bleiben, wie sie sind. Lose Lesezeichen kommen in den passenden Ordner: einen von dir oder einen neuen. Lose heißt: direkt in **Andere Lesezeichen** oder in einem Ordner, der nur Lesezeichen sammelt, etwa „Imported from Chrome“ eines Imports und die darin liegenden Ordner „Other bookmarks“ oder „Mobile bookmarks“ (das Hilfsmodell unterscheidet sie von deinen eigenen Ordnern, in jeder Sprache). Ein solcher Sammelordner, den das Einsortieren leert, wird entfernt (einer, der schon leer war, bleibt); kein anderer Ordner wird entfernt, umbenannt oder verschoben. Neue Ordner kommen ans Ende von **Andere Lesezeichen** oder in einen deiner Ordner.
+- **Neu beginnen**: Jedes Lesezeichen kommt nach Thema in neue Ordner in **Andere Lesezeichen**, und deine alten Ordner werden entfernt. Die neuen Ordner stehen in **Andere Lesezeichen** zuerst, nach Namen, mit höchstens einer Ebene von Unterordnern; ein Ordner, in dem ein Lesezeichen bleibt, das das Modell nicht einordnen konnte, bleibt bestehen.
+
+In beiden Fällen bleiben die Websites, die an deiner Lesezeichenleiste angepinnt sind (die eigenen Links der Leiste), wo sie sind.
+
+**Was gesendet wird, und an welches Modell.** Nur wenn du **Organisieren** drückst, gehen die Titel und Adressen deiner Lesezeichen (ohne alles nach einem **?** oder **#**) und die Namen deiner Ordner an das Hilfsmodell der App, das auch Sitzungstitel und Memory-Notizen schreibt ([Einstellungen → Agenten → Modelle → Hilfsmodell](/settings?s=models&find=Helper%20model)). Bei „Automatisch“ ist das Claude Haiku über Claude Code; ein eigenes Modell auf diesem Computer behält sie hier. Zu keiner anderen Zeit wird etwas gesendet. Ist der Titel eines Lesezeichens privat, drücke den Button nicht (oder nimm ein Modell auf diesem Computer als Hilfsmodell).
+
+Es arbeitet in zwei Schritten: Zuerst legt es die Ordner fest, dann sortiert es die Lesezeichen hinein, 150 auf einmal; ein paar hundert Lesezeichen dauern ein bis zwei Minuten. Während es arbeitet, steht oben im Bereich „Ordner werden ermittelt …“, dann „Lesezeichen werden sortiert … 150 von 412“ mit einem Balken und **Stoppen**, das nichts ändert. Ist es fertig, sagt es, was es getan hat, etwa „Einsortierte Lesezeichen: 412. Neue Ordner: 14. Entfernte leere Ordner: 3.“, und die Ordner erscheinen zugeklappt, damit die neuen auf einen Blick zu erkennen sind. **Rückgängig machen** stellt jedes Lesezeichen wieder so her, wie es war, solange du deine Lesezeichen seither nicht geändert hast; das X schließt die Meldung. Schlägt es fehl, wird nichts geändert, und **Erneut versuchen** öffnet es wieder.
+
+Agenten können deine Lesezeichen nicht für dich ordnen: Dein eigenes Surfen gehört nur dir. Frag einen, und er sagt dir, wo der Button ist.
 
 ### Lesezeichen importieren
 
@@ -747,6 +775,8 @@ Stoppen beendet die Aktion und entzieht allen Sitzungen die Freigabe. Für erneu
 - „Wie lese ich einen Artikel ohne den Wirrwarr, in größerer Schrift?“ (die Buch-Schaltfläche in der Adressleiste, dann **Aa**)
 - „Zeige Webseiten dunkel, außer eine Website.“ (**Menü** → **Dunkle Seiten**, dann das Schloss dieser Website → **Dunkle Seiten auf dieser Website**)
 - „Wie speichere ich eine ganze Webseite als Bild oder als PDF?“ (**Menü** → **Screenshot der ganzen Seite** oder **Als PDF speichern …**; beides landet in Downloads)
+- „Wie sortiere ich meine Lesezeichen mit KI in Ordner, und was sendet das?“ (**Mit KI organisieren** im Bereich Lesezeichen; die Titel und Adressen deiner Lesezeichen, ohne alles nach einem ? oder #, und die Namen deiner Ordner gehen an das Hilfsmodell, nur wenn du **Organisieren** drückst; **Rückgängig machen** stellt sie wieder her)
+- „Wie finde ich ein Lesezeichen?“ (**Lesezeichen durchsuchen** oben im Bereich Lesezeichen oder die Liste **Lesezeichen** der Bibliothek)
 - „Importiere meine Lesezeichen aus Chrome und Firefox in die Seite Browser.“ (oder: „Warum kann ich meine Safari-Lesezeichen nicht importieren?“)
 - „Importiere meinen Chrome-Verlauf in die Seite Browser.“ (oder: „Warum kann ich meinen Safari-Verlauf nicht importieren?“)
 - „Welche Chrome-Erweiterungen sind in meinem Browser, und welche davon laufen auch in den Browsern der Agenten?“

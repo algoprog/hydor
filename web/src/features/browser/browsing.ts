@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import {
   BROWSING_KEY,
   type BookmarkNode,
+  type BookmarkOrganizeState,
   type BrowserGroup,
   type BrowserPermissionAsk,
   type BrowserTab,
@@ -358,6 +359,96 @@ export const addBookmark = (b: { title: string; url?: string; parent?: string; p
   post<{ node: BookmarkNode; nodes: BookmarkNode[] }>('/api/browser/bookmarks', b).then(takeNodes, (e) => (toastError(e), null));
 export const editBookmark = (id: string, b: { title?: string; url?: string; parent?: string; pos?: number }) => patch<{ nodes: BookmarkNode[] }>(`/api/browser/bookmarks/${enc(id)}`, b).then(takeNodes, (e) => (toastError(e), null));
 export const removeBookmark = (id: string) => del<{ nodes: BookmarkNode[] }>(`/api/browser/bookmarks/${enc(id)}`).then(takeNodes, (e) => (toastError(e), null));
+
+// ---- organize bookmarks with AI --------------------------------------------------------------------------------
+
+export const useOrganize = create<{ state: BookmarkOrganizeState | null }>(() => ({ state: null }));
+
+/** Counts what changed the state by hand (start, stop, undo, forget), so a poll that was already on its way does not put back what it saw before. */
+let organizeGen = 0;
+
+function takeOrganize(state: BookmarkOrganizeState | undefined) {
+  if (!state) return;
+  const was = useOrganize.getState().state?.status;
+  useOrganize.setState({ state });
+  // The folders are made on the server: read the bookmarks again.
+  if (was === 'running' && state.status === 'done') void loadBookmarks();
+}
+
+export async function loadOrganize() {
+  const gen = organizeGen;
+  try {
+    const s = await api<BookmarkOrganizeState>('/api/browser/bookmarks/organize');
+    if (gen === organizeGen) takeOrganize(s);
+  } catch {}
+}
+
+/** Starts sorting the bookmarks into folders by topic; false when the server refused (its sentence is shown). */
+export async function startOrganize(keepFolders: boolean): Promise<boolean> {
+  organizeGen++;
+  try {
+    takeOrganize(await post<BookmarkOrganizeState>('/api/browser/bookmarks/organize', { keepFolders }));
+    return true;
+  } catch (e) {
+    toastError(e);
+    return false;
+  }
+}
+
+/** Stops a running job (nothing changes), or forgets a finished or failed one and its Undo. */
+export async function stopOrganize() {
+  organizeGen++;
+  try {
+    takeOrganize((await del<{ state: BookmarkOrganizeState }>('/api/browser/bookmarks/organize')).state);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** Puts the bookmarks back as they were before the last sort. */
+export async function undoOrganize() {
+  organizeGen++;
+  try {
+    const r = await post<{ nodes: BookmarkNode[]; state: BookmarkOrganizeState }>('/api/browser/bookmarks/organize/undo');
+    useBookmarks.setState({ nodes: r.nodes, loaded: true });
+    takeOrganize(r.state);
+    toast('Your bookmarks are back as they were', 'info');
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** Asks how the job is going while it runs (one request at a time, every 1.5 s) for as long as the caller wants it: call the result to stop. */
+export function watchOrganize(): () => void {
+  let alive = true;
+  let busy = false;
+  let timer: number | undefined;
+  const tick = async () => {
+    timer = undefined;
+    if (!alive || busy || useOrganize.getState().state?.status !== 'running') return;
+    busy = true;
+    const gen = organizeGen;
+    try {
+      const s = await api<BookmarkOrganizeState>('/api/browser/bookmarks/organize', { signal: AbortSignal.timeout(10_000) });
+      if (alive && gen === organizeGen) takeOrganize(s);
+    } catch {
+      // Asked again in a moment.
+    } finally {
+      busy = false;
+    }
+    schedule();
+  };
+  const schedule = () => {
+    if (alive && !busy && timer === undefined && useOrganize.getState().state?.status === 'running') timer = window.setTimeout(() => void tick(), 1500);
+  };
+  const off = useOrganize.subscribe(schedule);
+  schedule();
+  return () => {
+    alive = false;
+    off();
+    if (timer !== undefined) window.clearTimeout(timer);
+  };
+}
 
 // ---- read later ------------------------------------------------------------------------------------------------
 

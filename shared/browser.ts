@@ -383,6 +383,43 @@ export interface BookmarkNode {
   addedAt: number;
 }
 
+/**
+ * Organize with AI (the Bookmarks panel): the helper model sorts your bookmarks into folders by topic. Either way the
+ * links pinned on the bookmarks bar itself stay where they are, and Undo puts everything back until the bookmarks change.
+ */
+export interface BookmarkOrganizeStart {
+  /**
+   * true (Keep my folders): your folders, and the bookmarks in them, stay as they are; loose bookmarks (in Other bookmarks
+   * itself, or in folders that only collect them, such as an import's) go into the folder that fits, one of yours or a
+   * new one, and such collecting folders left empty go. false (Start over): every bookmark goes into new folders by topic
+   * in Other bookmarks, and the old folders go once empty.
+   */
+  keepFolders: boolean;
+}
+
+/** Where Organize with AI stands (GET /api/browser/bookmarks/organize). */
+export interface BookmarkOrganizeState {
+  /** idle: nothing to show; running; done: applied (see the counts); failed: nothing was changed (see error). */
+  status: 'idle' | 'running' | 'done' | 'failed';
+  keepFolders?: boolean;
+  /** While running: 'plan' while the folders are worked out, 'sort' while the bookmarks are filed into them. */
+  step?: 'plan' | 'sort';
+  /** While sorting: how many bookmarks are sorted so far, of how many. When done: `total` is how many were looked at. */
+  done?: number;
+  total?: number;
+  startedAt?: number;
+  finishedAt?: number;
+  /** When done: bookmarks moved, new folders made, old folders removed, and bookmarks the model gave no folder (they stay where they were). */
+  moved?: number;
+  made?: number;
+  removed?: number;
+  left?: number;
+  /** When done: Undo can still put the bookmarks back as they were (nothing has changed them since). */
+  canUndo?: boolean;
+  /** When failed: why, in a sentence. */
+  error?: string;
+}
+
 /** A page you set aside to read later (your own browsing; agents never see the list). */
 export interface LaterItem {
   id: string;

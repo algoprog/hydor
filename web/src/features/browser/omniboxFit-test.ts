@@ -29,5 +29,10 @@ same(ids(fitRows([typed, ...pages], 5)), ['typed', 'h0', 'h1', 'h2', 'h3'], 'one
 same(ids(fitRows([typed, page(0), page(1), search(0), search(1)], 3)).length, 3, 'where even two of each do not fit, the end goes');
 same(ids(fitRows([typed, page(0), page(1), search(0), search(1)], 3)), ['typed', 'h0', 's0'], 'one of each stays when there is room for no more');
 
+const mark = (n: number) => ({ id: `b${n}`, kind: 'bookmark' });
+const tab = { id: 't0', kind: 'tab' };
+same(ids(fitRows([typed, page(0), page(1), mark(0), page(2), mark(1), ...searches.slice(0, 3)], 6)), ['typed', 'h0', 'b0', 'b1', 's0', 's1'], 'your history goes before your bookmarks, its last pages first');
+same(ids(fitRows([typed, tab, mark(0), mark(1), ...searches.slice(0, 3)], 5)), ['typed', 't0', 'b0', 's0', 's1'], 'with no history left, the last of your pages goes');
+
 console.log(`${passed}/${passed + failed} passed`);
 process.exit(failed ? 1 : 0);
