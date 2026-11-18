@@ -28,6 +28,7 @@ import { BackButton, NavButton, PageHeader } from '../layout/PageHeader';
 import { SpaceLibrary } from '../pages/Library';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
+import { ProjectsColumn } from './ProjectsColumn';
 import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
@@ -181,7 +182,10 @@ const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wi
 function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceTab; memory: SpaceMemory }) {
   const spaces = useSpaces();
   const home = useApp((x) => x.boot?.home);
+  const sideOpen = useUI((x) => x.sideOpen);
   const wide = useMediaQuery('(min-width: 640px)');
+  // With the column beside it (a computer, sidebar open), All projects is a row there; the arrow is for the rest.
+  const column = useMediaQuery('(min-width: 1024px)') && sideOpen;
   const group = isGroup(s);
   const c = spaceColor(s);
   return (
@@ -189,7 +193,7 @@ function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceT
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
       <div className="relative mx-auto flex max-w-[1120px] items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
         <NavButton />
-        <BackButton label="All projects" onClick={() => go('/projects')} />
+        {!column && <BackButton label="All projects" onClick={() => go('/projects')} />}
         <SpaceMark s={s} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
@@ -784,6 +788,14 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
 export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
+  // The Projects column beside it on a computer, this project lit; a phone and a narrow window have none.
+  const wideColumn = useMediaQuery('(min-width: 1024px)');
+  const frame = (main: ReactNode) => (
+    <div className="flex h-full min-h-0">
+      {wideColumn && <ProjectsColumn project={id} />}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{main}</div>
+    </div>
+  );
   // Its address with ?share=1 (from the search box, the guide or an agent) opens the Share dialog.
   const share = new URLSearchParams(useSearch()).get('share') === '1';
   useEffect(() => {
@@ -810,8 +822,8 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
     };
   }, [id, spaces]);
   if (gone)
-    return (
-      <div className="flex h-full min-h-0 flex-col">
+    return frame(
+      <>
         <PageHeader title="Projects" />
         <Empty icon={<Boxes size={22} />} title="This project is gone">
           <span className="block">It was deleted, or the address is not one of your projects.</span>
@@ -821,19 +833,19 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
             </Button>
           </span>
         </Empty>
-      </div>
+      </>,
     );
   // The space as the list knows it shows at once; what the page fetches (fresher after a save) takes its place.
   const s: Space | undefined = data?.space ?? view;
   if (!s)
-    return (
+    return frame(
       <div className="flex h-full items-center justify-center text-fg-3">
         <Throbber size={28} />
-      </div>
+      </div>,
     );
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
-  return (
-    <div className="flex h-full min-h-0 flex-col">
+  return frame(
+    <>
       <Top s={s} view={view} tab={tab} memory={memory} />
       {tab === 'files' ? (
         // The folder scrolls in its own box, so the page keeps its height.
@@ -872,6 +884,6 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
           </div>
         </div>
       )}
-    </div>
+    </>,
   );
 }

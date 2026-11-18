@@ -431,9 +431,14 @@ agents that speak ACP and take MCP servers.
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and its own skills and start as its assistant. The Projects page shows each as a card in its colour with
-  what it holds (sessions, things in the Library, documents, skills) and New session. A project's own page opens at
-  once under a band of its colour, with the way back on the left, New session and one menu (its folder in Files,
+  guidelines and its own skills and start as its assistant. On a computer the Projects page has a column of places
+  beside the rail, the same kind as the Library's (the logo, New project and Hide sidebar on top; then All projects with
+  its count, Shared knowledge, and, under a Projects label, a row for each project with its mark and its sessions); it
+  stays beside a project's own pages with that project lit, and beside Shared knowledge. All projects is under a row with
+  its name and a box to find a project by its name or what it is about; each is a card in its colour with
+  what it holds (sessions, things in the Library, documents, skills) and New session. A phone and a narrow window have
+  no column: the page's header has its two tabs, All projects and Shared knowledge. A project's own page opens at
+  once under a band of its colour, with the way back on the left (when the column is not beside it), New session and one menu (its folder in Files,
   only its sessions in the sidebar, delete it), and its tabs under them (on a phone, those that do not fit under More
   at the row's end); its Overview has its sessions (with what each is doing), what it
   holds in the Library and what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents,

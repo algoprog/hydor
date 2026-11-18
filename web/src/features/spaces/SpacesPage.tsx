@@ -6,19 +6,20 @@
 // in its folder); dropped elsewhere on the list, nothing happens.
 import { useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, UserPlus, X } from 'lucide-react';
+import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, Search, SquarePen, UserPlus, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
 import { isGroup, spaceColor, type FoundIn } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Button, cx, Throbber } from '../../components/ui';
+import { Button, cx, Throbber, useMediaQuery } from '../../components/ui';
 import { basename, tildify, timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
-import { PageHeader } from '../layout/PageHeader';
+import { NavButton, PageHeader } from '../layout/PageHeader';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves } from '../pages/uploads';
 import { DropHint } from '../pages/UploadTray';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
+import { ProjectsColumn } from './ProjectsColumn';
 import { memoryPath, SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
 
@@ -225,67 +226,111 @@ function List() {
     e.preventDefault();
     if (e.type === 'dragover') e.dataTransfer.dropEffect = 'none';
   };
+  // The column (a computer): the places and a row for each project; a phone and a narrow window keep the header with its tabs.
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const [find, setFind] = useState('');
+  const words = find.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = (spaces ?? []).filter((s) => {
+    const text = `${s.name} ${tr(s.name)} ${s.description ?? ''} ${tr(s.description ?? '')}`.toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
+  const finding = wide && words.length > 0;
+  const grid = finding ? shown : (spaces ?? []);
   return (
-    <div className="flex h-full min-h-0 flex-col" onDragOver={refuse} onDrop={refuse}>
-      <PageHeader
-        title="Projects"
-        tip="spaces"
-        sub="Each project’s sessions, files, documents and Library, together"
-        actions={
-          <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={make}>
-            New project
-          </Button>
-        }
-      >
-        <SpacesTabs tab="spaces" />
-      </PageHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1120px] space-y-10 px-3 py-5 sm:px-6 sm:py-6">
-          {!spaces ? (
-            <div className="flex justify-center py-10 text-fg-3">
-              <Throbber size={28} />
-            </div>
-          ) : !spaces.length ? (
-            <Intro onMake={make} />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {sharing && (
-                <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
-                  <UserPlus size={15} className="shrink-0 text-accent" />
-                  <span className="min-w-0 flex-1">
-                    To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
-                  </span>
-                  <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
-                    <X size={14} />
-                  </button>
+    <div className="flex h-full min-h-0" onDragOver={refuse} onDrop={refuse}>
+      {wide && <ProjectsColumn place="all" tip="spaces" />}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {!wide && (
+          <PageHeader
+            title="Projects"
+            tip="spaces"
+            sub="Each project’s sessions, files, documents and Library, together"
+            actions={
+              <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={make}>
+                New project
+              </Button>
+            }
+          >
+            <SpacesTabs tab="spaces" />
+          </PageHeader>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={cx('mx-auto max-w-[1120px] px-3 sm:px-6', wide ? 'py-4 sm:py-5' : 'py-5 sm:py-6')}>
+            {wide && (
+              <div className="mb-4 flex min-h-8.5 flex-wrap items-center gap-x-3 gap-y-2">
+                <NavButton />
+                <h1 className="sr-only">Projects</h1>
+                <h2 className="min-w-0 truncate text-[17px] font-semibold tracking-tight">All projects</h2>
+                <span className="flex-1 max-lg:hidden" />
+                {!!spaces?.length && (
+                  <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 focus-within:border-accent/60 lg:max-w-[280px]">
+                    <Search size={14} className="shrink-0 text-fg-3" />
+                    <input
+                      value={find}
+                      onChange={(e) => setFind(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Escape' && find && (e.preventDefault(), setFind(''))}
+                      placeholder="Find a project"
+                      enterKeyHint="search"
+                      className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
+                    />
+                    {find && (
+                      <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
+                        <X size={13} />
+                      </button>
+                    )}
+                  </label>
+                )}
+              </div>
+            )}
+            <div className="space-y-10">
+              {!spaces ? (
+                <div className="flex justify-center py-10 text-fg-3">
+                  <Throbber size={28} />
+                </div>
+              ) : !spaces.length ? (
+                <Intro onMake={make} />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {sharing && (
+                    <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2 sm:col-span-2 xl:col-span-3">
+                      <UserPlus size={15} className="shrink-0 text-accent" />
+                      <span className="min-w-0 flex-1">
+                        To share a project, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>.
+                      </span>
+                      <button type="button" aria-label="Close" onClick={() => go('/projects', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  {grid.map((s) => (
+                    <SpaceCard key={s.id} s={s} spaces={spaces} />
+                  ))}
+                  {finding && !shown.length && <div className="py-6 text-[13.5px] text-fg-3 sm:col-span-2 xl:col-span-3">No project matches what you typed</div>}
+                  {plain >= 2 && !finding && (
+                    <button
+                      type="button"
+                      onClick={() => setMade('group')}
+                      className="flex min-h-[180px] flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-line-2 px-5 py-4 text-left text-fg-2 transition-colors hover:bg-bg-1 hover:text-fg"
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
+                        <Layers size={17} />
+                      </span>
+                      <span className="text-[14px] font-semibold">Group projects together</span>
+                      <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its projects: their files, documents and guidelines</span>
+                    </button>
+                  )}
                 </div>
               )}
-              {spaces.map((s) => (
-                <SpaceCard key={s.id} s={s} spaces={spaces} />
-              ))}
-              {plain >= 2 && (
-                <button
-                  type="button"
-                  onClick={() => setMade('group')}
-                  className="flex min-h-[180px] flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-line-2 px-5 py-4 text-left text-fg-2 transition-colors hover:bg-bg-1 hover:text-fg"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-bg-2 text-fg-3">
-                    <Layers size={17} />
-                  </span>
-                  <span className="text-[14px] font-semibold">Group projects together</span>
-                  <span className="text-[12.5px] leading-snug text-fg-3">Sessions in a group work with all its projects: their files, documents and guidelines</span>
-                </button>
+              {spaces && !finding && (
+                <Suggestions
+                  onMake={(f) => {
+                    setFrom(f);
+                    setMade('space');
+                  }}
+                />
               )}
             </div>
-          )}
-          {spaces && (
-            <Suggestions
-              onMake={(f) => {
-                setFrom(f);
-                setMade('space');
-              }}
-            />
-          )}
+          </div>
         </div>
       </div>
       <NewSpaceDialog open={!!made} group={made === 'group'} folder={made === 'space' ? from : undefined} onClose={() => setMade(false)} onMade={(s) => go(`/projects/${s.id}`)} />

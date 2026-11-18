@@ -23,10 +23,15 @@ Ein Projekt kann andere Projekte zusammenfassen. Das ist eine **Gruppe**; siehe 
 
 Klicke in der Werkzeugleiste auf **Projekte**. Öffne auf dem Smartphone zuerst das Seitenleistenmenü: Dort stehen **Projekte** unter den Werkzeugen. Auch die Suche nach „Projekte“ mit Strg+K beziehungsweise ⌘K führt dorthin.
 
-Die Seite hat zwei Tabs:
+Auf einem Computer hat die Seite wie die Bibliothek eine Spalte neben der Werkzeugleiste: das Logo mit **Neues Projekt** und **Seitenleiste ausblenden** oben, darunter:
 
-- **Alle Projekte** mit deinen Projekten und **Neues Projekt** oben rechts.
-- **Gemeinsames Wissen** für Dokumente, die alle Sitzungen durchsuchen können. Siehe [Gemeinsames Wissen](#shared-knowledge-documents-every-session-can-search).
+- **Alle Projekte** mit der Zahl deiner Projekte;
+- **Gemeinsames Wissen** für Dokumente, die alle Sitzungen durchsuchen können. Siehe [Gemeinsames Wissen](#shared-knowledge-documents-every-session-can-search);
+- unter der Überschrift **Projekte** eine Zeile für jedes deiner Projekte mit seinem Zeichen, seinem Namen und der Zahl seiner Sitzungen. Ein Klick öffnet seine Seite (siehe [Die Projektseite](#a-projects-own-page)).
+
+Der Bereich, in dem du bist, ist in der Spalte markiert, und er bleibt es, wenn du ein Projekt öffnest, sodass du von einem Projekt zum anderen wechseln kannst, ohne zurückzugehen. **Seitenleiste ausblenden** (Strg+B, auf dem Mac ⌘B) blendet die Spalte aus, **Seitenleiste anzeigen** am Anfang der obersten Zeile der Seite holt sie zurück. Auf dem Smartphone und in einem schmalen Fenster gibt es keine Spalte: Die Seite hat dann eine Kopfzeile mit zwei Tabs, **Alle Projekte** und **Gemeinsames Wissen**, und **Neues Projekt** oben rechts.
+
+Die Seite neben der Spalte beginnt mit einer Zeile: **Alle Projekte** links und rechts ein Feld zum Suchen eines Projekts (**Projekt suchen**). Tippe einen Teil des Namens oder dessen, worum es im Projekt geht, und die Karten werden beim Tippen weniger; Esc oder ✕ leert das Feld. Darunter:
 
 Jede Projektkarte zeigt:
 
@@ -35,11 +40,11 @@ Jede Projektkarte zeigt:
 - was es enthält: wie viele Sitzungen (jede Sitzung darin, egal ob du sie hier gestartet hast oder ob sie im Ordner des Projekts arbeitet), wie viele Dinge in der Bibliothek, Dokumente und Skills;
 - die Zeit seit der letzten Sitzungsaktivität sowie **Neue Sitzung** zum direkten Start im Projekt.
 
-Ein Klick auf die Karte öffnet das Projekt. Auch sein Name in der Suche per Strg+K führt direkt dorthin. Ohne Projekte erklärt die Seite deren Nutzen in drei kurzen Abschnitten mit **Projekt erstellen**.
+Ein Klick auf die Karte oder auf die Zeile des Projekts in der Spalte öffnet das Projekt. Auch sein Name in der Suche per Strg+K führt direkt dorthin. Ohne Projekte erklärt die Seite deren Nutzen in drei kurzen Abschnitten mit **Projekt erstellen**.
 
 Ziehe lokale Dateien auf eine Projektkarte, um sie hinzuzufügen. Währenddessen steht etwa „Ablegen, um zu ‚Abschlussarbeit‘ hinzuzufügen“. Dokumente, Tabellen, Folien, LaTeX und Notebooks werden Bibliotheksseiten, Bilder, Videos und Audio werden dort gespeichert. Andere Dateien landen im Projektordner. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
 
-Unter den Projekten listet **Ordner, in denen du arbeitest** Ordner auf, in denen du in letzter Zeit gearbeitet hast und die zu Projekten werden könnten (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
+Unter den Projekten (nicht, während du eines suchst) listet **Ordner, in denen du arbeitest** Ordner auf, in denen du in letzter Zeit gearbeitet hast und die zu Projekten werden könnten (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Ein Projekt erstellen
 
@@ -106,7 +111,7 @@ Wenn der Ordner des Projekts ein Git-Repository ist, bietet das Ende des Menüs 
 
 ## Die Projektseite
 
-Klicke auf der Projektseite auf ein Projekt, um es zu öffnen. Der obere Teil seiner Seite hat die Farbe des Projekts: Der Pfeil links führt zurück zu allen deinen Projekten (wie auf den anderen Seiten der App), dann folgen das Zeichen und der Name des Projekts und worum es geht (bei einer Gruppe die Projekte der Gruppe; ohne Beschreibung sein Ordner). Rechts startet **Neue Sitzung** eine Sitzung im Projekt (auf dem Smartphone der Stift), und **Mehr** (⋯) enthält:
+Klicke auf der Projektseite auf ein Projekt, um es zu öffnen. Der obere Teil seiner Seite hat die Farbe des Projekts: Auf einem Computer bleibt die Spalte neben ihr mit dem markierten Projekt, ein Klick auf eine andere Zeile öffnet also dieses Projekt. Auf dem Smartphone, in einem schmalen Fenster oder bei ausgeblendeter Spalte führt der Pfeil links zurück zu allen deinen Projekten (wie auf den anderen Seiten der App), und **Seitenleiste anzeigen** holt die Spalte zurück; dann folgen das Zeichen und der Name des Projekts und worum es geht (bei einer Gruppe die Projekte der Gruppe; ohne Beschreibung sein Ordner). Rechts startet **Neue Sitzung** eine Sitzung im Projekt (auf dem Smartphone der Stift), und **Mehr** (⋯) enthält:
 
 - **Ordner unter „Dateien“ öffnen**: der Ordner des Projekts auf der Seite Dateien.
 - **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Ordner des Projekts ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
@@ -363,7 +368,7 @@ Einmal hinzugefügte Verträge, Handbücher, Notizen, Fachartikel und Ordner las
 - **Gemeinsames Wissen** unter [Projekte → Gemeinsames Wissen](/knowledge) ist für alle Sitzungen verfügbar, auch in Projekten, sofern dort nicht ausgeschaltet.
 - **Das eigene Wissen eines Projekts**, in seinem Tab **Memory** unter **Dokumente**: Nur die Sitzungen dieses Projekts durchsuchen es, und die Sitzungen einer Gruppe, die das Projekt einbindet.
 
-Um das gemeinsame Wissen zu öffnen, klicke auf der Projektseite auf den Tab **Gemeinsames Wissen** oder tippe „gemeinsames Wissen“ ins Suchfeld (Strg+K).
+Um das gemeinsame Wissen zu öffnen, klicke in der Projektspalte auf **Gemeinsames Wissen** (auf dem Smartphone auf den Tab **Gemeinsames Wissen** der Projektseite) oder tippe „gemeinsames Wissen“ ins Suchfeld (Strg+K).
 
 ## Dokumente hinzufügen
 
@@ -453,7 +458,7 @@ Ohne ausdrückliche Einschränkung kombiniert der Agent Wort- und Bedeutungssuch
 
 Über den Wissensdatenbanken steht ein Feld mit „Probiere die Suche wie ein Agent aus: mit einer Frage oder ‚genauen Wörtern‘ in Anführungszeichen“. Tippe etwas ein und drücke die Eingabetaste. Bis zu 10 Passagen kommen zurück, jede mit ihrer Datei und Seite, ihrer Wissensdatenbank und der Art, wie sie gefunden wurde: **Wörter**, **Bedeutung** oder beides, oder **Exakt** für genauen Text. Klicke eine an, um die Datei zu öffnen.
 
-Im Tab „Gemeinsames Wissen“ durchsucht sie, was eine Sitzung außerhalb jedes Projekts durchsucht. Im Teil „Dokumente“ eines Projekts (sein Tab **Memory**) durchsucht sie, was eine Sitzung in diesem Projekt durchsucht.
+Auf der Seite „Gemeinsames Wissen“ durchsucht sie, was eine Sitzung außerhalb jedes Projekts durchsucht. Im Teil „Dokumente“ eines Projekts (sein Tab **Memory**) durchsucht sie, was eine Sitzung in diesem Projekt durchsucht.
 
 ## Welche Sitzungen welches Wissen durchsuchen
 

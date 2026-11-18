@@ -23,10 +23,15 @@ A project can also bring other projects together. That is a **group**: see [Brin
 
 Click **Projects** on the rail. On a phone, open the sidebar first: it is a drawer, and Projects is among its tools. You can also type "projects" in the search box (Ctrl+K, or ⌘K on a Mac).
 
-The page has two tabs:
+On a computer the page has a column beside the rail, the same kind as the Library's: the logo with **New project** and **Hide sidebar** on top, then:
 
-- **All projects**: your projects, with **New project** at the top right.
-- **Shared knowledge**: the documents every session can search (see [Shared knowledge: documents every session can search](#shared-knowledge-documents-every-session-can-search)).
+- **All projects**, with how many projects you have;
+- **Shared knowledge**: the documents every session can search (see [Shared knowledge: documents every session can search](#shared-knowledge-documents-every-session-can-search));
+- under a **Projects** label, a row for each of your projects, with its mark, its name and how many sessions it has. Click one to open its page (see [A project's own page](#a-projects-own-page)).
+
+The place you are in is lit in the column, and it stays there when you open a project, so you can move from one project to another without going back. **Hide sidebar** (Ctrl+B, or ⌘B on a Mac) hides the column; **Show sidebar** at the left of the page's top row brings it back. On a phone or in a narrow window, there is no column: the page has a header with two tabs, **All projects** and **Shared knowledge**, and **New project** at the top right.
+
+The page beside the column starts with a row: **All projects** at the left and, at the right, a box to find a project (**Find a project**). Type part of a name or of what a project is about, and the cards narrow down as you type; Esc or ✕ empties the box. Under the row:
 
 Each project shows as a card:
 
@@ -35,11 +40,11 @@ Each project shows as a card:
 - what it holds: how many sessions (every session in it, whether you started it here or it works in the project's folder), how many things in the Library, documents and skills;
 - how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
 
-Click a card to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
+Click a card, or its row in the column, to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
 
 Drop files from your computer on a project's card to add them to the project ("Drop to add to “Thesis”" shows while they are over it): documents, spreadsheets, slides, LaTeX and notebooks become pages of the Library, pictures, videos and sounds are kept there, and any other file goes in the project's folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 
-Under the projects, **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
+Under the projects (not while you are finding one), **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Make a project
 
@@ -106,7 +111,7 @@ When the project's folder is a Git repository, the end of the menu offers **New 
 
 ## A project's own page
 
-Click a project on the Projects page to open it. The top of its page is in the project's colour: the arrow on the left goes back to all your projects (as on the app's other pages), then come the project's mark and name and what it is about (a group's projects, for a group; its folder, with no description). On the right, **New session** starts a session in the project (on a phone, the pen), and **More** (⋯) has:
+Click a project on the Projects page to open it. On a computer the column stays beside it with the project lit, so a click on another row opens that project. The top of its page is in the project's colour: on a phone, in a narrow window or while the column is hidden, the arrow on the left goes back to all your projects (as on the app's other pages), and **Show sidebar** brings the column back; then come the project's mark and name and what it is about (a group's projects, for a group; its folder, with no description). On the right, **New session** starts a session in the project (on a phone, the pen), and **More** (⋯) has:
 
 - **Open its folder in Files**: the project's folder on the Files page.
 - **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the project's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
@@ -363,7 +368,7 @@ Agents can search documents you add once: contracts, manuals, notes, papers, a w
 - **Shared knowledge** ([Projects → Shared knowledge](/knowledge)): every session searches it, in a project too unless the project turns that off.
 - **A project's own knowledge**, on its **Memory** tab, under **Documents**: only that project's sessions search it, and the sessions of a group that brings the project in.
 
-To open the shared knowledge, click the **Shared knowledge** tab on the Projects page, or type "shared knowledge" in the search box (Ctrl+K).
+To open the shared knowledge, click **Shared knowledge** in the Projects column (on a phone, the **Shared knowledge** tab on the Projects page), or type "shared knowledge" in the search box (Ctrl+K).
 
 ## Add documents
 
@@ -444,7 +449,7 @@ In the conversation, a search shows as a step: **Searched your documents**, what
 Agents search in three ways:
 
 - **By words**: passages that hold the words of the question, the best matches first. Always available.
-- **By meaning**: passages that mean what the question asks, even in other words or another language. This needs **Search by meaning**, which is on unless you turn it off in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning). It runs on this computer, and while it is on, every base gets ready for it in the background (see [Memory](/guide/memory#search-by-meaning)). While it is off, the Shared knowledge tab and each project's Knowledge tab say where to turn it on, and agents find passages by their words.
+- **By meaning**: passages that mean what the question asks, even in other words or another language. This needs **Search by meaning**, which is on unless you turn it off in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning). It runs on this computer, and while it is on, every base gets ready for it in the background (see [Memory](/guide/memory#search-by-meaning)). While it is off, the Shared knowledge page and each project's Knowledge tab say where to turn it on, and agents find passages by their words.
 - **The exact text**: a phrase in quotes ("notice period") or a pattern between slashes (a regular expression, such as `/INV-\d+/`), found as the grep command would find it: for names, numbers and codes. These passages come in the order they appear in the documents.
 
 An agent searches by words and by meaning together unless it asks for one, and a question in quotes or between slashes is searched for exactly. It gets 8 passages at a time unless it asks for more (up to 25), and it can search one knowledge base by its name.
@@ -453,7 +458,7 @@ An agent searches by words and by meaning together unless it asks for one, and a
 
 Above the knowledge bases, a field says "Try a search, as agents do: a question, or “exact words” in quotes". Type and press Enter. Up to 10 passages come back, each with its file and page, its knowledge base and how it was found: **by words**, **by meaning**, or both, or **by exact** for exact text. Click one to open the file.
 
-On the Shared knowledge tab, it searches what a session outside any project searches. On a project's Documents part (its **Memory** tab), it searches what a session in that project searches.
+On the Shared knowledge page, it searches what a session outside any project searches. On a project's Documents part (its **Memory** tab), it searches what a session in that project searches.
 
 ## Which sessions search which knowledge
 
