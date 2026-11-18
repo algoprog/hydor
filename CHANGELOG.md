@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.91.1 · 18 November 2026
+
+Custom on a Claude model of your plan only runs the tool calls Claude actually wrote, and subagents keep working through
+an update of the app.
+
+- **No more made-up results**: Claude answers Custom through Claude Code, which cannot end a reply at its tool calls, so
+  Claude sometimes went on to write what it imagined the tools returned, and more calls on top of that, and all of it
+  was run. Custom now ends the reply where its calls end and stops Claude Code there: imagined results are never shown,
+  kept or acted on, the same call written twice runs once, and at most six calls run from one reply. Every model that
+  writes its calls as text gets the same care.
+- **Subagents stay on your session's agent**: a Claude Code session's subagents run as Claude Code again, with its own
+  tools, when they are asked for by tier. Since 0.86 the Standard and Best tiers' model names (Sonnet, Opus) also named
+  Custom's models of your plan, so such subagents started as Custom.
+- **Through an update**: a Custom step waiting for a model of your plan when the app restarts is asked again once the
+  app is back, instead of ending its turn. A turn that a restart did end no longer shows as working for ever: it ends
+  and says why, its subagent is not run again a tier up for it, and a message carries it on.
+
 ## 0.91.0 · 18 November 2026
 
 Chrome extensions in your own browser do what they should when you press their buttons, and you can pin or hide them
