@@ -67,7 +67,13 @@ export interface TabStateChange {
 }
 
 /** What a page's right-click menu asks of the app. */
-export type PageCommand = { cmd: 'ask'; text: string; url: string } | { cmd: 'bookmark'; url: string; title: string };
+export type PageCommand =
+  | { cmd: 'ask'; text: string; url: string }
+  | { cmd: 'bookmark'; url: string; title: string }
+  | { cmd: 'later'; url: string; title: string }
+  | { cmd: 'save-image'; path: string; name: string; url: string; title: string }
+  | { cmd: 'ask-image'; path: string; name: string; url: string; title: string }
+  | { cmd: 'picture-failed'; message: string };
 
 export interface PageFrame {
   jpeg: ArrayBuffer;

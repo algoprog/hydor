@@ -2,8 +2,8 @@
 // at work, and your tabs, one row each. Ctrl+B folds it away. An agent's row shows its browser in the page's place
 // (the page column and the right column take it over); a click on one of your tabs leaves it again.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Palette, Pencil, Plus, RotateCw, Sparkles, Ungroup, X, XCircle } from 'lucide-react';
-import { GROUP_COLORS, inTabOrder, type BrowserGroup, type BrowserView, type GroupColor } from '@shared/browser';
+import { Bookmark, Check, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Palette, Pencil, Plus, RotateCcw, RotateCw, Sparkles, Ungroup, X, XCircle } from 'lucide-react';
+import { GROUP_COLORS, inTabOrder, type BrowserGroup, type BrowserView, type GroupColor, type LaterItem } from '@shared/browser';
 import { Throbber } from '../../components/ui';
 import { ContextMenu, isMenuKey, type ContextMenuAt, type MenuEntry } from '../pages/common/menus';
 import { toast, useSessions } from '../../lib/store';
@@ -12,9 +12,9 @@ import { FadeText } from '../../components/FadeText';
 import { cx } from '../../components/ui';
 import { PinnedTiles } from './BookmarkBar';
 import { statusOf, titleOf } from './AgentTabs';
-import { closeTab, closeTabs, duplicateTab, editGroup, groupTabs, groupWithAi, isWebPage, moveToGroup, newTab, newTabIn, reloadTab, removeGroup, switchTab, tabName, useAgentBrowsers, useBookmarks, useGrouping, type AgentBrowser } from './browsing';
+import { closeTab, closeTabs, duplicateTab, editGroup, groupTabs, groupWithAi, isWebPage, laterShown, loadLater, markLater, moveToGroup, newTab, newTabIn, reloadTab, removeGroup, removeLater, switchTab, tabName, useAgentBrowsers, useBookmarks, useGrouping, useLater, type AgentBrowser } from './browsing';
 import { toggleBookmark } from './BookmarkBar';
-import { Favicon, Speaker } from './TabStrip';
+import { Favicon, SiteIcon, Speaker } from './TabStrip';
 import { useRowPhases } from '../../lib/flip';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { ColumnResizer, useNavWidth } from '../layout/SideColumn';
@@ -209,6 +209,66 @@ function GroupHeader({ g, count, over, renaming, onRename, onMenu }: { g: Browse
 const dot = (c: GroupColor) => <span className={cx('h-2.5 w-2.5 rounded-full', TONE[c].dot)} />;
 const groupLabel = (g: BrowserGroup) => g.name || 'Unnamed group';
 
+/** One page set aside to read later: a click opens it in a new tab; on hover, Mark as read (or as unread) and Remove. */
+function LaterRow({ n, onOpen }: { n: LaterItem; onOpen: () => void }) {
+  const read = n.readAt !== undefined;
+  const act = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg-3 opacity-0 group-hover:opacity-100 hover:bg-bg-3 hover:text-fg focus-visible:opacity-100';
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      title={n.title || n.url}
+      onClick={onOpen}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), onOpen())}
+      className={cx('group press flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none hover:bg-bg-2/60 hover:text-fg', read ? 'text-fg-3' : 'text-fg-2')}
+    >
+      <span className={cx('flex shrink-0', read && 'opacity-60')}>
+        <SiteIcon url={n.url} size={16} />
+      </span>
+      <FadeText text={n.title || n.url} className="flex-1" />
+      <button aria-label={read ? 'Mark as unread' : 'Mark as read'} title={read ? 'Mark as unread' : 'Mark as read'} onClick={(e) => (e.stopPropagation(), void markLater(n.id, !read))} className={act}>
+        {read ? <RotateCcw size={12} /> : <Check size={13} />}
+      </button>
+      <button aria-label="Remove" title="Remove" onClick={(e) => (e.stopPropagation(), void removeLater(n.id))} className={act}>
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
+/** Your Read later list, a quiet section: folded while nothing waits (open it to see what you have read, with Show read). */
+function ReadLater({ onOpen }: { onOpen: (url: string) => void }) {
+  const { items, loaded, showRead } = useLater();
+  const [open, setOpen] = useState<boolean | null>(null);
+  useEffect(() => void loadLater(), []);
+  const waiting = items.filter((n) => n.readAt === undefined).length;
+  const read = items.length - waiting;
+  const shown = laterShown(items, showRead);
+  // Folded by itself while nothing waits, unless you opened it.
+  const isOpen = open ?? waiting > 0;
+  if (!loaded) return null;
+  return (
+    <div className="mt-2">
+      <Label open={isOpen} onToggle={() => setOpen(!isOpen)} hint={waiting ? String(waiting) : undefined}>
+        Read later
+      </Label>
+      {isOpen && (
+        <div className="px-1.5">
+          {shown.map((n) => (
+            <LaterRow key={n.id} n={n} onOpen={() => onOpen(n.url)} />
+          ))}
+          {!shown.length && <div className="px-2.5 py-1.5 text-[12.5px] text-fg-3">Nothing waiting to be read.</div>}
+          {read > 0 && (
+            <button onClick={() => useLater.setState({ showRead: !showRead })} className="flex h-7 w-full items-center rounded-lg pl-2.5 text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2/60 hover:text-fg-2">
+              {showRead ? 'Hide read' : 'Show read'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserView; watching: string | null; onWatch: (key: string) => void; onLeave: () => void }) {
   // As wide as every other column, and resized the same way.
   const { width } = useNavWidth();
@@ -385,6 +445,7 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
             </div>
           )}
         </div>
+        <ReadLater onOpen={(url) => (watching && onLeave(), void newTab(url))} />
       </ColumnScroll>
       <ContextMenu at={menu?.at ?? null} items={menuItems()} onClose={() => setMenu(null)} title={menu && 'group' in menu ? 'Group' : 'Tab'} />
       <ColumnResizer inside />

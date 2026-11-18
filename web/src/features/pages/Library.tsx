@@ -14,7 +14,7 @@
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
 // Saved web pages (a document with the address it came from, kept from the Browser's Save) are a kind of their own, Web
 // pages, among the rest. In the desktop app three more chips at the row's end, after a divider, show what your own browser
-// keeps as lists (BrowserLists.tsx): Bookmarks, Downloads and History, for every project, never copied into the Library.
+// keeps as lists (BrowserLists.tsx): Bookmarks, Read later, Downloads and History, for every project, never copied into the Library.
 // On a wide screen the page draws its own column on the left (the app's sidebar gives way to its rail here): the places
 // and New, shown while the sidebar is open (Ctrl+B).
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (web, image, video and audio each, media pictures and
@@ -28,6 +28,7 @@ import {
   AudioLines,
   ArrowRight,
   Bookmark,
+  Clock,
   Boxes,
   Copy,
   Database,
@@ -158,6 +159,7 @@ const BOTH: (typeof SHOWS)[number] = { value: 'media', label: 'Pictures and vide
 /** What your own browser keeps, as chips after the rest (the desktop app): lists of its own, not Library items. */
 const BROWSER_SHOWS: { value: BrowserKind; label: string; icon: ReactNode; search: string }[] = [
   { value: 'bookmarks', label: 'Bookmarks', icon: <Bookmark size={13} />, search: 'Search your bookmarks' },
+  { value: 'later', label: 'Read later', icon: <Clock size={13} />, search: 'Search your Read later list' },
   { value: 'downloads', label: 'Downloads', icon: <FileDown size={13} />, search: 'Search your downloads' },
   { value: 'history', label: 'History', icon: <HistoryIcon size={13} />, search: 'Search your history' },
 ];

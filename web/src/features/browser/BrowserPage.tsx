@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkPlus,
+  Clock,
   Download,
   Ellipsis,
   ExternalLink,
@@ -51,9 +52,11 @@ import { AgentBar, AgentBox, AgentConversation } from './AgentView';
 import { askAboutTab, BrowserAskPanel, pickForAsk } from './BrowserAsk';
 import { toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
+import { keepPicture } from './pictures';
 import {
   activeTab,
   addBookmark,
+  addLater,
   groupWithAi,
   useGrouping,
   addFromStore,
@@ -452,7 +455,7 @@ function OwnBrowser() {
     };
   }, []);
 
-  // What a page's right-click menu asks: Ask an agent about the selection (Ask opens beside the page with it), and Bookmark this page.
+  // What a page's right-click menu asks: Ask an agent about the selection or a picture (Ask opens beside the page with it), Bookmark this page, Read later, and Save image to Library.
   useEffect(
     () =>
       listenTabs((c) => {
@@ -462,7 +465,19 @@ function OwnBrowser() {
           pickForAsk(t.id, { text: c.text, url: c.url });
           setPanel(null);
           setAskOpen(true);
-        } else if (!useBookmarks.getState().nodes.some((n) => n.url === c.url)) void addBookmark({ title: c.title || c.url, url: c.url, parent: 'bar' });
+        } else if (c.cmd === 'bookmark') {
+          if (!useBookmarks.getState().nodes.some((n) => n.url === c.url)) void addBookmark({ title: c.title || c.url, url: c.url, parent: 'bar' });
+        } else if (c.cmd === 'later') {
+          void addLater(c.url, c.title || c.url);
+        } else if (c.cmd === 'save-image') {
+          void keepPicture(c);
+        } else if (c.cmd === 'ask-image') {
+          const t = activeTab(st.current.view);
+          if (!t) return;
+          pickForAsk(t.id, { text: '', url: c.url, image: { path: c.path, name: c.name } });
+          setPanel(null);
+          setAskOpen(true);
+        } else if (c.cmd === 'picture-failed') toastError(new Error(c.message));
       }),
     [],
   );
@@ -543,6 +558,9 @@ function OwnBrowser() {
       </MenuItem>
       <MenuItem icon={<ExternalLink size={14} />} disabled={!tab || !canHand} onClick={() => (setMenu(false), tab && void desktopBrowser()?.openExternal(tab.url))}>
         Open in your default browser
+      </MenuItem>
+      <MenuItem icon={<Clock size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), tab && void addLater(tab.url, tab.title || tab.url))}>
+        Read this page later
       </MenuItem>
       <MenuItem icon={<WandSparkles size={14} />} disabled={!canHand} onClick={() => (setMenu(false), setDoOpen(true))}>
         Do this here…

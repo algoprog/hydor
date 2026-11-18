@@ -268,7 +268,7 @@ A bar runs across the top of the page. At its left, over the tab column, are the
 - **Save** keeps a readable copy of the page in the Library: a note says "Saved to the Library", with **Open**. It lands among the Library's **Web pages**. The Library's **Bookmarks**, **Downloads** and **History** chips list the same bookmarks, downloads and history as this page (see [Library](/guide/library)).
 - **Ask** opens the column beside the page to ask about it (see [Ask beside the page](/guide/web#ask-beside-the-page)); it shows lit while that column is there.
 - The buttons of your extensions come next, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
-- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser**, **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
+- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser**, **Read this page later** (see [Read later](/guide/web#read-later)), **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
 
 A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
 
@@ -293,6 +293,7 @@ The column at the left of the page lists, from the top (**Hide tabs**, or Ctrl+B
 - **Pinned sites**: the items of your bookmarks bar as tiles, five to a row and two rows at most (a **…** tile lists the rest). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it. Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**. With nothing on the bookmarks bar there are no tiles; the star puts the page there (see [Bookmarks](/guide/web#bookmarks)).
 - **Agents at work**, while an agent has a browser open: a row for each, with its icon and a dot (blue while it works, amber when it waits for you or you drive), the session's title and what it is doing. Click one to see it (see [Agents at work](/guide/web#agents-at-work)). Its arrow folds the list.
 - **Tabs**: a row for each tab, with its icon, title, **⋯** and **×** (on the open tab, and on the one you point at). A title too long for the column fades out at its end, and rolls along to show the rest while you point at its row. The open tab is the marked row; click a row to show that tab, and a middle click closes it. Right-click a row, or press its **⋯**, for the tab's menu (see [Tab groups and the tab menu](/guide/web#tab-groups-and-the-tab-menu)). Tabs you put in a group sit under the group's header, and the sparkles button at the end of the **Tabs** label groups your tabs with AI. A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker. **New tab** at the end opens your home page. Closing the last tab leaves a blank one.
+- **Read later**, under the tabs: the pages you set aside (see [Read later](/guide/web#read-later)), newest first, each with its icon and title, and the number waiting. It is folded while nothing waits; its arrow opens it. Click a row to open that page in a new tab. Point at a row for **Mark as read** (it leaves the list) and **Remove**. **Show read** at the end brings the pages you have read back (**Hide read** puts them away again).
 
 ### Tab groups and the tab menu
 
@@ -326,7 +327,7 @@ At the right of the page there is a column, shown only when something is in it, 
 
 ### Ask beside the page
 
-**Ask** in the bar (or **Ask about this page: “…”** in the box's list, or **Ask an agent about** in the right-click menu) opens the column for the tab you are on. Write what you want to know, or press **Summarise**, **Key points** or **Explain it simply**, then **Ask** (**Ctrl+Enter**, ⌘+Enter on a Mac). The line under the box says which agent and model answer: the ones the start page used last. A new session starts on a copy of the page as it is now (see [Ask about this page](/guide/web#ask-about-this-page)), and its conversation fills the column, so you can go on asking there.
+**Ask** in the bar (or **Ask about this page: “…”** in the box's list, or **Ask an agent about** in the right-click menu) opens the column for the tab you are on. Write what you want to know, or press **Summarise**, **Key points** or **Explain it simply**, then **Ask** (**Ctrl+Enter**, ⌘+Enter on a Mac). Words you picked in the page and sent with **Ask an agent about** show above the box, and go with your question (up to 4,000 characters of them); so does a picture sent with **Ask about this image** (see [Right-click menu](/guide/web#right-click-menu)), which shows above the box too, with quick questions such as **Describe this picture**. The line under the box says which agent and model answer: the ones the start page used last. A new session starts on a copy of the page as it is now (see [Ask about this page](/guide/web#ask-about-this-page)), and its conversation fills the column, so you can go on asking there.
 
 Each tab has its own question: switch tabs and the column shows that tab's conversation. **Open as a session** takes you to it among your sessions, and **New question** forgets this tab's conversation here (the session stays) so you can ask again. It works on pages of websites and files.
 
@@ -363,13 +364,23 @@ On the Browser page, from inside a page too, with Ctrl on Windows and Linux and 
 A right click in a page opens a menu, in English, with what applies where you clicked:
 
 - In a text field: spelling suggestions for a misspelt word, with **Add to dictionary**; then **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select all**.
-- On a link: **Open link in new tab**, **Open link in your default browser** and **Copy link address**.
-- On a picture: **Open image in new tab**, **Save image as…**, **Copy image** and **Copy image address**.
-- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens **Ask** beside the page with the selected words and the page's address ready to go with your question (see [Ask beside the page](/guide/web#ask-beside-the-page)).
+- On a link: **Open link in new tab**, **Open link in your default browser**, **Copy link address** and **Read link later** (see [Read later](/guide/web#read-later)).
+- On a picture: **Open image in new tab**, **Save image as…** (into your Downloads folder), **Save image to Library**, **Ask about this image**, **Copy image** and **Copy image address**.
+- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens **Ask** beside the page with the selected words (up to 4,000 characters of them) and the page's address ready to go with your question (see [Ask beside the page](/guide/web#ask-beside-the-page)).
 - On the page itself, away from a field or selected text: **Back**, **Forward** and **Reload**.
-- Always: **Bookmark this page**, **Print…** and **Inspect**, which opens the page's developer tools.
+- Always: **Bookmark this page**, **Read this page later** (on a web page), **Print…** and **Inspect**, which opens the page's developer tools.
+
+**Save image to Library** reads the picture with the tab's own sign-ins, so a picture behind a login works, and keeps it in the Library with the page as the place it came from. A note says "Saved to your Library", with **Open** (or "That picture is in your Library already" when you kept it before). It keeps PNG, JPEG, WebP, GIF and AVIF pictures of up to 50 MB; a bitmap or an icon becomes a PNG, and other kinds, such as SVG, are refused. The picture needs an http, https, data or blob address. Agents can read what is in the Library, so keep a picture there only when you are fine with that. **Ask about this image** reads the picture the same way and opens **Ask** beside the page with it ready to go with your question, together with a copy of the page.
 
 An extension's own items are never shown (see [What may not work](/guide/web#what-may-not-work)).
+
+### Read later
+
+Set a page aside for when you have time: right-click it and pick **Read this page later**, or a link and pick **Read link later**, or use **Read this page later** in the **Menu** (⋯). A note says "Added to Read later"; a page already on the list goes back to waiting, at the top. Only web pages (http and https) can be set aside.
+
+The list shows in two places: in the tab column, as **Read later** (see [The tab column](/guide/web#the-tab-column)), and in the Library, as the **Read later** chip beside **Bookmarks** (see [Lists of what your browser keeps](/guide/library#lists-of-what-your-browser-keeps)). Newest first, each row has the site's icon, the page's title and, in the Library, its site and when you added it. Click a row to open the page. **Mark as read** takes it off the list; **Show read** brings the pages you have read back, where **Mark as unread** puts one back to waiting. **Remove** forgets it.
+
+Like your bookmarks, the list is yours alone: agents never see it, and are refused the routes that serve it.
 
 ### History
 

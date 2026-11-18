@@ -256,7 +256,7 @@ async function writeAudioCaption(db: DB, w: Writer, m: MediaItem, fallback: { ti
     m.model ? `It was made with the model ${m.model}.` : '',
     m.prompt ? `It was made from these words: "${m.prompt.replace(/\s+/g, ' ').slice(0, 1500)}"` : '',
     m.lyrics ? `Its words, sung or spoken: "${m.lyrics.slice(0, 1500)}"` : '',
-    !m.prompt && !m.lyrics && m.source ? `Its file is called "${path.basename(m.source)}".` : '',
+    !m.prompt && !m.lyrics && m.source && !/^https?:\/\//i.test(m.source) ? `Its file is called "${path.basename(m.source)}".` : '',
     lang !== 'en' ? `Write them in ${LANGS.find((l) => l.id === lang)?.english ?? 'English'}.` : '',
   ]
     .filter(Boolean)
@@ -285,7 +285,9 @@ async function pictureOf(m: MediaItem, tmp: string): Promise<string | null> {
 
 /** Writes an item's title and description: what the model says, else from its prompt. */
 export async function writeCaption(db: DB, d: Pick<Deps, 'models'>, m: MediaItem): Promise<{ title: string; description: string; by?: string; error?: string }> {
-  const fallback = { title: titleFrom({ ...m, name: m.source ? path.basename(m.source) : undefined }), description: (m.prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 600) };
+  // A source that is a page's address (a picture kept from the Browser) says nothing of the picture's name: its title stays.
+  const fromPage = !!m.source && /^https?:\/\//i.test(m.source);
+  const fallback = { title: fromPage ? m.title : titleFrom({ ...m, name: m.source ? path.basename(m.source) : undefined }), description: (m.prompt ?? '').replace(/\s+/g, ' ').trim().slice(0, 600) };
   const w = await captionWriter(db, d).catch((e) => ({ why: String((e as Error).message ?? e) }));
   if ('why' in w) return { ...fallback, error: w.why };
   if (m.kind === 'audio') return writeAudioCaption(db, w, m, fallback);

@@ -82,7 +82,15 @@ document.onmousemove=()=>{};
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
   '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
 };
+// A one-pixel PNG, served at /photo-of-cat.png (and what its request said of the page it came from).
+const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+let lastReferer = '';
 const site = http.createServer((req, res) => {
+  if (req.url.split('?')[0] === '/photo-of-cat.png') {
+    lastReferer = String(req.headers.referer || '');
+    res.writeHead(200, { 'content-type': 'image/png' });
+    return void res.end(Buffer.from(PNG_B64, 'base64'));
+  }
   const body = pages[req.url.split('?')[0]];
   if (!body) return void (res.writeHead(404), res.end('nf'));
   res.writeHead(200, { 'content-type': 'text/html' });
@@ -621,24 +629,28 @@ app.whenReady().then(async () => {
       const base = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
       const labels = (tpl) => tpl.filter((i) => i.type !== 'separator').map((i) => i.label);
       const link = labels(t && browser.menuTemplate(t, { ...base, linkURL: 'https://example.com/a?b=c' }));
-      assert.deepEqual(link, ['Open link in new tab', 'Open link in your default browser', 'Copy link address', 'Back', 'Forward', 'Reload', 'Bookmark this page', 'Print…', 'Inspect']);
+      assert.deepEqual(link, ['Open link in new tab', 'Open link in your default browser', 'Copy link address', 'Read link later', 'Back', 'Forward', 'Reload', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       // A link that is not a web address (javascript:, mailto:) has only its copy.
       assert.deepEqual(labels(browser.menuTemplate(t, { ...base, linkURL: 'mailto:a@b.c' })).slice(0, 2), ['Copy link address', 'Back']);
       const img = labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'https://example.com/i.png' }));
-      assert.deepEqual(img.slice(0, 4), ['Open image in new tab', 'Save image as…', 'Copy image', 'Copy image address']);
+      assert.deepEqual(img.slice(0, 6), ['Open image in new tab', 'Save image as…', 'Save image to Library', 'Ask about this image', 'Copy image', 'Copy image address']);
+      // Only an address the app can read is offered for the Library or a question (not a file: or chrome: picture).
+      assert.ok(!labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'file:///tmp/a.png' })).includes('Save image to Library'));
       const sel = browser.menuTemplate(t, { ...base, selectionText: 'hello world' });
-      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Bookmark this page', 'Print…', 'Inspect']);
+      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       const long = labels(browser.menuTemplate(t, { ...base, selectionText: 'x'.repeat(100) }))[1];
       assert.ok(long.length < 60 && long.includes('…'), long);
       const field = browser.menuTemplate(t, { ...base, isEditable: true, misspelledWord: 'helo', dictionarySuggestions: ['hello', 'help'], editFlags: { canUndo: true, canCut: true, canCopy: true, canPaste: true, canSelectAll: true } });
-      assert.deepEqual(labels(field), ['hello', 'help', 'Add to dictionary', 'Undo', 'Redo', 'Cut', 'Copy', 'Paste', 'Select all', 'Bookmark this page', 'Print…', 'Inspect']);
+      assert.deepEqual(labels(field), ['hello', 'help', 'Add to dictionary', 'Undo', 'Redo', 'Cut', 'Copy', 'Paste', 'Select all', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       assert.equal(field.find((i) => i.label === 'Cut').enabled, true);
       assert.equal(field.find((i) => i.label === 'Redo').enabled, false);
       // Back and Forward say whether there is somewhere to go.
       const plain = browser.menuTemplate(t, base);
       assert.equal(plain.find((i) => i.label === 'Back').enabled, t.wc.navigationHistory.canGoBack());
       // Its items ask the app: ask an agent, bookmark, and a link in a new tab.
+      // Asking reads the whole selection from the page first, so its command may come a moment after the bookmark's.
       sel.find((i) => /^Ask an agent/.test(i.label)).click();
+      await until(async () => (await page('__cmds.length')) === 1, 2000, 'the ask command');
       sel.find((i) => i.label === 'Bookmark this page').click();
       await until(async () => (await page('__cmds.length')) === 2, 2000, 'the menu’s commands');
       assert.deepEqual(await page('__cmds'), [{ cmd: 'ask', text: 'hello world', url: `${appOrigin}/words` }, { cmd: 'bookmark', url: `${appOrigin}/words`, title: 'words' }]);
@@ -648,6 +660,56 @@ app.whenReady().then(async () => {
       assert.equal(att.params.targetInfo.type, 'page');
       assert.ok(!browser.conns.get(CONN).targets.get(att.params.targetInfo.targetId).offscreen, 'a tab of your own');
       await cdp('Target.closeTarget', { targetId: att.params.targetInfo.targetId });
+    });
+
+    await check('read later, a picture for the Library and a question: the app is told, the picture is read with the page as its referrer, and what is no picture is said so', async () => {
+      const t = ownT();
+      const base = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
+      const last = async () => (await page('__cmds')).at(-1);
+      const count = () => page('__cmds.length');
+      const next = async (click) => {
+        const n = await count();
+        click();
+        await until(async () => (await count()) === n + 1, 5000, 'the menu’s command');
+        return last();
+      };
+      const pic = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `${appOrigin}/photo-of-cat.png` });
+      const kept = await next(() => pic.find((i) => i.label === 'Save image to Library').click());
+      assert.equal(kept.cmd, 'save-image');
+      assert.equal(kept.name, 'photo-of-cat.png');
+      assert.equal(kept.url, `${appOrigin}/words`);
+      assert.equal(lastReferer, `${appOrigin}/words`, 'the page is its referrer');
+      assert.deepEqual([...fs.readFileSync(kept.path).subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'a PNG file the app can keep');
+      assert.ok(kept.path.startsWith(os.tmpdir()) && fs.statSync(kept.path).mode % 0o1000 === 0o600, 'in a temporary folder, for the owner');
+      const asked = await next(() => pic.find((i) => i.label === 'Ask about this image').click());
+      assert.equal(asked.cmd, 'ask-image');
+      assert.ok(fs.existsSync(asked.path) && asked.path !== kept.path);
+      // A picture inside the page's own address (data:) reads too; a page that is no picture is told so.
+      const inline = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `data:image/png;base64,${PNG_B64}` });
+      assert.equal((await next(() => inline.find((i) => i.label === 'Save image to Library').click())).cmd, 'save-image');
+      const html = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `${appOrigin}/words` });
+      const failed = await next(() => html.find((i) => i.label === 'Save image to Library').click());
+      assert.equal(failed.cmd, 'picture-failed');
+      assert.match(failed.message, /PNG, JPEG, WebP, GIF or AVIF/);
+      // Read later: a link (with its words), and the page.
+      const link = browser.menuTemplate(t, { ...base, linkURL: `${appOrigin}/popped`, linkText: 'the popped page' });
+      assert.deepEqual(await next(() => link.find((i) => i.label === 'Read link later').click()), { cmd: 'later', url: `${appOrigin}/popped`, title: 'the popped page' });
+      const later = await next(() => browser.menuTemplate(t, base).find((i) => i.label === 'Read this page later').click());
+      assert.deepEqual(later, { cmd: 'later', url: `${appOrigin}/words`, title: 'words' });
+      // The menu's own copy of a selection is cut short; a question quotes the whole of it, as the page has it selected.
+      const was = await t.wc.executeJavaScript('document.body.innerHTML', true);
+      await t.wc.executeJavaScript(`document.body.innerHTML = '<p>${'alpha beta '.repeat(300)}omega</p>'; getSelection().selectAllChildren(document.body); 1`, true);
+      try {
+        const cut = browser.menuTemplate(t, { ...base, selectionText: 'alpha beta alpha beta' });
+        const asked = await next(() => cut.find((i) => /^Ask an agent/.test(i.label)).click());
+        assert.equal(asked.cmd, 'ask');
+        assert.ok(asked.text.length > 3000 && asked.text.endsWith('omega'), String(asked.text.length));
+        // Words that are not the page's selection stay as they were given.
+        const other = browser.menuTemplate(t, { ...base, selectionText: 'something else' });
+        assert.equal((await next(() => other.find((i) => /^Ask an agent/.test(i.label)).click())).text, 'something else');
+      } finally {
+        await t.wc.executeJavaScript(`document.body.innerHTML = ${JSON.stringify(was)}; getSelection().removeAllRanges(); 1`, true);
+      }
     });
 
     await check('full-screen video: the window and the page fill the screen, and leaving puts both back', async () => {

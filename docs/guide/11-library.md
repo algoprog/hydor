@@ -261,7 +261,7 @@ Above the cards:
 - **Search by name or description** finds what fits your words, the best first: by their titles and descriptions (see [Descriptions](#descriptions)), and, with [search by meaning](/guide/memory#search-by-meaning) on, by what they mean, so "costs of the Lisbon trip" finds a spreadsheet called "Four days away" whose description says so. What has your words in its title or description shows at once, as you type. It looks through the whole place, every folder of it, and each card then says the folder it is in.
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
 - When a place holds more than one kind, **All**, **Web pages**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Boards**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image). [Show the saved web pages](/library?kind=web).
-- In the desktop app, after a thin divider, **Bookmarks**, **Downloads** and **History** show what your own browser keeps, as lists rather than cards, for every project at once (see [Lists of what your browser keeps](#lists-of-what-your-browser-keeps)).
+- In the desktop app, after a thin divider, **Bookmarks**, **Read later**, **Downloads** and **History** show what your own browser keeps, as lists rather than cards, for every project at once (see [Lists of what your browser keeps](#lists-of-what-your-browser-keeps)).
 
 With nothing kept yet, the Library says "Your Library is empty", that files dropped there are added, and has **New page** and **New slides**.
 
@@ -273,15 +273,16 @@ A saved web page is a Library item like the rest. It shows as a **Web page** (a 
 
 ### Lists of what your browser keeps
 
-In the desktop app, three more chips follow the others, after a thin divider: **Bookmarks**, **Downloads** and **History**. They are always there, empty or not. Each shows a list, not cards, for all your projects at once; while one is open no place beside the cards is highlighted, and picking a place brings the cards back. The search box above filters the list (**Search your bookmarks**, **Search your downloads**, **Search your history**). What you can do with a row shows at its right when you point at it:
+In the desktop app, four more chips follow the others, after a thin divider: **Bookmarks**, **Read later**, **Downloads** and **History**. They are always there, empty or not. Each shows a list, not cards, for all your projects at once; while one is open no place beside the cards is highlighted, and picking a place brings the cards back. The search box above filters the list (**Search your bookmarks**, **Search your Read later list**, **Search your downloads**, **Search your history**). What you can do with a row shows at its right when you point at it:
 
 - **Bookmarks**: each bookmark with its site and where it is, such as **Bookmarks bar › Recipes** (folders are not rows). Click it, or **Open**, to open it in your own browser; **Delete** removes the bookmark.
+- **Read later**: the pages you set aside in your own browser (see [Read later](/guide/web#read-later)), newest first, each with its site and when you added it (**Added Today**). Click one, or **Open**, to open it in your own browser; **Mark as read** takes it off the list and **Remove** forgets it. **Show read** brings the pages you have read back (**Marked as read** with their day), where **Mark as unread** puts one back to waiting.
 - **History**: the pages you visited, newest first, grouped by day (**Today**, **Yesterday**, then the date). **Open** opens one, **Remove from history** forgets it, and **Show older** reads on.
 - **Downloads**: the files your browser downloaded, newest first, grouped by day, each with the folder it was saved in (**Saved in** …) or **Failed**. Click one, or **Show in folder** (**Show in Finder** on a Mac, **Show in File Explorer** on Windows), to see the file in its folder (in the desktop app, in the system's file manager); **Open the address it came from** opens the page it was downloaded from; **Remove from the list** takes it off this list only, the file stays where it is. **Show older** reads on.
 
 ### Who can see them
 
-Your bookmarks, downloads and history are shown only to you. They are never copied into the Library, are not in **Everything** or in a project's count, are not found by the Library's search, and agents are refused them. A saved web page is different: it is a Library item like any other, so agents can read it as they read the rest of your Library, and find it by its title and description. Save a page only when you are fine with an agent reading its text. The address it came from is kept with it, without any sign-in in the address.
+Your bookmarks, Read later list, downloads and history are shown only to you. They are never copied into the Library, are not in **Everything** or in a project's count, are not found by the Library's search, and agents are refused them. A saved web page is different: it is a Library item like any other, so agents can read it as they read the rest of your Library, and find it by its title and description. Save a page only when you are fine with an agent reading its text. The address it came from is kept with it, without any sign-in in the address.
 
 ## Descriptions
 

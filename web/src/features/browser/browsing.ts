@@ -12,6 +12,7 @@ import {
   type BrowsingPrefs,
   type ExtensionsState,
   type HistoryEntry,
+  type LaterItem,
   type SuggestResult,
 } from '@shared/browser';
 import { api, del, enc, patch, post } from '../../lib/api';
@@ -292,6 +293,34 @@ export const addBookmark = (b: { title: string; url?: string; parent?: string; p
   post<{ node: BookmarkNode; nodes: BookmarkNode[] }>('/api/browser/bookmarks', b).then(takeNodes, (e) => (toastError(e), null));
 export const editBookmark = (id: string, b: { title?: string; url?: string; parent?: string; pos?: number }) => patch<{ nodes: BookmarkNode[] }>(`/api/browser/bookmarks/${enc(id)}`, b).then(takeNodes, (e) => (toastError(e), null));
 export const removeBookmark = (id: string) => del<{ nodes: BookmarkNode[] }>(`/api/browser/bookmarks/${enc(id)}`).then(takeNodes, (e) => (toastError(e), null));
+
+// ---- read later ------------------------------------------------------------------------------------------------
+
+/** Your Read later list (oldest first, as the server keeps it) and the choice to show what you have read. */
+export const useLater = create<{ items: LaterItem[]; loaded: boolean; showRead: boolean }>(() => ({ items: [], loaded: false, showRead: false }));
+
+export async function loadLater() {
+  try {
+    useLater.setState({ items: (await api<{ items: LaterItem[] }>('/api/browser/browsing/later')).items, loaded: true });
+  } catch {}
+}
+
+const takeLater = <T extends { items?: LaterItem[] }>(r: T): T => {
+  if (r.items) useLater.setState({ items: r.items, loaded: true });
+  return r;
+};
+
+/** Sets a page aside to read later (a page already on the list goes back to waiting). Whether it could. */
+export const addLater = (url: string, title: string) =>
+  post<{ items: LaterItem[]; existed: boolean }>('/api/browser/browsing/later', { url, title }).then(
+    (r) => (takeLater(r), toast(r.existed ? 'Already on your Read later list' : 'Added to Read later', 'ok'), true),
+    (e) => (toastError(e), false),
+  );
+export const markLater = (id: string, read: boolean) => patch<{ items: LaterItem[] }>(`/api/browser/browsing/later/${enc(id)}`, { read }).then(takeLater, (e) => (toastError(e), null));
+export const removeLater = (id: string) => del<{ items: LaterItem[] }>(`/api/browser/browsing/later/${enc(id)}`).then(takeLater, (e) => (toastError(e), null));
+
+/** What is shown of the list: newest first; the pages you have read only with Show read. */
+export const laterShown = (items: LaterItem[], showRead: boolean) => items.filter((n) => showRead || n.readAt === undefined).sort((a, b) => b.addedAt - a.addedAt);
 
 /** The items of a folder ('bar', 'other' or a folder's id), in order. */
 export const childrenOf = (nodes: BookmarkNode[], parent: string) => nodes.filter((n) => n.parent === parent).sort((a, b) => a.pos - b.pos);

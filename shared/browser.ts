@@ -267,6 +267,16 @@ export interface BookmarkNode {
   addedAt: number;
 }
 
+/** A page you set aside to read later (your own browsing; agents never see the list). */
+export interface LaterItem {
+  id: string;
+  url: string;
+  title: string;
+  addedAt: number;
+  /** When you marked it as read; unset while it waits. */
+  readAt?: number;
+}
+
 /** Bookmarks of another browser on this computer that can be imported. */
 export interface BookmarkSource {
   /** Stable for a scan: the browser and profile ('chrome:Default', 'firefox:abc.default-release', 'safari'). */

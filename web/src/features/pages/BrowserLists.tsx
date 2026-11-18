@@ -1,8 +1,8 @@
-// What your own browser keeps, as lists in the Library (its chips Bookmarks, Downloads and History, in the desktop app):
+// What your own browser keeps, as lists in the Library (its chips Bookmarks, Read later, Downloads and History, in the desktop app):
 // never copied into the Library, never in Everything or a project's count, and shown only to you (agents are refused
 // the routes). Each row is a site's icon, a title and a muted line, with what can be done to it at the right on hover.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, ExternalLink, FileDown, FolderOpen, History as HistoryIcon, Lock, X } from 'lucide-react';
+import { Bookmark, Check, Clock, ExternalLink, FileDown, FolderOpen, History as HistoryIcon, Lock, RotateCcw, X } from 'lucide-react';
 import type { BookmarkNode, DownloadEntry, HistoryEntry } from '@shared/browser';
 import { api, del, enc } from '../../lib/api';
 import { sepOf } from '../../lib/format';
@@ -12,11 +12,11 @@ import { toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
 import { Button, cx, Empty, IconButton, Throbber } from '../../components/ui';
-import { deleteHistory, loadBookmarks, loadHistory, removeBookmark, showDownload, useBookmarks } from '../browser/browsing';
+import { deleteHistory, laterShown, loadBookmarks, loadHistory, loadLater, markLater, removeBookmark, removeLater, showDownload, useBookmarks, useLater } from '../browser/browsing';
 import { hostOfTab, SiteIcon } from '../browser/TabStrip';
 
-export type BrowserKind = 'bookmarks' | 'downloads' | 'history';
-export const BROWSER_KINDS: BrowserKind[] = ['bookmarks', 'downloads', 'history'];
+export type BrowserKind = 'bookmarks' | 'later' | 'downloads' | 'history';
+export const BROWSER_KINDS: BrowserKind[] = ['bookmarks', 'later', 'downloads', 'history'];
 export const isBrowserKind = (v: string | null | undefined): v is BrowserKind => !!v && (BROWSER_KINDS as string[]).includes(v);
 
 const PAGE = 100;
@@ -149,6 +149,77 @@ function Bookmarks({ q }: { q: string }) {
           }
         />
       ))}
+    </div>
+  );
+}
+
+// ---- read later ---------------------------------------------------------------------------------------------------
+
+/** When a page was added or read: Today, Yesterday or the date. */
+const when = (ts: number) => {
+  const d = dayOf(ts, new Date());
+  return d === 'Today' || d === 'Yesterday' ? tr(d) : d;
+};
+
+function ReadLater({ q }: { q: string }) {
+  const { items, loaded, showRead } = useLater();
+  useEffect(() => void loadLater(), []);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const all = laterShown(items, showRead);
+  const list = words.length ? all.filter((n) => words.every((w) => `${n.title}\n${n.url}`.toLowerCase().includes(w))) : all;
+  const read = items.filter((n) => n.readAt !== undefined).length;
+  if (!loaded) return <Loading />;
+  if (!items.length)
+    return (
+      <Empty icon={<Clock size={22} />} title="Nothing set aside to read later">
+        Right-click a page or a link in your Browser and pick Read later, and it waits here. Only you see the list: agents never do.
+      </Empty>
+    );
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2 px-1">
+        <p className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-fg-3">
+          <Lock size={12} className="shrink-0" />
+          Only you see your Read later list. It is not copied into the Library.
+        </p>
+        {read > 0 && (
+          <Button size="sm" variant="ghost" onClick={() => useLater.setState({ showRead: !showRead })}>
+            {showRead ? 'Hide read' : 'Show read'}
+          </Button>
+        )}
+      </div>
+      {!list.length && <p className="py-8 text-center text-[13px] text-fg-3">{words.length ? tr(`Nothing on your list matches “${q}”.`) : tr('Nothing is waiting to be read.')}</p>}
+      {list.map((n) => {
+        const done = n.readAt !== undefined;
+        return (
+          <Row
+            key={n.id}
+            icon={<SiteIcon url={n.url} size={16} />}
+            title={n.title || shown(n.url)}
+            tip={n.url}
+            line={
+              <>
+                <span translate="no">{hostOfTab(n.url) || shown(n.url)}</span>
+                {` · ${done ? tr('Marked as read') : tr('Added')} ${when(done ? n.readAt! : n.addedAt)}`}
+              </>
+            }
+            onOpen={() => openInBrowser(n.url)}
+            actions={
+              <>
+                <IconButton label="Open" size="sm" onClick={() => openInBrowser(n.url)}>
+                  <ExternalLink size={14} />
+                </IconButton>
+                <IconButton label={done ? 'Mark as unread' : 'Mark as read'} size="sm" onClick={() => void markLater(n.id, !done)}>
+                  {done ? <RotateCcw size={14} /> : <Check size={15} />}
+                </IconButton>
+                <IconButton label="Remove" size="sm" onClick={() => void removeLater(n.id)}>
+                  <X size={15} />
+                </IconButton>
+              </>
+            }
+          />
+        );
+      })}
     </div>
   );
 }
@@ -343,5 +414,5 @@ function Downloads({ q }: { q: string }) {
 
 /** What one of the browser's chips shows; `q`: the words in the toolbar's search box. */
 export function BrowserList({ kind, q }: { kind: BrowserKind; q: string }) {
-  return kind === 'bookmarks' ? <Bookmarks q={q} /> : kind === 'history' ? <History q={q} /> : <Downloads q={q} />;
+  return kind === 'bookmarks' ? <Bookmarks q={q} /> : kind === 'later' ? <ReadLater q={q} /> : kind === 'history' ? <History q={q} /> : <Downloads q={q} />;
 }

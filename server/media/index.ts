@@ -103,12 +103,13 @@ function caption(d: Deps, id: string) {
 
 /**
  * Keeps a picture, a video or a sound in the Library: copied in, or with `move` moved in (the file leaves where it was:
- * an upload's, a file the desktop app drops), recording `source` as what it came from when that is not its path. The
+ * an upload's, a file the desktop app drops), recording `source` (the call's, or the request's `source`: the page a picture
+ * came from) as what it came from when that is not its path. The
  * same file kept already (its path and size, or anywhere its bytes) comes back instead, and nothing is copied or moved.
  */
 export async function keepFile(
   d: Deps,
-  b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown },
+  b: { path?: unknown; prompt?: unknown; model?: unknown; lyrics?: unknown; sessionKey?: unknown; space?: unknown; source?: unknown },
   o: { move?: boolean; source?: string } = {},
 ): Promise<{ item: MediaItem; existed: boolean }> {
   if (typeof b.path !== 'string' || !b.path.trim()) throw new HttpError(400, 'path: the image, video or sound to keep');
@@ -157,7 +158,7 @@ export async function keepFile(
     kind: type.kind,
     from: file,
     move: o.move,
-    source: o.source,
+    source: o.source ?? str(b.source, 2000),
     sha,
     ext: ext === 'jpeg' ? 'jpg' : ext === 'm4v' ? 'mp4' : ext === 'oga' ? 'ogg' : ext,
     mime: type.mime,

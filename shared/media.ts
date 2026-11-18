@@ -137,7 +137,7 @@ export interface MediaItem {
   space?: string;
   /** The Library folder it is in (a folder of its space: shared/pages.ts LibFolder); none at its place's top. */
   folder?: string;
-  /** The file it was saved from. */
+  /** The file it was saved from, or the page it was saved from (a picture kept from the Browser). */
   source?: string;
   caption: CaptionStatus;
   /** Why the title and description could not be written (caption "failed"). */

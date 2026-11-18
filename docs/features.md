@@ -245,7 +245,8 @@ agents that speak ACP and take MCP servers.
     rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
     open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ⋯, ×, a speaker to mute,
     middle click to close, **New tab**), resized by its edge like every column; a title too long fades at its end and rolls to
-    show the rest under the pointer. **A tab's menu** (right-click, or its ⋯): close it, the others or the ones below;
+    show the rest under the pointer; and **Read later**, a quiet section under the tabs, folded while nothing waits.
+    **A tab's menu** (right-click, or its ⋯): close it, the others or the ones below;
     duplicate, reload, copy its address, bookmark; add it to a group or take it out. **Tab groups**: a header with a colour
     (one of seven), a name and the tab count, folded or opened by a click, its tabs under it (drag a tab on or off a group);
     the header's menu renames, colours, opens a new tab in it, ungroups or closes it. Groups are kept with the tabs for the next
@@ -256,8 +257,8 @@ agents that speak ACP and take MCP servers.
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
     agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site
     permissions** or **Settings**, still open by `?panel=`. A sheet over the page in a narrow window.
-  - **Save** keeps a readable copy of the page in the Library as a Web page, whose Bookmarks, Downloads and History
-    chips list this browser's own.
+  - **Save** keeps a readable copy of the page in the Library as a Web page, whose Bookmarks, Read later, Downloads and
+    History chips list this browser's own.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
     search engine's suggestions, **Ask about this page** (opens Ask beside the page with your words), **Do it in a tab of
@@ -284,9 +285,14 @@ agents that speak ACP and take MCP servers.
   - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
     **Forget**.
   - **A right-click menu** on pages: Back, Forward, Reload; for a link, open it in a new tab or your default browser
-    and copy it; for a picture, open, save, copy it and its address; for selected text, Copy, Search with your engine
-    and Ask an agent about it (opens Ask beside the page); in a field, spelling suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this
-    page, Print… and Inspect.
+    and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to
+    Library** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
+    about this image** (opens Ask beside the page with the picture attached); for selected text, Copy, Search with your
+    engine and Ask an agent about it (opens Ask beside the page, quoting up to 4,000 characters); in a field, spelling
+    suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this page, Read this page later, Print… and Inspect.
+  - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
+    the Library's **Read later** chip beside Bookmarks; each page has **Mark as read** (it leaves the list; **Show read**
+    brings the read ones back) and **Remove**. It is yours alone: agents are refused its routes.
   - **Zoom** (Ctrl/⌘ with + − 0, and Ctrl and the wheel, with a chip that resets it), **print**, full-screen video,
     **find in page** (Ctrl/⌘+F, "3 of 12", Match case), a speaker on a tab that plays sound to mute it, and **Open in
     your default browser**.
@@ -508,10 +514,12 @@ agents that speak ACP and take MCP servers.
   the Library as a readable document (its title, the address and date it was saved from, what you had selected, and its
   text), shown as a Web page with its site and when it was saved, in Everything and in its project, under a Web pages
   chip of its own (not counted among the Documents); More → Open the original page opens the address it came from. A
-  saved page is a Library item like the rest, so agents can read it. In the desktop app three more chips, Bookmarks,
-  Downloads and History, show what your own browser keeps as lists (with a search field, a row's Open, Delete, Show in
-  folder and Remove from the list or history, and History and Downloads by day with Show older), for every project,
-  never copied into the Library or counted in it; agents are refused them.
+  saved page is a Library item like the rest, so agents can read it. In the desktop app four more chips, Bookmarks,
+  Read later, Downloads and History, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
+  Mark as read, Show in folder and Remove from the list or history, Show read on Read later, and History and Downloads by
+  day with Show older), for every project,
+  never copied into the Library or counted in it; agents are refused them. A picture kept from a page with Save image
+  to Library is different: it is a Library picture like any other (with the page it came from as its source).
 - **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
   way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
   it holds; deleting one deletes nothing in it. **New → Import a folder** brings a folder of this computer in: a LaTeX

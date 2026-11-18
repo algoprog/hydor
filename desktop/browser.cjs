@@ -22,7 +22,7 @@
 // the ad blocker of the browsing profile (adblock.cjs), whose count of what a page had blocked goes to the window with the
 // tab's other news (sound, zoom, full screen) as `hydor:browser-tab-state`.
 'use strict';
-const { BrowserWindow, Menu, WebContentsView, clipboard, ipcMain, session, shell } = require('electron');
+const { BrowserWindow, Menu, WebContentsView, clipboard, ipcMain, nativeImage, session, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -534,6 +534,171 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     return one.length > n ? `${one.slice(0, n - 1)}…` : one;
   };
 
+  // ---- a picture of a page: for the Library, or for a question ---------------------------------------------------------
+
+  /** The biggest picture kept or asked about. */
+  const PICTURE_MAX = 50 * 1024 * 1024;
+  const PICTURE_MS = 60_000;
+  /** Where the pictures wait for the app to take them: kept ones go after a few minutes, those of a question after a week. */
+  const pictureDir = (what) => path.join(os.tmpdir(), `hydor-browser-${what}`);
+  const PICTURE_KEEP = { library: 10 * 60_000, ask: 7 * 24 * 3_600_000 };
+
+  /** Whether a picture can be read from this address: a web address, or a picture inside the page's own data or blobs. */
+  const readable = (src) => /^(https?:|data:|blob:)/i.test(String(src || ''));
+
+  /** The kind of picture the first bytes say (the Library keeps PNG, JPEG, WebP, GIF and AVIF), or null. */
+  function pictureKind(b) {
+    const at = (i, s) => b.length >= i + s.length && b.subarray(i, i + s.length).toString('latin1') === s;
+    if (b.length >= 8 && b[0] === 0x89 && at(1, 'PNG')) return 'png';
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg';
+    if (at(0, 'GIF8')) return 'gif';
+    if (at(0, 'RIFF') && at(8, 'WEBP')) return 'webp';
+    if (at(4, 'ftyp') && (at(8, 'avif') || at(8, 'avis'))) return 'avif';
+    if (at(0, 'BM')) return 'bmp';
+    if (b.length >= 4 && b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'ico';
+    return null;
+  }
+
+  const tooBig = () => new Error('That picture is over 50 MB.');
+
+  /** The bytes of a data: address. */
+  function fromData(src) {
+    const comma = src.indexOf(',');
+    if (comma < 0) throw new Error('That picture could not be read.');
+    const head = src.slice(5, comma);
+    const body = src.slice(comma + 1);
+    if (body.length > PICTURE_MAX * 1.4) throw tooBig();
+    const bytes = /;base64$/i.test(head) ? Buffer.from(body, 'base64') : Buffer.from(decodeURIComponent(body), 'latin1');
+    if (bytes.length > PICTURE_MAX) throw tooBig();
+    return bytes;
+  }
+
+  /**
+   * The bytes of the picture at `src` as this tab sees it: its own session reads it (so a picture behind a sign-in is
+   * there, with the page as its referrer); a blob: address only the page itself can read, so the page does.
+   */
+  async function readPicture(t, src, page) {
+    if (/^data:/i.test(src)) return fromData(src);
+    if (/^blob:/i.test(src)) {
+      const url = await withTimeout(
+        t.wc.executeJavaScript(
+          `fetch(${JSON.stringify(src)}).then((r) => r.blob()).then((b) => b.size > ${PICTURE_MAX} ? 'big' : new Promise((ok, no) => { const f = new FileReader(); f.onload = () => ok(String(f.result)); f.onerror = () => no(f.error); f.readAsDataURL(b); }))`,
+          true,
+        ),
+        PICTURE_MS,
+        'The picture',
+      );
+      if (url === 'big') throw tooBig();
+      return fromData(String(url));
+    }
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), PICTURE_MS);
+    try {
+      const r = await t.wc.session.fetch(src, { signal: stop.signal, headers: page && /^https?:/i.test(page) ? { Referer: page } : {} });
+      if (!r.ok) throw new Error(`The site did not give the picture (${r.status}).`);
+      if (Number(r.headers.get('content-length')) > PICTURE_MAX) throw tooBig();
+      const parts = [];
+      let got = 0;
+      const reader = r.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        got += value.length;
+        if (got > PICTURE_MAX) {
+          stop.abort();
+          throw tooBig();
+        }
+        parts.push(Buffer.from(value));
+      }
+      return Buffer.concat(parts);
+    } catch (e) {
+      if (stop.signal.aborted && !/50 MB/.test(String((e && e.message) || e))) throw new Error('The picture took too long to load.');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** A name for the picture's file from its address (or the page's title): letters, digits, dots, dashes. */
+  function pictureName(src, title) {
+    let base = '';
+    if (/^https?:/i.test(src)) {
+      try {
+        base = decodeURIComponent(path.basename(new URL(src).pathname));
+      } catch {}
+    }
+    base = base.replace(/\.[A-Za-z0-9]{1,5}$/, '');
+    // A name that says nothing (a hash, a number) is no better than the page's title.
+    if (!/[A-Za-z]{3}/.test(base) || /^[0-9a-f-]{24,}$/i.test(base)) base = '';
+    base = (base || String(title || '').trim() || 'picture').replace(/[^\p{L}\p{N}._ -]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+    return base || 'picture';
+  }
+
+  /** The picture of a right-click, read and written to a file of its own (PNG, JPEG, WebP, GIF or AVIF; a bitmap or icon becomes a PNG). */
+  async function pictureFile(t, params, what) {
+    const src = String(params.srcURL || '');
+    if (!readable(src)) throw new Error('That picture cannot be read.');
+    let bytes = await readPicture(t, src, params.pageURL || t.wc.getURL());
+    let kind = pictureKind(bytes);
+    if (kind === 'bmp' || kind === 'ico') {
+      const img = nativeImage.createFromBuffer(bytes);
+      if (img.isEmpty()) throw new Error('That picture could not be read.');
+      bytes = img.toPNG();
+      kind = 'png';
+    }
+    if (!kind) throw new Error('Only a PNG, JPEG, WebP, GIF or AVIF picture can be kept (this one is another kind, or not a picture).');
+    const dir = pictureDir(what);
+    await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
+    const name = `${pictureName(src, t.wc.getTitle())}.${kind}`;
+    const file = path.join(dir, `${crypto.randomBytes(4).toString('hex')}-${name}`);
+    await fs.promises.writeFile(file, bytes, { mode: 0o600 });
+    // What is old goes now, and this one too once the app has taken it (a picture of a question stays: the agent may open it again).
+    void sweepPictures(what);
+    if (what === 'library') setTimeout(() => fs.promises.rm(file, { force: true }).catch(() => {}), PICTURE_KEEP.library).unref();
+    return { path: file, name };
+  }
+
+  async function sweepPictures(what) {
+    const dir = pictureDir(what);
+    try {
+      const now = Date.now();
+      for (const f of await fs.promises.readdir(dir)) {
+        const p = path.join(dir, f);
+        const st = await fs.promises.stat(p).catch(() => null);
+        if (st && now - st.mtimeMs > PICTURE_KEEP[what]) await fs.promises.rm(p, { force: true });
+      }
+    } catch {}
+  }
+
+  /** Reads the picture, then tells the app (a command), or tells it why not. */
+  async function sendPicture(t, params, what, command) {
+    const page = params.pageURL || t.wc.getURL();
+    try {
+      const f = await pictureFile(t, params, what);
+      uiOf(t)?.send('hydor:browser-command', { ...command, path: f.path, name: f.name, url: page, title: t.wc.getTitle() });
+    } catch (e) {
+      log('a picture could not be read', String((e && e.message) || e));
+      uiOf(t)?.send('hydor:browser-command', { cmd: 'picture-failed', message: String((e && e.message) || e) });
+    }
+  }
+
+  /** The most of a selection a question quotes (the app cuts it there; this keeps what travels to the window small). */
+  const QUOTE_MAX = 20_000;
+
+  /**
+   * Asks an agent about words picked in a page. The menu's own copy of the selection is cut short (Chromium keeps about a
+   * thousand characters of it), so the page itself is asked for the whole of it, when its main frame holds the same words.
+   */
+  async function askAbout(t, text, url) {
+    let words = text;
+    try {
+      const plain = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+      const whole = String(await withTimeout(t.wc.executeJavaScript('String(window.getSelection() || "")', true), 800, 'The selection')).trim();
+      if (plain(whole).length > plain(text).length && plain(whole).startsWith(plain(text).slice(0, 200))) words = whole;
+    } catch {}
+    uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text: words.slice(0, QUOTE_MAX), url });
+  }
+
   /**
    * The items of the menu for a click in one of your tabs, as a template for Menu.buildFromTemplate: what the page offers
    * where you clicked (a link, an image, selected text, a field) and what any page has.
@@ -558,11 +723,16 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
         items.push({ label: 'Open link in your default browser', click: () => void shell.openExternal(params.linkURL).catch(() => {}) });
       }
       items.push({ label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) });
+      if (web(params.linkURL)) items.push({ label: 'Read link later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: params.linkURL, title: String(params.linkText || '').trim() }) });
       sep();
     }
     if (params.mediaType === 'image' && params.srcURL) {
       if (web(params.srcURL)) items.push({ label: 'Open image in new tab', click: () => void openTab(params.srcURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
       items.push({ label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
+      if (readable(params.srcURL)) {
+        items.push({ label: 'Save image to Library', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
+        items.push({ label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
+      }
       items.push({ label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });
       items.push({ label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) });
       sep();
@@ -580,7 +750,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (text) {
       if (!params.isEditable) items.push({ label: 'Copy', click: () => wc.copy() });
       items.push({ label: `Search ${eng.name} for “${short(text)}”`, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
-      items.push({ label: `Ask an agent about “${short(text)}”`, click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text, url: page }) });
+      items.push({ label: `Ask an agent about “${short(text)}”`, click: () => void askAbout(t, text, page) });
       sep();
     }
     if (!params.isEditable && !text) {
@@ -591,6 +761,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       sep();
     }
     items.push({ label: 'Bookmark this page', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'bookmark', url: page, title: wc.getTitle() }) });
+    if (web(page)) items.push({ label: 'Read this page later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: page, title: wc.getTitle() }) });
     items.push({ label: 'Print…', click: () => wc.print({ printBackground: true }) });
     items.push({ type: 'separator' });
     items.push({ label: 'Inspect', click: () => wc.inspectElement(params.x, params.y) });

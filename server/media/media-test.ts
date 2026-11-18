@@ -438,6 +438,13 @@ const until = async (cond: () => boolean, ms = 8000) => {
   ok(all.length === 2 && all[0].id === p2.id, 'newest first');
   const gone = await req('DELETE', `/api/media/${item.id}`);
   ok(gone.statusCode === 200 && !fs.existsSync(item.file) && (await req('GET', `/api/media/${item.id}`)).statusCode === 404, 'deleted, file and all');
+
+  // A picture kept from a page (the Browser's Save image to Library): the page is its source, and its title comes from the file's name.
+  const fromPage = path.join(tmp, 'photo-of-cat.png');
+  fs.writeFileSync(fromPage, Buffer.concat([fs.readFileSync(pic), Buffer.from([0])]));
+  const kp = (await req('POST', '/api/media', { path: fromPage, source: 'https://example.com/cats' })).json();
+  ok(kp.item.source === 'https://example.com/cats' && kp.item.title === 'Photo of cat' && !kp.existed, `kept from a page: ${kp.item.source} / ${kp.item.title}`);
+  ok((await req('POST', '/api/media', { path: fromPage, source: 'https://example.com/cats' })).json().existed === true, 'the same picture again is the one kept');
 }
 
 await app.close();

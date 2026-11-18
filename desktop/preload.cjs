@@ -133,7 +133,7 @@ if (own) {
       openExternal: (url) => ipcRenderer.invoke('hydor:browser-open-external', String(url)),
       /** A tab's news as it changes ({ target, audible?, muted?, zoom?, blocked?, fullscreen? }); everything of a tab comes when it is shown. */
       onTabState: (fn) => listen('hydor:browser-tab-state', fn),
-      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }. */
+      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in the Library, or ask about it), { cmd: 'picture-failed', message }. */
       onCommand: (fn) => listen('hydor:browser-command', fn),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
