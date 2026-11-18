@@ -1,7 +1,8 @@
 // The Library (/library): everything kept, by space. Pages and small tools, slide decks, documents, spreadsheets
 // LaTeX documents and Jupyter notebooks (agents' and yours), and the pictures, videos and sounds you kept, each in the space it was made in
 // (an agent's save goes in its session's space; you pick when you keep something yourself) or in none. On a wide
-// screen the places are a list beside it: Everything (each space's things together, under its name), each space,
+// screen the places are a list beside it: Everything (each space's things together, under its name, which opens it; the
+// places with too few things to fill a row share one, each card naming its project), each space,
 // Not in a space, and Published (the sites published from pages or a project's build); on a phone, a row of chips.
 // Kinds filter what a place shows, a box finds things by name, and each card's More moves it to another space, or
 // turns it into another kind (slides from a document, a page from a spreadsheet…): an agent makes that from it, in its
@@ -15,12 +16,13 @@
 // Saved web pages (a page with the address it came from, kept from the Browser's Save) are a kind of their own, Web
 // pages, among the rest. In the desktop app five more chips at the row's end, after a divider, show what your own browser
 // keeps as lists (BrowserLists.tsx): Bookmarks, Read later, Downloads, History and Highlights, for every project, never copied into the Library.
+// Everything with the All chip also shows a few of each in a column beside the cards (under them on a narrow page; BrowserColumn.tsx), each with See all.
 // On a wide screen the page draws its own column on the left (the app's sidebar gives way to its rail here): the places
 // and New, shown while the sidebar is open (Ctrl+B).
 // Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (web, image, video and audio each, media pictures and
 // videos both: the old Media tab's ?tab=media too; bookmarks, downloads and history in the desktop app), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook|diagram opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
 import {
   AppWindow,
@@ -95,6 +97,7 @@ import { preloadEditors } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { PublishDialog, RenameDialog, SiteRow, Thumb } from './parts';
+import { BrowserColumn, overviewHasAny, useBrowsingOverview } from './BrowserColumn';
 import { BrowserList, isBrowserKind, openInBrowser, type BrowserKind } from './BrowserLists';
 import { NewPageDialog, type NewKind } from './NewDialog';
 import { CAN_DRAG, dragThing, FolderCrumbs, folderChain, FolderMenu, FolderNameDialog, FolderTile, ImportFolderDialog, moveToFolder, placeFolders, placeTopName } from './folders';
@@ -286,7 +289,7 @@ async function moveTo(it: Item, space: string | null, spaces: SpaceView[] | null
 // ---- one thing kept ----------------------------------------------------------------------------------------
 
 /** A card: its picture (with its kind), its name, its space when the list mixes them (and its folder), and More. */
-function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean; showFolder?: boolean }) {
+function ItemCard({ it, showSpace, showFolder, placeOnly }: { it: Item; showSpace?: boolean; showFolder?: boolean; placeOnly?: boolean }) {
   const spaces = useSpaces();
   const folders = usePagesStore((s) => s.folders);
   const [menu, setMenu] = useState(false);
@@ -338,7 +341,43 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
     }
   };
   const web = it.kind === 'web' ? p?.source : undefined;
-  const sub = m?.caption === 'pending' ? 'Writing its title…' : web ? tr(`Saved ${ago(it.made)}`) : tr(`Changed ${ago(it.at)}`);
+  // A card among several places' in one row (placeOnly) says where it is instead of when it changed: a narrow card has no
+  // room for both.
+  const tagged = !!(showSpace && space);
+  const pending = m?.caption === 'pending';
+  const sub = pending ? 'Writing its title…' : placeOnly && tagged ? '' : web ? tr(`Saved ${ago(it.made)}`) : tr(`Changed ${ago(it.at)}`);
+  // Where it is (its project, its folder, the site a web page came from) and when, a dot between each.
+  const where: ReactNode[] = [];
+  if (tagged)
+    where.push(
+      <span key="space" className="flex min-w-0 shrink items-center gap-1">
+        <SpaceMark s={space!} size={12} />
+        <span translate="no" className="truncate">
+          {space!.name}
+        </span>
+      </span>,
+    );
+  if (showFolder && inFolder)
+    where.push(
+      <span key="folder" className="flex min-w-0 shrink items-center gap-1" title={folderChain(folders, inFolder.id).map((f) => f.name).join(' › ')}>
+        <Folder size={11} className="shrink-0" />
+        <span translate="no" className="truncate">
+          {inFolder.name}
+        </span>
+      </span>,
+    );
+  if (web?.site)
+    where.push(
+      <span key="site" translate="no" className="max-w-[50%] min-w-0 shrink truncate">
+        {web.site}
+      </span>,
+    );
+  if (sub)
+    where.push(
+      <span key="when" className="shrink-0 truncate">
+        {sub}
+      </span>,
+    );
   // The page it was saved from, in your own browser (the desktop app) or a new tab.
   const openOriginal = () => (ownBrowserHere() ? openInBrowser(web!.url) : void window.open(web!.url, '_blank', 'noopener'));
   return (
@@ -368,33 +407,7 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             {it.title}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-fg-3">
-            {showSpace && space && (
-              <span className="flex min-w-0 shrink items-center gap-1">
-                <SpaceMark s={space} size={12} />
-                <span translate="no" className="truncate">
-                  {space.name}
-                </span>
-                <span>·</span>
-              </span>
-            )}
-            {showFolder && inFolder && (
-              <span className="flex min-w-0 shrink items-center gap-1" title={folderChain(folders, inFolder.id).map((f) => f.name).join(' › ')}>
-                <Folder size={11} className="shrink-0" />
-                <span translate="no" className="truncate">
-                  {inFolder.name}
-                </span>
-                <span>·</span>
-              </span>
-            )}
-            {web?.site && (
-              <span className="flex max-w-[50%] min-w-0 shrink items-center gap-1">
-                <span translate="no" className="truncate">
-                  {web.site}
-                </span>
-                <span>·</span>
-              </span>
-            )}
-            <span className="shrink-0 truncate">{sub}</span>
+            {where.flatMap((x, i) => (i ? [<span key={`dot${i}`}>·</span>, x] : [x]))}
             {people > 0 && <Users size={11} className="shrink-0 text-info" aria-label={tr(people === 1 ? 'Shared with 1 person' : `Shared with ${people} people`)} />}
             {p?.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
             {!!p?.storageBytes && <Database size={11} className="shrink-0" aria-label={tr(`Keeps ${bytes(p.storageBytes)}`)} />}
@@ -501,13 +514,14 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
   );
 }
 
-const GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-3.5';
+// Cards are at least 200 px wide, or --card-min (narrower beside the column of your browser's lists, so a row keeps three or four).
+const GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(var(--card-min,200px),1fr))] sm:gap-3.5';
 
-function Grid({ items, showSpace, showFolder, className }: { items: Item[]; showSpace?: boolean; showFolder?: boolean; className?: string }) {
+function Grid({ items, showSpace, showFolder, placeOnly, className }: { items: Item[]; showSpace?: boolean; showFolder?: boolean; placeOnly?: boolean; className?: string }) {
   return (
     <div className={className ?? GRID}>
       {items.map((it) => (
-        <ItemCard key={it.key} it={it} showSpace={showSpace} showFolder={showFolder} />
+        <ItemCard key={it.key} it={it} showSpace={showSpace} showFolder={showFolder} placeOnly={placeOnly} />
       ))}
     </div>
   );
@@ -642,21 +656,32 @@ function Places({ place, onPlace, items, sites, chips, dropAt, idle }: { place: 
 /** How many of a space's things the Everything view shows before See all. */
 const PER_SECTION = 8;
 
-/** A space's things in Everything: its name and mark, how many, and See all. */
+/** A place's mark and name, which open it: a project, or Not in a project. */
+function PlaceName({ space, onOpen }: { space: SpaceView | null; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2.5 text-left decoration-fg-3 underline-offset-4 hover:underline">
+      {space ? <SpaceMark s={space} size={22} className="rounded-md" /> : <Layers size={18} className="shrink-0 text-fg-3" />}
+      <span translate={space ? 'no' : undefined} className="min-w-0 truncate">
+        {space ? space.name : 'Not in a project'}
+      </span>
+    </button>
+  );
+}
+
+/** A space's things in Everything: its name and mark (they open it), how many, and See all when it holds more than show. */
 function SpaceSection({ space, items, onAll, showFolder }: { space: SpaceView | null; items: Item[]; onAll: () => void; showFolder?: boolean }) {
   const more = items.length > PER_SECTION;
   return (
     <section>
       <div className="mb-3 flex min-w-0 items-center gap-2.5">
-        {space ? <SpaceMark s={space} size={22} className="rounded-md" /> : <Layers size={18} className="shrink-0 text-fg-3" />}
-        <h2 translate={space ? 'no' : undefined} className="min-w-0 truncate text-[15px] font-semibold tracking-tight">
-          {space ? space.name : 'Not in a project'}
+        <h2 className="flex min-w-0 text-[15px] font-semibold tracking-tight">
+          <PlaceName space={space} onOpen={onAll} />
         </h2>
         <span className="tnum text-[13px] text-fg-3">{items.length}</span>
         <span className="flex-1" />
-        {(more || space) && (
+        {more && (
           <Button size="sm" variant="ghost" onClick={onAll} className="h-7 px-2 text-[12.5px]">
-            {more ? tr(`See all ${items.length}`) : 'See all'}
+            {tr(`See all ${items.length}`)}
             <ArrowRight size={13} className="ml-1" />
           </Button>
         )}
@@ -664,6 +689,50 @@ function SpaceSection({ space, items, onAll, showFolder }: { space: SpaceView | 
       <Grid items={items.slice(0, PER_SECTION)} showFolder={showFolder} />
     </section>
   );
+}
+
+/**
+ * Places too small to fill a row of cards, together in one grid rather than a section each with a row mostly empty:
+ * their names over it (each opens its place, with how many it holds) and each card naming its project.
+ */
+function SmallPlaces({ places, onOpen, showFolder }: { places: { space: SpaceView | null; items: Item[] }[]; onOpen: (space: SpaceView | null) => void; showFolder?: boolean }) {
+  return (
+    <section>
+      <h2 className="mb-3 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-[15px] font-semibold tracking-tight">
+        {places.map((p) => (
+          <span key={p.space?.id ?? 'none'} className="flex min-w-0 items-center gap-2">
+            <PlaceName space={p.space} onOpen={() => onOpen(p.space)} />
+            <span className="tnum text-[13px] font-normal text-fg-3">{p.items.length}</span>
+          </span>
+        ))}
+      </h2>
+      <Grid items={places.flatMap((p) => p.items)} showSpace showFolder={showFolder} placeOnly />
+    </section>
+  );
+}
+
+/**
+ * How many cards a row of GRID holds in the element the returned ref is given: two on a phone, else as many as fit at
+ * their least width (--card-min where the element has it, else 200 px), measured again as it changes size.
+ */
+function useGridCols(): [(el: HTMLDivElement | null) => void, number] {
+  const [cols, setCols] = useState(4);
+  const watch = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    watch.current?.disconnect();
+    watch.current = null;
+    if (!el) return;
+    const measure = () => {
+      if (!window.matchMedia('(min-width: 640px)').matches) return setCols(2);
+      const min = parseFloat(getComputedStyle(el).getPropertyValue('--card-min')) || 200;
+      // The gap between cards is 14 px (sm:gap-3.5).
+      setCols(Math.max(1, Math.floor((el.clientWidth + 14) / (min + 14))));
+    };
+    measure();
+    watch.current = new ResizeObserver(measure);
+    watch.current.observe(el);
+  }, []);
+  return [ref, cols];
 }
 
 /** The published sites, with Publish a folder. */
@@ -764,6 +833,12 @@ export function Library() {
   const placeList = placeSpace === undefined ? [] : placeFolders(folders, placeSpace);
   const askedFolder = q.get('folder');
   const current = askedFolder && placeList.some((f) => f.id === askedFolder) ? askedFolder : null;
+  // Everything's All also shows a few of what your own browser keeps, in a column beside the cards (the desktop app).
+  const columnWanted = own && !browserShow && place.kind === 'all' && show === 'all' && !current;
+  const overview = useBrowsingOverview(find.trim(), columnWanted);
+  const column = columnWanted && overviewHasAny(overview);
+  // Unlike a chip, See all keeps the words typed: the list opens filtered by them.
+  const seeAll = (k: BrowserKind) => go(addressOf(place, k, null), true);
   const chain = folderChain(folders, current);
   const topName = placeTopName(placeSpace ?? null, spaces);
   const goFolder = (id: string | null) => {
@@ -840,6 +915,21 @@ export function Library() {
     return [...order.map((id) => ({ space: spaces.find((s) => s.id === id) ?? null, items: by.get(id)! })), ...(by.has(null) ? [{ space: null, items: by.get(null)! }] : [])];
   }, [shown, place.kind, words, spaces]);
 
+  // Places with too few things to fill a row show together, where the first of them would be (two or more of them).
+  const [sectionsRef, cols] = useGridCols();
+  const blocks = useMemo(() => {
+    if (!sections) return null;
+    const small = sections.filter((x) => x.items.length < cols);
+    if (small.length < 2) return sections.map((one) => ({ one }));
+    const out: ({ one: (typeof sections)[number] } | { small: typeof sections })[] = [];
+    for (const x of sections) {
+      if (x.items.length >= cols) out.push({ one: x });
+      else if (x === small[0]) out.push({ small });
+    }
+    return out;
+  }, [sections, cols]);
+  const openPlace = (sp: SpaceView | null) => toPlace(sp ? { kind: 'space', id: sp.id } : { kind: 'none' });
+
   const newKinds: [NewKind, string, ReactNode][] = [
     ['page', 'Page', <AppWindow size={14} />],
     ['design', 'Design', <Palette size={14} />],
@@ -878,6 +968,19 @@ export function Library() {
   const body = () => {
     if (browserShow) return <BrowserList kind={browserShow} q={find.trim()} />;
     if (place.kind === 'published') return <Published sites={sites} onPublish={() => setPublish(true)} />;
+    if (!column) return cards();
+    return (
+      <div className="@container">
+        <div className="grid items-start gap-x-6 gap-y-8 @min-[860px]:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 [--card-min:168px]">{cards()}</div>
+          <BrowserColumn overview={overview!} onSeeAll={seeAll} />
+        </div>
+      </div>
+    );
+  };
+
+  /** The Library's own cards, for the place and kind open. */
+  const cards = () => {
     if (!items)
       return (
         <div className="flex justify-center py-10 text-fg-3">
@@ -944,12 +1047,16 @@ export function Library() {
       );
     if (!shown.length)
       return <p className="py-8 text-center text-[13px] text-fg-3">{words ? tr(`Nothing here matches “${find.trim()}”.`) : 'Nothing of that kind here.'}</p>;
-    if (sections)
+    if (blocks)
       return (
-        <div className="space-y-9">
-          {sections.map((s) => (
-            <SpaceSection key={s.space?.id ?? 'none'} space={s.space} items={s.items} showFolder={!!folders?.length} onAll={() => toPlace(s.space ? { kind: 'space', id: s.space.id } : { kind: 'none' })} />
-          ))}
+        <div ref={sectionsRef} className="space-y-9">
+          {blocks.map((b) =>
+            'one' in b ? (
+              <SpaceSection key={b.one.space?.id ?? 'none'} space={b.one.space} items={b.one.items} showFolder={!!folders?.length} onAll={() => openPlace(b.one.space)} />
+            ) : (
+              <SmallPlaces key="small" places={b.small} onOpen={openPlace} showFolder={!!folders?.length} />
+            ),
+          )}
         </div>
       );
     return <Grid items={shown} showSpace={place.kind === 'all'} showFolder={!!folders?.length} />;

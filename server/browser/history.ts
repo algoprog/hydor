@@ -253,6 +253,14 @@ export function historyCount(db: DB): number {
   return (db.prepare('select count(*) as n from browser_history').get() as { n: number }).n;
 }
 
+/** How many pages have all the words (as searchHistory finds them); with no words, all of them. */
+export function historyMatchCount(db: DB, q: string): number {
+  table(db);
+  const w = wordTests(wordsOf(q));
+  if (!w.sql) return historyCount(db);
+  return (db.prepare(`select count(*) as n from browser_history where ${w.sql}`).get(...w.args) as { n: number }).n;
+}
+
 // ---- frecency -------------------------------------------------------------------------------------------------
 
 /**

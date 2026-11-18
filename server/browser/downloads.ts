@@ -103,6 +103,18 @@ export function downloadCount(db: DB): number {
   return (db.prepare('select count(*) as n from browser_downloads').get() as { n: number }).n;
 }
 
+/** How many downloads listDownloads finds for the words (all of them with none). */
+export function countDownloads(db: DB, q = ''): number {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!words.length) return downloadCount(db);
+  downloadsTable(db);
+  const rows = db.prepare('select name, url from browser_downloads').all() as Pick<Row, 'name' | 'url'>[];
+  return rows.filter((r) => {
+    const hay = `${r.name}\n${r.url}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  }).length;
+}
+
 /** Clears the list: everything downloaded since that time, or all of it (the files stay). Returns how many went. */
 export function clearDownloads(db: DB, since?: number): number {
   downloadsTable(db);

@@ -115,6 +115,18 @@ export function listHighlights(db: DB, o: { q?: string; before?: number; limit?:
   return db.prepare(`select ${COLS} from browser_highlights ${where.length ? `where ${where.join(' and ')}` : ''} order by at desc, rowid desc limit ?`).all(...args, limit) as Row[];
 }
 
+/** How many highlights listHighlights finds for the words (all of them with none). */
+export function highlightCount(db: DB, q = ''): number {
+  table(db);
+  const where: string[] = [];
+  const args: string[] = [];
+  for (const w of wordsOf(q)) {
+    where.push('instr(hay, ?) > 0');
+    args.push(w);
+  }
+  return (db.prepare(`select count(*) as n from browser_highlights ${where.length ? `where ${where.join(' and ')}` : ''}`).get(...args) as { n: number }).n;
+}
+
 /** A note (empty takes it away). Null when there is no such highlight. */
 export function setNote(db: DB, id: string, note: unknown): PageHighlight | null {
   table(db);

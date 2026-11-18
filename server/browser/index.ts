@@ -9,6 +9,7 @@ import { historyImportRoutes } from './history-import.ts';
 import { browsingRoutes } from './browsing.ts';
 import { extensionRoutes } from './extensions.ts';
 import { laterRoutes } from './later.ts';
+import { overviewRoutes } from './overview.ts';
 import { startBrowserVectors } from './meaning.ts';
 import { browserRoutes } from './routes.ts';
 import { closeBrowser, killAll, openBrowsers, reapStale, setBrowserDeps, sweepIdle } from './session.ts';
@@ -43,6 +44,7 @@ export const browser: Feature = {
     extensionRoutes(d);
     browsingRoutes(d);
     laterRoutes(d);
+    overviewRoutes(d);
   },
   tools: (ctx) => (usable(ctx.deps.db) ? browserTools(ctx) : []),
   spawn: (_s, d) => (usable(d.db) ? { guides: [{ tools: ['browser_open', 'browser_act', 'browser_read', 'browser_tabs', 'browser_upload', 'browser_ask_user'], text: BROWSER_INSTRUCTIONS }] } : undefined),

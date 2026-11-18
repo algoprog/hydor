@@ -1,6 +1,7 @@
 // What your own browser keeps, as lists in the Library (its chips Bookmarks, Read later, Downloads, History and Highlights, in the desktop app):
-// never copied into the Library, never in Everything or a project's count, and shown only to you (agents are refused
-// the routes). Each row is a site's icon, a title and a muted line, with what can be done to it at the right on hover.
+// never copied into the Library or counted in it or in a project, and shown only to you (agents are refused the routes);
+// Everything's All shows a few of each in a column beside its cards (BrowserColumn.tsx). Each row is a site's icon, a
+// title and a muted line, with what can be done to it at the right on hover.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bookmark, Check, Clock, ExternalLink, FileDown, FolderOpen, Highlighter, History as HistoryIcon, Lock, RotateCcw, Sparkles, X } from 'lucide-react';
 import type { BookmarkNode, DownloadEntry, HistoryEntry } from '@shared/browser';

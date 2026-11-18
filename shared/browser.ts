@@ -1,6 +1,7 @@
 // The web browser agents drive (server/browser), as the pages see it: a session's browser and its live
 // view (with the agent's pointer in it), the user's input when they take over, the cards it adds to a
 // conversation, and Settings → Browser.
+import type { PageHighlight } from './highlights.ts';
 import type { AgentPointer } from './pointer.ts';
 
 /** One tab of a session's browser. */
@@ -584,6 +585,20 @@ export interface HistoryEntry {
   /** How many times you visited it, and typed its address. */
   visits: number;
   typed: number;
+}
+
+/** A few of each list your own browser keeps, for the Library's All (desktop app): how many each holds (or match the words) and its first few. */
+export interface BrowsingOverview {
+  /** Bookmarks (not folders), the most used first. */
+  bookmarks: { count: number; items: BookmarkNode[] };
+  /** Pages waiting to be read (not those marked as read), the newest added first. */
+  later: { count: number; items: LaterItem[] };
+  /** Pages visited, the latest first (with words: the likeliest first). */
+  history: { count: number; items: HistoryEntry[] };
+  /** Downloads, the newest first. */
+  downloads: { count: number; items: DownloadEntry[] };
+  /** Highlights, the newest first. */
+  highlights: { count: number; items: PageHighlight[] };
 }
 
 /** A tab you closed lately, to open again. */

@@ -595,7 +595,10 @@ agents that speak ACP and take MCP servers.
   Read later, Downloads, History and Highlights, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
   Mark as read, Show in folder and Remove from the list or history, Show read on Read later, History and Downloads by
   day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project,
-  never copied into the Library or counted in it; agents are refused them. A picture kept from a page with Save image
+  never copied into the Library or counted in it; agents are refused them. In Everything with All, a column beside the
+  cards shows a few of each that is not empty (the bookmarks you visit most as tiles, the latest history, the pages
+  waiting to be read, the latest downloads and highlights), each with its count and See all, filtered by the search
+  box too; it moves under the cards in a narrow window. A picture kept from a page with Save image
   to Library is different: it is a Library picture like any other (with the page it came from as its source).
 - **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
   way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
@@ -752,8 +755,9 @@ agents that speak ACP and take MCP servers.
   Library with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
   link (a published page with a description and a social picture where its link is shared). The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
-  Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
-  Published) are a column at the left of the same kind as the sessions' sidebar and Settings' (the logo, New and Hide, then the places; Ctrl+B hides it; a row of chips on a phone),
+  Move to a project moves anything; its places (Everything, each project's things under its name, which opens it, with
+  See all only when it holds more than show, and projects too small to fill a row sharing one, each card naming its
+  project; Not in a project, Published) are a column at the left of the same kind as the sessions' sidebar and Settings' (the logo, New and Hide, then the places; Ctrl+B hides it; a row of chips on a phone),
   beside the cards, with a search field, sorting and kind chips (Web pages, Pages, Slides, Documents,
   Spreadsheets, LaTeX, Pictures, Videos, Audio). Everything in it has a description (at most 100 words): the agent that
   saves something writes one (save_page and the other save tools' description, changed alone with an id), the helper
