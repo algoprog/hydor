@@ -3,6 +3,30 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.85.0 · 18 November 2026
+
+Your own browser becomes a place to collect and organise what you read: highlight it, keep clean reader copies with
+their pictures, save pictures, set pages aside to read later, and put your tabs in groups, by hand or with AI.
+
+- **Highlights**: select words on a page, right-click and choose **Highlight**: they are marked in a soft yellow, kept,
+  and marked again whenever you come back to the page. The Library's **Highlights** lists them by page, with search,
+  **Copy**, a note, and **Ask an agent about these**. Right-click a highlight to remove it. Your highlights are yours
+  alone: agents never see them.
+- **Save keeps a reader copy**: Save keeps the article as a reader view shows it, with its headings, pictures and
+  videos and without the site's menus, ads, comments and scripts. Its pictures are kept with the page, so it lasts
+  when the site's are gone. The ▾ beside Save picks the project or folder it goes in.
+- **Pictures to the Library**: right-click a picture for **Save image to Library** (it is read with the tab's own
+  sign-ins) or **Ask about this image**.
+- **Read later**: right-click a page or a link, or use the ⋯ menu, to set it aside. The list is in the tab column and
+  in the Library, with **Mark as read**.
+- **Tab groups**: right-click a tab for **Close tab**, **Close other tabs**, **Close tabs below**, **Duplicate**,
+  **Reload**, **Copy address**, **Bookmark** and **Add to group**. A group has a name and a colour, folds away and
+  comes back with your tabs. **Group my tabs with AI** sorts your open tabs into groups, with **Undo**: only their
+  titles and addresses go to the helper model, and only when you press it.
+- **Asking about a selection** quotes up to 4,000 characters of it.
+- **Subagents in the sidebar**: the line under a session says how many subagents it has at work and how many need you.
+- **New pictures** of the app in the guide, on the website and in the README, in the new look.
+
 ## 0.84.2 · 18 November 2026
 
 Fixes for the Browser: a menu always shows over the page, tab names stay in their column, and the tab column resizes
