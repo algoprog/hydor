@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, Folders, Inbox, ListFilter, PanelLeftClose, RotateCcw, Search, SquarePen, WifiOff, X } from 'lucide-react';
+import { Boxes, Folders, Inbox, ListFilter, PanelLeftClose, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { MOD } from '../../lib/format';
@@ -12,7 +12,7 @@ import { go } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Wordmark } from '../../components/Logo';
-import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
+import { cx, IconButton, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
@@ -41,6 +41,7 @@ function NavItem({ t, drag, floating, onMenu, tight }: { t: Tool; drag?: DragBit
       style={drag?.style}
       {...drag?.attrs}
       data-tour={floating ? undefined : t.tour}
+      data-tip={!floating && t.id === 'search' ? 'search' : undefined}
       onClick={() => Date.now() - lastDragEnd > 300 && t.go()}
       onContextMenu={onMenu}
       className={cx(
@@ -157,12 +158,11 @@ function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) =
 }
 
 /**
- * Navigation: the sessions, with new session and search. A column beside the rail on a computer (`column`: its tools and
+ * Navigation: the sessions, with new session and their filters (search is the rail's, Ctrl+K). A column beside the rail on a computer (`column`: its tools and
  * the inbox are on the rail, Rail.tsx); on phones a drawer that has them all, the tools in a grid under the sessions.
  */
 export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: boolean; column?: boolean }) {
   const [loc] = useLocation();
-  const [q, setQ] = useState('');
   const filter = useUI((s) => s.agentFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
   const byFolder = useUI((s) => s.groupByFolder);
@@ -172,7 +172,6 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
     if (spaces && spaceFilter && !spaces.some((s) => s.id === spaceFilter)) useUI.getState().set({ spaceFilter: null });
   }, [spaces, spaceFilter]);
   const connected = useApp((s) => s.connected);
-  const searchRef = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLButtonElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   // The rail loads the orders on a computer; the drawer has no rail.
@@ -188,22 +187,67 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
       data-tour="sidebar"
       className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile ? 'select-none [-webkit-touch-callout:none] [&_input]:select-text' : 'border-r border-line')}
     >
-      <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        {column ? (
-          <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">Sessions</h2>
-        ) : (
-          <>
-            <span className="flex min-w-0 flex-1 items-center text-fg">
-              <Wordmark height={16} tide />
-            </span>
-            {!connected && (
-              <span title="Reconnecting…" className="text-warn">
-                <WifiOff size={15} />
-              </span>
-            )}
-            <InboxButton active={loc === '/inbox'} onGo={nav} />
-          </>
+      <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-1 pr-2 pl-4">
+        <span className="flex min-w-0 flex-1 items-center text-fg">
+          <Wordmark height={16} tide />
+        </span>
+        {!connected && (
+          <span title="Reconnecting…" className="px-1 text-warn">
+            <WifiOff size={15} />
+          </span>
         )}
+        {!column && <InboxButton active={loc === '/inbox'} onGo={nav} />}
+        {/* Search is the rail's (and Ctrl+K's): it finds sessions with the rest. What stays here narrows the list itself. */}
+        <IconButton ref={filterRef} label="Filter and group sessions" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
+          <ListFilter size={16} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
+        </IconButton>
+        <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
+          {(
+            [
+              ['all', 'All agents', null],
+              ['claude', 'Claude Code', <AgentIcon key="c" agent="claude" size={14} />],
+              ['codex', 'Codex', <AgentIcon key="x" agent="codex" size={14} />],
+            ] as const
+          ).map(([v, label, icon]) => (
+            <MenuItem
+              key={v}
+              icon={icon}
+              checked={filter === v}
+              onClick={() => {
+                useUI.getState().set({ agentFilter: v });
+                setFilterOpen(false);
+              }}
+            >
+              {label}
+            </MenuItem>
+          ))}
+          {!!spaces?.length && (
+            <>
+              <MenuSep />
+              <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
+                Every project
+              </MenuItem>
+              {spaces.slice(0, 8).map((sp) => (
+                <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
+                  {sp.name}
+                </MenuItem>
+              ))}
+              <MenuItem
+                icon={<Boxes size={14} />}
+                onClick={() => {
+                  setFilterOpen(false);
+                  nav('/projects');
+                }}
+              >
+                Projects
+              </MenuItem>
+            </>
+          )}
+          <MenuSep />
+          <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
+            Group by folder or project
+          </MenuItem>
+        </Popover>
         {mobile ? (
           <IconButton label="Close menu" onClick={close}>
             <X size={18} />
@@ -224,80 +268,6 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
           <SquarePen size={16} className="shrink-0" />
           New session
         </button>
-        <div data-tip={mobile ? 'search' : undefined} className="relative">
-          <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-          <input
-            ref={searchRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQ('')}
-            placeholder="Search sessions"
-            className="h-9 w-full rounded-[10px] bg-bg-2 pr-16 pl-9 text-[13.5px] outline-none placeholder:text-fg-3 focus:ring-2 focus:ring-accent/25"
-          />
-          <span className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-1">
-            {q ? (
-              <IconButton label="Clear search" size="sm" onClick={() => setQ('')}>
-                <X size={14} />
-              </IconButton>
-            ) : (
-              !mobile && (
-                <button type="button" onClick={openPalette} title="Search everything: settings, sessions, apps, notes, files" className="rounded">
-                  <Kbd>{MOD}K</Kbd>
-                </button>
-              )
-            )}
-            <IconButton ref={filterRef} label="Filter and group sessions" size="sm" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
-              <ListFilter size={14} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
-            </IconButton>
-          </span>
-          <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
-            {(
-              [
-                ['all', 'All agents', null],
-                ['claude', 'Claude Code', <AgentIcon key="c" agent="claude" size={14} />],
-                ['codex', 'Codex', <AgentIcon key="x" agent="codex" size={14} />],
-              ] as const
-            ).map(([v, label, icon]) => (
-              <MenuItem
-                key={v}
-                icon={icon}
-                checked={filter === v}
-                onClick={() => {
-                  useUI.getState().set({ agentFilter: v });
-                  setFilterOpen(false);
-                }}
-              >
-                {label}
-              </MenuItem>
-            ))}
-            {!!spaces?.length && (
-              <>
-                <MenuSep />
-                <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
-                  Every project
-                </MenuItem>
-                {spaces.slice(0, 8).map((sp) => (
-                  <MenuItem key={sp.id} icon={<SpaceMark s={sp} size={14} />} checked={spaceFilter === sp.id} onClick={() => (useUI.getState().set({ spaceFilter: sp.id }), setFilterOpen(false))}>
-                    {sp.name}
-                  </MenuItem>
-                ))}
-                <MenuItem
-                  icon={<Boxes size={14} />}
-                  onClick={() => {
-                    setFilterOpen(false);
-                    nav('/projects');
-                  }}
-                >
-                  Projects
-                </MenuItem>
-              </>
-            )}
-            <MenuSep />
-            <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
-              Group by folder or project
-            </MenuItem>
-          </Popover>
-        </div>
       </div>
 
       <div
@@ -309,7 +279,7 @@ export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: bool
           if (mobile && e.currentTarget.contains(t) && t.closest('button')) close();
         }}
       >
-        <SessionList query={q} />
+        <SessionList query="" />
       </div>
 
       {mobile && <ToolGrid nav={nav} close={close} />}

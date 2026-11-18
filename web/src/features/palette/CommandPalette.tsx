@@ -143,14 +143,15 @@ function snippet(s: string): ReactNode {
   );
 }
 
-function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?: string; title: string; cwd?: string; updatedAt?: number; firstPrompt?: string }, home?: string, find?: string): Entry {
+function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?: string; title: string; cwd?: string; updatedAt?: number; firstPrompt?: string; archived?: boolean }, home?: string, find?: string): Entry {
   return {
     id: `s:${s.key}${find ? `:${find}` : ''}`,
     group: 'Sessions',
     icon: <AgentIcon agent={s.agent} name={s.acpName} size={15} />,
     title: s.title || 'Untitled',
     where: folderName(s.cwd, home),
-    hint: s.updatedAt ? timeAgo(s.updatedAt) : undefined,
+    // An archived session is out of the sidebar's list, so the search box is where it is found again: said so.
+    hint: s.archived ? 'Archived' : s.updatedAt ? timeAgo(s.updatedAt) : undefined,
     body: s.firstPrompt && s.firstPrompt !== s.title ? s.firstPrompt : undefined,
     facts: [
       ['Folder', s.cwd ?? ''],
@@ -253,14 +254,14 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
     const e = known.get(c.id);
     if (e) add({ entry: e, score: 0.8 * rrf(i), strength: 0.6 });
   });
-  // Sessions: their titles and folders here, and what the server finds by title or meaning.
+  // Sessions: their titles and folders here, and what the server finds by title or meaning. Archived ones too (the
+  // sidebar's list leaves them out, and this is where they are found), a little after the others.
   sessions
-    .filter((s) => !s.archived)
     .map((s) => ({ s, m: matchItem({ title: s.title ?? '', keywords: `${folderName(s.cwd, home)} ${s.gitBranch ?? ''}`, text: s.firstPrompt }, words, q) }))
     .filter((x) => x.m.score > 0)
-    .sort((a, b) => b.m.score - a.m.score)
+    .sort((a, b) => Number(!!a.s.archived) - Number(!!b.s.archived) || b.m.score - a.m.score)
     .slice(0, 30)
-    .forEach(({ s, m }, i) => add({ entry: sessionEntry(s, home), score: rrf(i), marks: m.marks, strength: matchStrength(m.score) }));
+    .forEach(({ s, m }, i) => add({ entry: sessionEntry(s, home), score: rrf(i) * (s.archived ? 0.6 : 1), marks: m.marks, strength: matchStrength(m.score) }));
   server?.sessions.forEach((s, i) => add({ entry: sessionEntry(s, home), score: 0.8 * rrf(i), strength: 0.6 }));
   server?.messages.forEach((m, i) => {
     const e = sessionEntry({ key: m.key, agent: m.agent, title: m.title, cwd: m.cwd, updatedAt: m.updatedAt }, home, q.trim());

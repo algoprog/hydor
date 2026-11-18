@@ -15,9 +15,9 @@ import { MOD } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { isStartingKey } from '../../lib/starting';
 import { useApp, useSessions, useUI } from '../../lib/store';
-import { OmegaMark } from '../../components/Logo';
 import { cx, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { openPalette } from '../palette/CommandPalette';
+import { ownColumn } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
 
@@ -175,6 +175,8 @@ export const Rail = memo(function Rail() {
     if (!isStartingKey(key)) lastSession = key;
   }, [session]);
   const inSessions = loc === '/' || loc.startsWith('/s/') || loc.startsWith('/review/');
+  const sideOpen = useUI((s) => s.sideOpen);
+  const sidebarShows = sideOpen && !ownColumn(loc);
 
   const tools = useTools(go, openPalette);
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
@@ -219,15 +221,13 @@ export const Rail = memo(function Rail() {
   );
 
   return (
-    <nav data-rail data-tour="tools" data-i18n="nav" aria-label="Tools" className="flex h-full w-[72px] shrink-0 flex-col border-r border-line bg-sidebar pt-[var(--safe-top)]">
-      <div className="flex min-h-[52px] shrink-0 flex-col items-center justify-center gap-1 text-accent">
-        <OmegaMark size={19} />
-        {!connected && (
-          <span title="Reconnecting…" className="text-warn">
-            <WifiOff size={13} />
-          </span>
-        )}
-      </div>
+    <nav data-rail data-tour="tools" data-i18n="nav" aria-label="Tools" className="flex h-full w-[72px] shrink-0 flex-col border-r border-line bg-sidebar pt-[calc(var(--safe-top)+8px)]">
+      {/* Offline: said beside the logo at the top of the sidebar, or here while no sidebar shows it. */}
+      {!connected && !sidebarShows && (
+        <span title="Reconnecting…" className="flex h-8 shrink-0 items-center justify-center text-warn">
+          <WifiOff size={15} />
+        </span>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

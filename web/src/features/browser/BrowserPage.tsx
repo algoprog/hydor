@@ -7,6 +7,7 @@
 // pages are the pages themselves (PageView draws them natively). Elsewhere the page says it is part of the desktop app
 // and starts nothing; the agents' browsers keep their live picture in sessions.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Wordmark } from '../../components/Logo';
 import { useSearch } from 'wouter';
 import type { BrowserView } from '@shared/browser';
 import {
@@ -179,14 +180,17 @@ export function BrowserPage() {
   return ownBrowserHere() ? <OwnBrowser /> : <NotHere />;
 }
 
-/** The tab column's top bar part: the page's name, a new tab, and the fold of the column (Ctrl+B). */
+/** The tab column's top bar part: the app's logo, a new tab, and the fold of the column (Ctrl+B). */
 function BarLead({ open }: { open: boolean }) {
   return (
     <div className={cx('flex h-full shrink-0 items-center gap-0.5 border-r border-line pr-2', open ? 'w-[260px] pl-3.5' : 'pl-2')}>
       {open && (
         <>
-          <Globe size={17} className="mr-2 shrink-0 text-fg-2" />
-          <div className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">Browser</div>
+          {/* The rail names the section: the column shows the app's logo, as every column does. */}
+          <h1 className="sr-only">Browser</h1>
+          <span className="flex min-w-0 flex-1 items-center pl-0.5 text-fg">
+            <Wordmark height={16} tide />
+          </span>
         </>
       )}
       <IconButton label={`New tab (${MOD}T)`} onClick={() => void newTab()}>
