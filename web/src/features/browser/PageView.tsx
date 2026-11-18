@@ -140,6 +140,35 @@ function layers(box: HTMLElement): Element[] {
   return out;
 }
 
+/**
+ * Whether something the floating layers draw lies over the box (r): a menu's panel, a tooltip, a toast. Found by where
+ * each is, not by a few points over the box: a narrow menu at the box's edge (the browser's ⋯ menu) fell between them,
+ * and the page stayed over it while it was open. What only holds the rest (a wrapper as big as the window, a box that
+ * draws nothing of its own) is looked into rather than counted, and what is not drawn (hidden, transparent, a pixel) is
+ * passed over; a dim over everything is the points' to find, since it takes the pointer.
+ */
+function overLayers(ls: Element[], r: DOMRect): boolean {
+  let budget = 200;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const visit = (n: Element, depth: number): boolean => {
+    if (--budget < 0) return false;
+    const cs = getComputedStyle(n);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false;
+    const b = n.getBoundingClientRect();
+    if (b.width >= 2 && b.height >= 2 && b.right > r.left + 1 && b.left < r.right - 1 && b.bottom > r.top + 1 && b.top < r.bottom - 1) {
+      const whole = b.width >= W - 2 && b.height >= H - 2;
+      const lines = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderRightWidth) + parseFloat(cs.borderBottomWidth) + parseFloat(cs.borderLeftWidth);
+      const bare = cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.backgroundImage === 'none' && cs.boxShadow === 'none' && cs.backdropFilter === 'none' && !lines;
+      if (!whole && !(bare && n.firstElementChild)) return true;
+    }
+    if (depth >= 5) return false;
+    for (const c of Array.from(n.children)) if (visit(c, depth + 1)) return true;
+    return false;
+  };
+  return ls.some((l) => visit(l, 0));
+}
+
 /** Transitions of these properties move things; the rest (colours, opacity, shadows) cannot move the box. */
 const MOVING = /^(width|height|min-|max-|top|left|right|bottom|inset|margin|padding|transform|translate|scale|flex|grid|gap|border(-\w+)?-width|font-size|line-height|display|visibility)/;
 
@@ -170,6 +199,9 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     let taking = false; // a picture is being made, the page is still up
     let okAt = 0; // since when the box has been free again, while the picture is up
     let wait = 0;
+    // A press outside the page often opens something over it (a menu): its picture is taken at once, so that the page
+    // can go as soon as that opens, not a picture later.
+    let early: { pic: Promise<string | null>; at: number } | null = null;
 
     // The page goes away for a while: a picture of it as it is first (the page is still there while it is made, a few
     // milliseconds), laid in its place under it, and the page is hidden only once the picture is drawn there. Hidden
@@ -187,6 +219,8 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
         return;
       }
       taking = true;
+      const fresh = early && performance.now() - early.at < 1500 ? early.pic : null;
+      early = null;
       const done = (src: string | null) => {
         if (gone || mine !== gen) {
           taking = false;
@@ -209,10 +243,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
         setAway(true);
       };
       if (!bridge.still) return done(null);
-      bridge
-        .still(target)
-        .catch(() => null)
-        .then(done);
+      (fresh ?? bridge.still(target).catch(() => null)).then(done);
     };
 
     // `scan`: look at what lies over the box too (always when a floating layer is up, otherwise only now and then).
@@ -221,7 +252,9 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       const r = el.getBoundingClientRect();
       let ok = document.visibilityState === 'visible' && r.width >= 8 && r.height >= 8 && r.bottom > 0 && r.right > 0 && r.left < window.innerWidth && r.top < window.innerHeight && uncut(cuts, r);
       // Nothing may lie over any part of it (menus, dialogs, toasts, the app's own overlays), nor cut it (scrolled out, clipped).
-      if (ok && (scan || layers(el).length)) {
+      const ls = ok ? layers(el) : [];
+      if (ls.length && overLayers(ls, r)) ok = false;
+      if (ok && (scan || ls.length)) {
         for (const [x, y] of points(r)) {
           const hit = document.elementFromPoint(x, y);
           if (!hit || !(hit === el || el.contains(hit))) {
@@ -294,7 +327,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     const lo = new MutationObserver(kick);
     const watchLayers = () => {
       lo.disconnect();
-      for (const c of document.body.children) if (!c.contains(el)) lo.observe(c, { childList: true, subtree: true });
+      for (const c of document.body.children) if (!c.contains(el)) lo.observe(c, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
     };
     const mo = new MutationObserver(() => {
       watchLayers();
@@ -313,10 +346,14 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       if (p !== undefined && !MOVING.test(p)) return;
       kick();
     };
+    const pressed = (e: PointerEvent) => {
+      kick();
+      if (at && !taking && bridge.still && !el.contains(e.target as Node)) early = { pic: bridge.still(target).catch(() => null), at: performance.now() };
+    };
     window.addEventListener('resize', kick);
     window.addEventListener('scroll', scrolled, true);
     document.addEventListener('visibilitychange', kick);
-    document.addEventListener('pointerdown', kick, true);
+    document.addEventListener('pointerdown', pressed, true);
     for (const ev of ['transitionrun', 'transitionend', 'animationstart', 'animationend']) document.addEventListener(ev, moved, true);
     // What nothing announces (an overlay shown in place, a sibling's layout) is caught by a look once a second.
     const timer = window.setInterval(() => {
@@ -335,7 +372,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       window.removeEventListener('resize', kick);
       window.removeEventListener('scroll', scrolled, true);
       document.removeEventListener('visibilitychange', kick);
-      document.removeEventListener('pointerdown', kick, true);
+      document.removeEventListener('pointerdown', pressed, true);
       for (const ev of ['transitionrun', 'transitionend', 'animationstart', 'animationend']) document.removeEventListener(ev, moved, true);
       // Shown, or still up while its picture is made or drawn: hidden with the place it had.
       if (at || shown.current || taking) void bridge.hide(target).catch(() => {});

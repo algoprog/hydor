@@ -805,6 +805,8 @@ html:not([data-motion=off]) .swap-out {
 .row-fold {
   display: grid;
   grid-template-rows: 1fr;
+  /* Its one column is as wide as the list, not as its row's whole text (a long tab name pushed the row past the column). */
+  grid-template-columns: minmax(0, 1fr);
 }
 .row-open > *,
 .row-close > * {
@@ -816,6 +818,36 @@ html:not([data-motion=off]) .row-open {
 }
 html:not([data-motion=off]) .row-close {
   animation: row-close 140ms var(--ease-app) both;
+}
+
+/* A line that may not fit (FadeText): its end fades out instead of being cut, and while the pointer is on its row
+   (.group) it rolls along to show the rest, waits, and rolls back. */
+.fade-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.fade-text > span {
+  display: inline-block;
+}
+.fade-text[data-over] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+@keyframes text-roll {
+  0%,
+  14% {
+    transform: none;
+  }
+  86%,
+  100% {
+    transform: translateX(var(--roll));
+  }
+}
+html:not([data-motion=off]) .group:hover .fade-text[data-over] > span,
+html:not([data-motion=off]) .group:focus-visible .fade-text[data-over] > span {
+  animation: text-roll var(--roll-time) ease-in-out 250ms infinite alternate;
 }
 
 /* The logo's water rises once when a session finishes: the tide of a hover, played by itself (Wordmark). */

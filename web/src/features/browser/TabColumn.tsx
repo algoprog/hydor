@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import type { BrowserView } from '@shared/browser';
 import { useSessions } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
+import { FadeText } from '../../components/FadeText';
 import { cx } from '../../components/ui';
 import { PinnedTiles } from './BookmarkBar';
 import { statusOf, titleOf } from './AgentTabs';
@@ -33,16 +34,14 @@ function AgentRow({ b, selected, onOpen }: { b: AgentBrowser; selected: boolean;
   const waits = !!st.warn;
   const busy = !!b.busy;
   return (
-    <button onClick={onOpen} title={titleOf(b, s?.title)} className={cx('relative flex h-[46px] w-full items-center gap-2.5 rounded-lg pr-2 pl-3 text-left transition-colors', selected ? 'bg-bg-2' : 'hover:bg-bg-2/60')}>
+    <button onClick={onOpen} title={titleOf(b, s?.title)} className={cx('group relative flex h-[46px] w-full items-center gap-2.5 rounded-lg pr-2 pl-3 text-left transition-colors', selected ? 'bg-bg-2' : 'hover:bg-bg-2/60')}>
       {selected && <span className={cx('absolute top-2 bottom-2 left-0 w-0.5 rounded-full', waits ? 'bg-warn' : 'bg-accent')} />}
       <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
         {s ? <AgentIcon agent={s.agent} name={s.acpName} size={18} spinning={busy && !waits} /> : <AgentIcon agent="claude" size={18} />}
         {(waits || busy) && <span className={cx('absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full ring-2 ring-sidebar', waits ? 'bg-warn' : 'bg-busy')} />}
       </span>
       <span className="min-w-0 flex-1">
-        <span translate="no" className="block truncate text-[13.5px] leading-tight">
-          {titleOf(b, s?.title)}
-        </span>
+        <FadeText text={titleOf(b, s?.title)} className="text-[13.5px] leading-tight" />
         <span className={cx('block truncate text-[12px] leading-tight', waits ? 'text-warn' : 'text-fg-3')}>{st.text}</span>
       </span>
     </button>
@@ -66,9 +65,7 @@ function TabRow({ t, on, watching, onLeave, ghost }: { t: BrowserView['tabs'][nu
       className={cx('group press flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none', ghost && 'pointer-events-none', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2/60 hover:text-fg')}
     >
       <Favicon tab={t} size={16} />
-      <span translate="no" className="min-w-0 flex-1 truncate">
-        {tabName(t)}
-      </span>
+      <FadeText text={tabName(t)} className="flex-1" />
       <Speaker tab={t} />
       <button
         aria-label="Close tab"
