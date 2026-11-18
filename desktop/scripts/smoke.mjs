@@ -28,16 +28,33 @@ const data = path.join(tmp, 'data');
 fs.mkdirSync(data);
 let server = null;
 const cleanup = () => {
+  // On Windows kill() stops the server alone, and the programs it started would go on (it asks Claude Code and Codex for
+  // their models as it starts, working in data\probe), holding the folders they work in: the whole tree goes, as
+  // launch-test.mjs stops the app. The app itself asks its server to stop over its channel, so the server stops them.
   try {
-    server?.kill();
-  } catch {}
+    if (WIN && server?.pid) execFileSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore' });
+    else server?.kill();
+  } catch {
+    try {
+      server?.kill();
+    } catch {}
+  }
   if (!WIN) {
     try {
       execFileSync(tmux, ['-S', path.join(data, 'tmux.sock'), 'kill-server'], { stdio: 'ignore' });
     } catch {}
   }
-  // Windows lets go of a stopped program's files a moment later.
-  setTimeout(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }), WIN ? 1000 : 0);
+  // Windows lets go of a stopped program's files a moment later. A scratch folder left behind is no fault of the app.
+  setTimeout(
+    () => {
+      try {
+        fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+      } catch (e) {
+        console.warn(`Could not remove ${tmp} (${e.code ?? e.message}); left for the system to clear.`);
+      }
+    },
+    WIN ? 1000 : 0,
+  );
 };
 const fail = (why) => {
   console.error(why);
