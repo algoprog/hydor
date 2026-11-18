@@ -237,7 +237,7 @@ agents that speak ACP and take MCP servers.
   everywhere): its tabs are real pages in the app's window, connecting to sites directly like any browser, kept between
   visits (up to 30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open
   addresses on your own network.
-  - **A bar and three columns**: a bar across the top (back, forward, reload, the address box, **Save**, **Ask**, your
+  - **A bar and three columns**: a bar across the top (back, forward, reload, home, the address box, **Save**, **Ask**, your
     extensions' buttons, **Add to Hydor** on a Web Store page, and a ⋯ menu), under it the **tab column** (Ctrl/⌘+B folds
     it away), the page, and a **column beside the page** that shows only when something is in it. Nothing is laid over
     the page: it narrows to make room.

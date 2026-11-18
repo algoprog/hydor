@@ -21,6 +21,7 @@ import {
   FileDown,
   Globe,
   History,
+  Home,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -74,7 +75,9 @@ import {
   switchTab,
   useBookmarks,
   desktopBrowser,
+  goTo,
   showDownload,
+  usePrefs,
 } from './browsing';
 import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
@@ -281,6 +284,8 @@ function OwnBrowser() {
   }, [view?.open, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tab = activeTab(view);
+  // The home page (Browser settings), for the Home button.
+  const home = usePrefs((s) => s.prefs?.home);
   const native = isNative(view);
   const marked = useMemo(() => (tab?.url ? nodes.filter((n) => n.url === tab.url) : []), [nodes, tab?.url]);
   const canHand = !!tab && /^https?:/i.test(tab.url);
@@ -610,6 +615,11 @@ function OwnBrowser() {
               {!mobile && (
                 <IconButton label={tab?.loading ? 'Stop' : 'Reload'} onClick={() => void navigate(tab?.loading ? 'stop' : 'reload')}>
                   {tab?.loading ? <X size={17} /> : <RotateCw size={16} />}
+                </IconButton>
+              )}
+              {!mobile && (
+                <IconButton label="Home" disabled={!home} onClick={() => home && void goTo(home, { tab: tab?.id })}>
+                  <Home size={16} />
                 </IconButton>
               )}
             </>
