@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.89.1 · 18 November 2026
+
+Wiki memory is simpler: no more lesson suggestions, and no switch of its own in each chat.
+
+- **Lessons learned are gone**: chats no longer suggest lessons for the project's wiki, agents no longer have tools to
+  preview and save them, and a project's **Memory → Wiki** tab no longer has **Suggest lessons learned**. What agents
+  learn still goes into memory notes and the project's wiki as before.
+- **Wiki memory is one setting**: the start page's and a session's **Options** no longer have **Wiki memory** and
+  **Auto lessons learned** switches, and **Settings → Memory → Wiki memory** no longer has the two "…by default in
+  chats" settings. Wiki memory is on or off there for every project, and in a project's own Settings for that one;
+  every chat in a project with it on uses it, except a Confidential chat.
+
 ## 0.89.0 · 18 November 2026
 
 Your bookmarks are easier to find and to keep in order: the address bar offers them, the Bookmarks panel searches
