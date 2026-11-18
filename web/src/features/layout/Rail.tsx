@@ -8,7 +8,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Inbox, MessagesSquare, RotateCcw, SquarePen, WifiOff } from 'lucide-react';
+import { Inbox, MessagesSquare, RotateCcw, WifiOff } from 'lucide-react';
 import { SECTION_TOOLS, usualOrder, type SidebarTool } from '@shared/sidebar';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { MOD } from '../../lib/format';
@@ -241,7 +241,6 @@ export const Rail = memo(function Rail() {
       >
         {/* The tiles scroll in a short window (their bar hidden), so none is left out. Touches on them may pick one up (lib/dragTouch). */}
         <div ref={touchDragArea} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Tile label="New" tip="New session" icon={<SquarePen size={19} />} onClick={() => go('/')} />
           <Tile label="Sessions" tip={inSessions ? `Sessions (${MOD}B)` : 'Sessions'} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
           {group(sections)}
           <div className="min-h-2 flex-1" />

@@ -18,7 +18,6 @@ On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels
 
 The rail is a column of tiles, each with an icon over its name; point at one to see its name and shortcut. The tile for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
 
-- **New**: opens the [start page](#the-start-page) for a new session.
 - **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
 
 Then the sections of the app (the desktop app has five; the web app and a phone have four, with no **Browser**):
@@ -147,7 +146,7 @@ In a terminal, `hydor away` lists the same and `hydor away seen` clears it (see 
 ## Start your first session
 
 1. Make sure the agent can work. Claude Code and Codex need you signed in: open [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts), find the **Accounts** group, press **Sign in** next to the agent and follow the steps (you open a link, approve, and paste or enter a code). Custom needs a model: add one in [Settings → Agents → Models](/settings?s=models). The welcome tour does this with you the first time. See [Agents, accounts and models](/guide/agents-models).
-2. Press **New** on the rail, or **New session** at the top of the sidebar. The app opens on the start page too.
+2. Press **New session** at the top of the sidebar. The app opens on the start page too.
 3. Press **Runs on** under the message box and pick the program. **Model** beside it picks its model; the one marked "default" is fine to start with.
 4. Press **Folder** and pick where the agent works:
    - a project, under **Projects**, to work in that project's folder with its documents and guidelines;

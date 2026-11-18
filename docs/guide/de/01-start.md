@@ -18,7 +18,6 @@ Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstell
 
 Die Werkzeugleiste ist eine Spalte aus Kacheln, jeweils mit dem Symbol über dem Namen; zeigst du auf eine, siehst du Name und Tastenkürzel. Die Kachel der geöffneten Seite ist hervorgehoben, daneben sitzt am Bildschirmrand ein Balken in der Akzentfarbe. Von oben nach unten:
 
-- **Neu**: öffnet die [Startseite](#the-start-page) für eine neue Sitzung.
 - **Sitzungen**: zeigt deine Sitzungen in der Seitenleiste. Auf der Startseite oder in einer Sitzung blendet die Kachel die Seitenleiste ein oder aus (wie Strg+B). Von jeder anderen Seite zeigt sie die Seitenleiste und bringt dich zur Sitzung, die du zuletzt in diesem Fenster geöffnet hattest, sonst zur Startseite.
 
 Dann die Bereiche der App (die Desktop-App hat fünf; in der Web-App und auf dem Smartphone sind es vier, ohne **Browser**):
@@ -147,7 +146,7 @@ Im Terminal listet `hydor away` dieselben Ereignisse auf; `hydor away seen` mark
 ## Deine erste Sitzung starten
 
 1. Stelle sicher, dass der Agent einsatzbereit ist. Melde dich für Claude Code oder Codex unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Accounts) im Bereich **Konten** über **Anmelden** beim gewünschten Agenten an. Folge den Schritten: Link öffnen, bestätigen und Code einfügen oder eingeben. Custom benötigt ein Modell aus [Einstellungen → Agenten → Modelle](/settings?s=models). Die Willkommenstour hilft dir beim ersten Mal dabei. Siehe [Agenten, Konten und Modelle](/guide/agents-models).
-2. Klicke in der Werkzeugleiste auf **Neu** oder oben in der Seitenleiste auf **Neue Sitzung**. Auch beim App-Start erscheint die Startseite.
+2. Klicke oben in der Seitenleiste auf **Neue Sitzung**. Auch beim App-Start erscheint die Startseite.
 3. Wähle unter dem Nachrichtenfeld über **Ausführungsumgebung** das Programm und daneben über **Modell** sein Modell. Zum Einstieg genügt das als „Standard“ markierte Modell.
 4. Wähle unter **Ordner** den Arbeitsort:
    - ein **Projekt**, um in dessen Ordner mit seinen Dokumenten und Richtlinien zu arbeiten;
