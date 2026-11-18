@@ -496,49 +496,52 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
           </div>
         ) : (
           <div className="@container mx-auto max-w-[1120px] px-4 pt-5 pb-10 sm:px-6 sm:pt-6">
-            {pinned.length > 0 && (
-              <div className="mb-5">
-                <Part title="Pinned" sub={pinned.length > 1 ? <span className="max-sm:hidden">Drag to change the order</span> : undefined}>
-                  <PinnedRow ids={pinned} faces={faces} />
-                </Part>
-              </div>
-            )}
-
-            {/* The find box stays at the top while the page scrolls; the kinds scroll away under it. */}
-            <div className="sticky top-0 z-20 -mx-4 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">
-              <label className="flex h-10 min-w-0 items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 focus-within:border-accent/60 sm:max-w-[460px]">
-                <Search size={15} className="shrink-0 text-fg-3" />
+            {/* As in the Library: the title at the left, the find box at the right of its row (it stays at the top while the
+                page scrolls), the kinds under it as the Library's chips. */}
+            <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">
+              <h2 className="min-w-0 truncate text-[17px] font-semibold tracking-tight max-sm:hidden">{cat === 'All' ? 'All apps' : cat}</h2>
+              <span className="flex-1 max-lg:hidden" />
+              <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 focus-within:border-accent/60 lg:max-w-[280px]">
+                <Search size={14} className="shrink-0 text-fg-3" />
                 <input
                   value={find}
                   onChange={(e) => setFind(e.target.value)}
                   onKeyDown={keys}
                   placeholder="Find an app: weather, recipes, a trip…"
                   enterKeyHint="go"
-                  className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-fg-3"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
                 />
                 {find && (
                   <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
-                    <X size={14} />
+                    <X size={13} />
                   </button>
                 )}
               </label>
             </div>
             {kinds.length > 2 && (
-              <div className="-mx-4 mt-1.5 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
                 {kinds.map(([k, n]) => (
                   <button
                     key={k}
                     type="button"
                     aria-pressed={cat === k}
                     onClick={() => setCat(k)}
-                    className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition-colors', cat === k ? 'border-fg bg-fg text-bg' : 'border-line bg-panel text-fg-2 hover:border-line-2 hover:text-fg')}
+                    className={cx('flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors', cat === k ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
                   >
                     {k}
-                    <span className={cx('tnum text-[11.5px]', cat === k ? 'opacity-70' : 'text-fg-3')}>{n}</span>
+                    <span className="tnum text-[11.5px] text-fg-3">{n}</span>
                   </button>
                 ))}
               </div>
             )}
+            {pinned.length > 0 && (
+              <div className="mt-5">
+                <Part title="Pinned" sub={pinned.length > 1 ? <span className="max-sm:hidden">Drag to change the order</span> : undefined}>
+                  <PinnedRow ids={pinned} faces={faces} />
+                </Part>
+              </div>
+            )}
+
 
             <div className="mt-8 space-y-9">
               {finding ? (
