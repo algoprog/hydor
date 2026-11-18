@@ -25553,5 +25553,9 @@
   "recently used apps latest runs run again last run result": "最近使用 应用 最近的运行 再运行一次 上次运行 结果",
   "The apps you made or installed from a file": "你制作或从文件安装的应用",
   "The apps you pinned to the top of the Apps page, in the order you put them": "你置顶在应用页面顶部的应用，按你排好的顺序",
-  "The apps you ran lately, with how each last run went and Run again": "你最近运行过的应用，以及它们上次运行的情况，还有再运行一次"
+  "The apps you ran lately, with how each last run went and Run again": "你最近运行过的应用，以及它们上次运行的情况，还有再运行一次",
+  "Find an agent": "查找智能体",
+  "Import Claude Code agent files": "导入 Claude Code 智能体文件",
+  "Places in Agents": "智能体中的位置",
+  "Where they work": "它们在哪里工作"
 }

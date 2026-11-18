@@ -25537,5 +25537,9 @@
   "recently used apps latest runs run again last run result": "χρησιμοποιήθηκαν πρόσφατα εφαρμογές πρόσφατες εκτελέσεις νέα εκτέλεση τελευταία εκτέλεση αποτέλεσμα",
   "The apps you made or installed from a file": "Οι εφαρμογές που φτιάξατε ή εγκαταστήσατε από αρχείο",
   "The apps you pinned to the top of the Apps page, in the order you put them": "Οι εφαρμογές που καρφιτσώσατε στην κορυφή της σελίδας των εφαρμογών, με τη σειρά που τους δώσατε",
-  "The apps you ran lately, with how each last run went and Run again": "Οι εφαρμογές που εκτελέσατε πρόσφατα, με το πώς πήγε η τελευταία εκτέλεση της καθεμιάς και το Νέα εκτέλεση"
+  "The apps you ran lately, with how each last run went and Run again": "Οι εφαρμογές που εκτελέσατε πρόσφατα, με το πώς πήγε η τελευταία εκτέλεση της καθεμιάς και το Νέα εκτέλεση",
+  "Find an agent": "Βρείτε έναν πράκτορα",
+  "Import Claude Code agent files": "Εισαγωγή αρχείων πρακτόρων του Claude Code",
+  "Places in Agents": "Θέσεις στους Πράκτορες",
+  "Where they work": "Πού εργάζονται"
 }

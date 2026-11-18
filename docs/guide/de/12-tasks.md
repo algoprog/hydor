@@ -49,7 +49,7 @@ Ohne Aufgaben erscheint der Hinweis, ein Beispiel zu wählen oder einen Agenten 
 
 ## Wochenübersicht: bisherige und kommende Läufe
 
-Unter [Agenten → Zeitpläne](/agents/schedules) im Tab **Zeitpläne** siehst du alles, was automatisch läuft. **Wochenansicht** in den Aufgabeneinstellungen und die Suche öffnen denselben Bereich. Er vereint geplante Aufgaben, Agentenzeitpläne, App-Zeitpläne einschließlich **Automatisch aktualisieren**, automatisch aktualisierte Board-Karten, Überwachungen und Webhooks. So erkennst du kommende Aufgaben, gleichzeitige Starts und vergangene Ergebnisse.
+Unter [Agenten → Zeitpläne](/agents/schedules) im Bereich **Zeitpläne** in der Spalte der Agentenseite (auf dem Smartphone ein Tab oben) siehst du alles, was automatisch läuft. **Wochenansicht** in den Aufgabeneinstellungen und die Suche öffnen denselben Bereich. Er vereint geplante Aufgaben, Agentenzeitpläne, App-Zeitpläne einschließlich **Automatisch aktualisieren**, automatisch aktualisierte Board-Karten, Überwachungen und Webhooks. So erkennst du kommende Aufgaben, gleichzeitige Starts und vergangene Ergebnisse.
 
 - **Woche**: Montag bis Sonntag stehen nebeneinander, Stunden am Rand, heute hervorgehoben und die aktuelle Uhrzeit als Linie. Ausgeführte Läufe erscheinen als Blöcke: grün **Abgeschlossen**, grau **Nichts Neues**, gelb **Braucht dich** bei teilweiser Erledigung oder Blockade, rot **Fehlgeschlagen** oder Fehler. Kommende Läufe sind blass und gestrichelt. Starten mehr als drei gleichzeitig, stehen zwei sichtbar neben einem Sammelblock wie **+2**.
 - **Die Spalte jedes Tages** nennt, was seine Läufe gekostet haben und wie viele fehlgeschlagen sind.

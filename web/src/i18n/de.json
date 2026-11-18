@@ -24283,5 +24283,9 @@
   "recently used apps latest runs run again last run result": "zuletzt verwendete Apps neueste Läufe erneut ausführen letzter Lauf Ergebnis",
   "The apps you made or installed from a file": "Die Apps, die du erstellt oder aus einer Datei installiert hast",
   "The apps you pinned to the top of the Apps page, in the order you put them": "Die Apps, die du oben auf der Apps-Seite angeheftet hast, in der Reihenfolge, die du festgelegt hast",
-  "The apps you ran lately, with how each last run went and Run again": "Die Apps, die du zuletzt ausgeführt hast, mit dem Verlauf des jeweils letzten Laufs und Erneut ausführen"
+  "The apps you ran lately, with how each last run went and Run again": "Die Apps, die du zuletzt ausgeführt hast, mit dem Verlauf des jeweils letzten Laufs und Erneut ausführen",
+  "Find an agent": "Agent suchen",
+  "Import Claude Code agent files": "Claude Code-Agentendateien importieren",
+  "Places in Agents": "Bereiche in Agenten",
+  "Where they work": "Wo sie arbeiten"
 }

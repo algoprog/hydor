@@ -49,7 +49,7 @@ With no tasks yet, the list says "No scheduled tasks yet: start from an example 
 
 ## See the week: what ran and what runs next
 
-Everything that runs by itself is in one place: [Agents → Schedules](/agents/schedules), the **Schedules** tab at the top of the Agents page. **Week view** in Settings → Scheduled tasks opens it too, and so does the search box. It brings together your scheduled tasks, your agents' schedules, your apps' schedules (**Update automatically** too), the board cards that keep themselves up to date, watchers and webhooks, so you can see what runs tomorrow, why several started at 08:00, and how last week went.
+Everything that runs by itself is in one place: [Agents → Schedules](/agents/schedules), the **Schedules** place in the Agents page's column (a tab at the top on a phone). **Week view** in Settings → Scheduled tasks opens it too, and so does the search box. It brings together your scheduled tasks, your agents' schedules, your apps' schedules (**Update automatically** too), the board cards that keep themselves up to date, watchers and webhooks, so you can see what runs tomorrow, why several started at 08:00, and how last week went.
 
 - **The week**: seven days side by side, Monday to Sunday, the hours down the side and today marked, with a line at the time now. Each run that happened is a block at its time, coloured by how it went: green for **Done**, grey for **Nothing new**, amber for **Needs you** (partly done or blocked), red for **Failed** (or an error). Runs still to come are drawn faintly, with a dashed edge and their name. When more than three start at once, two show and a **+2** block (or more) lists the rest.
 - **Each day's column** says what its runs cost and how many failed.

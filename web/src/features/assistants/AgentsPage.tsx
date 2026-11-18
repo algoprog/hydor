@@ -5,7 +5,7 @@
 // installs one from a file.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { CalendarClock, CalendarDays, Copy, Download, FileDown, FileUp, History, MessageSquarePlus, MoreHorizontal, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { BellRing, CalendarClock, CalendarDays, ChevronDown, Copy, Download, FileDown, FileUp, Globe, History, LayoutGrid, MessageSquarePlus, MoreHorizontal, Plus, Search, Settings2, Sparkles, Trash2, User, X } from 'lucide-react';
 import { agentFileName } from '@shared/agent-files';
 import { agentMode, DEFAULT_ASSISTANT, hasOutput, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft, TaskSchedule } from '@shared/automations';
@@ -15,11 +15,14 @@ import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
-import { Badge, Button, cx, IconButton, inputCls, MenuItem, Popover, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, IconButton, inputCls, MenuItem, Popover, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
-import { PageHeader } from '../layout/PageHeader';
+import { NavButton, PageHeader } from '../layout/PageHeader';
+import { PlaceRow, PlacesLabel } from '../layout/PlaceRow';
+import { SideColumn } from '../layout/SideColumn';
 import { SchedulesView } from '../automations/SchedulesView';
 import { TaskEditor } from '../settings/TasksSettings';
+import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import { EditAssistant, ImportDialog } from './AssistantsSettings';
 import { loadActivity, nextRunOf, statusOf, useAgentActivity } from './agentsState';
@@ -274,7 +277,8 @@ function NewAgent({ onClose, onAll, project }: { onClose: () => void; onAll: (d:
 
 // ---- one agent ----------------------------------------------------------------------------------------------
 
-function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant>) => void }) {
+/** `wide`: on a computer, where the page has its column and no header of its own: the button that shows the sidebar again sits at the left of the agent's. */
+function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Assistant>) => void; wide?: boolean }) {
   const st = useAssistantsState();
   const boot = useApp((s) => s.boot);
   const spaces = useSpaces();
@@ -298,6 +302,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
   if (!a)
     return (
       <div className="py-12 text-center text-[13.5px] text-fg-3">
+        {wide && <NavButton />}
         There is no such agent.{' '}
         <button type="button" className="text-accent hover:underline" onClick={() => go('/agents')}>
           See your agents
@@ -343,6 +348,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-3">
+        {wide && <NavButton />}
         <AssistantIcon icon={a.icon} size={18} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -486,14 +492,53 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
 
 // ---- the page --------------------------------------------------------------------------------------------------
 
+/** Where the page is, on a computer: all the agents, a part of them, one of the ready-made ones' pages (an address of its own) or Schedules. */
+type Place = 'all' | 'mine' | 'needs' | 'scheduled' | 'everywhere' | 'schedules' | `project:${string}`;
+
+/** The address that keeps a place (so a link opens it): /agents, /agents?place=mine, /agents/schedules. */
+function addressOf(p: Place): string {
+  if (p === 'all') return '/agents';
+  if (p === 'schedules') return '/agents/schedules';
+  return `/agents?place=${encodeURIComponent(p)}`;
+}
+
+const PLACE_TITLES: Record<string, string> = { all: 'All agents', mine: 'Your agents', needs: 'Needs you', scheduled: 'On a schedule', everywhere: 'Everywhere', schedules: 'Schedules' };
+
+/** New agent, with Import and Install under it: the page's actions, in the row of the logo on a computer. */
+function NewAgentMenu({ onImport, onInstall }: { onImport: () => void; onInstall: () => void }) {
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={btn} size="sm" variant="primary" icon={<Plus size={15} />} title="New agent" onClick={() => setOpen((o) => !o)}>
+        New
+        <ChevronDown size={14} className="-mr-1 opacity-70" />
+      </Button>
+      <Popover anchor={btn} open={open} onClose={() => setOpen(false)} align="end" width={270}>
+        <MenuItem icon={<Sparkles size={15} />} onClick={() => (setOpen(false), go('/agents?new=1'))}>
+          New agent
+        </MenuItem>
+        <MenuItem icon={<FileDown size={15} />} onClick={() => (setOpen(false), onInstall())}>
+          Install an agent from a file
+        </MenuItem>
+        <MenuItem icon={<FileUp size={15} />} onClick={() => (setOpen(false), onImport())}>
+          Import Claude Code agent files
+        </MenuItem>
+      </Popover>
+    </>
+  );
+}
+
 export function AgentsPage() {
   const [path] = useLocation();
   const search = useSearch();
   const st = useAssistantsState();
   const spaces = useSpaces();
   const act = useAgentActivity();
+  const wide = useMediaQuery('(min-width: 1024px)');
   const [edit, setEdit] = useState<Partial<Assistant> | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [find, setFind] = useState('');
   const [importing, setImporting] = useState(false);
   const [installing, setInstalling] = useState(false);
   // Schedules (/agents/schedules): everything that runs by itself, on a week; agents' own ids always end in -xxxx.
@@ -516,17 +561,28 @@ export function AgentsPage() {
   const builtins = (st?.assistants ?? []).filter((a) => a.builtin);
   const needs = mine.filter((a) => act?.[a.id]?.waiting).length;
   const projects = (spaces ?? []).filter((s) => mine.some((a) => a.projects?.includes(s.id)));
+  const scheduledCount = mine.filter((a) => act?.[a.id]?.schedules.length).length;
+  const everywhere = mine.filter((a) => !a.projects?.length).length;
+  // The place, on a computer: from the address (a place that is gone, as a project, shows All agents). Narrower, the chips pick the filter.
+  const asked = q.get('place');
+  const place: Place = schedules ? 'schedules' : !wide || id ? 'all' : asked === 'mine' || asked === 'needs' || asked === 'scheduled' || asked === 'everywhere' ? asked : asked?.startsWith('project:') && projects.some((s) => `project:${s.id}` === asked) ? (asked as Place) : 'all';
+  const by = wide ? (place === 'all' || place === 'mine' || place === 'schedules' ? 'all' : place.startsWith('project:') ? place.slice(8) : place) : filter;
+  const words = (wide ? find : '').trim().toLowerCase();
+  const found = (a: Assistant) => !words || `${a.name} ${a.description || a.instructions.slice(0, 160)}`.toLowerCase().includes(words);
   const shown = mine.filter((a) =>
-    filter === 'all'
+    (by === 'all'
       ? true
-      : filter === 'everywhere'
+      : by === 'everywhere'
         ? !a.projects?.length
-        : filter === 'scheduled'
+        : by === 'scheduled'
           ? !!act?.[a.id]?.schedules.length
-          : filter === 'needs'
+          : by === 'needs'
             ? !!act?.[a.id]?.waiting
-            : !!a.projects?.includes(filter),
+            : !!a.projects?.includes(by)) && found(a),
   );
+  const builtinsShown = builtins.filter(found);
+  const showBuiltins = !wide || place === 'all';
+  useEffect(() => setFind(''), [place]);
   const chip = (key: string, label: string, n?: number) => (
     <button
       key={key}
@@ -538,106 +594,196 @@ export function AgentsPage() {
       {n ? ` · ${n}` : ''}
     </button>
   );
-  return (
-    <div data-i18n="agents" className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        title="Agents"
-        sub={schedules ? 'Everything that runs by itself: what ran, how it went, and what runs next' : 'Each agent: what it does, where and when it works, what it thinks with, and whom it asks'}
-        back={id ? { label: 'All agents', onClick: () => go('/agents') } : undefined}
-        actions={
-          <>
-            <Button size="sm" variant="ghost" icon={<FileUp size={14} />} onClick={() => setImporting(true)} title="Import Claude Code agent files (.claude/agents)">
-              <span className="hidden sm:inline">Import</span>
-            </Button>
-            <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => setInstalling(true)} title="Install an agent from a file (.hydor-agent)">
-              <span className="hidden sm:inline">Install</span>
-            </Button>
-            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => go('/agents?new=1')}>
-              New agent
-            </Button>
-          </>
-        }
-      >
-        {!id && (
-          <Tabs
-            value={schedules ? 'schedules' : 'agents'}
-            onChange={(t) => go(t === 'schedules' ? '/agents/schedules' : '/agents')}
-            options={[
-              { value: 'agents', label: 'Your agents' },
-              { value: 'schedules', label: 'Schedules', icon: <CalendarDays size={14} /> },
-            ]}
-          />
-        )}
-      </PageHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1120px] space-y-6 px-3 py-5 sm:px-6 sm:py-6">
-          {schedules ? (
-            <SchedulesView />
-          ) : id ? (
-            <AgentDetail id={id} onEdit={setEdit} />
-          ) : !st ? (
-            <div className="flex justify-center py-10 text-fg-3">
-              <Throbber size={28} />
-            </div>
-          ) : (
+  const icon = (I: typeof User) => <I size={15} className="text-fg-3" />;
+  // The column (a computer): the places, then the ready-made agents, each with its own page; the page's actions in the row of the logo.
+  const column = wide && (
+    <SideColumn label="Agents" tip="agents" actions={<NewAgentMenu onImport={() => setImporting(true)} onInstall={() => setInstalling(true)} />}>
+      <h1 className="sr-only">Agents</h1>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+        <nav aria-label="Places in Agents" className="space-y-0.5">
+          <PlaceRow on={!id && place === 'all'} icon={icon(LayoutGrid)} label="All agents" count={st ? mine.length + builtins.length : 0} onClick={() => go(addressOf('all'))} />
+          <PlaceRow on={place === 'mine' || (!!id && !builtins.some((a) => a.id === id) && mine.some((a) => a.id === id))} icon={icon(User)} label="Your agents" count={mine.length} onClick={() => go(addressOf('mine'))} />
+          {(needs > 0 || place === 'needs') && <PlaceRow on={place === 'needs'} icon={icon(BellRing)} label="Needs you" count={needs} onClick={() => go(addressOf('needs'))} />}
+          {(scheduledCount > 0 || place === 'scheduled') && <PlaceRow on={place === 'scheduled'} icon={icon(CalendarClock)} label="On a schedule" count={scheduledCount} onClick={() => go(addressOf('scheduled'))} />}
+          {projects.length > 0 && (
             <>
-              {making && <NewAgent project={forProject} onClose={() => go('/agents', true)} onAll={(d) => setEdit(d)} />}
-              {!mine.length && !making ? (
-                <section className="rounded-2xl border border-dashed border-line-2 px-5 py-8 text-center">
-                  <div className="text-[15px] font-semibold">Make your first agent</div>
-                  <div className="mx-auto mt-1 max-w-[520px] text-[13.5px] text-fg-3">
-                    Say what it should do, and Hydor drafts it: its instructions, what it may use, the model tier it thinks with, and when it works by itself.
-                  </div>
-                  <Button className="mt-4" variant="primary" icon={<Plus size={14} />} onClick={() => go('/agents?new=1')}>
-                    New agent
-                  </Button>
-                </section>
-              ) : (
-                mine.length > 0 && (
-                  <section>
-                    <div className="mb-3 flex flex-wrap gap-1.5">
-                      {chip('all', 'All')}
-                      {chip('everywhere', 'Everywhere')}
-                      {projects.map((s) => chip(s.id, s.name))}
-                      {mine.some((a) => act?.[a.id]?.schedules.length) && chip('scheduled', 'On a schedule')}
-                      {needs > 0 && chip('needs', 'Needs you', needs)}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {shown.map((a) => (
-                        <AgentCard key={a.id} a={a} spaces={spaces} />
-                      ))}
-                    </div>
-                    {!shown.length && <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>}
-                  </section>
-                )
-              )}
-              <section>
-                <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>
-                <div className="flex flex-wrap gap-1.5">
-                  {/* Built-in identities stay English in German; authored agents keep their words in every language. */}
-                  {builtins.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => go(`/agents/${enc(a.id)}`)}
-                      title={a.description}
-                      translate={assistantTranslate(a)}
-                      className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
-                    >
-                      <AssistantIcon icon={a.icon} size={12} />
-                      {a.name}
-                      {a.id === DEFAULT_ASSISTANT && <span className="text-[11.5px] text-fg-3">· the default</span>}
-                    </button>
-                  ))}
-                </div>
-              </section>
+              <PlacesLabel>Where they work</PlacesLabel>
+              <PlaceRow on={place === 'everywhere'} icon={icon(Globe)} label="Everywhere" count={everywhere} onClick={() => go(addressOf('everywhere'))} />
+              {projects.map((s) => (
+                <PlaceRow
+                  key={s.id}
+                  on={place === `project:${s.id}`}
+                  icon={<SpaceMark s={s} size={15} />}
+                  label={s.name}
+                  mine
+                  count={mine.filter((a) => a.projects?.includes(s.id)).length}
+                  onClick={() => go(addressOf(`project:${s.id}`))}
+                />
+              ))}
             </>
           )}
-        </div>
+          {builtins.length > 0 && (
+            <>
+              <PlacesLabel>Built in</PlacesLabel>
+              {builtins.map((a) => (
+                <PlaceRow key={a.id} on={id === a.id} icon={<AssistantIcon icon={a.icon} size={15} plain className="text-fg-3" />} label={a.name} onClick={() => go(`/agents/${enc(a.id)}`)} />
+              ))}
+            </>
+          )}
+          <div className="mx-2.5 my-3 border-t border-line" />
+          <PlaceRow on={schedules} icon={icon(CalendarDays)} label="Schedules" onClick={() => go(addressOf('schedules'))} />
+        </nav>
       </div>
-      <EditAssistant value={edit} onClose={() => setEdit(null)} onSaved={(a) => (loadActivity(), !id && go(`/agents/${enc(a.id)}`, true))} />
-      <ImportDialog open={importing} onClose={() => setImporting(false)} />
-      <InstallAgentDialog open={installing} onClose={() => setInstalling(false)} />
+    </SideColumn>
+  );
+  const header = !wide && (
+    <PageHeader
+      title="Agents"
+      sub={schedules ? 'Everything that runs by itself: what ran, how it went, and what runs next' : 'Each agent: what it does, where and when it works, what it thinks with, and whom it asks'}
+      back={id ? { label: 'All agents', onClick: () => go('/agents') } : undefined}
+      actions={
+        <>
+          <Button size="sm" variant="ghost" icon={<FileUp size={14} />} onClick={() => setImporting(true)} title="Import Claude Code agent files (.claude/agents)">
+            <span className="hidden sm:inline">Import</span>
+          </Button>
+          <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => setInstalling(true)} title="Install an agent from a file (.hydor-agent)">
+            <span className="hidden sm:inline">Install</span>
+          </Button>
+          <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => go('/agents?new=1')}>
+            New agent
+          </Button>
+        </>
+      }
+    >
+      {!id && (
+        <Tabs
+          value={schedules ? 'schedules' : 'agents'}
+          onChange={(t) => go(t === 'schedules' ? '/agents/schedules' : '/agents')}
+          options={[
+            { value: 'agents', label: 'Your agents' },
+            { value: 'schedules', label: 'Schedules', icon: <CalendarDays size={14} /> },
+          ]}
+        />
+      )}
+    </PageHeader>
+  );
+  // The row at the top of the index, as the Library's: the place's name at the left, the find box at the right (it stays at the top while the page scrolls).
+  const project = place.startsWith('project:') ? projects.find((s) => `project:${s.id}` === place) : undefined;
+  const toolbar = wide && !id && (
+    <div className="sticky top-0 z-20 -mx-3 flex min-h-8.5 flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-3 py-2 sm:-mx-6 sm:px-6">
+      <NavButton />
+      <h2 translate={project ? 'no' : undefined} className="min-w-0 truncate text-[17px] font-semibold tracking-tight max-sm:hidden">
+        {project?.name ?? PLACE_TITLES[place]}
+      </h2>
+      <span className="flex-1 max-lg:hidden" />
+      {place !== 'schedules' && (
+        <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 focus-within:border-accent/60 lg:max-w-[280px]">
+          <Search size={14} className="shrink-0 text-fg-3" />
+          <input
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setFind('')}
+            placeholder="Find an agent"
+            enterKeyHint="go"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
+          />
+          {find && (
+            <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
+              <X size={13} />
+            </button>
+          )}
+        </label>
+      )}
+    </div>
+  );
+  return (
+    <div data-i18n="agents" className="flex h-full min-h-0">
+      {column}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {header}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={cx('mx-auto max-w-[1120px] px-3 sm:px-6', wide ? (id ? 'py-6' : 'pb-10') : 'py-5 sm:py-6')}>
+            {toolbar}
+            <div className={cx('space-y-6', wide && !id && 'pt-3')}>
+              {schedules ? (
+                <SchedulesView />
+              ) : id ? (
+                <AgentDetail id={id} onEdit={setEdit} wide={wide} />
+              ) : !st ? (
+                <div className="flex justify-center py-10 text-fg-3">
+                  <Throbber size={28} />
+                </div>
+              ) : (
+                <>
+                  {making && <NewAgent project={forProject} onClose={() => go('/agents', true)} onAll={(d) => setEdit(d)} />}
+                  {!mine.length && !making ? (
+                    place !== 'all' && place !== 'mine' && wide ? (
+                      <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>
+                    ) : (
+                      !words && (
+                        <section className="rounded-2xl border border-dashed border-line-2 px-5 py-8 text-center">
+                          <div className="text-[15px] font-semibold">Make your first agent</div>
+                          <div className="mx-auto mt-1 max-w-[520px] text-[13.5px] text-fg-3">
+                            Say what it should do, and Hydor drafts it: its instructions, what it may use, the model tier it thinks with, and when it works by itself.
+                          </div>
+                          <Button className="mt-4" variant="primary" icon={<Plus size={14} />} onClick={() => go('/agents?new=1')}>
+                            New agent
+                          </Button>
+                        </section>
+                      )
+                    )
+                  ) : (
+                    mine.length > 0 && (
+                      <section>
+                        {!wide && (
+                          <div className="mb-3 flex flex-wrap gap-1.5">
+                            {chip('all', 'All')}
+                            {chip('everywhere', 'Everywhere')}
+                            {projects.map((s) => chip(s.id, s.name))}
+                            {mine.some((a) => act?.[a.id]?.schedules.length) && chip('scheduled', 'On a schedule')}
+                            {needs > 0 && chip('needs', 'Needs you', needs)}
+                          </div>
+                        )}
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {shown.map((a) => (
+                            <AgentCard key={a.id} a={a} spaces={spaces} />
+                          ))}
+                        </div>
+                        {!shown.length && (!words || !showBuiltins || !builtinsShown.length) && <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>}
+                      </section>
+                    )
+                  )}
+                  {showBuiltins && builtinsShown.length > 0 && (
+                    <section>
+                      <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>
+                      <div className="flex flex-wrap gap-1.5">
+                        {/* Built-in identities stay English in German; authored agents keep their words in every language. */}
+                        {builtinsShown.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => go(`/agents/${enc(a.id)}`)}
+                            title={a.description}
+                            translate={assistantTranslate(a)}
+                            className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
+                          >
+                            <AssistantIcon icon={a.icon} size={12} />
+                            {a.name}
+                            {a.id === DEFAULT_ASSISTANT && <span className="text-[11.5px] text-fg-3">· the default</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <EditAssistant value={edit} onClose={() => setEdit(null)} onSaved={(a) => (loadActivity(), !id && go(`/agents/${enc(a.id)}`, true))} />
+        <ImportDialog open={importing} onClose={() => setImporting(false)} />
+        <InstallAgentDialog open={installing} onClose={() => setInstalling(false)} />
+      </div>
     </div>
   );
 }

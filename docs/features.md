@@ -140,12 +140,17 @@ agents that speak ACP and take MCP servers.
   problems and flashcards, the Planner with itineraries and calendars, the Analyst with key figures and charts), or one
   of your own, and switch to another in the session's message box when the work
   changes. The Agents page shows each of yours as a card with how it is doing (working, needs you, budget spent), its
-  projects, tier, next run and what it spent this month. **New agent** drafts one from what you say it should do, with
+  projects, tier, next run and what it spent this month. On a computer it has a column beside the rail, as the Library's
+  (the logo, **New**, whose menu has New agent, Install an agent from a file and Import Claude Code agent files, and Hide;
+  then All agents, Your agents, Needs you and On a schedule when some of yours are, Everywhere and each project that has
+  agents of its own, a row for each built-in agent that opens its page, and Schedules), a row with the place's name and a
+  find box (by name and line), and an agent's own page keeps the column beside it; a phone keeps its header, tabs and
+  chips. **New agent** drafts one from what you say it should do, with
   the helper model: its instructions, tools (switches for reading, editing, commands, the web, a browser, the computer
   and other tools), tier and a schedule, read as sentences whose underlined words change it in
   place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
-  listed on its page, and on a week with every other task in the page's Schedules tab); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
+  listed on its page, and on a week with every other task in the page's Schedules place); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
   agents: plain subagents on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
   with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
