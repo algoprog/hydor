@@ -17,6 +17,7 @@ import { RpcError, RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
+import { signedOutText } from '../signin.ts';
 
 type Json = Record<string, any>;
 
@@ -359,6 +360,9 @@ export function liveItem(it: Json, ts: number): TimelineItem | null {
 /** A turn error that says the plan's usage ran out (Codex's usageLimitExceeded). */
 const usageLimitHit = (e: Json | undefined) => !!e && /usage_?limit_?(exceeded|reached)/i.test(JSON.stringify(e.codexErrorInfo ?? e.code ?? ''));
 
+/** A turn's error that is the account's sign-in turned away: codexErrorInfo "unauthorized", or a message saying 401 Unauthorized. */
+const unauthorized = (e: Json | undefined) => !!e && !usageLimitHit(e) && (/unauthori[sz]ed/i.test(JSON.stringify(e.codexErrorInfo ?? e.code ?? '')) || signedOutText('codex', String(e.message ?? '')));
+
 export class CodexLive extends LiveAdapter {
   readonly agent = 'codex' as const;
   rpc: RpcPeer;
@@ -621,6 +625,8 @@ export class CodexLive extends LiveAdapter {
         this.approvals.clear();
         this.limitStopped = t.status === 'failed' && usageLimitHit(t.error);
         if (this.limitStopped && !this.replaying) this.emit('limithit');
+        this.signedOut = t.status === 'failed' && unauthorized(t.error);
+        if (this.signedOut && !this.replaying) this.emit('signedout');
         if (t.status === 'failed' && t.error?.message) {
           let msg = String(t.error.message);
           try {
@@ -725,6 +731,7 @@ export class CodexLive extends LiveAdapter {
         break;
       case 'error': {
         if (!p.willRetry && usageLimitHit(p.error)) this.emit('limithit');
+        if (!p.willRetry && unauthorized(p.error) && !this.replaying) this.emit('signedout');
         const msg = p.error?.message ?? 'Error';
         let text = String(msg);
         try {

@@ -4,18 +4,38 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { ClaudeLive } from './claude.ts';
+import { CodexLive } from './codex.ts';
 
 const make = () => {
   const runner = new EventEmitter() as any;
   runner.writeLine = () => {};
   const a = new ClaudeLive(runner, { sessionId: 's' } as any);
   let hits = 0;
+  let outs = 0;
   a.on('limithit', () => hits++);
+  a.on('signedout', () => outs++);
   const line = (m: object) => runner.emit('line', JSON.stringify(m), false);
-  return { a, line, hits: () => hits };
+  return { a, line, hits: () => hits, outs: () => outs };
 };
+
+/** A Codex thread fed its app-server's notifications. */
+const makeCodex = () => {
+  const runner = new EventEmitter() as any;
+  runner.writeLine = () => {};
+  const a = new CodexLive(runner, { cwd: '/test', threadId: 't' } as any);
+  let hits = 0;
+  let outs = 0;
+  a.on('limithit', () => hits++);
+  a.on('signedout', () => outs++);
+  const note = (method: string, params: object, replay = false) => runner.emit('line', JSON.stringify({ method, params }), replay);
+  return { a, note, hits: () => hits, outs: () => outs };
+};
+const codexFailed = (error: object) => ({ turn: { id: 'u1', status: 'failed', error } });
 const limitError = { type: 'assistant', error: 'rate_limit', message: { content: [{ type: 'text', text: "You've hit your weekly limit" }] } };
 const failed = { type: 'result', is_error: true, subtype: 'success', result: "You've hit your weekly limit · resets Nov 5" };
+
+const notLoggedIn = { type: 'result', is_error: true, subtype: 'success', result: 'Not logged in · Please run /login', usage: { output_tokens: 0 } };
+const rejectedToken = { type: 'result', is_error: true, subtype: 'success', result: 'Failed to authenticate. API Error: 401 OAuth access token is invalid.', api_error_status: 401 };
 
 const hitSummary = (name: string) =>
   `Agent "${name}" failed: Agent terminated early due to an API error: You've hit your 5-hour limit · resets 4:20am (UTC) (error type rate_limit, HTTP 429, request id req_1, model sent to the API: claude-sonnet-5-5)`;
@@ -23,6 +43,108 @@ const started = (id: string, description: string) => ({ type: 'system', subtype:
 const notice = (id: string, status: string, summary: string) => ({ type: 'system', subtype: 'task_notification', task_id: id, status, summary });
 
 const tests: [string, () => void][] = [
+  [
+    'a signed-out result flags the turn and says so, and is no limit hit',
+    () => {
+      const t = make();
+      t.line(notLoggedIn);
+      assert.equal(t.a.signedOut, true);
+      assert.equal(t.outs(), 1);
+      assert.equal(t.hits(), 0);
+      assert.ok(!t.a.limitStopped);
+    },
+  ],
+  [
+    'a rejected or expired token (401) flags it too, by its status or by its words',
+    () => {
+      const t = make();
+      t.line(rejectedToken);
+      assert.equal(t.a.signedOut, true);
+      t.line({ type: 'result', is_error: true, subtype: 'success', result: 'Failed to authenticate', api_error_status: 401 });
+      t.line({ type: 'result', is_error: true, subtype: 'success', result: 'Something went wrong', api_error_status: 401 });
+      assert.equal(t.a.signedOut, true);
+      assert.equal(t.outs(), 3);
+    },
+  ],
+  [
+    'a usage limit result does not flag a sign-out',
+    () => {
+      const t = make();
+      t.line(limitError);
+      t.line(failed);
+      assert.equal(t.a.limitStopped, true);
+      assert.ok(!t.a.signedOut);
+      assert.equal(t.outs(), 0);
+    },
+  ],
+  [
+    'a turn that got through, or fails for another reason, clears the flag',
+    () => {
+      const t = make();
+      t.line(notLoggedIn);
+      t.line({ type: 'result', is_error: false, subtype: 'success', result: 'Done', usage: { output_tokens: 120 } });
+      assert.equal(t.a.signedOut, false);
+      t.line(notLoggedIn);
+      t.line({ type: 'result', is_error: true, subtype: 'success', result: 'Request was aborted' });
+      assert.equal(t.a.signedOut, false);
+      assert.equal(t.outs(), 2);
+    },
+  ],
+  [
+    'a signed-out result in a transcript read back flags the turn but says nothing',
+    () => {
+      const runner = new EventEmitter() as any;
+      runner.writeLine = () => {};
+      const a = new ClaudeLive(runner, { sessionId: 's' } as any);
+      let outs = 0;
+      a.on('signedout', () => outs++);
+      runner.emit('line', JSON.stringify(notLoggedIn), true);
+      assert.equal(a.signedOut, true);
+      assert.equal(outs, 0);
+    },
+  ],
+  [
+    'Codex: a failed turn whose error is unauthorized flags it, by its codexErrorInfo or by its words',
+    () => {
+      const t = makeCodex();
+      t.note('turn/completed', codexFailed({ message: 'unexpected status 401 Unauthorized: Missing bearer or basic authentication in header', codexErrorInfo: 'unauthorized' }));
+      assert.equal(t.a.signedOut, true);
+      assert.equal(t.outs(), 1);
+      t.note('turn/completed', codexFailed({ message: 'unexpected status 401 Unauthorized: Missing bearer' }));
+      assert.equal(t.a.signedOut, true);
+      t.note('turn/completed', codexFailed({ message: 'boom', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 401 } } }));
+      assert.equal(t.outs(), 2, 'a 401 in the error info without the words is not enough');
+      assert.equal(t.hits(), 0);
+    },
+  ],
+  [
+    'Codex: a usage limit or another failure, or a turn that completed, is no sign-out; the next turn clears it',
+    () => {
+      const t = makeCodex();
+      t.note('turn/completed', codexFailed({ message: 'You hit your usage limit', codexErrorInfo: 'usageLimitExceeded' }));
+      assert.ok(!t.a.signedOut);
+      assert.equal(t.hits(), 1);
+      t.note('turn/completed', codexFailed({ message: 'stream disconnected', codexErrorInfo: 'other' }));
+      assert.ok(!t.a.signedOut);
+      t.note('turn/completed', codexFailed({ message: 'Unauthorized', codexErrorInfo: 'unauthorized' }));
+      assert.equal(t.a.signedOut, true);
+      t.note('turn/completed', { turn: { id: 'u2', status: 'completed' } });
+      assert.equal(t.a.signedOut, false);
+      assert.equal(t.outs(), 1);
+    },
+  ],
+  [
+    'Codex: an error notice that is final says so; one that will retry, or one read back, does not',
+    () => {
+      const t = makeCodex();
+      t.note('error', { error: { message: '401 Unauthorized', codexErrorInfo: 'unauthorized' }, willRetry: true });
+      assert.equal(t.outs(), 0);
+      t.note('error', { error: { message: '401 Unauthorized', codexErrorInfo: 'unauthorized' }, willRetry: false }, true);
+      assert.equal(t.outs(), 0);
+      t.note('error', { error: { message: '401 Unauthorized', codexErrorInfo: 'unauthorized' }, willRetry: false });
+      assert.equal(t.outs(), 1);
+    },
+  ],
   [
     'a turn stopped by the limit stays stopped through a turn the CLI starts itself without reaching the model',
     () => {

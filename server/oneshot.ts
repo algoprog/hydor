@@ -12,6 +12,7 @@ import path from 'node:path';
 import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { agentBaseEnv } from './env.ts';
+import { backgroundDone, isSignedOut, markSignedIn, markSignedOut, signedOutText } from './signin.ts';
 
 export interface OneShot {
   system: string;
@@ -27,15 +28,33 @@ export interface OneShot {
 
 type Env = Record<string, string>;
 
-/** The environments that point a CLI at each account to try, the default one first (index.ts sets it). */
-let accountsOf: (agent: 'claude' | 'codex') => Env[] = () => [{}];
-export const setOneShotAccounts = (f: (agent: 'claude' | 'codex') => Env[]) => (accountsOf = f);
+/** An account to ask: its id when it is an added one (none for the program's own sign-in), and the environment that points the CLI at it. */
+export interface OneShotAccount {
+  account?: string;
+  env: Env;
+}
 
-/** Why an account gave no answer; `next`: another account may (a limit reached, signed out), unlike a call that ran out of time. */
+/** The accounts to try for each program, the default one first (index.ts sets it). */
+let accountsOf: (agent: 'claude' | 'codex') => OneShotAccount[] = () => [{ env: {} }];
+export const setOneShotAccounts = (f: (agent: 'claude' | 'codex') => OneShotAccount[]) => (accountsOf = f);
+
+/** An account of a program that was signed out when the question came. */
+export interface SignedOutAccount {
+  agent: 'claude' | 'codex';
+  account?: string;
+}
+
+/**
+ * Why an account gave no answer; `next`: another account may (a limit reached, signed out), unlike a call that ran out of
+ * time. `signedOut`: its sign-in is what the program refused. `signedOutAccounts`: what a program's whole round found
+ * signed out (those that said so, and those passed over because they had lately).
+ */
 class NoAnswer extends Error {
   constructor(
     message: string,
     readonly next = true,
+    readonly signedOut = false,
+    readonly signedOutAccounts: SignedOutAccount[] = [],
   ) {
     super(message);
   }
@@ -88,29 +107,54 @@ function run(bin: string, args: string[], o: { timeout: number; env?: Env; signa
 
 /** Claude's answer from its JSON, or why there is none: its own words when it gave some ("You've hit your weekly limit · resets…"). */
 function claudeAnswer(r: Awaited<ReturnType<typeof run>>): string {
-  let j: { is_error?: boolean; result?: unknown } | null = null;
+  let j: { is_error?: boolean; result?: unknown; api_error_status?: unknown } | null = null;
   try {
     j = JSON.parse(r.stdout);
   } catch {}
   if (r.ok && j && !j.is_error && typeof j.result === 'string') return j.result;
   const said = j && typeof j.result === 'string' && j.result.trim() ? j.result.trim().slice(0, 300) : '';
-  throw new NoAnswer(said || r.why || 'it did not answer', !r.timedOut && r.why !== 'it was stopped');
+  // "Not logged in · Please run /login", or a token the service rejected (401): the account is signed out, not at a limit.
+  const out = !r.timedOut && (j?.api_error_status === 401 || signedOutText('claude', said || r.why || ''));
+  throw new NoAnswer(said || r.why || 'it did not answer', !r.timedOut && r.why !== 'it was stopped', out);
 }
 
-/** Asks each account in turn, while the one before could not answer for a reason another may not have. */
+/** The last few lines a program wrote (Codex's 401 is its last line, in stderr or stdout). */
+const tail = (s: string, n = 3) => s.trim().split('\n').slice(-n).join('\n');
+
+/**
+ * Asks each account in turn, while the one before could not answer for a reason another may not have. An account found
+ * signed out is marked (signin.ts) and passed over by the calls after, until the mark expires; one that answers clears
+ * its mark (it was signed in again, in a terminal say).
+ */
 async function eachAccount(agent: 'claude' | 'codex', ask: (env: Env) => Promise<string>, signal?: AbortSignal): Promise<string> {
   const pool = accountsOf(agent);
+  const out: SignedOutAccount[] = [];
   let first: NoAnswer | null = null;
-  for (const env of pool.length ? pool : [{}]) {
+  for (const { account, env } of pool.length ? pool : [{ env: {} }]) {
+    if (isSignedOut(agent, account)) {
+      out.push({ agent, account });
+      continue;
+    }
     try {
-      return await ask(env);
+      const answer = await ask(env);
+      markSignedIn(agent, account);
+      backgroundDone();
+      return answer;
     } catch (e) {
       const why = asNoAnswer(e);
+      if (why.signedOut) {
+        markSignedOut(agent, account, why.message);
+        out.push({ agent, account });
+        // Another account may do; the reason to give when none does is the sign-out, unless one said something else before.
+        if (!signal?.aborted) continue;
+      }
       first ??= why;
       if (!why.next || signal?.aborted) break;
     }
   }
-  throw first ?? new NoAnswer('it did not answer');
+  // Every account was signed out (said so, or passed over): that is the whole reason.
+  const only = !first && out.length > 0;
+  throw new NoAnswer(only ? (out.length === 1 ? 'signed out' : `all ${out.length} accounts are signed out`) : (first?.message ?? 'it did not answer'), first?.next ?? true, only, out);
 }
 
 const CLAUDE_FLAGS = ['--setting-sources', '', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands', '--output-format', 'json'];
@@ -135,7 +179,9 @@ async function askCodex(q: OneShot): Promise<string> {
         const r = await run(config.codexBin, ['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', ...(q.codexModel ? ['-m', q.codexModel] : []), '-c', 'model_reasoning_effort="low"', '-o', file, piped ? '-' : question], { timeout, env, signal: q.signal, input: piped ? question : undefined });
         const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
         if (r.ok && text.trim()) return text;
-        throw new NoAnswer(r.why ?? 'it gave no answer', !r.timedOut && r.why !== 'it was stopped');
+        // "ERROR: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header": the last line, in stderr or stdout.
+        const out = !r.ok && !r.timedOut && signedOutText('codex', [r.why, tail(r.stderr), tail(r.stdout)].join('\n'));
+        throw new NoAnswer(r.why ?? 'it gave no answer', !r.timedOut && r.why !== 'it was stopped', out);
       } finally {
         fs.rmSync(file, { force: true });
       }
@@ -158,6 +204,19 @@ export async function askClaudeAbout(q: OneShot & { files: string[] }): Promise<
   }
 }
 
+/** No model answered (an HttpError 502); `signedOut` are the accounts of either program that were signed out, if that is why. */
+export class NoModel extends HttpError {
+  constructor(
+    message: string,
+    readonly signedOut: SignedOutAccount[] = [],
+  ) {
+    super(502, message);
+  }
+}
+
+/** The signed-out accounts a failed call found, when the error says (none for any other error). */
+export const signedOutOf = (e: unknown): SignedOutAccount[] => (e instanceof NoModel ? e.signedOut : []);
+
 /** The model's answer as text. */
 export async function oneShot(q: OneShot): Promise<string> {
   let claude: NoAnswer;
@@ -170,7 +229,8 @@ export async function oneShot(q: OneShot): Promise<string> {
   try {
     return await askCodex(q);
   } catch (e) {
-    throw new HttpError(502, `Could not reach a model. Claude Code: ${claude.message.replace(/\.$/, '')}. Codex: ${asNoAnswer(e).message.replace(/\.$/, '')}.`);
+    const codex = asNoAnswer(e);
+    throw new NoModel(`Could not reach a model. Claude Code: ${claude.message.replace(/\.$/, '')}. Codex: ${codex.message.replace(/\.$/, '')}.`, [...claude.signedOutAccounts, ...codex.signedOutAccounts]);
   }
 }
 

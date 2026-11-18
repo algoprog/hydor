@@ -28,6 +28,7 @@ import { useMachines } from './machines';
 import { handleNotify } from './notify';
 import { useNotes } from './notes';
 import { emitFeatureEvent } from './featureEvents';
+import { useSignIn } from '../features/accounts/signin';
 
 // ---- toasts --------------------------------------------------------------------
 
@@ -560,6 +561,9 @@ export function handleEvent(e: ServerEvent) {
       if (boot) useApp.getState().set({ boot: { ...boot, accounts: e.accounts } });
       break;
     }
+    case 'signin':
+      useSignIn.getState().set(e.needs);
+      break;
     case 'acpAgents': {
       const boot = useApp.getState().boot;
       if (boot) useApp.getState().set({ boot: { ...boot, acpAgents: e.agents } });

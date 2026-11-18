@@ -55,6 +55,7 @@ export interface LiveConfig {
  *   'identity'   the session id / transcript path became known
  *   'ratelimit'  fresh plan-usage numbers
  *   'limithit'   the turn stopped because the plan's usage ran out
+ *   'signedout'  the turn stopped because the program's account is signed out (or its token was turned away)
  *   'call'       a model call finished: what it used (ModelCall)
  *   'exit'
  */
@@ -72,6 +73,8 @@ export abstract class LiveAdapter extends EventEmitter {
   lastActivity = Date.now();
   /** The last completed turn actually stopped at a usage limit; undefined until its outcome is known. */
   limitStopped?: boolean;
+  /** The last completed turn stopped because its account is signed out (not a usage limit); reset at each turn's end. */
+  signedOut?: boolean;
   /**
    * Its own subagents (Claude Code's Agent tool) that the plan's usage limit stopped, by task id, with what each was
    * doing: their work is kept, and a message to each continues it once an account has usage again.

@@ -16,6 +16,7 @@ import { PAGE_SERVER, runOf } from '../mcp.ts';
 import { wikiHookToken } from '../wiki/session/hook-auth.ts';
 import { memoryHookToken } from '../memory/hook-auth.ts';
 import { JsonFields } from '../pages/drafts.ts';
+import { signedOutText } from '../signin.ts';
 
 type Json = Record<string, any>;
 
@@ -808,6 +809,11 @@ export class ClaudeLive extends LiveAdapter {
     const kept = this.limitStopped === true && !m.is_error && !((m.usage?.output_tokens ?? 0) > 0);
     this.limitStopped = kept || (!!m.is_error && (this.limitStopped === true || /hit your .*limit/i.test(String(m.result ?? ''))));
     if (!replay && this.limitStopped && !kept) this.emit('limithit');
+    // Signed out ("Not logged in · Please run /login") or a token the API turned away (401): not a limit, and another
+    // account may do the work. Each result decides afresh, a quiet turn the CLI starts by itself included.
+    const said = String(m.result ?? '');
+    this.signedOut = !!m.is_error && !/hit your .*limit/i.test(said) && (m.api_error_status === 401 || signedOutText('claude', said));
+    if (!replay && this.signedOut) this.emit('signedout');
     this.approvals.clear();
     this.dropWaiting();
     this.state.status = 'idle';

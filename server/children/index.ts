@@ -493,7 +493,7 @@ const MESSAGE: RunTool = {
 export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter; still?: string }, now = Date.now()): string {
   const who = `Hydor subagent "${o.title}" (${o.key}, ${o.label})`;
   if (o.after)
-    return `[The ${who} reached a usage limit and carries on${goesOn(o.after, now)}.]\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
+    return `[The ${who} ${o.after.goes === 'account' && o.after.signedOut ? 'found its account signed out' : 'reached a usage limit'} and carries on${goesOn(o.after, now)}.]\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
   const reply = o.turn.reply.trim();
   const head =
     o.turn.status === 'interrupted'
@@ -509,7 +509,7 @@ export function resultMessage(o: { key: string; title: string; label: string; li
 
 /** How a child that reached a usage limit carries on, to follow "carries on". */
 function goesOn(a: LimitAfter, now: number): string {
-  if (a.goes === 'account') return ` with ${a.to}, an account with usage left`;
+  if (a.goes === 'account') return a.signedOut ? ` with ${a.to}, another account` : ` with ${a.to}, an account with usage left`;
   if (a.goes === 'credit') return ' with API credit, as every account is at its limit';
   if (a.goes === 'resume') return ` by itself when the limit lifts, ${liftsAt(a.at, now)}`;
   return '';

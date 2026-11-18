@@ -169,7 +169,9 @@ On a Mac, the app puts the command on your PATH by itself.
   Hydor, beside Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
   ([agents and models](docs/guide/16-agents-models.md)). Sign in to Claude Code, Codex and Grok Build with your
   subscriptions, and add more than one account of each, a work and a personal one say
-  ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)).
+  ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)). When one hits its limit or
+  is signed out, the work carries on with another, and you're asked to sign in again only when nothing else can do it
+  ([signed out](docs/guide/16-agents-models.md#when-an-account-is-signed-out)).
 - **Bring in what it knows**: **Settings → Memory → Bring in** takes the memory and skills you made in other agents,
   and what ChatGPT, Claude, Claude Code and Codex know about you. You pick what comes over ([memory](docs/guide/06-memory.md)).
 - **Your projects come along**: the folders you work in with Claude Code and Codex become Hydor projects, with their

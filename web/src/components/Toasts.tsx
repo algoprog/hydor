@@ -8,6 +8,7 @@ import { noticeLine } from '@shared/notice';
 import { useToasts, type Toast, type ToastNotice } from '../lib/store';
 import { AgentIcon } from './AgentIcon';
 import { UpdateNotice } from './UpdateNotice';
+import { SignInPrompt } from '../features/accounts/SignInPrompt';
 import { cx } from './ui';
 
 const TONE: Record<ToastNotice['kind'], { dot: string; text: string }> = {
@@ -49,13 +50,15 @@ function NoticeCard({ t, n }: { t: Toast; n: ToastNotice }) {
   );
 }
 
-export function Toasts() {
+/** `shell`: the app is shown (not a sign-in, setup or machine-down screen), so what it asks of you shows too. */
+export function Toasts({ shell = false }: { shell?: boolean }) {
   const list = useToasts((s) => s.list);
   const dismiss = useToasts((s) => s.dismiss);
   const hold = useToasts((s) => s.hold);
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+var(--safe-bottom))] z-[60] flex flex-col items-center gap-2 px-3 md:bottom-16 md:items-end md:px-5">
       <UpdateNotice />
+      {shell && <SignInPrompt />}
       {list.map((t) => (
         <div
           key={t.id}

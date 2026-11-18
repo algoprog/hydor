@@ -44,6 +44,7 @@ import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
 import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
+import { dropSignInSession, isSignedOut, markSignedOut, needSignIn, onSignedIn } from './signin.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { browserHandoffFinish, browserHandoffStart } from './browser/browsing.ts';
 import { carriedBrowserOnly, checkBrowserOnlyHandoff } from './browser/handoff.ts';
@@ -285,9 +286,9 @@ export function subagentsLine(names: string[]): string {
 /**
  * How a session whose turn its plan's usage limit stopped carries on (SessionManager.afterLimit): with another account
  * (`to`, by its name), on API credit, by itself once the limit lifts (`at`), or by other means (a message moved it
- * first, or a turn got through).
+ * first, or a turn got through). A session its account's sign-out stopped moves the same way (`signedOut`).
  */
-export type LimitAfter = { goes: 'account'; to: string } | { goes: 'credit' } | { goes: 'resume'; at: number } | { goes: 'on' };
+export type LimitAfter = { goes: 'account'; to: string; signedOut?: boolean } | { goes: 'credit' } | { goes: 'resume'; at: number } | { goes: 'on' };
 
 /** The notes a started agent has for its first message, given once: a command leaves them for the next. */
 function takeFirst(l: Live, text: string): string {
@@ -408,6 +409,8 @@ export class SessionManager extends EventEmitter {
       if (removed.length) this.emit('sessions', [], removed);
     });
     setInterval(() => this.reapIdle(), 5 * 60_000).unref();
+    // An account signed in again: the sessions its sign-out stopped go on.
+    onSignedIn((agent, account, keys) => void this.continueAfterSignIn(agent, account, keys));
     // A session waiting for its project's memory to be built starts when the most important part is read, or the job ends.
     wikiJobEvents.on('essentials', (space: string | null) => void this.buildReached(space, 'essentials'));
     wikiJobEvents.on('end', (space: string | null, state: string) => void this.buildReached(space, state));
@@ -743,6 +746,7 @@ export class SessionManager extends EventEmitter {
           const hit = this.limitHits.delete(s.key);
           if (hit) this.limitEnds.set(s.key, now);
           this.afterTurn(s, hit, now);
+          if (this.signedOutHits.delete(s.key)) this.afterSignOut(s, now);
           // A notice held from an earlier turn goes out at the end of this one, once nothing it started still runs.
           if (prev) this.finishedNotice(s, st, false, now);
         } else if (prev && st === 'idle' && this.heldDone.has(s.key) && !this.stillAtWork(s)) {
@@ -783,7 +787,10 @@ export class SessionManager extends EventEmitter {
       // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
       if (hit) this.limitEnds.set(s.key, now);
-      if ((st === 'idle' || st === 'error') && busy(prev.status)) this.afterTurn(s, hit, now);
+      if ((st === 'idle' || st === 'error') && busy(prev.status)) {
+        this.afterTurn(s, hit, now);
+        if (this.signedOutHits.delete(s.key)) this.afterSignOut(s, now);
+      }
       // A session on API credit goes back to a plan once one has usage again.
       if (st === 'idle' && busy(prev.status) && this.lives.get(s.key)?.apiCredit) this.leaveCredit(s.key).catch(() => {});
       // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
@@ -880,6 +887,68 @@ export class SessionManager extends EventEmitter {
     const read = agent === 'grok' ? this.limitReads.get(s.key) : undefined;
     const after: Promise<LimitAfter | null | void> = read ? read.then(carry, carry) : carry();
     this.limitAfter.set(s.key, { at: now, after: after.then((a) => a ?? null) });
+  }
+
+  /** Sessions whose turn the program turned away for its account's sign-in, until that turn's end is seen (afterSignOut). */
+  private signedOutHits = new Set<string>();
+
+  /**
+   * A turn of a session run here ended because its account is signed out (it is marked so already). With Switch accounts
+   * at a limit on, another signed-in account with usage left takes the session over and it continues; with none, or
+   * with that off, the user is asked to sign in again, and the session continues once they have (continueAfterSignIn).
+   * How a move went is kept for afterLimit, so a lead hears of it.
+   */
+  private afterSignOut(s: SessionSummary, now: number) {
+    const agent = this.accountAgentOf(s.key, s.agent);
+    if (agent !== 'claude' && agent !== 'codex') return;
+    const from = this.accountOf(s.key);
+    this.signedOutEnds.set(s.key, now);
+    // Another move is under way (a limit, or a message): it settles where the session runs.
+    if (this.switching.has(s.key)) return;
+    const after = (async (): Promise<LimitAfter | null> => {
+      if (autoSwitchOn(this.db) && !s.external) {
+        this.switching.add(s.key);
+        try {
+          const to = await this.freeAccount(agent, from);
+          if (to) {
+            // Meanwhile you stopped it, or it moved already.
+            if (this.userStopped.has(s.key) || this.accountOf(s.key) !== from) return null;
+            if (!(await this.carryOver(s.key, from, to.id, 'signedout'))) await this.deliverOrQueue(s.key, `${this.accountName(agent, from)} is signed out, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.`);
+            dropSignInSession(s.key);
+            return { goes: 'account', to: this.accountName(agent, to.id), signedOut: true };
+          }
+        } catch (e) {
+          // It could not move: the user is asked as when no other account could take it.
+          this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` });
+        } finally {
+          this.switching.delete(s.key);
+        }
+      }
+      if (!this.userStopped.has(s.key)) needSignIn({ agent, account: from, session: s.key });
+      return null;
+    })().catch((e: Error) => {
+      this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${e.message}` });
+      return null;
+    });
+    this.limitAfter.set(s.key, { at: now, after });
+  }
+
+  /**
+   * An account is signed in again: each session its sign-out stopped, still there, still run as that account and not at
+   * work, starts afresh (its agent process stops, so the next start reads the new sign-in) and is told to continue.
+   */
+  private async continueAfterSignIn(agent: AccountAgent, account: string | undefined, keys: string[]) {
+    for (const key of keys) {
+      try {
+        if (!this.exists(key) || this.accountAgentOf(key) !== agent || (this.accountOf(key) ?? '') !== (account ?? '') || this.external.get(key)) continue;
+        const st = this.lives.get(key)?.adapter.state.status;
+        if (st === 'working' || st === 'waiting' || st === 'starting') continue;
+        await this.stopAndWait(key);
+        await this.deliverOrQueue(key, 'Signed in again. Continue where you left off.');
+      } catch (e) {
+        this.emit('toast', { level: 'error', text: `${this.summary(key)?.title ?? 'A session'}: could not continue after signing in: ${(e as Error).message}` });
+      }
+    }
   }
 
   /** How each session's turn that its plan's usage limit stopped last carries on (`at`: when that turn ended). */
@@ -1226,6 +1295,14 @@ export class SessionManager extends EventEmitter {
           });
         this.limitReads.set(key, read);
       }
+    });
+    // The turn was turned away for the account's sign-in: the account is passed over from now on, and once the turn is
+    // over the session moves to another one or the user is asked to sign in again (afterSignOut). A session on API
+    // credit runs on a key, not the account's sign-in: its refusal says nothing of the account.
+    adapter.on('signedout', () => {
+      if (this.lives.get(key)?.apiCredit || (adapter.agent !== 'claude' && adapter.agent !== 'codex')) return;
+      markSignedOut(adapter.agent, this.lives.get(key)?.account, adapter.state.error);
+      if (!this.userStopped.has(key)) this.signedOutHits.add(key);
     });
     // A tool call's input as the model writes it: Pages draws a page while it is being written.
     adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
@@ -1878,11 +1955,11 @@ export class SessionManager extends EventEmitter {
 
   private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
 
-  /** Another signed-in account of the agent with usage left, the least used first; null when there is none. */
+  /** Another signed-in account of the agent with usage left, the least used first (one found signed out lately is passed over); null when there is none. */
   private async freeAccount(agent: AccountAgent, except: string | undefined): Promise<{ id: string | undefined } | null> {
     let best: { id: string | undefined; used: number } | null = null;
     for (const id of accountPool(this.db, agent)) {
-      if (id === except) continue;
+      if (id === except || isSignedOut(agent, id)) continue;
       const u = await this.usageOf(agent, id);
       if (SessionManager.usedUp(u)) continue;
       const used = Math.max(0, ...u!.windows.map((w) => w.usedPercent ?? 0));
@@ -1892,7 +1969,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An account as people know it: an added one's name, the CLI's own by its email. */
-  private accountName(agent: AccountAgent, account: string | undefined): string {
+  accountName(agent: AccountAgent, account: string | undefined): string {
     if (account) return accountById(this.db, account)?.name ?? 'another account';
     // Grok Build's usage has no email: its sign-in check kept it.
     const email = agent === 'grok' ? grokControl(this.db).email : this.controlFor(agent).lastUsage?.account?.email;
@@ -1994,14 +2071,18 @@ export class SessionManager extends EventEmitter {
   private switching = new Set<string>();
   /** When each session's turn last ended at its plan's usage limit. */
   private limitEnds = new Map<string, number>();
+  /** When each session's turn last ended signed out. */
+  private signedOutEnds = new Map<string, number>();
 
   /**
-   * Whether a session's turn that began at `since` (or later) was stopped by its plan's usage limit, not by the work:
-   * another account takes it over, or it waits for the reset, so it is no failure of its own (a helper is not run
-   * again a tier up for it, nor a scheduled run).
+   * Whether a session's turn that began at `since` (or later) was stopped by its plan's usage limit or its account's
+   * sign-out, not by the work: another account takes it over, or it waits for the reset or the sign-in, so it is no
+   * failure of its own (a helper is not run again a tier up for it, nor a scheduled run).
    */
   stoppedAtLimit(key: string, since = 0): boolean {
-    return (this.limitEnds.get(key) ?? -1) >= since || this.limitHits.has(key) || this.lives.get(key)?.adapter.limitStopped === true;
+    const a = this.lives.get(key)?.adapter;
+    // A turn its account's sign-out stopped is no failure of the work either: a tier above would fail the same way.
+    return (this.limitEnds.get(key) ?? -1) >= since || this.limitHits.has(key) || a?.limitStopped === true || (this.signedOutEnds.get(key) ?? -1) >= since || this.signedOutHits.has(key) || a?.signedOut === true;
   }
 
   /** Sessions whose running turn stopped on the plan's usage limit, as the agent said. */
@@ -2041,13 +2122,30 @@ export class SessionManager extends EventEmitter {
     if (!agent || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') return;
-    if (!this.lastUsageOf(agent, this.accountOf(key))?.limited) return;
+    const from = this.accountOf(key);
+    const out = isSignedOut(agent, from);
+    if (!out && !this.lastUsageOf(agent, from)?.limited) return;
     this.switching.add(key);
     try {
-      await this.beforeResume(key);
+      if (out) await this.leaveSignedOut(key, agent, from);
+      else await this.beforeResume(key);
     } finally {
       this.switching.delete(key);
     }
+  }
+
+  /**
+   * Before a message goes to a session whose account was found signed out lately, with Switch accounts on: another
+   * signed-in account with usage left takes it first, so the message is not turned away. With none, the message goes
+   * to its own account (a sign-in made outside the app may be noticed then).
+   */
+  private async leaveSignedOut(key: string, agent: AccountAgent, from: string | undefined) {
+    const to = await this.freeAccount(agent, from);
+    if (!to) return;
+    await this.carryOver(key, from, to.id, 'signedout');
+    // Its next message says so: the agent may be waiting for the old account's sign-in.
+    this.moveNotes.set(key, `${this.accountName(agent, from)} is signed out, so this session now runs on ${this.accountName(agent, to.id)}.`);
+    dropSignInSession(key);
   }
 
   /**
@@ -2135,15 +2233,19 @@ export class SessionManager extends EventEmitter {
     }
   }
 
-  /** Moves the session to the account, says so, and brings a Codex goal along. True when that goal continues it by itself. */
-  private async carryOver(key: string, from: string | undefined, to: string | undefined): Promise<boolean> {
+  /** Moves the session to the account, says so (`why` it moves), and brings a Codex goal along. True when that goal continues it by itself. */
+  private async carryOver(key: string, from: string | undefined, to: string | undefined, why: 'limit' | 'signedout' = 'limit'): Promise<boolean> {
     const agent = this.accountAgentOf(key);
     if (!agent) return false;
     const s = this.summary(key);
     // Codex keeps a thread's goal in its account's own folder: it is set again on the new one.
     const goal = agent === 'codex' ? s?.goal : undefined;
     await this.moveToAccount(key, to);
-    this.emit('toast', { level: 'info', text: `${s?.title ?? 'A session'}: ${this.accountName(agent, from)} is at its usage limit, so it continues on ${this.accountName(agent, to)}` });
+    // Each a whole sentence, so the app's dictionaries translate it.
+    const title = s?.title ?? 'A session';
+    const was = this.accountName(agent, from);
+    const now = this.accountName(agent, to);
+    this.emit('toast', { level: 'info', text: why === 'signedout' ? `${title}: ${was} is signed out, so it continues on ${now}` : `${title}: ${was} is at its usage limit, so it continues on ${now}` });
     if (!goal) return false;
     await this.goal(key, 'set', goal.objective);
     if (goal.status === 'active' || goal.status === 'limited') return true;
@@ -2249,8 +2351,8 @@ export class SessionManager extends EventEmitter {
     if (!c) {
       const env = accountEnv(this.db, agent, account);
       c = agent === 'claude' ? new ClaudeControl(env) : new CodexControl(env);
-      // Sign-in progress reaches the browser as the default accounts' does.
-      c.on('flow', (f) => this.emit('flow', f));
+      // Sign-in progress reaches the browser as the default accounts' does, with the account it is for (server/signin.ts).
+      c.on('flow', (f) => this.emit('flow', f, account));
       this.extraControls.set(account, c);
     }
     return c;
@@ -2406,9 +2508,13 @@ export class SessionManager extends EventEmitter {
     // Waiting for the memory to be built, the agent has nothing running to stop: Stop ends the build and starts the agent.
     if (this.gates.get(key)?.state === 'building') return this.answerGate(key, 'stop');
     this.limitHits.delete(key);
+    this.signedOutHits.delete(key);
     this.userStopped.add(key);
     const a = this.lives.get(key)?.adapter;
-    if (a) a.limitStopped = false;
+    if (a) {
+      a.limitStopped = false;
+      a.signedOut = false;
+    }
     this.emit('resumeCancelled', key);
     this.holdQueue(key);
     await this.live(key).adapter.interrupt();
@@ -2944,8 +3050,12 @@ export class SessionManager extends EventEmitter {
     if (l.agent === 'acp' && (l.adapter.state.status === 'starting' || (!this.isCustom(key) && ['working', 'waiting'].includes(l.adapter.state.status)))) return queued();
     await this.snapshot(key);
     this.limitHits.delete(key);
+    this.signedOutHits.delete(key);
     this.userStopped.delete(key);
     l.adapter.limitStopped = false;
+    l.adapter.signedOut = false;
+    // Sent on: it no longer waits for a sign-in (a turn that is turned away again asks for it again).
+    dropSignInSession(key);
     this.emit('resumeCancelled', key);
     try {
       const first = [takeFirst(l, text), this.takeMoveNote(key, text)].filter(Boolean).join('\n\n');
@@ -3201,6 +3311,7 @@ export class SessionManager extends EventEmitter {
     // Its transcript belongs to its lead: deleted with it.
     refuseSubagent(leadsOf(this), key);
     dropNotes(this.db, key);
+    dropSignInSession(key);
     if (this.gates.delete(key)) this.saveGates();
     const l = this.lives.get(key);
     // Its transcript as the running agent knows it: the index may not have it yet.

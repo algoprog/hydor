@@ -789,6 +789,29 @@ export interface AccountStatus {
   error?: string;
 }
 
+/**
+ * An account the app needed and found signed out, when nothing else could do the work (no other account of the
+ * program, and for background work none of Custom's models either): the prompt to sign in to it again, on every page
+ * and in a session it stopped (server/signin.ts).
+ */
+export interface SignInNeed {
+  agent: AccountAgent;
+  /** An added account's id; none for the program's own sign-in. */
+  account?: string;
+  /** The account as people know it: an added one's name, the program's own by its email when known. */
+  name: string;
+  /** Background work needed it (the helper model on Automatic: titles, memory, your profile…). */
+  background: boolean;
+  /** What that background work was, when it said ("shortening your profile"). */
+  task?: string;
+  /** Sessions it stopped: they continue by themselves once it is signed in again. */
+  sessions: string[];
+  /** When it was last needed. */
+  at: number;
+  /** Not now: the prompt on every page stays hidden until then (a session it stops shows it again). */
+  hiddenUntil?: number;
+}
+
 export interface LoginFlow {
   id: string;
   agent: AccountAgent;
@@ -955,6 +978,8 @@ export type ServerEvent =
   | { t: 'accounts'; accounts: AgentAccount[] }
   | { t: 'acpAgents'; agents: AcpAgentDef[] }
   | { t: 'login'; flow: LoginFlow }
+  /** The accounts to sign in to again (server/signin.ts), all of them each time. */
+  | { t: 'signin'; needs: SignInNeed[] }
   | { t: 'index'; done: number; total: number; running: boolean }
   | { t: 'system'; sample: SystemSample }
   | { t: 'toast'; level: 'info' | 'error'; text: string }

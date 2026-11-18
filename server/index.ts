@@ -77,6 +77,7 @@ import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
 import { setOneShotAccounts } from './oneshot.ts';
+import { dismissSignIn, initSignIn, markSignedIn, signInNeeds } from './signin.ts';
 import { limitsOf, limitSupport, oomKills, SessionMeter, setLimits, wrapRunner } from './resources.ts';
 import { setRunnerWrap } from './runner/client.ts';
 import { appWords } from './language/index.ts';
@@ -891,9 +892,11 @@ const atLimit = (agent: 'claude' | 'codex', id: string | undefined) => {
   const lim = sessions.controlFor(agent, id).lastUsage?.limited;
   return !!lim && (lim.resetsAt == null || lim.resetsAt > Date.now());
 };
+// Accounts found signed out and the prompts to sign in again (server/signin.ts) reach every page, and are named as people know them.
+initSignIn({ broadcast, nameOf: (agent, account) => sessions.accountName(agent, account) });
 setOneShotAccounts((agent) => {
   const pool = autoSwitchOn(db) ? accountPool(db, agent) : [undefined];
-  return [...pool.filter((id) => !atLimit(agent, id)), ...pool.filter((id) => atLimit(agent, id))].map((id) => accountEnv(db, agent, id));
+  return [...pool.filter((id) => !atLimit(agent, id)), ...pool.filter((id) => atLimit(agent, id))].map((id) => ({ ...(id ? { account: id } : {}), env: accountEnv(db, agent, id) }));
 });
 // Each session started from now on runs within the limits set in Settings → General (server/resources.ts).
 setRunnerWrap((runId, cmd, args) => {
@@ -1142,6 +1145,29 @@ app.delete('/api/agent-accounts/:id', async (req) => {
 function broadcastAccounts() {
   broadcast({ t: 'accounts', accounts: addedAccounts(db) });
 }
+
+/** An account's sign-in state, as GET /api/accounts reads it. */
+const accountStatus = (agent: 'claude' | 'codex' | 'grok', account: string | undefined) => (agent === 'grok' ? grokControl(db, account).account() : sessions.controlFor(agent, account).account());
+
+/** The accounts the app found signed out and asks the user to sign in to again (Settings → Agents → Accounts shows them too). */
+app.get('/api/accounts/sign-in', async () => ({ needs: signInNeeds() }));
+/** Not now: the prompt stays hidden for an hour. */
+app.delete('/api/accounts/sign-in/:agent', async (req) => {
+  const agent = loginAgent((req.params as { agent: string }).agent);
+  const account = acctOf(req);
+  if (account && accountById(db, account)?.agent !== agent) throw new HttpError(404, `No such ${ACCOUNT_AGENT_NAMES[agent]} account`);
+  dismissSignIn(agent, account);
+  return { needs: signInNeeds() };
+});
+/** Reads the account's sign-in now: signed in again clears the prompt and continues the sessions it stopped. */
+app.post('/api/accounts/sign-in/:agent/check', async (req) => {
+  const agent = loginAgent((req.params as { agent: string }).agent);
+  const account = acctOf(req);
+  if (account && accountById(db, account)?.agent !== agent) throw new HttpError(404, `No such ${ACCOUNT_AGENT_NAMES[agent]} account`);
+  const signedIn = !!(await accountStatus(agent, account)).loggedIn;
+  if (signedIn) markSignedIn(agent, account);
+  return { signedIn, needs: signInNeeds() };
+});
 
 /** The sign-in calls of an agent's accounts: Claude Code, Codex and Grok Build have them; any other agent is unknown. */
 const loginAgent = (agent: string): 'claude' | 'codex' | 'grok' => {
@@ -1697,12 +1723,15 @@ machines.on('notify', (n: NotifyEvent) => {
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
 /** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */
-const onFlow = (f: LoginFlow) => {
+const onFlow = (f: LoginFlow, account?: string) => {
   broadcast({ t: 'login', flow: publicFlow(f) });
   if (f.state === 'done' && scheduler.nextResume() !== undefined) setTimeout(() => readUsage().catch(() => {}), 1500);
+  // Signed in again: its prompt goes and the sessions its sign-out stopped continue. Only a finished sign-in proves it:
+  // a sign-in the service revoked can still read as signed in on this computer, so the accounts list clears nothing.
+  if (f.state === 'done') markSignedIn(f.agent, account);
 };
-claude.on('flow', onFlow);
-codex.on('flow', onFlow);
+claude.on('flow', (f: LoginFlow) => onFlow(f));
+codex.on('flow', (f: LoginFlow) => onFlow(f));
 sessions.on('flow', onFlow);
 grokFlows.on('flow', onFlow);
 // Projects found in Claude Code and Codex (server/spaces/found.ts): a session that works in a project's folder joins it as the

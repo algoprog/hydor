@@ -27,6 +27,8 @@ import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
 import { LimitBanner } from '../usage/LimitReset';
+import { SignInBanner } from '../accounts/SignInPrompt';
+import { useSignIn } from '../accounts/signin';
 import { FeatureComposerButtons, FeatureSessionOptions } from '../registry';
 import { SessionAccount } from './SessionAccount';
 import { SessionAssistantPicker, useSessionAssistant } from '../assistants/AssistantPicker';
@@ -168,6 +170,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // Whose plan limit it could hit: Claude Code, Codex or Grok Build (an ACP agent); the other ACP agents have none.
   const acpDef = useApp((x) => (s.agent === 'acp' ? x.boot?.acpAgents?.find((a) => a.id === s.acpAgent) : undefined));
   const limitAgent = accountAgentOf(s.agent, acpDef);
+  // The account this session runs on is signed out: it continues once it is signed in again (whatever Not now said).
+  const signInNeed = useSignIn((st) => st.needs.find((n) => n.sessions.includes(key)));
   const working = running && (live!.status === 'working' || live!.status === 'waiting' || live!.status === 'starting');
   // The agent has not had its first message: it waits for the project's memory question or build (its card has the controls). Nothing runs to stop, and what is written is queued for after the first message.
   const waitsMemory = running && !!live!.memory;
@@ -468,6 +472,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     <div className="shrink-0 px-3 pb-[max(10px,var(--safe-bottom))] sm:px-6 sm:pb-5">
       <div className="mx-auto max-w-[800px]">
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
+        {signInNeed && <SignInBanner need={signInNeed} className="mb-2" />}
         {limitAgent && <LimitBanner agent={limitAgent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />}
         <GoalBar s={s} className="mb-2" />
         <WorkTray key={key} s={s} />

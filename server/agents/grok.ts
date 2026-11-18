@@ -504,7 +504,8 @@ export function grokControl(db: DB, account?: string | null): GrokControl {
   let c = controls.get(key);
   if (!c) {
     c = new GrokControl(key ? accountEnv(db, 'grok', key) : {});
-    c.on('flow', (f: LoginFlow) => grokFlows.emit('flow', f));
+    // With the account it is for (none: the program's own sign-in), so a finished sign-in clears just that one (server/signin.ts).
+    c.on('flow', (f: LoginFlow) => grokFlows.emit('flow', f, key || undefined));
     controls.set(key, c);
   }
   return c;

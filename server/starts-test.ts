@@ -147,7 +147,7 @@ test('a Custom process from before the update queues unsupported follow-ups with
   const m: any = {
     gates: new Map(),
     lives: new Map([[key, live]]), live: () => live, isCustom: () => true,
-    switchBeforeSend: async () => {}, snapshot: async () => {}, limitHits: new Map(), userStopped: new Set(),
+    switchBeforeSend: async () => {}, snapshot: async () => {}, limitHits: new Map(), signedOutHits: new Set(), userStopped: new Set(),
     takeMoveNote: () => '', emit: () => {}, saveFiles: () => [], saveImages: (v: unknown) => v,
     enqueue: (...args: unknown[]) => queued.push(args), touchApp: () => {},
   };

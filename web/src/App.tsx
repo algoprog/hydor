@@ -11,6 +11,7 @@ import { newerBuild, useApp, useSessions, useUI, useUsage, type Bootstrap } from
 import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
 import { handleNotify, initNotifications } from './lib/notify';
 import { startPresence } from './lib/presence';
+import { useSignIn } from './features/accounts/signin';
 import { live, ownLive } from './lib/ws';
 import { MachineDown } from './features/machines/MachineSwitcher';
 import { MachineOld, openedAnyway } from './features/machines/MachineOld';
@@ -112,9 +113,13 @@ export function App() {
     }
     useSessions.getState().load().catch(() => {});
     useUsage.getState().refresh().catch(() => {});
+    useSignIn.getState().load().catch(() => {});
     const off = live.onStatus((up) => {
       useApp.getState().set({ connected: up });
-      if (up) useSessions.getState().load().catch(() => {});
+      if (up) {
+        useSessions.getState().load().catch(() => {});
+        useSignIn.getState().load().catch(() => {});
+      }
     });
     live.start();
     initNotifications();
@@ -157,7 +162,7 @@ export function App() {
           </CrashGuard>
         </Router>
       )}
-      <Toasts />
+      <Toasts shell={auth === 'ok' && !down && !holding && !older} />
     </>
   );
 }

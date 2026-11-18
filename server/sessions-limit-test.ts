@@ -13,6 +13,7 @@ import path from 'node:path';
 import { addAccount, removeAccount } from './accounts.ts';
 import { kvSet, openDb } from './db.ts';
 import { SessionManager, subagentsLine } from './sessions.ts';
+import { isSignedOut, markSignedIn, markSignedOut, needSignIn, onSignedIn, resetSignIn, signInNeeds } from './signin.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -35,7 +36,7 @@ const agentTask = (description: string, status = 'running'): Task => ({ status, 
 
 /** A stand-in for a running Claude Code session's adapter. */
 function fakeAdapter(status = 'idle') {
-  return { tasks: new Map<string, Task>(), limitTasks: new Map<string, string>(), state: { status }, limitStopped: undefined as boolean | undefined, exited: false };
+  return { tasks: new Map<string, Task>(), limitTasks: new Map<string, string>(), state: { status }, limitStopped: undefined as boolean | undefined, signedOut: undefined as boolean | undefined, exited: false };
 }
 
 /** The manager's own methods, with stand-ins for everything that would reach an agent, an account or the network. */
@@ -57,6 +58,8 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     endedTurns: new Map(),
     limitHits: new Set<string>(),
     limitEnds: new Map(),
+    signedOutHits: new Set<string>(),
+    signedOutEnds: new Map<string, number>(),
     switching: new Set<string>(),
     userStopped: new Set<string>(),
     moveNotes: new Map<string, string>(),
@@ -104,6 +107,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
   m.finishedNotice = proto.finishedNotice.bind(m);
   m.releaseHeld = proto.releaseHeld.bind(m);
   m.afterLimit = proto.afterLimit.bind(m);
+  m.afterSignOut = proto.afterSignOut.bind(m);
   m.switchAtLimit = proto.switchAtLimit.bind(m);
   m.switchForSubagents = proto.switchForSubagents.bind(m);
   m.subagentsAtWork = proto.subagentsAtWork.bind(m);
@@ -799,6 +803,226 @@ test('beforeResume for a Grok session moves it to the account with usage left, w
   assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b']]);
   assert.deepEqual(t.calls.usageOf, [['grok', 'a', 60_000]]);
   assert.equal(t.takeMoveNote(GROK_KEY, 'hi'), 'Account a reached its usage limit, so this session now runs on Account b, which has usage left.');
+});
+
+// ---- an account signed out ------------------------------------------------------------
+
+/** A signed-out turn of the session ended (as the adapter's 'signedout' leaves it, the account marked), seen as it went idle. */
+function signedOutTurn(t: ReturnType<typeof manager>, extra: Record<string, unknown> = {}) {
+  markSignedOut('claude', 'a');
+  t.m.signedOutHits.add(KEY);
+  t.m.statuses.set(KEY, { status: 'working', turnStart: Date.now() });
+  t.watchStatus([summary('idle', extra)]);
+}
+
+/** Runs a signed-out test with no marks or prompts left over from another. */
+const signedOutTest = (name: string, fn: () => void | Promise<void>) =>
+  test(name, async () => {
+    resetSignIn();
+    try {
+      await fn();
+    } finally {
+      resetSignIn();
+    }
+  });
+
+signedOutTest('a session whose account is signed out moves to another account with usage, and is told so', async () => {
+  const t = manager({ free: { id: 'b' } });
+  signedOutTurn(t);
+  assert.ok(t.m.signedOutHits.size === 0, 'the hit is taken at the turn end');
+  assert.deepEqual(await t.m.limitAfter.get(KEY).after, { goes: 'account', to: 'Account b', signedOut: true });
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'signedout']]);
+  assert.deepEqual(t.calls.delivered, ['Account a is signed out, so this session now runs on Account b. Continue where you left off.']);
+  assert.deepEqual(signInNeeds(), [], 'nobody is asked while another account can do the work');
+  assert.equal(isSignedOut('claude', 'a'), true);
+  assert.equal(t.calls.switchAtLimit.length, 0);
+  assert.ok(t.m.signedOutEnds.has(KEY));
+  assert.equal(t.m.switching.has(KEY), false);
+});
+
+signedOutTest('a moved session that a goal continues by itself is not told to continue again', async () => {
+  const t = manager({ free: { id: 'b' } });
+  t.m.carryOver = async (...a: unknown[]) => (t.calls.carryOver.push(a), true);
+  signedOutTurn(t);
+  await t.m.limitAfter.get(KEY).after;
+  assert.equal(t.calls.carryOver.length, 1);
+  assert.deepEqual(t.calls.delivered, []);
+});
+
+signedOutTest('with no other account to take it, the user is asked to sign in again, for this session', async () => {
+  const t = manager({ free: null });
+  signedOutTurn(t);
+  assert.equal(await t.m.limitAfter.get(KEY).after, null);
+  assert.equal(t.calls.carryOver.length + t.calls.delivered.length, 0);
+  const [need] = signInNeeds();
+  assert.deepEqual([need.agent, need.account, need.sessions, need.background], ['claude', 'a', [KEY], false]);
+});
+
+signedOutTest('with Switch accounts off, or an external session, the user is asked and nothing moves', async () => {
+  kvSet(db, 'auto_switch', '0');
+  try {
+    const t = manager({ free: { id: 'b' } });
+    signedOutTurn(t);
+    await t.m.limitAfter.get(KEY).after;
+    assert.equal(t.calls.carryOver.length, 0);
+    assert.deepEqual(signInNeeds().map((n) => n.sessions), [[KEY]]);
+  } finally {
+    kvSet(db, 'auto_switch', '1');
+  }
+  resetSignIn();
+  const t = manager({ free: { id: 'b' } });
+  signedOutTurn(t, { external: { client: 'VS Code', status: 'idle' } });
+  await t.m.limitAfter.get(KEY).after;
+  assert.equal(t.calls.carryOver.length, 0);
+  assert.deepEqual(signInNeeds().map((n) => n.sessions), [[KEY]]);
+});
+
+signedOutTest('a quick signed-out turn (begun and ended between two looks) is acted on too', async () => {
+  const t = manager({ free: null });
+  markSignedOut('claude', 'a');
+  t.m.signedOutHits.add(KEY);
+  quickTurn(t);
+  await t.m.limitAfter.get(KEY).after;
+  assert.deepEqual(signInNeeds().map((n) => n.sessions), [[KEY]]);
+});
+
+signedOutTest('a session you stopped yourself is not asked about; one already moving is left to that move', async () => {
+  const t = manager({ free: null });
+  t.m.userStopped.add(KEY);
+  markSignedOut('claude', 'a');
+  // The adapter's own handler does not count a hit for a turn you stopped; one that slipped in is still not asked about.
+  t.m.signedOutHits.add(KEY);
+  t.m.statuses.set(KEY, { status: 'working', turnStart: Date.now() });
+  t.watchStatus([summary('idle')]);
+  await t.m.limitAfter.get(KEY).after;
+  assert.deepEqual(signInNeeds(), []);
+  const u = manager({ free: null });
+  u.m.switching.add(KEY);
+  signedOutTurn(u);
+  assert.equal(u.m.limitAfter.get(KEY), undefined);
+  assert.deepEqual(signInNeeds(), []);
+});
+
+signedOutTest('a move that fails asks the user instead, and says why', async () => {
+  const t = manager({ free: { id: 'b' } });
+  t.m.carryOver = async () => {
+    throw new Error('no luck');
+  };
+  signedOutTurn(t);
+  assert.equal(await t.m.limitAfter.get(KEY).after, null);
+  assert.deepEqual(signInNeeds().map((n) => n.sessions), [[KEY]]);
+  assert.equal((t.calls.toasts[0] as { text: string }).text, 'A session: could not switch accounts: no luck');
+  assert.equal(t.m.switching.has(KEY), false);
+});
+
+signedOutTest('after a sign-in the session it stopped is stopped and told to continue; others are left', async () => {
+  const t = manager({ free: null });
+  const stopped: string[] = [];
+  t.m.exists = (k: string) => k !== 'claude:gone';
+  t.m.accountOf = (k: string) => t.m.lives.get(k)?.account ?? 'a';
+  t.m.stopAndWait = async (k: string) => void stopped.push(k);
+  t.m.continueAfterSignIn = proto.continueAfterSignIn.bind(t.m);
+  // The constructor's own wiring.
+  const off = onSignedIn((agent, account, keys) => void t.m.continueAfterSignIn(agent, account, keys));
+  try {
+    const WORKING = 'claude:00000000-0000-0000-0000-000000000002';
+    const OTHER = 'claude:00000000-0000-0000-0000-000000000003';
+    t.m.lives.set(WORKING, { adapter: { ...fakeAdapter('working') }, account: 'a' });
+    t.m.lives.set(OTHER, { adapter: fakeAdapter(), account: 'z' });
+    t.m.lives.get(KEY).account = 'a';
+    markSignedOut('claude', 'a');
+    for (const k of [KEY, WORKING, OTHER, 'claude:gone']) needSignIn({ agent: 'claude', account: 'a', session: k });
+    markSignedIn('claude', 'a');
+    await sleep(30);
+    assert.deepEqual(stopped, [KEY]);
+    assert.deepEqual(t.calls.delivered, ['Signed in again. Continue where you left off.']);
+    assert.deepEqual(signInNeeds(), []);
+    assert.equal(isSignedOut('claude', 'a'), false);
+  } finally {
+    off();
+  }
+});
+
+signedOutTest('a sign-in nobody was waiting on continues nothing', async () => {
+  const t = manager({ free: null });
+  t.m.continueAfterSignIn = proto.continueAfterSignIn.bind(t.m);
+  const off = onSignedIn((agent, account, keys) => void t.m.continueAfterSignIn(agent, account, keys));
+  try {
+    markSignedOut('claude', 'a');
+    markSignedIn('claude', 'a');
+    await sleep(20);
+    assert.deepEqual(t.calls.delivered, []);
+  } finally {
+    off();
+  }
+});
+
+signedOutTest('a message to a session whose account is signed out moves it first, and it no longer waits for a sign-in', async () => {
+  const t = manager({ free: { id: 'b' } });
+  t.m.switchBeforeSend = proto.switchBeforeSend.bind(t.m);
+  t.m.leaveSignedOut = proto.leaveSignedOut.bind(t.m);
+  t.m.beforeResume = async () => assert.fail('a sign-out is not a limit');
+  markSignedOut('claude', 'a');
+  needSignIn({ agent: 'claude', account: 'a', session: KEY });
+  await t.m.switchBeforeSend(KEY);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'signedout']]);
+  assert.equal(t.m.moveNotes.get(KEY), 'Account a is signed out, so this session now runs on Account b.');
+  assert.deepEqual(signInNeeds(), []);
+  assert.equal(t.m.switching.has(KEY), false);
+});
+
+signedOutTest('a message goes on as it is when no other account can take the session, or its account is not signed out', async () => {
+  const none = manager({ free: null });
+  none.m.switchBeforeSend = proto.switchBeforeSend.bind(none.m);
+  none.m.leaveSignedOut = proto.leaveSignedOut.bind(none.m);
+  markSignedOut('claude', 'a');
+  await none.m.switchBeforeSend(KEY);
+  assert.equal(none.calls.carryOver.length, 0);
+  resetSignIn();
+  const fine = manager({ free: { id: 'b' } });
+  fine.m.switchBeforeSend = proto.switchBeforeSend.bind(fine.m);
+  fine.m.leaveSignedOut = proto.leaveSignedOut.bind(fine.m);
+  await fine.m.switchBeforeSend(KEY);
+  assert.equal(fine.calls.carryOver.length, 0);
+});
+
+signedOutTest('a turn stopped by a sign-out is not the work failing', () => {
+  const t = manager();
+  t.m.stoppedAtLimit = proto.stoppedAtLimit.bind(t.m);
+  assert.equal(t.m.stoppedAtLimit(KEY, 0), false);
+  t.adapter.signedOut = true;
+  assert.equal(t.m.stoppedAtLimit(KEY, 0), true);
+  t.adapter.signedOut = false;
+  t.m.signedOutHits.add(KEY);
+  assert.equal(t.m.stoppedAtLimit(KEY, 0), true);
+  t.m.signedOutHits.clear();
+  t.m.signedOutEnds.set(KEY, 1000);
+  assert.equal(t.m.stoppedAtLimit(KEY, 500), true);
+  assert.equal(t.m.stoppedAtLimit(KEY, 2000), false);
+});
+
+signedOutTest('freeAccount passes over an account found signed out, and still the one asked to leave', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const usage = { agent: 'claude', ok: true, fetchedAt: Date.now(), windows: [{ id: 'w', label: 'Weekly', usedPercent: 10, resetsAt: null }], limited: null };
+    const m: any = { db, usageOf: async () => usage };
+    const free = (except: string | undefined) => proto.freeAccount.call(m, 'claude', except) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free(a.id))?.id, undefined, 'the main account, the least used first among equals, when listed first');
+    markSignedOut('claude', undefined);
+    markSignedOut('claude', b.id);
+    assert.equal(await free(a.id), null);
+    markSignedIn('claude', b.id);
+    assert.equal((await free(a.id))?.id, b.id);
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+signedOutTest('the lead of a subagent that moved for a sign-out hears so, not of a usage limit', async () => {
+  const { resultMessage } = await import('./children/index.ts');
+  const text = resultMessage({ key: 'claude:c', title: 'T', label: 'Claude Code', link: '/s/c', turn: { reply: '' } as any, after: { goes: 'account', to: 'Work', signedOut: true } });
+  assert.match(text, /^\[The Hydor subagent "T" \(claude:c, Claude Code\) found its account signed out and carries on with Work, another account\.\]/);
 });
 
 // ---- subagentsLine --------------------------------------------------------------------

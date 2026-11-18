@@ -596,6 +596,27 @@ test('a profile longer than its words is shortened by the helper in the backgrou
   answer('Chris: short.');
   await e.p;
   assert.equal(userProfile(db)?.text, 'Chris, written again by hand.');
+  // The helper never answers (waiting on a sign-in nobody makes): it ends with an error at the time limit, and a late answer is dropped.
+  saveProfile(db, long, { source: 'user' });
+  e = ends();
+  let late!: (t: string) => void;
+  let task: string | undefined;
+  const t0 = Date.now();
+  fitProfile(
+    db,
+    (q) => ((task = q.task), new Promise<string>((r) => (late = r))),
+    () => e.end(),
+    150,
+  );
+  assert.equal(profileFit()?.running, true);
+  await e.p;
+  assert.ok(Date.now() - t0 >= 140, 'it waited for the limit');
+  assert.equal(task, 'shortening your profile', 'the helper is told what the call is for');
+  assert.deepEqual(profileFit(), { running: false, at: profileFit()!.at, error: 'The helper model did not answer within 4 minutes' });
+  late('Chris: too late.');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(userProfile(db)?.text, long, 'a late answer is not kept');
+  assert.equal(profileFit()?.error, 'The helper model did not answer within 4 minutes');
   store.setProfileWords(db, 1000);
   store.clearAll(db);
 });

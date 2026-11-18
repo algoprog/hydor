@@ -45,7 +45,7 @@ export function saveProfile(db: DB, text: string, by: ChangeBy): { profile: Memo
 // ---- shortened to fit ------------------------------------------------------------------------------
 
 /** The helper model, asked for text. */
-export type AskText = (q: { system: string; prompt: string; maxTokens: number }) => Promise<string>;
+export type AskText = (q: { system: string; prompt: string; maxTokens: number; task?: string }) => Promise<string>;
 export const helperText =
   (db: DB): AskText =>
   (q) =>
@@ -60,17 +60,28 @@ let jobs = 0;
 /** Whether the helper is shortening the profile now, or why it could not lately (for Settings). */
 export const profileFit = (): ProfileFit | undefined => fit;
 
+/** How long the whole shortening may take, both tries: the helper may be waiting on a sign-in nobody has made. */
+export const FIT_LIMIT_MS = 4 * 60_000;
+
 /**
  * Starts shortening the profile when it has more words than it may, in the background (false when it fits): the
  * helper rewrites it to about nine tenths of the limit, again tighter when that is still too long. The rewrite goes in
- * as the helper's change, only if the profile is the same as when it started. `done` hears when it ends, either way.
+ * as the helper's change, only if the profile is the same as when it started. `done` hears when it ends, either way:
+ * with an error at `limitMs`, when the helper has not answered by then (a late answer is dropped).
  */
-export function fitProfile(db: DB, ask: AskText, done: () => void = () => {}): boolean {
+export function fitProfile(db: DB, ask: AskText, done: () => void = () => {}, limitMs = FIT_LIMIT_MS): boolean {
   const cur = userProfile(db);
   const limit = profileWords(db);
   if (!cur || wordCount(cur.text) <= limit) return false;
   const job = ++jobs;
   fit = { running: true, at: Date.now() };
+  const timer = setTimeout(() => {
+    if (job !== jobs) return;
+    // Counted as ended: what the helper answers after this is not kept.
+    jobs++;
+    fit = { running: false, at: Date.now(), error: 'The helper model did not answer within 4 minutes' };
+    done();
+  }, limitMs);
   void (async () => {
     let error: string | undefined;
     try {
@@ -78,7 +89,7 @@ export function fitProfile(db: DB, ask: AskText, done: () => void = () => {}): b
       let out = '';
       for (const share of [0.9, 0.7]) {
         const target = Math.max(1, Math.floor(limit * share));
-        const raw = await ask({ system: fitSystem(wordCount(text), limit, target), prompt: `<profile>\n${text.replace(/<\/?profile>/gi, '')}\n</profile>`, maxTokens: limit * 2 + 256 });
+        const raw = await ask({ system: fitSystem(wordCount(text), limit, target), prompt: `<profile>\n${text.replace(/<\/?profile>/gi, '')}\n</profile>`, maxTokens: limit * 2 + 256, task: 'shortening your profile' });
         out = cleanProfile(raw.replace(/^\s*```[a-z]*\n?|\n?```\s*$/g, ''));
         if (out && wordCount(out) <= limit) break;
         text = out || text;
@@ -92,6 +103,7 @@ export function fitProfile(db: DB, ask: AskText, done: () => void = () => {}): b
       error = (e as Error).message?.slice(0, 300) || 'The helper model did not answer';
     }
     if (job !== jobs) return;
+    clearTimeout(timer);
     fit = { running: false, at: Date.now(), ...(error ? { error } : {}) };
     done();
   })();

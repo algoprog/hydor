@@ -121,6 +121,12 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error), and the app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
+  An account that has been signed out (its sign-in ended or was revoked) is worked around the same way: a session
+  whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,
+  or none left, it stops with a banner and a **Sign in** button, and continues by itself once you are signed in
+  again); the helper model's background jobs pass it over for 15 minutes, then the next signed-in account, then
+  Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added) answer; and
+  only when nothing could do the work does a card on every page ask you to sign in again.
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
   account when every account is at its limit, and go back to the plan once it has usage again.
 
