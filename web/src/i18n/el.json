@@ -25839,5 +25839,18 @@
   "Vietnamese": "Βιετναμέζικα",
   "Welsh": "Ουαλικά",
   "your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app": "δικό σας πρόγραμμα περιήγησης αρχική σελίδα μηχανή αναζήτησης google duckduckgo bing προτάσεις αποκλεισμός διαφημίσεων διαφημίσεις ιχνηλάτες banner για cookies μετάφραση σκούρες σελίδες αυτόματη αναπαραγωγή ήχος προβολή ανάγνωσης εκκαθάριση δεδομένων περιήγησης ιστορικό cookies κρυφή μνήμη εφαρμογή υπολογιστή",
-  "This page has no article to show in reader view": "Αυτή η σελίδα δεν έχει άρθρο για την προβολή ανάγνωσης"
+  "This page has no article to show in reader view": "Αυτή η σελίδα δεν έχει άρθρο για την προβολή ανάγνωσης",
+  "{0} page{1} of history": "{0} σελίδες ιστορικού",
+  "Bring in your bookmarks and history?": "Εισαγωγή σελιδοδεικτών και ιστορικού;",
+  "Brought in": "Εισήχθη",
+  "Brought in {0} page{1}": "Εισήχθησαν σελίδες: {0}",
+  "Close {0}, then try again: it locks its history while it is open": "Κλείστε το {0} και δοκιμάστε ξανά: κλειδώνει το ιστορικό του όσο είναι ανοιχτό.",
+  "history visited pages recently closed tabs reopen closed tab clear browsing data forget back import bring in chrome firefox safari edge brave other browsers": "ιστορικό σελίδες που επισκεφθήκατε πρόσφατα κλεισμένες καρτέλες επαναφορά κλεισμένης καρτέλας εκκαθάριση δεδομένων περιήγησης διαγραφή πίσω εισαγωγή φέρτε chrome firefox safari edge brave άλλα προγράμματα περιήγησης",
+  "Hydor has a browser of its own. Bring in what the browsers on this computer know, so your sites are a click away and the address bar suggests them. It all stays on this computer.": "Το Hydor έχει δικό του πρόγραμμα περιήγησης. Εισαγάγετε ό,τι ξέρουν τα προγράμματα περιήγησης σε αυτόν τον υπολογιστή, ώστε οι ιστότοποί σας να είναι ένα κλικ μακριά και η γραμμή διευθύνσεων να τους προτείνει. Όλα μένουν σε αυτόν τον υπολογιστή.",
+  "No other browser with history was found on this computer.": "Δεν βρέθηκε άλλο πρόγραμμα περιήγησης με ιστορικό σε αυτόν τον υπολογιστή.",
+  "Say which browser to import from.": "Πείτε από ποιο πρόγραμμα περιήγησης να γίνει η εισαγωγή.",
+  "That browser’s history is not here any more.": "Το ιστορικό αυτού του προγράμματος περιήγησης δεν υπάρχει πια.",
+  "The pages you visited in your own browser, by day, with a search box and the tabs you closed lately, and importing the history of the other browsers on this computer: Chrome, Firefox, Safari, Edge, Brave and more (desktop app)": "Οι σελίδες που επισκεφθήκατε στο δικό σας πρόγραμμα περιήγησης, ανά ημέρα, με πλαίσιο αναζήτησης και τις καρτέλες που κλείσατε πρόσφατα, και η εισαγωγή του ιστορικού των άλλων προγραμμάτων περιήγησης σε αυτόν τον υπολογιστή: Chrome, Firefox, Safari, Edge, Brave και άλλα (εφαρμογή υπολογιστή)",
+  "There is no history to import there.": "Εκεί δεν υπάρχει ιστορικό για εισαγωγή.",
+  "Your history has all of it already": "Το ιστορικό σας τα έχει ήδη όλα"
 }

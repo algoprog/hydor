@@ -407,6 +407,28 @@ export interface BookmarkSource {
   error?: string;
 }
 
+/** The history of another browser on this computer (or of one of its profiles) that can be imported. */
+export interface HistorySource {
+  /** The same as its BookmarkSource's id, so the two lists can be put together: 'chrome:Default', 'firefox:abc.default-release', 'safari'. */
+  id: string;
+  /** The browser's name as people know it (Google Chrome, Microsoft Edge, Firefox, Safari…). */
+  browser: string;
+  /** Its profile's name, when it has several. */
+  profile?: string;
+  /** How many pages of its history would come in (its latest 20,000 at most). */
+  count: number;
+  /** Why it cannot be read now, when it cannot (Safari without Full Disk Access, its file held by the browser while it runs…). */
+  error?: string;
+}
+
+/** What importing another browser's history did. */
+export interface HistoryImport {
+  /** Pages new to your history. */
+  added: number;
+  /** Pages your history had already, now with that browser's visits (a later last visit, more visits). */
+  updated: number;
+}
+
 /** A Chrome extension in your own browsing (the desktop app's browser runs it). */
 export interface BrowserExtension {
   /** Its Chrome Web Store id (32 letters a–p): from the store, the browser it came from, or its key. */

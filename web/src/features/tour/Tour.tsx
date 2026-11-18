@@ -11,13 +11,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Globe, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import type { BookmarkNode, BookmarkSource, HistoryImport, HistorySource } from '@shared/browser';
 import type { AccountAgent, AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { saveStart, startSettings } from '../../lib/start';
 import { desktopSystem, enablePush, pushState, systemNotices, systemNoticesState, testSystemNotice, turnOnSystemNotices, whenBack, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
+import { LOCALE } from '../../i18n/locale';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
@@ -29,7 +31,8 @@ import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';
 import { Sea, SourcesMap, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
 import { machineBase, machineId } from '../../lib/machine';
 import { tourDone } from '../tips/state';
-import { build, PHONE_STEP, setupDone, takeAfterSetup, TOUR_SETUP_STEPS } from './setup';
+import { useBookmarks } from '../browser/browsing';
+import { build, DESKTOP_APP, PHONE_STEP, setupDone, takeAfterSetup, TOUR_SETUP_STEPS } from './setup';
 
 export { Sea, setupDone, TOUR_SETUP_STEPS, TourProgress, type Use };
 
@@ -94,9 +97,35 @@ interface TourState {
   found: string[];
   /** The Bring in dialog is open over the tour. */
   bringIn: boolean;
+  /** The other browsers on this computer with bookmarks or history to bring in (desktop apps only): a step offers them. */
+  browsers: FoundBrowser[];
+  /** What bringing each browser's things in has come to, by its id (kept as the person goes back and forth). */
+  imports: Record<string, BrowserImport>;
+  /** Which kinds the step brings in. */
+  bring: { bookmarks: boolean; history: boolean };
 }
 
-const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false, found: [], bringIn: false }));
+/** A browser profile on this computer, with what it holds. */
+interface FoundBrowser {
+  id: string;
+  browser: string;
+  profile?: string;
+  bookmarks: number;
+  history: number;
+  /** Why a kind cannot be read now, when it cannot. */
+  errors: { bookmarks?: string; history?: string };
+}
+
+type Kind = 'bookmarks' | 'history';
+
+/** Bringing one browser's things in: under way, which kinds came in, and what went wrong with the others (they can be tried again). */
+interface BrowserImport {
+  busy: boolean;
+  brought: { bookmarks?: true; history?: true };
+  error?: string;
+}
+
+const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false, found: [], bringIn: false, browsers: [], imports: {}, bring: { bookmarks: true, history: true } }));
 
 /** The tour is on screen (tips wait for it). */
 export const tourOpen = () => useTour.getState().open;
@@ -111,12 +140,42 @@ export function startTour(from?: string, fresh = false) {
   window.clearTimeout(builtTimer);
   const saved = savedUses();
   const uses = saved ?? [];
-  const i = from ? steps(uses, fresh, []).findIndex((s) => s.id === from) : 0;
-  useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh, found: [], bringIn: false });
+  const i = from ? steps(uses, fresh, [], false).findIndex((s) => s.id === from) : 0;
+  useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh, found: [], bringIn: false, browsers: [], imports: {}, bring: { bookmarks: true, history: true } });
   // Which assistants are here is looked up as the tour opens; the step comes (and the dots count it) once it is known.
   api<{ found: { name: string }[] }>('/api/memory/bring-in/found')
-    .then((r) => useTour.setState({ found: r.found.map((f) => f.name) }))
+    .then((r) => arrives({ found: r.found.map((f) => f.name) }))
     .catch(() => {});
+  // The same for the other browsers' bookmarks and history, in a desktop app (the one on this computer).
+  if (DESKTOP_APP && !machineId)
+    void Promise.allSettled([api<{ sources: BookmarkSource[] }>('/api/browser/bookmarks/sources'), api<{ sources: HistorySource[] }>('/api/browser/browsing/history/sources')]).then(([b, h]) =>
+      arrives({ browsers: mergeBrowsers(b.status === 'fulfilled' ? b.value.sources : [], h.status === 'fulfilled' ? h.value.sources : []) }),
+    );
+}
+
+/** The bookmark sources and the history sources, one row for each browser profile: those with bookmarks, history or an error. */
+function mergeBrowsers(bookmarks: BookmarkSource[], history: HistorySource[]): FoundBrowser[] {
+  const rows = new Map<string, FoundBrowser>();
+  for (const s of bookmarks) rows.set(s.id, { id: s.id, browser: s.browser, profile: s.profile, bookmarks: s.count, history: 0, errors: { bookmarks: s.error } });
+  for (const s of history) {
+    const r = rows.get(s.id);
+    if (!r) rows.set(s.id, { id: s.id, browser: s.browser, profile: s.profile, bookmarks: 0, history: s.count, errors: { history: s.error } });
+    else {
+      r.profile ??= s.profile;
+      r.history = s.count;
+      r.errors.history = s.error;
+    }
+  }
+  return [...rows.values()].filter((r) => r.bookmarks || r.history || r.errors.bookmarks || r.errors.history);
+}
+
+/** Sets what arrives after the tour opened (the assistants found, the browsers) so the step the person is on stays the one shown. */
+function arrives(set: Partial<Pick<TourState, 'found' | 'browsers'>>) {
+  const s = useTour.getState();
+  const before = steps(s.uses, s.fresh, s.found, s.browsers.length > 0);
+  const id = before[Math.min(s.i, before.length - 1)]?.id;
+  const at = steps(s.uses, s.fresh, set.found ?? s.found, (set.browsers ?? s.browsers).length > 0).findIndex((x) => x.id === id);
+  useTour.setState(at >= 0 ? { ...set, i: at } : set);
 }
 
 
@@ -483,7 +542,6 @@ function PhoneSetup() {
   );
 }
 
-/** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
 /** The assistants found, and the button that opens Bring in over the tour (the dialog lists what would come first). */
 function BringInStep() {
   const found = useTour((s) => s.found);
@@ -505,6 +563,97 @@ function BringInStep() {
   );
 }
 
+/** What a browser row holds, as words: "12 bookmarks · 3,400 pages of history". */
+function holds(b: FoundBrowser): string {
+  const n = (x: number) => x.toLocaleString(LOCALE);
+  return [b.bookmarks > 0 && `${n(b.bookmarks)} bookmark${b.bookmarks === 1 ? '' : 's'}`, b.history > 0 && `${n(b.history)} page${b.history === 1 ? '' : 's'} of history`].filter(Boolean).join(' · ');
+}
+
+/** The kinds to bring from a row: those toggled on that it has (an error counts: trying again may work now) and not brought yet. */
+const toBring = (b: FoundBrowser, on: Record<Kind, boolean>, r?: BrowserImport): Kind[] => (['bookmarks', 'history'] as const).filter((k) => on[k] && (b[k] > 0 || b.errors[k]) && !r?.brought[k]);
+
+
+/** Bookmarks and history of the other browsers here: which kinds to bring, and a row for each browser to bring in. */
+function BrowsersStep() {
+  const browsers = useTour((s) => s.browsers);
+  const imports = useTour((s) => s.imports);
+  const bring = useTour((s) => s.bring);
+  const set = (id: string, f: (r: BrowserImport) => BrowserImport) => useTour.setState((s) => ({ imports: { ...s.imports, [id]: f(s.imports[id] ?? { busy: false, brought: {} }) } }));
+  // Each kind left to bring, one after the other: one that came in is kept (a second try does not bring it twice), a failure
+  // is shown on the row (the first one: Safari's permission, say, is the same for both) and the next kind goes on.
+  const run = async (b: FoundBrowser) => {
+    const state = useTour.getState();
+    const kinds = toBring(b, state.bring, state.imports[b.id]);
+    const errors: string[] = [];
+    set(b.id, (r) => ({ ...r, busy: true, error: undefined }));
+    for (const k of kinds) {
+      try {
+        if (k === 'bookmarks') {
+          const r = await post<{ added: number; folder?: string; nodes: BookmarkNode[] }>('/api/browser/bookmarks/import', { source: b.id });
+          useBookmarks.setState({ nodes: r.nodes, loaded: true });
+        } else await post<HistoryImport>('/api/browser/browsing/history/import', { source: b.id });
+        set(b.id, (r) => ({ ...r, brought: { ...r.brought, [k]: true } }));
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+    set(b.id, (r) => ({ ...r, busy: false, error: errors[0] }));
+  };
+  const toggle = (k: Kind, label: string) => (
+    <button
+      type="button"
+      aria-pressed={bring[k]}
+      onClick={() => useTour.setState((s) => ({ bring: { ...s.bring, [k]: !s.bring[k] } }))}
+      className={cx(
+        'flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] ring-inset transition-colors',
+        bring[k] ? 'bg-bg-1 text-fg ring-[1.5px] ring-[var(--water-2)]' : 'bg-bg-1 text-fg-3 ring-1 ring-line hover:ring-line-2',
+      )}
+    >
+      <Check size={13} strokeWidth={3} className={bring[k] ? 'text-[var(--water-2)]' : 'invisible'} /> {label}
+    </button>
+  );
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        {toggle('bookmarks', 'Bookmarks')}
+        {toggle('history', 'History')}
+      </div>
+      <div className="divide-y divide-line overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-line">
+        {browsers.map((b) => {
+          const r = imports[b.id];
+          const left = toBring(b, bring, r).length;
+          const brought = !!r && (r.brought.bookmarks || r.brought.history);
+          const text = holds(b);
+          // The import's own error, else why the first kind still wanted could not be read.
+          const error = r?.error || (['bookmarks', 'history'] as const).map((k) => (bring[k] && !r?.brought[k] ? b.errors[k] : undefined)).find(Boolean);
+          return (
+            <div key={b.id} className="flex items-center gap-3 px-3.5 py-2.5">
+              <span className="tour-tile-icon">
+                <Globe size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13.5px] font-medium text-fg" translate="no">
+                  {b.profile ? `${b.browser} · ${b.profile}` : b.browser}
+                </div>
+                {text && <div className="text-[12px] text-fg-3">{text}</div>}
+                {error && <div className="text-[12px] text-warn">{error}</div>}
+              </div>
+              {left === 0 && brought ? (
+                <Connected label="Brought in" />
+              ) : (
+                <Button size="sm" variant="secondary" className="rounded-full" icon={<Import size={13} />} disabled={left === 0 || !!r?.busy} onClick={() => void run(b)}>
+                  {r?.busy ? 'Importing…' : 'Import'}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
 const FIRST_TASKS = ['Plan a 3-day trip to Lisbon in May', 'Sum up a PDF I drop in', 'Make a budget spreadsheet for a small café'];
 
 function TryThese({ finish }: { finish?: boolean }) {
@@ -556,7 +705,7 @@ function DotsLegend() {
 /** "a, b or c" */
 const either = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}` : (xs[0] ?? ''));
 
-function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
+function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean): Step[] {
   const has = (u: Use) => uses.includes(u);
   const claude = has('claude');
   const codex = has('codex');
@@ -656,6 +805,19 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
       ),
       Extra: BringInStep,
     });
+  // In a desktop app, its own browser can take in what the other browsers here know: bookmarks and history.
+  if (browsers)
+    list.push({
+      id: 'browsers',
+      title: 'Bring in your bookmarks and history?',
+      body: 'Hydor has a browser of its own. Bring in what the browsers on this computer know, so your sites are a click away and the address bar suggests them. It all stays on this computer.',
+      scene: () => (
+        <div className="flex w-full justify-center">
+          <TideMark size={84} />
+        </div>
+      ),
+      Extra: BrowsersStep,
+    });
   const names = [claude && 'Claude Code', codex && 'Codex', models && 'Custom with your models', has('agents') && 'the agents you added'].filter((x): x is string => !!x);
   // The app arrives in this order, the message box before the row under it.
   list.push(
@@ -742,8 +904,8 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
 }
 
 // The new install's first screen counts the tour's steps without the tour (setup.ts): checked here while developing.
-if (import.meta.env.DEV && steps([], true, []).length + 1 !== TOUR_SETUP_STEPS)
-  console.warn(`TOUR_SETUP_STEPS is ${TOUR_SETUP_STEPS} in tour/setup.ts, but a new install's tour has ${steps([], true, []).length + 1} steps`);
+if (import.meta.env.DEV && steps([], true, [], false).length + 1 !== TOUR_SETUP_STEPS)
+  console.warn(`TOUR_SETUP_STEPS is ${TOUR_SETUP_STEPS} in tour/setup.ts, but a new install's tour has ${steps([], true, [], false).length + 1} steps`);
 
 // ---- the overlay ----------------------------------------------------------------------------
 
@@ -945,13 +1107,13 @@ function TourPage(p: {
 }
 
 export function Tour() {
-  const { open, closing, i, signIn, uses, fresh, found, bringIn } = useTour();
+  const { open, closing, i, signIn, uses, fresh, found, browsers, bringIn } = useTour();
   // A dialog is open over the tour: the tour waits under it.
   const over = !!signIn || bringIn;
   const boot = useApp((s) => s.boot);
   const mobile = useIsMobile();
   const [loc] = useLocation();
-  const list = useMemo(() => steps(uses, fresh, found), [uses, fresh, found]);
+  const list = useMemo(() => steps(uses, fresh, found, browsers.length > 0), [uses, fresh, found, browsers]);
   const step = open ? list[Math.min(i, list.length - 1)] : undefined;
   // The step's target as last looked for: where it comes to rest, or null while it is not there.
   const [seen, setSeen] = useState<{ id: string; r: DOMRect | null } | null>(null);

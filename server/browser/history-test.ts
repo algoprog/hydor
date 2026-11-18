@@ -19,7 +19,7 @@ import { addBookmark, changeBookmark, loadBookmarks, removeBookmark } from './bo
 import { addressOf } from './browsing.ts';
 import { browserVectorCounts, browsingAlike, downloadText, fillBrowserVectors, historyText, syncBookmarkVectors } from './meaning.ts';
 import { addDownload, clearDownloads, downloadCount, listDownloads, MAX_DOWNLOADS } from './downloads.ts';
-import { addVisit, clearHistory, clearSuggestCache, engineSuggestions, frecency, HistoryRecorder, historyCount, historyUrl, listHistory, MAX_HISTORY, parseSuggestions, plainUrl, removeHistory, setTitle, SUGGEST_URLS, suggest, type Fetch, type SuggestInput } from './history.ts';
+import { addVisit, clearHistory, clearSuggestCache, engineSuggestions, frecency, HistoryRecorder, historyCount, historyUrl, listHistory, MAX_HISTORY, mergeHistory, parseSuggestions, plainUrl, removeHistory, setTitle, SUGGEST_URLS, suggest, table, type Fetch, type SuggestInput } from './history.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -626,6 +626,143 @@ async function main() {
     assert.equal(downloadCount(db), MAX_DOWNLOADS);
     assert.equal(listDownloads(db, { q: 'file-0' }).length, 0, 'the oldest went');
     assert.equal(listDownloads(db, { limit: 1 })[0].name, 'newest.bin');
+    db.close();
+  });
+
+  await check('mergeHistory: new pages come in with their visits, typed counts and titles; what is not a page is left out; times are clamped', () => {
+    const db = fresh();
+    const r = mergeHistory(
+      db,
+      [
+        { url: 'https://a.example/', title: ' Page  A ', at: NOW - DAY, visits: 3, typed: 1 },
+        { url: 'http://b.example/x?y=1', title: '', at: NOW - 2 * DAY },
+        { url: 'file:///tmp/c.html', title: 'C', at: NOW - 3 * DAY, visits: 0, typed: -4 },
+        { url: 'https://future.example/', title: 'Soon', at: NOW + 10 * DAY, visits: 2.9, typed: 1.5 },
+        { url: 'javascript:alert(1)', title: 'no', at: NOW },
+        { url: 'about:blank', title: 'no', at: NOW },
+        { url: 'chrome://settings', title: 'no', at: NOW },
+        { url: 'https://nan.example/', title: 'no', at: Number.NaN },
+        { url: 'https://zero.example/', title: 'no', at: 0 },
+        { url: 'https://neg.example/', title: 'no', at: -5 },
+      ],
+      NOW,
+    );
+    assert.deepEqual(r, { added: 4, updated: 0 });
+    const rows = listHistory(db, { limit: 50 });
+    assert.deepEqual(
+      rows.map((e) => [e.url, e.title, e.at, e.visits, e.typed]),
+      [
+        ['https://future.example/', 'Soon', NOW, 2, 1],
+        ['https://a.example/', 'Page A', NOW - DAY, 3, 1],
+        ['http://b.example/x?y=1', '', NOW - 2 * DAY, 1, 0],
+        ['file:///tmp/c.html', 'C', NOW - 3 * DAY, 1, 0],
+      ],
+    );
+    assert.equal(listHistory(db, { q: 'page a' }).length, 1, 'searchable by the title');
+    db.close();
+  });
+
+  await check('mergeHistory: pages of one address are combined, fragments included', () => {
+    const db = fresh();
+    const r = mergeHistory(
+      db,
+      [
+        { url: 'https://a.example/doc#top', title: 'Old title', at: NOW - 5 * DAY, visits: 2, typed: 1 },
+        { url: 'https://a.example/doc#end', title: 'New title', at: NOW - DAY, visits: 3, typed: 0 },
+        { url: 'https://a.example/doc', title: '', at: NOW - 3 * DAY, visits: 1, typed: 2 },
+      ],
+      NOW,
+    );
+    assert.deepEqual(r, { added: 1, updated: 0 });
+    const rows = listHistory(db);
+    assert.equal(rows.length, 1);
+    assert.deepEqual([rows[0].url, rows[0].title, rows[0].at, rows[0].visits, rows[0].typed], ['https://a.example/doc', 'New title', NOW - DAY, 6, 3]);
+    // The latest visit has no title: the latest one that has a title gives it.
+    const db2 = fresh();
+    mergeHistory(db2, [{ url: 'https://t.example/', title: 'Has one', at: NOW - 2 * DAY }, { url: 'https://t.example/#x', title: '', at: NOW - DAY }], NOW);
+    assert.deepEqual([listHistory(db2)[0].title, listHistory(db2)[0].at], ['Has one', NOW - DAY]);
+    db.close();
+    db2.close();
+  });
+
+  await check('mergeHistory: merging takes the larger of each, and the same import again changes nothing', () => {
+    const db = fresh();
+    addVisit(db, 'https://a.example/', 'Mine', true, NOW - 10 * DAY);
+    addVisit(db, 'https://a.example/', 'Mine', false, NOW - 9 * DAY);
+    addVisit(db, 'https://later.example/', 'Local', false, NOW - DAY);
+    const pages = [
+      { url: 'https://a.example/', title: 'Theirs', at: NOW - 5 * DAY, visits: 7, typed: 0 },
+      { url: 'https://later.example/', title: 'Imported', at: NOW - 4 * DAY, visits: 1, typed: 0 },
+      { url: 'https://new.example/', title: 'New', at: NOW - 6 * DAY, visits: 2, typed: 2 },
+    ];
+    assert.deepEqual(mergeHistory(db, pages, NOW), { added: 1, updated: 1 });
+    const by = (u: string) => listHistory(db).find((e) => e.url === u)!;
+    // Later visit, more visits, the typed count it had; the later visit's title.
+    assert.deepEqual([by('https://a.example/').at, by('https://a.example/').visits, by('https://a.example/').typed, by('https://a.example/').title], [NOW - 5 * DAY, 7, 1, 'Theirs']);
+    // An older visit changes nothing.
+    assert.deepEqual([by('https://later.example/').at, by('https://later.example/').visits, by('https://later.example/').title], [NOW - DAY, 1, 'Local']);
+    assert.deepEqual(mergeHistory(db, pages, NOW), { added: 0, updated: 0 });
+    assert.equal(historyCount(db), 3);
+    db.close();
+  });
+
+  await check('mergeHistory: titles: the later visit gives it, a page without one takes it, a changed one is embedded again', async () => {
+    useModel();
+    const db = fresh();
+    addVisit(db, 'https://t.example/one', 'Mine', false, NOW - 3 * DAY);
+    addVisit(db, 'https://t.example/two', '', false, NOW - 3 * DAY);
+    addVisit(db, 'https://t.example/three', 'Kept', false, NOW - DAY);
+    assert.equal(await fillBrowserVectors(db), 3);
+    mergeHistory(
+      db,
+      [
+        { url: 'https://t.example/one', title: 'Newer title', at: NOW - 2 * DAY },
+        { url: 'https://t.example/two', title: 'Was empty', at: NOW - 5 * DAY },
+        { url: 'https://t.example/three', title: 'Older title', at: NOW - 2 * DAY },
+        { url: 'https://t.example/four', title: '', at: NOW - 2 * DAY },
+      ],
+      NOW,
+    );
+    const title = (u: string) => listHistory(db).find((e) => e.url === u)!.title;
+    assert.equal(title('https://t.example/one'), 'Newer title');
+    assert.equal(title('https://t.example/two'), 'Was empty');
+    assert.equal(title('https://t.example/three'), 'Kept');
+    assert.equal(listHistory(db, { q: 'newer title' }).length, 1, 'the search words follow the title');
+    assert.equal(listHistory(db, { q: 'mine' }).length, 0);
+    // A changed title lost its vector (the page whose title stayed keeps it).
+    assert.equal(vectorRows(db, 'history'), 1);
+    // An imported page with no title keeps the one it has.
+    mergeHistory(db, [{ url: 'https://t.example/one', title: '', at: NOW - DAY }], NOW);
+    assert.equal(title('https://t.example/one'), 'Newer title');
+    setEmbedderForTests(null);
+    db.close();
+  });
+
+  await check('mergeHistory: only the newest 20 000 stay, and added counts those still there', () => {
+    const db = fresh();
+    table(db);
+    const insert = db.prepare("insert into browser_history (url, title, hay, at, visits, typed) values (?, '', ?, ?, 1, 0)");
+    db.transaction(() => {
+      for (let i = 0; i < MAX_HISTORY - 2; i++) insert.run(`https://old.example/${i}`, `old.example/${i}`, 1000 + i);
+    })();
+    const r = mergeHistory(
+      db,
+      [
+        { url: 'https://n1.example/', at: NOW - 3 },
+        { url: 'https://n2.example/', at: NOW - 2 },
+        { url: 'https://n3.example/', at: NOW - 1 },
+        // Older than everything the table has: it comes in, then goes at once.
+        { url: 'https://ancient.example/', at: 5 },
+      ],
+      NOW,
+    );
+    assert.equal(historyCount(db), MAX_HISTORY);
+    assert.deepEqual(r, { added: 3, updated: 0 });
+    const urlsNow = new Set((db.prepare('select url from browser_history').all() as { url: string }[]).map((x) => x.url));
+    assert.equal(urlsNow.has('https://ancient.example/'), false);
+    assert.equal(urlsNow.has('https://old.example/0'), false, 'the oldest went');
+    assert.equal(urlsNow.has('https://old.example/1'), true);
+    assert.equal(urlsNow.has('https://n3.example/'), true);
     db.close();
   });
 

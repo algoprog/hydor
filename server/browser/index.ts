@@ -5,6 +5,7 @@ import type { Feature } from '../features/types.ts';
 import { findChromes, pickChrome } from './chrome.ts';
 import { forgetSession } from './ops.ts';
 import { bookmarkRoutes } from './bookmarks.ts';
+import { historyImportRoutes } from './history-import.ts';
 import { browsingRoutes } from './browsing.ts';
 import { extensionRoutes } from './extensions.ts';
 import { laterRoutes } from './later.ts';
@@ -38,6 +39,7 @@ export const browser: Feature = {
     browserRoutes(d);
     // Your own browsing's bookmarks and extensions (the Browser page).
     bookmarkRoutes(d);
+    historyImportRoutes(d);
     extensionRoutes(d);
     browsingRoutes(d);
     laterRoutes(d);

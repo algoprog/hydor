@@ -279,7 +279,12 @@ agents that speak ACP and take MCP servers.
     bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search address of your own, with search
     suggestions you can turn off.
   - **History**: a panel with a search box, by day, a way to delete one page, **Recently closed** and **Clear browsing
-    data…**; Ctrl/⌘+Shift+T opens the tab you closed last. It stays on this computer, the last 20,000 pages. What the
+    data…**; Ctrl/⌘+Shift+T opens the tab you closed last. It stays on this computer, the last 20,000 pages. **Import**,
+    at its foot, brings in the latest 20,000 pages of the other browsers on this computer (the ones for bookmarks, each
+    profile by its name, with how many pages would come in): each keeps its title, last visit, visits and typed visits,
+    so the address bar ranks them as that browser did; pages you have keep the later visit and larger counts, so
+    importing again adds nothing twice. A browser that locks its history while it is open asks you to close it (Firefox
+    can stay open); Safari needs Full Disk Access. What the
     browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
     the history, the files staying where they are.
   - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
@@ -351,7 +356,8 @@ agents that speak ACP and take MCP servers.
 - **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
   Arc and Safari, each profile by its name, into one new folder that keeps the browser's own folders; Safari needs Full Disk
-  Access) or from an exported bookmarks file, and export them as a file Chrome, Firefox and Safari import.
+  Access) or from an exported bookmarks file, and export them as a file Chrome, Firefox and Safari import. The desktop
+  app's welcome tour offers both, bookmarks and history, from those browsers.
 - **Chrome extensions** in your own browser (the desktop app's browser runs them): from the Chrome Web Store by link or
   id, or the **Add to Hydor** button on a Web Store page, from a folder (loaded where it is), or from the Chrome-based
   browsers on this computer; toolbar buttons with popups and badges, options pages, a switch to turn one off, **Remove**,
@@ -1881,7 +1887,9 @@ programs shows each program's version and what is out, with Check now, Update no
   drift gently. Then it shows you around as the app builds itself up, a ring of water lighting each part as it is
   explained, with first tasks to put in the message box. When the folder of Claude Code, Codex or another agent
   is on this computer, one more page, "Coming from another agent?", names what it found and opens
-  Bring in over the tour. Help shows it again.
+  Bring in over the tour. In the desktop apps, when other browsers are on this computer, "Bring in your bookmarks and
+  history?" lists them, each with how many bookmarks and pages of history it has, and **Import** beside one brings in
+  what is switched on (Bookmarks, History); Next goes on without. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the

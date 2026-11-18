@@ -25858,5 +25858,18 @@
   "Welsh": "威尔士语",
   "your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app": "自己的浏览 主页 搜索引擎 google duckduckgo bing 搜索建议 广告拦截器 拦截广告 跟踪器 Cookie 横幅 翻译 深色网页 自动播放 声音 阅读视图 清除浏览数据 历史记录 cookie 缓存 桌面应用",
   "This page has no article to show in reader view": "此网页没有可在阅读视图中显示的文章",
-  "browser::Translation": "翻译"
+  "browser::Translation": "翻译",
+  "{0} page{1} of history": "历史记录中有 {0} 个网页",
+  "Bring in your bookmarks and history?": "导入书签和历史记录？",
+  "Brought in": "已导入",
+  "Brought in {0} page{1}": "已导入 {0} 个网页",
+  "Close {0}, then try again: it locks its history while it is open": "请先关闭 {0}，然后重试：它在打开时会锁住历史记录。",
+  "history visited pages recently closed tabs reopen closed tab clear browsing data forget back import bring in chrome firefox safari edge brave other browsers": "历史记录 访问过的页面 最近关闭的标签页 重新打开已关闭的标签页 清除浏览数据 忘记 返回 history 导入 导入历史记录 chrome firefox safari edge brave 其他浏览器",
+  "Hydor has a browser of its own. Bring in what the browsers on this computer know, so your sites are a click away and the address bar suggests them. It all stays on this computer.": "Hydor 有一个自己的浏览器。把这台电脑上的浏览器所了解的内容导入进来，这样你的网站点一下就能打开，地址栏也会给你建议。这一切都只留在这台电脑上。",
+  "No other browser with history was found on this computer.": "在这台电脑上没有找到其他有历史记录的浏览器。",
+  "Say which browser to import from.": "请指明要从哪个浏览器导入。",
+  "That browser’s history is not here any more.": "那个浏览器的历史记录已经不在了。",
+  "The pages you visited in your own browser, by day, with a search box and the tabs you closed lately, and importing the history of the other browsers on this computer: Chrome, Firefox, Safari, Edge, Brave and more (desktop app)": "你在自己的浏览器中访问过的页面，按日期排列，带搜索框和最近关闭的标签页，还能导入这台电脑上其他浏览器的历史记录：Chrome、Firefox、Safari、Edge、Brave 等（桌面应用）",
+  "There is no history to import there.": "那里没有可导入的历史记录。",
+  "Your history has all of it already": "你的历史记录里已经有全部内容"
 }

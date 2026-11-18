@@ -3,7 +3,7 @@
 // your browsing's view (HistoryRecorder), ranked by frecency (how often and how lately, typed addresses counting most)
 // and kept to the last 20 000 pages. The suggestions put together your open tabs, bookmarks and history for what was
 // typed, the address to complete it to in place, and what the search engine suggests (a stand-in `fetch` in tests).
-import type { BookmarkNode, BrowserView, BrowsingPrefs, HistoryEntry, SearchEngine, Suggestion, SuggestResult } from '../../shared/browser.ts';
+import type { BookmarkNode, BrowserView, BrowsingPrefs, HistoryEntry, HistoryImport, SearchEngine, Suggestion, SuggestResult } from '../../shared/browser.ts';
 import type { DB } from '../db.ts';
 import { warmMeaning } from '../memory/embed.ts';
 import { browsingAlike, dropVectors, sweepHistoryVectors } from './meaning.ts';
@@ -126,6 +126,69 @@ export function setTitle(db: DB, url: string, title: string) {
   if (!row) return;
   db.prepare('update browser_history set title = ?, hay = ? where id = ?').run(t, hayOf(t, u), row.id);
   dropVectors(db, 'history', [String(row.id)]);
+}
+
+/**
+ * Another browser's history brought in. Pages of one address are combined first (the latest visit, the visits and typed
+ * counts added up, the title of the latest visit that has one). A page the history has keeps the larger of each count and
+ * the later visit, so bringing the same history again changes nothing; its title becomes the imported one when that visit
+ * is later (or it had none). Then only the newest 20 000 pages stay.
+ */
+export function mergeHistory(db: DB, pages: { url: string; title?: string; at: number; visits?: number; typed?: number }[], now = Date.now()): HistoryImport {
+  table(db);
+  const mine = new Map<string, { title: string; titleAt: number; at: number; visits: number; typed: number }>();
+  for (const p of pages) {
+    const u = historyUrl(p.url);
+    if (!u) continue;
+    const at = Number(p.at);
+    if (!Number.isFinite(at) || at <= 0) continue;
+    const visits = Math.max(1, Math.floor(Number(p.visits)) || 1);
+    const typed = Math.max(0, Math.floor(Number(p.typed)) || 0);
+    const t = tidyTitle(p.title, u);
+    const when = Math.min(Math.floor(at), now);
+    const m = mine.get(u);
+    if (!m) mine.set(u, { title: t, titleAt: t ? when : 0, at: when, visits, typed });
+    else {
+      m.visits += visits;
+      m.typed += typed;
+      m.at = Math.max(m.at, when);
+      if (t && when >= m.titleAt) (m.title = t), (m.titleAt = when);
+    }
+  }
+  return db.transaction((): HistoryImport => {
+    const last = (db.prepare('select coalesce(max(id), 0) as id from browser_history').get() as { id: number }).id;
+    const find = db.prepare(`select ${COLS} from browser_history where url = ?`);
+    const insert = db.prepare('insert into browser_history (url, title, hay, at, visits, typed) values (?, ?, ?, ?, ?, ?)');
+    const update = db.prepare('update browser_history set at = ?, visits = ?, typed = ?, title = ?, hay = ? where id = ?');
+    let added = 0;
+    let updated = 0;
+    for (const [u, m] of mine) {
+      const row = find.get(u) as Row | undefined;
+      if (!row) {
+        insert.run(u, m.title, hayOf(m.title, u), m.at, m.visits, m.typed);
+        added++;
+        continue;
+      }
+      const at = Math.max(row.at, m.at);
+      const visits = Math.max(row.visits, m.visits);
+      const typed = Math.max(row.typed, m.typed);
+      const title = m.title && (m.at > row.at || !row.title) ? m.title : row.title;
+      if (at === row.at && visits === row.visits && typed === row.typed && title === row.title) continue;
+      // A new title is embedded again.
+      if (title !== row.title) dropVectors(db, 'history', [String(row.id)]);
+      update.run(at, visits, typed, title, hayOf(title, u), row.id);
+      updated++;
+    }
+    // The oldest pages go once there are more than the most.
+    const n = (db.prepare('select count(*) as n from browser_history').get() as { n: number }).n;
+    if (n > MAX_HISTORY) {
+      db.prepare('delete from browser_history where id in (select id from browser_history order by at asc, id asc limit ?)').run(n - MAX_HISTORY);
+      sweepHistoryVectors(db);
+      // Only the pages that are still there count as added.
+      added = (db.prepare('select count(*) as n from browser_history where id > ?').get(last) as { n: number }).n;
+    }
+    return { added, updated };
+  })();
 }
 
 /** `instr` tests for each word, to put after a `where`: all the words are in the title or the address. */

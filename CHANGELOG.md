@@ -29,6 +29,11 @@ does more of what you expect of a browser.
 - **A site's data**: the padlock deletes a site's cookies and data, and turns dark pages off for one site.
 - **Video and sound**: right-click a video or a sound for Play, Mute, Loop, Show controls, Picture in picture, and
   saving it or copying its address.
+- **Bring in your history**: **Import** at the foot of the History panel brings in the history of Chrome, Edge, Brave,
+  Firefox, Safari and the other browsers on this computer, its latest 20,000 pages, so the address bar suggests the
+  sites you know. Importing again adds nothing twice.
+- **Your browsers, in the welcome tour**: in the desktop apps, the tour asks **Bring in your bookmarks and history?**
+  when it finds other browsers on this computer, and brings in what you pick, one browser at a time.
 
 ## 0.86.3 · 18 November 2026
 

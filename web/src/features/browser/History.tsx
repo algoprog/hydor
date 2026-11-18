@@ -2,8 +2,10 @@
 // to open again; and a way to clear it all.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { History as HistoryIcon, Search, Trash2, Undo2, X } from 'lucide-react';
-import type { HistoryEntry } from '@shared/browser';
+import type { HistoryEntry, HistoryImport, HistorySource } from '@shared/browser';
 import { LOCALE } from '../../i18n/locale';
+import { api, post } from '../../lib/api';
+import { toast, toastError } from '../../lib/store';
 import { Button, cx, IconButton, inputCls, Throbber } from '../../components/ui';
 import { deleteHistory, goTo, KEY, loadHistory, reopenClosed } from './browsing';
 import { Note, Panel } from './Panel';
@@ -33,6 +35,8 @@ export function HistoryPanel({ onClose, onClear, tab }: { onClose: () => void; o
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Counts the times history was brought in, so the list shown is read again.
+  const [brought, setBrought] = useState(0);
   const first = useRef(true);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
@@ -58,7 +62,7 @@ export function HistoryPanel({ onClose, onClear, tab }: { onClose: () => void; o
       live = false;
       window.clearTimeout(t);
     };
-  }, [q]);
+  }, [q, brought]);
 
   const older = async () => {
     const last = entries?.[entries.length - 1];
@@ -166,6 +170,63 @@ export function HistoryPanel({ onClose, onClear, tab }: { onClose: () => void; o
           )}
         </>
       )}
+      {!q.trim() && <ImportBox onBrought={() => setBrought((n) => n + 1)} />}
     </Panel>
+  );
+}
+
+/** Bringing history in from the other browsers on this computer. */
+function ImportBox({ onBrought }: { onBrought: () => void }) {
+  const [sources, setSources] = useState<HistorySource[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ sources: HistorySource[] }>('/api/browser/browsing/history/sources').then(
+      (r) => live && setSources(r.sources),
+      () => live && setSources([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const bring = async (id: string) => {
+    setBusy(id);
+    try {
+      const r = await post<HistoryImport>('/api/browser/browsing/history/import', { source: id });
+      const n = r.added + r.updated;
+      toast(n ? `Brought in ${n.toLocaleString(LOCALE)} page${n === 1 ? '' : 's'}` : 'Your history has all of it already', 'info');
+      onBrought();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-line pb-4">
+      <div className="px-4 pt-3 pb-1 text-[11.5px] font-medium text-fg-3">Import</div>
+      {sources === null && (
+        <div className="flex justify-center py-3">
+          <Throbber size={18} />
+        </div>
+      )}
+      {sources?.map((s) => (
+        <div key={s.id} className="flex items-center gap-2 px-4 py-1.5">
+          <div className="min-w-0 flex-1">
+            <div translate="no" className="truncate text-[13px]">
+              {s.browser}
+              {s.profile ? ` · ${s.profile}` : ''}
+            </div>
+            <div className={cx('text-[12px]', s.error ? 'text-warn' : 'text-fg-3')}>{s.error ? s.error : `${s.count.toLocaleString(LOCALE)} page${s.count === 1 ? '' : 's'}`}</div>
+          </div>
+          <Button size="sm" disabled={(!s.error && !s.count) || busy !== null} onClick={() => void bring(s.id)}>
+            {busy === s.id ? 'Importing…' : 'Import'}
+          </Button>
+        </div>
+      ))}
+      {sources?.length === 0 && <Note>No other browser with history was found on this computer.</Note>}
+    </div>
   );
 }

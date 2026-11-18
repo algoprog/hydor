@@ -4,15 +4,14 @@
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import type { FastifyRequest } from 'fastify';
 import { BOOKMARK_ROOTS, type BookmarkNode, type BookmarkSource } from '../../shared/browser.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { syncBookmarkVectors } from './meaning.ts';
+import { chromeTime, chromiumProfiles, dirsNow, firefoxProfiles, readCopy, readJson, type Dirs } from './other-browsers.ts';
 
 const KEY = 'browser.bookmarks';
 export const MAX_BOOKMARKS = 20_000;
@@ -245,62 +244,6 @@ interface Candidate {
   load: () => Promise<Imp[]> | Imp[];
 }
 
-interface ChromiumKind {
-  key: string;
-  name: string;
-  /** Its user data folders on this system. */
-  dirs: (h: Dirs) => string[];
-}
-
-interface Dirs {
-  home: string;
-  config: string;
-  mac: string;
-  local: string;
-  roaming: string;
-}
-
-function dirsNow(): Dirs {
-  const home = os.homedir();
-  return {
-    home,
-    config: process.env.XDG_CONFIG_HOME || path.join(home, '.config'),
-    mac: path.join(home, 'Library', 'Application Support'),
-    local: process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'),
-    roaming: process.env.APPDATA || path.join(home, 'AppData', 'Roaming'),
-  };
-}
-
-const by = (linux: string[], mac: string[], win: (h: Dirs) => string[] = () => []) => (h: Dirs) =>
-  process.platform === 'darwin' ? mac.map((p) => path.join(h.mac, p)) : process.platform === 'win32' ? win(h) : linux.map((p) => (p.startsWith('~/') ? path.join(h.home, p.slice(2)) : path.join(h.config, p)));
-
-const flatpak = (app: string, rest: string) => `~/.var/app/${app}/config/${rest}`;
-
-const CHROMIUMS: ChromiumKind[] = [
-  { key: 'chrome', name: 'Google Chrome', dirs: by(['google-chrome', flatpak('com.google.Chrome', 'google-chrome')], ['Google/Chrome'], (h) => [path.join(h.local, 'Google', 'Chrome', 'User Data')]) },
-  { key: 'chrome-beta', name: 'Google Chrome Beta', dirs: by(['google-chrome-beta'], []) },
-  { key: 'chromium', name: 'Chromium', dirs: by(['chromium', '~/snap/chromium/common/chromium', flatpak('org.chromium.Chromium', 'chromium')], ['Chromium'], (h) => [path.join(h.local, 'Chromium', 'User Data')]) },
-  { key: 'edge', name: 'Microsoft Edge', dirs: by(['microsoft-edge', flatpak('com.microsoft.Edge', 'microsoft-edge')], ['Microsoft Edge'], (h) => [path.join(h.local, 'Microsoft', 'Edge', 'User Data')]) },
-  { key: 'brave', name: 'Brave', dirs: by(['BraveSoftware/Brave-Browser', flatpak('com.brave.Browser', 'BraveSoftware/Brave-Browser')], ['BraveSoftware/Brave-Browser'], (h) => [path.join(h.local, 'BraveSoftware', 'Brave-Browser', 'User Data')]) },
-  { key: 'vivaldi', name: 'Vivaldi', dirs: by(['vivaldi'], ['Vivaldi'], (h) => [path.join(h.local, 'Vivaldi', 'User Data')]) },
-  { key: 'opera', name: 'Opera', dirs: by(['opera'], ['com.operasoftware.Opera'], (h) => [path.join(h.roaming, 'Opera Software', 'Opera Stable')]) },
-  { key: 'arc', name: 'Arc', dirs: by([], ['Arc/User Data']) },
-];
-
-function readJson(file: string): any {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
-  } catch {
-    return undefined;
-  }
-}
-
-/** Chrome keeps dates as microseconds since 1601. */
-const chromeTime = (v: unknown) => {
-  const ms = Number(v) / 1000 - 11_644_473_600_000;
-  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
-};
-
 function chromeNode(n: any): Imp | null {
   if (!n || typeof n !== 'object') return null;
   if (n.type === 'folder') return { title: String(n.name ?? ''), children: (Array.isArray(n.children) ? n.children : []).map(chromeNode).filter((x: Imp | null): x is Imp => !!x), added: chromeTime(n.date_added) };
@@ -322,126 +265,39 @@ function chromeFile(file: string): Imp[] {
 }
 
 function chromiumCandidates(h: Dirs): Candidate[] {
-  const found: Candidate[] = [];
-  for (const kind of CHROMIUMS) {
-    for (const [di, dir] of kind.dirs(h).entries()) {
-      if (!fs.existsSync(dir)) continue;
-      // The variants of one browser (Snap, Flatpak) get their own ids.
-      const key = di === 0 ? kind.key : `${kind.key}-${di + 1}`;
-      const names = readJson(path.join(dir, 'Local State'))?.profile?.info_cache ?? {};
-      const folders = new Set<string>(Object.keys(names));
-      try {
-        for (const e of fs.readdirSync(dir, { withFileTypes: true })) if (e.isDirectory() && /^(Default|Profile \d+)$/.test(e.name)) folders.add(e.name);
-      } catch {}
-      const mine: { folder: string; file: string }[] = [];
-      // Opera keeps its bookmarks at the top, with no profile folders.
-      if (fs.existsSync(path.join(dir, 'Bookmarks'))) mine.push({ folder: '', file: path.join(dir, 'Bookmarks') });
-      for (const folder of [...folders].sort((a, b) => (a === 'Default' ? -1 : b === 'Default' ? 1 : a.localeCompare(b, 'en', { numeric: true })))) {
-        const file = path.join(dir, folder, 'Bookmarks');
-        if (fs.existsSync(file)) mine.push({ folder, file });
-      }
-      for (const m of mine) {
-        found.push({
-          info: { id: `${key}:${m.folder || 'Default'}`, browser: kind.name, profile: mine.length > 1 ? String(names[m.folder]?.name || m.folder || 'Default') : undefined },
-          load: () => chromeFile(m.file),
-        });
-      }
-    }
-  }
-  return found;
+  return chromiumProfiles(h, 'Bookmarks').map((p) => ({ info: { id: p.id, browser: p.browser, profile: p.profile }, load: () => chromeFile(p.file) }));
 }
 
 // Firefox
 
-const FIREFOX_DIRS = (h: Dirs) =>
-  process.platform === 'darwin'
-    ? [path.join(h.mac, 'Firefox')]
-    : process.platform === 'win32'
-      ? [path.join(h.roaming, 'Mozilla', 'Firefox')]
-      : [path.join(h.home, '.mozilla', 'firefox'), path.join(h.home, 'snap', 'firefox', 'common', '.mozilla', 'firefox'), path.join(h.home, '.var', 'app', 'org.mozilla.firefox', '.mozilla', 'firefox')];
-
-/** The profiles profiles.ini lists: their names and folders. */
-function firefoxProfiles(dir: string): { name: string; folder: string }[] {
-  let ini: string;
-  try {
-    ini = fs.readFileSync(path.join(dir, 'profiles.ini'), 'utf8');
-  } catch {
-    return [];
-  }
-  const out: { name: string; folder: string }[] = [];
-  let sec: Record<string, string> | null = null;
-  const flush = () => {
-    if (sec?.Path) out.push({ name: sec.Name || path.basename(sec.Path), folder: sec.IsRelative === '0' ? sec.Path : path.join(dir, sec.Path) });
-    sec = null;
-  };
-  for (const raw of ini.split(/\r?\n/)) {
-    const line = raw.trim();
-    const m = /^\[(.*)\]$/.exec(line);
-    if (m) {
-      flush();
-      sec = /^Profile\d+$/i.test(m[1]) ? {} : null;
-    } else if (sec) {
-      const i = line.indexOf('=');
-      if (i > 0) sec[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+function firefoxFile(profileDir: string): Promise<Imp[]> {
+  return readCopy(path.join(profileDir, 'places.sqlite'), (db) => {
+    const rows = db
+      .prepare('select b.id, b.type, b.parent, b.position, b.title, b.guid, b.dateAdded, p.url from moz_bookmarks b left join moz_places p on p.id = b.fk order by b.parent, b.position')
+      .all() as { id: number; type: number; parent: number; position: number; title: string | null; guid: string; dateAdded: number | null; url: string | null }[];
+    const kids = new Map<number, typeof rows>();
+    for (const r of rows) kids.set(r.parent, [...(kids.get(r.parent) ?? []), r]);
+    const build = (r: (typeof rows)[number], depth: number): Imp | null => {
+      const added = r.dateAdded ? r.dateAdded / 1000 : undefined;
+      if (r.type === 1) return r.url ? { title: r.title ?? '', url: r.url, added } : null;
+      if (r.type !== 2 || depth > DEPTH_MAX) return null;
+      return { title: r.title ?? '', added, children: (kids.get(r.id) ?? []).map((k) => build(k, depth + 1)).filter((x): x is Imp => !!x) };
+    };
+    const root = (guid: string, title: string): Imp => {
+      const r = rows.find((x) => x.guid === guid);
+      return r ? { ...(build(r, 0) as Imp), title } : { title, children: [] };
+    };
+    const out: Imp[] = [...(root('toolbar_____', 'Bookmarks Toolbar').children ?? [])];
+    for (const [guid, title] of [['menu________', 'Bookmarks Menu'], ['unfiled_____', 'Other Bookmarks'], ['mobile______', 'Mobile Bookmarks']]) {
+      const f = root(guid, title);
+      if (f.children?.length) out.push(f);
     }
-  }
-  flush();
-  return out;
-}
-
-function firefoxFile(profileDir: string): Imp[] {
-  const src = path.join(profileDir, 'places.sqlite');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-places-'));
-  try {
-    // Firefox locks the file while it runs: read a copy, with the log it has not folded in yet.
-    fs.copyFileSync(src, path.join(tmp, 'places.sqlite'));
-    if (fs.existsSync(`${src}-wal`)) fs.copyFileSync(`${src}-wal`, path.join(tmp, 'places.sqlite-wal'));
-    let db: Database.Database;
-    try {
-      db = new Database(path.join(tmp, 'places.sqlite'), { readonly: true, fileMustExist: true });
-      db.prepare('select 1 from moz_bookmarks limit 1').get();
-    } catch {
-      db = new Database(path.join(tmp, 'places.sqlite'), { fileMustExist: true });
-    }
-    try {
-      const rows = db
-        .prepare('select b.id, b.type, b.parent, b.position, b.title, b.guid, b.dateAdded, p.url from moz_bookmarks b left join moz_places p on p.id = b.fk order by b.parent, b.position')
-        .all() as { id: number; type: number; parent: number; position: number; title: string | null; guid: string; dateAdded: number | null; url: string | null }[];
-      const kids = new Map<number, typeof rows>();
-      for (const r of rows) kids.set(r.parent, [...(kids.get(r.parent) ?? []), r]);
-      const build = (r: (typeof rows)[number], depth: number): Imp | null => {
-        const added = r.dateAdded ? r.dateAdded / 1000 : undefined;
-        if (r.type === 1) return r.url ? { title: r.title ?? '', url: r.url, added } : null;
-        if (r.type !== 2 || depth > DEPTH_MAX) return null;
-        return { title: r.title ?? '', added, children: (kids.get(r.id) ?? []).map((k) => build(k, depth + 1)).filter((x): x is Imp => !!x) };
-      };
-      const root = (guid: string, title: string): Imp => {
-        const r = rows.find((x) => x.guid === guid);
-        return r ? { ...(build(r, 0) as Imp), title } : { title, children: [] };
-      };
-      const out: Imp[] = [...(root('toolbar_____', 'Bookmarks Toolbar').children ?? [])];
-      for (const [guid, title] of [['menu________', 'Bookmarks Menu'], ['unfiled_____', 'Other Bookmarks'], ['mobile______', 'Mobile Bookmarks']]) {
-        const f = root(guid, title);
-        if (f.children?.length) out.push(f);
-      }
-      return out;
-    } finally {
-      db.close();
-    }
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+    return out;
+  });
 }
 
 function firefoxCandidates(h: Dirs): Candidate[] {
-  const found: Candidate[] = [];
-  for (const dir of FIREFOX_DIRS(h)) {
-    const ps = firefoxProfiles(dir).filter((p) => fs.existsSync(path.join(p.folder, 'places.sqlite')));
-    for (const p of ps) {
-      found.push({ info: { id: `firefox:${path.basename(p.folder)}`, browser: 'Firefox', profile: ps.length > 1 ? p.name : undefined }, load: () => firefoxFile(p.folder) });
-    }
-  }
-  return found;
+  return firefoxProfiles(h).map((p) => ({ info: { id: p.id, browser: p.browser, profile: p.profile }, load: () => firefoxFile(p.folder) }));
 }
 
 // Safari: a binary property list, turned into XML by plutil and read by a small parser of that XML.

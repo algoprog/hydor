@@ -24587,5 +24587,18 @@
   "Vietnamese": "Vietnamesisch",
   "Welsh": "Walisisch",
   "your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app": "eigenes Surfen Startseite Suchmaschine Google DuckDuckGo Bing Vorschläge Werbeblocker Werbung blockieren Tracker Cookie-Banner übersetzen Übersetzung dunkle Seiten Autoplay Ton Leseansicht Browserdaten löschen Verlauf Cookies Cache Desktop-App",
-  "This page has no article to show in reader view": "Diese Seite hat keinen Artikel für die Leseansicht"
+  "This page has no article to show in reader view": "Diese Seite hat keinen Artikel für die Leseansicht",
+  "{0} page{1} of history": "{0} Seiten im Verlauf",
+  "Bring in your bookmarks and history?": "Lesezeichen und Verlauf importieren?",
+  "Brought in": "Importiert",
+  "Brought in {0} page{1}": "{0} Seiten importiert",
+  "Close {0}, then try again: it locks its history while it is open": "Schließe {0} und versuche es erneut: Der Browser sperrt seinen Verlauf, solange er geöffnet ist.",
+  "history visited pages recently closed tabs reopen closed tab clear browsing data forget back import bring in chrome firefox safari edge brave other browsers": "Verlauf besuchte Seiten zuletzt geschlossene Tabs geschlossenen Tab wieder öffnen Browserdaten löschen vergessen zurück importieren übernehmen Chrome Firefox Safari Edge Brave andere Browser",
+  "Hydor has a browser of its own. Bring in what the browsers on this computer know, so your sites are a click away and the address bar suggests them. It all stays on this computer.": "Hydor hat einen eigenen Browser. Importiere, was die Browser auf diesem Computer wissen, damit deine Websites nur einen Klick entfernt sind und die Adressleiste sie vorschlägt. Alles bleibt auf diesem Computer.",
+  "No other browser with history was found on this computer.": "Auf diesem Computer wurde kein anderer Browser mit Verlauf gefunden.",
+  "Say which browser to import from.": "Gib an, aus welchem Browser importiert werden soll.",
+  "That browser’s history is not here any more.": "Der Verlauf dieses Browsers ist nicht mehr da.",
+  "The pages you visited in your own browser, by day, with a search box and the tabs you closed lately, and importing the history of the other browsers on this computer: Chrome, Firefox, Safari, Edge, Brave and more (desktop app)": "Die Seiten, die du in deinem eigenen Browser besucht hast, nach Tag geordnet, mit Suchfeld und den zuletzt geschlossenen Tabs, und der Import des Verlaufs der anderen Browser auf diesem Computer: Chrome, Firefox, Safari, Edge, Brave und mehr (Desktop-App)",
+  "There is no history to import there.": "Dort gibt es keinen Verlauf zum Importieren.",
+  "Your history has all of it already": "Dein Verlauf enthält schon alles davon"
 }
