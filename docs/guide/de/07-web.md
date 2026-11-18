@@ -382,7 +382,7 @@ Das Schloss am Anfang der Adressleiste zeigt, ob die Verbindung zur Website sich
 
 ### Downloads
 
-Eine Datei, die eine Seite herunterlädt, wird im Ordner Downloads des Computers gespeichert, auf dem die App läuft, und steht unter **Menü** (⋯) → **Downloads** als „Wird heruntergeladen…“, „Fertig“ oder „Fehlgeschlagen“, mit ihrem Pfad. Klicke auf eine fertige, um sie in ihrem Ordner zu zeigen.
+Eine Datei, die eine Seite herunterlädt, wird im Ordner Downloads des Computers gespeichert, auf dem die App läuft, und steht unter **Menü** (⋯) → **Downloads** als „Wird heruntergeladen…“, „Fertig“ oder „Fehlgeschlagen“, mit ihrem Pfad. Klicke auf eine fertige, um sie in ihrem Ordner zu zeigen: Die Desktop-App öffnet dafür den Dateimanager des Systems mit der ausgewählten Datei (**Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**; siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
 
 ### Wenn eine Website eine Berechtigung anfragt
 

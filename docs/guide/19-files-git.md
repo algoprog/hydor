@@ -68,7 +68,7 @@ The bar over the folder holds, from the left:
 - **Find in** *the folder*: narrows the list to the names that hold what you type, as you type. Enter, or the line **Search everything in … for "…", inside files too** at the top of the list, searches every folder under this one, file names and what is in the files (see [Search files](/guide/files-git#search-files)).
 - **New**: **New folder**, **New file**, **New notebook**, **Upload files** and **Upload a folder**.
 - **As a list** or **As tiles, with pictures**: tiles show pictures as themselves, a good way to look through photos.
-- **More** (⋯): **Sort by** (**Name**, **Date changed**, **Size** or **Kind**, and **The other way round**), **Show hidden files**, **Pin to Places**, **New session in this folder**, **Open a terminal here**, **Copy path**, **Download as .zip** and **Refresh**.
+- **More** (⋯): **Sort by** (**Name**, **Date changed**, **Size** or **Kind**, and **The other way round**), **Show hidden files**, **Pin to Places**, **New session in this folder**, **Open a terminal here**, **Copy path**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)), **Download as .zip** and **Refresh**.
 
 The list puts folders first. For each thing it shows its name, when it changed ("just now", "5 min ago", the time for today, "Yesterday", or the date) and its size. Click a column's title to sort by it, and again for the other way round. In a narrow window the bar keeps the field behind a search button, and **As a list** and **As tiles, with pictures** move under **More**; the date and size columns give way to the names.
 
@@ -105,6 +105,7 @@ Every row has a menu. Point at the row and click **More** (⋯) at its end, or r
 - **Rename** (F2), **Duplicate**, **Move to** and **Copy to**.
 - **Open a terminal here** (a folder): a new shell in that folder, in the bottom panel on a computer or on the Terminal page on a phone.
 - **Copy path**: the full path, to paste anywhere.
+- **Show in Finder** (Mac), **Show in File Explorer** (Windows) or **Show in folder** (Linux): in the desktop app, for a file or folder on this computer, it opens the system's own file manager with the item selected. Its name tells which one your system has. It is not in the web app, and not for the files of another machine.
 - **Download**, or **Download as .zip** for a folder.
 - **Delete** (the Delete key).
 
@@ -232,7 +233,7 @@ On a computer, the bar above the file shows its path and these buttons:
 - **Ask**: asks an agent to change the file, or about it ([below](#ask-an-agent-about-the-file)).
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
-- **More** (⋯): **Find**, **Replace**, **Go to line**, **Ask about the selection** and **Keyboard shortcuts**, then **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
+- **More** (⋯): **Find**, **Replace**, **Go to line**, **Ask about the selection** and **Keyboard shortcuts**, then **Start a session with it**, **Add to a project**, **Show in its folder**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app) and **Copy path**.
 - **Save**.
 
 To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace (Ctrl+H, or ⌘⌥F on a Mac). Ctrl+G (⌘⌥G on a Mac) goes to a line.
@@ -241,7 +242,7 @@ Right-click in the text (or press the menu key or Shift+F10 for the menu at the 
 
 The strip under the text shows where the cursor is (**Ln 12, Col 5**, with how many characters are picked; click it to go to a line), the file's language, its indentation (**Spaces: 2**, **Spaces: 4**, **Tabs**: read from the file; click to pick another for what you type next), **LF** or **CRLF** (how the file's lines end; click to save it with the other) and **Wrap** or **No wrap** (click to switch).
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Go to line**, **Ask about the selection**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Go to line**, **Ask about the selection**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app) and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
 
 ### Ask an agent about the file
 
@@ -275,7 +276,7 @@ These files open in the editors the [Library](/guide/library#documents) has for 
 - **Excel files** (.xlsx), **CSV** and **TSV** files open in the spreadsheet editor, with their sheets and working formulas (and an Excel file's filters, conditional formatting, dropdowns and checkboxes, merged cells, notes and charts).
 - **LaTeX files** (.tex) open in the LaTeX editor, the source beside its typeset pages. The files the document reads (chapters it puts in with `\input`, its bibliography) open with it, and it is typeset among the rest of its folder (its pictures, styles and data), which TeX reads but never changes. A chapter opens the document it belongs to (the one it names with `% !TEX root = …` or as a subfile's, else the one in its folder, or a folder or two up, that reads it), with the chapter open and the document's files in the [files tree](/guide/library#the-files-tree): the files it reads, in their folders, and, greyed, what TeX takes from the folder as it is (its pictures, styles and classes, data), to look at; change those in Files. On a narrow screen, **Files** over the source opens the tree. Comments work as in the [Library](/guide/library#latex-documents): a file keeps only its text, so the app keeps its comments beside it, by the file's path, saved with **Save**; they go along when you rename or move the file (or its folder) here, and an agent [asked about the file](#ask-an-agent-about-the-file) reads them, answers and resolves them, its answers showing as they come. **Resolve with AI**, on a comment or at the top of **Comments**, sends them to that agent at once ([Resolve comments with AI](/guide/library#resolve-comments-with-ai)). **Compare versions** is for LaTeX documents kept in the Library.
 
-Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. A file opened at a line, from a search, opens as text.
+Change it as in the [Library](/guide/library#documents), then click **Save** in the bar at the bottom, or press Ctrl+S (⌘S on a Mac); **Discard** goes back to the file as it was. The bar above has the file's path, **Ask** ([ask an agent](#ask-an-agent-about-the-file)), **Download** and **More** (⋯): **Edit as text** (CSV, TSV and LaTeX files) or **Show as a preview** (Word and Excel files) shows the file as before, with a button in the bar to come back to the editor, and the Files page's **Start a session with it**, **Add to a project**, **Show in its folder**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app) and **Copy path**. A file opened at a line, from a search, opens as text.
 
 What saving keeps of the file:
 
@@ -392,7 +393,7 @@ The results come in two parts:
 - **Files by that name**: up to 30 files whose names hold what you typed, each with its folder.
 - **Inside files**: the matching lines, grouped by file, each file with its number of matches. Click a line to open the file at that line, or a file's name to open it.
 
-Each result's **More** (⋯) has **Show in its folder**, **Start a session with it**, **Add to a project** and the rest of a file's menu.
+Each result's **More** (⋯) has **Show in its folder**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app), **Start a session with it**, **Add to a project** and the rest of a file's menu.
 
 The search is in the page's address, so Back and a reload keep it. It skips files the folder's `.gitignore` leaves out and files over 4 MB. It stops at 50 matches in a file and 1,000 in all, or after 15 seconds, and shows the first 30 matching lines of each file. PDF, Word and other documents are found by their names, not the text inside them; for agents to search inside them, add them to [knowledge](/guide/projects#shared-knowledge-documents-every-session-can-search).
 
@@ -489,7 +490,7 @@ Then Sync sends yours up. If both sides changed the same lines, it stops so you 
 The ⋯ menu has the steps one at a time, and the rest:
 
 - **Fetch** asks the remote what is new without changing anything here. **Pull** brings it in (when both sides moved on, it asks the same question). **Push** sends your commits up.
-- **Open a terminal here**, **Show in Files** and **Copy path**.
+- **Open a terminal here**, **Show in Files**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app) and **Copy path**.
 - **Remotes**: the repository's remotes and their addresses. A repository without one says **No remote · Add one**: paste an address and click **Add remote** (it is called origin), then **Publish branch**.
 - **Push tags**, when the repository has tags.
 
@@ -502,7 +503,7 @@ When something doesn't go through, a red box says what happened, in plain words 
 There is no separate staging step: each file has a box that puts it in the next commit (all of them at first), and the box at the top ticks or unticks them all ("3 of 4 in the commit").
 
 - **Discard this part**, at the top of each part of a file's changes, puts just those lines back as they were in the last commit (after a question).
-- A file's ⋯ menu: **Open the file**, **Show in Files**, **Discard the changes** (for a new file, **Delete the new file**; both ask first and can't be undone), and **Ignore it** (a new file) or **Stop tracking and ignore** (a file git keeps: the next commit takes it out of the repository, and it stays on this computer). Both add it to `.gitignore`.
+- A file's ⋯ menu: **Open the file**, **Show in Files**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app), **Discard the changes** (for a new file, **Delete the new file**; both ask first and can't be undone), and **Ignore it** (a new file) or **Stop tracking and ignore** (a file git keeps: the next commit takes it out of the repository, and it stays on this computer). Both add it to `.gitignore`.
 - The box icon at the top of the list puts every change aside in a stash (see [Put changes aside with a stash](/guide/files-git#put-changes-aside-with-a-stash)).
 
 To commit, at the bottom of the list:
@@ -725,7 +726,7 @@ Below, in more detail:
 - **Network**: download and upload, and each network connection.
 - **Storage**: reads and writes, and every disk with its free space, filesystem and how full it is.
 - **Sensors**: temperatures, red from 85 °C.
-- **Notebook kernels** (while any run): each with its environment, state, memory and **Shut down**.
+- **Notebook kernels** (while any run): each with its environment, state, memory, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app) for its notebook, and **Shut down**.
 - **Sessions** (while any run, on Linux and a Mac): each live session's programs (its agent's, the commands it runs, the servers it started), the most memory first, with how many there are, their CPU and their memory. On the right, the limits sessions run under: click them to change them ([Limit each session](/guide/app#limit-each-session)). Click a session to open it.
 - **Processes**: the 12 busiest programs by **CPU** or **Memory** (or **GPU**, for those using one), with process ID, user, CPU and memory. Point at a row for its full command.
 

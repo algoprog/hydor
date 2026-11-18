@@ -8,6 +8,7 @@ import { api, enc, post } from '../../lib/api';
 import { bytes, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go, showInFiles } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Markdown } from '../../components/Markdown';
@@ -311,6 +312,11 @@ export function PluginDetail({
                   <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), onClose(), showInFiles(p.root))}>
                     Show its folder
                   </MenuItem>
+                  {canReveal() && (
+                    <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), reveal(p.root))}>
+                      {revealLabel()}
+                    </MenuItem>
+                  )}
                   <MenuSep />
                   <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(false), remove())}>
                     Remove

@@ -20,6 +20,7 @@ import {
   FilePlus2,
   Folder,
   FolderInput,
+  FolderOpen,
   FolderPlus,
   FolderUp,
   LayoutGrid,
@@ -42,6 +43,7 @@ import { api, post, put } from '../../lib/api';
 import { basename, bytes, dirname, joinPath } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { openFile } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { pickedFromInput, startUpload } from '../../lib/upload';
 import { FileIcon } from '../documents/fileTypes';
@@ -936,6 +938,11 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
           <MenuItem icon={<Copy size={14} />} onClick={() => (closeMore(), copyPaths([folderItem]))}>
             Copy path
           </MenuItem>
+          {canReveal() && (
+            <MenuItem icon={<FolderOpen size={14} />} onClick={() => (closeMore(), reveal(dir))}>
+              {revealLabel()}
+            </MenuItem>
+          )}
           <MenuItem icon={<Download size={14} />} onClick={() => (closeMore(), download([folderItem]))}>
             Download as .zip
           </MenuItem>

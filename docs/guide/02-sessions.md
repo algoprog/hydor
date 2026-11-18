@@ -493,6 +493,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
   - **Open a pull request**, or **Pull request #12** once there is one.
   - **Worktree: agent/…**: the worktree's dialog (sessions in a worktree).
   - **Browse the folder**: opens Files at the session's folder.
+  - **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the session's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
   - **Open a terminal here**: a new terminal in the folder (in the panel at the bottom on a computer, on the Terminal page on a phone).
 - **Session settings** (a submenu):
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).

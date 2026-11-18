@@ -493,6 +493,7 @@ Die Schaltfläche ⋯ oben rechts in einer Sitzung öffnet ihr Menü. Manche Ein
   - **Pull-Request öffnen** oder nach der Verknüpfung etwa **Pull-Request #12**.
   - **Worktree: agent/…**: Worktree-Dialog bei entsprechenden Sitzungen.
   - **Ordner durchsuchen**: öffnet Dateien im Sitzungsordner.
+  - **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Sitzungsordner ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
   - **Hier ein Terminal öffnen**: neues Terminal im Arbeitsordner, am Computer im unteren Bereich, auf dem Smartphone auf der Terminal-Seite.
 - **Sitzungseinstellungen**:
   - **Memory** mit **Ein** oder **Aus**: aktiviert oder deaktiviert Memory für diese Sitzung. „Für alle aus“ bedeutet, dass Memory in den Einstellungen deaktiviert ist. Siehe [Memory](/guide/memory).

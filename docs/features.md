@@ -1722,6 +1722,13 @@ programs shows each program's version and what is out, with Check now, Update no
   icon's menu), and swap it in with agents carrying on. A Mac app and an AppImage go back to the version before if the
   new one does not start; on Windows the new version's installer runs without its window; the .deb installs once you
   give your password.
+- In the desktop apps, a file or folder on this computer can be shown selected in the system's own file manager, from
+  the menu of each place that has one (Show in Finder on a Mac, Show in File Explorer on Windows, Show in folder on
+  Linux; it never opens or runs anything): a file's or folder's menu and More in Files, the file viewer and editors,
+  the cards and pictures, videos and sounds an agent hands over, the Library's pictures, videos and sounds, the
+  Browser's Downloads, a session's Folder and code, a project's menu, an experiment run's menu, a repository's menu
+  and a changed file's, a plugin's and a skill's folder or file, an app's folder, and a notebook kernel's notebook in
+  System. It is not in the web app, and not for the files of another machine (its pages, or a link someone shared).
 - On Windows the server runs as it does elsewhere: agents' commands in Git for Windows' bash, terminals the app keeps
   itself (Windows has no tmux), and each version run from a copy of its own so agents carry on through updates.
 - While the app loads, in a browser or while a desktop app starts, its logo shows, HYDΩR with water rising in the Ω

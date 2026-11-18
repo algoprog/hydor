@@ -16,6 +16,7 @@ import {
 import { api, del, enc, patch, post } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { openFile, openSession } from '../../lib/nav';
+import { canReveal, reveal } from '../../lib/reveal';
 import { agentKey, lastAgent, startSettings } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { desktopBrowser, nativePages, type TabStateChange } from './PageView';
@@ -40,12 +41,8 @@ export { desktopBrowser };
  */
 export const ownBrowserHere = (): boolean => !!desktopBrowser() && !machineId;
 
-/** A finished download: shown in its folder by the desktop app when it can, else opened as the app opens files. */
-export const showDownload = (path: string) => {
-  const b = desktopBrowser();
-  if (!b?.showFile) return openFile(path);
-  void b.showFile(path).then((ok) => ok || openFile(path), () => openFile(path));
-};
+/** A finished download: shown in its folder by the desktop app when it can (selected in the system's file manager), else opened as the app opens files. */
+export const showDownload = (path: string) => (canReveal() ? reveal(path) : openFile(path));
 
 /** The desktop app shows this browser's pages itself (not as pictures). */
 export const isNative = nativePages;

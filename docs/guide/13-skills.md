@@ -90,7 +90,7 @@ Click a skill's name, or a **Using skill** pill in a conversation. A window open
 - when to use it, and its keywords, if it has any ("Custom brings it in when you say" and the words);
 - the instructions, as agents read them;
 - **History**, when it has changes: every change, newest first, **Saved**, **Changed**, **Removed** or **Brought back**, how long ago, and how many lines were added and removed. Click a change to see it line by line;
-- at the bottom, where its file is: click it to show it in Files.
+- at the bottom, where its file is: click it to show it in Files; in the desktop app, a button beside it (**Show in Finder**, **Show in File Explorer** or **Show in folder**) shows it in the system's file manager.
 
 The buttons at the bottom depend on the skill:
 

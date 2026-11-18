@@ -127,7 +127,8 @@ it into `dist/dev`, starts the dev app (`electron desktop`, hidden, under `xvfb-
 `--no-sandbox` where the sandbox cannot run) on a scratch `DATA_DIR`, with `HYDOR_DESKTOP_SERVER_ENTRY` running the
 check instead of the server and `HYDOR_BROWSER_ENGINE=desktop`, and exits with its code. A second run
 (`desktop/scripts/browser-ipc-check.cjs`) checks what the first cannot see, the window's side: an agent's tab watched and
-typed into through the messages the app's page sends, and your own tab shown in the window. It needs Electron in
+typed into through the messages the app's page sends, your own tab shown in the window, and what "Show in Finder / File Explorer / folder"
+(`desktop/reveal.cjs`) shows and refuses. It needs Electron in
 `desktop/node_modules` (`cd desktop && npm ci`); `--no-ipc` and `--only-ipc` pick one of the two runs. It skips what
 Electron cannot do, saying so.
 

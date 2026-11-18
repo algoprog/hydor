@@ -109,6 +109,7 @@ When the project's folder is a Git repository, the end of the menu offers **New 
 Click a project on the Projects page to open it. The top of its page is in the project's colour: the arrow on the left goes back to all your projects (as on the app's other pages), then come the project's mark and name and what it is about (a group's projects, for a group; its folder, with no description). On the right, **New session** starts a session in the project (on a phone, the pen), and **More** (⋯) has:
 
 - **Open its folder in Files**: the project's folder on the Files page.
+- **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the project's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
 - **Only its sessions in the sidebar**: the session list shows only the sessions in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
@@ -136,7 +137,7 @@ The project's folder, and the other folders it works with, as the [Files page](/
 - Over the folder, a chip for each: the project's own folder, by the project's name, and each folder it works with, by its name. Click one to show it.
 - **Attach a folder** adds a folder of yours for the project to work with, where it is: find it by name or type its path. Nothing is copied. Up to 12.
 - ✕ on a folder's chip leaves it out of the project; the folder itself stays as it is. The message has **Undo**.
-- **Open in Files** opens the folder on the Files page.
+- **Open in Files** opens the folder on the Files page. In the desktop app, **Show in Finder**, **Show in File Explorer** or **Show in folder** shows it in the system's file manager.
 
 To add files from elsewhere, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)). Or drop files from your computer on the project's card or its Library: what the Library keeps (documents, spreadsheets, pictures…) goes there, and any other file comes into this folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 

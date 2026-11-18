@@ -9,6 +9,7 @@ import type { GitActionResult, GitFileStatus } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { dirname, timeAgo } from '../../lib/format';
 import { openFile } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError } from '../../lib/store';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, Empty, IconButton, MenuItem, MenuSep, Popover, Throbber } from '../../components/ui';
@@ -220,6 +221,11 @@ function FileMenu({ ctx, f, always }: { ctx: RepoCtx; f: GitFileStatus; always?:
           <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), goFolder(dirname(abs), abs))}>
             Show in Files
           </MenuItem>
+          {canReveal() && f.code[0] !== 'D' && f.code[1] !== 'D' && (
+            <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), reveal(abs))}>
+              {revealLabel()}
+            </MenuItem>
+          )}
           {!repo.op && (
             <>
               <MenuSep />

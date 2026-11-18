@@ -63,7 +63,7 @@ Klicke auf ein Plugin. Sein Fenster zeigt:
 - eigene Dateien, mögliche Probleme im Plugin-Ordner und unter **Über dieses Plugin** seine eigene Beschreibung;
 - bei hinzugefügten Plugins den Plugin-Ordner und den Datenordner.
 
-Ein hinzugefügtes Plugin hat unten ein **⋯**-Menü: **Bearbeiten** für selbst erstellte oder aus einem Ordner eingebundene Plugins, **Neueste Version herunterladen** bei Plugins aus einem Link sowie **Erneut einrichten**, **In eine ZIP-Datei packen**, **Ordner anzeigen** und **Entfernen**.
+Ein hinzugefügtes Plugin hat unten ein **⋯**-Menü: **Bearbeiten** für selbst erstellte oder aus einem Ordner eingebundene Plugins, **Neueste Version herunterladen** bei Plugins aus einem Link sowie **Erneut einrichten**, **In eine ZIP-Datei packen**, **Ordner anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App; siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)) und **Entfernen**.
 
 ## Voraussetzungen und Einrichtung eines Plugins
 

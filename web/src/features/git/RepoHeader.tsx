@@ -8,6 +8,7 @@ import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpFromLine, Check, Copy, Elli
 import type { GitActionResult, GitRepoDetail, GitSyncResult } from '@shared/types';
 import { del, post } from '../../lib/api';
 import { ago } from '../../lib/format';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError } from '../../lib/store';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, type useConfirm } from '../../components/ui';
@@ -248,6 +249,11 @@ export function RepoMenu({
         <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), goFolder(repo.path))}>
           Show in Files
         </MenuItem>
+        {canReveal() && (
+          <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), reveal(repo.path))}>
+            {revealLabel()}
+          </MenuItem>
+        )}
         <MenuItem icon={<Copy size={14} />} onClick={() => (close(), copyText(repo.path, 'Copied the path'))}>
           Copy path
         </MenuItem>

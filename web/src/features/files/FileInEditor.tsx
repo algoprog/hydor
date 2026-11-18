@@ -18,6 +18,7 @@ import { useFeatureEvent } from '../../lib/featureEvents';
 import { basename, dirname } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { filePath, go, useFilePeek } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, useUI } from '../../lib/store';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { EDITORS } from '../pages/editors';
@@ -397,6 +398,11 @@ export function FileInEditor({
                 <MenuItem icon={<FolderOpen size={14} />} onClick={pick(() => goFolder(dirname(path), path))}>
                   Show in its folder
                 </MenuItem>
+                {canReveal() && (
+                  <MenuItem icon={<FolderOpen size={14} />} onClick={pick(() => reveal(path))}>
+                    {revealLabel()}
+                  </MenuItem>
+                )}
                 <MenuItem icon={<Copy size={14} />} onClick={pick(() => copyPaths([itemOf(path)]))}>
                   Copy path
                 </MenuItem>

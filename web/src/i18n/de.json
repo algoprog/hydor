@@ -24260,5 +24260,8 @@
   "{0}: could not continue after signing in: {1}": "{0}: Konnte nach der Anmeldung nicht fortgesetzt werden: {1}",
   "Signed in again. Continue where you left off.": "Wieder angemeldet. Mach dort weiter, wo du aufgehört hast.",
   "Your {0} account “{1}” is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts).": "Dein {0}-Konto „{1}“ ist abgemeldet, und kein anderes Konto und kein Custom-Modell konnte das übernehmen: Melde dich erneut an (Einstellungen → Agenten → Konten).",
-  "Your main {0} account is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts).": "Dein {0}-Hauptkonto ist abgemeldet, und kein anderes Konto und kein Custom-Modell konnte das übernehmen: Melde dich erneut an (Einstellungen → Agenten → Konten)."
+  "Your main {0} account is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts).": "Dein {0}-Hauptkonto ist abgemeldet, und kein anderes Konto und kein Custom-Modell konnte das übernehmen: Melde dich erneut an (Einstellungen → Agenten → Konten).",
+  "Show in Finder": "Im Finder anzeigen",
+  "Show in File Explorer": "Im Datei-Explorer anzeigen",
+  "This is not on this computer, or it is no longer there": "Das liegt nicht auf diesem Computer oder ist nicht mehr vorhanden."
 }

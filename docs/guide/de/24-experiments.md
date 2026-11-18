@@ -59,7 +59,7 @@ Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst
 
 Klicke auf einen Lauf. Auf breiten Bildschirmen öffnet er sich neben der Liste, auf schmalen an ihrer Stelle mit einem Zurück-Pfeil.
 
-- Oben stehen Name und Aktionen: **Stoppen** während der Ausführung oder Wartezeit, **Erneut ausführen** zum Öffnen eines vorausgefüllten neuen Laufs und **Mehr** (⋯) mit **Befehl kopieren**, **Arbeitsordner in Dateien öffnen** und nach Abschluss **Datensatz löschen**. Das Löschen entfernt Aufzeichnung, Protokoll, Patch und Metriken. Vom Job im Arbeitsordner erzeugte Dateien bleiben erhalten.
+- Oben stehen Name und Aktionen: **Stoppen** während der Ausführung oder Wartezeit, **Erneut ausführen** zum Öffnen eines vorausgefüllten neuen Laufs und **Mehr** (⋯) mit **Befehl kopieren**, **Arbeitsordner in Dateien öffnen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App; siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)) und nach Abschluss **Datensatz löschen**. Das Löschen entfernt Aufzeichnung, Protokoll, Patch und Metriken. Vom Job im Arbeitsordner erzeugte Dateien bleiben erhalten.
 - Darunter siehst du Status und Begründung, Ausführungsort sowie Start- und Endzeit.
 - **Metriken** zeigt jede Metrik über die Schritte hinweg mit letztem und bestem Wert. **Alle N** blendet mehr als vier Metriken ein.
 - **Protokoll** zeigt die Ausgabe, neueste Zeilen unten. **Folgen** hält bei laufenden Jobs die neueste Ausgabe im Blick. Scrollst du nach oben, wird das automatische Nachführen unterbrochen.

@@ -11,6 +11,8 @@
 //     one that is not shown), and a resize of the
 //     window moves a shown own tab at once, by its distance from the window's edges;
 //   - what is not an own tab or an agent's tab here is refused, and a page that is not the app's own gets nothing;
+//   - reveal (desktop/reveal.cjs, with a stand-in for the file manager) accepts a file or a folder anywhere on this computer, and
+//     refuses a missing or relative path, a network path, and a page of another machine (/m/<id>/…);
 //   - what people expect of a browser, for your own tab: zoom (keys and the preload), find with its match count, mute, the
 //     larger list of shortcuts, the right-click menu's items for a link, a selection and a field (and what its items ask of
 //     the app), full-screen video, opening in the default browser (refused but for http and https), clearing browsing data;
@@ -26,6 +28,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { createBrowser } = require('../browser.cjs');
+const { createReveal } = require('../reveal.cjs');
 const { createAdblock } = require('../adblock.cjs');
 
 // The ad blocker's package is the server's (the repository's node_modules).
@@ -72,6 +75,8 @@ inp.onkeypress=(e)=>__kd.push('press:'+e.key.charCodeAt(0));
 document.onmousemove=()=>{};
 </script>`,
   '/popped': '<!doctype html><title>popped</title><body style="margin:0;background:#fa8"><h1>popped</h1>',
+  // A page of another machine the window shows (the Machines feature forwards its server under /m/<id>/).
+  '/m/other/app': '<!doctype html><title>other machine</title><body>',
   '/own': '<!doctype html><title>own page</title><body style="margin:0;background:rgb(255,0,0)"><h1 style="color:#fff">mine</h1>',
   '/words': '<!doctype html><title>words</title><body style="margin:0"><p>alpha beta alpha gamma alpha</p>',
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
@@ -136,6 +141,14 @@ app.whenReady().then(async () => {
     adblock: { dir: path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`), modulePath: () => ADBLOCK, engine: require(ADBLOCK).ElectronBlocker.parse(`||${AD_HOST}^\n`) },
   });
   browser.registerIpc();
+  // Reveal as main.cjs wires it (its fromThisMachine: the app's origin, and not a /m/ page), with a stand-in for the system's file manager.
+  const revealed = [];
+  const fromThisMachine = (e) => {
+    if (!e.senderFrame || !e.senderFrame.url) return false;
+    const u = new URL(e.senderFrame.url);
+    return u.origin === appOrigin && !/^\/m\//.test(u.pathname);
+  };
+  createReveal({ fromOwnPage: fromThisMachine, show: (real) => revealed.push(real) }).registerIpc();
   const cdp = (method, params = {}, sessionId) =>
     new Promise((resolve, reject) => {
       const id = ++seq;
@@ -459,6 +472,47 @@ app.whenReady().then(async () => {
       assert.equal(await other.webContents.executeJavaScript(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:0,y:0,w:100,h:100})`), false);
       other.destroy();
       stranger.destroy();
+    });
+
+
+    await check('reveal shows a file or a folder of this computer in the file manager, and nothing else', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-reveal-'));
+      try {
+        const file = path.join(dir, 'a file.txt');
+        fs.writeFileSync(file, 'x');
+        const link = path.join(dir, 'link');
+        fs.symlinkSync(file, link);
+        assert.equal(await page('typeof hydorDesktop.reveal'), 'function');
+        const reveal = (p) => page(`hydorDesktop.reveal(${JSON.stringify(p)})`);
+        // A file and a folder, outside the home folder too; a link is shown as the file it points to.
+        assert.equal(await reveal(file), true);
+        assert.equal(await reveal(dir), true);
+        assert.equal(await reveal(link), true);
+        assert.deepEqual(revealed, [fs.realpathSync.native(file), fs.realpathSync.native(dir), fs.realpathSync.native(file)]);
+        // Not there, not absolute, a network path, not a path.
+        revealed.length = 0;
+        assert.equal(await reveal(path.join(dir, 'no-such-file')), false);
+        assert.equal(await reveal('a file.txt'), false);
+        assert.equal(await reveal('../' + path.basename(dir)), false);
+        assert.equal(await reveal(''), false);
+        assert.equal(await reveal('\\\\server\\share\\file.txt'), false);
+        assert.equal(await reveal('//server/share/file.txt'), false);
+        assert.equal(await page('hydorDesktop.reveal({})'), false);
+        assert.equal(revealed.length, 0, 'something was shown that should not be');
+        // A page of another machine (/m/<id>/…) has the bridge, but its paths are not this computer's.
+        const other = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, preload: process.env.HYDOR_PRELOAD } });
+        await other.loadURL(`${appOrigin}/m/other/app`);
+        assert.equal(await other.webContents.executeJavaScript(`hydorDesktop.reveal(${JSON.stringify(file)})`), false);
+        other.destroy();
+        // A page that is not the app's own (the same address on the other loopback name) is refused too.
+        const named = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, preload: process.env.HYDOR_PRELOAD } });
+        await named.loadURL(`http://localhost:${sitePort}/app`);
+        assert.equal(await named.webContents.executeJavaScript(`hydorDesktop.reveal(${JSON.stringify(file)})`), false);
+        named.destroy();
+        assert.equal(revealed.length, 0, 'a refused page got something shown');
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     });
 
 

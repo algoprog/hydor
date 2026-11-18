@@ -2,11 +2,13 @@
 // with it. Each change saved there comes here as a version by its folder; a mistake there is said here and
 // changes nothing; a save here writes the folder again.
 import { useEffect, useState } from 'react';
+import { FolderOpen } from 'lucide-react';
 import type { AppDef } from '@shared/apps';
 import { api, del, enc, post } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, inputCls } from '../../components/ui';
+import { Button, cx, IconButton, inputCls } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 
 interface FolderState {
@@ -59,6 +61,11 @@ export function FolderBox({ app }: { app: AppDef }) {
         <code className="min-w-0 flex-1 truncate rounded-md bg-bg-2 px-2 py-1.5 text-[12.5px]" translate="no">
           {state.folder.path}
         </code>
+        {canReveal() && (
+          <IconButton label={revealLabel()} size="sm" onClick={() => reveal(state.folder!.path)}>
+            <FolderOpen size={14} />
+          </IconButton>
+        )}
         <Button
           size="sm"
           variant="ghost"

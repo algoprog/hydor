@@ -68,7 +68,7 @@ Die Leiste über dem Ordner enthält von links:
 - **In *dem Ordner* suchen**: grenzt die Liste beim Tippen auf die Namen ein, die enthalten, was du eingibst. Enter oder die Zeile **Alles in … nach „…“ durchsuchen, auch Dateiinhalte** oben in der Liste durchsucht jeden Ordner darunter, Dateinamen und den Inhalt der Dateien (siehe [Dateien suchen](/guide/files-git#search-files)).
 - **Neu** mit **Neuer Ordner**, **Neue Datei**, **Neues Notebook**, **Dateien hochladen** und **Ordner hochladen**.
 - **Als Liste** oder **Als Kacheln mit Bildern**: Kacheln zeigen Bilder als Bilder, eine gute Möglichkeit, Fotos durchzusehen.
-- **Mehr** (⋯): **Sortieren nach** (**Name**, **Änderungsdatum**, **Größe** oder **Typ**, und **Reihenfolge umkehren**), **Versteckte Dateien anzeigen**, **An „Orte“ anheften**, **Neue Sitzung in diesem Ordner**, **Hier ein Terminal öffnen**, **Pfad kopieren**, **Als .zip herunterladen** und **Aktualisieren**.
+- **Mehr** (⋯): **Sortieren nach** (**Name**, **Änderungsdatum**, **Größe** oder **Typ**, und **Reihenfolge umkehren**), **Versteckte Dateien anzeigen**, **An „Orte“ anheften**, **Neue Sitzung in diesem Ordner**, **Hier ein Terminal öffnen**, **Pfad kopieren**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App; siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)), **Als .zip herunterladen** und **Aktualisieren**.
 
 Die Liste zeigt Ordner zuerst. Zu jedem Eintrag zeigt sie seinen Namen, wann er sich geändert hat („gerade eben“, „vor 5 Min.“, die Uhrzeit für heute, „Gestern“ oder das Datum) und seine Größe. Klicke auf den Titel einer Spalte, um danach zu sortieren, und noch einmal für die umgekehrte Reihenfolge. In einem schmalen Fenster verbirgt die Leiste das Feld hinter einer Suchschaltfläche, **Als Liste** und **Als Kacheln mit Bildern** wandern unter **Mehr**, und die Spalten für Datum und Größe weichen den Namen.
 
@@ -105,6 +105,7 @@ Jede Zeile hat ein Menü. Fahre auf die Zeile und klicke an ihrem Ende auf **Meh
 - **Umbenennen** mit F2, **Duplizieren**, **Verschieben nach** und **Kopieren nach**.
 - **Hier ein Terminal öffnen** (ein Ordner): eine neue Shell in diesem Ordner, auf einem Computer im unteren Bereich, auf einem Smartphone auf der Seite „Terminal“.
 - **Pfad kopieren** als vollständiger Pfad.
+- **Im Finder anzeigen** (Mac), **Im Datei-Explorer anzeigen** (Windows) oder **Im Ordner anzeigen** (Linux): In der Desktop-App zeigt es eine Datei oder einen Ordner auf diesem Computer ausgewählt im Dateimanager des Systems. Der Name sagt, welcher es auf deinem System ist. In der Web-App gibt es das nicht, und auch nicht für Dateien eines anderen Computers.
 - **Herunterladen**, bei Ordnern **Als .zip herunterladen**.
 - **Löschen** mit der Entf-Taste.
 
@@ -232,7 +233,7 @@ Auf einem Computer zeigt die Leiste über der Datei ihren Pfad und diese Schaltf
 - **Fragen** für Fragen und Änderungsaufträge; siehe [unten](#ask-an-agent-about-the-file).
 - **Terminal in diesem Ordner**: eine neue Shell im Ordner der Datei.
 - **Herunterladen**.
-- **Mehr** (⋯) mit **Suchen**, **Ersetzen**, **Zu Zeile springen**, **Frage zur Auswahl stellen**, **Tastenkombinationen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen** und **Pfad kopieren**.
+- **Mehr** (⋯) mit **Suchen**, **Ersetzen**, **Zu Zeile springen**, **Frage zur Auswahl stellen**, **Tastenkombinationen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App) und **Pfad kopieren**.
 - **Speichern**.
 
 Strg+F beziehungsweise ⌘F öffnet die Suchleiste bei aktivem Textcursor. Ersetzen geht mit Strg+H beziehungsweise ⌘⌥F; Zeilensprung mit Strg+G beziehungsweise ⌘⌥G.
@@ -241,7 +242,7 @@ Klicke mit der rechten Maustaste in den Text (oder drücke die Menütaste oder U
 
 Der Streifen unter dem Text zeigt, wo der Cursor steht (**Zeile 12, Spalte 5**, mit der Anzahl der ausgewählten Zeichen; klicke darauf, um zu einer Zeile zu springen), die Sprache der Datei, ihre Einrückung (**Spaces: 2**, **Spaces: 4**, **Tabs**: aus der Datei gelesen; klicke, um für das, was du als Nächstes tippst, eine andere zu wählen), **LF** oder **CRLF** (wie die Zeilen der Datei enden; klicke, um sie mit dem anderen zu speichern) und **Umbruch** oder **Kein Zeilenumbruch** (klicke zum Umschalten).
 
-Auf einem Smartphone zeigt die Leiste **Zurück**, den Namen der Datei über ihrem Ordner, **Vorschau** oder **Als Seite anzeigen**, **Agenten fragen** (✨), **Speichern** (sobald du etwas änderst) und **Mehr** (⋯), worunter **Finden**, **Zu Zeile springen**, **Frage zur Auswahl stellen**, **Automatischer Zeilenumbruch**, **Änderungen seit dem letzten Commit**, **Terminal in diesem Ordner**, **Herunterladen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen** und **Pfad kopieren** stehen. Smartphones brechen lange Zeilen um, solange du **Automatischer Zeilenumbruch** nicht ausschaltest.
+Auf einem Smartphone zeigt die Leiste **Zurück**, den Namen der Datei über ihrem Ordner, **Vorschau** oder **Als Seite anzeigen**, **Agenten fragen** (✨), **Speichern** (sobald du etwas änderst) und **Mehr** (⋯), worunter **Finden**, **Zu Zeile springen**, **Frage zur Auswahl stellen**, **Automatischer Zeilenumbruch**, **Änderungen seit dem letzten Commit**, **Terminal in diesem Ordner**, **Herunterladen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App) und **Pfad kopieren** stehen. Smartphones brechen lange Zeilen um, solange du **Automatischer Zeilenumbruch** nicht ausschaltest.
 
 ### Einen Agenten zur Datei fragen
 
@@ -275,7 +276,7 @@ Diese Formate öffnen dieselben Editoren wie die [Bibliothek](/guide/library#doc
 - **Excel** mit .xlsx sowie **CSV** und **TSV** im Tabelleneditor mit Blättern und Formeln. Bei Excel auch mit Filtern, bedingter Formatierung, Dropdowns, Checkboxen, verbundenen Zellen, Notizen und Diagrammen.
 - **LaTeX-Dateien** (.tex) öffnen sich im LaTeX-Editor, der Quelltext neben den gesetzten Seiten. Die Dateien, die das Dokument einliest (Kapitel, die es mit `\input` einbindet, seine Bibliografie), öffnen sich mit, und es wird zusammen mit dem Rest seines Ordners gesetzt (seine Bilder, Stile und Daten), den TeX liest, aber nie verändert. Ein Kapitel öffnet das Dokument, zu dem es gehört (das, das es mit `% !TEX root = …` oder als Subfile nennt, sonst das im eigenen Ordner oder ein oder zwei Ordner darüber, das es einliest), mit geöffnetem Kapitel und den Dateien des Dokuments im [Dateibaum](/guide/library#the-files-tree): die Dateien, die es einliest, in ihren Ordnern und, grau dargestellt, was TeX unverändert aus dem Ordner nimmt (seine Bilder, Stile und Klassen, Daten), zum Ansehen; ändere diese in Dateien. Bei schmalem Bildschirm öffnet **Dateien** über dem Quelltext den Baum. Kommentare funktionieren wie in der [Bibliothek](/guide/library#latex-documents): Eine Datei enthält nur ihren Text, deshalb speichert die App ihre Kommentare daneben, anhand des Dateipfads, mit **Speichern**; sie ziehen mit, wenn du die Datei (oder ihren Ordner) hier umbenennst oder verschiebst, und ein [zur Datei befragter Agent](#ask-an-agent-about-the-file) liest, beantwortet und erledigt sie, seine Antworten erscheinen laufend. **Mit KI lösen**, an einem Kommentar oder oben in **Kommentare**, sendet sie sofort an diesen Agenten ([Kommentare mit KI lösen](/guide/library#resolve-comments-with-ai)). **Versionen vergleichen** gibt es für LaTeX-Dokumente, die in der Bibliothek liegen.
 
-Bearbeite sie wie in der [Bibliothek](/guide/library#documents) und klicke dann in der Leiste unten auf **Speichern** oder drücke Strg+S (⌘S auf dem Mac); **Verwerfen** geht zurück zur Datei, wie sie war. Die Leiste oben zeigt den Pfad der Datei sowie **Fragen** ([einen Agenten fragen](#ask-an-agent-about-the-file)), **Herunterladen** und **Mehr** (⋯): **Als Text bearbeiten** (CSV-, TSV- und LaTeX-Dateien) oder **Als Vorschau anzeigen** (Word- und Excel-Dateien) zeigt die Datei wie zuvor, mit einer Schaltfläche in der Leiste, um zum Editor zurückzukehren, und dazu **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen** und **Pfad kopieren** der Dateiseite. Eine Datei, die bei einer Zeile aus einer Suche geöffnet wird, öffnet sich als Text.
+Bearbeite sie wie in der [Bibliothek](/guide/library#documents) und klicke dann in der Leiste unten auf **Speichern** oder drücke Strg+S (⌘S auf dem Mac); **Verwerfen** geht zurück zur Datei, wie sie war. Die Leiste oben zeigt den Pfad der Datei sowie **Fragen** ([einen Agenten fragen](#ask-an-agent-about-the-file)), **Herunterladen** und **Mehr** (⋯): **Als Text bearbeiten** (CSV-, TSV- und LaTeX-Dateien) oder **Als Vorschau anzeigen** (Word- und Excel-Dateien) zeigt die Datei wie zuvor, mit einer Schaltfläche in der Leiste, um zum Editor zurückzukehren, und dazu **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App) und **Pfad kopieren** der Dateiseite. Eine Datei, die bei einer Zeile aus einer Suche geöffnet wird, öffnet sich als Text.
 
 Erhalt beim Speichern:
 
@@ -392,7 +393,7 @@ Die Treffer sind aufgeteilt:
 - **Dateien mit diesem Namen**: bis zu 30 Dateien, deren Namen enthalten, was du getippt hast, jeweils mit ihrem Ordner.
 - **In Dateien**: die passenden Zeilen, nach Datei gruppiert, jede Datei mit ihrer Trefferzahl. Klicke auf eine Zeile, um die Datei an dieser Zeile zu öffnen, oder auf den Namen einer Datei, um sie zu öffnen.
 
-**Mehr** (⋯) bei jedem Ergebnis bietet **Im Ordner anzeigen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen** und den Rest des Menüs einer Datei.
+**Mehr** (⋯) bei jedem Ergebnis bietet **Im Ordner anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App), **Sitzung damit starten**, **Zu einem Projekt hinzufügen** und den Rest des Menüs einer Datei.
 
 Die Suche steht in der Seitenadresse und bleibt bei Zurück oder Neuladen erhalten. Ausgeschlossen sind `.gitignore`-Inhalte und Dateien über 4 MB. Grenzen: 50 Treffer je Datei, insgesamt 1.000 oder 15 Sekunden, angezeigt werden je Datei zunächst 30 Zeilen. PDF, Word und andere Dokumente werden nur nach Namen gefunden. Für Inhaltssuche durch Agenten füge sie dem [Wissen](/guide/projects#shared-knowledge-documents-every-session-can-search) hinzu.
 
@@ -489,7 +490,7 @@ Danach sendet Synchronisieren deine Commits hoch. Haben beide Seiten dieselben Z
 Das ⋯-Menü bietet einzelne Schritte:
 
 - **Fetch** aktualisiert Remoteinformationen ohne lokale Dateiänderung. **Pull** übernimmt Commits mit derselben Rückfrage bei Abweichungen. **Push** sendet deine Commits.
-- **Hier ein Terminal öffnen**, **In Dateien anzeigen**, **Pfad kopieren**.
+- **Hier ein Terminal öffnen**, **In Dateien anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App), **Pfad kopieren**.
 - **Remotes**: die Remotes des Repositorys und ihre Adressen. Ein Repository ohne eines zeigt **Kein Remote · Hinzufügen**: Füge eine Adresse ein und klicke auf **Remote hinzufügen** (es heißt origin), dann auf **Branch veröffentlichen**.
 - **Tags pushen**, wenn Tags vorhanden sind.
 
@@ -502,7 +503,7 @@ Fehler erscheinen rot mit möglichst verständlicher Erklärung und **Git-Ausgab
 Es gibt keinen getrennten Staging-Schritt. Kästchen je Datei bestimmen den nächsten Commit, zunächst alle. Das obere Kästchen wählt alle oder keine; die Anzeige lautet etwa „3 von 4 im Commit“.
 
 - **Diesen Teil verwerfen** oben an jedem Teil der Änderungen einer Datei setzt nach einer Rückfrage genau diese Zeilen auf den Stand des letzten Commits zurück.
-- Das ⋯-Menü einer Datei bietet **Datei öffnen**, **In Dateien anzeigen**, **Änderungen verwerfen** (bei einer neuen Datei **Neue Datei löschen**; beide fragen vorher nach und lassen sich nicht rückgängig machen) sowie **Ignoriere es** (eine neue Datei) oder **Nicht mehr verfolgen und ignorieren** (eine Datei, die Git verfolgt: Der nächste Commit nimmt sie aus dem Repository, auf diesem Computer bleibt sie erhalten). Beides trägt sie in `.gitignore` ein.
+- Das ⋯-Menü einer Datei bietet **Datei öffnen**, **In Dateien anzeigen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App), **Änderungen verwerfen** (bei einer neuen Datei **Neue Datei löschen**; beide fragen vorher nach und lassen sich nicht rückgängig machen) sowie **Ignoriere es** (eine neue Datei) oder **Nicht mehr verfolgen und ignorieren** (eine Datei, die Git verfolgt: Der nächste Commit nimmt sie aus dem Repository, auf diesem Computer bleibt sie erhalten). Beides trägt sie in `.gitignore` ein.
 - Das Kastensymbol oben über der Liste legt alle Änderungen in einem Stash beiseite (siehe [Änderungen mit einem Stash beiseitelegen](/guide/files-git#put-changes-aside-with-a-stash)).
 
 Zum Committen unten:
@@ -725,7 +726,7 @@ Darunter stehen Details:
 - **Netzwerk**: Download und Upload sowie jede Netzwerkverbindung.
 - **Datenträger** mit Lese- und Schreibraten, freiem Platz, Dateisystem und Belegung je Laufwerk.
 - **Sensoren** mit Temperaturen, ab 85 °C rot.
-- **Notebook-Kernel** (solange welche laufen): jeder mit seiner Umgebung, seinem Zustand, seinem Speicher und **Herunterfahren**.
+- **Notebook-Kernel** (solange welche laufen): jeder mit seiner Umgebung, seinem Zustand, seinem Speicher, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App) für sein Notebook und **Herunterfahren**.
 - **Sitzungen** (solange welche laufen, unter Linux und auf einem Mac): die Programme jeder laufenden Sitzung (die ihres Agenten, die Befehle, die sie ausführt, die Server, die sie gestartet hat), die mit dem meisten Speicher zuerst, mit der Anzahl, ihrer CPU und ihrem Speicher. Rechts stehen die Limits, unter denen Sitzungen laufen: Klicke darauf, um sie zu ändern ([Jede Sitzung begrenzen](/guide/app#limit-each-session)). Klicke eine Sitzung an, um sie zu öffnen.
 - **Prozesse**: die 12 aktivsten Programme nach **CPU** oder **Memory** (oder **GPU**, für die, die eine verwenden), mit Prozess-ID, Nutzer, CPU und Speicher. Zeige auf eine Zeile, um ihren vollständigen Befehl zu sehen.
 

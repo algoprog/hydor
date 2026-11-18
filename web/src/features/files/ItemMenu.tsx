@@ -8,6 +8,7 @@ import type { Space } from '@shared/spaces';
 import { FolderFinder, type FolderChoice } from '../../components/FolderPicker';
 import { MenuBack, MenuItem, MenuSep, Popover, useConfirm, useIsMobile } from '../../components/ui';
 import { dirname, tildify } from '../../lib/format';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { useApp } from '../../lib/store';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
@@ -96,6 +97,13 @@ export function ItemMenu({
     onClose();
     f();
   };
+  // In the desktop app, on this computer: the item selected in the system's file manager.
+  const revealIt =
+    one && canReveal() ? (
+      <MenuItem icon={<FolderOpen size={14} />} onClick={act(() => reveal(one.path))}>
+        {revealLabel()}
+      </MenuItem>
+    ) : null;
   return (
     <>
       <Popover anchor={anchor} open={open && items.length > 0} onClose={onClose} width={sub ? 320 : 248} title={one ? one.name : `${items.length} items`}>
@@ -132,6 +140,7 @@ export function ItemMenu({
                   Show in its folder
                 </MenuItem>
               )}
+              {showFolder && revealIt}
               {dirOnly ? (
                 <MenuItem icon={<MessageSquarePlus size={14} />} onClick={act(() => newSessionIn(one.path))}>
                   New session in this folder
@@ -173,6 +182,7 @@ export function ItemMenu({
               <MenuItem icon={<Copy size={14} />} onClick={act(() => copyPaths(items))}>
                 {one ? 'Copy path' : 'Copy paths'}
               </MenuItem>
+              {!showFolder && revealIt}
               <MenuItem icon={<Download size={14} />} onClick={act(() => download(items))}>
                 {one && !one.dir ? 'Download' : 'Download as .zip'}
               </MenuItem>

@@ -9,6 +9,7 @@ import { api, ApiError } from '../../lib/api';
 import { LOCALE } from '../../i18n/locale';
 import { machinePath } from '../../lib/machine';
 import { go, goFull, sessionPath, showInFiles } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { DiffView } from '../../components/DiffView';
@@ -236,6 +237,17 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
                 }}
               >
                 Its folder in Files
+              </MenuItem>
+            )}
+            {v.run.folder && !machine && !v.run.remote && canReveal() && (
+              <MenuItem
+                icon={<FolderOpen size={14} />}
+                onClick={() => {
+                  setMenu(false);
+                  reveal(v.run.folder!);
+                }}
+              >
+                {revealLabel()}
               </MenuItem>
             )}
             {!going && (

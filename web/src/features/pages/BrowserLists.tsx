@@ -7,6 +7,7 @@ import type { BookmarkNode, DownloadEntry, HistoryEntry } from '@shared/browser'
 import { api, del, enc } from '../../lib/api';
 import { sepOf } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { revealLabel } from '../../lib/reveal';
 import { toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
@@ -317,7 +318,7 @@ function Downloads({ q }: { q: string }) {
               actions={
                 <>
                   {d.path && !d.failed && (
-                    <IconButton label="Show in folder" size="sm" onClick={() => showDownload(d.path)}>
+                    <IconButton label={revealLabel()} size="sm" onClick={() => showDownload(d.path)}>
                       <FolderOpen size={14} />
                     </IconButton>
                   )}

@@ -109,6 +109,7 @@ Wenn der Ordner des Projekts ein Git-Repository ist, bietet das Ende des Menüs 
 Klicke auf der Projektseite auf ein Projekt, um es zu öffnen. Der obere Teil seiner Seite hat die Farbe des Projekts: Der Pfeil links führt zurück zu allen deinen Projekten (wie auf den anderen Seiten der App), dann folgen das Zeichen und der Name des Projekts und worum es geht (bei einer Gruppe die Projekte der Gruppe; ohne Beschreibung sein Ordner). Rechts startet **Neue Sitzung** eine Sitzung im Projekt (auf dem Smartphone der Stift), und **Mehr** (⋯) enthält:
 
 - **Ordner unter „Dateien“ öffnen**: der Ordner des Projekts auf der Seite Dateien.
+- **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Ordner des Projekts ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
 - **Nur Projektsitzungen in der Seitenleiste**: Die Sitzungsliste zeigt nur die Sitzungen im Projekt, so wie es der Filter der Seitenleiste selbst tut (siehe [Die Sitzungen eines Projekts in der Seitenleiste zeigen](#show-one-projects-sessions-in-the-sidebar)). Wähle es noch einmal aus, um wieder alle Sitzungen zu sehen.
 - **Mit anderen teilen**: Lade jemanden (eine Betreuerin, einen Studenten) ein, das Projekt zu sehen und seine Dokumente über einen eigenen Link zu kommentieren (siehe [Ein Projekt mit anderen teilen](#share-a-project-with-people)).
 - **Projekt löschen**; siehe [Ein Projekt löschen](#delete-a-project).
@@ -136,7 +137,7 @@ Der Projektordner und Zusatzordner erscheinen wie auf der [Dateien-Seite](/guide
 - Über dem Inhalt stehen Schaltflächen je Ordner, der Stamm unter dem Projektnamen, weitere unter ihren Ordnernamen. Ein Klick wechselt den angezeigten Ordner.
 - **Ordner hinzufügen** fügt per Name oder Pfad einen weiteren Arbeitsordner unverändert hinzu, höchstens zwölf. Es wird nichts kopiert.
 - ✕ auf dem Chip eines Ordners nimmt ihn aus dem Projekt heraus; der Ordner selbst bleibt, wie er ist. Der Hinweis bietet **Rückgängig machen**.
-- **In Dateien öffnen** öffnet den Ordner auf der Dateien-Seite.
+- **In Dateien öffnen** öffnet den Ordner auf der Dateien-Seite. In der Desktop-App zeigt **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** ihn im Dateimanager des Systems.
 
 **Zu einem Projekt hinzufügen** auf der Dateien-Seite, im Dateifenster oder auf Agenten-Dateikarten kopiert Dateien in den Projektordner und verknüpft Ordner als zusätzliche Arbeitsorte. Siehe [Dateien zu einem Projekt hinzufügen](/guide/files-git#add-files-to-a-project). Alternativ ziehst du lokale Dateien auf Projektkarte oder Bibliothek. Unterstützte Dokumente, Tabellen und Bilder kommen in die Bibliothek, andere Dateien in den Projektordner. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
 

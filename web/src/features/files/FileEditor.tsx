@@ -3,6 +3,7 @@ import { ArrowLeft, ClipboardPaste, Copy, CornerDownRight, Download, Ellipsis, E
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle, EditorSnapshot, EditorStatus } from '../../lib/codemirror';
 import { basename, bytes, dirname } from '../../lib/format';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -520,6 +521,11 @@ export function FileEditor({
       <MenuItem icon={<FolderOpen size={14} />} onClick={shut(() => goFolder(dirname(path), path))}>
         Show in its folder
       </MenuItem>
+      {canReveal() && (
+        <MenuItem icon={<FolderOpen size={14} />} onClick={shut(() => reveal(path))}>
+          {revealLabel()}
+        </MenuItem>
+      )}
       <MenuItem icon={<Copy size={14} />} onClick={shut(() => copyPaths([itemOf(path)]))}>
         Copy path
       </MenuItem>

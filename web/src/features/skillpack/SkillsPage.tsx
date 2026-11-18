@@ -52,6 +52,7 @@ import { api, del, enc, post, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { ago, tildify } from '../../lib/format';
 import { go, openSession, showInFiles } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Markdown } from '../../components/Markdown';
@@ -520,9 +521,16 @@ function SkillDetail({
                 <Markdown text={fm.body} className="text-[13.5px]" />
               </div>
             )}
-            <button type="button" onClick={() => (onClose(), showInFiles(doc.file))} className="block max-w-full truncate font-mono text-[11.5px] text-fg-3 hover:text-fg hover:underline" title="Show in Files">
-              {tildify(doc.file, home)}
-            </button>
+            <div className="flex max-w-full items-center gap-1">
+              <button type="button" onClick={() => (onClose(), showInFiles(doc.file))} className="block min-w-0 truncate font-mono text-[11.5px] text-fg-3 hover:text-fg hover:underline" title="Show in Files">
+                {tildify(doc.file, home)}
+              </button>
+              {canReveal() && (
+                <IconButton label={revealLabel()} size="sm" onClick={() => reveal(doc.file)}>
+                  <FolderOpen size={13} />
+                </IconButton>
+              )}
+            </div>
           </>
         )}
       </div>

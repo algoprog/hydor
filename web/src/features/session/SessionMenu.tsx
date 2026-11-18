@@ -9,6 +9,7 @@ import { enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
 import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { go } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useUI } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { useCatalog } from '../../components/AgentPickers';
@@ -125,6 +126,11 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
             <MenuItem icon={<FolderOpen size={15} />} onClick={() => (close(), useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))}>
               Browse the folder
             </MenuItem>
+            {canReveal() && (
+              <MenuItem icon={<FolderOpen size={15} />} onClick={() => (close(), reveal(s.cwd!))}>
+                {revealLabel()}
+              </MenuItem>
+            )}
             <MenuItem icon={<SquareTerminal size={15} />} onClick={() => (close(), openTerminalAt(s.cwd!))}>
               Open a terminal here
             </MenuItem>

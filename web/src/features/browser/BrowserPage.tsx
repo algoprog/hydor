@@ -38,6 +38,7 @@ import {
 import { enc, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { canReveal, revealLabel } from '../../lib/reveal';
 import { toastError, useToasts, useUI } from '../../lib/store';
 import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Sheet, Throbber, useIsMobile } from '../../components/ui';
 import { live as socket } from '../../lib/ws';
@@ -130,7 +131,7 @@ function DownloadsPanel({ onClose }: { onClose: () => void }) {
     <Panel title="Downloads" onClose={onClose}>
       {!downloads.length && <div className="px-4 py-3 text-[12.5px] leading-relaxed text-fg-3">Nothing downloaded yet. Files you save from a page go to your Downloads folder.</div>}
       {downloads.map((d) => (
-        <button key={`${d.path}${d.at}`} disabled={!d.done || d.failed} onClick={() => showDownload(d.path)} className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left enabled:hover:bg-bg-2">
+        <button key={`${d.path}${d.at}`} disabled={!d.done || d.failed} title={d.done && !d.failed && canReveal() ? revealLabel() : undefined} onClick={() => showDownload(d.path)} className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left enabled:hover:bg-bg-2">
           <FileDown size={16} className="shrink-0 text-fg-3" />
           <span className="min-w-0 flex-1">
             <span translate="no" className="block truncate text-[13.5px]">

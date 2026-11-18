@@ -15,6 +15,7 @@ import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Se
 import { api, del, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
 import { tr } from '../../i18n/runtime';
@@ -152,6 +153,11 @@ export function SpaceMenu({ s }: { s: Space }) {
         <MenuItem icon={<FolderOpen size={15} />} onClick={pick(() => goFolder(s.folder))}>
           Open its folder in Files
         </MenuItem>
+        {canReveal() && (
+          <MenuItem icon={<FolderOpen size={15} />} onClick={pick(() => reveal(s.folder))}>
+            {revealLabel()}
+          </MenuItem>
+        )}
         <MenuItem icon={<ListFilter size={15} />} checked={filter === s.id} onClick={pick(() => useUI.getState().set({ spaceFilter: filter === s.id ? null : s.id }))}>
           Only its sessions in the sidebar
         </MenuItem>

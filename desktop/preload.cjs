@@ -3,7 +3,8 @@
 // Finder, Explorer or a file manager into its place instead of uploading a copy (web/src/features/pages/uploads.ts);
 // and the notices the app shows as the system's own notifications (main.cjs): those the system did not show, for the
 // page to show inside the app, the page a click on one opens, whether the system shows them, a test one, and the
-// system's settings where you allow them (web/src/lib/notify.ts).
+// system's settings where you allow them (web/src/lib/notify.ts); and `reveal`, a file or folder shown in the system's file
+// manager (desktop/reveal.cjs, web/src/lib/reveal.ts).
 // Only the app's own pages, from the server on this computer (its loopback address), get it: a page of another machine
 // the window shows (the Machines feature, /m/<id>/…, which this server forwards) is told apart by the page itself, and
 // uploads as a browser does. The page runs isolated from this script (contextIsolation, sandbox): it sees these functions.
@@ -56,6 +57,8 @@ if (own) {
   contextBridge.exposeInMainWorld('hydorDesktop', {
     /** Choose a local folder through the operating system's dialog. */
     chooseFolder: (current) => ipcRenderer.invoke('hydor:choose-folder', String(current || '')),
+    /** Shows a file or folder of this computer, selected in the system's file manager (Finder, File Explorer, the desktop's); whether it could (false: not there, or not a place on this computer). */
+    reveal: (path) => ipcRenderer.invoke('hydor:reveal', String(path)),
     /** A dropped file's path on this computer, or '' (a file made in the page, or one the system gave no path for). */
     pathOf: (file) => {
       try {

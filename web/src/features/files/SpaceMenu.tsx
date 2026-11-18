@@ -6,6 +6,7 @@ import { Boxes, Copy, Ellipsis, FolderOpen, LibraryBig, MessageSquarePlus, Plus,
 import type { Space } from '@shared/spaces';
 import { cx, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber } from '../../components/ui';
 import { dirname } from '../../lib/format';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { NewSpaceDialog, SpaceMark } from '../spaces/parts';
 import { useKeepIn } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
@@ -162,9 +163,19 @@ export function FileMore({
                 Show in Files
               </MenuItem>
             )}
+            {inFiles && canReveal() && (
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), reveal(path))}>
+                {revealLabel()}
+              </MenuItem>
+            )}
             <MenuItem icon={<Copy size={14} />} onClick={() => (close(), copyPaths([item]))}>
               Copy path
             </MenuItem>
+            {!inFiles && canReveal() && (
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), reveal(path))}>
+                {revealLabel()}
+              </MenuItem>
+            )}
           </>
         )}
       </Popover>

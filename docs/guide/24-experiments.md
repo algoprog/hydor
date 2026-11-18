@@ -59,7 +59,7 @@ The new run opens, so you can watch it start.
 
 Click a run. On a wide screen it opens beside the list; on a narrow one in its place, with an arrow back.
 
-- At the top: its name; **Stop** while it runs or waits; **Run again**, which opens New run filled in with its settings, to change before you start it; and **More** (⋯): **Copy the command**, **Its folder in Files**, and once it has ended **Delete the record** (its record, log, patch and metrics go; the files the job made in its own folder stay).
+- At the top: its name; **Stop** while it runs or waits; **Run again**, which opens New run filled in with its settings, to change before you start it; and **More** (⋯): **Copy the command**, **Its folder in Files**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)), and once it has ended **Delete the record** (its record, log, patch and metrics go; the files the job made in its own folder stay).
 - Its status and why, where it runs, and when it started or ended.
 - **Metrics**: each metric over steps, with its last value and its best. **All N** shows more than four.
 - **Log**: the end of its output, newest at the bottom. While it runs, **Follow** keeps the newest in view; scroll up to read and it stops following.

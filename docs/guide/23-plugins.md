@@ -63,7 +63,7 @@ Click a plugin. Its window shows:
 - its own files, problems in its folder if any, and **About it**: its own description;
 - for a plugin you added, its folder and its data folder.
 
-A plugin you added has a **⋯** menu at the bottom: **Change it** (for plugins you made, or use from a folder), **Get the latest version** (for one from a link), **Set it up again**, **Pack into a .zip**, **Show its folder** and **Remove**.
+A plugin you added has a **⋯** menu at the bottom: **Change it** (for plugins you made, or use from a folder), **Get the latest version** (for one from a link), **Set it up again**, **Pack into a .zip**, **Show its folder**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)) and **Remove**.
 
 ## What a plugin needs, and its setup
 

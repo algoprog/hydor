@@ -49,6 +49,7 @@ const { createNotices } = require('./notices.cjs');
 const { badgeBitmap } = require('./badge.cjs');
 const { createAwake } = require('./awake.cjs');
 const { createBrowser } = require('./browser.cjs');
+const { createReveal } = require('./reveal.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -681,6 +682,8 @@ const fromThisMachine = (e) => {
 const adblock = { dir: path.join(app.getPath('userData'), 'adblock'), modulePath: () => path.join(serverDir(), 'node_modules', '@ghostery', 'adblocker-electron') };
 browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage: fromThisMachine, ext: extensions, adblock });
 browser.registerIpc();
+// "Show in Finder / File Explorer / folder": a file or folder of this computer, selected in the system's file manager.
+createReveal({ fromOwnPage: fromThisMachine }).registerIpc();
 // A forwarded machine's folders belong to its server, not this desktop computer.
 ipcMain.handle('hydor:choose-folder', async (e, current) => {
   if (!fromOwnPage(e) || /^\/m\//.test(new URL(e.senderFrame.url).pathname)) return null;

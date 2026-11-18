@@ -126,7 +126,14 @@ function Tile({ n, nodes, onMenu }: { n: BookmarkNode; nodes: BookmarkNode[]; on
         onContextMenu={(e: ReactMouseEvent<HTMLButtonElement>) => (e.preventDefault(), onMenu(n, e.currentTarget))}
         className={cx('flex h-10 w-10 items-center justify-center rounded-[10px] bg-bg-2 transition-colors hover:bg-bg-3', open && 'bg-bg-3')}
       >
-        {n.url ? <SiteIcon url={n.url} size={20} /> : <Folder size={19} className="text-fg-2" />}
+        {n.url ? (
+          // On a light plate in both themes: a dark site icon (GitHub's) would vanish on the dark tile.
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-white">
+            <SiteIcon url={n.url} size={18} />
+          </span>
+        ) : (
+          <Folder size={19} className="text-fg-2" />
+        )}
       </button>
       {!n.url && <Scrim open={open} onClose={() => setOpen(false)} />}
       {!n.url && (

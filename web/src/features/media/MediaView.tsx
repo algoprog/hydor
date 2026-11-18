@@ -7,7 +7,7 @@
 // the title and description again, start a new session with it in the message box, or delete it. A sound opens in the
 // sound editor, and so does a video's sound (its More menu).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, AudioLines, Download, Ellipsis, FolderInput, History, MessageSquare, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Share2, SlidersHorizontal, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { ArrowLeft, AudioLines, Download, Ellipsis, FolderInput, FolderOpen, History, MessageSquare, MessageSquarePlus, MessagesSquare, Pencil, RefreshCw, Settings2, Share2, SlidersHorizontal, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { clipLength, type MediaItem, type MediaVersion } from '@shared/media';
 import type { MediaComment, MediaCommentOp } from '@shared/media-comments';
@@ -16,6 +16,7 @@ import { onFeatureEvent } from '../../lib/featureEvents';
 import { bytes } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { openLightbox } from '../../components/Lightbox';
@@ -224,6 +225,11 @@ function MediaView({ id }: { id: string }) {
             {m.sessionKey && (
               <MenuItem icon={<MessagesSquare size={14} />} onClick={() => (setMenu(false), go(`/s/${encodeURIComponent(m.sessionKey!)}`))}>
                 Open its session
+              </MenuItem>
+            )}
+            {canReveal() && (
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), reveal(m.file))}>
+                {revealLabel()}
               </MenuItem>
             )}
             {!!spaces?.length && (

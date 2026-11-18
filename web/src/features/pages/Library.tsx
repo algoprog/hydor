@@ -39,6 +39,7 @@ import {
   FileText,
   Folder,
   FolderInput,
+  FolderOpen,
   FolderPlus,
   FolderTree,
   Globe,
@@ -75,6 +76,7 @@ import { openShare, useSharedThings } from '../spaces/ShareHost';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useUI } from '../../lib/store';
 import { tr, trIn } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
@@ -462,6 +464,11 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             <MenuItem icon={<Download size={14} />} onClick={() => (close(), downloadMedia(m!))}>
               Download
             </MenuItem>
+            {canReveal() && (
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), reveal(m!.file))}>
+                {revealLabel()}
+              </MenuItem>
+            )}
             <MenuItem icon={<RefreshCw size={14} />} onClick={() => (close(), void recaption(m!))}>
               Write its title and description again
             </MenuItem>

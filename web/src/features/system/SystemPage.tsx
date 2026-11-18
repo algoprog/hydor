@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Bot, Cpu, Fan, Gauge, HardDrive, MemoryStick, Microchip, Network, NotebookText, Server, Thermometer, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Cpu, Fan, FolderOpen, Gauge, HardDrive, MemoryStick, Microchip, Network, NotebookText, Server, Thermometer, Zap } from 'lucide-react';
 import type { KernelInfo, SystemInfo, SystemSample } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { ago, basename, bytes, pct, rate, tildify } from '../../lib/format';
 import { go, openFile, sessionPath } from '../../lib/nav';
 import { AgentIcon } from '../../components/AgentIcon';
 import { limitsText, useSessionResources } from './sessionUse';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useSystemLive } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { CoreGrid, Legend, Meter, severityColor, Sparkline, TimeSeries, useInterval } from '../../components/charts';
 import { SystemHeader } from './SystemHeader';
-import { Button, cx, Throbber, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, IconButton, Throbber, Segmented, useConfirm } from '../../components/ui';
 
 function Card({ icon, title, right, children, className }: { icon: React.ReactNode; title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
@@ -186,6 +187,11 @@ function NotebookKernels() {
               </div>
             </button>
             {k.rss != null && <span className="tnum shrink-0 text-[12px] text-fg-2">{bytes(k.rss)}</span>}
+            {canReveal() && (
+              <IconButton label={revealLabel()} size="sm" onClick={() => reveal(k.notebook)}>
+                <FolderOpen size={14} />
+              </IconButton>
+            )}
             <Button size="sm" variant="ghost" onClick={() => shutdown(k)}>
               Shut down
             </Button>

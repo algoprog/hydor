@@ -382,7 +382,7 @@ The padlock at the start of the address bar shows whether the connection to the 
 
 ### Downloads
 
-A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder.
+A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder: the desktop app opens the system's file manager with the file selected (**Show in Finder**, **Show in File Explorer** or **Show in folder**; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
 
 ### When a site asks for a permission
 

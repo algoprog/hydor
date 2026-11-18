@@ -13,6 +13,7 @@ import { api, enc, post, put } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
 import { basename, tildify } from '../../lib/format';
 import { go, showInFiles } from '../../lib/nav';
+import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
 import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
@@ -371,6 +372,11 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
         {loaded?.path && (
           <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(null), showInFiles(loaded.path!))}>
             Show in Files
+          </MenuItem>
+        )}
+        {loaded?.path && canReveal() && (
+          <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(null), reveal(loaded.path!))}>
+            {revealLabel()}
           </MenuItem>
         )}
         {loaded?.pageId ? (

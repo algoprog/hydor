@@ -90,7 +90,7 @@ Klicke auf den Skill-Namen oder eine Anzeige **Skill wird verwendet** in der Unt
 - Einsatzzweck und gegebenenfalls Schlüsselwörter unter „Custom bindet es auf deine Anweisung ein“;
 - die Anleitung, wie Agenten sie lesen;
 - **Verlauf**, sofern Änderungen vorliegen: neueste zuerst mit **Gespeichert**, **Geändert**, **Entfernt** oder **Wiederhergestellt**, Zeitpunkt sowie hinzugefügten und entfernten Zeilen. Ein Klick zeigt die Änderungen zeilenweise;
-- ganz unten, wo seine Datei liegt: Klicke darauf, um sie in Dateien anzuzeigen.
+- ganz unten, wo seine Datei liegt: Klicke darauf, um sie in Dateien anzuzeigen; in der Desktop-App zeigt eine Schaltfläche daneben (**Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**) sie im Dateimanager des Systems.
 
 Welche Aktionen unten verfügbar sind, hängt vom Skill ab:
 
