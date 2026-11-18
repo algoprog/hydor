@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.84.2 · 18 November 2026
+
+Fixes for the Browser: a menu always shows over the page, tab names stay in their column, and the tab column resizes
+like every other one.
+
+- **Menus over the page**: a menu that opens over the page, such as the ⋯ menu at the end of the bar, always shows on
+  top. On a wide window it sometimes stayed behind the page.
+- **Tab names**: a tab's row stays inside the tab column with its ×, and a title too long fades out at its end and
+  rolls along to show the rest while you point at it (not with Motion off); the agents' rows do the same.
+- **The tab column resizes**: drag its edge to make it wider or narrower, as every column in the app does.
+- **Home** is back in the bar, after Reload: it opens your home page in the tab you are on.
+- **Help**: **Take the tour** sits in the first page's top right corner.
+
 ## 0.84.1 · 18 November 2026
 
 The sidebar keeps to the subagents that are at work or waiting for you.
