@@ -825,6 +825,10 @@ test('a helper whose turn a restart of the app cut is not run again a tier up; o
   const n = sessions.created.length;
   await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
   assert.equal(sessions.created.length, n, 'no helper started again');
+  // The cut turn was the brief's: a later turn answers a message (here one that fails), and is not judged by the brief.
+  sessions.all.get(a)!.items.push(user('Message from the session that started you:\n\nWait for the index.'), said('Waiting.'), { kind: 'turn', id: 'cut-5', seq: 9005, status: 'failed' } as TimelineItem, { kind: 'system', id: 'cut-6', seq: 9006, level: 'error', text: 'The model refused' } as TimelineItem);
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n, 'a turn after the cut one, answering a message, is not run again a tier up');
   // Any other error steps up, as before.
   await call(k, 'start_child_session', { brief: 'Write the six tasks again.', tier: 'quick', title: 'Failed' });
   const b = newest();

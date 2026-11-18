@@ -731,8 +731,13 @@ async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Pro
   if (!x || !isTier(x.tier)) return null;
   // A turn its plan's usage limit stopped is no failure of the tier: another account takes it over, or it waits for the reset.
   if (d.sessions.stoppedAtLimit?.(key, startedAt) || LIMIT.test(turn.error ?? '')) return null;
-  // Nor is a turn a restart of the app cut short.
-  if ((turn.error ?? '').startsWith(CUT_BY_RESTART)) return null;
+  // Nor is a turn a restart of the app cut short. It still was the turn that answers the brief: the turns after it answer
+  // messages (the lead's "carry on", a change of plan) and are not judged against the brief, which would run all the
+  // work again a tier up (seen 2026-11-18: a gold-set subagent told to wait was stepped up to Best on the whole brief).
+  if ((turn.error ?? '').startsWith(CUT_BY_RESTART)) {
+    if (!sessionExtra(d.db, key).stepJudged && turn.prompt?.id) setSessionExtra(d.db, key, { stepJudged: turn.prompt.id });
+    return null;
+  }
   const next = nextTier(x.tier);
   // By itself a subagent goes no higher than Best: Max is for its lead to ask for.
   if (!next || tierRank(next) > tierRank(lowerTier(x.max, 'best')!)) return null;
