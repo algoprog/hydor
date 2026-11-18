@@ -69,7 +69,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
-- A rail of tools at the left edge of every page on a computer, and the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide), which `Ctrl+B` (or Sessions on the rail) hides and shows. The sidebar's width, 180 to 560 pixels, is set by dragging its edge or with the arrow keys on it, and kept.
+- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide), which `Ctrl+B` (or Sessions on the rail) hides and shows. The sidebar's width, 180 to 560 pixels, is set by dragging its edge or with the arrow keys on it, and kept.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume

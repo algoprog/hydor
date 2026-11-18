@@ -11,6 +11,7 @@ import { useMachines } from '../../lib/machines';
 import { pct } from '../../lib/format';
 import { machineId } from '../../lib/machine';
 import { useApp, useSessions, useUsage } from '../../lib/store';
+import { cx } from '../../components/ui';
 import { severityColor } from '../../components/charts';
 import { features } from '../registry';
 import { useOutbox } from '../outbox/store';
@@ -30,7 +31,7 @@ function leftOf(u: AgentUsage): number {
  * What is left across the subscriptions, as a tiny meter under "Usage": the paid ones, or the free ones when there
  * are no paid ones, each counted once (an added account can be the agent's own sign-in too). No subscriptions, no bar.
  */
-export function UsageHint() {
+export function UsageHint({ compact }: { compact?: boolean } = {}) {
   const { claude, codex, grok, accounts } = useUsage();
   const seen = new Set<string>();
   const subs = [claude, codex, grok, ...Object.values(accounts)].filter((u): u is AgentUsage => {
@@ -49,7 +50,7 @@ export function UsageHint() {
     ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
   ].join('\n');
   return (
-    <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
+    <span className={cx('absolute left-1/2 h-[3px] -translate-x-1/2 overflow-hidden rounded-full bg-fg/10', compact ? 'bottom-[3px] w-5' : 'bottom-[7px] w-8')} title={title}>
       <span className="block h-full rounded-full" style={{ width: `${left}%`, background: left <= 0 ? 'var(--err)' : severityColor(100 - left) }} />
     </span>
   );
@@ -78,14 +79,17 @@ export interface Tool {
   keys?: string;
 }
 
-/** Every tool, in no order (the caller sorts them by the user's): `nav` goes to a page, `searching` opens the search box. */
-export function useTools(nav: (path: string) => void, searching: () => void): Tool[] {
+/**
+ * Every tool, in no order (the caller sorts them by the user's): `nav` goes to a page, `searching` opens the search box.
+ * `compact`: the rail's small icon tiles (their marks sit closer to the icon) rather than the phone drawer's grid.
+ */
+export function useTools(nav: (path: string) => void, searching: () => void, compact = false): Tool[] {
   const [loc] = useLocation();
   const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
   return [
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
     // What the agents' plans have used and have left, with a thin bar for it at a glance.
-    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint /> },
+    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint compact={compact} /> },
     // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
     { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
     {
@@ -95,7 +99,7 @@ export function useTools(nav: (path: string) => void, searching: () => void): To
       match: loc === '/settings',
       go: () => nav('/settings'),
       tour: 'nav-settings',
-      extra: updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined,
+      extra: updates ? <span className={cx('absolute h-1.5 w-1.5 rounded-full bg-accent', compact ? 'top-[7px] left-[calc(50%+5px)]' : 'top-2.5 left-[calc(50%+7px)]')} title="A newer version is out (Settings → General)" /> : undefined,
     },
     { id: 'search', label: 'Search', icon: <Search size={17} />, match: false, go: searching, keys: 'K' },
     { id: 'help', label: 'Help', icon: <CircleHelp size={17} />, match: loc === '/guide' || loc.startsWith('/guide/'), go: () => nav('/guide') },

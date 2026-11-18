@@ -1,8 +1,8 @@
-// The rail: a narrow column at the left edge of every page on a computer. The app's mark, New session and Sessions (which
-// shows or hides the sidebar), the sections (Browser, Library, Projects, Apps, Agents), then the inbox and the tools
-// (Search, Usage, System, Settings, Help). Each group of tools keeps the order you drag it into, on every device.
+// The rail: a narrow column of icons at the left edge of every page on a computer. Sessions (which shows or hides the
+// sidebar), the sections (Browser, Library, Projects, Apps, Agents), then the inbox and the tools (Search, Usage,
+// System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or the keyboard's focus. Each group of tools keeps the order you drag it into, on every device.
 // A phone has no rail: its drawer (Sidebar.tsx) holds the same.
-import { cloneElement, isValidElement, memo, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, createContext, isValidElement, memo, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -15,14 +15,14 @@ import { MOD } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { isStartingKey } from '../../lib/starting';
 import { useApp, useSessions, useUI } from '../../lib/store';
-import { cx, MenuItem, Popover, useMediaQuery } from '../../components/ui';
+import { cx, Kbd, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { openPalette } from '../palette/CommandPalette';
 import { ownColumn } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
 
 /** The rail's width in px. */
-export const RAIL_WIDTH = 72;
+export const RAIL_WIDTH = 56;
 
 /** The session open last in this window: Sessions goes back to it. */
 let lastSession: string | null = null;
@@ -33,6 +33,40 @@ let lastDragEnd = 0;
 /** A tile's icon, a little larger than the 17 px the tools' entries give it. */
 const big = (icon: ReactNode) => (isValidElement(icon) ? cloneElement(icon as ReactElement<{ size?: number }>, { size: 19 }) : icon);
 
+/** The rail's tooltip, shared by its tiles: show beside a tile, hide (`cold`: a press, a drag, a menu: the next waits again). */
+const TipCtx = createContext<{ show: (el: HTMLElement, label: string, keys?: string, now?: boolean) => void; hide: (cold?: boolean) => void }>({ show: () => {}, hide: () => {} });
+
+/** A tile's name (and its key) beside it: after a moment, or at once while one was just shown (moving along the rail). */
+function useRailTip() {
+  const [tip, setTip] = useState<{ label: string; keys?: string; top: number } | null>(null);
+  const timer = useRef(0);
+  const warm = useRef(0);
+  const shown = useRef(false);
+  const api = useMemo(
+    () => ({
+      show(el: HTMLElement, label: string, keys?: string, now = false) {
+        window.clearTimeout(timer.current);
+        const put = () => {
+          const r = el.getBoundingClientRect();
+          shown.current = true;
+          setTip({ label, keys, top: r.top + r.height / 2 });
+        };
+        if (now || performance.now() < warm.current) put();
+        else timer.current = window.setTimeout(put, 450);
+      },
+      hide(cold = false) {
+        window.clearTimeout(timer.current);
+        warm.current = shown.current && !cold ? performance.now() + 700 : 0;
+        shown.current = false;
+        setTip(null);
+      },
+    }),
+    [],
+  );
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return [tip, api] as const;
+}
+
 /** What a tile being dragged gets: its place among the others, and the handlers that pick it up. */
 interface DragBits {
   ref: (el: HTMLElement | null) => void;
@@ -42,10 +76,10 @@ interface DragBits {
   lifted: boolean;
 }
 
-/** One tile: icon over label; the one for the page that is open has its own background and an accent bar at the rail's edge. */
+/** One tile: an icon, named by the rail's tooltip; the one for the page that is open has its own background and an accent bar at the rail's edge. */
 function Tile({
   label,
-  tip,
+  keys,
   icon,
   current,
   onClick,
@@ -58,7 +92,8 @@ function Tile({
   sorted,
 }: {
   label: string;
-  tip?: string;
+  /** Its shortcut, shown in the tooltip ("Ctrl+K"). */
+  keys?: string;
   icon: ReactNode;
   current?: boolean;
   onClick: () => void;
@@ -71,29 +106,36 @@ function Tile({
   /** One of the tools that can be dragged: a click right after a drop is not a click. */
   sorted?: boolean;
 }) {
+  const tip = useContext(TipCtx);
   return (
     <button
       ref={drag?.ref}
       style={drag?.style}
       {...drag?.attrs}
       type="button"
-      title={tip ?? label}
-      aria-label={tip ?? label}
+      aria-label={keys ? `${label} (${keys})` : label}
       aria-current={current ? 'page' : undefined}
       data-tour={floating ? undefined : tour}
       data-tip={floating ? undefined : dataTip}
+      onPointerEnter={(e) => !floating && e.pointerType === 'mouse' && tip.show(e.currentTarget, label, keys)}
+      onPointerLeave={() => tip.hide()}
+      onFocus={(e) => !floating && e.currentTarget.matches(':focus-visible') && tip.show(e.currentTarget, label, keys, true)}
+      onBlur={() => tip.hide()}
+      onPointerDown={() => tip.hide(true)}
       onClick={() => (!sorted || Date.now() - lastDragEnd > 300) && onClick()}
-      onContextMenu={onMenu}
+      onContextMenu={(e) => {
+        tip.hide(true);
+        onMenu?.(e);
+      }}
       className={cx(
-        'relative flex h-[54px] w-full shrink-0 flex-col items-center justify-center gap-1 rounded-[10px] text-[10.5px] transition-colors',
+        'relative mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors',
         // The copy that follows the pointer while it is dragged, lifted off the page.
-        floating ? 'bg-bg-2 text-fg shadow-lg ring-1 ring-line-2' : current ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
+        floating ? 'bg-bg-2 text-fg shadow-lg ring-1 ring-line-2' : current ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
         drag?.lifted && 'opacity-40',
       )}
     >
-      {current && !floating && <span aria-hidden className="absolute top-3 bottom-3 -left-2 w-[3px] rounded-r-full bg-accent" />}
-      <span className="shrink-0">{icon}</span>
-      <span className="max-w-full truncate px-0.5 leading-none">{label}</span>
+      {current && !floating && <span aria-hidden className="absolute top-2 bottom-2 -left-2 w-[3px] rounded-r-full bg-accent" />}
+      {icon}
       {extra}
     </button>
   );
@@ -121,7 +163,7 @@ function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; flo
   return (
     <Tile
       label={t.label}
-      tip={t.keys ? `${t.label} (${MOD}${t.keys})` : undefined}
+      keys={t.keys ? `${MOD}${t.keys}` : undefined}
       icon={big(t.icon)}
       current={t.match}
       onClick={t.go}
@@ -141,15 +183,14 @@ function InboxTile({ current }: { current: boolean }) {
   const n = useInboxCount();
   return (
     <Tile
-      label="Inbox"
-      tip={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'}
+      label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'}
       icon={<Inbox size={19} />}
       current={current}
       onClick={() => go('/inbox')}
       dataTip={n > 0 ? 'inbox' : undefined}
       extra={
         n > 0 ? (
-          <span className="tnum pointer-events-none absolute top-1.5 left-[calc(50%+3px)] min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-semibold text-accent-fg">{n > 99 ? '99+' : n}</span>
+          <span className="tnum pointer-events-none absolute -top-0.5 left-[calc(50%+2px)] min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-semibold text-accent-fg">{n > 99 ? '99+' : n}</span>
         ) : undefined
       }
     />
@@ -178,7 +219,8 @@ export const Rail = memo(function Rail() {
   const sideOpen = useUI((s) => s.sideOpen);
   const sidebarShows = sideOpen && !ownColumn(loc);
 
-  const tools = useTools(go, openPalette);
+  const tools = useTools(go, openPalette, true);
+  const [tip, tipApi] = useRailTip();
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   const sections = tools.filter((t) => SECTION_TOOLS.includes(t.id));
   const utilities = tools.filter((t) => !SECTION_TOOLS.includes(t.id));
@@ -212,7 +254,7 @@ export const Rail = memo(function Rail() {
 
   const group = (list: Tool[]) => (
     <SortableContext items={list.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1">
         {list.map((t) => (
           <SortableTile key={t.id} t={t} onMenu={onMenu} />
         ))}
@@ -221,7 +263,8 @@ export const Rail = memo(function Rail() {
   );
 
   return (
-    <nav data-rail data-tour="tools" data-i18n="nav" aria-label="Tools" className="flex h-full w-[72px] shrink-0 flex-col border-r border-line bg-sidebar pt-[calc(var(--safe-top)+8px)]">
+    <nav data-rail data-tour="tools" data-i18n="nav" aria-label="Tools" className="flex h-full w-[56px] shrink-0 flex-col border-r border-line bg-sidebar pt-[calc(var(--safe-top)+8px)]">
+      <TipCtx.Provider value={tipApi}>
       {/* Offline: said beside the logo at the top of the sidebar, or here while no sidebar shows it. */}
       {!connected && !sidebarShows && (
         <span title="Reconnecting…" className="flex h-8 shrink-0 items-center justify-center text-warn">
@@ -234,14 +277,15 @@ export const Rail = memo(function Rail() {
         onDragStart={({ active }) => {
           setDragId(active.id as SidebarTool);
           setMenu(false);
+          tipApi.hide(true);
         }}
         onDragEnd={onDrop}
         onDragCancel={() => setDragId(null)}
         accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
       >
         {/* The tiles scroll in a short window (their bar hidden), so none is left out. Touches on them may pick one up (lib/dragTouch). */}
-        <div ref={touchDragArea} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Tile label="Sessions" tip={inSessions ? `Sessions (${MOD}B)` : 'Sessions'} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
+        <div ref={touchDragArea} onScroll={() => tipApi.hide(true)} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
           {group(sections)}
           <div className="min-h-2 flex-1" />
           <InboxTile current={loc === '/inbox'} />
@@ -260,6 +304,19 @@ export const Rail = memo(function Rail() {
           Back to the usual order
         </MenuItem>
       </Popover>
+      </TipCtx.Provider>
+      {tip &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[80] flex -translate-y-1/2 items-center gap-2 rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap text-fg shadow-lg"
+            style={{ top: tip.top, left: RAIL_WIDTH + 6 }}
+          >
+            {tip.label}
+            {tip.keys && <Kbd>{tip.keys}</Kbd>}
+          </div>,
+          document.body,
+        )}
     </nav>
   );
 });

@@ -16,7 +16,7 @@ Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstell
 
 ### Die Werkzeugleiste
 
-Die Werkzeugleiste ist eine Spalte aus Kacheln, jeweils mit dem Symbol über dem Namen; zeigst du auf eine, siehst du Name und Tastenkürzel. Die Kachel der geöffneten Seite ist hervorgehoben, daneben sitzt am Bildschirmrand ein Balken in der Akzentfarbe. Von oben nach unten:
+Die Werkzeugleiste ist eine Spalte aus Symbolen; zeigst du auf eines oder gehst mit der Tabulatortaste dorthin, nennt ein Hinweis daneben seinen Namen und, wo es eines gibt, sein Tastenkürzel. Das Symbol der geöffneten Seite ist hervorgehoben, daneben sitzt am Bildschirmrand ein Balken in der Akzentfarbe. Von oben nach unten:
 
 - **Sitzungen**: zeigt deine Sitzungen in der Seitenleiste. Auf der Startseite oder in einer Sitzung blendet die Kachel die Seitenleiste ein oder aus (wie Strg+B). Von jeder anderen Seite zeigt sie die Seitenleiste und bringt dich zur Sitzung, die du zuletzt in diesem Fenster geöffnet hattest, sonst zur Startseite.
 

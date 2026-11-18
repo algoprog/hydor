@@ -17090,7 +17090,6 @@
 "Session title":"web/src/features/sessions/SessionList.tsx",
 "sessions":"server/apps/views.ts",
 "Sessions":"web/src/features/layout/Rail.tsx",
-"Sessions ({0}B)":"web/src/features/layout/Rail.tsx",
 "Sessions are running as this account: stop them first":"server/index.ts",
 "Sessions by project":"web/src/features/tips/catalog.ts",
 "Sessions in a group work with all its projects: their files, documents and guidelines":"web/src/features/spaces/SpacesPage.tsx",

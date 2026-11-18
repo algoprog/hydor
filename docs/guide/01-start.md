@@ -16,7 +16,7 @@ On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels
 
 ### The rail
 
-The rail is a column of tiles, each with an icon over its name; point at one to see its name and shortcut. The tile for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
+The rail is a column of icons; point at one, or move to it with Tab, and a tooltip beside it gives its name and, where it has one, its shortcut. The icon for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
 
 - **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
 
