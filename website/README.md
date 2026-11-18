@@ -45,16 +45,15 @@ records). Publish it again after each release, so the page names the new version
 
 ## Its pictures
 
-- `img/app-*.webp` are whole windows of the app in its dark theme, all 1280×800 (and a phone's screen), taken from
-  the demo copy with made-up data that the guide's screenshot tool runs. `shots.mjs` lists them; take them again
-  when the app's look changes (build the app in a worktree first, as `scripts/guide-shots/README.md` says):
+- `img/app-*.webp`, `trip-app.webp` (the Trip planner's answer in a chat, on its map) and `library-slides.webp` (the
+  trip's slides in the Library's editor) are whole windows of the app in its dark theme, all 1280×800 (and a phone's
+  screen), taken from the demo copy with made-up data that the guide's screenshot tool runs. `shots.mjs` lists them;
+  take them again when the app's look changes (build the app in a worktree first, as `scripts/guide-shots/README.md` says):
 
   ```bash
   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --themes dark --out website/src/img
   ```
 
-- `trip-app.webp`, `library-slides.webp` and `tour-poster.webp` are frames of the tour film (its source is in
-  `~/naget-video/source/hydor`): the Trip planner's map at 75 s, and the slides in their editor at 90 s (cropped just
-  inside the editor's border; the poster is the whole frame).
+- `tour-poster.webp` is a frame of the tour film (its source is in `~/naget-video/source/hydor`), shown before it plays.
 - `og.jpg`: with the site served as above, copy `og/og.html` into `dist/website`, take a 1200×630 screenshot of
   http://localhost:4321/og.html and save it as `src/img/og.jpg`.

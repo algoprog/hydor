@@ -1,10 +1,14 @@
-// The website's pictures of the app (website/src/img/app-*.webp): whole windows of the demo copy the guide's
-// screenshot tool runs, all the same size (1280×800, saved 1600 pixels wide), and a phone's screen. Take them with
+// The website's pictures of the app (website/src/img/app-*.webp, trip-app.webp and library-slides.webp): whole windows
+// of the demo copy the guide's screenshot tool runs, all the same size (1280×800, saved 1600 pixels wide), and a phone's
+// screen. The Trip planner's answer and the slides are the README's (prepare adds their run and deck). Take them with
 //
 //   node scripts/guide-shots/run.mjs --root /tmp/guide-shots-app --shots website/shots.mjs --themes dark --out website/src/img
 //
 // after building the app in a worktree as scripts/guide-shots/README.md says.
 import { sleep } from '../scripts/guide-shots/cdp.mjs';
+import { deckShot, tripShot } from '../scripts/guide-shots/readme-shots.mjs';
+
+export { prepare } from '../scripts/guide-shots/readme-shots.mjs';
 
 const session = (ctx, name) => `/s/${encodeURIComponent(ctx.sessions[name].key)}`;
 
@@ -33,4 +37,6 @@ export const SHOTS = [
   whole('app-research', (ctx) => session(ctx, 'ebike'), { settle: 2500 }),
   whole('app-tasks', '/settings?s=tasks'),
   whole('app-phone', (ctx) => session(ctx, 'checkout'), { settle: 2500, width: 390, height: 844, phone: true }),
+  tripShot('trip-app'),
+  deckShot('library-slides'),
 ];
