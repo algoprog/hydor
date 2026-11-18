@@ -3,6 +3,33 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.87.0 · 18 November 2026
+
+Your own browser translates pages, opens private tabs, shows articles in reader view and pages in dark colours, and
+does more of what you expect of a browser.
+
+- **Translate a page**: when a page is in another language, a button in the address bar translates it where it is, what
+  you see first, and goes on as you scroll or the page changes; **Show original** brings its own words back. Pick your
+  language, always translate a language, never translate a language or a site, or select words and right-click →
+  **Translate “…”**. The words are translated by the helper model (Settings → Models): Claude Haiku on Automatic, or a
+  model on your computer.
+- **Private tabs**: **New private tab** (Ctrl+Shift+N, ⇧⌘N on a Mac) opens a tab whose pages are not kept in your
+  history, the closed tabs or the tabs that come back next time, and whose sign-ins, cookies and site data are kept
+  apart and forgotten when you close the last private tab. They sit in a purple **Private** part of the tab column;
+  extensions do not run in them, and agents never get them. Right-click a link → **Open link in private tab**.
+- **Reader view**: on an article, the book button in the address bar shows the article alone, in a clean column, with
+  the text size, colours (Auto, Dark, Light or Sepia) and font you choose.
+- **Dark pages**: ⋯ → **Dark pages** shows pages that have no dark look of their own in dark colours, except on the
+  sites you leave as they are (from the padlock).
+- **Where a link goes**: point at a link and its address shows at the bottom of the page.
+- **Screenshots and PDFs**: ⋯ → a screenshot of what you see or of the whole page, saved in your Downloads folder and
+  copied, or **Save as PDF…**.
+- **Quieter pages**: a page's sound waits until you click or type in it (a setting lets sites play it by themselves),
+  and the ad blocker hides cookie banners too (**Hide cookie banners**).
+- **A site's data**: the padlock deletes a site's cookies and data, and turns dark pages off for one site.
+- **Video and sound**: right-click a video or a sound for Play, Mute, Loop, Show controls, Picture in picture, and
+  saving it or copying its address.
+
 ## 0.86.1 · 18 November 2026
 
 Links in an agent's reply to the app's own pages now take you there.
