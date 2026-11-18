@@ -193,10 +193,10 @@ export function GuidePage() {
     />
   );
 
-  // The row at the top of the page on a computer, as the Library's: the title at the left, the find box at the right
-  // (in a topic; the home has its own big one), and the tour on the home.
+  // The row at the top of the page on a computer, as the Library's: in a topic, its title at the left and the find box at
+  // the right, over the text's column; on the home (its own big box below), Take the tour in the page's top right corner.
   const toolbar = column && (
-    <div className={cx('mx-auto flex min-h-8.5 items-center gap-x-3 px-4 pt-5 sm:px-6', topic ? 'max-w-[820px]' : 'max-w-[980px]')}>
+    <div className={cx('mx-auto flex min-h-8.5 items-center gap-x-3 px-4 pt-5 sm:px-6', topic ? 'max-w-[820px]' : 'max-w-none')}>
       <NavButton />
       {/* A topic's title; the first page has its own big question, so no title here. */}
       {topic && (
