@@ -2,7 +2,10 @@
 // app starts, runs that check instead of the server (HYDOR_DESKTOP_SERVER_ENTRY) with HYDOR_BROWSER_ENGINE=desktop, and
 // quits with its exit code. Then a second run (desktop/scripts/browser-ipc-check.cjs) checks what the check cannot, the
 // app's window: an agent's tab watched and used through the messages the window's page sends, and your own tab shown.
-//   node desktop/scripts/browser-selftest.mjs [--no-ipc] [--only-ipc]
+// A third run (desktop/scripts/extensions-check.cjs) checks Chrome extensions in your own browser: small extensions of its
+// own get the tab you see, new tabs, downloads, a side panel and a popup when their buttons are pressed.
+//   node desktop/scripts/browser-selftest.mjs [--no-ipc] [--only-ipc] [--only-ext]
+// --no-ipc leaves out the window check only; --only-ipc and --only-ext run just that one.
 // Needs `electron` in desktop/node_modules (npm ci there) and, without a display, xvfb-run (Linux). It builds the
 // check into dist/dev, so run it in a checkout.
 import { spawn, spawnSync } from 'node:child_process';
@@ -68,7 +71,9 @@ function run(argv, env, ms) {
 
 let failed = false;
 
-if (!args.includes('--only-ipc')) {
+const only = args.includes('--only-ipc') || args.includes('--only-ext');
+
+if (!only) {
   console.log('Building the browser check...');
   const built = spawnSync(process.execPath, ['scripts/build-server.mjs', 'server/browser/selftest.ts'], { cwd: root, env: { ...process.env, OUTDIR: 'dist/dev' }, stdio: 'inherit' });
   if (built.status !== 0) process.exit(built.status ?? 1);
@@ -88,7 +93,7 @@ if (!args.includes('--only-ipc')) {
   }
 }
 
-if (!args.includes('--no-ipc')) {
+if (!args.includes('--no-ipc') && !args.includes('--only-ext')) {
   console.log('\nRunning the window check in the desktop app...');
   const env = { ...envFor('ipc'), HYDOR_PRELOAD: path.join(desktop, 'preload.cjs') };
   fs.mkdirSync(env.DATA_DIR, { recursive: true });
@@ -97,6 +102,18 @@ if (!args.includes('--no-ipc')) {
   if (r.code !== 0) {
     failed = true;
     console.log(`\nThe window check failed (exit ${r.code}).`);
+  }
+}
+
+if (!args.includes('--only-ipc')) {
+  console.log('\nRunning the extensions check in the desktop app...');
+  const env = { ...envFor('ext'), HYDOR_PRELOAD: path.join(desktop, 'preload.cjs') };
+  fs.mkdirSync(env.DATA_DIR, { recursive: true });
+  const r = await run([path.join(desktop, 'scripts/extensions-check.cjs'), `--user-data-dir=${path.join(tmp, 'user-ext')}`, ...flags], env, 3 * 60_000);
+  process.stdout.write(r.out);
+  if (r.code !== 0) {
+    failed = true;
+    console.log(`\nThe extensions check failed (exit ${r.code}).`);
   }
 }
 

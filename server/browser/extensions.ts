@@ -31,7 +31,8 @@ type Stored = BrowserExtension & { dir: string };
 function readAll(db: DB): Stored[] {
   try {
     const v = JSON.parse(kvGet(db, KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((x) => x && ID_RE.test(String(x.id)) && typeof x.dir === 'string') : [];
+    // Entries stored before pinning existed have no `pinned`: they count as pinned.
+    return Array.isArray(v) ? v.filter((x) => x && ID_RE.test(String(x.id)) && typeof x.dir === 'string').map((x) => ({ ...x, pinned: x.pinned !== false })) : [];
   } catch {
     return [];
   }
@@ -88,9 +89,9 @@ export function idFromFolder(dir: string): string {
  */
 const UNSUPPORTED = new Set(
   (
-    'declarativeNetRequest declarativeNetRequestWithHostAccess declarativeNetRequestFeedback offscreen sidePanel identity identity.email cookies history ' +
-    'bookmarks downloads downloads.open downloads.shelf downloads.ui tts ttsEngine proxy debugger nativeMessaging tabGroups topSites sessions readingList search ' +
-    'fontSettings privacy contentSettings pageCapture desktopCapture tabCapture gcm webNavigation declarativeContent printing printingMetrics idle power ' +
+    'declarativeNetRequest declarativeNetRequestWithHostAccess declarativeNetRequestFeedback identity identity.email history ' +
+    'bookmarks tts ttsEngine proxy debugger nativeMessaging tabGroups topSites sessions readingList search ' +
+    'fontSettings privacy contentSettings pageCapture desktopCapture tabCapture gcm declarativeContent printing printingMetrics power ' +
     'browsingData dns processes vpnProvider wallpaper documentScan loginState certificateProvider platformKeys webAuthenticationProxy audio fileBrowserHandler ' +
     'fileSystemProvider networking.config accessibilityFeatures system.cpu system.display system.memory system.storage'
   ).split(' '),
@@ -223,6 +224,7 @@ function entryFor(id: string, dir: string, info: Described, over: Partial<Browse
     ...over,
     enabled: old?.enabled ?? true,
     agents: old?.agents ?? false,
+    pinned: old?.pinned ?? over.pinned ?? true,
     ...(info.action ? { action: info.action } : {}),
     ...(info.iconFile ? { icon: true } : {}),
     ...(info.options ? { options: info.options } : {}),
@@ -246,6 +248,7 @@ function register(db: DB, e: Stored): Stored {
     const old = list[i];
     e.enabled = old.enabled;
     e.agents = old.agents;
+    e.pinned = old.pinned;
     list[i] = e;
     // The copy it had is no longer used when the new one is somewhere else.
     if (old.source !== 'folder' && old.dir !== e.dir) removeFiles(old);
@@ -537,6 +540,8 @@ const newer = (a: string, b: string) => {
 interface Found {
   source: ExtensionSource;
   dir: string;
+  /** Whether that browser had it pinned to its toolbar; undefined when the profile has no list of pins. */
+  pinned?: boolean;
 }
 
 /** The extensions of every profile of the browsers here, with the folder holding each one's files. */
@@ -563,6 +568,11 @@ function scanBrowsers(have: Set<string>): Found[] {
       } as Record<string, any>;
       const secure = readJson(path.join(p.dir, 'Secure Preferences'))?.extensions?.settings ?? {};
       for (const [id, s] of Object.entries<any>(secure)) settings[id] = { ...settings[id], ...s };
+      // Chrome's pinned list is in the profile's Preferences (Secure Preferences too, in some browsers); none = no list there.
+      const pins = [readJson(path.join(p.dir, 'Preferences')), readJson(path.join(p.dir, 'Secure Preferences'))]
+        .map((j) => j?.extensions?.pinned_extensions)
+        .filter(Array.isArray) as unknown[][];
+      const pinned = pins.length ? new Set(pins.flat().map(String)) : undefined;
       let ids: string[] = [];
       try {
         ids = fs.readdirSync(path.join(p.dir, 'Extensions')).filter((n) => ID_RE.test(n));
@@ -590,6 +600,7 @@ function scanBrowsers(have: Set<string>): Found[] {
         const off = s.state === 0 || (typeof reasons === 'number' && reasons > 0) || (Array.isArray(reasons) && reasons.length > 0);
         mine.push({
           dir,
+          ...(pinned ? { pinned: pinned.has(id) } : {}),
           source: { id: `${b.key}:${p.folder}/${id}`, extensionId: id, browser: b.name, ...(p.name ? { profile: p.name } : {}), name: info.name, version: info.version, enabled: !off, have: have.has(id) },
         });
       }
@@ -623,7 +634,7 @@ export function importFrom(db: DB, ids: string[]): { added: BrowserExtension[]; 
       const out = path.join(part, 'files');
       fs.cpSync(f.dir, out, { recursive: true, filter: (s) => path.basename(s) !== '_metadata' });
       const dest = settle(id, out, info.version);
-      added.push(strip(register(db, entryFor(id, dest, info, { source: 'import', from: f.source.browser }, readAll(db).find((x) => x.id === id)))));
+      added.push(strip(register(db, entryFor(id, dest, info, { source: 'import', from: f.source.browser, ...(f.pinned !== undefined ? { pinned: f.pinned } : {}) }, readAll(db).find((x) => x.id === id)))));
     } catch (e) {
       failed.push({ id: sid, error: (e as Error).message });
     } finally {
@@ -695,8 +706,10 @@ export function extensionRoutes(d: Deps) {
     const e = list.find((x) => x.id === cur.id)!;
     if (b.enabled !== undefined) e.enabled = !!b.enabled;
     if (b.agents !== undefined) e.agents = !!b.agents;
+    if (b.pinned !== undefined) e.pinned = !!b.pinned;
     writeAll(db, list);
-    changed();
+    // Pinning only decides which buttons the toolbar shows: the browser has no need to load its extensions again.
+    if (b.enabled !== undefined || b.agents !== undefined) changed();
     return { extension: strip(e), ...extensionState(db) };
   });
 

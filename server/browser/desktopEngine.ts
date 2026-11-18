@@ -96,6 +96,14 @@ export function onDesktopInput(fn: (conn: string, target: string, typed: boolean
   });
 }
 
+/** An extension in the app's browser opened a tab or switched to one (connection, tab): it is to become the tab you see. */
+export function onDesktopFront(fn: (conn: string, target: string) => void) {
+  listen();
+  onDesktop('browser-front', (m) => {
+    if (m.type === 'browser-front') fn(m.conn, m.target);
+  });
+}
+
 /** Tells a profile's running browser which extensions to load now. */
 export function sendExtensions(profile: string, extensions: { id: string; path: string }[]) {
   tellDesktop({ type: 'browser-extensions', profile, extensions });

@@ -485,6 +485,8 @@ export interface BrowserExtension {
   enabled: boolean;
   /** Also in agents' browsers that keep sign-ins (profiles): off unless you turn it on. */
   agents: boolean;
+  /** Its button shows on the toolbar; the others are in the Extensions menu. */
+  pinned: boolean;
   /** Its toolbar button, when it has one: its words and its popup page (inside the extension). */
   action?: { title?: string; popup?: string };
   /** Whether it has an icon (GET /api/browser/extensions/:id/icon). */

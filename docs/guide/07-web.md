@@ -267,7 +267,7 @@ A bar runs across the top of the page. At its left, over the tab column, are the
 - The star at the end of the box bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away. The sites on the bar show as tiles at the top of the tab column.
 - **Save** keeps a readable copy of the page in the Library, as a reader view shows it: the article's text with its pictures and videos, without the site's menus, ads, comments and scripts (see [Web pages from your browser](/guide/library#web-pages-from-your-browser)). A note says "Saved to the Library" (or "Saved to" and the place), with **Open**. It lands among the Library's **Web pages**. The **▾** beside Save lists where it can go: **Not in a project**, each project, and the Library's folders in them. The place Save uses is marked in that menu: the one you picked last on this computer (**Not in a project** at first). The Library's **Bookmarks**, **Read later**, **Downloads**, **History** and **Highlights** chips list the same bookmarks, pages to read later, downloads, history and highlights as this page (see [Library](/guide/library)).
 - **Ask** opens the column beside the page to ask about it (see [Ask beside the page](/guide/web#ask-beside-the-page)); it shows lit while that column is there.
-- The buttons of your extensions come next, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
+- The buttons of the extensions you pinned come next, then **Extensions** (the puzzle piece), which lists every extension that is on, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
 - **Menu** (⋯) has **New private tab** (see [Private tabs](/guide/web#private-tabs)), then **Find in page**, **Translate page…** (**Show original** while the page is translated; see [Translate a page](/guide/web#translate-a-page)), **Reader view** and **Dark pages** (ticked while they are on; see [Reader view](/guide/web#reader-view) and [Dark pages](/guide/web#dark-pages)), then **Print…**, **Screenshot of what you see**, **Screenshot of the whole page** and **Save as PDF…** (see [Screenshots and PDFs](/guide/web#screenshots-and-pdfs)), then **Open in your default browser**, **Read this page later** (see [Read later](/guide/web#read-later)), **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Import bookmarks and history…**, **Highlights** (with how many the page has), **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links. In a private tab, **Ask** and **Do this here…** are greyed out: agents never get a private tab.
 
 A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab, and [/browser?private=1](/browser?private=1) opens a new private tab (add `&url=https://example.com` to open that address in it).
@@ -513,7 +513,7 @@ Your highlights stay on this computer, in the app's own database, and agents nev
 
 Your own browser blocks ads and trackers, as an ad blocker does: it keeps the requests of known ad and tracking servers from going out, and hides the empty places that are left. It uses Ghostery's lists of ads and trackers (EasyList, EasyPrivacy and others), which the app downloads from GitHub when your browser first starts and refreshes every week (when it can't, it keeps the lists it has); nothing about you is sent with them. It blocks nothing in the agents' browsers, and works in private tabs. **Block ads and trackers** in the [browser's settings](/guide/web#browser-settings) turns it off.
 
-With it on, a Chrome extension that blocks requests (an ad blocker of your own) may not run; turn the blocker off to give it the page.
+With it on, your Chrome extensions still see the page's requests, but one that blocks or changes requests (an ad blocker of your own) does not block them; turn the blocker off to give it the page.
 
 To let one site show its ads, click the padlock in the address bar and press **Allow ads on this site** (its subdomains too); the page reloads. **Block ads on this site** takes it back.
 
@@ -600,13 +600,24 @@ Extensions are not updated by themselves. Add one again from the Chrome Web Stor
 
 ### Turn one off, or take it away
 
-Each extension in the panel shows its icon, name and version, and a switch that turns it on or off. **Remove** deletes it (a folder's own files stay). When an extension has a button on the toolbar, it shows to the right of the address bar while it is on: click it to open its popup under the button, and a badge on it, a number or a few letters, shows what the extension reports. **Options** opens its options page in a tab.
+Each extension in the panel shows its icon, name and version, and a switch that turns it on or off. **Remove** deletes it (a folder's own files stay). **Options** opens its options page in a tab.
+
+When an extension has a button on the toolbar, it shows to the right of the address bar while it is on and pinned: click it to open its popup under the button, and a badge on it, a number or a few letters, shows what the extension reports. The extensions you have not pinned have no button of their own, and are in the **Extensions** button (the puzzle piece) after the others. It shows while at least one extension is on.
+
+- **Use an extension from the menu**: press **Extensions** and click an extension's name to use it, as you would click its button. An extension without a toolbar button of its own is listed too: its name opens its options page when it has one.
+- **Pin it or unpin it**: the pin beside an extension in that menu (**Pin to toolbar**, or **Unpin from toolbar** when it is pinned) shows or hides its button on the toolbar. The pin is lit while it is pinned. Pinning changes only the toolbar: the extension keeps running either way.
+- **More for an extension**: the **⋮** beside it has **Options** (when it has an options page), **Turn off** and **Remove**, which asks first.
+- **Manage extensions**, at the foot of the menu, opens the panel.
+- **Right-click a button** on the toolbar for a small menu with its name, then **Options** (when it has an options page), **Unpin**, **Remove** and **Manage extensions**.
+- **Pin to toolbar** is also a switch in the panel, under each extension that is on and has a button.
+
+A new extension starts pinned. Extensions you bring in from Chrome keep the pins they had there: the ones you had pinned in Chrome are pinned here, and the others are in the **Extensions** menu. A click on an extension that is not running in this browser says so ("… isn’t running in this browser").
 
 **Also in agents’ browsers** is off at first. Turned on, the extension also runs in the agents' browsers that keep sign-ins, those using a profile (see [Keep sign-ins with profiles](/guide/web#keep-sign-ins-with-profiles)), and those only. Browsers that start fresh never get extensions. (On a server, a Chromium or Chrome for Testing loads them; Google Chrome does not any more.)
 
 ### What may not work
 
-The desktop app's browser has part of what Chrome gives extensions. Content that an extension adds to pages, popups, options pages, stored settings, messages, badges, notifications (shown as the system's) and alarms work. Things that may not: blocking or changing requests (which many ad blockers rely on), the side panel, signing in with an account, cookies, history, bookmarks and downloads of the browser, tab groups, background pages that Chrome makes for them (offscreen), keyboard shortcuts of an extension, and the items an extension adds to the right-click menu (accepted, never shown). The extension's row says which it asks for, on a line like "Some parts may not work here: blocking or changing requests, cookies". It goes by what the extension asks for, so it may still work well.
+The desktop app's browser has most of what Chrome gives extensions. Content that an extension adds to pages, popups, options pages, stored settings, messages, badges, notifications (shown as the system's) and alarms work, and so does what an extension does with your tabs: it sees the tab you are on, and the address and title of the pages it may read; it opens tabs (in front, as in Chrome), switches to them and closes them, and hears when they load or change. Its downloads are saved like yours, it reads and sets the cookies of the sites it may use, the background pages it makes for itself (offscreen) run, and its side panel opens under its button, the way a popup does. Things that may not work: blocking or changing requests (which many ad blockers rely on), signing in with an account, the browser's history and bookmarks, tab groups, keyboard shortcuts of an extension, and the items an extension adds to the right-click menu (accepted, never shown). The extension's row says which it asks for, on a line like "Some parts may not work here: blocking or changing requests, signing in with an account". It goes by what the extension asks for, so it may still work well.
 
 ## Hand a page to an agent
 
@@ -781,6 +792,7 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "Bring my Chrome history into the Browser page." (or: "Why can't I import my Safari history?")
 - "Which Chrome extensions are in my browser, and which of them run in the agents' browsers too?"
 - "Add the extension at https://chromewebstore.google.com/detail/… to my browser." (the app asks you first, every time)
+- "Keep only my password manager on the toolbar, and the other extensions in the Extensions menu." (the pin beside each extension in the **Extensions** button's menu)
 - "Fill in the library card form at riverside.example.org for me; I'll watch." (its pointer shows in the live view where it clicks and types)
 - "Open Notes on my Mac and start a note with today's shopping list."
 - "Open Notepad and write down today's shopping list." (on Windows; the glow around the screen shows while it works, its ring shows where it points, and Esc stops it)

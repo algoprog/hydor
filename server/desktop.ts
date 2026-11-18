@@ -159,6 +159,8 @@ export type FromDesktop =
   | { type: 'cdp'; conn: string; data: string }
   | { type: 'browser-gone'; conn: string; why?: string }
   | { type: 'browser-input'; conn: string; target: string; typed?: boolean }
+  /** An extension opened a tab of your own browsing or asked to switch to one: it becomes the tab you see. */
+  | { type: 'browser-front'; conn: string; target: string }
   /** A page of your own browsing asks for a permission (camera, microphone, location…): the app waits for `browser-permission-answer`. */
   | { type: 'browser-permission'; conn: string; target: string; id: string; permission: string; origin: string; media?: string[] };
 

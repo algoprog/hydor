@@ -15,7 +15,7 @@ import type { Deps } from '../features/types.ts';
 import { addNote, notesOf, updateNote } from '../notes.ts';
 import { Cdp, CdpSession } from './cdp.ts';
 import { BROWSER_DIR, launchChrome, pickChrome, plainUserAgent } from './chrome.ts';
-import { launchDesktop, onDesktopInput, sendExtensions } from './desktopEngine.ts';
+import { launchDesktop, onDesktopFront, onDesktopInput, sendExtensions } from './desktopEngine.ts';
 import { addDownload } from './downloads.ts';
 import { extensionsFor, onExtensionsChange } from './extensions.ts';
 import { hostPort, isPrivate, refusal, type Policy } from './guard.ts';
@@ -1308,6 +1308,29 @@ onDesktopInput((conn, target, typed) => {
   if (b.closed || b.driver === 'user' || b.ownBrowser) return;
   if (b.active !== t) b.setActive(t);
   void b.takeOver(true).catch(() => {});
+});
+
+/**
+ * An extension asked for one of your own tabs to come to the front (a tab it opened, or tabs.update with active): your
+ * own browsing shows it. A tab the extension just opened may still be on its way into the list, so it is looked for a
+ * little while.
+ */
+onDesktopFront((conn, target) => {
+  void (async () => {
+    for (let i = 0; i < 50; i++) {
+      const t = byConn(conn)?.tabOf(target);
+      const b = t ? ownerOf(t) : undefined;
+      if (t && b && b.tabs.includes(t)) {
+        if (b.key !== BROWSING_KEY || b.closed || t.closed) return;
+        if (b.active !== t) {
+          b.setActive(t);
+          b.changed();
+        }
+        return;
+      }
+      await sleep(100);
+    }
+  })();
 });
 
 /** A site's name for people: the address's host without "www.". */

@@ -25907,5 +25907,13 @@
   "Quiet these 4 weeks: {0}": "过去 4 周没有动静：{0}",
   "Quiet these 4 weeks: {0} and {1} more": "过去 4 周没有动静：{0} 及另外 {1} 个",
   "Shared with people": "已与他人分享",
-  "Where the work went": "工作去了哪里"
+  "Where the work went": "工作去了哪里",
+"{0} isn’t running in this browser":"{0} 没有在此浏览器中运行",
+"Its files are deleted from Hydor. A folder you added yourself stays where it is.":"它的文件会从 Hydor 中删除。你自己添加的文件夹会保留在原处。",
+"Manage extensions":"管理扩展程序",
+"Pin to toolbar":"固定到工具栏",
+"Unpin from toolbar":"从工具栏取消固定",
+"Chrome extensions for your own browser, from the Chrome Web Store, a folder or your other browsers, with the ones you pin on the toolbar and the rest in the puzzle-piece Extensions menu (desktop app)":"你自己的浏览器的 Chrome 扩展程序：来自 Chrome 应用商店、文件夹或你的其他浏览器；固定的显示在工具栏上，其余的在拼图块形状的“扩展程序”菜单里（桌面应用）",
+"extensions chrome web store add-ons addons plugins install dark reader password manager ad blocker folder unpacked agents browsers badge popup pin unpin pinned toolbar puzzle piece hide menu manage options turn off remove":"扩展程序 chrome 应用商店 插件 附加组件 安装 dark reader 密码管理器 广告拦截 文件夹 未打包 智能体 浏览器 徽标 弹出窗口 固定 取消固定 已固定 工具栏 拼图 隐藏 菜单 管理 选项 关闭 移除",
+"clearing browsing data":"清除浏览数据"
 }

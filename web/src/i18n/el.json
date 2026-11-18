@@ -25888,5 +25888,13 @@
   "Quiet these 4 weeks: {0}": "Χωρίς δραστηριότητα τις τελευταίες 4 εβδομάδες: {0}",
   "Quiet these 4 weeks: {0} and {1} more": "Χωρίς δραστηριότητα τις τελευταίες 4 εβδομάδες: {0} και {1} ακόμα",
   "Shared with people": "Κοινοποιημένα σε άτομα",
-  "Where the work went": "Πού πήγε η δουλειά"
+  "Where the work went": "Πού πήγε η δουλειά",
+"{0} isn’t running in this browser":"Το {0} δεν εκτελείται σε αυτό το πρόγραμμα περιήγησης",
+"Its files are deleted from Hydor. A folder you added yourself stays where it is.":"Τα αρχεία της διαγράφονται από το Hydor. Ένας φάκελος που προσθέσατε εσείς παραμένει εκεί που είναι.",
+"Manage extensions":"Διαχείριση επεκτάσεων",
+"Pin to toolbar":"Καρφίτσωμα στη γραμμή εργαλείων",
+"Unpin from toolbar":"Ξεκαρφίτσωμα από τη γραμμή εργαλείων",
+"Chrome extensions for your own browser, from the Chrome Web Store, a folder or your other browsers, with the ones you pin on the toolbar and the rest in the puzzle-piece Extensions menu (desktop app)":"Επεκτάσεις του Chrome για το δικό σας πρόγραμμα περιήγησης, από το Chrome Web Store, από φάκελο ή από τα άλλα προγράμματα περιήγησής σας, με όσες καρφιτσώνετε στη γραμμή εργαλείων και τις υπόλοιπες στο μενού Επεκτάσεις με το κομμάτι παζλ (εφαρμογή υπολογιστή)",
+"extensions chrome web store add-ons addons plugins install dark reader password manager ad blocker folder unpacked agents browsers badge popup pin unpin pinned toolbar puzzle piece hide menu manage options turn off remove":"επεκτάσεις chrome web store πρόσθετα plugins εγκατάσταση dark reader διαχείριση κωδικών αποκλεισμός διαφημίσεων φάκελος πράκτορες προγράμματα περιήγησης σήμα αναδυόμενο καρφίτσωμα ξεκαρφίτσωμα καρφιτσωμένη γραμμή εργαλείων παζλ απόκρυψη μενού διαχείριση επιλογές απενεργοποίηση αφαίρεση",
+"clearing browsing data":"διαγραφή δεδομένων περιήγησης"
 }

@@ -16,9 +16,11 @@
 //     and a frame preload with two ipcMain handlers for the cosmetic filters. The engine's own handlers are arrow functions
 //     the session calls through the engine at the time of a request, so this module replaces them on the engine object with
 //     ones that first leave out the sites you allowed ads on, and count what was blocked.
-//   - Electron has one webRequest handler for each event and session, and Electron's own handlers go before an extension's
-//     chrome.webRequest: with this blocker on, an extension that blocks requests (an ad blocker of your own) may not run.
-//     Turning the setting off takes ours off (the session's handlers are removed) and the extension has the session again.
+//   - Electron has one webRequest handler for each event and session, and while a session has any of the app's, its requests
+//     skip Chromium's own extension webRequest. So the engine gets a stand-in for the session (request-hub.cjs) whose handlers
+//     the hub puts on the session, and the hub tells the extensions of the requests too (extensions.cjs): an extension sees
+//     them, but one that blocks requests (an ad blocker of your own) does not block while this blocker is on. Turning the
+//     setting off takes ours off (the session's handlers are removed) and the extension has the session again.
 //   - allowAds: the sites you allowed ads on (a site includes its subdomains). The page's host decides, not the request's:
 //     its requests are never blocked and no cosmetic filter runs on it. The engine gets `@@||host^$document` exceptions for
 //     them as well (which it honours for its cosmetic and scriptlet rules; its network matching ignores a $document
@@ -28,6 +30,9 @@
 //   - The count of what a tab had blocked since its last main-frame navigation is in browser.cjs (`onBlocked` gets the id
 //     of the page's webContents).
 'use strict';
+const { hubOf } = require('./request-hub.cjs');
+/** The session as the engine is given it: its webRequest handlers go through the hub, which shares them with the extensions. */
+const facadeOf = (ses) => hubOf(ses).facade;
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -193,13 +198,13 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: givenOne = nul
       changed = true;
       try {
         if (had) {
-          if (had.isBlockingEnabled(ses)) had.disableBlockingInSession(ses);
+          if (had.isBlockingEnabled(facadeOf(ses))) had.disableBlockingInSession(facadeOf(ses));
           enabled.delete(ses);
         }
         if (want) {
           const main = ipc();
           if (main) for (const c of COSMETIC_CHANNELS) main.removeHandler(c);
-          want.enableBlockingInSession(ses);
+          want.enableBlockingInSession(facadeOf(ses));
           enabled.set(ses, want);
         }
       } catch (e) {
@@ -310,7 +315,7 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: givenOne = nul
       const had = enabled.get(ses);
       enabled.delete(ses);
       try {
-        if (had && had.isBlockingEnabled(ses)) had.disableBlockingInSession(ses);
+        if (had && had.isBlockingEnabled(facadeOf(ses))) had.disableBlockingInSession(facadeOf(ses));
       } catch {}
       if (had) routeCosmetics();
     },
@@ -338,7 +343,7 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: givenOne = nul
       clearTimeout(timer);
       for (const ses of [...enabled.keys()]) {
         try {
-          enabled.get(ses).disableBlockingInSession(ses);
+          enabled.get(ses).disableBlockingInSession(facadeOf(ses));
         } catch {}
       }
       const had = enabled.size;

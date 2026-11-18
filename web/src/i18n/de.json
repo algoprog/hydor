@@ -24636,5 +24636,13 @@
   "Quiet these 4 weeks: {0}": "Ruhig in diesen 4 Wochen: {0}",
   "Quiet these 4 weeks: {0} and {1} more": "Ruhig in diesen 4 Wochen: {0} und {1} mehr",
   "Shared with people": "Mit anderen geteilt",
-  "Where the work went": "Wohin die Arbeit ging"
+  "Where the work went": "Wohin die Arbeit ging",
+  "{0} isn’t running in this browser": "{0} läuft in diesem Browser nicht",
+  "Its files are deleted from Hydor. A folder you added yourself stays where it is.": "Ihre Dateien werden aus Hydor gelöscht. Ein Ordner, den du selbst hinzugefügt hast, bleibt, wo er ist.",
+  "Manage extensions": "Erweiterungen verwalten",
+  "Pin to toolbar": "In der Symbolleiste anheften",
+  "Unpin from toolbar": "Von der Symbolleiste lösen",
+  "Chrome extensions for your own browser, from the Chrome Web Store, a folder or your other browsers, with the ones you pin on the toolbar and the rest in the puzzle-piece Extensions menu (desktop app)": "Chrome-Erweiterungen für deinen eigenen Browser, aus dem Chrome Web Store, aus einem Ordner oder aus deinen anderen Browsern, mit den angehefteten in der Symbolleiste und den anderen im Menü Erweiterungen (dem Puzzleteil) (Desktop-App)",
+  "extensions chrome web store add-ons addons plugins install dark reader password manager ad blocker folder unpacked agents browsers badge popup pin unpin pinned toolbar puzzle piece hide menu manage options turn off remove": "erweiterungen chrome web store add-ons addons plugins installieren dark reader passwortmanager werbeblocker ordner entpackt agenten browser badge popup anheften lösen angeheftet symbolleiste puzzleteil ausblenden menü verwalten optionen deaktivieren entfernen",
+  "clearing browsing data": "Browserdaten löschen"
 }

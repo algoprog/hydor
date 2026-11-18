@@ -389,6 +389,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       const ctx = own();
       const conn = ctx && ctx.conn;
       const rule = ctx && (ctx.download || conn.defaultCtx.download);
+      // A download an extension asked for: it hears how it goes, and it keeps the name the extension gave it.
+      const claim = ext && ext.claimDownload ? ext.claimDownload(item) : null;
       if (!conn || !rule || rule.behavior === 'deny' || !rule.path) return item.cancel();
       const guid = crypto.randomUUID();
       const t = wc ? byWc.get(wc.id) : null;
@@ -397,7 +399,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       } catch {}
       item.setSavePath(path.join(rule.path, guid));
       const events = rule.events !== false;
-      if (events) event(conn, 'Browser.downloadWillBegin', { frameId: t ? t.id : '', guid, url: item.getURL(), suggestedFilename: item.getFilename() });
+      if (events) event(conn, 'Browser.downloadWillBegin', { frameId: t ? t.id : '', guid, url: item.getURL(), suggestedFilename: (claim && claim.name) || item.getFilename() });
       const progress = (state) => events && event(conn, 'Browser.downloadProgress', { guid, totalBytes: item.getTotalBytes(), receivedBytes: item.getReceivedBytes(), state });
       item.on('updated', () => progress('inProgress'));
       item.on('done', (_ev, state) => progress(state === 'completed' ? 'completed' : 'canceled'));
@@ -1322,6 +1324,13 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     t.ready = true;
     if (conn.discover) event(conn, 'Target.targetCreated', { targetInfo: { ...infoOf(t), attached: false } });
     event(conn, 'Target.attachedToTarget', { sessionId: t.sid, targetInfo: infoOf(t), waitingForDebugger: true });
+    extTab(t);
+  }
+
+  /** Extensions see your own tabs (not private ones, not agents' tabs in your browsing). */
+  const forExtensions = (t) => !!ext && t.conn.profile === BROWSING && !t.offscreen && !t.agent && !t.ctx.private && !t.gone;
+  function extTab(t) {
+    if (forExtensions(t) && ext.tabAdded) ext.tabAdded(t.wc);
   }
 
   async function loadBlank(wc) {
@@ -1399,6 +1408,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
         t.ready = true;
         if (conn.discover) event(conn, 'Target.targetCreated', { targetInfo: { ...infoOf(t), attached: false } });
         event(conn, 'Target.attachedToTarget', { sessionId: t.sid, targetInfo: infoOf(t), waitingForDebugger: true });
+        extTab(t);
       } catch (e) {
         log('a new window could not be set up', String((e && e.message) || e));
         destroyTarget(t, false);
@@ -1410,6 +1420,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   function destroyTarget(t, selfClosed) {
     if (t.gone) return;
     t.gone = true;
+    if (ext && ext.tabRemoved) ext.tabRemoved(t.wc);
     const { conn } = t;
     byWc.delete(t.wc.id);
     bubbleOff(t);
@@ -1815,6 +1826,33 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   const browsingSession = () => session.fromPartition('persist:hydor-browsing');
 
+  // What extensions may do with your tabs (extensions.cjs): open one (in front, unless the extension asks otherwise: the
+  // server makes it the tab you see), bring one to the front, close one.
+  if (ext && ext.useTabs)
+    ext.useTabs({
+      open: async (url, { active = true } = {}) => {
+        const conn = [...conns.values()].find((c) => c.profile === BROWSING && !c.closed);
+        if (!conn) return null;
+        const { targetId } = await createTarget(conn, { url: String(url) });
+        const t = conn.targets.get(targetId);
+        if (!t || t.gone) return null;
+        if (active) toServer({ type: 'browser-front', conn: conn.id, target: t.id });
+        return t.wc;
+      },
+      activate: (wc) => {
+        const t = byWc.get(wc.id);
+        if (t && !t.gone && t.id) toServer({ type: 'browser-front', conn: t.conn.id, target: t.id });
+      },
+      close: (wc) => {
+        const t = byWc.get(wc.id);
+        if (t && forExtensions(t)) destroyTarget(t, false);
+      },
+      bounds: (wc) => {
+        const t = byWc.get(wc.id);
+        return t ? t.bounds : null;
+      },
+    });
+
   // ---- what the app's own page asks (preload.cjs) -------------------------------------------------------------------
 
   const ownTab = (id) => {
@@ -1911,6 +1949,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
         from?.contentView.removeChildView(t.view);
         win.contentView.addChildView(t.view);
         t.shownIn = win;
+        if (forExtensions(t) && ext.tabFront) ext.tabFront(t.wc);
       }
       // A page that is full screen fills the window, wherever the Browser page says its place is.
       if (t.fs) t.fs.fit();
@@ -2229,11 +2268,11 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     return true;
   }
 
+  /** An extension's button pressed: true when the extension took it, false when it is not running here. */
   async function popupOf(e, extension, rect) {
     if (!fromOwnPage(e) || !ext) return false;
     try {
-      await ext.popup(browsingSession(), String(extension), rect);
-      return true;
+      return (await ext.popup(browsingSession(), String(extension), rect)) === true;
     } catch (err) {
       log('an extension popup did not open', String((err && err.message) || err));
       return false;

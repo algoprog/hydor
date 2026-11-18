@@ -836,7 +836,7 @@ function OwnBrowser() {
                     Ask
                   </Button>
                 )}
-                {!mobile && <ExtensionButtons />}
+                {!mobile && <ExtensionButtons onManage={() => (setClearAt(false), setTranslationAt(0), openPanel('extensions'))} />}
                 {!mobile && store && (
                   <Button
                     size="sm"

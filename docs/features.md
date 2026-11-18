@@ -239,8 +239,8 @@ agents that speak ACP and take MCP servers.
   everywhere): its tabs are real pages in the app's window, connecting to sites directly like any browser, kept between
   visits (up to 30; private tabs are not kept). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open
   addresses on your own network.
-  - **A bar and three columns**: a bar across the top (back, forward, reload, home, the address box, **Save**, **Ask**, your
-    extensions' buttons, **Add to Hydor** on a Web Store page, and a ⋯ menu), a purple **Private** chip in a private tab, and
+  - **A bar and three columns**: a bar across the top (back, forward, reload, home, the address box, **Save**, **Ask**, the buttons of
+    the extensions you pinned, **Extensions** (the puzzle piece: every extension that is on, to use, pin or unpin), **Add to Hydor** on a Web Store page, and a ⋯ menu), a purple **Private** chip in a private tab, and
     the translate and reader view buttons at the end of the address box when a page can use them, under it the **tab column** (Ctrl/⌘+B folds
     it away), the page, and a **column beside the page** that shows only when something is in it. Nothing is laid over
     the page: it narrows to make room.
@@ -375,10 +375,15 @@ agents that speak ACP and take MCP servers.
   one for History and a row for each browser and profile with its counts and **Import**.
 - **Chrome extensions** in your own browser (the desktop app's browser runs them): from the Chrome Web Store by link or
   id, or the **Add to Hydor** button on a Web Store page, from a folder (loaded where it is), or from the Chrome-based
-  browsers on this computer; toolbar buttons with popups and badges, options pages, a switch to turn one off, **Remove**,
-  and **Also in agents’ browsers** (those that use a profile) off until you turn it on. Electron lacks part of Chrome's extension features, so
-  each extension's row names the parts that may not work (blocking or changing requests, cookies, history, the side
-  panel…). Changing an extension through the API asks you every time.
+  browsers on this computer; toolbar buttons with popups and badges for the ones you pin (as in Chrome: the puzzle-piece **Extensions** menu lists
+  all of them to use, pin, unpin, turn off or remove, and right-clicking a button unpins it; those brought in from Chrome keep
+  their pins, new ones start pinned), options pages, a switch to turn one off, **Remove**,
+  and **Also in agents’ browsers** (those that use a profile) off until you turn it on. The app fills in the extension
+  features Electron lacks: your tabs (the one you are on, opening one in front, switching, closing, their loads and
+  changes), windows, downloads, cookies of the sites it may use, page-load events and a side panel shown under the
+  button; extensions that use the `browser` object (Firefox's name) get them too. Each extension's row names the parts
+  that may still not work (blocking or changing requests, signing in with an account, history…), and pressing the button
+  of one that is not running says so. Changing an extension through the API asks you every time.
 - **Hand a page to an agent**: **Ask about this page** (**Ask** in the bar) starts a session with a copy of the page's
   text (the agent cannot touch the page); **Do this here** (the ⋯ menu, or the box's **Do it in a tab of its own**) gives
   Claude Code or Custom one tab of its own at your page, signed in as you on that site, kept to that site, with the

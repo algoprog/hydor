@@ -12,7 +12,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import Fastify from 'fastify';
 import { HttpError } from '../auth.ts';
-import { openDb, kvGet } from '../db.ts';
+import { openDb, kvGet, kvSet } from '../db.ts';
 import { unzip } from './chrome.ts';
 import type { Deps } from '../features/types.ts';
 
@@ -301,7 +301,9 @@ test('unsupported: what the desktop app’s browser lacks, from permissions and 
     optional_permissions: ['history', 'notifications', 'enterprise.deviceAttributes'],
     host_permissions: ['https://*/*'],
   });
-  assert.deepEqual(ex.unsupportedPermissions(m), ['cookies', 'declarativeNetRequest', 'enterprise.deviceAttributes', 'history', 'identity', 'sidePanel', 'system.cpu']);
+  // The app stands in for cookies, the side panel, downloads and page loads (desktop/extension-preload.cjs).
+  assert.deepEqual(ex.unsupportedPermissions(m), ['declarativeNetRequest', 'enterprise.deviceAttributes', 'history', 'identity', 'system.cpu']);
+  assert.deepEqual(ex.unsupportedPermissions(manifest({ permissions: ['downloads', 'webNavigation', 'offscreen', 'idle', 'cookies', 'sidePanel'] })), []);
   assert.deepEqual(ex.unsupportedPermissions(manifest({ permissions: ['storage', 'geolocation', 'webRequest', 'management'] })), []);
 });
 
@@ -481,6 +483,94 @@ test('the store route: downloads (a stand-in here), installs, and says plainly w
   }
   assert.equal((await call('DELETE', `/api/browser/extensions/${id}`)).status, 200);
   assert.equal((await call('DELETE', `/api/browser/extensions/${id}`)).status, 404);
+});
+
+test('pinning: new ones are pinned, a change of only that does not reload the browser, and it survives installing again', async () => {
+  const dir = path.join(tmp, 'pin ext');
+  write(path.join(dir, 'manifest.json'), manifest({ name: 'Pin me', action: {} }));
+  const a = (await call('POST', '/api/browser/extensions/folder', { path: dir })).json.extension;
+  assert.equal(a.pinned, true);
+  const before = changes;
+  let r = await call('PATCH', `/api/browser/extensions/${a.id}`, { pinned: false });
+  assert.equal(r.json.extension.pinned, false);
+  assert.equal(r.json.extensions.find((x: any) => x.id === a.id).pinned, false);
+  assert.equal(changes, before, 'pinning is not a change the browser has to load again');
+  assert.equal(JSON.parse(kvGet(db, 'browser.extensions') ?? '[]').find((x: any) => x.id === a.id).pinned, false);
+  // enabled and agents still tell the listeners, with or without pinned beside them.
+  await call('PATCH', `/api/browser/extensions/${a.id}`, { agents: true });
+  assert.equal(changes, before + 1);
+  await call('PATCH', `/api/browser/extensions/${a.id}`, { enabled: false, pinned: true });
+  assert.equal(changes, before + 2);
+  await call('PATCH', `/api/browser/extensions/${a.id}`, { enabled: true, pinned: false });
+  assert.equal(changes, before + 3);
+  // Loading the same folder again keeps it unpinned, as it keeps the other switches.
+  const again = (await call('POST', '/api/browser/extensions/folder', { path: dir })).json.extension;
+  assert.equal(again.id, a.id);
+  assert.equal(again.pinned, false);
+  assert.equal((await call('GET', '/api/browser/extensions')).json.extensions.find((x: any) => x.id === a.id).pinned, false);
+  // The same through a CRX of the store.
+  const k = newKey();
+  const id = idOf(k);
+  const file = path.join(tmp, 'pin.crx');
+  fs.writeFileSync(file, crx3(makeZip({ 'manifest.json': JSON.stringify(manifest({ version: '1.0' })) }), k));
+  assert.equal((await ex.installCrxFile(db, file, id)).pinned, true);
+  await call('PATCH', `/api/browser/extensions/${id}`, { pinned: false });
+  fs.writeFileSync(file, crx3(makeZip({ 'manifest.json': JSON.stringify(manifest({ version: '2.0' })) }), k));
+  assert.equal((await ex.installCrxFile(db, file, id)).pinned, false);
+  r = await call('DELETE', `/api/browser/extensions/${id}`);
+  await call('DELETE', `/api/browser/extensions/${a.id}`);
+});
+
+test('pinning: an entry stored before it existed reads as pinned', async () => {
+  const dir = path.join(tmp, 'old ext');
+  write(path.join(dir, 'manifest.json'), manifest({ name: 'Old' }));
+  const id = (await call('POST', '/api/browser/extensions/folder', { path: dir })).json.extension.id;
+  const list = JSON.parse(kvGet(db, 'browser.extensions') ?? '[]');
+  for (const x of list) delete x.pinned;
+  kvSet(db, 'browser.extensions', JSON.stringify(list));
+  assert.ok(!('pinned' in JSON.parse(kvGet(db, 'browser.extensions')!)[0]));
+  const got = (await call('GET', '/api/browser/extensions')).json.extensions.find((x: any) => x.id === id);
+  assert.equal(got.pinned, true);
+  // Unpinning it works from there, and an explicit false is never taken for "absent".
+  await call('PATCH', `/api/browser/extensions/${id}`, { pinned: false });
+  assert.equal((await call('GET', '/api/browser/extensions')).json.extensions.find((x: any) => x.id === id).pinned, false);
+  await call('DELETE', `/api/browser/extensions/${id}`);
+});
+
+test('pinning: an import keeps the pins Chrome had (Preferences, Secure Preferences); a profile without a list brings them in pinned', async () => {
+  const chromium = path.join(home, '.config/chromium');
+  const pA = 'f'.repeat(32);
+  const pB = 'g'.repeat(32);
+  const pC = 'h'.repeat(32);
+  const pD = 'i'.repeat(32);
+  const pE = 'j'.repeat(32);
+  for (const [profile, id] of [['Default', pA], ['Default', pB], ['Default', pC], ['Profile 1', pD], ['Profile 1', pE]]) write(path.join(chromium, profile, 'Extensions', id, '1.0_0', 'manifest.json'), manifest({ name: `Pin ${id[0]}` }));
+  // Default: a list in Preferences naming pA and one in Secure Preferences naming pC; pB is in neither. Profile 1: no list at all.
+  write(path.join(chromium, 'Default/Preferences'), { extensions: { pinned_extensions: [pA, 7], settings: {} } });
+  write(path.join(chromium, 'Default/Secure Preferences'), { extensions: { pinned_extensions: [pC], settings: {} } });
+  write(path.join(chromium, 'Profile 1/Preferences'), { extensions: { settings: {} } });
+  try {
+    const ids = [pA, pB, pC].map((x) => `chromium:Default/${x}`).concat([pD, pE].map((x) => `chromium:Profile 1/${x}`));
+    const r = await call('POST', '/api/browser/extensions/import', { ids });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.failed.length, 0);
+    const pin = (id: string) => r.json.extensions.find((x: any) => x.id === id).pinned;
+    assert.equal(pin(pA), true);
+    assert.equal(pin(pB), false);
+    assert.equal(pin(pC), true);
+    assert.equal(pin(pD), true);
+    assert.equal(pin(pE), true);
+    // An empty list is a list: nothing is pinned. Importing again keeps what is already here.
+    write(path.join(chromium, 'Default/Preferences'), { extensions: { pinned_extensions: [], settings: {} } });
+    fs.rmSync(path.join(chromium, 'Default/Secure Preferences'));
+    await call('PATCH', `/api/browser/extensions/${pA}`, { pinned: true });
+    const r2 = await call('POST', '/api/browser/extensions/import', { ids: [`chromium:Default/${pA}`, `chromium:Default/${pB}`] });
+    assert.equal(r2.json.extensions.find((x: any) => x.id === pA).pinned, true);
+    assert.equal(r2.json.extensions.find((x: any) => x.id === pB).pinned, false);
+  } finally {
+    for (const id of [pA, pB, pC, pD, pE]) await call('DELETE', `/api/browser/extensions/${id}`);
+    fs.rmSync(chromium, { recursive: true, force: true });
+  }
 });
 
 test('removing: the copied files go, and the registry forgets it', async () => {
