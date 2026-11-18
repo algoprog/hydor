@@ -3,6 +3,26 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.86.0 · 18 November 2026
+
+Custom can use the models of your Claude and ChatGPT plans with nothing to set up, and the subagents a turn starts
+show together in one compact card instead of filling the screen.
+
+- **Your plans' models in Custom**: when Claude Code is signed in on this computer, Custom can use Claude Opus, Fable,
+  Sonnet and Haiku through it, and when Codex is signed in with ChatGPT, the models your ChatGPT plan lists: no API key,
+  nothing to set up, and nothing extra to pay. Custom's model menus group models under **Your subscriptions**, **On this
+  computer** and **In the cloud**, and **Settings → Models** has a **Your subscriptions** group that says which models
+  each program lends, or why it lends none. A confidential session never uses them.
+- **Subagents in one card**: the subagents a turn starts now show together as one card under it, with what they share
+  said once ("6 Claude Code subagents · Sonnet 5.5") and how they stand ("5 working · 1 done"), and a line for each with
+  its title and how long it has worked. While others work, the finished ones fold into one line ("4 finished: …"), and
+  the card folds to its top line once all are done; click the top line to open or fold it. A turn with one subagent
+  shows it as a one-line card.
+- **Stop that looks like stop**: point at a subagent's line and **Stop** takes the place of its time (on a touch screen
+  it is always there), and the card's **⋯** menu stops them all. The stop buttons in the line above the message box are
+  a stop sign now, no longer a square that looked like a checkbox.
+- **The terminal's settings**: `hydor settings` lists **General → Motion** again.
+
 ## 0.85.1 · 18 November 2026
 
 Highlights work on the pages where they said "Select some words on the page first", the browser's right-click menu
