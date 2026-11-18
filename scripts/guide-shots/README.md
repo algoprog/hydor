@@ -22,6 +22,10 @@ rm /tmp/guide-shots-app/node_modules && git worktree remove --force /tmp/guide-s
 `--shots <file>` takes another list of shots instead of the guide's, such as the website's whole windows of the app
 (`website/shots.mjs`, see `website/README.md`).
 
+The README's pictures (`docs/media/readme-*.webp`) come from `readme-shots.mjs` the same way, then `readme-frame.py` (Pillow)
+gives the windows their rounded corners and puts the phone over the session's dimmed window; its header says how.
+`readme-answers.webp` and `readme-library.webp` need a planned trip and a deck of slides that the demo does not have.
+
 To take a shot from uncommitted changes, apply them to the worktree before building. `--out <dir>` writes the
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
 8795, password "a demo password").
