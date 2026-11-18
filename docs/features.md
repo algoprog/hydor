@@ -1755,8 +1755,7 @@ programs shows each program's version and what is out, with Check now, Update no
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
 - Small, quiet motion, set per device in Settings → General → Appearance → Motion (Full, Calm or Off; the system's
-  Reduce motion always means Off). Full: buttons, rail tiles, session rows and chips dip to 97% while pressed; rail icons
-  lean to the pointer; a copy turns into a check that draws itself, holds for a moment and turns back; switches spring;
+  Reduce motion always means Off). Full: buttons, rail tiles, session rows and chips dip to 97% while pressed; a copy turns into a check that draws itself, holds for a moment and turns back; switches spring;
   the rail's accent bar glides to the page you open; a session's dot turns green with one ring when work finishes and
   pulses twice amber when it needs you, its status words cross-fading; the session list's rows and the Browser's tab
   rows glide to their new places, a closed tab's row closing up and a new one opening; the Inbox count, the start page's

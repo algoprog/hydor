@@ -22,22 +22,6 @@ import { columnOf } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
 
-/** How each tile's icon answers the pointer (styles.css, .ico-*): by tool, and the two tiles of the rail's own. */
-const ICON_MOTION: Record<string, string> = {
-  sessions: 'ico-lift',
-  browser: 'ico-turn',
-  pages: 'ico-tilt',
-  spaces: 'ico-rise',
-  apps: 'ico-grow',
-  agents: 'ico-beat',
-  inbox: 'ico-dip',
-  search: 'ico-tilt',
-  usage: 'ico-nudge',
-  system: 'ico-lift',
-  settings: 'ico-turn',
-  help: 'ico-beat',
-};
-
 /** The rail's width in px. */
 export const RAIL_WIDTH = 56;
 
@@ -98,7 +82,6 @@ function Tile({
   label,
   keys,
   icon,
-  motion,
   current,
   onClick,
   extra,
@@ -113,8 +96,6 @@ function Tile({
   /** Its shortcut, shown in the tooltip ("Ctrl+K"). */
   keys?: string;
   icon: ReactNode;
-  /** The tool's id: how its icon moves when the pointer is on the tile. */
-  motion?: string;
   current?: boolean;
   onClick: () => void;
   extra?: ReactNode;
@@ -148,13 +129,13 @@ function Tile({
         onMenu?.(e);
       }}
       className={cx(
-        'group press relative mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors',
+        'press relative mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors',
         // The copy that follows the pointer while it is dragged, lifted off the page.
         floating ? 'bg-bg-2 text-fg shadow-lg ring-1 ring-line-2' : current ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
         drag?.lifted && 'opacity-40',
       )}
     >
-      <span className={cx('ico', motion && ICON_MOTION[motion])}>{icon}</span>
+      {icon}
       {extra}
     </button>
   );
@@ -184,7 +165,6 @@ function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; flo
       label={t.label}
       keys={t.keys ? `${MOD}${t.keys}` : undefined}
       icon={big(t.icon)}
-      motion={t.id}
       current={t.match}
       onClick={t.go}
       extra={t.extra}
@@ -201,19 +181,18 @@ function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; flo
 /** The inbox: how many things wait on you (sessions here and on other machines, calls the Outbox holds) as a pill on its icon. */
 function InboxTile({ current }: { current: boolean }) {
   const n = useInboxCount();
-  // A new thing waits: the pill pops and the tray dips once (not for what was there when the page opened).
+  // A new thing waits: the pill pops once (not for what was there when the page opened).
   const last = useRef(n);
   const [grown, setGrown] = useState(0);
   useEffect(() => {
     if (n > last.current) setGrown((g) => g + 1);
     last.current = n;
   }, [n]);
-  const icon = <Inbox key={grown} size={19} className={grown ? 'ico-dip-once' : undefined} />;
+  const icon = <Inbox size={19} />;
   return (
     <Tile
       label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'}
       icon={icon}
-      motion="inbox"
       current={current}
       onClick={() => go('/inbox')}
       dataTip={n > 0 ? 'inbox' : undefined}
@@ -343,7 +322,7 @@ export const Rail = memo(function Rail() {
         {/* The tiles scroll in a short window (their bar hidden), so none is left out. Touches on them may pick one up (lib/dragTouch). */}
         <div ref={areaRef} onScroll={() => tipApi.hide(true)} className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <span ref={bar} aria-hidden className={cx('rail-bar', glide && 'glide')} style={{ opacity: 0 }} />
-          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} motion="sessions" current={inSessions} onClick={sessions} />
+          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
           {group(sections)}
           <div className="min-h-2 flex-1" />
           <InboxTile current={loc === '/inbox'} />
