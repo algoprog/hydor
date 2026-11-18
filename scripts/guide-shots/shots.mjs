@@ -236,8 +236,8 @@ export const SHOTS = [
     id: 'researchers',
     height: 1000,
     async take(p, ctx) {
-      await ctx.go('/apps', { settle: 1500 });
-      await p.click(chip('main', 'Research'), { wait: 800 });
+      // A kind is a place in the Apps page's column (and in its address) on a computer.
+      await ctx.go('/apps?kind=Research', { settle: 1500 });
       await p.park();
       return p.shot(ctx.file, { clip: await main(p) });
     },
@@ -256,7 +256,7 @@ export const SHOTS = [
     },
   },
   {
-    // Apps → Connected apps: the services connected for every agent, the marketplace and the keys, as tabs.
+    // Apps → Connected apps (the last place in the Apps page's column): the services connected for every agent, the marketplace and the keys.
     id: 'connections',
     async take(p, ctx) {
       await ctx.go('/apps/connected?tab=market', { settle: 1800 });
