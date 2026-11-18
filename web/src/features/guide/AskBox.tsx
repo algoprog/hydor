@@ -52,6 +52,7 @@ export function AskBox({
   topics,
   onOpen,
   hero,
+  bar,
   topic,
   value,
   onValue,
@@ -60,6 +61,8 @@ export function AskBox({
   topics: GuideTopic[] | null;
   onOpen: (topic: string, section?: string) => void;
   hero?: boolean;
+  /** The find box of a page's top row on a computer, the Library's size and look. */
+  bar?: boolean;
   topic?: string;
   /** The text, when the page sets it too (a question picked below the box). */
   value?: string;
@@ -154,10 +157,10 @@ export function AskBox({
       <div
         className={cx(
           'flex items-center gap-2 border bg-panel transition-colors focus-within:border-accent/50',
-          hero ? 'h-14 rounded-[18px] border-line-2 pr-2 pl-4 shadow-[0_8px_30px_rgba(0,0,0,0.10)]' : 'h-9 rounded-[10px] border-transparent bg-bg-2 pr-1 pl-3',
+          hero ? 'h-14 rounded-[18px] border-line-2 pr-2 pl-4 shadow-[0_8px_30px_rgba(0,0,0,0.10)]' : bar ? 'h-8.5 rounded-xl border-line bg-bg-1 pr-1.5 pl-2.5' : 'h-9 rounded-[10px] border-transparent bg-bg-2 pr-1 pl-3',
         )}
       >
-        <Search size={hero ? 18 : 15} className="shrink-0 text-fg-3" />
+        <Search size={hero ? 18 : bar ? 14 : 15} className="shrink-0 text-fg-3" />
         <input
           ref={input}
           value={q}
@@ -170,7 +173,7 @@ export function AskBox({
           enterKeyHint="send"
           placeholder={hero && !mobile ? 'Ask a question, or search the guide' : 'Ask or search'}
           aria-label="Ask a question, or search the guide"
-          className={cx('min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-3', hero ? 'text-[16px]' : 'text-[13.5px]')}
+          className={cx('min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-3', hero ? 'text-[16px]' : bar ? 'text-[13px]' : 'text-[13.5px]')}
         />
         {q && (
           <IconButton label="Clear" size="sm" onClick={() => (setQ(''), input.current?.focus())}>

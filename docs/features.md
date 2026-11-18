@@ -1805,7 +1805,8 @@ programs shows each program's version and what is out, with Check now, Update no
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
-- Help (on the rail): a guide to every part of the app, its topics grouped on one page, each with a picture of
+- Help (on the rail): a guide to every part of the app, its topics grouped on one page (and, in a wide window, in a
+  column of the same kind as the Library's, with Ask an agent and Hide sidebar beside the logo), each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same

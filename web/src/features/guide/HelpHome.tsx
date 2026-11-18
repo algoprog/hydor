@@ -2,7 +2,7 @@
 // a card in its group.
 import { useState } from 'react';
 import type { GuideTopic } from '@shared/guide';
-import { useIsMobile } from '../../components/ui';
+import { cx, useIsMobile } from '../../components/ui';
 import { AskBox, TopicIcon } from './AskBox';
 import { GROUPS, lookOf, POPULAR, rankOf } from './topics';
 
@@ -26,13 +26,13 @@ function TopicCard({ t, onOpen }: { t: GuideTopic; onOpen: (t: string) => void }
   );
 }
 
-export function HelpHome({ topics, onOpen }: { topics: GuideTopic[]; onOpen: (t: string, s?: string) => void }) {
+export function HelpHome({ topics, onOpen, column }: { topics: GuideTopic[]; onOpen: (t: string, s?: string) => void; column?: boolean }) {
   const mobile = useIsMobile();
   const [q, setQ] = useState('');
   const groups = GROUPS.map((g) => ({ ...g, topics: topics.filter((t) => lookOf(t.id).group === g.id).sort((a, b) => rankOf(a.id) - rankOf(b.id)) })).filter((g) => g.topics.length);
   return (
     <div className="@container mx-auto max-w-[980px] px-4 pb-16 sm:px-6">
-      <section className="pt-7 pb-2 sm:pt-12">
+      <section className={cx('pb-2', column ? 'pt-8' : 'pt-7 sm:pt-12')}>
         <h2 className="text-center text-[25px] font-semibold tracking-tight sm:text-[30px]">How can we help?</h2>
         <p className="mx-auto mt-2 max-w-[540px] text-center text-[14px] leading-relaxed text-fg-2 sm:text-[14.5px]">
           Search the guide, or ask an agent. It answers from the guide, and can change a setting or set something up for you.

@@ -72,7 +72,8 @@ function Figure({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export function TopicPage({ topic, topics, onOpen }: { topic: GuideTopic; topics: GuideTopic[]; onOpen: (t: string, s?: string) => void }) {
+/** `column`: on a computer, where the page's top row and its column already name the topic. */
+export function TopicPage({ topic, topics, onOpen, column }: { topic: GuideTopic; topics: GuideTopic[]; onOpen: (t: string, s?: string) => void; column?: boolean }) {
   const look = lookOf(topic.id);
   const group = GROUPS.find((g) => g.id === look.group)!;
   const { lead, figure } = useMemo(() => introOf(topic), [topic]);
@@ -147,19 +148,23 @@ export function TopicPage({ topic, topics, onOpen }: { topic: GuideTopic; topics
 
   return (
     <article className="mx-auto max-w-[820px] px-4 pb-20 sm:px-6" onClickCapture={onLink}>
-      <header className="pt-6 sm:pt-9">
-        <div className="flex items-center gap-1 text-[12.5px] text-fg-3">
-          <button onClick={() => go('/guide')} className="rounded hover:text-fg">
-            Help
-          </button>
-          <ChevronRight size={13} className="shrink-0" />
-          <span className="truncate">{group.title}</span>
-        </div>
-        <div className="mt-3 flex items-center gap-3.5">
-          <TopicIcon id={topic.id} size="lg" />
-          <h2 className="min-w-0 text-[24px] leading-tight font-semibold tracking-tight sm:text-[28px]">{topic.title}</h2>
-        </div>
-        <Markdown text={lead} app resolveImage={imageUrl} className="guide guide-lead mt-4" />
+      <header className={column ? 'pt-4' : 'pt-6 sm:pt-9'}>
+        {!column && (
+          <>
+            <div className="flex items-center gap-1 text-[12.5px] text-fg-3">
+              <button onClick={() => go('/guide')} className="rounded hover:text-fg">
+                Help
+              </button>
+              <ChevronRight size={13} className="shrink-0" />
+              <span className="truncate">{group.title}</span>
+            </div>
+            <div className="mt-3 flex items-center gap-3.5">
+              <TopicIcon id={topic.id} size="lg" />
+              <h2 className="min-w-0 text-[24px] leading-tight font-semibold tracking-tight sm:text-[28px]">{topic.title}</h2>
+            </div>
+          </>
+        )}
+        <Markdown text={lead} app resolveImage={imageUrl} className={cx('guide guide-lead', !column && 'mt-4')} />
         {figure && <Figure key={figure.src} src={figure.src} alt={figure.alt} />}
       </header>
 

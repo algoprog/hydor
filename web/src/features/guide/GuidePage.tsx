@@ -8,12 +8,14 @@ import { useLocation } from 'wouter';
 import { BookOpen, Signpost, Sparkles } from 'lucide-react';
 import { Button, cx, Empty, IconButton, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
 import { go, goApp } from '../../lib/nav';
-import { toastError } from '../../lib/store';
-import { PageHeader } from '../layout/PageHeader';
+import { toastError, useUI } from '../../lib/store';
+import { NavButton, PageHeader } from '../layout/PageHeader';
+import { SideColumn } from '../layout/SideColumn';
 import { startTour } from '../tour/Tour';
 import { closeAsk, openAsk, reopenAsk, useAsk } from './ask';
-import { AskBox } from './AskBox';
+import { AskBox, TopicIcon } from './AskBox';
 import { AskPanel } from './AskPanel';
+import { HelpPlaces } from './HelpColumn';
 import { HelpHome } from './HelpHome';
 import { examplesOf } from './search';
 import { loadGuide, useGuide } from './state';
@@ -82,8 +84,11 @@ export function GuidePage() {
   const [loc] = useLocation();
   const mobile = useIsMobile();
   const wide = useMediaQuery('(min-width: 1280px)');
+  // On a computer the guide has a column of its own, as the Library's; narrower, the page keeps its header.
+  const column = useMediaQuery('(min-width: 1024px)');
   const topics = useGuide((s) => s.topics);
   const ask = useAsk();
+  const sideOpen = useUI((s) => s.sideOpen);
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     loadGuide().catch(toastError);
@@ -129,7 +134,7 @@ export function GuidePage() {
       The guide comes with the app, in its docs/guide folder.
     </Empty>
   ) : topic ? (
-    <TopicPage key={topic.id} topic={topic} topics={topics} onOpen={open} />
+    <TopicPage key={topic.id} topic={topic} topics={topics} onOpen={open} column={column} />
   ) : id ? (
     <Empty icon={<BookOpen size={22} />} title="No such topic">
       <Button size="sm" onClick={() => go('/guide')}>
@@ -137,7 +142,7 @@ export function GuidePage() {
       </Button>
     </Empty>
   ) : (
-    <HelpHome topics={topics} onOpen={open} />
+    <HelpHome topics={topics} onOpen={open} column={column} />
   );
 
   const home = (
@@ -187,12 +192,59 @@ export function GuidePage() {
     />
   );
 
+  // The row at the top of the page on a computer, as the Library's: the title at the left, the find box at the right
+  // (in a topic; the home has its own big one), and the tour on the home.
+  const toolbar = column && (
+    <div className={cx('mx-auto flex min-h-8.5 items-center gap-x-3 px-4 pt-5 sm:px-6', topic ? 'max-w-[820px]' : 'max-w-[980px]')}>
+      <NavButton />
+      <h2 translate={topic ? 'no' : undefined} className="flex min-w-0 items-center gap-2.5 text-[17px] font-semibold tracking-tight">
+        {topic && <TopicIcon id={topic.id} size="sm" />}
+        <span className="truncate">{topic ? topic.title : 'Help'}</span>
+      </h2>
+      <span className="flex-1" />
+      {topic ? (
+        <AskBox bar topics={topics} onOpen={open} topic={topic.id} className="min-w-[180px] flex-1 lg:max-w-[280px]" />
+      ) : (
+        !id && (
+          <Button size="sm" variant="ghost" icon={<Signpost size={14} />} onClick={() => startTour()}>
+            Take the tour
+          </Button>
+        )
+      )}
+      {/* The column holds Ask an agent while it shows; hidden, it comes to this row. */}
+      {!sideOpen && !(ask.open && wide) && (
+        <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={showAsk}>
+          Ask an agent
+        </Button>
+      )}
+    </div>
+  );
+  const sideColumn = column && (
+    <SideColumn
+      label="Help"
+      actions={
+        !(ask.open && wide) && (
+          <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={showAsk}>
+            Ask an agent
+          </Button>
+        )
+      }
+    >
+      <h1 className="sr-only">Help</h1>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+        <HelpPlaces topics={topics} current={topic?.id ?? null} onHome={() => go('/guide')} onOpen={open} />
+      </div>
+    </SideColumn>
+  );
+
   const panel = ask.open && <AskPanel examples={examples} />;
   return (
     <div className="flex h-full min-h-0">
+      {sideColumn}
       <div className="flex min-w-0 flex-1 flex-col">
-        {header}
+        {!column && header}
         <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+          {toolbar}
           {content}
         </div>
       </div>
