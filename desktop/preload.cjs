@@ -103,6 +103,10 @@ if (own) {
       /** A picture of one of your tabs as it is now (a JPEG data URL, the size of its place) for where it is taken away for a moment; null when it is not shown. */
       still: (target) => ipcRenderer.invoke('hydor:browser-still', String(target)),
       focus: (target) => ipcRenderer.invoke('hydor:browser-focus', String(target)),
+      /** Takes the keys back for this page from your tab's page (a shortcut it passed on, such as ⌘L, types here): whether it could. */
+      focusApp: () => ipcRenderer.invoke('hydor:browser-focus-app'),
+      /** One of your tabs' pages took the keys ({ target }), which to this page looks the same as the window going behind another. */
+      onPageFocus: (fn) => listen('hydor:browser-page-focus', fn),
       /**
        * An agent's tab as frames: onFrame({ jpeg: ArrayBuffer, w, h }) about 30 a second, one at once (w, h the page's size in
        * CSS pixels), onCursor(css cursor). Resolves to a function that stops them, or null when it is not an agent's tab here.

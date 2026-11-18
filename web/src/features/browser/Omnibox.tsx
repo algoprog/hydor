@@ -2,7 +2,8 @@
 // under it offers your open tabs, bookmarks and history, what you typed as an address, the search engine's suggestions
 // and, last, asking about the page you are on, doing something in it (an agent in a tab of its own) and asking an agent.
 // Enter opens the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your
-// history. At rest it shows the address as its site and the rest. A padlock opens what the page's site may do; a chip
+// history. At rest it shows the address as its site and the rest. What you typed stays while the window is behind another;
+// a click into the page ends it, as in any browser. A padlock opens what the page's site may do; a chip
 // shows a zoom other than 100 %; a star bookmarks the page.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -102,6 +103,9 @@ export function Omnibox({
   const [hover, setHover] = useState(-1);
   const [info, setInfo] = useState(false);
   const noInline = useRef(false);
+  // The window went behind another while you were in the box: it is still the page's focused element and keeps what you
+  // typed, and goes on from there when the window comes back (the focus it gets then is not a new start).
+  const held = useRef(false);
   const box = useRef<HTMLDivElement>(null);
   const lock = useRef<HTMLButtonElement>(null);
   const [at, setAt] = useState<{ left: number; top: number; width: number; room: number } | null>(null);
@@ -185,11 +189,15 @@ export function Omnibox({
   };
   const finish = () => {
     close();
+    held.current = false;
     setEditing(false);
     setDirty(false);
     setCompletion('');
     inputRef.current?.blur();
   };
+  // In the desktop app, your tab's page took the keys (you clicked into it): the box lets go, as in any browser. This page
+  // hears it from the app, since to it that looks the same as the window going behind another.
+  useEffect(() => desktopBrowser()?.onPageFocus?.(() => document.activeElement === inputRef.current && finish()), []); // eslint-disable-line react-hooks/exhaustive-deps
   // The page takes the keyboard after an address is opened, as in any browser.
   const toPage = (id?: string) => id && void desktopBrowser()?.focus(id);
   const choose = (r: Row | undefined, inNew: boolean) => {
@@ -245,17 +253,28 @@ export function Omnibox({
         aria-expanded={open && rows.length > 0}
         aria-autocomplete="both"
         onFocus={(e) => {
+          // The keys came back with the window: the box goes on as you left it.
+          if (held.current) return void (held.current = false);
           setEditing(true);
           setTyped(shownAddress(url));
           setCompletion('');
           setDirty(false);
           e.target.select();
         }}
-        onBlur={() => {
+        onBlur={(e) => {
+          close();
+          // Still the page's focused element: the page itself lost the keys, to another window or to your tab's page (which
+          // the app says, above). The box keeps what you typed for when they come back, as in any browser; an older desktop
+          // app does not say when your tab took them, so there the box lets go at once.
+          if (document.activeElement === e.currentTarget) {
+            const d = desktopBrowser();
+            if (!d || d.onPageFocus) return void (held.current = true);
+            e.currentTarget.blur();
+          }
+          held.current = false;
           setEditing(false);
           setDirty(false);
           setCompletion('');
-          close();
         }}
         onChange={(e) => {
           const t = e.target.value;
@@ -298,7 +317,8 @@ export function Omnibox({
         placeholder="Search, open, ask, or tell an agent what to do"
         aria-label="Address"
         translate="no"
-        className={cx('h-full w-full min-w-0 bg-transparent px-2 text-[13.5px] outline-none placeholder:text-fg-3', atRest && 'text-transparent')}
+        // At rest its text is hidden under the site and the rest, which are shorter: a selection left in it must not show.
+        className={cx('h-full w-full min-w-0 bg-transparent px-2 text-[13.5px] outline-none placeholder:text-fg-3', atRest && 'text-transparent selection:bg-transparent')}
       />
       {atRest && (
         <div translate="no" aria-hidden className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-[13.5px] whitespace-nowrap">

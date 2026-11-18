@@ -631,6 +631,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (hit.zoom) return void zoom(t, hit.zoom);
       uiOf(t)?.send('hydor:browser-key', { key: hit.key, ctrl: !!input.control, meta: !!input.meta, alt: !!input.alt, shift: !!input.shift });
     });
+    // The page took the keys (you clicked into it): the window's page is told, so its address bar lets go of them as in any
+    // browser. It cannot tell by itself: to it, that looks the same as the window going behind another one.
+    wc.on('focus', () => uiOf(t)?.send('hydor:browser-page-focus', { target: t.id }));
     // Ctrl and the wheel zoom as in Chrome.
     wc.on('zoom-changed', (_e, direction) => zoom(t, direction === 'in' ? 'in' : 'out'));
     wc.on('audio-state-changed', (e) => tabState(t, { audible: !!e.audible }));
@@ -2216,6 +2219,16 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     else t.wc.focus();
   }
 
+  /**
+   * The window's page takes the keys back from your tab's page, after a shortcut that page passed on types into the window's
+   * page (⌘L the address bar, ⌘F the find bar): window.focus() there cannot take them from another page in the window.
+   */
+  function focusApp(e) {
+    if (!fromOwnPage(e) || e.sender.isDestroyed()) return false;
+    e.sender.focus();
+    return true;
+  }
+
   async function popupOf(e, extension, rect) {
     if (!fromOwnPage(e) || !ext) return false;
     try {
@@ -2433,6 +2446,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     ipcMain.handle('hydor:browser-hide', (e, target) => hide(e, target));
     ipcMain.handle('hydor:browser-still', (e, target) => still(e, target));
     ipcMain.handle('hydor:browser-focus', (e, target) => focus(e, target));
+    ipcMain.handle('hydor:browser-focus-app', (e) => focusApp(e));
     ipcMain.handle('hydor:browser-watch', (e, a) => watch(e, a && a.target, !a || a.on !== false));
     ipcMain.handle('hydor:browser-input', (e, a) => input(e, a && a.target, a && a.events));
     ipcMain.handle('hydor:browser-edit', (e, a) => edit(e, a && a.target, a && a.op));

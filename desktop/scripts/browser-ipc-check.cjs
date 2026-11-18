@@ -6,7 +6,8 @@
 //     and the server is told you typed;
 //   - a pop-up of an agent's tab is an agent's tab too;
 //   - your own tab (onscreen) is shown in the window where asked, moves, goes away with the window, is drawn there,
-//     and still answers CDP while it is shown; its shortcuts reach the window's page;
+//     and still answers CDP while it is shown; its shortcuts reach the window's page, which hears when it takes the keys
+//     and can take them back;
 //   - `still` is a JPEG picture of a shown own tab in the screen's own pixels, however wide (and null for an agent's tab or
 //     one that is not shown), and a resize of the
 //     window moves a shown own tab at once, by its distance from the window's edges;
@@ -70,7 +71,7 @@ const until = async (fn, ms = 5000, what = 'it') => {
 
 // ---- the test site, and a proxy (the browser sends everything through one) ----
 const pages = {
-  '/app': '<!doctype html><title>app</title><body style="margin:0;background:#123"><script>window.__keys=[];hydorDesktop.browser.onKey((k)=>__keys.push(k));window.__states=[];hydorDesktop.browser.onTabState((s)=>__states.push(s));window.__cmds=[];hydorDesktop.browser.onCommand((c)=>__cmds.push(c));</script>',
+  '/app': '<!doctype html><title>app</title><body style="margin:0;background:#123"><script>window.__keys=[];hydorDesktop.browser.onKey((k)=>__keys.push(k));window.__states=[];hydorDesktop.browser.onTabState((s)=>__states.push(s));window.__cmds=[];hydorDesktop.browser.onCommand((c)=>__cmds.push(c));window.__pageFocus=[];hydorDesktop.browser.onPageFocus((p)=>__pageFocus.push(p));</script>',
   '/agent': `<!doctype html><title>agent page</title><body style="margin:0;height:3000px;background:linear-gradient(#fff,#8af)">
 <button id=btn style="position:absolute;left:100px;top:100px;width:200px;height:60px">Click</button>
 <input id=inp style="position:absolute;left:100px;top:200px;width:300px;height:40px">
@@ -480,6 +481,24 @@ app.whenReady().then(async () => {
       assert.deepEqual((await page('__keys')).map((k) => [k.key, k.ctrl, k.alt]), [['t', true, false], ['ArrowLeft', false, true], ['F5', false, false]]);
     });
 
+    await check('the keys: your tab taking them tells the window’s page, which takes them back for a shortcut such as ⌘L', async () => {
+      const t = browser.conns.get(CONN).targets.get(own.targetId);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:50,y:60,w:400,h:300})`);
+      win.webContents.focus();
+      await until(() => win.webContents.isFocused(), 2000, 'the window’s page to have the keys');
+      const told = await page('__pageFocus.length');
+      await page(`hydorDesktop.browser.focus(${JSON.stringify(own.targetId)})`);
+      await until(() => t.wc.isFocused(), 2000, 'the tab to have the keys');
+      await until(async () => (await page('__pageFocus.length')) > told, 2000, 'the window’s page to be told');
+      assert.equal((await page('__pageFocus')).at(-1).target, own.targetId);
+      assert.equal(await page('document.hasFocus()'), false);
+      assert.equal(await page('hydorDesktop.browser.focusApp()'), true);
+      await until(() => win.webContents.isFocused(), 2000, 'the window’s page to take the keys back');
+      assert.equal(t.wc.isFocused(), false);
+      assert.equal(await page('document.hasFocus()'), true);
+      assert.equal(await page('__pageFocus.length'), told + 1, 'giving the keys back is not your tab taking them');
+    });
+
     await check('what is not that kind of tab here is refused: an agent’s tab cannot be shown, an own tab not watched, a stranger’s page gets nothing', async () => {
       assert.equal(await page(`hydorDesktop.browser.show(${JSON.stringify(agent.targetId)}, {x:0,y:0,w:100,h:100})`), false);
       assert.equal(await page(`hydorDesktop.browser.watch(${JSON.stringify(own.targetId)}, ()=>{})`), null);
@@ -496,6 +515,7 @@ app.whenReady().then(async () => {
       assert.equal(await stranger.webContents.executeJavaScript('typeof hydorDesktop'), 'undefined');
       // The preload lets a page on another loopback name in, but main checks the server's origin: localhost is not 127.0.0.1.
       assert.equal(await other.webContents.executeJavaScript(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:0,y:0,w:100,h:100})`), false);
+      assert.equal(await other.webContents.executeJavaScript('hydorDesktop.browser.focusApp()'), false);
       other.destroy();
       stranger.destroy();
     });

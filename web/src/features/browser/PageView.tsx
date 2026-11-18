@@ -29,6 +29,10 @@ export interface DesktopBrowserBridge {
   /** A picture of one of your own tabs as it is shown now (a JPEG data URL of its place, in the screen's own pixels); null when it is not shown. An older app does not have it. */
   still?(target: string): Promise<string | null>;
   focus(target: string): Promise<void>;
+  /** Takes the keys back for this page from your tab's page (a shortcut it passed on, such as ⌘L, types here); window.focus() cannot. An older app does not have it. */
+  focusApp?(): Promise<boolean>;
+  /** One of your tabs' pages took the keys (you clicked into it), which to this page looks the same as the window going behind another; the function it returns stops listening. An older app does not have it. */
+  onPageFocus?(fn: (p: { target: string }) => void): () => void;
   popup(extensionId: string, rect: PageRect): Promise<boolean>;
   /** An extension's badge or title changed; the function it returns stops listening (for this call only). */
   onBadge(fn: (b: { extension: string; text: string; color?: string; title?: string }) => void): () => void;

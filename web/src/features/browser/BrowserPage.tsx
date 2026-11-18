@@ -495,9 +495,13 @@ function OwnBrowser() {
       }
       const key = k.key.toLowerCase();
       const active = activeTab(s.view);
-      // The page's own window has the focus when it is a native page that was typed in: take it back for the address bar.
+      // A native page that was typed in has the keys: this page takes them back for the address bar or the find bar
+      // (window.focus() cannot take them from another page in the window; an older app has nothing else).
       const own = () => {
-        if (fromPage) window.focus();
+        if (!fromPage) return;
+        const d = desktopBrowser();
+        if (d?.focusApp) void d.focusApp();
+        else window.focus();
       };
       if (k.mod && !k.alt && !k.shift && key === 't') {
         own();
