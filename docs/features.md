@@ -613,7 +613,7 @@ agents that speak ACP and take MCP servers.
   it. A Claude Code or Codex subagent is one the program runs inside the session, and it shows the same way: a card
   under the turn that started it (the program's icon, its title, its kind and model, how it stands, **Open**, and a
   stop button for Claude Code's, which asks first), one line with the Hydor ones under its lead in the sidebar
-  (“5 subagents · 1 working”), a row in the tray, and a page of its own with its whole conversation, read-only and
+  (“5 subagents · 1 needs you”), a row in the tray, and a page of its own with its whole conversation, read-only and
   live while it works, with a bar that leads back to its lead (**Open parent**). When one that worked in the
   background comes back, its lead's conversation shows “Reply from …” (a Codex subagent's reply is fetched when you
   open the line), in place between the steps it came among. You cannot talk to it, resume, fork or delete it (its

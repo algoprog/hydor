@@ -98,8 +98,8 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
           {total} {team === 'campaign' ? 'campaign member' : team ? 'swarm member' : 'subagent'}
           {total === 1 ? '' : 's'}
         </span>
+        {/* Every one shown is at work or waits for you: only those that wait are said. */}
         {waiting > 0 && <span className="truncate text-warn">· {waiting} need{waiting === 1 ? 's' : ''} you</span>}
-        {working > 0 && <span className="truncate text-busy">· {working} working</span>}
       </button>
       {open &&
         rows.map((c) => (
