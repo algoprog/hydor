@@ -4,6 +4,7 @@ import type { HfInspect, HfModel, HfSort, LocalModel, ModelFit, ModelsState, Ope
 import type { LocalPickView } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
+import { go } from '../../lib/nav';
 import { live } from '../../lib/ws';
 import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Throbber, useConfirm } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Row, Select, Stack } from './kit';
@@ -39,6 +40,7 @@ export function ModelsSettings() {
       <TiersSection />
       {st ? (
         <>
+          <Subscriptions st={st} />
           <LocalModels st={st} />
           <AddFromHf st={st} />
           <OpenRouterBody st={st} />
@@ -46,6 +48,7 @@ export function ModelsSettings() {
         </>
       ) : (
         <>
+          {loading('Your subscriptions')}
           {loading('On this machine')}
           {loading('Add a model from Hugging Face')}
           {loading('OpenRouter')}
@@ -53,6 +56,42 @@ export function ModelsSettings() {
         </>
       )}
     </Stack>
+  );
+}
+
+/** The plans whose models Custom borrows through Claude Code's and Codex's sign-ins. */
+function Subscriptions({ st }: { st: ModelsState }) {
+  // An older server does not send them.
+  const list = st.subscriptions ?? [];
+  if (!list.length) return null;
+  return (
+    <Group
+      title="Your subscriptions"
+      info="Custom can use the models of your Claude and ChatGPT plans through Claude Code’s and Codex’s sign-ins on this computer. They use your plan’s usage instead of an API key. Claude answers through Claude Code one step at a time, with Custom’s tools described in its instructions. A confidential session never uses them."
+    >
+      {list.map((p) => (
+        <Row
+          key={p.provider}
+          label={<span translate="no">{p.program}</span>}
+          hint={
+            !p.installed ? (
+              'Not installed on this computer'
+            ) : p.signedIn ? (
+              <span translate="no">{p.models.map((m) => m.label).join(', ')}</span>
+            ) : (
+              'Signed out: sign in again to use these models'
+            )
+          }
+          control={
+            p.installed && !p.signedIn ? (
+              <Button size="sm" variant="secondary" onClick={() => go('/settings?s=accounts')}>
+                Accounts
+              </Button>
+            ) : undefined
+          }
+        />
+      ))}
+    </Group>
   );
 }
 

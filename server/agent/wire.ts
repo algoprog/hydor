@@ -82,6 +82,8 @@ export function wire(system: string, messages: ChatMessage[], o: { m: AgentModel
           if (m.reasoning_details?.length) a.reasoning_details = m.reasoning_details;
           else if (m.reasoning) a.reasoning = m.reasoning;
         } else if ((o.m.provider === 'vllm' || o.m.provider === 'ollama') && m.reasoning) a.reasoning_content = m.reasoning;
+        // A ChatGPT plan's model gets its sealed reasoning back between tool calls (server/models/subscription.ts).
+        else if (o.m.provider === 'codex' && m.reasoning_details?.length) a.reasoning_details = m.reasoning_details;
       }
       push(a);
       if (!o.textMode) open = (a.tool_calls ?? []).map((c) => c.id);

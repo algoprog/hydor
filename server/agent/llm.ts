@@ -70,20 +70,33 @@ function overflow(err: string): ContextOverflow | null {
   return new ContextOverflow(err, limit, prompt);
 }
 
-export async function chat(
-  m: AgentModel,
-  o: {
-    messages: ChatMessage[];
-    tools?: ToolSchema[];
-    toolChoice?: 'auto' | 'none';
-    signal: AbortSignal;
-    onText: (t: string) => void;
-    onReasoning: (t: string) => void;
-    maxTokens?: number;
-    /** Sampling and reasoning options, dropped if the server refuses them. */
-    extra?: Record<string, unknown>;
-  },
-): Promise<Reply> {
+export interface ChatOptions {
+  messages: ChatMessage[];
+  tools?: ToolSchema[];
+  toolChoice?: 'auto' | 'none';
+  signal: AbortSignal;
+  onText: (t: string) => void;
+  onReasoning: (t: string) => void;
+  maxTokens?: number;
+  /** Sampling and reasoning options, dropped if the server refuses them. */
+  extra?: Record<string, unknown>;
+  /** The same for every step of a conversation (its session's id): a provider that caches by it reads the last step's back. */
+  cacheKey?: string;
+}
+
+/**
+ * How a model of your Claude or ChatGPT plan (provider claude or codex) is asked: through the server, which holds the
+ * programs' sign-ins (server/models/subscription.ts). The server sets it to ask in its own process; Custom's agent
+ * process, to ask through its run's address.
+ */
+let planGateway: ((m: AgentModel, o: ChatOptions) => Promise<Reply>) | null = null;
+export const setPlanGateway = (f: (m: AgentModel, o: ChatOptions) => Promise<Reply>) => (planGateway = f);
+
+export async function chat(m: AgentModel, o: ChatOptions): Promise<Reply> {
+  if (m.provider === 'claude' || m.provider === 'codex') {
+    if (!planGateway) throw new Error(`${m.label} is a model of your ${m.provider === 'claude' ? 'Claude' : 'ChatGPT'} plan, which only the app can reach`);
+    return planGateway(m, o);
+  }
   // Claude through OpenRouter keeps a cache of the conversation only when asked (OpenAI, DeepSeek and Gemini do on their
   // own): asked with each request, the next one reads it back, sooner and at a tenth of the price. A server that refuses
   // it gets requests without it, as for any option (plain).

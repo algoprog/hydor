@@ -10,7 +10,7 @@ Der Agent ist das Programm, das deine Nachricht liest, Tools wie Dateien, Befehl
 
 - **Claude Code** (Anthropic). Läuft mit deinem Claude-Abo oder rechnet über ein Anthropic-API-Konto ab. Seine Modelle sind die von Anthropic (Opus, Sonnet, Haiku). Es hat eigene Nutzungslimits, die die [Nutzungsseite](/usage) zeigt.
 - **Codex** von OpenAI nutzt dein ChatGPT-Abo und OpenAI-Modelle. Auch seine Limits stehen unter Nutzung. Codex wird mitgeliefert.
-- **Custom** nutzt alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle: OpenRouter, lokale Ollama- oder vLLM-Modelle und OpenAI-kompatible Endpunkte. Geeignet für offene, günstigere oder vollständig lokale Modelle. Siehe [Custom, der eigene Agent der App](/guide/custom).
+- **Custom** nutzt die Modelle deiner Claude- und ChatGPT-Abos (über die Anmeldungen von Claude Code und Codex) und alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle: OpenRouter, lokale Ollama- oder vLLM-Modelle und OpenAI-kompatible Endpunkte. Geeignet für offene, günstigere oder vollständig lokale Modelle. Siehe [Custom, der eigene Agent der App](/guide/custom).
 - **Agenten mit ACP-Unterstützung** wie Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie und Grok Build (der Coding-Agent von xAI, mit seinen Grok-Modellen) oder ein eigener Befehl. ACP, das Agent Client Protocol, standardisiert die Verbindung zwischen App und Agentenprogramm. Jeder verwendet seine eigene Anmeldung und Modelle.
 
 Unterstützung in der App:
@@ -70,7 +70,7 @@ Agenten wählen Modelle nach Leistungsstufe statt nach Namen: **Schnell** für k
 
 Auf der Startseite steht **Modell** auf **Automatisch**: Die Sitzung startet auf der Stufe Am besten. Ihr Hauptagent gibt klare Teile an Subagenten auf Standard und Schnell ab und kann sich selbst auf Max verschieben, wenn sich ein Problem als schwerer erweist, als Am besten bewältigen kann (eine Korrektur, die zweimal fehlgeschlagen ist, eine Ursache, die er nicht findet, ein Beweis); eine Zeile in der Unterhaltung sagt das, mit dem Grund. Eine Anfrage geht nicht allein wegen ihres Wortlauts an Max: Am besten löst das meiste, was schwer klingt, für weniger. Wähle stattdessen ein Modell nach Namen, dann denkt die Sitzung mit diesem; ihre Subagenten bekommen weiterhin Leistungsstufen. Ein Agent von dir kann stattdessen mit einer Stufe denken (siehe [Die Modellstufe eines Agenten](/guide/agents#what-an-agent-thinks-with-tiers)).
 
-[Einstellungen → Agenten → Modelle → Leistungsstufen](/settings?s=models&find=Tiers) sagt, was jede Stufe für jedes Programm bedeutet: eine Zeile für jede Stufe, mit einem Schalter neben dem Titel der Gruppe, um das Programm zu wählen (**Claude Code**, **Codex** oder **Custom**), und in jeder Zeile ein Modell und, bei Claude Code und Codex, einen Aufwand. Zu Beginn ist bei Claude Code Schnell gleich Haiku, Standard gleich Sonnet, Am besten gleich Opus und Max das neueste Fable; bei Codex ist Schnell gleich Luna, Standard gleich Terra, Am besten gleich Sol und Max gleich Astra (in einem Abo ohne eines davon das nächstliegende, das es anbietet, mit mehr Aufwand für die höhere Stufe, wo sich zwei ein Modell teilen); Custom hat keine, deshalb behalten seine Sitzungen das Modell, das sie gewählt haben, bis du eines deiner Custom-Modelle wählst (ein Modell auf diesem Computer macht Schnell kostenlos). Eine Stufe, die du nicht änderst, folgt dem neuesten Modell dieser Art ihres Programms. **Zurück zu den Standardeinstellungen** im Menü **⋯** neben dem Titel stellt sie wieder her.
+[Einstellungen → Agenten → Modelle → Leistungsstufen](/settings?s=models&find=Tiers) sagt, was jede Stufe für jedes Programm bedeutet: eine Zeile für jede Stufe, mit einem Schalter neben dem Titel der Gruppe, um das Programm zu wählen (**Claude Code**, **Codex** oder **Custom**), und in jeder Zeile ein Modell und, bei Claude Code und Codex, einen Aufwand. Zu Beginn ist bei Claude Code Schnell gleich Haiku, Standard gleich Sonnet, Am besten gleich Opus und Max das neueste Fable; bei Codex ist Schnell gleich Luna, Standard gleich Terra, Am besten gleich Sol und Max gleich Astra (in einem Abo ohne eines davon das nächstliegende, das es anbietet, mit mehr Aufwand für die höhere Stufe, wo sich zwei ein Modell teilen); Custom hat keine, deshalb behalten seine Sitzungen das Modell, das sie gewählt haben, bis du eines seiner Modelle wählst (ein Modell auf diesem Computer macht Schnell kostenlos). Auf dem Tab **Custom** kann eine Stufe auch ein Modell deines Claude- oder ChatGPT-Abos nennen (siehe [Woher Customs Modelle stammen](#where-customs-models-come-from)). Eine Stufe, die du nicht änderst, folgt dem neuesten Modell dieser Art ihres Programms. **Zurück zu den Standardeinstellungen** im Menü **⋯** neben dem Titel stellt sie wieder her.
 
 Unter **Modellstufen in Sitzungen** stehen zwei standardmäßig aktive Schalter:
 
@@ -276,15 +276,25 @@ Die App öffnet eine Sitzung im Ordner, den du wählst, zeigt die Nachrichten un
 
 ## Woher Customs Modelle stammen
 
-Custom verwendet alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle mit denselben Tools, Skills und MCP-Servern. Wähle auf der Startseite Custom und danach das Modell. Die Einstellungen enthalten:
+Custom verwendet die Modelle deiner Claude- und ChatGPT-Abos, Modelle auf diesem Computer und Modelle in der Cloud, mit denselben Tools, Skills und MCP-Servern wie die anderen Agenten. Wähle auf der Startseite Custom und danach das Modell. Sie stammen aus drei Quellen:
+
+- **Deine Abos**: die Modelle deiner Claude- und ChatGPT-Abos, über die Anmeldungen von Claude Code und Codex auf diesem Computer. Du musst nichts einrichten: Ist Claude Code angemeldet, bietet das Menü **Modell** von Custom Claude Opus, Fable, Sonnet und Haiku an (immer das neueste jeder Art), und ist Codex mit ChatGPT angemeldet, die Modelle, die dein ChatGPT-Abo auflistet (zum Beispiel GPT-6 Luna). Ein Programm, das abgemeldet vorgefunden wird, verliert seine Modelle im Menü, bis du es wieder anmeldest, und Codex, das mit einem API-Key statt mit ChatGPT angemeldet ist, stellt keine bereit. Sie verbrauchen die Nutzung deines Abos, keinen API-Key und kein Geld pro Token; eine Custom-Sitzung zeigt für diese Schritte deshalb 0 $. Jedes Konto des Programms wird der Reihe nach versucht, wie bei anderen einzelnen Aufgaben: Ein Konto am Nutzungslimit oder abgemeldet gibt den Schritt an dein nächstes Konto weiter (bei eingeschaltetem **Bei erreichtem Limit das Konto wechseln**). Eine [vertrauliche Sitzung](/guide/sessions#keep-a-session-confidential) verwendet sie nie, weil sie auf den Servern von Anthropic oder OpenAI laufen. Wie sie antworten, steht unter [Custom](/guide/custom#what-custom-is-and-when-to-use-it).
+- **Auf diesem Computer**: hier installierte Modelle (Ollama, vLLM) und Endpunkte in deinem Netzwerk.
+- **In der Cloud**: OpenRouter, Endpunkte anderswo und Ollamas Cloud-Modelle.
+
+Du kannst sie überall wählen, wo sich Customs Modelle wählen lassen: auf der Startseite, im Modellmenü einer Sitzung, bei Customs Leistungsstufen, als Hilfsmodell und als Modell eines Agenten oder einer App.
+
+[Einstellungen → Agenten → Modelle](/settings?s=models) enthält alles, was Customs Modelle brauchen. Die Seite hat sieben Teile, von oben nach unten:
 
 - **Hilfsmodell** für kleine App-Aufgaben.
+- **Leistungsstufen**: ein Modell für jede Art von Aufgabe (siehe [Modellstufen nach Aufgabenart](#tiers-a-model-for-each-kind-of-job)).
+- **Deine Abos**: je eine Zeile für Claude Code und Codex, mit den Modellen, die es Custom leiht. Eine Zeile sagt „Abgemeldet: Melde dich erneut an, um diese Modelle zu nutzen“ mit einem Link zu **Konten**, oder „Nicht auf diesem Computer installiert“.
 - **Auf diesem Computer**: was dieser Computer hat, und die Modelle, die hier installiert sind.
 - **Modell von Hugging Face hinzufügen** zum Suchen, Prüfen und Installieren offener Modelle.
 - **OpenRouter**: Hunderte Modelle über einen Key, in drei Gruppen: dein Key, die Modelle, die du hinzugefügt hast, und eine Suche, um weitere hinzuzufügen.
 - **Modelllaufzeitumgebungen und Endpunkte** für Ollama, vLLM, andere OpenAI-kompatible Server und einen Hugging-Face-Token.
 
-Fahre im Menü **Modell** von Custom mit der Maus über ein Modell, um zu sehen, wo es läuft und wie viel es auf einmal liest, zum Beispiel „OpenRouter · 128K Kontext“ oder „vLLM, auf diesem Computer · 32K Kontext · startet bei Verwendung“. Die Listen aktualisieren sich jede Minute von selbst.
+Im Menü **Modell** von Custom stehen die Modelle in den Gruppen **Deine Abos**, **Auf diesem Computer** und **In der Cloud**, und jede Zeile sagt, worüber das Modell läuft: „Claude Code“, „Codex“, „OpenRouter“, „Ollama“, „vLLM“ oder der Name eines Endpunkts. Fahre mit der Maus über ein Modell, um zu sehen, wo es läuft und wie viel es auf einmal liest, zum Beispiel „OpenRouter · 128K Kontext“ oder „vLLM, auf diesem Computer · 32K Kontext · startet bei Verwendung“. Die Listen aktualisieren sich jede Minute von selbst.
 
 ## Das Hilfsmodell wählen
 
@@ -302,8 +312,8 @@ Das Hilfsmodell bearbeitet kleine Aufgaben außerhalb von Unterhaltungen:
 
 Öffne unter [Einstellungen → Agenten → Modelle](/settings?s=models&find=Helper%20model) die Auswahl **Modell** in **Hilfsmodell**. Das (i) nennt die Aufgaben.
 
-- **Automatisch** (der Standard): Claude Haiku über Claude Code, oder Codex, wenn Claude Code nicht antworten kann. Ein Konto an seinem Nutzungslimit gibt die Frage zuerst an dein nächstes angemeldetes Konto weiter (bei eingeschaltetem **Bei erreichtem Limit das Konto wechseln**), und ein abgemeldetes Konto wird übersprungen. Wenn keines der beiden Programme antworten kann, übernimmt eines deiner Custom-Modelle die Aufgabe (das, das die Stufe **Schnell** von Custom nennt, sonst das günstigste, das du hinzugefügt hast), und nur wenn nichts sie übernehmen könnte, bittet dich eine Karte, dich anzumelden (siehe [Wenn ein Konto abgemeldet ist](#when-an-account-is-signed-out)). Wenn nichts antwortet, nennt die Fehlermeldung für jedes den Grund: „You've hit your weekly limit“, ein Modell, das dein Codex-Abo nicht anbietet …
-- Jedes Modell von Custom, mit dem Ort, an dem es läuft (openrouter, ollama, vllm oder endpoint), und „verarbeitet Bilder“ bei denen, die Bilder sehen können.
+- **Automatisch** (der Standard): Claude Haiku über Claude Code, oder Codex, wenn Claude Code nicht antworten kann. Ein Konto an seinem Nutzungslimit gibt die Frage zuerst an dein nächstes angemeldetes Konto weiter (bei eingeschaltetem **Bei erreichtem Limit das Konto wechseln**), und ein abgemeldetes Konto wird übersprungen. Wenn keines der beiden Programme antworten kann, übernimmt eines deiner Custom-Modelle die Aufgabe (das, das die Stufe **Schnell** von Custom nennt, sonst das günstigste, das du hinzugefügt hast; die Modelle deiner Abos werden dabei übersprungen, weil sie über dieselben zwei Programme laufen), und nur wenn nichts sie übernehmen könnte, bittet dich eine Karte, dich anzumelden (siehe [Wenn ein Konto abgemeldet ist](#when-an-account-is-signed-out)). Wenn nichts antwortet, nennt die Fehlermeldung für jedes den Grund: „You've hit your weekly limit“, ein Modell, das dein Codex-Abo nicht anbietet …
+- Jedes Modell von Custom, gruppiert wie im Menü **Modell** von Custom (**Deine Abos**, **Auf diesem Computer** und **In der Cloud**), mit dem, worüber es läuft (Claude Code, Codex, OpenRouter, Ollama, vLLM oder der Name eines Endpunkts), und „verarbeitet Bilder“ bei denen, die Bilder sehen können. Auch ein Modell deines Claude- oder ChatGPT-Abos kann das Hilfsmodell sein: Es antwortet über Claude Code oder Codex mit der Nutzung deines Abos.
 
 Automatisch kann keine Bilder ansehen. Wenn du Custom mit einem Modell verwendest, das keine Bilder sieht, wähle ein Hilfsmodell, das Bilder sieht, sonst kann Custom deine Bilder nicht beschreiben lassen.
 
@@ -459,6 +469,7 @@ Ein [Hugging-Face-Token](/settings?s=models&find=Hugging%20Face%20token) erlaubt
 - „Finde ein bildfähiges Hugging-Face-Modell, das hier gut läuft. Prüfe und installiere die passende Größe.“
 - „Füge das neueste DeepSeek-Modell von OpenRouter hinzu.“ Voraussetzung ist dein OpenRouter-Key.
 - „Wähle ein bildfähiges Hilfsmodell.“
+- „Nutze in einer Custom-Sitzung das Sonnet meines Claude-Abos und zeige mir, was es kostet.“
 - „Stoppe das laufende vLLM-Modell, um Grafikspeicher freizugeben.“
 - „Nutze alle Claude-Konten und wechsle bei einem Limit zum nächsten.“
 - „Verwende mein API-Guthaben, wenn alle Claude-Abos aufgebraucht sind.“

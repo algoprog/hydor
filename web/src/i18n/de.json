@@ -24405,5 +24405,18 @@
   "Save image to Library": "Bild in der Bibliothek speichern",
   "Search {0} for “{1}”": "Mit {0} nach „{1}“ suchen",
   "browser::Highlight": "Markieren",
-  "browser::Remove highlight": "Markierung entfernen"
+  "browser::Remove highlight": "Markierung entfernen",
+  "{0} (through Claude Code): {1}": "{0} (über Claude Code): {1}",
+  "{0} (through Codex) answered {1}: {2}": "{0} (über Codex) hat mit {1} geantwortet: {2}",
+  "{0} is a model of your {1} plan, which only the app can reach": "{0} ist ein Modell deines {1}-Plans, das nur die App erreichen kann",
+  "{0} is a model of your plan, and this part of the app cannot reach {1}": "{0} ist ein Modell deines Plans, und dieser Teil der App kann {1} nicht erreichen",
+  "Custom can use the models of your Claude and ChatGPT plans through Claude Code’s and Codex’s sign-ins on this computer. They use your plan’s usage instead of an API key. Claude answers through Claude Code one step at a time, with Custom’s tools described in its instructions. A confidential session never uses them.": "Custom kann die Modelle deiner Claude- und ChatGPT-Pläne über die Anmeldungen von Claude Code und Codex auf diesem Computer nutzen. Sie verbrauchen das Kontingent deines Plans statt eines API-Schlüssels. Claude antwortet über Claude Code Schritt für Schritt, wobei die Werkzeuge von Custom in seinen Anweisungen beschrieben werden. Eine vertrauliche Sitzung nutzt sie nie.",
+  "In the cloud": "In der Cloud",
+  "Model: {0} · {1}": "Modell: {0} · {1}",
+  "Models for Custom, the app’s own agent: your Claude and ChatGPT plans through Claude Code and Codex, models on this computer, and OpenRouter or other providers in the cloud": "Modelle für Custom, den eigenen Agenten der App: deine Claude- und ChatGPT-Pläne über Claude Code und Codex, Modelle auf diesem Computer sowie OpenRouter oder andere Anbieter in der Cloud",
+  "Not installed on this computer": "Nicht auf diesem Computer installiert",
+  "Signed out: sign in again to use these models": "Abgemeldet: Melde dich erneut an, um diese Modelle zu nutzen",
+  "subscription plan claude chatgpt codex claude code sign in login account use plan usage no api key models custom": "Abo Plan Abonnement Claude ChatGPT Codex Claude Code anmelden Login Konto Plan-Kontingent nutzen kein API-Schlüssel Modelle Custom",
+  "The models of your Claude and ChatGPT plans, which Custom can use through Claude Code and Codex": "Die Modelle deiner Claude- und ChatGPT-Pläne, die Custom über Claude Code und Codex nutzen kann",
+  "Your subscriptions": "Deine Abos"
 }

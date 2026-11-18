@@ -10,12 +10,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { toolAllowed } from '../../shared/assistants.ts';
-import type { AgentModel, ContextPart } from '../../shared/types.ts';
+import { isSubscription, type AgentModel, type ContextPart } from '../../shared/types.ts';
 import { PUBLIC_RUN_ENV, publicRunOf, publicRunPrompt } from '../apps/publicRun.ts';
 import { checkpoint, estimate, NOTES_START, pinned, prune, summaryRequest, tailStart, type Pins } from './compact.ts';
 import { callId, familyOf, requestOptions } from './families.ts';
 import { Guard, signature, type PlanEntry } from './guard.ts';
-import { chat, ContextOverflow, StreamCut, ToolsUnsupported, type ChatMessage, type Part, type Reply, type ToolSchema } from './llm.ts';
+import { chat, ContextOverflow, setPlanGateway, StreamCut, ToolsUnsupported, type ChatMessage, type Part, type Reply, type ToolSchema } from './llm.ts';
+import { planClient } from './plan-client.ts';
 import { McpClient, mcpServers } from './mcp.ts';
 import { describeImages, fitImage, imagePart, keepImage, type Img } from './media.ts';
 import { parseCalls, StreamFilter, stripMarkup } from './parse.ts';
@@ -42,6 +43,8 @@ const OWN = 'hydor';
 /** A public app's run (server/apps/publicRun.ts): no shell, no files, only the app's own server. */
 const PUBLIC_RUN = publicRunOf(process.env[PUBLIC_RUN_ENV]);
 const MAX_STEPS = 200;
+// A model of your Claude or ChatGPT plan is asked through the app, which holds Claude Code's and Codex's sign-ins.
+if (RUNTIME) setPlanGateway(planClient(RUNTIME));
 
 // ---- the protocol --------------------------------------------------------------------------------
 
@@ -85,7 +88,7 @@ async function ready(s: Session): Promise<AgentModel> {
     );
   if (!m) throw new Error('There is no model to use yet. Add one in Settings → Models: an OpenRouter key, Ollama, or a model from Hugging Face.');
   s.model = m.id;
-  if (!m.start && m.baseUrl) return m;
+  if (isSubscription(m.provider) || (!m.start && m.baseUrl)) return m;
   say(s.id, 'agent_thought_chunk', `Starting ${m.label} with vLLM (the first time takes a minute or two)…\n`);
   const r = await fetch(`${RUNTIME}/ensure`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: m.id }) });
   const d: any = await r.json().catch(() => ({}));
@@ -306,7 +309,8 @@ function account(s: Session, m: AgentModel, u: Reply['usage'], parts?: Partial<R
   t.in += u.prompt - cached;
   t.cached += cached;
   t.out += u.completion;
-  const cost = u.cost ?? (m.provider === 'ollama' || m.provider === 'vllm' ? 0 : undefined);
+  // A model on this computer costs nothing per token, and one of your plan uses the plan's usage, not money.
+  const cost = u.cost ?? (m.provider === 'ollama' || m.provider === 'vllm' || isSubscription(m.provider) ? 0 : undefined);
   if (cost === undefined) t.unpriced++;
   else t.usd += cost;
   update(s.id, {
@@ -406,7 +410,7 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
   let summary = '';
   for (const share of [2.5, 1.2]) {
     try {
-      const r = await chat(m, { messages: summaryRequest(head, previous, Math.floor(w * share)), signal, onText: () => {}, onReasoning: () => {}, maxTokens: Math.max(1024, Math.min(4096, Math.floor(w * 0.1))) });
+      const r = await chat(m, { messages: summaryRequest(head, previous, Math.floor(w * share)), signal, onText: () => {}, onReasoning: () => {}, maxTokens: Math.max(1024, Math.min(4096, Math.floor(w * 0.1))), cacheKey: s.id });
       account(s, m, r.usage);
       summary = stripMarkup(r.text);
       if (summary) break;
@@ -624,6 +628,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
         onReasoning: (t) => say(s.id, 'agent_thought_chunk', t),
         maxTokens: budget ?? room,
         extra: requestOptions(m, fam),
+        cacheKey: s.id,
       });
       filter.end();
       budget = undefined;
@@ -666,7 +671,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
         calls = parsed.map((p, i) => ({ id: callId(`${Date.now()}${i}${p.name}`), name: p.name, raw: JSON.stringify(p.args) }));
       }
     }
-    const thought = calls.length && reply.reasoning ? { reasoning: reply.reasoning, ...(reply.details ? { reasoning_details: reply.details } : {}) } : {};
+    const thought = calls.length && (reply.reasoning || reply.details?.length) ? { reasoning: reply.reasoning, ...(reply.details ? { reasoning_details: reply.details } : {}) } : {};
     const kept = fam.keepThinking ? reply.text : reply.text.replace(/<think>[\s\S]*?<\/think>\s*/g, '');
     if (textMode) s.messages.push({ role: 'assistant', content: kept, ...thought });
     else

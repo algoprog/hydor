@@ -119,12 +119,13 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Modelle
 
-[Einstellungen → Modelle](/settings?s=models): Modelle für Custom, den Agenten der App: OpenRouter, Ollama und lokal mit vLLM ausgeführte Hugging Face-Modelle. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
+[Einstellungen → Modelle](/settings?s=models): Modelle für Custom, den eigenen Agenten der App: deine Claude- und ChatGPT-Pläne über Claude Code und Codex, Modelle auf diesem Computer sowie OpenRouter oder andere Anbieter in der Cloud. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
 
 - [**Hilfsmodell**](/settings?s=models&find=Helper%20model): Modell für kleine Aufgaben neben den Sitzungen.
 - [**Leistungsstufen**](/settings?s=models&find=Tiers): Modellzuordnung der Stufen Quick, Standard, Best und Max je Agentenprogramm. Hauptsitzungen nutzen Best oder Max, Subagenten Standard und Quick.
 - [**Subagenten koordinieren**](/settings?s=models&find=Lead%20with%20subagents): Der Hauptagent plant, delegiert klar abgegrenzte Teilaufgaben an günstigere Subagenten und prüft deren Ergebnisse.
 - [**Max für schwierige Probleme**](/settings?s=models&find=Max%20for%20hard%20problems): Ein Hauptagent auf Automatic kann zu Max wechseln, wenn sich ein Problem als schwieriger erweist, als Best bewältigen kann.
+- [**Deine Abos**](/settings?s=models&find=Your%20subscriptions): Die Modelle deiner Claude- und ChatGPT-Pläne, die Custom über Claude Code und Codex nutzen kann.
 - [**Auf diesem Computer**](/settings?s=models&find=On%20this%20machine): Hier installierte Modelle und deren Downloads.
 - [**Modell von Hugging Face hinzufügen**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face): Vorschläge für diesen Computer: Suche weitere Modelle, prüfe ihre lokale Ausführbarkeit und installiere ein passendes Modell.
 - [**OpenRouter**](/settings?s=models&find=OpenRouter): Modelle über OpenRouter mit deinem Key.

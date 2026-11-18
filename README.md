@@ -8,7 +8,7 @@
 <h3 align="center">The everything app for AI agents</h3>
 
 <p align="center">
-  Claude Code and Codex on the plans you already pay for, or any model, local ones too, with unified memory. They
+  Claude Code and Codex on the plans you already pay for, or any model (your Claude and ChatGPT plans' models, local ones too), with unified memory. They
   code, research, write and run your routine work on your own computer, answer with dynamic UIs and apps, and check
   with you on your phone.
 </p>
@@ -64,7 +64,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
       <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
-      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model including on-device.</p>
+      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model: your Claude or ChatGPT plan's, on-device or in the cloud.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />

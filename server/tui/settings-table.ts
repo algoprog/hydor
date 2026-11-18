@@ -358,6 +358,10 @@ row('models', 'Helper model', 'choice', {
 row('models', 'Tiers', 'command', { command: 'hydor tiers', note: 'hydor tiers shows the model each tier means for each program and changes them.' });
 row('models', 'Lead with subagents', 'switch', { read: rd('/api/models/tiers', 'team.on'), write: put('/api/models/tiers', (v) => ({ team: { on: v } })) });
 row('models', 'Max for hard problems', 'switch', { read: rd('/api/models/tiers', 'team.hard'), write: put('/api/models/tiers', (v) => ({ team: { hard: v } })) });
+row('models', 'Your subscriptions', 'page', {
+  read: { endpoint: '/api/models', pick: (d) => (d.subscriptions ?? []).filter((p: any) => p.installed && p.signedIn).map((p: any) => p.program) },
+  note: 'The Claude and ChatGPT plans whose models Custom can use through Claude Code and Codex; signing in is done in Accounts.',
+});
 row('models', 'On this machine', 'page', {
   read: { endpoint: '/api/models', pick: (d) => (d.local ?? []).map((m: any) => m.repo ?? m.id) },
   note: 'Installing, starting and removing models run here is done on the page.',

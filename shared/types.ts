@@ -697,6 +697,10 @@ export interface ModelOption {
   isDefault?: boolean;
   /** Custom's: it runs on this computer or your private network, so a confidential session may use it. */
   local?: boolean;
+  /** Custom's: how it is paid for and where it runs (a plan through Claude Code or Codex, this computer, or the cloud). */
+  source?: ModelSource;
+  /** Custom's: what it comes through, in a few words ("Claude Code", "Codex", "OpenRouter", "Ollama", "vLLM", an endpoint's name). */
+  via?: string;
 }
 
 export interface ModeOption {
@@ -1453,7 +1457,25 @@ export interface UpdateReady {
 
 // ---- models for Console, the app's own agent ---------------------------------------------------------
 
-export type ModelProvider = 'openrouter' | 'ollama' | 'vllm' | 'endpoint';
+/**
+ * Where a model of Custom's comes from. claude and codex: a model of your Claude or ChatGPT plan, reached through the
+ * Claude Code or Codex sign-in on this computer (server/models/subscription.ts), so it uses the plan's usage.
+ */
+export type ModelProvider = 'openrouter' | 'ollama' | 'vllm' | 'endpoint' | 'claude' | 'codex';
+
+/** The programs whose sign-in lends Custom their plan's models. */
+export type SubscriptionProvider = 'claude' | 'codex';
+
+/**
+ * How a model of Custom's is paid for and where it runs, as the pickers group them: subscription (your Claude or
+ * ChatGPT plan, through Claude Code's or Codex's sign-in), local (this computer or your network) or cloud (OpenRouter,
+ * an endpoint elsewhere, Ollama's cloud models: billed by the provider).
+ */
+export type ModelSource = 'subscription' | 'local' | 'cloud';
+
+export const isSubscription = (provider: ModelProvider | string | undefined): provider is SubscriptionProvider => provider === 'claude' || provider === 'codex';
+
+export const modelSource = (m: { provider: ModelProvider | string; local?: boolean }): ModelSource => (isSubscription(m.provider) ? 'subscription' : m.local ? 'local' : 'cloud');
 
 /** A model Console can run, as its agent process reads it (models/agent.json, on the server only). */
 export interface AgentModel {
@@ -1482,6 +1504,8 @@ export interface AgentModel {
   maxOutput?: number;
   /** It runs on this computer or your private network (Ollama, vLLM, a local endpoint): a confidential session may use it. */
   local?: boolean;
+  /** A plan's model (provider claude or codex): the reasoning efforts its program takes, as it lists them. */
+  efforts?: string[];
 }
 
 export interface ModelEntry {
@@ -1670,7 +1694,22 @@ export interface ModelDownload {
   startedAt: number;
 }
 
+/** A program whose sign-in lends Custom its plan's models (Settings → Models shows each). */
+export interface SubscriptionModels {
+  provider: SubscriptionProvider;
+  /** "Claude Code", "Codex". */
+  program: string;
+  /** Whether the program is here and answered when asked for its models. */
+  installed: boolean;
+  /** At least one of its accounts is signed in (none found signed out lately). */
+  signedIn: boolean;
+  /** Custom's ids and names for the models it lends ("claude/sonnet", "Sonnet"). */
+  models: { id: string; label: string }[];
+}
+
 export interface ModelsState {
+  /** The plans' models Custom can use through Claude Code's and Codex's sign-ins. */
+  subscriptions: SubscriptionModels[];
   openrouter: { keyHint?: string; pinned: OpenRouterModel[] };
   ollama: { url: string; version?: string };
   vllm: { command?: string; path?: string; version?: string };

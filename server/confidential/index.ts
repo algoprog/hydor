@@ -88,7 +88,16 @@ export const CONFIDENTIAL_TOOLS = new Set([
 // ---- the models -----------------------------------------------------------------------------------------
 
 /** Where a model that is not local runs, in a few words. */
-const elsewhere = (m: AgentModel) => (m.provider === 'openrouter' ? 'through OpenRouter' : m.provider === 'ollama' ? 'on Ollama’s cloud or another computer' : `at ${m.label.replace(/^.*\((.+)\)$/, '$1')}, outside your network`);
+const elsewhere = (m: AgentModel) =>
+  m.provider === 'openrouter'
+    ? 'through OpenRouter'
+    : m.provider === 'ollama'
+      ? 'on Ollama’s cloud or another computer'
+      : m.provider === 'claude'
+        ? 'on Anthropic’s servers (your Claude plan, through Claude Code)'
+        : m.provider === 'codex'
+          ? 'on OpenAI’s servers (your ChatGPT plan, through Codex)'
+          : `at ${m.label.replace(/^.*\((.+)\)$/, '$1')}, outside your network`;
 
 export const NO_LOCAL_MODEL = 'There is no model on this computer to run a confidential session. Install one in Settings → Models: the ones suggested for this computer install with one click.';
 

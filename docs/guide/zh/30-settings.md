@@ -119,12 +119,13 @@
 
 ### 模型
 
-[设置 → 模型](/settings?s=models)：Custom（本应用自带的智能体）的模型：OpenRouter、Ollama，以及在这里用 vLLM 运行的 Hugging Face 模型。详见[智能体、账户和模型](/guide/agents-models)。
+[设置 → 模型](/settings?s=models)：Custom（应用自带的智能体）的模型：通过 Claude Code 和 Codex 使用你的 Claude 和 ChatGPT 套餐、这台电脑上的模型，以及云端的 OpenRouter 或其他提供商。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**辅助模型**](/settings?s=models&find=Helper%20model)：在会话之外处理小任务的模型。
 - [**档位**](/settings?s=models&find=Tiers)：快速、标准、最佳和最高在每个程序中对应的模型：会话由最佳或最高档位主导，它的子智能体使用标准和快速档位。
 - [**主智能体带领子智能体**](/settings?s=models&find=Lead%20with%20subagents)：会话的主智能体负责规划，把明确的部分交给更便宜档位的子智能体，并检查它们的工作。
 - [**难题用最高档位**](/settings?s=models&find=Max%20for%20hard%20problems)：使用“自动”时，当问题超出最佳档位的能力，主智能体可以自己升到最高档位。
+- [**你的订阅**](/settings?s=models&find=Your%20subscriptions)：你的 Claude 和 ChatGPT 套餐中的模型，Custom 可以通过 Claude Code 和 Codex 使用。
 - [**在本机**](/settings?s=models&find=On%20this%20machine)：安装在这里的模型及其下载。
 - [**从 Hugging Face 添加模型**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face)：为这台电脑推荐的模型，或者搜索，看看每一个在这里运行得如何，然后安装它。
 - [**OpenRouter**](/settings?s=models&find=OpenRouter)：通过 OpenRouter 使用的模型，用你的密钥。

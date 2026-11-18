@@ -25675,5 +25675,18 @@
   "Save image to Library": "将图片保存到资料库",
   "Search {0} for “{1}”": "用{0}搜索“{1}”",
   "browser::Highlight": "高亮",
-  "browser::Remove highlight": "移除高亮"
+  "browser::Remove highlight": "移除高亮",
+  "{0} (through Claude Code): {1}": "{0}（通过 Claude Code）：{1}",
+  "{0} (through Codex) answered {1}: {2}": "{0}（通过 Codex）返回 {1}：{2}",
+  "{0} is a model of your {1} plan, which only the app can reach": "{0} 是你的 {1} 套餐中的模型，只有应用本身能访问",
+  "{0} is a model of your plan, and this part of the app cannot reach {1}": "{0} 是你的套餐中的模型，应用的这一部分无法访问 {1}",
+  "Custom can use the models of your Claude and ChatGPT plans through Claude Code’s and Codex’s sign-ins on this computer. They use your plan’s usage instead of an API key. Claude answers through Claude Code one step at a time, with Custom’s tools described in its instructions. A confidential session never uses them.": "Custom 可以通过这台电脑上 Claude Code 和 Codex 的登录，使用你的 Claude 和 ChatGPT 套餐中的模型。它们使用你套餐的额度，而不是 API 密钥。Claude 通过 Claude Code 一步一步地回答，Custom 的工具在它的指令中说明。保密会话从不使用它们。",
+  "In the cloud": "在云端",
+  "Model: {0} · {1}": "模型：{0} · {1}",
+  "Models for Custom, the app’s own agent: your Claude and ChatGPT plans through Claude Code and Codex, models on this computer, and OpenRouter or other providers in the cloud": "Custom（应用自带的智能体）的模型：通过 Claude Code 和 Codex 使用你的 Claude 和 ChatGPT 套餐、这台电脑上的模型，以及云端的 OpenRouter 或其他提供商",
+  "Not installed on this computer": "这台电脑上未安装",
+  "Signed out: sign in again to use these models": "已退出登录：请重新登录以使用这些模型",
+  "subscription plan claude chatgpt codex claude code sign in login account use plan usage no api key models custom": "订阅 套餐 Claude ChatGPT Codex Claude Code 登录 账户 套餐额度 无需 API 密钥 模型 Custom",
+  "The models of your Claude and ChatGPT plans, which Custom can use through Claude Code and Codex": "你的 Claude 和 ChatGPT 套餐中的模型，Custom 可以通过 Claude Code 和 Codex 使用",
+  "Your subscriptions": "你的订阅"
 }

@@ -1,9 +1,10 @@
 // The models Console can use, and installing, running and removing them. It keeps agent.json current
 // for the agent process and tells the browser as things change (a download's progress, a server
-// coming up). A vLLM model starts when a session first uses it.
+// coming up). A vLLM model starts when a session first uses it. Your Claude and ChatGPT plans' models,
+// through Claude Code's and Codex's sign-ins, come after your own (server/models/subscription.ts).
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AgentModel, HfInspect, LocalModel, ModelDownload, ModelEntry, ModelOption, ModelsState, VllmServer } from '../../shared/types.ts';
+import { modelSource, type AgentModel, type HfInspect, type LocalModel, type ModelDownload, type ModelEntry, type ModelOption, type ModelsState, type SubscriptionModels, type VllmServer } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { isLocalAddress } from '../../shared/confidential.ts';
 import { keyHint, loadConfig, MODELS_DIR, saveConfig, writeAgentModels, type Endpoint, type ModelsConfig } from './config.ts';
@@ -27,6 +28,10 @@ export class ModelManager {
   private endpointContext = new Map<string, number>();
   private pinnedInfo = new Map<string, openrouter.OrModel>();
   private emitTimer: NodeJS.Timeout | null = null;
+  /** Your plans' models (Claude Code's and Codex's sign-ins), and how each program stands. */
+  private plans: AgentModel[] = [];
+  private planState: SubscriptionModels[] = [];
+  private planSource: (() => Promise<{ models: AgentModel[]; state: SubscriptionModels[] }>) | null = null;
 
   constructor(private onChange: (s: ModelsState) => void) {
     // Servers from before a restart that are still running are watched again.
@@ -36,9 +41,21 @@ export class ModelManager {
     setInterval(() => void this.refresh(), 60_000).unref();
   }
 
-  /** Ollama's models, endpoints' models and the pinned OpenRouter models, then agent.json. */
+  /** Where your plans' models come from (index.ts): the programs' sign-ins, asked again at each refresh. */
+  setPlans(f: () => Promise<{ models: AgentModel[]; state: SubscriptionModels[] }>) {
+    this.planSource = f;
+    void this.refresh();
+  }
+
+  /** Ollama's models, endpoints' models, the pinned OpenRouter models and your plans' models, then agent.json. */
   async refresh() {
     const c = this.cfg;
+    if (this.planSource)
+      try {
+        const p = await this.planSource();
+        this.plans = p.models;
+        this.planState = p.state;
+      } catch {}
     this.ollamaVersion = await ollama.version(c.ollama.url);
     this.ollamaModels = this.ollamaVersion ? await ollama.models(c.ollama.url).catch(() => []) : [];
     for (const e of c.endpoints) {
@@ -131,6 +148,8 @@ export class ModelManager {
           contextLength: this.endpointContext.get(`${e.id}/${m}`),
           ...(isLocalAddress(e.baseUrl) ? { local: true } : {}),
         });
+    // Your plans' models come after your own: a session with no model of its own starts on one you added.
+    out.push(...this.plans);
     return out;
   }
 
@@ -149,16 +168,35 @@ export class ModelManager {
     );
   }
 
-  /** The models for the pickers (no addresses or keys). */
+  /**
+   * The models for the pickers (no addresses or keys), each with how it is paid for and where it runs (source) and what
+   * it comes through (via), which the pickers group and label them by.
+   */
   options(): ModelOption[] {
-    const where = { openrouter: 'OpenRouter', ollama: 'Ollama', vllm: 'vLLM, on this machine', endpoint: 'Endpoint' };
-    return this.agentModels().map((m) => ({
-      value: m.id,
-      label: m.label,
-      description: [where[m.provider], m.contextLength ? `${Math.round(m.contextLength / 1000)}K context` : '', m.start ? 'starts when used' : ''].filter(Boolean).join(' · '),
-      efforts: [],
-      ...(m.local ? { local: true } : {}),
-    }));
+    const names = new Map(this.cfg.endpoints.map((e) => [e.id, e.name]));
+    return this.agentModels().map((m) => {
+      const source = modelSource(m);
+      const via = m.provider === 'endpoint' ? (names.get(m.id.split('/')[1] ?? '') ?? 'Endpoint') : VIA[m.provider];
+      const where =
+        source === 'subscription'
+          ? `Your ${m.provider === 'claude' ? 'Claude' : 'ChatGPT'} plan, through ${via}`
+          : m.provider === 'vllm'
+            ? 'vLLM, on this machine'
+            : source === 'local'
+              ? `${via}, on this computer or your network`
+              : m.provider === 'ollama'
+              ? 'Ollama’s cloud or another computer'
+              : via;
+      return {
+        value: m.id,
+        label: m.label,
+        description: [where, m.contextLength ? `${Math.round(m.contextLength / 1000)}K context` : '', m.start ? 'starts when used' : ''].filter(Boolean).join(' · '),
+        efforts: [],
+        source,
+        via,
+        ...(m.local ? { local: true } : {}),
+      };
+    });
   }
 
   private writeAgent() {
@@ -194,6 +232,7 @@ export class ModelManager {
     });
     for (const o of this.ollamaModels) local.push({ id: o.id, repo: o.label, runtime: 'ollama', sizeBytes: o.sizeBytes, detail: o.detail, vision: o.vision, supported: true });
     return {
+      subscriptions: this.planState,
       openrouter: {
         keyHint: keyHint(c.openrouter.apiKey),
         pinned: c.openrouter.pinned.map((id) => {
@@ -404,6 +443,9 @@ export class ModelManager {
 }
 
 const TOOL_RANK = { native: 3, template: 2, text: 1 } as const;
+
+/** What each kind of model comes through, as the pickers name it. */
+const VIA: Record<AgentModel['provider'], string> = { openrouter: 'OpenRouter', ollama: 'Ollama', vllm: 'vLLM', endpoint: 'Endpoint', claude: 'Claude Code', codex: 'Codex' };
 
 /** Local models, the best first (see localModels); `sizeOf` gives a model's size in bytes (0 when not known). */
 export function rankLocal(models: AgentModel[], sizeOf: (m: AgentModel) => number, prefer?: string | null): AgentModel[] {

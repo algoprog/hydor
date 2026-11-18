@@ -3,7 +3,7 @@
 // question. Settings → Models picks it: one of Custom's models, or "auto", which asks Claude's Haiku
 // through its CLI (else Codex), like the app's other one-off questions (server/oneshot.ts).
 import fs from 'node:fs';
-import type { AgentModel } from '../shared/types.ts';
+import { isSubscription, modelSource, type AgentModel } from '../shared/types.ts';
 import { chat, type ChatMessage, type Part } from './agent/llm.ts';
 import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
@@ -55,13 +55,20 @@ export function setHelperModel(db: DB, id: string) {
   kvSet(db, KEY, id);
 }
 
-/** What the helper can be: "auto" first, then Custom's models. */
+/**
+ * What the helper can be: "auto" first, then Custom's models, each with how it is paid for and where it runs (source:
+ * your plan through Claude Code or Codex, this computer, or the cloud) and what it comes through, as the pickers say.
+ */
 export function helperOptions(db: DB) {
+  const said = new Map((manager?.options() ?? []).map((o) => [o.value, o]));
   return {
     model: helperModelId(db),
     options: [
       { value: 'auto', label: 'Automatic', detail: 'Claude Haiku through Claude Code, else Codex' },
-      ...customModels().map((m) => ({ value: m.id, label: m.label, detail: m.provider, vision: !!m.vision })),
+      ...customModels().map((m) => {
+        const o = said.get(m.id);
+        return { value: m.id, label: m.label, detail: o?.description?.split(' · ')[0] ?? m.provider, vision: !!m.vision, source: o?.source ?? modelSource(m), via: o?.via ?? m.provider };
+      }),
     ],
   };
 }
@@ -87,6 +94,8 @@ export function helperCost(db: DB, t: { tokensIn: number; tokensOut: number }): 
   const m = customModels().find((x) => x.id === id);
   if (!m) return { model: id, label: id, priced: false };
   if (m.provider === 'ollama' || m.provider === 'vllm') return { model: id, label: m.label, priced: true, usd: 0 };
+  // A model of your plan uses the plan's usage, as Automatic does: no price to show.
+  if (isSubscription(m.provider)) return { model: id, label: m.label, priced: false };
   const tokens = { tokensIn: t.tokensIn, tokensCached: 0, tokensOut: t.tokensOut };
   const usd = costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens);
   return typeof usd === 'number' && Number.isFinite(usd) ? { model: id, label: m.label, priced: true, usd: Math.round(usd * 100) / 100 } : { model: id, label: m.label, priced: false };
@@ -101,6 +110,8 @@ export function helperParallel(db: DB): number {
   if (id === 'auto') return 3;
   const m = customModels().find((x) => x.id === id);
   if (!m || m.local || m.provider === 'ollama' || m.provider === 'vllm') return 1;
+  // Each call to a model of your Claude plan is a Claude Code program, as on Automatic.
+  if (m.provider === 'claude') return 3;
   return 4;
 }
 
@@ -128,7 +139,8 @@ function guessCost(db: DB, m: AgentModel): number {
  * cheapest first. A call with pictures needs a model that sees them.
  */
 function fallbackModels(db: DB, q: HelperAsk): AgentModel[] {
-  const all = customModels().filter((m) => !q.images?.length || m.vision);
+  // Your plans' models go through the same Claude Code and Codex that could not answer: they are no way round them.
+  const all = customModels().filter((m) => !isSubscription(m.provider) && (!q.images?.length || m.vision));
   const tiers = tiersOf(db).console;
   const named: AgentModel[] = [];
   for (const pick of q.strong ? [tiers.best, tiers.max, tiers.standard] : [tiers.quick, tiers.standard]) {
@@ -157,7 +169,7 @@ async function askModel(db: DB, q: HelperAsk, model: AgentModel, timeout: number
   if (q.onCost && r.usage) {
     const cached = r.usage.cached ?? 0;
     const tokens = { tokensIn: Math.max(0, r.usage.prompt - cached), tokensCached: cached, tokensOut: r.usage.completion };
-    const usd = m.provider === 'ollama' || m.provider === 'vllm' ? 0 : (r.usage.cost ?? costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens));
+    const usd = m.provider === 'ollama' || m.provider === 'vllm' || isSubscription(m.provider) ? 0 : (r.usage.cost ?? costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens));
     if (typeof usd === 'number' && Number.isFinite(usd)) q.onCost(usd);
   }
   return r.text;

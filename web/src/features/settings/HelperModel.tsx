@@ -2,14 +2,16 @@
 // mode's checks, second opinions, reading a page for one question).
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
+import type { ModelSource } from '@shared/types';
 import { api } from '../../lib/api';
 import { toastError } from '../../lib/store';
-import { OptionRow, Picker, Throbber } from '../../components/ui';
+import { MODEL_SOURCES } from '../../components/AgentPickers';
+import { MenuLabel, OptionRow, Picker, Throbber } from '../../components/ui';
 import { Group, Row } from './kit';
 
 interface HelperState {
   model: string;
-  options: { value: string; label: string; detail?: string; vision?: boolean }[];
+  options: { value: string; label: string; detail?: string; vision?: boolean; source?: ModelSource; via?: string }[];
 }
 
 export function HelperModel() {
@@ -38,8 +40,8 @@ export function HelperModel() {
         control={
           st ? (
             <Picker icon={<Sparkles size={14} className="text-fg-3" />} value={cur?.label ?? 'Automatic'} title="The helper model" width={300}>
-              {(close) =>
-                st.options.map((o) => (
+              {(close) => {
+                const row = (o: HelperState['options'][number]) => (
                   <OptionRow
                     key={o.value}
                     label={o.label}
@@ -50,8 +52,25 @@ export function HelperModel() {
                       void pick(o.value);
                     }}
                   />
-                ))
-              }
+                );
+                // Automatic first, then Custom's models under where they come from.
+                return (
+                  <>
+                    {st.options.filter((o) => !o.source).map(row)}
+                    {MODEL_SOURCES.map(({ source, title }) => {
+                      const rows = st.options.filter((o) => o.source === source);
+                      return (
+                        rows.length > 0 && (
+                          <div key={source}>
+                            <MenuLabel>{title}</MenuLabel>
+                            {rows.map(row)}
+                          </div>
+                        )
+                      );
+                    })}
+                  </>
+                );
+              }}
             </Picker>
           ) : (
             <Throbber className="text-fg-3" />

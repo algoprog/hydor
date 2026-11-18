@@ -119,12 +119,13 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Models
 
-[Settings → Models](/settings?s=models): models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM. More in [Agents, accounts and models](/guide/agents-models).
+[Settings → Models](/settings?s=models): models for Custom, the app’s own agent: your Claude and ChatGPT plans through Claude Code and Codex, models on this computer, and OpenRouter or other providers in the cloud. More in [Agents, accounts and models](/guide/agents-models).
 
 - [**Helper model**](/settings?s=models&find=Helper%20model): The model for small jobs beside sessions.
 - [**Tiers**](/settings?s=models&find=Tiers): The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its subagents get Standard and Quick.
 - [**Lead with subagents**](/settings?s=models&find=Lead%20with%20subagents): A session’s main agent plans, hands clear parts to subagents on cheaper tiers and checks their work.
 - [**Max for hard problems**](/settings?s=models&find=Max%20for%20hard%20problems): A main agent on Automatic may move itself to Max when a problem proves harder than Best can manage.
+- [**Your subscriptions**](/settings?s=models&find=Your%20subscriptions): The models of your Claude and ChatGPT plans, which Custom can use through Claude Code and Codex.
 - [**On this machine**](/settings?s=models&find=On%20this%20machine): Models installed here, and their downloads.
 - [**Add a model from Hugging Face**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face): The ones suggested for this computer, or search, see how each would run here, and install it.
 - [**OpenRouter**](/settings?s=models&find=OpenRouter): Models through OpenRouter, with your key.

@@ -1,18 +1,18 @@
 # Custom, der eigene Agent der App
 
-Custom ist Hydors eigener Agent. Er verwendet Modelle von OpenRouter, Ollama, vLLM oder anderen OpenAI-kompatiblen Servern mit denselben Tools, Skills und Verbindungen wie Claude Code und Codex. Hier erfährst du, was Custom kann, wie Berechtigungen und Befehlsprüfungen funktionieren und wie Auto-Modus, Sandbox, Ziele, lange Unterhaltungen, schwächere Modelle und Einstellungen zusammenspielen.
+Custom ist Hydors eigener Agent. Er verwendet die Modelle deiner Claude- und ChatGPT-Abos sowie Modelle von OpenRouter, Ollama, vLLM oder anderen OpenAI-kompatiblen Servern mit denselben Tools, Skills und Verbindungen wie Claude Code und Codex. Hier erfährst du, was Custom kann, wie Berechtigungen und Befehlsprüfungen funktionieren und wie Auto-Modus, Sandbox, Ziele, lange Unterhaltungen, schwächere Modelle und Einstellungen zusammenspielen.
 
 ![Einstellungen → Modelle: Hilfsmodell und Modelle auf diesem Computer](images/custom.webp)
 
 ## Was Custom ist und wann du ihn verwendest
 
-Claude Code verwendet ausschließlich Anthropic-Modelle, Codex ausschließlich OpenAI-Modelle. Custom nutzt dagegen jedes unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichtete Modell: offene Modelle auf deinem Computer, günstige oder kostenlose Modelle über OpenRouter oder deinen eigenen Server. Zum Hinzufügen siehe [Agenten, Konten und Modelle](/guide/agents-models).
+Claude Code verwendet ausschließlich Anthropic-Modelle, Codex ausschließlich OpenAI-Modelle. Custom nutzt dagegen auch die Modelle deiner Claude- und ChatGPT-Abos, über die Anmeldungen von Claude Code und Codex auf diesem Computer, und jedes unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichtete Modell: offene Modelle auf deinem Computer, günstige oder kostenlose Modelle über OpenRouter oder deinen eigenen Server. Für die Modelle deiner Abos musst du nichts einrichten: Sobald Claude Code angemeldet ist, bietet das Menü **Modell** von Custom Claude Opus, Fable, Sonnet und Haiku an, und sobald Codex mit ChatGPT angemeldet ist, die Modelle, die dein ChatGPT-Abo auflistet, alle unter **Deine Abos**. Sie verbrauchen die Nutzung deines Abos, keinen API-Key. Woher Customs Modelle stammen und wie du weitere hinzufügst, steht unter [Agenten, Konten und Modelle](/guide/agents-models#where-customs-models-come-from).
 
 Custom passt, wenn du:
 
-- ein lokal bleibendes Modell über Ollama oder vLLM möchtest oder eine vollständig lokale Sitzung brauchst. Eine [vertrauliche Sitzung](/guide/sessions#keep-a-session-confidential) verwendet immer Custom;
+- ein lokal bleibendes Modell über Ollama oder vLLM möchtest oder eine vollständig lokale Sitzung brauchst. Eine [vertrauliche Sitzung](/guide/sessions#keep-a-session-confidential) verwendet immer Custom und nur Modelle auf diesem Computer oder in deinem eigenen Netzwerk (nie die Modelle deiner Abos, die auf den Servern von Anthropic oder OpenAI laufen);
 - ein bestimmtes Modell wie DeepSeek, Qwen, GLM oder Kimi nutzen möchtest;
-- Kosten senken oder nach Ausschöpfung deines Claude- oder ChatGPT-Abos weiterarbeiten willst.
+- Customs eigene Tools und Regeln mit einem Modell deines Claude- oder ChatGPT-Abos nutzen, Kosten senken oder nach Ausschöpfung deines Claude- oder ChatGPT-Abos weiterarbeiten willst (mit einem Modell von anderswo).
 
 Custom unterstützt Recherche, Schreiben, Dokumente und Alltagsaufgaben. In Codeprojekten, erkennbar etwa an `package.json`, `Cargo.toml` oder einem Git-Repository, arbeitet er wie ein sorgfältiger Entwickler: erst lesen, dann ändern, Projektvorgaben beachten und vor der Fertigmeldung die Tests und Prüfungen des Projekts ausführen.
 
@@ -209,6 +209,7 @@ Nicht jedes Modell kann Tools so zuverlässig einsetzen wie Claude oder GPT. Cus
 - **Länge**: Ein Durchlauf umfasst höchstens 200 Schritte. Ab Schritt 150 soll das Modell den wichtigsten Teil abschließen. Wegen der Ausgabelänge abgeschnittene Antworten werden in kleineren Schritten fortgesetzt.
 - **Fehlerhafte Tool-Aufrufe**: Als Text geschriebene Aufrufe werden erkannt und ausgeführt, nahezu korrekte Argumente repariert und falsch geschriebene Tool-Namen zugeordnet oder mit einer Tool-Liste beantwortet.
 - **Modelle ohne Tool Calling**: Nimmt der Server keine Tool-Definitionen an, beschreibt Custom sie in den Anweisungen und liest Aufrufe aus der Modellausgabe.
+- **Claude über Claude Code**: Anthropic lässt nur eigene Programme die Anmeldung eines Abos nutzen, deshalb antwortet ein Claude-Modell deines Abos über Claude Code selbst, Schritt für Schritt. Customs Tools werden in seinen Anweisungen beschrieben, und Claude schreibt seine Tool-Aufrufe als Text, wie bei einem Modell ohne Tool Calling; jeder Schritt nutzt den Cache des vorigen wieder. Die Modelle von Codex sind anders: Sie werden direkt auf deinem ChatGPT-Abo gefragt, mit Customs Tools als echten Tools.
 - **Verbindungsprobleme**: Bei Abbrüchen während einer Antwort oder überlastetem Server wartet Custom und versucht es mehrfach erneut.
 - **Viele Tools**: Bei zahlreichen MCP- und Verbindungs-Tools sieht das Modell zuerst eine Kurzliste. Vollständige Beschreibungen und zugehörige Funktionsanweisungen lädt es bei Bedarf; siehe [Was das Modell liest](#what-the-model-reads). Modelle mit ungefähr 32.000 Kontexttoken oder weniger außerhalb von OpenRouter erhalten weniger Anweisungen: keine Hinweise zu Antwortoberflächen, eine Namensliste weiterer Tools und weniger vollständige Tool-Definitionen. Auch das Tool zum Anzeigen von HTML-Seiten wartet dann in der Liste. Zusätzlich soll das Modell kleine Schritte machen.
 - **Modellfamilien** erhalten empfohlene Einstellungen ihres Anbieters, das beim Training verwendete Änderungsformat und gegebenenfalls einen passenden Denkaufwand. Rein lesende Schritte können parallel laufen.
@@ -219,7 +220,7 @@ Stoppt Custom einen Durchlauf aus einem dieser Gründe, endet die Antwort mit �
 
 Bildfähige Modelle erhalten deine Bilder direkt. Falls ffmpeg oder ImageMagick verfügbar ist, werden große Bilder zuvor verkleinert.
 
-Andernfalls beschreibt das Hilfsmodell Bildinhalt und Anordnung und gibt vorhandenen Text wortgetreu wieder. Dafür muss es selbst Bilder verarbeiten können. Wähle unter [Einstellungen → Agenten → Modelle](/settings?s=models&find=Helper%20model) in der Gruppe **Hilfsmodell** ein entsprechend gekennzeichnetes **Modell**. „Automatisch“ unterstützt das nicht. Ohne geeignetes Hilfsmodell erfährt Custom lediglich, dass ein für ihn nicht sichtbares Bild vorhanden ist. In vertraulichen Sitzungen darf nur ein lokales Hilfsmodell Bilder beschreiben.
+Andernfalls beschreibt das Hilfsmodell Bildinhalt und Anordnung und gibt vorhandenen Text wortgetreu wieder. Dafür muss es selbst Bilder verarbeiten können. Wähle unter [Einstellungen → Agenten → Modelle](/settings?s=models&find=Helper%20model) in der Gruppe **Hilfsmodell** ein entsprechend gekennzeichnetes **Modell**. „Automatisch“ unterstützt das nicht. Ohne geeignetes Hilfsmodell erfährt Custom lediglich, dass ein für ihn nicht sichtbares Bild vorhanden ist. In vertraulichen Sitzungen darf nur ein lokales Hilfsmodell Bilder beschreiben (nie ein Modell deiner Abos).
 
 ## Verzweigen und ab hier bearbeiten
 
@@ -230,6 +231,7 @@ Custom speichert Unterhaltungen auf dem Datenträger und setzt sie nach einem Ap
 ## Was Custom kostet
 
 - Bei OpenRouter-Modellen verwendet die Sitzung die pro Aufruf gemeldeten tatsächlichen Kosten. Claude-Modelle werden ausdrücklich dazu aufgefordert, die Unterhaltung in ihrem Cache zu behalten; andere tun das selbst. Das erneute Lesen kostet so ungefähr ein Zehntel. Die angebotenen Tools ändern sich höchstens einmal pro Sitzung. Tools für Hintergrundbefehle bleiben nach dem ersten Einsatz verfügbar, damit der Cache bestehen bleibt.
+- Modelle deines Claude- oder ChatGPT-Abos (unter **Deine Abos**): die Nutzung deines Abos, kein Geld pro Token; die Sitzung zeigt für diese Schritte 0 $. Ein Konto am Nutzungslimit oder abgemeldet gibt den Schritt an dein nächstes Konto dieses Programms weiter (bei eingeschaltetem **Bei erreichtem Limit das Konto wechseln**).
 - Lokale Modelle über Ollama oder vLLM: keine Modellgebühren.
 - Andere Endpunkte: Berechnung anhand der Token wie bei anderen Agenten; siehe [Nutzung, Limits und Kosten](/guide/usage).
 
@@ -258,3 +260,4 @@ Die Modelle von Custom und das für Prüfungen zuständige **Hilfsmodell** finde
 - „Zeige meine OpenRouter-Nutzung und -Kosten ohne manuelle Modellpreise.“
 - „Warum ist meine erste Anfrage an Custom für ein lokales Modell so lang?“
 - „Wie voll ist der Kontext meiner Custom-Sitzung und was belegt den meisten Platz?“
+- „Führe meine Custom-Sitzung mit dem Sonnet meines Claude-Abos statt über OpenRouter aus.“

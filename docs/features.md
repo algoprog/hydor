@@ -125,7 +125,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,
   or none left, it stops with a banner and a **Sign in** button, and continues by itself once you are signed in
   again); the helper model's background jobs pass it over for 15 minutes, then the next signed-in account, then
-  Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added) answer; and
+  Codex, then one of your Custom models (the one Custom's Quick tier names, else the cheapest you added; not your plans' models, which go through the same two programs) answer; and
   only when nothing could do the work does a card on every page ask you to sign in again.
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
   account when every account is at its limit, and go back to the plan once it has usage again.
@@ -1350,13 +1350,14 @@ agents that speak ACP and take MCP servers.
 
 OpenRouter session costs and token usage show above the message box without a spending cap. Charges come from OpenRouter automatically, with its generation records and catalog prices as fallbacks; its catalog also supplies Usage estimates, so no manual prices are required.
 
-Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its working and starting indicators use the Hydor loading animation (water rising and falling in its Ω), vertically centred beside their text. It works like them: it reads,
+Custom is the app's own agent, for models beyond Claude Code's and Codex's, and for theirs too: it also runs the models of your Claude and ChatGPT plans. Its working and starting indicators use the Hydor loading animation (water rising and falling in its Ω), vertically centred beside their text. It works like them: it reads,
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
 about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks,
 "Edit from here" (with the files put back) and `/goal` work for it as they do for Claude Code and Codex.
 
+- **Your plans' models, and any others**: Custom's Model menu groups models under **Your subscriptions**, **On this computer** and **In the cloud**, each row with what it comes through (Claude Code, Codex, OpenRouter, Ollama, vLLM, an endpoint's name). With nothing to set up, a signed-in Claude Code offers Claude Opus, Fable, Sonnet and Haiku (always the newest of each), and Codex signed in with ChatGPT offers the models the plan lists (a program found signed out drops its models; Codex on an API key lends none). They use the plan's usage, not an API key or money per token (a session shows $0 for those steps), and each account of the program is tried in turn, so one at its limit or signed out hands the step to the next (with **Switch accounts at a limit** on). Claude's models answer through Claude Code itself, one step at a time, as Anthropic lets only its own programs use a plan's sign-in: Custom's tools are described in its instructions and Claude writes its calls as text, each step reusing the last one's cache. Codex's are asked directly on the ChatGPT plan, with Custom's tools as real tools. A confidential session never uses them. They can be picked wherever Custom's models can: the start page, a session's model menu, Custom's tiers, the helper model, an agent's or app's model. Settings → Agents → Models shows them in **Your subscriptions**, after **Tiers**.
 - **A helper for anything**: research, writing, documents and everyday tasks, with an engineer's habits in a code
   project (it runs the project's checks before it says it is done). It reads PDFs, Office files and images
   (described by the helper model for a model that does not see), and web pages as clean Markdown.

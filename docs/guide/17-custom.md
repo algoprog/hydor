@@ -1,18 +1,18 @@
 # Custom, the app's own agent
 
-Custom is Hydor's own agent: it runs any model you add, from OpenRouter, Ollama, vLLM or another OpenAI-compatible server, with the same tools, skills and connections as Claude Code and Codex. This topic covers what it can do, its permission modes and how it checks commands, Auto mode, the sandbox for commands, goals, how it copes with long work and weaker models, and its settings.
+Custom is Hydor's own agent: it runs the models of your Claude and ChatGPT plans, and any model you add, from OpenRouter, Ollama, vLLM or another OpenAI-compatible server, with the same tools, skills and connections as Claude Code and Codex. This topic covers what it can do, its permission modes and how it checks commands, Auto mode, the sandbox for commands, goals, how it copes with long work and weaker models, and its settings.
 
 ![Settings → Models: the helper model, and models on this computer](images/custom.webp)
 
 ## What Custom is, and when to use it
 
-Claude Code only runs Anthropic's models, and Codex only OpenAI's. Custom runs any model you set up in [Settings → Agents → Models](/settings?s=models): open models on your own computer, cheap or free models through OpenRouter, or a server of your own. See [Agents, accounts and models](/guide/agents-models) for adding models.
+Claude Code only runs Anthropic's models, and Codex only OpenAI's. Custom runs the models of your Claude and ChatGPT plans too, through the sign-ins of Claude Code and Codex on this computer, and any model you set up in [Settings → Agents → Models](/settings?s=models): open models on your own computer, cheap or free models through OpenRouter, or a server of your own. There is nothing to set up for your plans' models: once Claude Code is signed in, Custom's **Model** menu offers Claude Opus, Fable, Sonnet and Haiku, and once Codex is signed in with ChatGPT, the models your ChatGPT plan lists, all under **Your subscriptions**. They use your plan's usage, not an API key. See [Agents, accounts and models](/guide/agents-models#where-customs-models-come-from) for where Custom's models come from and for adding more.
 
 Use Custom when you want:
 
-- a model that never leaves your computer (Ollama or vLLM), or a whole session that doesn't: a [confidential session](/guide/sessions#keep-a-session-confidential) always runs on Custom;
+- a model that never leaves your computer (Ollama or vLLM), or a whole session that doesn't: a [confidential session](/guide/sessions#keep-a-session-confidential) always runs on Custom, and uses only models on this computer or your own network (never the models of your plans, which run on Anthropic's or OpenAI's servers);
 - a particular model, such as DeepSeek, Qwen, GLM or Kimi;
-- to keep costs down, or to work when your Claude or ChatGPT plan is used up.
+- Custom's own tools and rules with a model of your Claude or ChatGPT plan, or to keep costs down, or to work when your Claude or ChatGPT plan is used up (with a model from elsewhere).
 
 It helps with anything: research, writing, documents and everyday tasks. In a code project (a folder with a `package.json`, `Cargo.toml`, a git repository and the like) it works like a careful engineer: it reads before it changes, follows the project's own instructions, and runs the project's tests and checks before it says it's done.
 
@@ -209,6 +209,7 @@ Not every model is as practised with tools as Claude or GPT. Custom catches the 
 - **Length**: a turn takes at most 200 steps; at 150 the model is told to finish the most important part. A reply cut off by the model's length limit is continued in shorter steps.
 - **Broken tool calls**: calls written as text are read and run, calls with almost-right arguments are repaired, and a misspelt tool name is matched to the right one or answered with the list of tools.
 - **Models without tool calling**: when a model's server takes no tools, Custom describes them in the instructions and reads the model's calls from what it writes.
+- **Claude through Claude Code**: Anthropic lets only its own programs use a plan's sign-in, so a Claude model of your plan answers through Claude Code itself, one step at a time. Custom's tools are described in its instructions and Claude writes its tool calls as text, as for a model without tool calling, and each step reuses the cache of the last one. Codex's models are different: they are asked directly on your ChatGPT plan, with Custom's tools as real tools.
 - **Hiccups**: when the connection breaks mid-reply, or the server is busy, Custom waits and tries again a few times.
 - **Many tools**: when there are many (from MCP servers and connections), the model sees a short list and looks up the full description of the ones it needs; a feature's instructions about a tool come with it, when the model looks it up or uses it (see [What the model reads](#what-the-model-reads)). A model with a short context (about 32,000 tokens or less, not through OpenRouter) gets a leaner set: no guidance on answer UIs, a list of tools by name only, and fewer tools in full (the one that shows a page of HTML waits in the list too). It is also asked to take small steps.
 - **Each model family** gets its maker's recommended settings, the edit format it was trained on, and a reasoning effort where it has one. Steps that only read run at the same time, to save waiting.
@@ -219,7 +220,7 @@ When Custom stops a turn for one of these reasons, the reply ends with "(Stopped
 
 A model that sees images gets your pictures directly. Pictures are made smaller first when this computer has ffmpeg or ImageMagick.
 
-For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" in the **Model** menu of the **Helper model** group. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures.
+For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" in the **Model** menu of the **Helper model** group. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures (a model of your plans never does).
 
 ## Forks and Edit from here
 
@@ -230,6 +231,7 @@ Custom keeps each conversation on disk, so it carries on after the app restarts.
 ## What Custom costs
 
 - Models through OpenRouter: OpenRouter reports what each call cost, and the session's spending uses that. Claude models there are asked to keep the conversation in their cache, as the others do on their own, so each step reads it back for about a tenth of the price; and the tools Custom is offered change at most once in a session (the tools for commands running in the background stay once one has run), so that cache holds.
+- Models of your Claude or ChatGPT plan (under **Your subscriptions**): your plan's usage, not money per token, so a session shows $0 for those steps. An account at its usage limit or signed out hands the step to your next account of that program (with **Switch accounts at a limit** on).
 - Models on this computer (Ollama, vLLM): nothing.
 - Other endpoints: the tokens are priced like the other agents' (see [Usage, limits and costs](/guide/usage)).
 
@@ -258,3 +260,4 @@ Custom's models are in [Settings → Agents → Models](/settings?s=models), and
 - "Show my OpenRouter usage and costs without entering model prices."
 - "Why is my first message to Custom so long for a local model?"
 - "How full is the context of my Custom session, and what takes the most?"
+- "Run my Custom session on my Claude plan's Sonnet instead of OpenRouter."

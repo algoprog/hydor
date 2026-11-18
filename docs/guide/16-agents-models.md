@@ -10,7 +10,7 @@ An agent is the program that does the work in a session: it reads your message, 
 
 - **Claude Code** (Anthropic). Runs on your Claude plan, or bills an Anthropic API account. Its models are Anthropic's (Opus, Sonnet, Haiku). It has its own usage limits, which the [Usage page](/usage) shows.
 - **Codex** (OpenAI). Runs on your ChatGPT plan. Its models are OpenAI's. It has usage limits too, shown on the Usage page. Codex comes with the app.
-- **Custom**, the app's own agent. It runs any model you add in [Settings → Agents → Models](/settings?s=models): models through OpenRouter, models on this computer (with Ollama or vLLM), or any OpenAI-compatible endpoint. Use it for open models, cheaper models, or models that never leave your computer. See [Custom, the app's own agent](/guide/custom).
+- **Custom**, the app's own agent. It runs the models of your Claude and ChatGPT plans (through Claude Code's and Codex's sign-ins), and any model you add in [Settings → Agents → Models](/settings?s=models): models through OpenRouter, models on this computer (with Ollama or vLLM), or any OpenAI-compatible endpoint. Use it for open models, cheaper models, or models that never leave your computer. See [Custom, the app's own agent](/guide/custom).
 - **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build (xAI's coding agent, with its Grok models) and others, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
 
 What each can do in the app:
@@ -69,7 +69,7 @@ Agents pick models by tier instead of by name: **Quick** for small, very clear j
 
 On the start page, **Model** opens on **Automatic**: the session starts on Best. Its main agent hands clear parts to subagents on Standard and Quick, and may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find, a proof); a line in the conversation says so, with why. A request is not sent to Max on its wording alone: Best solves most of what reads as hard, for less. Pick a model by name instead and the session thinks with that one; its subagents still get tiers. An agent of yours can think with one tier instead (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
 
-[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program: a row for each tier, with a switch beside the group's title to pick the program (**Claude Code**, **Codex** or **Custom**), and in each row a model and, for Claude Code and Codex, an effort. A tier's (i) says more about it. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Quick is Luna, Standard is Terra, Best is Sol and Max is Astra (on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults**, in the **⋯** menu beside the title, puts them back.
+[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program: a row for each tier, with a switch beside the group's title to pick the program (**Claude Code**, **Codex** or **Custom**), and in each row a model and, for Claude Code and Codex, an effort. A tier's (i) says more about it. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Quick is Luna, Standard is Terra, Best is Sol and Max is Astra (on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); Custom has none, so its sessions keep the model they picked until you choose one of its models (a model on this computer makes Quick free). On the **Custom** tab a tier can name a model of your Claude or ChatGPT plan too (see [Where Custom's models come from](#where-customs-models-come-from)). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults**, in the **⋯** menu beside the title, puts them back.
 
 Two switches in the **Tiers in sessions** group under the tiers say how sessions use them:
 
@@ -275,15 +275,25 @@ The app opens a session in the folder you pick, shows the agent's messages and s
 
 ## Where Custom's models come from
 
-Custom runs any model you set up in [Settings → Agents → Models](/settings?s=models), with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model. The page has five parts, from top to bottom:
+Custom runs the models of your Claude and ChatGPT plans, models on this computer and models in the cloud, with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model. They come from three places:
+
+- **Your subscriptions**: the models of your Claude and ChatGPT plans, through the sign-ins of Claude Code and Codex on this computer. There is nothing to set up: when Claude Code is signed in, Custom's **Model** menu offers Claude Opus, Fable, Sonnet and Haiku (always the newest of each), and when Codex is signed in with ChatGPT, it offers the models your ChatGPT plan lists (for example GPT-6 Luna). A program that is found signed out loses its models from the menu until you sign it in again, and Codex signed in with an API key instead of ChatGPT lends none. They use your plan's usage, not an API key and not money per token, so a Custom session on one shows $0 for those steps. Each account of the program is tried in turn, as with other one-off work: an account at its usage limit or signed out hands the step to your next account (with **Switch accounts at a limit** on). A [confidential session](/guide/sessions#keep-a-session-confidential) never uses them, because they run on Anthropic's or OpenAI's servers. See [Custom](/guide/custom#what-custom-is-and-when-to-use-it) for how they answer.
+- **On this computer**: models installed here (Ollama, vLLM), and endpoints on your network.
+- **In the cloud**: OpenRouter, endpoints elsewhere, and Ollama's cloud models.
+
+You can pick them anywhere Custom's models can be picked: the start page, a session's model menu, Custom's tiers, the helper model, and an agent's or app's model.
+
+[Settings → Agents → Models](/settings?s=models) has everything Custom's models need. The page has seven parts, from top to bottom:
 
 - **Helper model**: the model for the app's small jobs.
+- **Tiers**: a model for each kind of job (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)).
+- **Your subscriptions**: a row each for Claude Code and Codex, with the models it lends Custom. A row says "Signed out: sign in again to use these models" with a link to **Accounts**, or "Not installed on this computer".
 - **On this machine**: what this computer has, and the models installed here.
 - **Add a model from Hugging Face**: search, check and install open models.
 - **OpenRouter**: hundreds of models through one key, in three groups: your key, the models you added, and a search to add more.
 - **Runtimes and endpoints**: Ollama, vLLM, other OpenAI-compatible servers, and a Hugging Face token.
 
-In Custom's **Model** menu, hover over a model to see where it runs and how much it reads at once, for example "OpenRouter · 128K context" or "vLLM, on this machine · 32K context · starts when used". The lists refresh by themselves every minute.
+In Custom's **Model** menu, the models are grouped under **Your subscriptions**, **On this computer** and **In the cloud**, and each row says what it comes through: "Claude Code", "Codex", "OpenRouter", "Ollama", "vLLM" or an endpoint's name. Hover over a model to see where it runs and how much it reads at once, for example "OpenRouter · 128K context" or "vLLM, on this machine · 32K context · starts when used". The lists refresh by themselves every minute.
 
 ## Choose the helper model
 
@@ -301,8 +311,8 @@ The helper model does small jobs beside your sessions, outside any conversation:
 
 Open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and click the **Model** menu in the **Helper model** group (its (i) lists the small jobs):
 
-- **Automatic** (the default): Claude Haiku through Claude Code, or Codex when Claude Code can't answer. An account at its usage limit hands the question to your next signed-in account first (with **Switch accounts at a limit** on), and a signed-out account is passed over. When neither program can answer, one of your Custom models does the job (the one the **Quick** tier of Custom names, else the cheapest you added), and only when nothing could do it does a card ask you to sign in (see [When an account is signed out](#when-an-account-is-signed-out)). When nothing answers, the error says why for each: "You've hit your weekly limit", a model your Codex plan doesn't offer…
-- Any of Custom's models, with where it runs (openrouter, ollama, vllm or endpoint) and "sees images" for those that can see.
+- **Automatic** (the default): Claude Haiku through Claude Code, or Codex when Claude Code can't answer. An account at its usage limit hands the question to your next signed-in account first (with **Switch accounts at a limit** on), and a signed-out account is passed over. When neither program can answer, one of your Custom models does the job (the one the **Quick** tier of Custom names, else the cheapest you added; the models of your plans are skipped here, since they go through the same two programs), and only when nothing could do it does a card ask you to sign in (see [When an account is signed out](#when-an-account-is-signed-out)). When nothing answers, the error says why for each: "You've hit your weekly limit", a model your Codex plan doesn't offer…
+- Any of Custom's models, grouped as in Custom's **Model** menu (**Your subscriptions**, **On this computer** and **In the cloud**), with what it comes through (Claude Code, Codex, OpenRouter, Ollama, vLLM or an endpoint's name) and "sees images" for those that can see. A model of your Claude or ChatGPT plan can be the helper too: it answers through Claude Code or Codex on your plan's usage.
 
 Automatic can't look at pictures. If you use Custom with a model that doesn't see images, pick a helper model that sees images, or Custom can't have your pictures described.
 
@@ -458,6 +468,7 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Find a model on Hugging Face that runs well on this computer and sees images, check it, and install the best size."
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)
 - "Make the helper model one that sees images."
+- "Use my Claude plan's Sonnet in a Custom session, and show me what it costs."
 - "Stop the vLLM model that's running, to free the graphics card."
 - "Use all my Claude accounts: when one hits its limit, carry on with another."
 - "When all my Claude accounts run out, carry on with my API credit."

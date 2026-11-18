@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { Check, ChevronRight, Cpu, Gauge, ShieldCheck } from 'lucide-react';
 import { AUTO_MODEL, modelFamily as family, newerVersion as newer } from '@shared/tiers';
-import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
+import type { Agent, AgentCatalog, ModelOption, ModelSource, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
 import { go } from '../lib/nav';
 import { agentName } from './AgentIcon';
-import { cx, OptionRow, Picker } from './ui';
+import { cx, MenuLabel, OptionRow, Picker } from './ui';
 
 type Catalog = AgentCatalog & { prefs?: SessionPrefs };
 
@@ -94,6 +94,13 @@ function modelRows(c: Catalog, named = false): ModelRow[] {
   });
 }
 
+/** Custom's models by where they come from, in this order; Claude Code's and Codex's lists have no source and show as one. */
+export const MODEL_SOURCES: { source: ModelSource; title: string }[] = [
+  { source: 'subscription', title: 'Your subscriptions' },
+  { source: 'local', title: 'On this computer' },
+  { source: 'cloud', title: 'In the cloud' },
+];
+
 function ModelMenu({
   agent,
   c,
@@ -137,6 +144,10 @@ function ModelMenu({
   const found = (r: ModelRow) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w));
   const shown = words.length ? rows.filter(found) : rows.filter((r) => !r.older || open || selected(r));
   const hidden = words.length ? 0 : rows.length - shown.length;
+  // Custom's rows carry their source: three sections, an empty one (or one with no match) left out.
+  const sections: { title?: string; rows: ModelRow[] }[] = shown.some((r) => r.opt.source)
+    ? [...MODEL_SOURCES.map(({ source, title }) => ({ title, rows: shown.filter((r) => r.opt.source === source) })), { title: undefined, rows: shown.filter((r) => !r.opt.source) }].filter((x) => x.rows.length)
+    : [{ rows: shown }];
   return (
     <div className="py-0.5">
       {rows.length > 8 && (
@@ -145,7 +156,7 @@ function ModelMenu({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && shown[0]) onPick(shown[0].value);
+            if (e.key === 'Enter' && sections[0]) onPick(sections[0].rows[0].value);
           }}
           placeholder="Search models"
           className="mx-1 mb-1 h-8 w-[calc(100%-8px)] rounded-lg bg-bg-2 px-2.5 text-[13px] outline-none placeholder:text-fg-3"
@@ -164,18 +175,28 @@ function ModelMenu({
           {isAuto && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
         </button>
       )}
-      {shown.map((r) => (
-        <button
-          key={r.opt.value}
-          type="button"
-          title={r.hint}
-          onClick={() => onPick(r.value)}
-          className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-bg-2', selected(r) && 'bg-bg-2')}
-        >
-          <span className="min-w-0 flex-1 truncate text-fg">{r.label}</span>
-          {r.isDefault && <span className="shrink-0 text-[11px] text-fg-3">default</span>}
-          {selected(r) && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
-        </button>
+      {sections.map((sec) => (
+        <div key={sec.title ?? ''}>
+          {sec.title && <MenuLabel>{sec.title}</MenuLabel>}
+          {sec.rows.map((r) => (
+            <button
+              key={r.opt.value}
+              type="button"
+              title={r.hint}
+              onClick={() => onPick(r.value)}
+              className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] transition-colors hover:bg-bg-2', selected(r) && 'bg-bg-2')}
+            >
+              <span className="min-w-0 flex-1 truncate text-fg">{r.label}</span>
+              {r.isDefault && <span className="shrink-0 text-[11px] text-fg-3">default</span>}
+              {r.opt.via && (
+                <span className="shrink-0 text-[11px] text-fg-3" translate="no">
+                  {r.opt.via}
+                </span>
+              )}
+              {selected(r) && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+            </button>
+          ))}
+        </div>
       ))}
       {hidden > 0 && (
         <button type="button" onClick={() => setOpen(true)} className="flex h-7.5 w-full items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
@@ -240,12 +261,14 @@ export function ModelPicker({
   if (agent === 'acp' && !c?.models.length) return null;
   const isAuto = !!auto && value === AUTO_MODEL;
   const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
+  // Custom's model: what it comes through, with the name in the title.
+  const via = !isAuto && !def ? findModel(c, value)?.via : undefined;
   return (
     <Picker
       icon={<Cpu size={label ? 14 : 13} className="shrink-0" />}
       label={label}
       value={isAuto ? 'Automatic' : c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
-      title={isAuto ? `Model: ${auto}` : def ? `Model: ${agentName(agent)}'s default` : 'Model'}
+      title={isAuto ? `Model: ${auto}` : def ? `Model: ${agentName(agent)}'s default` : via ? `Model: ${modelLabel(c, value)} · ${via}` : 'Model'}
       disabled={disabled}
       width={260}
     >

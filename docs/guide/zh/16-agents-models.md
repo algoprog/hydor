@@ -10,7 +10,7 @@ Hydor 可以运行好几种 AI 智能体：Claude Code、Codex、Custom（应用
 
 - **Claude Code**（Anthropic）。使用你的 Claude 套餐运行，或者从 Anthropic API 账户计费。它的模型是 Anthropic 的（Opus、Sonnet、Haiku）。它有自己的用量限制，显示在[用量页面](/usage)上。
 - **Codex**（OpenAI）。使用你的 ChatGPT 套餐运行。它的模型是 OpenAI 的。它也有用量限制，同样显示在用量页面上。Codex 随应用一起提供。
-- **Custom**，应用自己的智能体。它可以运行你在[设置 → 智能体 → 模型](/settings?s=models)中添加的任何模型：通过 OpenRouter 使用的模型、这台电脑上的模型（用 Ollama 或 vLLM），或者任何兼容 OpenAI 的端点。想用开放模型、更便宜的模型，或者完全不离开你电脑的模型时，就用它。请看[Custom，应用自己的智能体](/guide/custom)。
+- **Custom**，应用自己的智能体。它可以运行你的 Claude 和 ChatGPT 套餐的模型（通过 Claude Code 和 Codex 的登录），以及你在[设置 → 智能体 → 模型](/settings?s=models)中添加的任何模型：通过 OpenRouter 使用的模型、这台电脑上的模型（用 Ollama 或 vLLM），或者任何兼容 OpenAI 的端点。想用开放模型、更便宜的模型，或者完全不离开你电脑的模型时，就用它。请看[Custom，应用自己的智能体](/guide/custom)。
 - **支持 ACP 的智能体**：Gemini CLI、OpenCode、Qwen Code、Goose、Kimi CLI、Auggie、Grok Build（xAI 的编程智能体，使用它自己的 Grok 模型）等，或者你自己的命令。ACP（Agent Client Protocol，智能体客户端协议）是应用与智能体程序对话的一种通用方式。每个智能体都在它自己的程序里登录一次，并使用它自己的模型。
 
 各自在应用里能做什么：
@@ -69,7 +69,7 @@ Grok 的模型支持思考强度，选项和 Claude Code、Codex 一样：
 
 在开始页上，**模型**一开始是**自动**：会话从最佳开始。它的主智能体把明确的部分交给标准和快速档位上的子智能体，并且在问题难到最佳应付不了时（一个修了两次都没成功的问题、一个找不到的原因、一个证明），可以自己切换到最高；对话里会有一行说明并给出原因。请求不会仅凭措辞就被送到最高：最佳能解决大多数看起来很难的问题，而且花费更少。改为按名称选一个模型，会话就用那个模型思考；它的子智能体仍然会得到档位。你的智能体可以只用一个档位思考（见[智能体用什么思考：档位](/guide/agents#what-an-agent-thinks-with-tiers)）。
 
-[设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers)说明每个档位在每个程序中的含义：每个档位一行，该组标题旁有一个开关，用来选择程序（**Claude Code**、**Codex** 或 **Custom**），每一行里是一个模型，以及（Claude Code 和 Codex 的）投入程度。档位的 (i) 会多说几句。初始时，Claude Code 的快速是 Haiku、标准是 Sonnet、最佳是 Opus、最高是最新的 Fable；Codex 的快速是 Luna、标准是 Terra、最佳是 Sol、最高是 Astra（如果套餐里没有其中某个，就用它提供的最接近的一个，两个档位共用一个模型时，较高的档位投入程度更高）；Custom 没有设定，所以它的会话会沿用它们所选的模型，直到你选择你的某个 Custom 模型（用这台电脑上的模型，快速档就是免费的）。你没去改动的档位，会跟随其程序中同类模型的最新版本。标题旁 **⋯** 菜单里的**恢复默认**会把它们改回去。
+[设置 → 智能体 → 模型 → 档位](/settings?s=models&find=Tiers)说明每个档位在每个程序中的含义：每个档位一行，该组标题旁有一个开关，用来选择程序（**Claude Code**、**Codex** 或 **Custom**），每一行里是一个模型，以及（Claude Code 和 Codex 的）投入程度。档位的 (i) 会多说几句。初始时，Claude Code 的快速是 Haiku、标准是 Sonnet、最佳是 Opus、最高是最新的 Fable；Codex 的快速是 Luna、标准是 Terra、最佳是 Sol、最高是 Astra（如果套餐里没有其中某个，就用它提供的最接近的一个，两个档位共用一个模型时，较高的档位投入程度更高）；Custom 没有设定，所以它的会话会沿用它们所选的模型，直到你选择它的某个模型（用这台电脑上的模型，快速档就是免费的）。在 **Custom** 标签页上，一个档位也可以指定你的 Claude 或 ChatGPT 套餐的模型（见 [Custom 的模型从哪里来](#where-customs-models-come-from)）。你没去改动的档位，会跟随其程序中同类模型的最新版本。标题旁 **⋯** 菜单里的**恢复默认**会把它们改回去。
 
 档位下面**会话中的档位**组里的两个开关决定会话怎样使用它们：
 
@@ -274,15 +274,25 @@ Claude Code、Codex 或 Grok Build 的账户可能会退出登录：它的登录
 
 ## Custom 的模型从哪里来
 
-Custom 可以运行你在[设置 → 智能体 → 模型](/settings?s=models)中设置的任何模型，并使用和其他智能体相同的工具、技能和 MCP 服务器。在开始页上选 Custom，再选模型。这个页面从上到下分成五个部分：
+Custom 可以运行你的 Claude 和 ChatGPT 套餐的模型、这台电脑上的模型和云端的模型，并使用和其他智能体相同的工具、技能和 MCP 服务器。在开始页上选 Custom，再选模型。它们来自三个地方：
+
+- **你的订阅**：你的 Claude 和 ChatGPT 套餐的模型，通过这台电脑上 Claude Code 和 Codex 的登录使用。什么都不用设置：Claude Code 登录后，Custom 的**模型**菜单会提供 Claude Opus、Fable、Sonnet 和 Haiku（始终是每种的最新版本）；Codex 用 ChatGPT 登录后，则提供你的 ChatGPT 套餐列出的模型（例如 GPT-6 Luna）。发现已退出登录的程序，它的模型会从菜单中消失，直到你重新登录；用 API 密钥而不是 ChatGPT 登录的 Codex 不提供任何模型。它们用的是你套餐的用量，不是 API 密钥，也不是按 token 付费，所以 Custom 会话用它们的这些步骤显示 $0。程序的每个账户会依次尝试，和其他一次性工作一样：达到用量限额或已退出登录的账户会把这一步交给你的下一个账户（需开启**达到限额时切换账户**）。[保密会话](/guide/sessions#keep-a-session-confidential)从不使用它们，因为它们运行在 Anthropic 或 OpenAI 的服务器上。它们如何回答，见 [Custom](/guide/custom#what-custom-is-and-when-to-use-it)。
+- **在这台电脑上**：装在这里的模型（Ollama、vLLM），以及你网络中的端点。
+- **在云端**：OpenRouter、其他地方的端点，以及 Ollama 的云端模型。
+
+Custom 的模型能在哪里选，它们就能在哪里选：开始页、会话的模型菜单、Custom 的档位、辅助模型，以及智能体或应用的模型。
+
+[设置 → 智能体 → 模型](/settings?s=models)包含 Custom 的模型需要的一切。这个页面从上到下分成七个部分：
 
 - **辅助模型**：负责应用里各种小活的模型。
+- **档位**：为每一类工作配一个模型（见[按工作类型选模型：档位](#tiers-a-model-for-each-kind-of-job)）。
+- **你的订阅**：Claude Code 和 Codex 各一行，写着它借给 Custom 的模型。一行会写“已退出登录：请重新登录以使用这些模型”，并带一个通往**账户**的链接，或者写“这台电脑上未安装”。
 - **在本机**：这台电脑有什么，以及装在这里的模型。
 - **从 Hugging Face 添加模型**：搜索、查看并安装开放模型。
 - **OpenRouter**：一个密钥就能用上数百个模型，分三组：你的密钥、你添加的模型，以及用来添加更多模型的搜索。
 - **运行时和端点**：Ollama、vLLM、其他兼容 OpenAI 的服务器，以及 Hugging Face 令牌。
 
-在 Custom 的**模型**菜单中，把鼠标悬停在一个模型上，可以看到它在哪里运行、一次能读多少内容，例如“OpenRouter · 128K 上下文”或“vLLM，在本机 · 32K 上下文 · 用到时启动”。这些列表每分钟会自动刷新。
+在 Custom 的**模型**菜单中，模型分在**你的订阅**、**在这台电脑上**和**在云端**这几组下，每一行都写着它通过什么运行：“Claude Code”、“Codex”、“OpenRouter”、“Ollama”、“vLLM”或某个端点的名称。把鼠标悬停在一个模型上，可以看到它在哪里运行、一次能读多少内容，例如“OpenRouter · 128K 上下文”或“vLLM，在本机 · 32K 上下文 · 用到时启动”。这些列表每分钟会自动刷新。
 
 ## 选择辅助模型
 
@@ -300,8 +310,8 @@ Custom 可以运行你在[设置 → 智能体 → 模型](/settings?s=models)�
 
 打开[设置 → 智能体 → 模型](/settings?s=models&find=Helper%20model)，点击**辅助模型**组里的**模型**菜单（它的 (i) 列出这些小活）：
 
-- **自动**（默认）：通过 Claude Code 使用 Claude Haiku，Claude Code 无法回答时则用 Codex。达到用量限额的账户会先把问题交给你下一个已登录的账户（需开启**达到限额时切换账户**），已退出登录的账户会被跳过。两个程序都无法回答时，由你的某个 Custom 模型来做（Custom 的**快速**档位指定的那个，否则是你添加的最便宜的），只有在没有任何办法完成时，才会有一张卡片请你登录（见[当某个账户已退出登录](#when-an-account-is-signed-out)）。都无法回答时，错误信息会分别说明原因：“You've hit your weekly limit”、你的 Codex 套餐不提供的模型……
-- Custom 的任何一个模型，注明它在哪里运行（openrouter、ollama、vllm 或 endpoint），能看图片的还会标有“能看图片”。
+- **自动**（默认）：通过 Claude Code 使用 Claude Haiku，Claude Code 无法回答时则用 Codex。达到用量限额的账户会先把问题交给你下一个已登录的账户（需开启**达到限额时切换账户**），已退出登录的账户会被跳过。两个程序都无法回答时，由你的某个 Custom 模型来做（Custom 的**快速**档位指定的那个，否则是你添加的最便宜的；你套餐的模型在这里会被跳过，因为它们走的是同样这两个程序），只有在没有任何办法完成时，才会有一张卡片请你登录（见[当某个账户已退出登录](#when-an-account-is-signed-out)）。都无法回答时，错误信息会分别说明原因：“You've hit your weekly limit”、你的 Codex 套餐不提供的模型……
+- Custom 的任何一个模型，分组与 Custom 的**模型**菜单相同（**你的订阅**、**在这台电脑上**和**在云端**），注明它通过什么运行（Claude Code、Codex、OpenRouter、Ollama、vLLM 或某个端点的名称），能看图片的还会标有“能看图片”。你的 Claude 或 ChatGPT 套餐的模型也可以当辅助模型：它通过 Claude Code 或 Codex 回答，用的是你套餐的用量。
 
 “自动”看不了图片。如果你在 Custom 中使用的模型看不了图片，请选一个能看图片的辅助模型，否则 Custom 就没法请辅助模型描述你的图片。
 
@@ -462,4 +472,5 @@ vLLM 是一个在 NVIDIA 显卡上运行模型的快速服务器，也是这里�
 - “我的 Claude 账户都用完限额时，用我的 API 额度继续。”
 - “Claude Code 和 Codex 的每个档位各用哪个模型？把最高设为 Claude Code 用 Opus。”
 - “为什么 Hydor 请我重新登录 Claude Code？”
+- “在 Custom 会话里用我 Claude 套餐的 Sonnet，并告诉我它花多少钱。”
 - “我的 Claude Code 账户已退出登录：我的哪些会话在等它，它们能用另一个账户继续吗？”

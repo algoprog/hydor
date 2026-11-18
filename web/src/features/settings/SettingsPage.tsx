@@ -69,7 +69,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code, Codex and Grok Build sign-ins every session uses' },
       { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP' },
-      { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
+      { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: your Claude and ChatGPT plans through Claude Code and Codex, models on this computer, and OpenRouter or other providers in the cloud' },
       { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a project, or in one session' },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
       { id: 'skills', label: 'Skills', icon: Sparkles, sub: 'Written methods agents load when a task calls for one: built in, yours, from plugins and the agents’ own' },

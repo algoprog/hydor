@@ -2,7 +2,7 @@ import './env-compat.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import compress from '@fastify/compress';
@@ -10,6 +10,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
+import { isSubscription } from '../shared/types.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { AuthManager, clientAddress, HttpError, SESSION_COOKIE } from './auth.ts';
 import { isInternal } from './internal.ts';
@@ -41,6 +42,8 @@ import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
+import { initPlans, planChat, planModels } from './models/subscription.ts';
+import { ContextOverflow, setPlanGateway, StreamCut, type ChatMessage, type ToolSchema } from './agent/llm.ts';
 import { clients as agentClients, clientUpdates, ensureCommand, install as installClient, setClientAutoUpdate, startClientUpdates, watchClients } from './clients.ts';
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
@@ -894,10 +897,22 @@ const atLimit = (agent: 'claude' | 'codex', id: string | undefined) => {
 };
 // Accounts found signed out and the prompts to sign in again (server/signin.ts) reach every page, and are named as people know them.
 initSignIn({ broadcast, nameOf: (agent, account) => sessions.accountName(agent, account) });
-setOneShotAccounts((agent) => {
+const accountsToAsk = (agent: 'claude' | 'codex') => {
   const pool = autoSwitchOn(db) ? accountPool(db, agent) : [undefined];
   return [...pool.filter((id) => !atLimit(agent, id)), ...pool.filter((id) => atLimit(agent, id))].map((id) => ({ ...(id ? { account: id } : {}), env: accountEnv(db, agent, id) }));
+};
+setOneShotAccounts(accountsToAsk);
+// Custom's models of your Claude and ChatGPT plans: asked through Claude Code's and Codex's sign-ins, the accounts in
+// the same order (server/models/subscription.ts), by the helper and the app here and by Custom's sessions through
+// their run's address (/agent/run/:token/model).
+initPlans({
+  accounts: accountsToAsk,
+  codexToken: (account, refresh) => sessions.controlFor('codex', account).authToken(refresh),
+  claudeModels: () => sessions.controlFor('claude').models(),
+  codexModels: () => sessions.controlFor('codex').models(),
 });
+setPlanGateway(planChat);
+models.setPlans(planModels);
 // Each session started from now on runs within the limits set in Settings → General (server/resources.ts).
 setRunnerWrap((runId, cmd, args) => {
   const limits = limitsOf(db);
@@ -951,6 +966,48 @@ app.post('/api/models/stop', async (req) => {
 app.post('/agent/run/:token/ensure', async (req, reply) => {
   if (!runOf((req.params as { token: string }).token)) return reply.code(403).send({ error: 'Not a running agent' });
   return { model: await models.ensure(String((req.body as { id?: string } | undefined)?.id ?? '')) };
+});
+/**
+ * Custom asks a model of your Claude or ChatGPT plan (server/models/subscription.ts); its run's token is the permission.
+ * The reply streams back a JSON object a line: pieces of text and reasoning, then the reply or what went wrong.
+ */
+app.post('/agent/run/:token/model', async (req, reply) => {
+  const run = runOf((req.params as { token: string }).token);
+  if (!run) return reply.code(403).send({ error: 'Not a running agent' });
+  const b = (req.body ?? {}) as { id?: string; messages?: ChatMessage[]; tools?: ToolSchema[]; toolChoice?: 'auto' | 'none'; maxTokens?: number; cacheKey?: string };
+  const m = models.agentModels().find((x) => x.id === b.id);
+  if (!m || !isSubscription(m.provider)) return reply.code(404).send({ error: `${b.id ?? 'That model'} is not one of your plans' models here: Claude Code or Codex may be signed out (Settings → Models)` });
+  if (!Array.isArray(b.messages) || !b.messages.length) return reply.code(400).send({ error: 'No conversation to answer' });
+  // A confidential session uses only models on this computer (its agent offers no others, and the app refuses them too).
+  const live = sessions.liveByRun(run);
+  if (live && confidentialKey(db, live.key)) return reply.code(409).send({ error: 'A confidential session uses only models on this computer' });
+  const out = new PassThrough();
+  const ac = new AbortController();
+  const line = (o: object) => {
+    if (!out.writableEnded) out.write(JSON.stringify(o) + '\n');
+  };
+  // The session stopped (its agent closed the request): the program stops too.
+  reply.raw.on('close', () => {
+    if (!out.writableEnded) ac.abort();
+  });
+  const ping = setInterval(() => line({ t: 'ping' }), 15_000);
+  void planChat(m, {
+    messages: b.messages,
+    tools: Array.isArray(b.tools) ? b.tools : undefined,
+    toolChoice: b.toolChoice === 'none' ? 'none' : 'auto',
+    maxTokens: typeof b.maxTokens === 'number' ? b.maxTokens : undefined,
+    cacheKey: typeof b.cacheKey === 'string' ? b.cacheKey : undefined,
+    signal: ac.signal,
+    onText: (v) => line({ t: 'text', v }),
+    onReasoning: (v) => line({ t: 'reasoning', v }),
+  })
+    .then((r) => line({ t: 'reply', reply: r }))
+    .catch((e) => line({ t: 'error', kind: e instanceof ContextOverflow ? 'overflow' : e instanceof StreamCut ? 'cut' : 'error', message: (e as Error)?.message ?? String(e), ...(e instanceof ContextOverflow ? { limit: e.limit, prompt: e.prompt } : {}) }))
+    .finally(() => {
+      clearInterval(ping);
+      out.end();
+    });
+  return reply.header('content-type', 'application/x-ndjson; charset=utf-8').header('cache-control', 'no-store').send(out);
 });
 /** Custom asks the helper model to put images into words, for a model that does not see them; its run's token is the permission. */
 app.post('/agent/run/:token/describe', async (req, reply) => {

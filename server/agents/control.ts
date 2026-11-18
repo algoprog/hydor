@@ -149,6 +149,15 @@ export class CodexControl extends EventEmitter {
     }
   }
 
+  /**
+   * The ChatGPT token Codex signs in with (Codex refreshes it first when asked, and keeps its own copy current), and how
+   * it signs in: Custom's models of your ChatGPT plan are asked with it (server/models/subscription.ts).
+   */
+  async authToken(refresh = false): Promise<{ token: string | null; method: string | null }> {
+    const r = await this.call('getAuthStatus', { includeToken: true, refreshToken: refresh });
+    return { token: typeof r?.authToken === 'string' && r.authToken ? r.authToken : null, method: typeof r?.authMethod === 'string' ? r.authMethod : null };
+  }
+
   async models(force = false): Promise<ModelOption[]> {
     if (!force && this.modelsCache && Date.now() - this.modelsCache.at < 10 * 60_000) return this.modelsCache.models;
     const r = await this.call('model/list', { includeHidden: false });

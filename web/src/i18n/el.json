@@ -25657,5 +25657,18 @@
   "Remove highlight": "Αφαίρεση επισήμανσης",
   "Save image as…": "Αποθήκευση εικόνας ως…",
   "Save image to Library": "Αποθήκευση εικόνας στη Βιβλιοθήκη",
-  "Search {0} for “{1}”": "Αναζήτηση στο {0} για «{1}»"
+  "Search {0} for “{1}”": "Αναζήτηση στο {0} για «{1}»",
+  "{0} (through Claude Code): {1}": "{0} (μέσω Claude Code): {1}",
+  "{0} (through Codex) answered {1}: {2}": "{0} (μέσω Codex) απάντησε {1}: {2}",
+  "{0} is a model of your {1} plan, which only the app can reach": "Το {0} είναι μοντέλο του πακέτου {1} σου, στο οποίο έχει πρόσβαση μόνο η εφαρμογή",
+  "{0} is a model of your plan, and this part of the app cannot reach {1}": "Το {0} είναι μοντέλο του πακέτου σου και αυτό το μέρος της εφαρμογής δεν έχει πρόσβαση στο {1}",
+  "Custom can use the models of your Claude and ChatGPT plans through Claude Code’s and Codex’s sign-ins on this computer. They use your plan’s usage instead of an API key. Claude answers through Claude Code one step at a time, with Custom’s tools described in its instructions. A confidential session never uses them.": "Το Custom μπορεί να χρησιμοποιεί τα μοντέλα των πακέτων Claude και ChatGPT σου μέσω των συνδέσεων του Claude Code και του Codex σε αυτόν τον υπολογιστή. Χρησιμοποιούν τη χρήση του πακέτου σου αντί για κλειδί API. Το Claude απαντά μέσω του Claude Code ένα βήμα τη φορά, με τα εργαλεία του Custom περιγραμμένα στις οδηγίες του. Μια εμπιστευτική συνεδρία δεν τα χρησιμοποιεί ποτέ.",
+  "In the cloud": "Στο σύννεφο",
+  "Model: {0} · {1}": "Μοντέλο: {0} · {1}",
+  "Models for Custom, the app’s own agent: your Claude and ChatGPT plans through Claude Code and Codex, models on this computer, and OpenRouter or other providers in the cloud": "Μοντέλα για το Custom, τον ενσωματωμένο πράκτορα της εφαρμογής: τα πακέτα Claude και ChatGPT σου μέσω Claude Code και Codex, μοντέλα σε αυτόν τον υπολογιστή, και OpenRouter ή άλλοι πάροχοι στο σύννεφο",
+  "Not installed on this computer": "Δεν είναι εγκατεστημένο σε αυτόν τον υπολογιστή",
+  "Signed out: sign in again to use these models": "Αποσυνδεδεμένο: συνδέσου ξανά για να χρησιμοποιήσεις αυτά τα μοντέλα",
+  "subscription plan claude chatgpt codex claude code sign in login account use plan usage no api key models custom": "συνδρομή πακέτο Claude ChatGPT Codex Claude Code σύνδεση λογαριασμός χρήση πακέτου χωρίς κλειδί API μοντέλα Custom",
+  "The models of your Claude and ChatGPT plans, which Custom can use through Claude Code and Codex": "Τα μοντέλα των πακέτων Claude και ChatGPT σου, που το Custom μπορεί να χρησιμοποιεί μέσω Claude Code και Codex",
+  "Your subscriptions": "Οι συνδρομές σου"
 }
