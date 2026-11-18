@@ -17,8 +17,9 @@ import { kvGet, kvSet, type DB } from '../db.ts';
 import { desktopChromium, onDesktop, tellDesktop } from '../desktop.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
+import { saveWebPage } from '../pages/webpage.ts';
 import { loadBookmarks } from './bookmarks.ts';
-import { clearDownloads } from './downloads.ts';
+import { clearDownloads, listDownloads, removeDownload } from './downloads.ts';
 import { clearHistory, HistoryRecorder, historyUrl, listHistory, removeHistory, suggest } from './history.ts';
 import { shownUrl } from './outline.ts';
 import { browserOf, downloadsFolder, ensureBrowser, handOver, onBrowserView, openBrowsers, outsideSessions, siteOfUrl, takeBack, takeClosedTab, viewOf, type SessionBrowser } from './session.ts';
@@ -631,6 +632,17 @@ export function browsingRoutes(d: Deps) {
     if (!Number.isInteger(id)) throw new HttpError(400, 'Send the id of the entry');
     return { removed: removeHistory(db, id) };
   });
+  app.get('/api/browser/browsing/downloads', async (req) => {
+    const { q, before, limit } = req.query as Record<string, string | undefined>;
+    const n = before === undefined || before === '' ? undefined : Number(before);
+    if (n !== undefined && !Number.isFinite(n)) throw new HttpError(400, 'before should be a time in milliseconds');
+    return { downloads: listDownloads(db, { q: q ?? '', before: n, limit: limit === undefined ? undefined : Number(limit) }) };
+  });
+  app.delete('/api/browser/browsing/downloads/:id', async (req) => {
+    const id = Number(P(req).id);
+    if (!Number.isInteger(id)) throw new HttpError(400, 'Send the id of the download');
+    return { removed: removeDownload(db, id) };
+  });
   app.post('/api/browser/browsing/history/clear', async (req) => {
     const since = sinceOf(B(req).since);
     return { removed: clearHistory(db, since) };
@@ -719,6 +731,27 @@ export function browsingRoutes(d: Deps) {
     const file = path.join(dir, name);
     fs.writeFileSync(file, snapshotMarkdown({ title: t.title, url: t.url, selected, text }), { mode: 0o600 });
     return { path: file, name, title: t.title, url: shownUrl(t.url) };
+  });
+
+  // ---- a page kept in the Library ----
+
+  /** Save: the tab's readable text (and what is selected) kept as a document in the Library, with the address it came from. */
+  app.post('/api/browser/browsing/tabs/:id/save-page', async (req) => {
+    const b = browserOf(BROWSING_KEY);
+    const t = b?.tabs.find((x) => x.targetId === P(req).id);
+    if (!b || !t || t.closed) throw new HttpError(404, 'No such tab');
+    if (!/^(https?|file):/i.test(t.url)) throw new HttpError(409, 'That tab shows no page to save');
+    const { space, folder } = B(req);
+    await t.waitLoad(3000);
+    let text = '';
+    let selected = '';
+    try {
+      text = await t.readable(200_000);
+      selected = (await t.evaluate<string>('String(getSelection() || "")')).slice(0, 20_000);
+    } catch (e) {
+      if (!text) throw new HttpError(502, `Could not read the page: ${(e as Error).message}`);
+    }
+    return { id: saveWebPage(d, { title: t.title, url: t.url, selected, text, space, folder }).id };
   });
 
   // ---- tabs given to agents, and the agents' browsers ----

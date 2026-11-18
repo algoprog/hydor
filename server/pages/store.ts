@@ -76,6 +76,9 @@ export function initPages(db: DB) {
   if (!cols.includes('description')) db.exec('alter table pages add column description text');
   // Locked by its owner, so it doesn't change by accident (page-tools.ts): no new version until it is unlocked.
   if (!cols.includes('locked')) db.exec('alter table pages add column locked integer');
+  // A web page saved from the user's own browser (server/pages/webpage.ts): the address it came from and its site's name.
+  if (!cols.includes('source_url')) db.exec('alter table pages add column source_url text');
+  if (!cols.includes('site')) db.exec('alter table pages add column site text');
   initFolders(db);
   // A page's icon (the emoji the page editor puts at its top), for links to it in other pages: kept as each version is
   // saved, and read once from the pages saved before ('' for none).
@@ -133,6 +136,8 @@ interface Row {
   icon: string | null;
   description: string | null;
   locked: number | null;
+  source_url: string | null;
+  site: string | null;
   versions: number;
   bytes: number;
   by: PageVersion['by'] | null;
@@ -166,6 +171,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(r.icon ? { icon: r.icon } : {}),
   ...(r.description ? { description: r.description } : {}),
   ...(r.locked ? { locked: true } : {}),
+  ...(r.source_url ? { source: { url: r.source_url, site: r.site ?? '' } } : {}),
 });
 
 /** The library's pages: a template's screens stay with their template. */
@@ -309,6 +315,8 @@ export function createPage(
     folder?: string | null;
     turn?: string;
     description?: unknown;
+    /** A web page saved from the user's browser: the address it came from and its site's name (shown "Web page" in the Library). */
+    source?: { url: string; site: string };
     /** Keep the model as given: a board whose refreshes were set on purpose (save_board's), not copied. */
     asIs?: boolean;
   },
@@ -323,7 +331,7 @@ export function createPage(
   let id = newId();
   while (db.prepare('select 1 from pages where id = ?').get(id)) id = newId();
   db.transaction(() => {
-    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space, folder, description) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('insert into pages (id, title, version, created_at, updated_at, session_key, source_item, link_nonce, kind, app, space, folder, description, source_url, site) values (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       id,
       title,
       now,
@@ -336,6 +344,8 @@ export function createPage(
       p.app ? null : (p.space ?? null),
       p.app ? null : (p.folder ?? null),
       cleanDescription(p.description) || null,
+      p.source?.url ? p.source.url.slice(0, 2000) : null,
+      p.source?.url ? (p.source.site || '').slice(0, 200) : null,
     );
     db.prepare('insert into page_versions (page_id, version, title, html, bytes, created_at, by, turn) values (?, 1, ?, ?, ?, ?, ?, ?)').run(id, title, html, Buffer.byteLength(html), now, p.by, p.turn ?? null);
     if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
@@ -434,7 +444,7 @@ export function copyPage(db: DB, id: string): PageInfo {
   const p = mustPage(db, id);
   const cur = pageSource(db, id)!;
   const title = cleanTitle(`${p.title} (copy)`);
-  const place = { space: p.space, folder: p.folder, description: p.description };
+  const place = { space: p.space, folder: p.folder, description: p.description, source: p.source };
   return createPage(db, cur.kind === 'page' ? { title, html: cur.text, by: 'made', ...place } : { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), by: 'made', ...place });
 }
 

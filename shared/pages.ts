@@ -84,6 +84,8 @@ export interface PageInfo {
   description?: string;
   /** Locked by its owner, so it doesn't change by accident: no new version until it is unlocked. */
   locked?: boolean;
+  /** A web page saved from the user's own browser (a document): the address it came from and its site ("example.com"). The Library shows it as a Web page. */
+  source?: { url: string; site: string };
 }
 
 /**

@@ -12,8 +12,13 @@
 // A place (a project, or none) holds folders too (folders.tsx): its folders show first, as tiles, then its things; a
 // folder opens with the way back over it, and things go in folders by More → Move to a folder or, on a computer, by
 // dragging them onto one. Finding by name and the kind chips look through the whole place and say where each thing is.
-// Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (image, video and audio each, media pictures and
-// videos both: the old Media tab's ?tab=media too), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook|diagram opens New
+// Saved web pages (a document with the address it came from, kept from the Browser's Save) are a kind of their own, Web
+// pages, among the rest. In the desktop app three more chips at the row's end, after a divider, show what your own browser
+// keeps as lists (BrowserLists.tsx): Bookmarks, Downloads and History, for every project, never copied into the Library.
+// On a wide screen the page draws its own column on the left (the app's sidebar gives way to its rail here): the places
+// and New, shown while the sidebar is open (Ctrl+B).
+// Addresses: /library?project=<id>|none, &folder=<id>, &kind=<kind> (web, image, video and audio each, media pictures and
+// videos both: the old Media tab's ?tab=media too; bookmarks, downloads and history in the desktop app), ?tab=published; ?new=page|design|slides|doc|sheet|tex|notebook|diagram opens New
 // with that kind, ?new=folder New → Folder and ?new=import New → Import a folder.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react';
 import { useSearch } from 'wouter';
@@ -22,17 +27,21 @@ import {
   ArrowDownUp,
   AudioLines,
   ArrowRight,
+  Bookmark,
   Boxes,
   Copy,
   Database,
   Download,
   Ellipsis,
+  ExternalLink,
+  FileDown,
   FileText,
   Folder,
   FolderInput,
   FolderPlus,
   FolderTree,
   Globe,
+  History as HistoryIcon,
   ImageIcon,
   Layers,
   LayoutDashboard,
@@ -65,10 +74,11 @@ import { openShare, useSharedThings } from '../spaces/ShareHost';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toast, toastError } from '../../lib/store';
+import { toast, toastError, useUI } from '../../lib/store';
 import { tr, trIn } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
-import { PageHeader } from '../layout/PageHeader';
+import { NavButton } from '../layout/PageHeader';
+import { ownBrowserHere } from '../browser/browsing';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
 import { useMedia } from '../media/state';
 import { useAskRun } from '../guide/ask';
@@ -79,6 +89,7 @@ import { preloadEditors } from './editors';
 import { exportFile, type ExportFormat } from './exportFile';
 import { EXPORTS } from './exports';
 import { PublishDialog, RenameDialog, SiteRow, Thumb } from './parts';
+import { BrowserList, isBrowserKind, openInBrowser, type BrowserKind } from './BrowserLists';
 import { NewPageDialog, type NewKind } from './NewDialog';
 import { CAN_DRAG, dragThing, FolderCrumbs, folderChain, FolderMenu, FolderNameDialog, FolderTile, ImportFolderDialog, moveToFolder, placeFolders, placeTopName } from './folders';
 import { usePagesStore } from './state';
@@ -89,9 +100,10 @@ import { DropHint } from './UploadTray';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio';
+/** `web`: a document saved from the Browser (it has the address it came from). */
+type ItemKind = 'page' | 'slides' | 'doc' | 'web' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'web' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio' | 'media' | BrowserKind;
 
 interface Item {
   key: string;
@@ -111,6 +123,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
   page: { label: 'Page', icon: <AppWindow size={12} /> },
   slides: { label: 'Slides', icon: <Presentation size={12} /> },
   doc: { label: 'Document', icon: <FileText size={12} /> },
+  web: { label: 'Web page', icon: <Globe size={12} /> },
   sheet: { label: 'Spreadsheet', icon: <Sheet size={12} /> },
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
   notebook: { label: 'Notebook', icon: <NotebookText size={12} /> },
@@ -123,6 +136,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
 
 const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'all', label: 'All', has: () => true },
+  { value: 'web', label: 'Web pages', has: (k) => k === 'web' },
   { value: 'page', label: 'Pages', has: (k) => k === 'page' },
   { value: 'slides', label: 'Slides', has: (k) => k === 'slides' },
   { value: 'doc', label: 'Documents', has: (k) => k === 'doc' },
@@ -137,6 +151,12 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
 ];
 /** Pictures and videos together: the old Media tab's address (and an older link's), with no chip of its own. */
 const BOTH: (typeof SHOWS)[number] = { value: 'media', label: 'Pictures and videos', has: (k) => k === 'image' || k === 'video' };
+/** What your own browser keeps, as chips after the rest (the desktop app): lists of its own, not Library items. */
+const BROWSER_SHOWS: { value: BrowserKind; label: string; icon: ReactNode; search: string }[] = [
+  { value: 'bookmarks', label: 'Bookmarks', icon: <Bookmark size={13} />, search: 'Search your bookmarks' },
+  { value: 'downloads', label: 'Downloads', icon: <FileDown size={13} />, search: 'Search your downloads' },
+  { value: 'history', label: 'History', icon: <HistoryIcon size={13} />, search: 'Search your history' },
+];
 const showOf = (v: Show) => SHOWS.find((s) => s.value === v) ?? BOTH;
 
 type Sort = 'changed' | 'name' | 'made';
@@ -146,7 +166,7 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: 'made', label: 'Newest made' },
 ];
 
-const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.kind ?? 'page', title: p.title, space: p.space, folder: p.folder, at: p.updatedAt, made: p.createdAt, page: p });
+const fromPage = (p: PageInfo): Item => ({ key: `p:${p.id}`, kind: p.kind === 'doc' && p.source ? 'web' : (p.kind ?? 'page'), title: p.title, space: p.space, folder: p.folder, at: p.updatedAt, made: p.createdAt, page: p });
 const fromMedia = (m: MediaItem): Item => ({ key: `m:${m.id}`, kind: m.kind, title: m.title, space: m.space, folder: m.folder, at: m.updatedAt, made: m.createdAt, media: m });
 
 /** Everything kept, the last changed first; with the spaces as they are now (a space deleted: in none) and the folders (one gone: at the top). */
@@ -309,7 +329,10 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
       toastError(e);
     }
   };
-  const sub = m?.caption === 'pending' ? 'Writing its title…' : tr(`Changed ${ago(it.at)}`);
+  const web = it.kind === 'web' ? p?.source : undefined;
+  const sub = m?.caption === 'pending' ? 'Writing its title…' : web ? tr(`Saved ${ago(it.made)}`) : tr(`Changed ${ago(it.at)}`);
+  // The page it was saved from, in your own browser (the desktop app) or a new tab.
+  const openOriginal = () => (ownBrowserHere() ? openInBrowser(web!.url) : void window.open(web!.url, '_blank', 'noopener'));
   return (
     <div
       draggable={CAN_DRAG}
@@ -355,6 +378,14 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
                 <span>·</span>
               </span>
             )}
+            {web?.site && (
+              <span className="flex max-w-[50%] min-w-0 shrink items-center gap-1">
+                <span translate="no" className="truncate">
+                  {web.site}
+                </span>
+                <span>·</span>
+              </span>
+            )}
             <span className="shrink-0 truncate">{sub}</span>
             {people > 0 && <Users size={11} className="shrink-0 text-info" aria-label={tr(people === 1 ? 'Shared with 1 person' : `Shared with ${people} people`)} />}
             {p?.published && <Globe size={11} className="shrink-0 text-accent" aria-label="Published" />}
@@ -381,6 +412,11 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
             <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setRename(true))}>
               Edit the title and description
             </MenuItem>
+            {web && (
+              <MenuItem icon={<ExternalLink size={14} />} onClick={() => (close(), openOriginal())}>
+                Open the original page
+              </MenuItem>
+            )}
           </>
         ) : (
           <MenuItem icon={<MessageSquarePlus size={14} />} onClick={() => (close(), startSessionWithMedia(m!))}>
@@ -479,7 +515,9 @@ function placeOf(q: URLSearchParams): Place {
 
 function addressOf(place: Place, show: Show, folder?: string | null): string {
   const q = new URLSearchParams();
-  if (place.kind === 'published') q.set('tab', 'published');
+  // Your browser's lists are for every project: they have no place.
+  if (isBrowserKind(show)) q.set('kind', show);
+  else if (place.kind === 'published') q.set('tab', 'published');
   else {
     if (place.kind === 'none') q.set('project', 'none');
     if (place.kind === 'space') q.set('project', place.id);
@@ -537,22 +575,24 @@ function PlaceButton({ on, icon, label, count, onClick, chip, mine, drop }: { on
   );
 }
 
-function Places({ place, onPlace, items, sites, chips, dropAt }: { place: Place; onPlace: (p: Place) => void; items: Item[]; sites: SiteInfo[] | null; chips?: boolean; dropAt?: string }) {
+function Places({ place, onPlace, items, sites, chips, dropAt, idle }: { place: Place; onPlace: (p: Place) => void; items: Item[]; sites: SiteInfo[] | null; chips?: boolean; dropAt?: string; idle?: boolean }) {
   const spaces = useSpaces() ?? [];
   const count = (id: string | null) => items.filter((it) => (it.space ?? null) === id).length;
   const none = count(null);
+  // One of your browser's lists is open (they belong to no place): nothing is highlighted.
+  const at = (k: Place['kind']) => !idle && place.kind === k;
   // Files dropped on a project go in it; on Everything, Not in a project or Published, in none.
   const drop = (space: string, at: string): DropOn => ({ space, at, over: dropAt === at });
   const list = (
     <>
-      <PlaceButton chip={chips} on={place.kind === 'all'} icon={<LibraryBig size={15} className={chips ? undefined : 'text-fg-3'} />} label="Everything" count={items.length} onClick={() => onPlace({ kind: 'all' })} drop={drop('', 'all')} />
+      <PlaceButton chip={chips} on={at('all')} icon={<LibraryBig size={15} className={chips ? undefined : 'text-fg-3'} />} label="Everything" count={items.length} onClick={() => onPlace({ kind: 'all' })} drop={drop('', 'all')} />
       {spaces.length > 0 && !chips && <div className="px-2.5 pt-4 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">Projects</div>}
       {spaces.map((s) => (
         <PlaceButton
           key={s.id}
           chip={chips}
           mine
-          on={place.kind === 'space' && place.id === s.id}
+          on={!idle && place.kind === 'space' && place.id === s.id}
           icon={<SpaceMark s={s} size={chips ? 16 : 18} />}
           label={s.name}
           count={count(s.id)}
@@ -560,11 +600,11 @@ function Places({ place, onPlace, items, sites, chips, dropAt }: { place: Place;
           drop={drop(s.id, `space:${s.id}`)}
         />
       ))}
-      {spaces.length > 0 && (none > 0 || place.kind === 'none') && (
-        <PlaceButton chip={chips} on={place.kind === 'none'} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a project" count={none} onClick={() => onPlace({ kind: 'none' })} drop={drop('', 'none')} />
+      {spaces.length > 0 && (none > 0 || at('none')) && (
+        <PlaceButton chip={chips} on={at('none')} icon={<Layers size={15} className={chips ? undefined : 'text-fg-3'} />} label="Not in a project" count={none} onClick={() => onPlace({ kind: 'none' })} drop={drop('', 'none')} />
       )}
       {!chips && <div className="mx-2.5 my-3 border-t border-line" />}
-      <PlaceButton chip={chips} on={place.kind === 'published'} icon={<Globe size={15} className={chips ? undefined : 'text-fg-3'} />} label="Published" count={sites?.length ?? undefined} onClick={() => onPlace({ kind: 'published' })} drop={drop('', 'published')} />
+      <PlaceButton chip={chips} on={at('published')} icon={<Globe size={15} className={chips ? undefined : 'text-fg-3'} />} label="Published" count={sites?.length ?? undefined} onClick={() => onPlace({ kind: 'published' })} drop={drop('', 'published')} />
     </>
   );
   if (chips) return <div className="-mx-3 mb-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [&::-webkit-scrollbar]:hidden">{list}</div>;
@@ -644,13 +684,17 @@ function Published({ sites, onPublish }: { sites: SiteInfo[] | null; onPublish: 
 export function Library() {
   const search = useSearch();
   const q = new URLSearchParams(search);
-  const place = placeOf(q);
+  // Your browser's lists (the desktop app) belong to no place: they show for every project.
+  const own = ownBrowserHere();
   const asked = q.get('kind') ?? (q.get('tab') === 'media' ? 'media' : 'all');
-  const show: Show = SHOWS.some((s) => s.value === asked) || asked === 'media' ? (asked as Show) : 'all';
+  const show: Show = SHOWS.some((s) => s.value === asked) || asked === 'media' || (own && isBrowserKind(asked)) ? (asked as Show) : 'all';
+  const browserShow = isBrowserKind(show) ? show : null;
+  const place: Place = browserShow ? { kind: 'all' } : placeOf(q);
   const items = useItems();
   const sites = usePagesStore((s) => s.sites);
   const spaces = useSpaces();
   const wide = useMediaQuery('(min-width: 1024px)');
+  const sideOpen = useUI((s) => s.sideOpen);
   const [find, setFind] = useState('');
   const [sort, setSort] = useState<Sort>(() => (localStorage.getItem('wa.pages.sort') as Sort) || 'changed');
   const [sortMenu, setSortMenu] = useState(false);
@@ -658,6 +702,7 @@ export function Library() {
   const [making, setMaking] = useState<NewKind | null>(null);
   const [publish, setPublish] = useState(false);
   const folders = usePagesStore((s) => s.folders);
+  const chipsRef = useRef<HTMLDivElement>(null);
   const [newMenu, setNewMenu] = useState(false);
   const newRef = useRef<HTMLButtonElement>(null);
   const [folderAsk, setFolderAsk] = useState(false);
@@ -669,6 +714,15 @@ export function Library() {
     preloadEditors();
   }, []);
   useEffect(() => localStorage.setItem('wa.pages.sort', sort), [sort]);
+  // The chip of the kind shown stays in view in a row that scrolls (a phone's: your browser's chips are at its end).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const row = chipsRef.current;
+      const on = row?.querySelector<HTMLElement>('[aria-pressed=true]');
+      if (row && on && on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft + on.offsetWidth - row.clientWidth + 12;
+    }, 120);
+    return () => clearTimeout(t);
+  }, [show, items === null]);
   // The search box's "New page", "New slides"… open here with the dialog.
   const newAsked = q.get('new');
   useEffect(() => {
@@ -684,7 +738,12 @@ export function Library() {
   }, [place.kind === 'space' ? place.id : '', spaces]);
   const toPlace = (p: Place) => {
     setFind('');
-    go(addressOf(p, samePlace(p, place) ? show : 'all'), true);
+    go(addressOf(p, !browserShow && samePlace(p, place) ? show : 'all'), true);
+  };
+  // A chip: the rest keep the place open; your browser's lists leave it, and take the words typed for the others with them.
+  const toShow = (k: Show, folder: string | null) => {
+    if (isBrowserKind(k) !== !!browserShow) setFind('');
+    go(addressOf(place, k, folder), true);
   };
   const space = place.kind === 'space' ? (spaces?.find((s) => s.id === place.id) ?? null) : null;
   // A place of its own (a project, or none; everything, when there are no projects) shows its folders, and a folder open.
@@ -726,6 +785,7 @@ export function Library() {
   // What the place holds, then what the kind and the words keep of it.
   const here = useMemo(() => (items ?? []).filter((it) => place.kind === 'all' || (place.kind === 'none' ? !it.space : place.kind === 'space' && it.space === place.id)), [items, search]);
   const kinds = useMemo(() => SHOWS.filter((s) => s.value === 'all' || here.some((it) => s.has(it.kind))), [here]);
+
   const words = find.trim().toLowerCase();
   // Found by the server (search.ts) best first, then what has the words in its title or description and the server
   // left out (a word half typed); until it answers, those alone.
@@ -803,6 +863,7 @@ export function Library() {
   const title = place.kind === 'published' ? 'Published' : place.kind === 'none' ? 'Not in a project' : space ? space.name : 'Everything';
 
   const body = () => {
+    if (browserShow) return <BrowserList kind={browserShow} q={find.trim()} />;
     if (place.kind === 'published') return <Published sites={sites} onPublish={() => setPublish(true)} />;
     if (!items)
       return (
@@ -881,122 +942,175 @@ export function Library() {
     return <Grid items={shown} showSpace={place.kind === 'all'} showFolder={!!folders?.length} />;
   };
 
+  const publishButton = (
+    <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>
+      Publish a folder
+    </Button>
+  );
+  // The search, sort and kinds show for the Library's places, and for one of your browser's lists (its chips are what lead there).
+  const tools = place.kind !== 'published' && (!!here.length || !!placeList.length || own || !!browserShow);
+  const browserChip = BROWSER_SHOWS.find((b) => b.value === browserShow);
+  const chipCls = (on: boolean) => cx('flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors', on ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg');
+
   return (
-    <div className="flex h-full min-h-0 flex-col" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-      <PageHeader
-        title="Library"
-        tip="library"
-        sub="What agents made for you and what you kept: pages, slides, documents, pictures, videos and sounds, by project"
-        actions={
-          place.kind === 'published' ? (
-            <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => setPublish(true)}>
-              Publish a folder
-            </Button>
-          ) : (
-            newButton
-          )
-        }
-      />
-      <div className="relative flex min-h-0 flex-1">
-        {wide && items && (
-          <aside className="w-[232px] shrink-0 overflow-y-auto border-r border-line px-3 py-4">
-            <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />
+    <>
+      <div className="flex h-full min-h-0" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+        {/* The Library's own column: its places, and New. The sidebar (Ctrl+B) hides it. */}
+        {wide && sideOpen && (
+          <aside className="flex w-[260px] shrink-0 flex-col border-r border-line bg-sidebar pt-[var(--safe-top)]">
+            <div className="flex h-14 shrink-0 items-center gap-2 pr-3 pl-4">
+              <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">
+                <span data-tip="library" className="inline-block max-w-full truncate align-top">
+                  Library
+                </span>
+              </h1>
+              {newButton}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">{items && <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} idle={!!browserShow} />}</div>
           </aside>
         )}
-        <div className={cx('min-h-0 min-w-0 flex-1 overflow-y-auto', over?.at === 'main' && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}>
-          <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
-            {!wide && items && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />}
-            {/* Come to share something (the search box's Share something with people): where it is done. */}
-            {q.get('share') === '1' && (
-              <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2">
-                <UserPlus size={15} className="shrink-0 text-accent" />
-                <span className="min-w-0 flex-1">
-                  To share one thing, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>, or use{' '}
-                  <span className="font-medium text-fg">Share</span> at the top of its own page.
-                </span>
-                <button type="button" aria-label="Close" onClick={() => go('/library', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
-                  <X size={14} />
-                </button>
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          {!wide && (
+            <header className="shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]">
+              <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
+                <NavButton />
+                <h1 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-tight">
+                  <span data-tip="library" className="inline-block max-w-full truncate align-top">
+                    Library
+                  </span>
+                </h1>
+                <div className="flex shrink-0 items-center gap-1.5">{place.kind === 'published' ? publishButton : newButton}</div>
               </div>
-            )}
-            {place.kind !== 'published' && (!!here.length || !!placeList.length) && (
-              <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
-                {folderView && chain.length > 0 ? (
-                  <FolderCrumbs chain={chain} space={space} topName={topName} onGo={goFolder} />
-                ) : (
-                  wide && (
-                  <h2 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
-                    {space && <SpaceMark s={space} size={22} className="rounded-md" />}
-                    <span translate={space ? 'no' : undefined} className="truncate">
-                      {title}
-                    </span>
-                  </h2>
-                  )
-                )}
-                {space && wide && !chain.length && (
-                  <>
-                    <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
-                      Open the project
-                    </button>
-                    <button type="button" onClick={() => pickFiles(space.id)} className="flex items-center gap-1 text-[12.5px] font-medium text-fg-3 hover:text-fg">
-                      <Upload size={13} />
-                      Upload files
-                    </button>
-                  </>
-                )}
-                <span className="flex-1 max-lg:hidden" />
-                <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 lg:max-w-[280px]">
-                  <Search size={14} className="shrink-0 text-fg-3" />
-                  <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Search by name or description" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
-                  {find && (
-                    <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
-                      <X size={13} />
-                    </button>
-                  )}
-                </label>
-                {space && !wide && (
-                  <IconButton label="Upload files" onClick={() => pickFiles(space.id)}>
-                    <Upload size={16} />
-                  </IconButton>
-                )}
-                <Button ref={sortRef} size="sm" variant="ghost" icon={<ArrowDownUp size={13} />} onClick={() => setSortMenu((x) => !x)}>
-                  <span className="max-sm:hidden">{SORTS.find((x) => x.value === sort)!.label}</span>
-                </Button>
-                <Popover anchor={sortRef} open={sortMenu} onClose={() => setSortMenu(false)} align="end" width={180}>
-                  {SORTS.map((x) => (
-                    <MenuItem key={x.value} checked={sort === x.value} onClick={() => (setSort(x.value), setSortMenu(false))}>
-                      {x.label}
-                    </MenuItem>
-                  ))}
-                </Popover>
-                {kinds.length > 2 && (
-                  <div className="flex w-full gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
-                    {kinds.map((k) => (
-                      <button
-                        key={k.value}
-                        type="button"
-                        aria-pressed={show === k.value}
-                        onClick={() => go(addressOf(place, k.value, current), true)}
-                        className={cx(
-                          'h-7 shrink-0 rounded-full px-3 text-[12.5px] transition-colors',
-                          show === k.value ? 'bg-bg-3 font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg',
+            </header>
+          )}
+          <div className={cx('min-h-0 min-w-0 flex-1 overflow-y-auto', over?.at === 'main' && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}>
+            <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-5">
+              {!wide && items && !browserShow && <Places chips place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} />}
+              {/* Come to share something (the search box's Share something with people): where it is done. */}
+              {q.get('share') === '1' && (
+                <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] text-fg-2">
+                  <UserPlus size={15} className="shrink-0 text-accent" />
+                  <span className="min-w-0 flex-1">
+                    To share one thing, open its <span className="font-medium text-fg">More</span> (⋯) and pick <span className="font-medium text-fg">Share with people</span>, or use{' '}
+                    <span className="font-medium text-fg">Share</span> at the top of its own page.
+                  </span>
+                  <button type="button" aria-label="Close" onClick={() => go('/library', true)} className="shrink-0 rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {(wide || tools) && (
+                <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
+                  {wide && !sideOpen && <NavButton />}
+                  {place.kind === 'published' ? (
+                    wide && (
+                      <>
+                        <h2 className="min-w-0 truncate text-[17px] font-semibold tracking-tight">Published</h2>
+                        <span className="flex-1" />
+                        {publishButton}
+                      </>
+                    )
+                  ) : (
+                    tools && (
+                      <>
+                        {browserChip ? (
+                          wide && (
+                            <h2 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
+                              <span className="truncate">{browserChip.label}</span>
+                            </h2>
+                          )
+                        ) : folderView && chain.length > 0 ? (
+                          <FolderCrumbs chain={chain} space={space} topName={topName} onGo={goFolder} />
+                        ) : (
+                          wide && (
+                            <h2 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
+                              {space && <SpaceMark s={space} size={22} className="rounded-md" />}
+                              <span translate={space ? 'no' : undefined} className="truncate">
+                                {title}
+                              </span>
+                            </h2>
+                          )
                         )}
-                      >
-                        {k.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {body()}
+                        {space && wide && !chain.length && !browserShow && (
+                          <>
+                            <button type="button" onClick={() => go(`/projects/${space.id}`)} className="text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                              Open the project
+                            </button>
+                            <button type="button" onClick={() => pickFiles(space.id)} className="flex items-center gap-1 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+                              <Upload size={13} />
+                              Upload files
+                            </button>
+                          </>
+                        )}
+                        <span className="flex-1 max-lg:hidden" />
+                        <label className="flex h-8.5 min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-line bg-bg-1 px-2.5 lg:max-w-[280px]">
+                          <Search size={14} className="shrink-0 text-fg-3" />
+                          <input
+                            value={find}
+                            onChange={(e) => setFind(e.target.value)}
+                            placeholder={browserChip ? browserChip.search : 'Search by name or description'}
+                            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3"
+                          />
+                          {find && (
+                            <button type="button" onClick={() => setFind('')} className="text-fg-3 hover:text-fg" aria-label="Clear">
+                              <X size={13} />
+                            </button>
+                          )}
+                        </label>
+                        {space && !wide && !browserShow && (
+                          <IconButton label="Upload files" onClick={() => pickFiles(space.id)}>
+                            <Upload size={16} />
+                          </IconButton>
+                        )}
+                        {!browserShow && (
+                          <>
+                            <Button ref={sortRef} size="sm" variant="ghost" icon={<ArrowDownUp size={13} />} onClick={() => setSortMenu((x) => !x)}>
+                              <span className="max-sm:hidden">{SORTS.find((x) => x.value === sort)!.label}</span>
+                            </Button>
+                            <Popover anchor={sortRef} open={sortMenu} onClose={() => setSortMenu(false)} align="end" width={180}>
+                              {SORTS.map((x) => (
+                                <MenuItem key={x.value} checked={sort === x.value} onClick={() => (setSort(x.value), setSortMenu(false))}>
+                                  {x.label}
+                                </MenuItem>
+                              ))}
+                            </Popover>
+                          </>
+                        )}
+                        {(kinds.length > 2 || own) && (
+                          <div ref={chipsRef} className="flex w-full items-center gap-1.5 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
+                            {kinds.map((k) => (
+                              <button key={k.value} type="button" aria-pressed={show === k.value} onClick={() => toShow(k.value, current)} className={chipCls(show === k.value)}>
+                                {k.label}
+                              </button>
+                            ))}
+                            {/* Your own browser's lists, after a divider: the desktop app only, always there, empty or not. */}
+                            {own && (
+                              <>
+                                <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 bg-line-2" />
+                                {BROWSER_SHOWS.map((b) => (
+                                  <button key={b.value} type="button" aria-pressed={show === b.value} onClick={() => toShow(b.value, current)} className={chipCls(show === b.value)}>
+                                    {b.icon}
+                                    {b.label}
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )
+                  )}
+                </div>
+              )}
+              {body()}
+            </div>
           </div>
+          {over && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+              <DropHint name={overName} />
+            </div>
+          )}
         </div>
-        {over && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
-            <DropHint name={overName} />
-          </div>
-        )}
       </div>
       <PublishDialog open={publish} onClose={() => setPublish(false)} />
       <NewPageDialog open={!!making} kind={making ?? 'page'} space={space?.id ?? null} folder={current ?? undefined} onClose={() => setMaking(null)} />
@@ -1015,7 +1129,7 @@ export function Library() {
         }}
       />
       <ImportFolderDialog open={importing} onClose={() => setImporting(false)} space={placeSpace ?? null} folder={current} folderName={chain[chain.length - 1]?.name} />
-    </div>
+    </>
   );
 }
 

@@ -464,6 +464,14 @@ agents that speak ACP and take MCP servers.
 - **Comments and earlier versions for pictures, videos and sounds**: comments on a spot of a picture or a moment of a
   video or a sound, on its page (and through the API for agents); each picture, video or sound keeps the last five it
   was when saved over (in an editor, by an agent or through a link), to look at, download or bring back.
+- **Web pages saved from your browser**: in the desktop app, Save in your own browser keeps the page you are looking at in
+  the Library as a readable document (its title, the address and date it was saved from, what you had selected, and its
+  text), shown as a Web page with its site and when it was saved, in Everything and in its project, under a Web pages
+  chip of its own (not counted among the Documents); More → Open the original page opens the address it came from. A
+  saved page is a Library item like the rest, so agents can read it. In the desktop app three more chips, Bookmarks,
+  Downloads and History, show what your own browser keeps as lists (with a search field, a row's Open, Delete, Show in
+  folder and Remove from the list or history, and History and Downloads by day with Show older), for every project,
+  never copied into the Library or counted in it; agents are refused them.
 - **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
   way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
   it holds; deleting one deletes nothing in it. **New → Import a folder** brings a folder of this computer in: a LaTeX
@@ -607,7 +615,8 @@ agents that speak ACP and take MCP servers.
   link (a published page with a description and a social picture where its link is shared). The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
   ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
   Move to a project moves anything; its places (Everything, each project's things under its name, Not in a project,
-  Published) sit beside the cards, with a search field, sorting and kind chips (Pages, Slides, Documents,
+  Published) are a column of the Library's own at the left (Ctrl+B hides it with the sidebar; a row of chips on a phone),
+  beside the cards, with a search field, sorting and kind chips (Web pages, Pages, Slides, Documents,
   Spreadsheets, LaTeX, Pictures, Videos, Audio). Everything in it has a description (at most 100 words): the agent that
   saves something writes one (save_page and the other save tools' description, changed alone with an id), the helper
   model writes one for files added and pages kept from a conversation, models that see images write those of

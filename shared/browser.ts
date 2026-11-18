@@ -325,6 +325,18 @@ export interface BrowsingPrefs {
 }
 
 /** A page you visited in your own browser. */
+/** A file your own browser downloaded, as the Library's Downloads list shows it (server/browser/downloads.ts keeps them). */
+export interface DownloadEntry {
+  id: number;
+  name: string;
+  /** Where it was saved ('' when it failed). */
+  path: string;
+  /** The address it came from ('' when it has none a page could open: a blob or data address). */
+  url: string;
+  at: number;
+  failed: boolean;
+}
+
 export interface HistoryEntry {
   id: number;
   url: string;

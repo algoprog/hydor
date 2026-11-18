@@ -1,6 +1,6 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, boards, slides, pictures made with AI and edited, exporting, asking an agent for changes, and publishing.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with saved pictures, videos, sounds and web pages. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, boards, slides, pictures made with AI and edited, exporting, asking an agent for changes, and publishing.
 
 ![The Library: everything kept, each project's things together, with its places beside them](images/library.webp)
 
@@ -243,7 +243,7 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 **Library** on the rail ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac).
 
-Beside the cards are the Library's places, each with how many things it holds (in a narrower window or on a phone, a row of chips above the cards):
+In a wide window the Library has a column of its own at the left, with its name, **New** (see [Make a page](#make-a-page)) and its places. **Ctrl+B** (⌘B on a Mac) hides it together with the sidebar, and **Show sidebar** at the start of the row above the cards brings it back. In a narrower window or on a phone the places are a row of chips above the cards, and **New** is at the top right. Each place shows how many things it holds:
 
 - **Everything**: all you kept. With projects, each project's things show together under its name, the one changed most lately first, each with **See all** to show only that project, then those **Not in a project**.
 - Your **Projects**, each by its mark and name: what agents saved in its sessions and what you put there (see [Sort it by project](#sort-it-by-project)). **Open the project**, beside its name, goes to the project's own page.
@@ -252,7 +252,7 @@ Beside the cards are the Library's places, each with how many things it holds (i
 
 With no projects yet, a note under the places says what projects do for the Library, with a way to **Projects**.
 
-Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX** or **Picture**; a video shows its length), its title and when it last changed, with people when it is shared with people, a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Edit the title and description**, **Share with people** (see [Share with people](#share-with-people)), **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Turn it into** (slides, a document or a page made from it by an agent: see [Made with AI from a kind](#made-with-ai-from-a-kind)), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Share with people**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
+Each thing is a card with a picture of it (a page as it opens, with its data; slides by their first slide; a document, a spreadsheet or LaTeX by the top of its first page or sheet; a picture or a video by a still; until the picture is taken, its first letter shows), its kind on the picture (**Slides**, **Document**, **Spreadsheet**, **LaTeX**, **Web page** or **Picture**; a video shows its length), its title and when it last changed (a web page: its site and when you saved it; see [Web pages from your browser](#web-pages-from-your-browser)), with people when it is shared with people, a globe when it is published and a cylinder when it keeps data. While you search Everything, each card names its project too. Click a card to open it. Its **More** (⋯) has **Edit** (**Present** for slides), **Edit the title and description**, **Open the original page** (a saved web page), **Share with people** (see [Share with people](#share-with-people)), **Move to a project**, **Move to a folder** (when its place has folders), **Duplicate** (a copy without its data), **Turn it into** (slides, a document or a page made from it by an agent: see [Made with AI from a kind](#made-with-ai-from-a-kind)), **Download as** (see [Export to a file](#export-to-a-file)) and **Delete**; a picture's or a video's has **Start a session with it**, **Share with people**, **Move to a project**, **Move to a folder**, **Download**, **Write its title and description again** and **Delete**.
 
 A project, and **Not in a project**, can hold folders too: they show first, as tiles, before the cards (see [Folders](#folders)).
 
@@ -260,9 +260,28 @@ Above the cards:
 
 - **Search by name or description** finds what fits your words, the best first: by their titles and descriptions (see [Descriptions](#descriptions)), and, with [search by meaning](/guide/memory#search-by-meaning) on, by what they mean, so "costs of the Lisbon trip" finds a spreadsheet called "Four days away" whose description says so. What has your words in its title or description shows at once, as you type. It looks through the whole place, every folder of it, and each card then says the folder it is in.
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
-- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Boards**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
+- When a place holds more than one kind, **All**, **Web pages**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Boards**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image). [Show the saved web pages](/library?kind=web).
+- In the desktop app, after a thin divider, **Bookmarks**, **Downloads** and **History** show what your own browser keeps, as lists rather than cards, for every project at once (see [Lists of what your browser keeps](#lists-of-what-your-browser-keeps)).
 
 With nothing kept yet, the Library says "Your Library is empty", that files dropped there are added, and has **New page** and **New slides**.
+
+## Web pages from your browser
+
+In the desktop app, **Save** in [your own browser](/guide/web#your-own-browser) keeps the page you are looking at in the Library, as a readable copy: a document with the page's title, a line with the address it was saved from and the date, what you had selected (when you had selected something) set apart under its own heading, and then the page's text. Pictures, ads, scripts and the page's look are not kept; the address is, so the original can still be opened. A message at the bottom says it is kept, with **Open** to go to it.
+
+A saved web page is a Library item like the rest. It shows as a **Web page** (a globe on its picture; its card names its site and when you saved it), in **Everything** and in its project, with a chip of its own, **Web pages**, and it is not counted among the **Documents**. [Show the saved web pages](/library?kind=web). It comes in **Not in a project**; **Move to a project** and **Move to a folder** in its **More** (⋯) put it elsewhere. Open it to read it, or to change it as any document (see [Documents](#documents)). **Open the original page** in its **More** (⋯) opens the address it was saved from, in your own browser in the desktop app and in a new tab elsewhere. **Duplicate** keeps the address with the copy.
+
+### Lists of what your browser keeps
+
+In the desktop app, three more chips follow the others, after a thin divider: **Bookmarks**, **Downloads** and **History**. They are always there, empty or not. Each shows a list, not cards, for all your projects at once; while one is open no place beside the cards is highlighted, and picking a place brings the cards back. The search box above filters the list (**Search your bookmarks**, **Search your downloads**, **Search your history**). What you can do with a row shows at its right when you point at it:
+
+- **Bookmarks**: each bookmark with its site and where it is, such as **Bookmarks bar › Recipes** (folders are not rows). Click it, or **Open**, to open it in your own browser; **Delete** removes the bookmark.
+- **History**: the pages you visited, newest first, grouped by day (**Today**, **Yesterday**, then the date). **Open** opens one, **Remove from history** forgets it, and **Show older** reads on.
+- **Downloads**: the files your browser downloaded, newest first, grouped by day, each with the folder it was saved in (**Saved in** …) or **Failed**. Click one, or **Show in folder**, to see the file in its folder; **Open the address it came from** opens the page it was downloaded from; **Remove from the list** takes it off this list only, the file stays where it is. **Show older** reads on.
+
+### Who can see them
+
+Your bookmarks, downloads and history are shown only to you. They are never copied into the Library, are not in **Everything** or in a project's count, are not found by the Library's search, and agents are refused them. A saved web page is different: it is a Library item like any other, so agents can read it as they read the rest of your Library, and find it by its title and description. Save a page only when you are fine with an agent reading its text. The address it came from is kept with it, without any sign-in in the address.
 
 ## Descriptions
 

@@ -18,6 +18,8 @@ import type { CreateOpts } from '../sessions.ts';
 import { addressOf, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
 import { pickChrome } from './chrome.ts';
 import { addDownload, downloadCount } from './downloads.ts';
+import { ruleFor } from '../guide/api.ts';
+import { initPages, listPages, pageSource } from '../pages/store.ts';
 import { browserRoutes } from './routes.ts';
 import { addVisit, listHistory } from './history.ts';
 import { find } from '../find/index.ts';
@@ -243,6 +245,45 @@ async function main() {
   } else {
     await realBrowser();
   }
+  await check('the Library’s Downloads list: newest first, found by words, paged by time, one removed; and agents are refused it and saving a tab', async () => {
+    fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
+    const db = openDb(path.join(process.env.DATA_DIR!, 'browsing-downloads.db'));
+    initPages(db);
+    const t0 = Date.now() - 100_000;
+    const ids = [
+      addDownload(db, { name: 'pasta.pdf', path: '/home/me/Downloads/pasta.pdf', url: 'https://recipes.example/pasta.pdf', at: t0 }).id,
+      addDownload(db, { name: 'report.xlsx', path: '', url: 'https://corp.example/report.xlsx', at: t0 + 1000 }).id,
+      addDownload(db, { name: 'bread.pdf', path: '/home/me/Downloads/bread.pdf', url: 'https://recipes.example/bread.pdf', at: t0 + 2000 }).id,
+    ];
+    const app = Fastify();
+    app.setErrorHandler((err: Error, _req, reply) => void reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message }));
+    const deps = { app, db, sessions: { summary: () => null, list: () => ({ sessions: [], total: 0 }) }, scheduler: { list: () => [] }, models: null, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://localhost' } as unknown as Deps;
+    browsingRoutes(deps);
+    const call = async (method: 'GET' | 'POST' | 'DELETE', url: string) => {
+      const r = await app.inject({ method, url });
+      return { status: r.statusCode, body: r.body ? JSON.parse(r.body) : {} };
+    };
+    const names = async (qs = '') => ((await call('GET', `/api/browser/browsing/downloads${qs}`)).body.downloads as { name: string; failed: boolean }[]).map((d) => d.name);
+    assert.deepEqual(await names(), ['bread.pdf', 'report.xlsx', 'pasta.pdf'], 'newest first');
+    assert.equal(((await call('GET', '/api/browser/browsing/downloads')).body.downloads as { name: string; failed: boolean }[]).find((d) => d.name === 'report.xlsx')!.failed, true, 'one without a file failed');
+    assert.deepEqual(await names('?q=RECIPES'), ['bread.pdf', 'pasta.pdf'], 'words are looked for in the name and the address it came from, in any case');
+    assert.deepEqual(await names('?limit=1'), ['bread.pdf']);
+    assert.deepEqual(await names(`?before=${t0 + 2000}&limit=1`), ['report.xlsx'], 'the next page is those older than the last one’s time');
+    assert.equal((await call('GET', '/api/browser/browsing/downloads?before=soon')).status, 400);
+    assert.equal((await call('DELETE', '/api/browser/browsing/downloads/nope')).status, 400);
+    assert.deepEqual((await call('DELETE', `/api/browser/browsing/downloads/${ids[1]}`)).body, { removed: true });
+    assert.deepEqual((await call('DELETE', `/api/browser/browsing/downloads/${ids[1]}`)).body, { removed: false }, 'a second time there is nothing to remove');
+    assert.deepEqual(await names(), ['bread.pdf', 'pasta.pdf']);
+    assert.equal(downloadCount(db), 2);
+    // Saving a tab: no browser open, no such tab; a refused call never reaches the Library.
+    assert.equal((await call('POST', '/api/browser/browsing/tabs/nope/save-page')).status, 404);
+    assert.equal(listPages(db).length, 0);
+    // Agents never use any of it.
+    for (const [m, u] of [['GET', '/api/browser/browsing/downloads'], ['DELETE', '/api/browser/browsing/downloads/1'], ['POST', '/api/browser/browsing/tabs/x/save-page']] as const) {
+      assert.equal(ruleFor(m, u).level, 'refuse', `${m} ${u}`);
+    }
+    await app.close();
+  });
   // Last: it sets up your browsing's routes on a database of its own, which the real-browser checks above must not share.
   await check('clearing browsing data with the history ticked clears the downloads list too; and your browsing reaches the search box only for a person', async () => {
     fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
@@ -413,6 +454,23 @@ async function realBrowser() {
       const text = fs.readFileSync(r.path, 'utf8');
       assert.match(text, /^# Inbox/);
       assert.match(text, /## What I selected\n\n> Inbox/);
+      assert.match(text, /Hello Hello hello/);
+      assert.doesNotMatch(text, /hello hidden/);
+    });
+    await check('real: Save keeps the page in the Library as a document with the address it came from', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      await b.active!.evaluate('(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector("h1")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()');
+      initPages(db);
+      const url = b.active!.url;
+      const r = await call('POST', `/api/browser/browsing/tabs/${b.active!.targetId}/save-page`, {});
+      const page = listPages(db).find((p) => p.id === r.id)!;
+      assert.equal(page.kind, 'doc');
+      assert.equal(page.title, 'Inbox');
+      assert.equal(page.source?.url, url);
+      assert.equal(page.source?.site, '127.0.0.1');
+      const text = pageSource(db, r.id)!.text;
+      assert.match(text, /Saved from /);
+      assert.match(text, /What you selected/);
       assert.match(text, /Hello Hello hello/);
       assert.doesNotMatch(text, /hello hidden/);
     });

@@ -2,24 +2,16 @@
 // the open browser; this list outlives it, so the search box can find a file you got last month). A row is made when a
 // download ends, done or failed, and the last 5 000 are kept. Clearing browsing data with the history ticked clears it too
 // (the files stay where they were saved).
+import type { DownloadEntry } from '../../shared/browser.ts';
 import type { DB } from '../db.ts';
-import { sweepDownloadVectors } from './meaning.ts';
+import { dropVectors, sweepDownloadVectors } from './meaning.ts';
 
 export const MAX_DOWNLOADS = 5000;
 const NAME_MAX = 200;
 const PATH_MAX = 2000;
 const URL_MAX = 2000;
 
-export interface DownloadEntry {
-  id: number;
-  name: string;
-  /** Where it was saved ('' when it failed). */
-  path: string;
-  /** The address it came from ('' when it has none a page could open: a blob or data address). */
-  url: string;
-  at: number;
-  failed: boolean;
-}
+export type { DownloadEntry };
 
 const ready = new WeakSet<DB>();
 export function downloadsTable(db: DB) {
@@ -77,8 +69,8 @@ export function addDownload(db: DB, d: { name: string; path?: string | null; url
   return { id, name: row.name, path: row.path, url: row.url, at, failed: row.failed };
 }
 
-/** The downloads, newest first; `q`: only those with all its words in the name or the address it came from. */
-export function listDownloads(db: DB, o: { q?: string; limit?: number } = {}): DownloadEntry[] {
+/** The downloads, newest first; `q`: only those with all its words in the name or the address it came from; `before`: only those older than this time (the next page of a long list). */
+export function listDownloads(db: DB, o: { q?: string; limit?: number; before?: number } = {}): DownloadEntry[] {
   downloadsTable(db);
   const limit = Math.max(1, Math.min(200, Math.floor(o.limit ?? 100) || 100));
   const words = (o.q ?? '').toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
@@ -86,6 +78,7 @@ export function listDownloads(db: DB, o: { q?: string; limit?: number } = {}): D
   const rows = db.prepare('select id, name, path, url, at, failed from browser_downloads order by at desc, id desc').all() as Row[];
   const out: DownloadEntry[] = [];
   for (const r of rows) {
+    if (o.before !== undefined && r.at >= o.before) continue;
     if (words.length) {
       const hay = `${r.name}\n${r.url}`.toLowerCase();
       if (!words.every((w) => hay.includes(w))) continue;
@@ -116,4 +109,12 @@ export function clearDownloads(db: DB, since?: number): number {
   const n = (since === undefined ? db.prepare('delete from browser_downloads').run() : db.prepare('delete from browser_downloads where at >= ?').run(since)).changes;
   sweepDownloadVectors(db);
   return n;
+}
+
+/** Takes one download out of the list (the file stays where it was saved) and its vector with it. True when it was there. */
+export function removeDownload(db: DB, id: number): boolean {
+  downloadsTable(db);
+  const n = db.prepare('delete from browser_downloads where id = ?').run(id).changes;
+  dropVectors(db, 'download', [String(id)]);
+  return n > 0;
 }

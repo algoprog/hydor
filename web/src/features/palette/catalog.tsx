@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -64,8 +64,9 @@ export interface Entry extends Findable {
 }
 
 /** Words a page of each kind is found by. */
-const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page', string> = {
+const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page' | 'web', string> = {
   page: 'page html',
+  web: 'web page saved site article link browser',
   slides: 'slides deck presentation powerpoint',
   doc: 'document doc word report letter',
   sheet: 'spreadsheet sheet excel table',
@@ -76,7 +77,7 @@ const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page', string> = {
 };
 
 /** Your own browser is part of the desktop app: its page, its panels and the Settings rows that open them are found only there. */
-const browserOnly = (it: CatalogItem) => it.path?.startsWith('/browser') || (it.section === 'browser' && it.find !== undefined && BROWSING_OPTIONS.has(it.find));
+const browserOnly = (it: CatalogItem) => it.path?.startsWith('/browser') || /^\/library\?kind=(bookmarks|downloads|history)$/.test(it.path ?? '') || (it.section === 'browser' && it.find !== undefined && BROWSING_OPTIONS.has(it.find));
 const BROWSING_OPTIONS = new Set(['Bookmarks', 'Extensions', 'Browser settings']);
 
 const settingsAt = (s: string, find?: string) => `/settings?s=${encodeURIComponent(s)}${find ? `&find=${encodeURIComponent(find)}` : ''}`;
@@ -93,6 +94,10 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:media': <Images size={15} />,
   'go:videos': <Play size={15} />,
   'go:audio': <AudioLines size={15} />,
+  'go:web-pages': <Globe size={15} />,
+  'go:library-bookmarks': <Bookmark size={15} />,
+  'go:library-downloads': <FileDown size={15} />,
+  'go:library-history': <History size={15} />,
   'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
   'go:browser': <Globe size={15} />,
@@ -247,7 +252,7 @@ export async function liveEntries(): Promise<Entry[]> {
       icon: kind.icon(15),
       mark: kind.icon(20),
       title: p.title,
-      keywords: `${PAGE_WORDS[p.kind ?? 'page'] ?? 'page'} library${p.published ? ' published' : ''}`,
+      keywords: `${PAGE_WORDS[p.source ? 'web' : (p.kind ?? 'page')] ?? 'page'} library${p.published ? ' published' : ''}`,
       text: p.description,
       where: ['Library', ...place].join(' › '),
       hint: timeAgo(p.updatedAt),
