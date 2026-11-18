@@ -1,12 +1,12 @@
 # System: files, Git, Terminal and Preview
 
-**System** in the sidebar is this computer: browse, find, open and edit its files, add them to projects and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of how the computer is doing (Monitor) are here too, so you can check and finish an agent's work without leaving the app.
+**System** on the rail is this computer: browse, find, open and edit its files, add them to projects and to new sessions, search inside them, run Jupyter notebooks, commit and push with Git, open pull requests and review what a branch changes. Terminals, previews of the web apps running here, before and after screenshots of an agent's changes to one, and a live view of how the computer is doing (Monitor) are here too, so you can check and finish an agent's work without leaving the app.
 
 ![System → Git: a repository’s changes beside one file’s diff, the commit box, and Sync](images/files-git.webp)
 
 ## Open System
 
-Click **System** in the sidebar's tools, or go to [System](/system). A row of tabs under its title takes you to each part, and each keeps its own address:
+Click **System** on the rail, or go to [System](/system). A row of tabs under its title takes you to each part, and each keeps its own address:
 
 - **Overview** ([open it](/system)): the computer at a glance, and what each tool holds now (see [The overview](#the-overview)).
 - **Files** ([open it](/files)): the files on this computer (see [Open the Files page](#open-the-files-page)).

@@ -17,7 +17,7 @@ An app holds everything a task needs except the details that change each time:
 
 Each time you run an app, Hydor starts a session with the filled-in task. The agent works through it from start to finish without stopping to ask you things: it makes sensible assumptions and says what they were. That one go is called a **run**. You can then ask for changes to the result, and the agent hands in an updated one.
 
-Open the Apps page from the **Apps** tile at the bottom of the sidebar, or go to [/apps](/apps). On a phone the sidebar is a drawer: open it first. You can also find any app, yours or ready-made, by typing its name in the search box (Ctrl+K, ⌘K on a Mac).
+Open the Apps page from the **Apps** tile on the rail, or go to [/apps](/apps). On a phone the sidebar is a drawer: open it first. You can also find any app, yours or ready-made, by typing its name in the search box (Ctrl+K, ⌘K on a Mac).
 
 ## Find your way around the Apps page
 

@@ -748,6 +748,7 @@ function StartComposer({
 
 /** Phones have no sidebar on screen: the latest sessions sit under the composer. */
 function RecentSessions() {
+  const mobile = useIsMobile();
   const { byKey, order } = useSessions();
   const home = useApp((s) => s.boot?.home);
   const all = order.map((k) => byKey[k]).filter((s) => s && !s.archived && !s.subagentOf);
@@ -757,7 +758,7 @@ function RecentSessions() {
     <div data-tour="recent" className="mt-10">
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-[13px] font-medium text-fg-3">Recent</h2>
-        <button className="flex items-center gap-0.5 text-[13px] text-fg-3 hover:text-fg" onClick={() => useUI.getState().set({ drawerOpen: true })}>
+        <button className="flex items-center gap-0.5 text-[13px] text-fg-3 hover:text-fg" onClick={() => useUI.getState().set(mobile ? { drawerOpen: true } : { sideOpen: true })}>
           All sessions <ChevronRight size={14} />
         </button>
       </div>

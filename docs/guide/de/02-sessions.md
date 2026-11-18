@@ -6,7 +6,7 @@ Eine Sitzung ist eine Unterhaltung mit einem Agenten in einem Ordner: Du beschre
 
 ## Eine Sitzung starten
 
-**Neue Sitzung** oben in der Seitenleiste öffnet die Startseite. Schreibe deinen Auftrag in das Nachrichtenfeld, prüfe die Auswahl darunter und drücke Enter oder **Starten**; auf dem Smartphone verwendest du den runden Pfeil. Die Sitzungsseite öffnet sich sofort mit deiner Nachricht und dem arbeitenden Agenten (**In Arbeit**). Kann die Sitzung nicht starten, steht dort der Grund. **Zurück zur Startseite** übernimmt deine Nachricht und Anhänge wieder in das Eingabefeld.
+**Neu** in der Werkzeugleiste oder **Neue Sitzung** oben in der Seitenleiste öffnet die Startseite. Schreibe deinen Auftrag in das Nachrichtenfeld, prüfe die Auswahl darunter und drücke Enter oder **Starten**; auf dem Smartphone verwendest du den runden Pfeil. Die Sitzungsseite öffnet sich sofort mit deiner Nachricht und dem arbeitenden Agenten (**In Arbeit**). Kann die Sitzung nicht starten, steht dort der Grund. **Zurück zur Startseite** übernimmt deine Nachricht und Anhänge wieder in das Eingabefeld.
 
 Bricht die Verbindung ab, bevor die App antwortet, etwa weil dein Smartphone in den Ruhezustand wechselt oder das Netzwerk wechselt, erscheint **Verbindung wird wiederhergestellt…**. Sobald die Verbindung steht, fragt die Seite den Stand deiner Nachricht ab. Wurde die Sitzung gestartet, öffnet sie sich; eine Sitzung wird nie doppelt gestartet. Ist die App etwa eine Minute lang nicht erreichbar, erscheint **Die App konnte nicht erreicht werden**. **Erneut versuchen** fragt noch einmal nach.
 

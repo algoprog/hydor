@@ -21,7 +21,7 @@ A project can also bring other projects together. That is a **group**: see [Brin
 
 ## Open the Projects page
 
-Click **Projects** among the tools at the bottom of the sidebar. On a phone, open the sidebar first: it is a drawer. You can also type "projects" in the search box (Ctrl+K, or ⌘K on a Mac).
+Click **Projects** on the rail. On a phone, open the sidebar first: it is a drawer, and Projects is among its tools. You can also type "projects" in the search box (Ctrl+K, or ⌘K on a Mac).
 
 The page has two tabs:
 

@@ -25427,5 +25427,9 @@
   "It finished its work": "Ολοκλήρωσε τη δουλειά του",
   "It stopped before it finished": "Σταμάτησε πριν ολοκληρωθεί",
   "Loading its reply": "Φόρτωση της απάντησής του",
-  "{0} subagent of": "υποπράκτορας του {0} της συνεδρίας"
+  "{0} subagent of": "υποπράκτορας του {0} της συνεδρίας",
+  "Agents are ready to help. Help explains every part of the app, and short tips will show you the rest as you go.": "Οι πράκτορες είναι έτοιμοι να βοηθήσουν. Η Βοήθεια εξηγεί κάθε μέρος της εφαρμογής, και σύντομες συμβουλές θα σας δείχνουν τα υπόλοιπα όσο προχωράτε.",
+  "Library keeps what agents made for you, Apps the tasks you run again and again, Inbox everything waiting on you, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.": "Η Βιβλιοθήκη κρατά ό,τι έφτιαξαν οι πράκτορες για εσάς, οι Εφαρμογές τις εργασίες που τρέχετε ξανά και ξανά, τα Εισερχόμενα ό,τι σας περιμένει, η Χρήση όσα έχουν απομείνει από τα πλάνα σας, το Σύστημα τα αρχεία αυτού του υπολογιστή και η Βοήθεια τον οδηγό για κάθε μέρος της εφαρμογής.",
+  "Search finds your sessions, files, settings, apps, notes and answers in the guide. Open it here, or with {0}K.": "Η Αναζήτηση βρίσκει τις συνεδρίες, τα αρχεία, τις ρυθμίσεις, τις εφαρμογές, τις σημειώσεις σας και απαντήσεις στον οδηγό. Ανοίξτε την εδώ ή με {0}K.",
+  "Sessions ({0}B)": "Συνεδρίες ({0}B)"
 }

@@ -175,7 +175,7 @@ If a page of another machine fails to draw, you see "This page stopped working" 
 
 - **Everything on a machine's pages is that machine's**: its sessions, folders and files, Git, terminals, agents' sign-ins, models and settings.
 - **Some things always come from the machine you opened the app on**: your password and sign-in, the list of machines, notifications, the themes you made, and the welcome tour and its tips.
-- **Notices from every machine reach you.** A notice from another machine names it, push notifications come through your own machine, and the [Inbox](/guide/inbox) lists what waits on you on every machine. The sidebar's inbox count includes them.
+- **Notices from every machine reach you.** A notice from another machine names it, push notifications come through your own machine, and the [Inbox](/guide/inbox) lists what waits on you on every machine. The count on the rail's **Inbox** includes them.
 - **Read-only links** work for sessions on other machines too (see [Share a session with a read-only link](/guide/devices#share-a-session-with-a-read-only-link)).
 - **Not on other machines**: Preview, which opens dev servers on the machine you opened only, and Connect other agents, since each machine's own server is reached at its own address.
 - Your browser remembers the Files page's folder, the open files and the terminal you last used for each machine on its own.

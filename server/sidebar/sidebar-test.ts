@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { MAX_PLACES, placeOrder, SIDEBAR_TOOLS, toolOrder, usualOrder } from '../../shared/sidebar.ts';
+import { MAX_PLACES, placeOrder, SECTION_TOOLS, SIDEBAR_TOOLS, toolOrder, usualOrder } from '../../shared/sidebar.ts';
 import type { ServerEvent } from '../../shared/types.ts';
 import { kvGet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -26,6 +26,11 @@ let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
 const usual = [...SIDEBAR_TOOLS];
+
+test('the usual order: the sections (Browser, Library, Projects, Apps, Agents), then Search, Usage, System, Settings, Help', () => {
+  assert.deepEqual(usual, ['browser', 'pages', 'spaces', 'apps', 'agents', 'search', 'usage', 'system', 'settings', 'help']);
+  assert.deepEqual(SECTION_TOOLS, usual.slice(0, 5), 'the rail\'s upper group comes first in the usual order');
+});
 
 test('an order: the tools named first, then the rest in their usual order', () => {
   assert.deepEqual(toolOrder([]), usual);

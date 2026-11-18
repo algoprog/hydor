@@ -36,7 +36,7 @@ Jede Ebene umfasst höchstens 20.000 Zeichen. Halte die Richtlinien möglichst k
 
 Jedes Projekt kann eigene Richtlinien erhalten: für wen die Arbeit gedacht ist, welcher Schreibstil passt und welche Projektregeln gelten.
 
-1. Öffne **Projekte** in der Seitenleiste und wähle das Projekt.
+1. Öffne **Projekte** in der Werkzeugleiste und wähle das Projekt.
 2. Fülle das Feld **Agentenrichtlinien: Vorgaben für alle Agenten im Projekt** aus.
 3. Speichere das Projekt.
 

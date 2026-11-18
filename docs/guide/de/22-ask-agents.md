@@ -8,7 +8,7 @@ Alle Agenten kennen diese Hilfe und können die App für dich bedienen. Wenn du 
 
 Frage in einer beliebigen Sitzung so, wie du einen Menschen fragen würdest: „Wie teile ich diese Sitzung mit einem Kollegen?“, „Wo aktiviere ich Benachrichtigungen auf meinem Handy?“ oder „Was macht der Auto-Modus?“. Der Agent schlägt die Antwort in dieser Hilfe nach. Seine Beschreibung bezieht sich auf die aktuelle App; die Links führen direkt zur genannten Stelle.
 
-Du kannst die Hilfe auch selbst lesen: über **Hilfe** in der Seitenleiste oder die Suche (Strg+K, auf dem Mac ⌘K). Dort erscheinen die Abschnitte unter **Hilfe**. Gibst du auf der Hilfeseite oben eine Frage ein und drückst Enter, geht sie an einen Agenten. Seine Antwort erscheint neben dem Artikel (siehe [Hilfe erhalten](/guide/start#get-help)).
+Du kannst die Hilfe auch selbst lesen: über **Hilfe** in der Werkzeugleiste oder die Suche (Strg+K, auf dem Mac ⌘K). Dort erscheinen die Abschnitte unter **Hilfe**. Gibst du auf der Hilfeseite oben eine Frage ein und drückst Enter, geht sie an einen Agenten. Seine Antwort erscheint neben dem Artikel (siehe [Hilfe erhalten](/guide/start#get-help)).
 
 ## Einstellungen ändern oder etwas einrichten lassen
 

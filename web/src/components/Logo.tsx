@@ -149,3 +149,12 @@ export function Logo({ size = 28 }: { size?: number }) {
     </svg>
   );
 }
+
+/** The Ω alone, in the text's colour (the rail's mark): `size` px tall, drawn with the icon's stroke. */
+export function OmegaMark({ size = 19, className }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox={MARK_BOX} width={size} height={size} fill="none" className={['shrink-0', className].filter(Boolean).join(' ')} aria-hidden>
+      <path d={OMEGA} stroke="currentColor" strokeWidth={MARK_STROKE} />
+    </svg>
+  );
+}

@@ -175,7 +175,7 @@ Wenn die Seite eines anderen Computers nicht angezeigt werden kann, siehst du st
 
 - **Alle Inhalte einer Computerseite gehören diesem Computer**: Sitzungen, Ordner, Dateien, Git, Terminals, Agentenanmeldungen, Modelle und Einstellungen.
 - **Einige Dinge stammen immer vom zuerst geöffneten Computer**: Passwort und Anmeldung, Computerliste, Benachrichtigungen, eigene Designs sowie Willkommenstour und Tipps.
-- **Alle Computer können dich benachrichtigen.** Nachrichten nennen den Ursprung, Push läuft über deinen eigenen Computer und der [Posteingang](/guide/inbox) sammelt offene Anfragen aller Computer. Die Seitenleistenzahl berücksichtigt sie ebenfalls.
+- **Alle Computer können dich benachrichtigen.** Nachrichten nennen den Ursprung, Push läuft über deinen eigenen Computer und der [Posteingang](/guide/inbox) sammelt offene Anfragen aller Computer. Die Zahl am **Posteingang** der Werkzeugleiste berücksichtigt sie ebenfalls.
 - **Schreibgeschützte Links** funktionieren auch für fremde Computersitzungen; siehe [Eine Sitzung schreibgeschützt teilen](/guide/devices#share-a-session-with-a-read-only-link).
 - **Nicht auf fremden Computerseiten verfügbar** sind Vorschau für Entwicklungsserver, die nur den zuerst geöffneten Computer verwendet, und Andere Agenten verbinden, da jeder Server seine eigene Adresse hat.
 - Der Browser merkt sich den geöffneten Ordner der Dateiseite, offene Dateien und das zuletzt genutzte Terminal für jeden Computer getrennt.

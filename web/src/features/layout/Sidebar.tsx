@@ -1,101 +1,25 @@
-import { memo, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, CircleHelp, Folders, Gauge, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
+import { Boxes, Folders, Inbox, ListFilter, PanelLeftClose, RotateCcw, Search, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
-import { activityOf } from '../../lib/activity';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
-import { useMachines } from '../../lib/machines';
-import { MOD, pct } from '../../lib/format';
+import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { useApp, useSessions, useUI, useUsage } from '../../lib/store';
+import { useApp, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Wordmark } from '../../components/Logo';
-import { severityColor } from '../../components/charts';
 import { cx, IconButton, Kbd, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
-import { machineId } from '../../lib/machine';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
-import { features } from '../registry';
-import type { AgentUsage } from '@shared/types';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
-import { useOutbox } from '../outbox/store';
-import { systemTabOf } from '../system/SystemHeader';
-
-/** A subscription on a free plan (Codex "free", a Claude free account); any other plan counts as paid. */
-const freePlan = (u: AgentUsage) => /free/i.test(u.account?.plan ?? '');
-
-/** What one subscription has left: none at a limit, else what its fullest window leaves. */
-function leftOf(u: AgentUsage): number {
-  if (u.limited) return 0;
-  const used = Math.max(0, ...u.windows.map((w) => w.usedPercent ?? 0));
-  return Math.max(0, 100 - Math.min(100, used));
-}
-
-/**
- * What is left across the subscriptions, as a tiny meter under "Usage": the paid ones, or the free ones when there
- * are no paid ones, each counted once (an added account can be the agent's own sign-in too). No subscriptions, no bar.
- */
-function UsageHint() {
-  const { claude, codex, grok, accounts } = useUsage();
-  const seen = new Set<string>();
-  const subs = [claude, codex, grok, ...Object.values(accounts)].filter((u): u is AgentUsage => {
-    if (!u?.ok || !u.windows.some((w) => w.usedPercent != null)) return false;
-    const key = u.account?.email ? `${u.agent}:${u.account.email.toLowerCase()}` : null;
-    if (key && seen.has(key)) return false;
-    if (key) seen.add(key);
-    return true;
-  });
-  const paid = subs.filter((u) => !freePlan(u));
-  const counted = paid.length ? paid : subs;
-  if (!counted.length) return null;
-  const left = counted.reduce((n, u) => n + leftOf(u), 0) / counted.length;
-  const title = [
-    `${Math.round(left)}% left across ${counted.length} ${paid.length ? 'paid' : 'free'} subscription${counted.length === 1 ? '' : 's'}`,
-    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
-  ].join('\n');
-  return (
-    <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
-      <span className="block h-full rounded-full" style={{ width: `${left}%`, background: left <= 0 ? 'var(--err)' : severityColor(100 - left) }} />
-    </span>
-  );
-}
-
-/** The inbox, by the sidebar's title: how many sessions wait on you, here and on the other machines, on its corner. */
-function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
-  const here = useSessions((s) => Object.values(s.byKey).filter((x) => !x.subagentOf && activityOf(x)?.status === 'waiting').length);
-  const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
-  // Calls held in the Outbox for your OK wait on you too.
-  const held = useOutbox((s) => s.held);
-  useEffect(() => void useOutbox.getState().load(), []);
-  const n = here + there + held;
-  return (
-    <span data-tip={n > 0 ? 'inbox' : undefined} className="relative inline-flex">
-      <IconButton label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'} active={active} onClick={() => onGo('/inbox')}>
-        <Inbox size={17} />
-      </IconButton>
-      {n > 0 && <span className="tnum pointer-events-none absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-warn px-1 text-center text-[10px] leading-4 font-semibold text-bg">{n > 99 ? '99+' : n}</span>}
-    </span>
-  );
-}
-
-/** One of the tools at the bottom: what it shows, and where it goes. */
-interface Tool {
-  id: SidebarTool;
-  label: string;
-  icon: ReactNode;
-  /** Its page is the one open. */
-  match: boolean;
-  go: () => void;
-  extra?: ReactNode;
-  tour?: string;
-}
+import { useInboxCount, useTools, type Tool } from './tools';
 
 /** What a tool being dragged gets: its place among the others, and the handlers that pick it up. */
 interface DragBits {
@@ -147,64 +71,18 @@ function SortableTool({ t, onMenu, tight }: { t: Tool; onMenu: (e: ReactMouseEve
   );
 }
 
-/** Navigation: new session, search, every session, then the tools, in the order you drag them into. A drawer on phones. */
-export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
-  const [loc] = useLocation();
-  const [q, setQ] = useState('');
-  const filter = useUI((s) => s.agentFilter);
-  const spaceFilter = useUI((s) => s.spaceFilter);
-  const byFolder = useUI((s) => s.groupByFolder);
-  const spaces = useSpaces();
-  // A space deleted while the list showed only its sessions: all of them again.
-  useEffect(() => {
-    if (spaces && spaceFilter && !spaces.some((s) => s.id === spaceFilter)) useUI.getState().set({ spaceFilter: null });
-  }, [spaces, spaceFilter]);
-  const connected = useApp((s) => s.connected);
-  const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const filterRef = useRef<HTMLButtonElement>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
+/** A phone's tools: every one in a grid, in the order you drag them into (on a computer they are on the rail, Rail.tsx). */
+function ToolGrid({ nav, close }: { nav: (path: string) => void; close: () => void }) {
   const order = useToolOrder((s) => s.tools);
-  useEffect(() => loadToolOrder(), []);
   const [dragId, setDragId] = useState<SidebarTool | null>(null);
   const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
   const coarse = useMediaQuery('(pointer: coarse)');
   const toolMenuAt = useRef<HTMLElement | null>(null);
   const [toolMenu, setToolMenu] = useState(false);
-
-  const close = () => useUI.getState().set({ drawerOpen: false });
-  const nav = (path: string) => {
-    go(path);
-    if (mobile) close();
-  };
-
-  const tools: Tool[] = [
-    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
-    // What the agents' plans have used and have left, with a thin bar for it at a glance.
-    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint /> },
-    // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
-    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: <Settings size={17} />,
-      match: loc === '/settings',
-      go: () => nav('/settings'),
-      tour: 'nav-settings',
-      extra: updates ? <span className="absolute top-2.5 left-[calc(50%+7px)] h-1.5 w-1.5 rounded-full bg-accent" title="A newer version is out (Settings → General)" /> : undefined,
-    },
-    {
-      id: 'search',
-      label: 'Search',
-      icon: <Search size={17} />,
-      match: false,
-      go: () => {
-        if (mobile) close();
-        openPalette();
-      },
-    },
-    { id: 'help', label: 'Help', icon: <CircleHelp size={17} />, match: loc === '/guide' || loc.startsWith('/guide/'), go: () => nav('/guide') },
-  ];
+  const tools = useTools(nav, () => {
+    close();
+    openPalette();
+  });
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   // Nine tools or more: five to a row, so they make two rows (not two and a lone one).
   const wide = tools.length >= 9;
@@ -214,7 +92,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
     lastDragEnd = Date.now();
     setDragId(null);
     if (!over || active.id === over.id) return;
-    // Moved among every tool, the hidden ones too (Preview, on another machine's pages), so those keep their places.
+    // Moved among every tool, the hidden ones too (Browser, on another machine's pages), so those keep their places.
     const from = order.indexOf(active.id as SidebarTool);
     const to = order.indexOf(over.id as SidebarTool);
     if (from >= 0 && to >= 0) setToolOrder(arrayMove(order, from, to));
@@ -228,20 +106,104 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   };
 
   return (
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={({ active }) => {
+          setDragId(active.id as SidebarTool);
+          setToolMenu(false);
+        }}
+        onDragEnd={onToolDrop}
+        onDragCancel={() => setDragId(null)}
+        accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
+      >
+        {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
+        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
+          <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
+            {tools.map((t) => (
+              <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
+            ))}
+          </SortableContext>
+        </nav>
+        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
+      </DndContext>
+      <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
+        <MenuItem
+          icon={<RotateCcw size={14} />}
+          onClick={() => {
+            setToolMenu(false);
+            setToolOrder([]);
+          }}
+        >
+          Back to the usual order
+        </MenuItem>
+      </Popover>
+    </>
+  );
+}
+
+/** The inbox, by the drawer's title: how many sessions wait on you, here and on the other machines, on its corner. */
+function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
+  const n = useInboxCount();
+  return (
+    <span data-tip={n > 0 ? 'inbox' : undefined} className="relative inline-flex">
+      <IconButton label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'} active={active} onClick={() => onGo('/inbox')}>
+        <Inbox size={17} />
+      </IconButton>
+      {n > 0 && <span className="tnum pointer-events-none absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-warn px-1 text-center text-[10px] leading-4 font-semibold text-bg">{n > 99 ? '99+' : n}</span>}
+    </span>
+  );
+}
+
+/**
+ * Navigation: the sessions, with new session and search. A column beside the rail on a computer (`column`: its tools and
+ * the inbox are on the rail, Rail.tsx); on phones a drawer that has them all, the tools in a grid under the sessions.
+ */
+export const Sidebar = memo(function Sidebar({ mobile, column }: { mobile?: boolean; column?: boolean }) {
+  const [loc] = useLocation();
+  const [q, setQ] = useState('');
+  const filter = useUI((s) => s.agentFilter);
+  const spaceFilter = useUI((s) => s.spaceFilter);
+  const byFolder = useUI((s) => s.groupByFolder);
+  const spaces = useSpaces();
+  // A space deleted while the list showed only its sessions: all of them again.
+  useEffect(() => {
+    if (spaces && spaceFilter && !spaces.some((s) => s.id === spaceFilter)) useUI.getState().set({ spaceFilter: null });
+  }, [spaces, spaceFilter]);
+  const connected = useApp((s) => s.connected);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const filterRef = useRef<HTMLButtonElement>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  // The rail loads the orders on a computer; the drawer has no rail.
+  useEffect(() => (mobile ? loadToolOrder() : undefined), [mobile]);
+  const close = () => useUI.getState().set({ drawerOpen: false });
+  const nav = (path: string) => {
+    go(path);
+    if (mobile) close();
+  };
+
+  return (
     <aside
       data-tour="sidebar"
       className={cx('flex h-full w-full flex-col bg-sidebar pt-[var(--safe-top)]', mobile ? 'select-none [-webkit-touch-callout:none] [&_input]:select-text' : 'border-r border-line')}
     >
       <div data-tour="sidebar-top" className="flex h-14 shrink-0 items-center gap-2.5 px-4">
-        <span className="flex min-w-0 flex-1 items-center text-fg">
-          <Wordmark height={16} tide />
-        </span>
-        {!connected && (
-          <span title="Reconnecting…" className="text-warn">
-            <WifiOff size={15} />
-          </span>
+        {column ? (
+          <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">Sessions</h2>
+        ) : (
+          <>
+            <span className="flex min-w-0 flex-1 items-center text-fg">
+              <Wordmark height={16} tide />
+            </span>
+            {!connected && (
+              <span title="Reconnecting…" className="text-warn">
+                <WifiOff size={15} />
+              </span>
+            )}
+            <InboxButton active={loc === '/inbox'} onGo={nav} />
+          </>
         )}
-        <InboxButton active={loc === '/inbox'} onGo={nav} />
         {mobile ? (
           <IconButton label="Close menu" onClick={close}>
             <X size={18} />
@@ -262,7 +224,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
           <SquarePen size={16} className="shrink-0" />
           New session
         </button>
-        <div data-tip="search" className="relative">
+        <div data-tip={mobile ? 'search' : undefined} className="relative">
           <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
           <input
             ref={searchRef}
@@ -350,38 +312,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         <SessionList query={q} />
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={({ active }) => {
-          setDragId(active.id as SidebarTool);
-          setToolMenu(false);
-        }}
-        onDragEnd={onToolDrop}
-        onDragCancel={() => setDragId(null)}
-        accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
-      >
-        {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
-        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
-          <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
-            {tools.map((t) => (
-              <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
-            ))}
-          </SortableContext>
-        </nav>
-        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
-      </DndContext>
-      <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
-        <MenuItem
-          icon={<RotateCcw size={14} />}
-          onClick={() => {
-            setToolMenu(false);
-            setToolOrder([]);
-          }}
-        >
-          Back to the usual order
-        </MenuItem>
-      </Popover>
+      {mobile && <ToolGrid nav={nav} close={close} />}
     </aside>
   );
 });

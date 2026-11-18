@@ -28,7 +28,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 
 ## The Agents page
 
-Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
+Open **Agents** on the rail, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
 
 - **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)); **Install** installs an agent from a file someone gave you (see [Share an agent as a file](#share-an-agent-as-a-file)).
 - Two tabs under the title: **Your agents**, this page, and **Schedules**, everything that runs by itself on a week: your agents' schedules with your other scheduled tasks, your apps' schedules, watchers and webhooks, each run coloured by how it went, what runs next, and a list of them all with a switch to pause each (see [See the week: what ran and what runs next](/guide/tasks#see-the-week-what-ran-and-what-runs-next)).

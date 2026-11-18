@@ -2,7 +2,7 @@ import { memo, useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation, useRoute, useSearch } from 'wouter';
 import { activityOf } from '../../lib/activity';
 import { useSessions, useUI } from '../../lib/store';
-import { cx, useIsMobile, useMediaQuery } from '../../components/ui';
+import { cx, useIsMobile } from '../../components/ui';
 import { FilesPage } from '../files/FilesPage';
 import { QuickOpen } from '../files/FileSearch';
 import { UploadTrays } from '../pages/UploadTray';
@@ -21,6 +21,8 @@ import { MonitorPage } from '../system/SystemPage';
 import { SystemOverview } from '../system/SystemOverview';
 import { TerminalPage, TerminalPanel } from '../terminal/TerminalPanel';
 import { UsagePage } from '../usage/UsagePage';
+import { ownColumn } from './column';
+import { Rail, RAIL_WIDTH } from './Rail';
 import { Sidebar } from './Sidebar';
 import { undoLast } from '../../lib/flags';
 import { CommandPalette, usePalette } from '../palette/CommandPalette';
@@ -30,7 +32,7 @@ import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { EditorHost } from '../mediaedit/host';
 import { CrashGuard } from '../../components/CrashGuard';
 import { ShareDialogHost } from '../spaces/ShareHost';
-import { HelpButton, Tour } from '../tour/Tour';
+import { Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
 import { HandsFree } from '../voice/HandsFree';
 import { ReviewPage } from '../review/ReviewPage';
@@ -226,14 +228,13 @@ export function Shell() {
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
-  const maxNavigation = Math.max(180, Math.min(560, windowWidth - 320));
+  // The rail takes its width off the window's; the sidebar and the page keep what is left.
+  const maxNavigation = Math.max(180, Math.min(560, windowWidth - RAIL_WIDTH - 320));
   const navWidth = Math.max(180, Math.min(maxNavigation, Number.isFinite(navigationWidth) ? navigationWidth : 280));
   const setNavWidth = (width: number) => useUI.getState().set({ navigationWidth: Math.max(180, Math.min(maxNavigation, width)) });
   const panelOpen = useUI((s) => s.panelOpen);
   const panelHeight = useUI((s) => s.panelHeight);
   const [loc] = useLocation();
-  // With the sidebar (and its Tour tile) hidden, the ? sits in the corner where it clears a centred composer, the terminal and the panel.
-  const roomy = useMediaQuery('(min-width: 900px)');
   useTitleBadge();
 
   // Moving to another page closes the drawer.
@@ -297,14 +298,15 @@ export function Shell() {
 
   return (
     <div data-shell className="flex h-dvh overflow-hidden bg-bg">
-      {sideOpen && (
+      <Rail />
+      {sideOpen && !ownColumn(loc) && (
         <div className="relative shrink-0" style={{ width: navWidth }}>
-          <Sidebar />
+          <Sidebar column />
           <div
             role="separator" aria-label="Resize navigation" aria-orientation="vertical" aria-valuemin={180} aria-valuemax={maxNavigation} aria-valuenow={navWidth} tabIndex={0}
             className="absolute top-0 right-0 z-20 h-full w-2 translate-x-1/2 cursor-col-resize touch-none hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none"
             onPointerDown={(e) => { if (e.button === 0) { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); } }}
-            onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) setNavWidth(e.clientX); }}
+            onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) setNavWidth(e.clientX - RAIL_WIDTH); }}
             onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
             onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setNavWidth(navWidth + (e.key === 'ArrowLeft' ? -10 : 10)); } }}
           />
@@ -337,7 +339,6 @@ export function Shell() {
       <ShareDialogHost />
       <Lightbox />
       <VideoBox />
-      {!sideOpen && roomy && !panelOpen && loc !== '/terminal' && <HelpButton />}
       <Tour />
       <Tips />
       <HandsFree />

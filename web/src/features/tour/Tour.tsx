@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import type { AccountAgent, AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -703,7 +703,7 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
       sidebar: true,
       icon: <LayoutGrid size={16} />,
       title: 'Everything else',
-      body: 'Library keeps what agents made for you, Apps the tasks you run again and again, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.',
+      body: 'Library keeps what agents made for you, Apps the tasks you run again and again, Inbox everything waiting on you, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.',
     },
     {
       id: 'notify',
@@ -732,7 +732,7 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
       id: 'done',
       icon: <Check size={16} />,
       title: 'You’re all set',
-      body: 'Agents are ready to help. Help (?) explains every part of the app, and short tips will show you the rest as you go.',
+      body: 'Agents are ready to help. Help explains every part of the app, and short tips will show you the rest as you go.',
       width: 420,
       next: 'Get started',
       Extra: () => <TryThese finish />,
@@ -1241,19 +1241,5 @@ export function Tour() {
         />
       )}
     </>
-  );
-}
-
-/** Desktop: the ? in the bottom-right corner, while the sidebar is hidden: Help, the guide (with the tour). */
-export function HelpButton() {
-  return (
-    <button
-      onClick={() => go('/guide')}
-      className="fixed right-4 bottom-4 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-line-2 bg-elevated text-fg-2 shadow-lg transition-colors hover:text-fg"
-      aria-label="Help"
-      title="Help: the guide to every part of the app"
-    >
-      <CircleHelp size={18} />
-    </button>
   );
 }

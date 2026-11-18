@@ -81,7 +81,7 @@ see it. `list_connections` shows what is connected.
 ## Keeping things together, and how agents behave [spaces, guidelines, assistants, memory]
 
 - **A project** for a long piece of life (a move, a renovation, a job hunt, a course): its own folder,
-  documents, guidelines and memory. **Projects** among the tools at the bottom of the sidebar.
+  documents, guidelines and memory. **Projects** on the rail (the narrow strip of tools at the left edge).
 - **Shared knowledge** (Projects → **Shared knowledge**): documents every session can search, such as
   manuals, policies, a recipe collection.
 - **Agent Guidelines** (Settings → Agents → Agent Guidelines, `/settings?s=guidelines`): what every
@@ -99,7 +99,7 @@ see it. `list_connections` shows what is connected.
   **Send a test**. On an iPhone, only from the app opened from the home screen.
 - **Voice:** the microphone in the message box (dictation), the speaker on a reply (read aloud), and the
   headphones button, **Hands-free**, to talk with the app while walking or cooking.
-- **The inbox** (the tray at the top of the sidebar) gathers everything waiting on them.
+- **The inbox** (the tray tile on the rail) gathers everything waiting on them.
 
 ## Plugins that add abilities [plugins]
 

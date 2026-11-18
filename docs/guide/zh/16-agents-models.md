@@ -137,7 +137,7 @@ Claude Code 和 Codex 需要先登录才能工作，添加之后的 Grok Build �
 
 如果你在 Grok Build 未登录时开始一个 Grok Build 会话，会话会停下，并显示“Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again.”。请在那里登录，然后再发一次消息。除了订阅，你也可以在智能体的环境中设置 `XAI_API_KEY`（xAI API 密钥）来使用 Grok Build。
 
-欢迎导览（从侧边栏的**帮助**进入）会问你想用哪些智能体和模型，也会一步步带你完成这些登录。
+欢迎导览（从工具栏的**帮助**进入）会问你想用哪些智能体和模型，也会一步步带你完成这些登录。
 
 ## 添加第二个账户（工作和个人）
 

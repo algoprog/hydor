@@ -6,7 +6,7 @@ Experimente führt Trainings- und Evaluationsjobs für dich aus. Ein Job wartet,
 
 ## Experimente öffnen
 
-Klicke in der Seitenleiste auf **System** und dann auf **Experimente** oder öffne [Experimente](/system/experiments). Die Karte **Experimente** in der [Systemübersicht](/system) zeigt aktive Läufe. Ein Klick öffnet den jeweiligen Lauf.
+Klicke in der Werkzeugleiste auf **System** und dann auf **Experimente** oder öffne [Experimente](/system/experiments). Die Karte **Experimente** in der [Systemübersicht](/system) zeigt aktive Läufe. Ein Klick öffnet den jeweiligen Lauf.
 
 Die obere Zeile beschreibt die Warteschlange, etwa „2 laufen · 1 wartet auf eine GPU“. Daneben siehst du kleine Speicheranzeigen für die GPUs dieses Computers. Belegt einer deiner Läufe eine GPU, erscheint sie in der Akzentfarbe. Ein Klick öffnet den Lauf.
 

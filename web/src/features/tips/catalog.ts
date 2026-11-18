@@ -7,7 +7,7 @@ import { MOD } from '../../lib/format';
 export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   search: {
     title: 'Search everything',
-    body: `This box finds your sessions. ${MOD}K, or Search among the tools, opens the search box, which finds the rest too: files, settings, apps, notes and answers in the guide.`,
+    body: `Search finds your sessions, files, settings, apps, notes and answers in the guide. Open it here, or with ${MOD}K.`,
   },
   inbox: {
     title: 'Everything waiting on you',

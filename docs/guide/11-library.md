@@ -241,7 +241,7 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 ## Find your pages
 
-**Library** in the sidebar ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac).
+**Library** on the rail ([/library](/library)) holds everything you kept, made and published. On a phone, open the sidebar with **Menu** (≡) first. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac).
 
 Beside the cards are the Library's places, each with how many things it holds (in a narrower window or on a phone, a row of chips above the cards):
 

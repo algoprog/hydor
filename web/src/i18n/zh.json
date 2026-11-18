@@ -25443,5 +25443,9 @@
   "It finished its work": "它完成了工作",
   "It stopped before it finished": "它在完成前就被停止了",
   "Loading its reply": "正在加载它的回复",
-  "{0} subagent of": "{0} 子智能体，来自"
+  "{0} subagent of": "{0} 子智能体，来自",
+  "Agents are ready to help. Help explains every part of the app, and short tips will show you the rest as you go.": "智能体已经准备好帮忙了。帮助会解释应用的每个部分，简短的提示会在你用到时介绍其余功能。",
+  "Library keeps what agents made for you, Apps the tasks you run again and again, Inbox everything waiting on you, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.": "资料库保存智能体为你做的内容，应用是你反复运行的任务，收件箱汇总所有等你处理的事项，用量显示你的套餐还剩多少，系统是这台电脑的文件，帮助则是应用每个部分的指南。",
+  "Search finds your sessions, files, settings, apps, notes and answers in the guide. Open it here, or with {0}K.": "搜索可以找到你的会话、文件、设置、应用、笔记，以及指南中的答案。在这里打开，或按 {0}K。",
+  "Sessions ({0}B)": "会话（{0}B）"
 }

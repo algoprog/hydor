@@ -210,7 +210,7 @@ export function Tips() {
   if (!shown || !box) return null;
   const text = TIP_TEXT[shown.id];
   const w = mobile ? Math.min(innerWidth - EDGE * 2, 380) : 304;
-  const at = place(box, w, cardH || 160, !mobile && !!shown.el.closest('[data-tour="sidebar"]'));
+  const at = place(box, w, cardH || 160, !mobile && !!shown.el.closest('[data-tour="sidebar"], [data-rail]'));
   const skip = () => {
     setTipsOn(false);
     close(true);

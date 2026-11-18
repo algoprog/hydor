@@ -6,7 +6,7 @@ Experiments runs your training and evaluation jobs for you. A job waits until a 
 
 ## Open Experiments
 
-Click **System** in the sidebar, then the **Experiments** tab, or go to [Experiments](/system/experiments). The **Experiments** card on [System's overview](/system) lists the runs going now; click one to open it.
+Click **System** on the rail, then the **Experiments** tab, or go to [Experiments](/system/experiments). The **Experiments** card on [System's overview](/system) lists the runs going now; click one to open it.
 
 The line at the top says what the queue is doing ("2 running · 1 waiting for a GPU"). Beside it, this computer's GPUs as small meters: the memory each one uses, in the accent colour when one of your runs holds it (click it to open that run).
 

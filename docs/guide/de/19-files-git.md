@@ -1,12 +1,12 @@
 # System: Dateien, Git, Terminal und Vorschau
 
-**System** in der Seitenleiste bündelt die Werkzeuge dieses Computers: Dateien finden, öffnen, bearbeiten und ihre Inhalte durchsuchen, zu Projekten oder neuen Sitzungen hinzufügen, Jupyter-Notebooks ausführen, Git-Commits erstellen und pushen, Pull-Requests öffnen und Branchänderungen prüfen. Dazu kommen Terminals, Vorschauen laufender Web-Apps, Vorher-nachher-Aufnahmen von Agentenänderungen und die Systemüberwachung. So kannst du Agentenarbeit innerhalb der App prüfen und abschließen.
+**System** in der Werkzeugleiste bündelt die Werkzeuge dieses Computers: Dateien finden, öffnen, bearbeiten und ihre Inhalte durchsuchen, zu Projekten oder neuen Sitzungen hinzufügen, Jupyter-Notebooks ausführen, Git-Commits erstellen und pushen, Pull-Requests öffnen und Branchänderungen prüfen. Dazu kommen Terminals, Vorschauen laufender Web-Apps, Vorher-nachher-Aufnahmen von Agentenänderungen und die Systemüberwachung. So kannst du Agentenarbeit innerhalb der App prüfen und abschließen.
 
 ![System → Git: Repositoryänderungen, Dateivergleich, Commitfeld und Synchronisierung](images/files-git.webp)
 
 ## System öffnen
 
-Wähle **System** unter den Werkzeugen der Seitenleiste oder öffne [System](/system). Tabs unter dem Titel führen zu den Bereichen mit eigener Adresse:
+Wähle **System** in der Werkzeugleiste oder öffne [System](/system). Tabs unter dem Titel führen zu den Bereichen mit eigener Adresse:
 
 - **Übersicht** ([öffnen](/system)): Computer und aktueller Inhalt der Werkzeuge; siehe [Übersicht](#the-overview).
 - **Dateien** ([öffnen](/files)): lokale Dateien; siehe [Dateiseite öffnen](#open-the-files-page).

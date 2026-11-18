@@ -6,7 +6,7 @@ A session is one conversation with an agent, in one folder: you say what you wan
 
 ## Start a session
 
-**New session** at the top of the sidebar opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once, with your message and the agent at work on it (**Working**). If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
+**New** on the rail, or **New session** at the top of the sidebar, opens the start page. Write what you want done in the message box, check the row of choices under it, and press Enter (or **Start**; on a phone, the round arrow). The session's page opens at once, with your message and the agent at work on it (**Working**). If the session can't start, its page says why, and **Back to the start page** puts your message (and what you attached) back in the box.
 
 If the connection drops before the app answers (your phone went to sleep, or the network changed), the page shows **Reconnecting…** and, once it can, asks the app what came of your message: the session opens if it started, and a session never starts twice. If the app stays out of reach for about a minute, the page says **The app could not be reached**; **Try again** asks once more.
 

@@ -1,4 +1,4 @@
-// The sidebar's orders, as you drag them (shared/sidebar.ts): the tools at its bottom, and the groups of your projects
+// The sidebar's orders, as you drag them (shared/sidebar.ts): the tools on the rail beside it, and the groups of your projects
 // and folders among the sessions. Kept here, so every device shows the same order, and open pages change at once.
 // Another machine's pages show this server's.
 import { MAX_FOLDER_NAME, MAX_FOLDER_NAMES, RETIRED_TOOLS, SIDEBAR_TOOLS, folderNameMap, isSidebarTool, placeOrder, toolOrder, usualOrder, type SidebarTool } from '../../shared/sidebar.ts';

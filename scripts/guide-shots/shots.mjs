@@ -2,10 +2,14 @@
 // size; `ctx.go` opens a page of the demo app, `ctx.file` is where the picture goes.
 import { sleep } from './cdp.mjs';
 
-/** The part of the window right of the sidebar, down to `bottom` (CSS pixels) when given. */
+/**
+ * The part of the window right of the rail and the sessions sidebar, down to `bottom` (CSS pixels) when given. A page
+ * with a column of its own (the Library's, an `<aside>` too) has the rail only: the sessions sidebar is `aside[data-tour="sidebar"]`.
+ */
 async function main(p, bottom) {
-  const aside = await p.box('aside');
-  const x = aside ? Math.round(aside.x + aside.width) : 0;
+  const rail = await p.box('nav[data-rail]');
+  const side = await p.box('aside[data-tour="sidebar"]');
+  const x = Math.round(Math.max(rail ? rail.x + rail.width : 0, side ? side.x + side.width : 0));
   return { x, y: 0, width: p.size.width - x, height: Math.min(p.size.height, bottom ?? p.size.height) };
 }
 

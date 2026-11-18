@@ -138,7 +138,7 @@ Danach erlaubt **Konto wechseln** dieselbe Anmeldung mit einem anderen Konto (be
 
 Startest du eine Grok-Build-Sitzung, während es abgemeldet ist, bricht die Sitzung ab mit „Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again.“ Melde dich dort an und sende deine Nachricht erneut. Statt eines Abos funktioniert für Grok Build auch ein xAI-API-Key in `XAI_API_KEY`, in der Umgebung der Agenten.
 
-Die Willkommenstour (über **Hilfe** in der Seitenleiste) fragt, welche Agenten und Modelle du nutzen möchtest, und führt dich ebenfalls durch diese Anmeldungen.
+Die Willkommenstour (über **Hilfe** in der Werkzeugleiste) fragt, welche Agenten und Modelle du nutzen möchtest, und führt dich ebenfalls durch diese Anmeldungen.
 
 ## Ein zweites Konto für Arbeit oder Privat hinzufügen
 

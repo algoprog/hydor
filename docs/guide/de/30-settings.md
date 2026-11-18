@@ -4,7 +4,7 @@ Hier findest du sämtliche Einstellungsbereiche in der Reihenfolge der App, jewe
 
 ## Aufbau der Einstellungen
 
-Öffne **Einstellungen** in der Seitenleiste. Am Computer gibt es oben drei Tabs: **App** für die Anwendung selbst, **Agenten** für die Agenten und ihre Anweisungen sowie **Funktionen** für gemeinsame Ergänzungen wie Suche, Browser und Memory. Links stehen die Bereiche des gewählten Tabs, rechts der geöffnete Bereich. Auf dem Handy erscheinen alle Bereiche in einer Liste. Tippe einen an, um ihn zu öffnen; der Pfeil oben führt zurück.
+Öffne **Einstellungen** in der Werkzeugleiste. Am Computer gibt es oben drei Tabs: **App** für die Anwendung selbst, **Agenten** für die Agenten und ihre Anweisungen sowie **Funktionen** für gemeinsame Ergänzungen wie Suche, Browser und Memory. Links stehen die Bereiche des gewählten Tabs, rechts der geöffnete Bereich. Auf dem Handy erscheinen alle Bereiche in einer Liste. Tippe einen an, um ihn zu öffnen; der Pfeil oben führt zurück.
 
 Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem Mac ⌘K) beispielsweise „dunkles Design“ oder „Benachrichtigungen“ ein und wähle den Treffer. Die App öffnet den richtigen Bereich und hebt die Option hervor. Du kannst auch einen Agenten mit der Änderung beauftragen ([Agenten die App bedienen lassen](/guide/ask-agents)).
 

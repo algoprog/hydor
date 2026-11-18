@@ -24,10 +24,10 @@ import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
-import { toast, toastError, useUI } from '../../../lib/store';
+import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { LOCALE } from '../../../i18n/locale';
-import { Button, cx, IconButton, Popover, Segmented, useConfirm, useMediaQuery } from '../../../components/ui';
+import { Button, cx, IconButton, Popover, Segmented, useConfirm } from '../../../components/ui';
 import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds';
 import type { PageVersion } from '@shared/pages';
 import { SIGNATURE_WIDTH_MM } from '@shared/signatures';
@@ -334,11 +334,6 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     return () => ro.disconnect();
   }, []);
   const phone = layout === 'sheet' || width < 640;
-  // The app's ? sits in the window's bottom right corner while its sidebar is hidden (Shell's HelpButton): the save
-  // bar's buttons and the word count keep clear of it.
-  const helpShown = useUI((s) => !s.sideOpen && !s.panelOpen);
-  const roomy = useMediaQuery('(min-width: 900px)');
-  const corner = helpShown && roomy && !phone;
   const wideOutline = width >= 1100 && layout !== 'sheet';
   const outlineW = wideOutline && outlineOpen ? 220 : 0;
   const comments: Comment[] = model?.comments ?? [];
@@ -1811,14 +1806,14 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
             onClick={openCount}
             title="Word count"
             className="absolute right-3 bottom-1.5 rounded-md bg-bg/80 px-1.5 text-[11px] text-fg-3 tabular-nums hover:text-fg"
-            style={{ right: panelW ? panelW + 12 : corner ? 64 : 12 }}
+            style={{ right: panelW ? panelW + 12 : 12 }}
           >
             {`${words.toLocaleString(LOCALE)} word${words === 1 ? '' : 's'}`}
           </button>
         )}
       </div>
       {dirty && !readOnly && (
-        <div className={cx('flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]', corner && 'pr-16')}>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
           <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warn align-middle" />
             Not saved yet{savedNote ? <span className="text-fg-3"> · {savedNote}</span> : null}

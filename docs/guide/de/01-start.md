@@ -2,7 +2,7 @@
 
 Dieser Beitrag führt dich durch Hydor: was die App ist, wie ihre Oberfläche aufgebaut ist, wie du deine erste Sitzung startest, Inhalte mit der Suche findest und die App auf dem Smartphone verwendest. Am Ende findest du alle Tastenkombinationen in einer Tabelle.
 
-![Die App mit deinen Sitzungen links in der Seitenleiste und der Startseite für neue Aufträge](images/start.webp)
+![Die App mit der Werkzeugleiste und deinen Sitzungen links in der Seitenleiste und der Startseite für neue Aufträge](images/start.webp)
 
 ## Was Hydor ist
 
@@ -10,15 +10,44 @@ Hydor führt KI-Agenten auf deinem eigenen Computer aus. Du bedienst sie in eine
 
 ## Die Oberfläche kennenlernen
 
-Der Bildschirm besteht aus der **Seitenleiste** links und der geöffneten Seite daneben, etwa Startseite, Sitzung oder Einstellungen. Auf dem Smartphone lässt sich die Seitenleiste als Menü einblenden. Siehe [Die App auf dem Smartphone verwenden](#use-the-app-on-a-phone).
+Der Bildschirm besteht aus drei Teilen: der **Werkzeugleiste**, einem schmalen Streifen mit Werkzeugen ganz links, der **Seitenleiste** daneben mit deinen Sitzungen und der geöffneten Seite, etwa Startseite, Sitzung oder Einstellungen. Die Werkzeugleiste ist am Computer immer da. Auf dem Smartphone gibt es sie nicht: Dort lässt sich die Seitenleiste als Menü einblenden und enthält auch die Werkzeuge (siehe [Die App auf dem Smartphone verwenden](#use-the-app-on-a-phone)).
 
 Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstellen: Ziehe ihren rechten Rand oder klicke darauf und verwende die linke und rechte Pfeiltaste. Der Browser merkt sich die Breite.
 
-### Oben in der Seitenleiste
+### Die Werkzeugleiste
 
-- **Hydor** mit Logo. Während einer erneuten Verbindung zur App erscheint daneben ein durchgestrichenes WLAN-Symbol.
-- **Posteingang**, das Ablagesymbol: alle ausstehenden Freigaben, Fragen und Formulare aus sämtlichen Sitzungen, geplanten Aufgaben und Computern. Die Zahl am Symbol nennt die gerade auf dich wartenden Sitzungen. Siehe [Posteingang und Benachrichtigungen](/guide/inbox).
-- **Seitenleiste ausblenden** per Strg+B. Bei ausgeblendeter Leiste zeigt die Schaltfläche oben links auf jeder Seite sie wieder an. Auf dem Smartphone heißt sie **Menü schließen**.
+Die Werkzeugleiste ist eine Spalte aus Kacheln, jeweils mit dem Symbol über dem Namen; zeigst du auf eine, siehst du Name und Tastenkürzel. Die Kachel der geöffneten Seite ist hervorgehoben, daneben sitzt am Bildschirmrand ein Balken in der Akzentfarbe. Von oben nach unten:
+
+- Das Zeichen der App, **Ω**. Während einer erneuten Verbindung zur App erscheint darunter ein durchgestrichenes WLAN-Symbol.
+- **Neu**: öffnet die [Startseite](#the-start-page) für eine neue Sitzung.
+- **Sitzungen**: zeigt deine Sitzungen in der Seitenleiste. Auf der Startseite oder in einer Sitzung blendet die Kachel die Seitenleiste ein oder aus (wie Strg+B). Von jeder anderen Seite zeigt sie die Seitenleiste und bringt dich zur Sitzung, die du zuletzt in diesem Fenster geöffnet hattest, sonst zur Startseite.
+
+Dann die Bereiche der App (die Desktop-App hat fünf; in der Web-App und auf dem Smartphone sind es vier, ohne **Browser**):
+
+- **Browser**: ein eigener Browser, nur in der Desktop-App, mit Tabs, einer intelligenten Adressleiste, Lesezeichen, Verlauf, einem Werbeblocker und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
+- **Bibliothek**: erstellte Werkzeuge und Seiten, gespeicherte Bilder und Videos und deine Veröffentlichungen. Siehe [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
+- **Projekte**: Sitzungen, Dokumente und Richtlinien je Projekt sowie das für alle Sitzungen durchsuchbare gemeinsame Wissen. Siehe [Projekte und Wissen](/guide/projects).
+- **Apps**: wiederkehrende Aufgaben, für die du ein Formular ausfüllst und ein Agent die Arbeit übernimmt. Siehe [Apps](/guide/apps).
+- **Agenten**: deine und die mitgelieferten Agenten mit Aufgaben, Arbeitsorten, Zeitplänen, Modellen und Zuständigkeiten. Siehe [Agenten](/guide/agents).
+
+Weiter unten, nach etwas Abstand:
+
+- **Posteingang**: alle ausstehenden Freigaben, Fragen und Formulare aus sämtlichen Sitzungen, geplanten Aufgaben und Computern. Die Zahl am Symbol nennt, wie viele Dinge gerade auf dich warten. Siehe [Posteingang und Benachrichtigungen](/guide/inbox).
+- **Suchen**: öffnet dieselbe Suche wie Strg+K.
+- **Nutzung**: wie viel du vom Kontingent jedes Abos verbraucht hast und wann es zurückgesetzt wird, mit den Tabs **Aktivität** und **Arena**. Ein schmaler Balken unter dem Symbol zeigt das übrige Kontingent deiner bezahlten Abos oder, falls du keine hast, deiner kostenlosen Abos. Ist nichts mehr übrig, wird er rot. Siehe [Nutzung, Limits und Kosten](/guide/usage).
+- **System**: dieser Computer mit Tabs für **Übersicht** zu Zustand und aktuellem Inhalt der Werkzeuge, **Dateien** zum Durchsuchen, Öffnen und Bearbeiten, **Git** für Repositorys, Änderungen, Branches und Verlauf, **Terminal** für auch nach einem Seitenwechsel weiterlaufende Shells, **Vorschau** für lokale Entwicklungsserver, nur auf den eigenen Seiten dieses Computers und **Überwachen** mit Live-Anzeigen für Prozessoren, Grafikkarten, Arbeitsspeicher, Datenträger und aktive Programme. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git).
+- **Einstellungen**: sämtliche App-Einstellungen. Ein Punkt zeigt eine verfügbare neue Version an. Siehe [Alle Einstellungen](/guide/settings).
+- **Hilfe**: öffnet diesen Leitfaden, in dem du auch einen Agenten zur App befragen kannst. Hier startet auch die Willkommenstour.
+
+Die Bereiche stehen in der Reihenfolge Browser, Bibliothek, Projekte, Apps, Agenten, die Werkzeuge unter dem Posteingang in der Reihenfolge Suchen, Nutzung, System, Einstellungen, Hilfe: Das ist die Standardreihenfolge. Zum Ändern ziehst du eine Kachel an eine andere Position innerhalb ihrer Gruppe (der Bereiche oder der Werkzeuge unter dem Posteingang). Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt ein Rechtsklick auf eine Kachel und **Standardreihenfolge wiederherstellen** alles zurück. In einem zu niedrigen Fenster lässt sich die Werkzeugleiste scrollen.
+
+Die Seite **Browser** und die Startseite der **Bibliothek** zeigen neben der Werkzeugleiste eine eigene Spalte (die Tabs des Browsers, die Ordner der Bibliothek) statt der Seitenleiste mit den Sitzungen. **Sitzungen** in der Werkzeugleiste holt die Seitenleiste für die anderen Seiten zurück.
+
+### Die Seitenleiste
+
+Die Seitenleiste ist die Spalte neben der Werkzeugleiste. Sie enthält:
+
+- **Sitzungen** als Titel und am Ende **Seitenleiste ausblenden** (Strg+B). Bei ausgeblendeter Seitenleiste zeigt die Schaltfläche oben links auf jeder Seite sie wieder an; die Werkzeugleiste bleibt. Auf dem Smartphone stehen hier stattdessen der App-Name **Hydor**, der Posteingang und **Menü schließen**.
 - Eine Computerauswahl, sobald du unter [Einstellungen → Computer](/settings?s=machines) weitere Computer hinzugefügt hast. Sie nennt den angezeigten Computer und zeigt einen Punkt, wenn Sitzungen anderswo deine Antwort benötigen. Siehe [Smartphones, andere Computer und Freigaben](/guide/devices).
 - **Neue Sitzung** öffnet die [Startseite](#the-start-page).
 - **Sitzungen suchen** sucht nach Titel, Ordner und Nachrichteninhalt, auch in archivierten Sitzungen. Escape leert das Feld. Am Computer öffnet **Strg+K** am Feldende stattdessen die übergreifende Suche. Siehe [Alles mit Strg+K durchsuchen](#search-everything-with-ctrlk).
@@ -71,23 +100,6 @@ Subagenten, also die vom Agenten für Teilaufgaben gestarteten Sitzungen (Hydor-
 
 Jede Sitzungszeile hat ein Menü: Fahre darüber und klicke rechts auf **⋯**, oder verwende einen Rechtsklick; auf dem Smartphone tippst du auf **⋯**. Es bietet **Umbenennen**, außerhalb von Projekten **Ordner umbenennen**, **Anheften** oder **Lösen**, **Zurückstellen**, **Abschließen**, **Archivieren** und **Löschen** mit Bestätigung. Ein Doppelklick auf den Titel oder F2 bei ausgewählter Zeile benennt die Sitzung ebenfalls um. Siehe [Umbenennen, anheften, zurückstellen, abschließen, archivieren oder löschen](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 
-### Die Werkzeuge unten
-
-Unten in der Seitenleiste stehen die App-Werkzeuge in zwei Zeilen mit je fünf Einträgen (die Desktop-App hat zehn; in der Web-App und auf dem Smartphone sind es neun, ohne **Browser**):
-
-- **Bibliothek**: erstellte Werkzeuge und Seiten, gespeicherte Bilder und Videos und deine Veröffentlichungen. Siehe [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
-- **Projekte**: Sitzungen, Dokumente und Richtlinien je Projekt sowie das für alle Sitzungen durchsuchbare gemeinsame Wissen. Siehe [Projekte und Wissen](/guide/projects).
-- **Apps**: wiederkehrende Aufgaben, für die du ein Formular ausfüllst und ein Agent die Arbeit übernimmt. Siehe [Apps](/guide/apps).
-- **Agenten**: deine und die mitgelieferten Agenten mit Aufgaben, Arbeitsorten, Zeitplänen, Modellen und Zuständigkeiten. Siehe [Agenten](/guide/agents).
-- **Browser**: ein eigener Browser, nur in der Desktop-App, mit Tabs, einer intelligenten Adressleiste, Lesezeichen, Verlauf, einem Werbeblocker und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
-- **Nutzung**: wie viel du vom Kontingent jedes Abos verbraucht hast und wann es zurückgesetzt wird, mit den Tabs **Aktivität** und **Arena**. Ein schmaler Balken unter dem Symbol zeigt das übrige Kontingent deiner bezahlten Abos oder, falls du keine hast, deiner kostenlosen Abos. Ist nichts mehr übrig, wird er rot. Siehe [Nutzung, Limits und Kosten](/guide/usage).
-- **System**: dieser Computer mit Tabs für **Übersicht** zu Zustand und aktuellem Inhalt der Werkzeuge, **Dateien** zum Durchsuchen, Öffnen und Bearbeiten, **Git** für Repositorys, Änderungen, Branches und Verlauf, **Terminal** für auch nach einem Seitenwechsel weiterlaufende Shells, **Vorschau** für lokale Entwicklungsserver, nur auf den eigenen Seiten dieses Computers und **Überwachen** mit Live-Anzeigen für Prozessoren, Grafikkarten, Arbeitsspeicher, Datenträger und aktive Programme. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git).
-- **Einstellungen**: sämtliche App-Einstellungen. Ein Punkt zeigt eine verfügbare neue Version an. Siehe [Alle Einstellungen](/guide/settings).
-- **Suchen**: öffnet dieselbe Suche wie Strg+K.
-- **Hilfe**: öffnet diesen Leitfaden, in dem du auch einen Agenten zur App befragen kannst. Hier startet auch die Willkommenstour.
-
-Das ist die Standardreihenfolge. Ziehe ein Werkzeug an eine andere Position; auf dem Smartphone hältst du es vorher kurz gedrückt. Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt am Computer ein Rechtsklick auf ein Werkzeug und **Standardreihenfolge wiederherstellen** alles zurück.
-
 ### Die Startseite
 
 **Neue Sitzung** öffnet die Startseite mit „Woran sollen wir arbeiten?“ und „Stelle eine Aufgabe: Recherche, Dokumente, Pläne oder Code.“. Unter dem großen Nachrichtenfeld stehen:
@@ -136,7 +148,7 @@ Im Terminal listet `hydor away` dieselben Ereignisse auf; `hydor away seen` mark
 ## Deine erste Sitzung starten
 
 1. Stelle sicher, dass der Agent einsatzbereit ist. Melde dich für Claude Code oder Codex unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Accounts) im Bereich **Konten** über **Anmelden** beim gewünschten Agenten an. Folge den Schritten: Link öffnen, bestätigen und Code einfügen oder eingeben. Custom benötigt ein Modell aus [Einstellungen → Agenten → Modelle](/settings?s=models). Die Willkommenstour hilft dir beim ersten Mal dabei. Siehe [Agenten, Konten und Modelle](/guide/agents-models).
-2. Klicke oben in der Seitenleiste auf **Neue Sitzung**. Auch beim App-Start erscheint die Startseite.
+2. Klicke in der Werkzeugleiste auf **Neu** oder oben in der Seitenleiste auf **Neue Sitzung**. Auch beim App-Start erscheint die Startseite.
 3. Wähle unter dem Nachrichtenfeld über **Ausführungsumgebung** das Programm und daneben über **Modell** sein Modell. Zum Einstieg genügt das als „Standard“ markierte Modell.
 4. Wähle unter **Ordner** den Arbeitsort:
    - ein **Projekt**, um in dessen Ordner mit seinen Dokumenten und Richtlinien zu arbeiten;
@@ -153,7 +165,7 @@ Weiter geht es mit [Sitzungen](/guide/sessions), wo alle Sitzungsfunktionen besc
 
 ## Alles mit Strg+K durchsuchen
 
-Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suchen** in der Seitenleiste und das Strg+K-Symbol bei **Sitzungen suchen** öffnen sie. Erneutes Strg+K oder Esc schließt sie.
+Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suchen** in der Werkzeugleiste und das Strg+K-Symbol bei **Sitzungen suchen** öffnen sie. Erneutes Strg+K oder Esc schließt sie.
 
 ### Was die Suche findet
 
@@ -240,7 +252,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 | Tasten | Funktion | Wo |
 | --- | --- | --- |
 | Strg+K | Suche öffnen oder schließen | Überall außer beim Tippen in Codeeditoren oder Terminals |
-| Strg+B | Seitenleiste ein- oder ausblenden | Am Computer außer im Codeeditor |
+| Strg+B | Seitenleiste ein- oder ausblenden (die Werkzeugleiste bleibt) | Am Computer außer im Codeeditor |
 | Strg+` | Unteren Terminalbereich ein- oder ausblenden | Am Computer |
 | Strg+P | Datei im Ordner der Dateien-Seite über einen Teil ihres Namens schnell öffnen | Überall |
 | Strg+Z | Anheften, Lösen, Archivieren, Wiederherstellen oder Zurückstellen innerhalb von 8 Sekunden rückgängig machen | Außerhalb von Textfeldern |
@@ -264,7 +276,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 
 ## Hilfe erhalten
 
-**Hilfe** in der Seitenleiste öffnet diesen Leitfaden. Gib auf dessen Startseite eine Frage oder einige Wörter in das Feld oben ein:
+**Hilfe** in der Werkzeugleiste (auf dem Smartphone im Menü) öffnet diesen Leitfaden. Gib auf dessen Startseite eine Frage oder einige Wörter in das Feld oben ein:
 
 - **Passende Abschnitte** erscheinen beim Tippen. Ein Klick öffnet sie; auch die übergreifende Suche per Strg+K findet sie.
 - **Enter** oder **Fragen** lässt einen Agenten in einem Bereich neben dem Leitfaden antworten, mit Links zu passenden Stellen. Nach deiner Freigabe auf einer Karte kann er auch Einstellungen ändern oder etwas einrichten. Die Antwort gehört zu einer normalen Sitzung mit dem auf der Startseite zuletzt gewählten Agenten und Modell. Stelle weitere Fragen im Bereich oder öffne die Sitzung über den Pfeil oben auf ihrer eigenen Seite.
@@ -289,7 +301,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 - „Was hätten meine heutigen Sitzungen zu API-Preisen gekostet?“
 - „Beschränke meine Suche auf Sitzungen und Seiten.“
 - „Findet die Suche die Seite über Hotels in Lissabon, die ich letzten Monat besucht habe?“ (in der Desktop-App: dein Verlauf, deine Lesezeichen und Downloads, über ihre Wörter oder darüber, worum es geht; Agenten können sie nicht ansehen)
-- „Setze Einstellungen und Suche an den Anfang der Werkzeuge unten in der Seitenleiste.“
+- „Setze Einstellungen an den Anfang der Werkzeuge unter dem Posteingang in meiner Werkzeugleiste.“
 - „Setze mein Projekt Abschlussarbeit an die erste Stelle der Gruppen in der Seitenleiste.“
 - „Welche Projekte hat Hydor aus meinen Claude-Code- und Codex-Sitzungen erstellt?“
 - „Was steht in meinem Posteingang?“

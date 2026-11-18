@@ -69,7 +69,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
-- The sidebar's width, 180 to 560 pixels, is set by dragging its edge or with the arrow keys on it, and kept.
+- A rail of tools at the left edge of every page on a computer, and the sidebar with your sessions beside it, which `Ctrl+B` (or Sessions on the rail) hides and shows. The sidebar's width, 180 to 560 pixels, is set by dragging its edge or with the arrow keys on it, and kept.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
@@ -129,7 +129,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 Every agent here gets the same help from the app, whatever its model: Claude Code, Codex, Custom, and the
 agents that speak ACP and take MCP servers.
 
-- **Agents** (in the sidebar; assistants before 0.37.0): start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or
+- **Agents** (on the rail; assistants before 0.37.0): start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or
   App builder (it makes apps; the others answer in the answer UIs that suit their work: the Tutor with practice
   problems and flashcards, the Planner with itineraries and calendars, the Analyst with key figures and charts), or one
   of your own, and switch to another in the session's message box when the work
@@ -221,7 +221,7 @@ agents that speak ACP and take MCP servers.
   German, Greek, Chinese, French and Spanish; **Ask before sending on signed-in sites** turns it off), as it always
   stops before paying. The desktop app's own browser is in Settings → Browser's list and chosen first; with it,
   **Show a window** and the download of a Chrome are not shown.
-- **Your own browser** (the **Browser** tool in the sidebar, in the desktop app only: the web app and a phone have no
+- **Your own browser** (the **Browser** tool on the rail, in the desktop app only: the web app and a phone have no
   Browser button, and `/browser` there says it is part of the desktop app; the agents' browsers work everywhere): its
   tabs are real pages in the app's window, connecting to sites directly like any browser, kept between visits (up to
   30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open addresses on your own
@@ -404,7 +404,7 @@ agents that speak ACP and take MCP servers.
   and the time left, with **Stop** (what was written stays), **Continue** and **Try again** (`…/wiki/stop`, `…/wiki/continue`); one
   job at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`). Agents are told of a wiki only
   once it has an article.
-- **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
+- **Projects** (on the rail): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
@@ -1589,7 +1589,7 @@ programs shows each program's version and what is out, with Check now, Update no
   and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how
   long); pinned and busy ones stay, and their numbers stay in Activity.
-- System: this computer under one tool in the sidebar, a tab each for Files, Git, Terminal, Preview,
+- System: this computer under one tool on the rail, a tab each for Files, Git, Terminal, Preview,
   Monitor (CPU, memory, GPUs, disks, network, each live session's programs and the busiest processes, live) and
   Experiments, and an overview with how it is doing and what each tool holds now (recent files and a search,
   repositories with changes, the shells running, the web apps to preview).
@@ -1710,10 +1710,8 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, Usage, System, Settings, Search, Help: ten tools in two rows of five; nine without Browser, which is in the desktop app only) stay in
-  the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
-  it up. On a computer, right-click one for Back to the usual order.
-- One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
+- The rail's tiles: New (a new session) and Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Library, Projects, Apps, Agents), and below, after some space, Inbox (with a count of what waits on you) and the tools (Search, Usage, System, Settings, Help). The current page's tile is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device; a phone has no rail, and its drawer holds them all in one grid (hold one a moment to pick it up). On a computer, right-click a tile for Back to the usual order. The Browser and the Library's front page draw a column of their own in the sidebar's place.
+- One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,
   every setting, sessions and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
   skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Pictures,
   videos, sounds, the Library's pages and files show with a thumbnail and their details (what each is, size or
@@ -1742,7 +1740,7 @@ programs shows each program's version and what is out, with Check now, Update no
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
-- Help (in the sidebar): a guide to every part of the app, its topics grouped on one page, each with a picture of
+- Help (on the rail): a guide to every part of the app, its topics grouped on one page, each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same

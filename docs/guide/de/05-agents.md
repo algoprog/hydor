@@ -28,7 +28,7 @@ Ein Agent ist eine Sitzungsrolle. Allgemeine Vorgaben für alle Agenten, ein Pro
 
 ## Die Agentenseite
 
-Öffne **Agenten** in der Seitenleiste oder [/agents](/agents). Auf dem Smartphone musst du das Seitenleistenmenü vorher öffnen. Auch **Deine Agenten** unter [Einstellungen → Funktionen → Deine Agenten](/settings?s=assistants&find=Your%20agents) führt mit der Anzahl eigener Agenten dorthin. Die übrigen Einstellungen dort betreffen Aufgabenordner und Aufräumen.
+Öffne **Agenten** in der Werkzeugleiste oder [/agents](/agents). Auf dem Smartphone musst du das Seitenleistenmenü vorher öffnen. Auch **Deine Agenten** unter [Einstellungen → Funktionen → Deine Agenten](/settings?s=assistants&find=Your%20agents) führt mit der Anzahl eigener Agenten dorthin. Die übrigen Einstellungen dort betreffen Aufgabenordner und Aufräumen.
 
 - **Neuer Agent** erstellt einen; siehe [Einen Agenten erstellen](#make-an-agent). **Importieren** übernimmt Claude-Code-Dateien; siehe [Claude-Code-Agenten importieren](#import-claude-codes-agent-files). **Installieren** liest eine erhaltene Agentendatei; siehe [Agenten als Datei teilen](#share-an-agent-as-a-file).
 - Zwei Tabs unter dem Titel: **Deine Agenten**, diese Seite, und **Zeitpläne**, alles, was von selbst in einer Woche läuft: die Zeitpläne deiner Agenten mit deinen anderen geplanten Aufgaben, die Zeitpläne deiner Apps, Überwachungen und Webhooks, jeder Lauf nach seinem Ergebnis eingefärbt, was als Nächstes läuft, und eine Liste von allen mit einem Schalter, um jeden anzuhalten (siehe [Die Woche ansehen: was lief und was als Nächstes läuft](/guide/tasks#see-the-week-what-ran-and-what-runs-next)).

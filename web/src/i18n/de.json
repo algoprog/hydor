@@ -24173,5 +24173,9 @@
   "It finished its work": "Es hat seine Arbeit beendet",
   "It stopped before it finished": "Es wurde gestoppt, bevor es fertig war",
   "Loading its reply": "Antwort wird geladen",
-  "{0} subagent of": "{0} Subagent von"
+  "{0} subagent of": "{0} Subagent von",
+  "Agents are ready to help. Help explains every part of the app, and short tips will show you the rest as you go.": "Die Agenten sind bereit. Die Hilfe erklärt die Bereiche der App; kurze Tipps begleiten dich bei der Nutzung.",
+  "Library keeps what agents made for you, Apps the tasks you run again and again, Inbox everything waiting on you, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.": "In der Bibliothek liegt, was Agenten für dich gemacht haben, Apps sind die Aufgaben, die du immer wieder startest, der Posteingang sammelt alles, was auf dich wartet, Nutzung zeigt, was von deinen Tarifen übrig ist, System die Dateien dieses Computers, und die Hilfe ist das Handbuch zu jedem Teil der App.",
+  "Search finds your sessions, files, settings, apps, notes and answers in the guide. Open it here, or with {0}K.": "Die Suche findet deine Sitzungen, Dateien, Einstellungen, Apps, Notizen und Antworten im Handbuch. Öffne sie hier oder mit {0}K.",
+  "Sessions ({0}B)": "Sitzungen ({0}B)"
 }

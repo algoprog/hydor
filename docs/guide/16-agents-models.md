@@ -137,7 +137,7 @@ Once signed in, the button reads **Switch account**: it starts the same sign-in 
 
 If you start a Grok Build session while it is signed out, the session stops with "Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again." Sign in there and send your message again. An xAI API key in `XAI_API_KEY`, in the agents' environment, works for Grok Build instead of a subscription.
 
-The welcome tour (from **Help** in the sidebar) asks which agents and models you want to use and walks you through these sign-ins too.
+The welcome tour (from **Help** on the rail) asks which agents and models you want to use and walks you through these sign-ins too.
 
 ## Add a second account (work and personal)
 

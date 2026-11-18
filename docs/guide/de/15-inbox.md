@@ -6,7 +6,7 @@ Agenten arbeiten selbstständig, brauchen aber gelegentlich deine Zustimmung, ei
 
 ## Den Posteingang öffnen
 
-Klicke oben in der Seitenleiste neben Hydor auf das Ablagesymbol. Auf dem Smartphone öffnest du zuerst **Menü** (≡); das Symbol steht oben im Seitenmenü. Du kannst auch in der Suche mit Strg+K beziehungsweise ⌘K auf dem Mac nach „Posteingang“ suchen. [Posteingang öffnen](/inbox).
+Klicke in der Werkzeugleiste auf die Kachel **Posteingang** mit dem Ablagesymbol. Eine Zahl an ihrer Ecke nennt, wie viele Dinge auf dich warten. Auf dem Smartphone öffnest du zuerst **Menü** (≡); das Symbol steht oben im Seitenmenü. Du kannst auch in der Suche mit Strg+K beziehungsweise ⌘K auf dem Mac nach „Posteingang“ suchen. [Posteingang öffnen](/inbox).
 
 Die Überschrift nennt die Anzahl offener Anfragen, etwa „3 warten auf dich“. Neueste Einträge stehen oben. Die Liste aktualisiert sich, sobald Sitzungen eine Antwort benötigen oder weiterlaufen, und prüft während der Anzeige zusätzlich alle paar Sekunden nach.
 

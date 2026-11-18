@@ -2,7 +2,7 @@
 
 This topic shows you around Hydor: what it is, what is on the screen, how to start your first session, how to find anything with the search box, and how to use the app on a phone. It ends with every keyboard shortcut in one table.
 
-![The app: the sidebar with your sessions on the left, and the start page, where you say what you want done](images/start.webp)
+![The app: the rail of tools and the sidebar with your sessions on the left, and the start page, where you say what you want done](images/start.webp)
 
 ## What Hydor is
 
@@ -10,15 +10,44 @@ Hydor runs AI agents on your own computer, and you use them from any browser, at
 
 ## Find your way around
 
-The screen has two parts: the **sidebar** on the left, and the page you are on (the start page, a session, Settings…) beside it. On a phone the sidebar is a drawer that slides in (see [Use the app on a phone](#use-the-app-on-a-phone)).
+The screen has three parts: the **rail**, a narrow strip of tools at the far left; the **sidebar** beside it, with your sessions; and the page you are on (the start page, a session, Settings…). The rail is always there on a computer. On a phone there is no rail: the sidebar is a drawer that slides in and holds the tools too (see [Use the app on a phone](#use-the-app-on-a-phone)).
 
 On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels: drag its right edge, or click the edge and press the left and right arrow keys. The width is kept in this browser.
 
-### The top of the sidebar
+### The rail
 
-- **Hydor**, with the logo. A crossed-out Wi-Fi icon appears beside the name while the page reconnects to the app.
-- **Inbox** (the tray icon): everything waiting on you, such as approvals, questions and forms, from every session, scheduled task and machine. A number on its corner says how many sessions wait on you right now. See [Inbox and notifications](/guide/inbox).
-- **Hide sidebar** (Ctrl+B). While the sidebar is hidden, the button at the top left of each page shows it again. On a phone this button is **Close menu**.
+The rail is a column of tiles, each with an icon over its name; point at one to see its name and shortcut. The tile for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
+
+- The app's mark, **Ω**. A crossed-out Wi-Fi icon appears under it while the page reconnects to the app.
+- **New**: opens the [start page](#the-start-page) for a new session.
+- **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
+
+Then the sections of the app (the desktop app has five; the web app and a phone have four, with no **Browser**):
+
+- **Browser**: a browser of your own, only in the desktop app, with tabs, a smart address bar, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
+- **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
+- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
+- **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
+- **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
+
+Further down, after some space:
+
+- **Inbox**: everything waiting on you, such as approvals, questions and forms, from every session, scheduled task and machine. A number on its corner says how many things wait on you right now. See [Inbox and notifications](/guide/inbox).
+- **Search**: opens the search box (the same as Ctrl+K).
+- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs; a thin bar under its icon shows how much is left across your paid subscriptions, or your free ones when you have no paid ones, red when nothing is left. See [Usage, limits and costs](/guide/usage).
+- **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
+- **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
+- **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
+
+The sections come in the order Browser, Library, Projects, Apps, Agents, and the tools below the Inbox in the order Search, Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools under the Inbox). The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
+
+The **Browser** page and the **Library**'s front page show a column of their own beside the rail (the browser's tabs, the library's folders) in place of the sessions sidebar. **Sessions** on the rail brings the sidebar back for the other pages.
+
+### The sidebar
+
+The sidebar is the column beside the rail. It holds:
+
+- **Sessions**, its title, with **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of each page shows it again, and the rail stays. On a phone the drawer has the app's name **Hydor**, the inbox and **Close menu** here instead.
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - **Search sessions** finds sessions by their title, their folder and the words said in them, archived sessions included. Escape clears it. On a computer, the **Ctrl+K** badge at the end of the field opens the search box instead (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
@@ -71,23 +100,6 @@ Subagents, the sessions that an agent started for parts of its job (Hydor subage
 
 Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Rename folder** (for a session not in a project), **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 
-### The tools at the bottom
-
-The bottom of the sidebar holds the app's tools, in two rows of five (the desktop app has ten; in the web app and on a phone there are nine, with no **Browser**):
-
-- **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
-- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
-- **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
-- **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
-- **Browser**: a browser of your own, only in the desktop app, with tabs, a smart address bar, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
-- **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs; a thin bar under its icon shows how much is left across your paid subscriptions, or your free ones when you have no paid ones, red when nothing is left. See [Usage, limits and costs](/guide/usage).
-- **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
-- **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
-- **Search**: opens the search box (the same as Ctrl+K).
-- **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
-
-That is their usual order. To change it, drag a tool to another place among them (on a phone, hold it a moment first). The tools keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tool on a computer and choose **Back to the usual order** to put them all back.
-
 ### The start page
 
 **New session** opens the start page. It asks "What should we work on?", says "Ask for anything: research, documents, plans, code.", and holds a large message box with a row of choices under it:
@@ -136,7 +148,7 @@ In a terminal, `hydor away` lists the same and `hydor away seen` clears it (see 
 ## Start your first session
 
 1. Make sure the agent can work. Claude Code and Codex need you signed in: open [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts), find the **Accounts** group, press **Sign in** next to the agent and follow the steps (you open a link, approve, and paste or enter a code). Custom needs a model: add one in [Settings → Agents → Models](/settings?s=models). The welcome tour does this with you the first time. See [Agents, accounts and models](/guide/agents-models).
-2. Press **New session** at the top of the sidebar. The app opens on the start page too.
+2. Press **New** on the rail, or **New session** at the top of the sidebar. The app opens on the start page too.
 3. Press **Runs on** under the message box and pick the program. **Model** beside it picks its model; the one marked "default" is fine to start with.
 4. Press **Folder** and pick where the agent works:
    - a project, under **Projects**, to work in that project's folder with its documents and guidelines;
@@ -153,7 +165,7 @@ Next: [Sessions](/guide/sessions) explains everything you can do in a session.
 
 ## Search everything with Ctrl+K
 
-The search box finds anything in the app as you type, like Spotlight on a Mac. Open it with Ctrl+K (⌘K on a Mac) from any page, except while you type in a code editor or a terminal. The **Search** tile in the sidebar and the Ctrl+K badge in **Search sessions** open it too. Press Ctrl+K again, or Esc, to close it.
+The search box finds anything in the app as you type, like Spotlight on a Mac. Open it with Ctrl+K (⌘K on a Mac) from any page, except while you type in a code editor or a terminal. The **Search** tile on the rail and the Ctrl+K badge in **Search sessions** open it too. Press Ctrl+K again, or Esc, to close it.
 
 ### What it finds
 
@@ -240,7 +252,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 | Keys | What it does | Where |
 | --- | --- | --- |
 | Ctrl+K | Opens or closes the search box | Anywhere, except while typing in a code editor or terminal |
-| Ctrl+B | Shows or hides the sidebar | Anywhere on a computer, except in a code editor |
+| Ctrl+B | Shows or hides the sidebar (the rail stays) | Anywhere on a computer, except in a code editor |
 | Ctrl+` | Shows or hides the terminal panel at the bottom | On a computer |
 | Ctrl+P | Quick open: jump to a file by part of its name, in the folder the Files page shows | Anywhere |
 | Ctrl+Z | Undoes a pin, unpin, archive, unarchive or snooze, within 8 seconds | Outside text fields |
@@ -264,7 +276,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 
 ## Get help
 
-**Help** in the sidebar opens this guide. Type a question or a few words in the box at the top of its first page:
+**Help** on the rail (in the drawer on a phone) opens this guide. Type a question or a few words in the box at the top of its first page:
 
 - **Sections that match** show as you type; click one to open it. The search box (Ctrl+K) finds them too.
 - **Press Enter**, or click **Ask**, and an agent answers in a panel beside the guide, with links to the right place. It can also change a setting or set something up for you, once you confirm the change on a card. The answer is an ordinary session, with the agent and model you picked last on the start page: ask more in the panel, or open it on its own page with the arrow at the panel's top.
@@ -289,7 +301,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "What did my sessions today cost at API prices?"
 - "Make my search box look only in my sessions and pages."
 - "Can the search box find the page about Lisbon hotels I visited last month?" (in the desktop app: your history, bookmarks and downloads, by their words or what they are about; agents can't look at them)
-- "Put Settings and Search first among the tools at the bottom of my sidebar."
+- "Put Settings first among the tools under the Inbox on my rail."
 - "Put my Thesis project first among the groups in my sidebar."
 - "Which of my projects did Hydor make from my Claude Code and Codex sessions?"
 - "What is in my inbox?"

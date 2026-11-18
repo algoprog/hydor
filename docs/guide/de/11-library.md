@@ -241,7 +241,7 @@ Agenten können auch eine Seite ändern, die du behalten hast: Bitte „füge me
 
 ## Deine Seiten finden
 
-**Bibliothek** in der Seitenleiste unter [/library](/library) enthält gespeicherte, erstellte und veröffentlichte Inhalte. Auf dem Smartphone öffnest du zuerst **Menü** ≡. Die übergreifende Suche per Strg+K beziehungsweise ⌘K findet Seiten, Bilder und Videos nach Titel und Beschreibung.
+**Bibliothek** in der Werkzeugleiste unter [/library](/library) enthält gespeicherte, erstellte und veröffentlichte Inhalte. Auf dem Smartphone öffnest du zuerst **Menü** ≡. Die übergreifende Suche per Strg+K beziehungsweise ⌘K findet Seiten, Bilder und Videos nach Titel und Beschreibung.
 
 Neben den Karten stehen die Bereiche der Bibliothek, jeder mit der Zahl dessen, was er enthält (in einem schmaleren Fenster oder auf einem Telefon eine Reihe von Chips über den Karten):
 

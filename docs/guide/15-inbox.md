@@ -6,7 +6,7 @@ Agents work on their own, but now and then they need you: an approval, an answer
 
 ## Open the inbox
 
-The inbox is the tray button at the top of the sidebar, beside the name Hydor. On a phone, open the sidebar with **Menu** (≡) first: the button is at the top of the drawer. You can also type "inbox" in the search box (Ctrl+K, ⌘K on a Mac). [Open the inbox](/inbox).
+The inbox is the **Inbox** tile on the rail, with the tray icon. A number on its corner says how many things wait on you. On a phone, open the sidebar with **Menu** (≡) first: the button is at the top of the drawer. You can also type "inbox" in the search box (Ctrl+K, ⌘K on a Mac). [Open the inbox](/inbox).
 
 Its header says how many things wait on you ("3 waiting on you"). The newest are at the top. The list updates by itself as sessions start and stop waiting, and checks again every few seconds while you look at it.
 

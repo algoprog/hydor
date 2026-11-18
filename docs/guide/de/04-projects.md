@@ -21,7 +21,7 @@ Ein Projekt kann andere Projekte zusammenfassen. Das ist eine **Gruppe**; siehe 
 
 ## Die Projektseite öffnen
 
-Klicke unten in der Seitenleiste auf **Projekte**. Öffne auf dem Smartphone zuerst das Seitenleistenmenü. Auch die Suche nach „Projekte“ mit Strg+K beziehungsweise ⌘K führt dorthin.
+Klicke in der Werkzeugleiste auf **Projekte**. Öffne auf dem Smartphone zuerst das Seitenleistenmenü: Dort stehen **Projekte** unter den Werkzeugen. Auch die Suche nach „Projekte“ mit Strg+K beziehungsweise ⌘K führt dorthin.
 
 Die Seite hat zwei Tabs:
 

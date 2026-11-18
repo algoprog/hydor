@@ -36,7 +36,7 @@ Each level holds up to 20,000 characters. Keep them short where you can: every s
 
 Every project has guidelines of its own, for the work you keep in it: who it is for, the style to write in, the rules of the project.
 
-1. Open **Projects** in the sidebar and pick the project.
+1. Open **Projects** on the rail and pick the project.
 2. Write in the **Agent Guidelines: what every agent in it follows** field.
 3. Save the project.
 

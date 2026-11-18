@@ -17,7 +17,7 @@ Die App enthält alles außer den von Lauf zu Lauf wechselnden Angaben:
 
 Jedes Mal, wenn du eine App ausführst, startet Hydor eine Sitzung mit der ausgefüllten Aufgabe. Der Agent arbeitet sie von Anfang bis Ende durch, ohne dir zwischendurch Fragen zu stellen: Er trifft vernünftige Annahmen und sagt, welche das waren. Dieser eine Durchgang heißt **Lauf**. Danach kannst du um Änderungen am Ergebnis bitten, und der Agent liefert ein aktualisiertes ab.
 
-Öffne die Seite „Apps“ über die Kachel **Apps** unten in der Seitenleiste oder gehe zu [/apps](/apps). Auf einem Smartphone ist die Seitenleiste eine Schublade: Öffne sie zuerst. Du kannst auch jede App, eigene oder fertige, finden, indem du ihren Namen in das Suchfeld eingibst (Ctrl+K, auf einem Mac ⌘K).
+Öffne die Seite „Apps“ über die Kachel **Apps** in der Werkzeugleiste oder gehe zu [/apps](/apps). Auf einem Smartphone ist die Seitenleiste eine Schublade: Öffne sie zuerst. Du kannst auch jede App, eigene oder fertige, finden, indem du ihren Namen in das Suchfeld eingibst (Ctrl+K, auf einem Mac ⌘K).
 
 ## Orientierung auf der Apps-Seite
 
