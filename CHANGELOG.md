@@ -30,6 +30,16 @@ does more of what you expect of a browser.
 - **Video and sound**: right-click a video or a sound for Play, Mute, Loop, Show controls, Picture in picture, and
   saving it or copying its address.
 
+## 0.86.3 · 18 November 2026
+
+Stop takes effect on screen the moment you press it.
+
+- **Stop shows at once**: pressing **Stop** in a session, by the message box or in its header, shows the session
+  stopped straight away: the turn ends "Stopped after …", the send button comes back and the session is no longer
+  marked as working in the list, along with the subagents and background tasks it stopped. Before, nothing changed
+  until the agent had finished stopping, which can take a few seconds. If the agent is somehow still at work 20
+  seconds later, the session shows it at work again.
+
 ## 0.86.2 · 18 November 2026
 
 The desktop apps of 0.86.0 and 0.86.1 come out with this version.

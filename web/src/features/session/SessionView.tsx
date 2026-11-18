@@ -8,7 +8,7 @@ import { ago, basename, bytes, compact, dirname, money, prettyPath, tildify } fr
 import { limitsText, useSessionResources } from '../system/sessionUse';
 import { useSearch } from 'wouter';
 import { go, openFile, openSession, sessionPath } from '../../lib/nav';
-import { toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
+import { stopSession, toastError, useApp, useLive, useSessions, useTimeline, useUI, type DetailsTab } from '../../lib/store';
 import { live as socket } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
@@ -124,7 +124,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
   } else if (working && !s.live?.memory) {
     // Waiting on the memory question or its build, the card has the controls (Start now, Stop building).
     action = (
-      <Button size="sm" variant="secondary" icon={<Square size={11} fill="currentColor" strokeWidth={0} />} onClick={() => post(`/api/sessions/${enc(s.key)}/interrupt`).catch(toastError)} title="Stop the current turn (Esc)">
+      <Button size="sm" variant="secondary" icon={<Square size={11} fill="currentColor" strokeWidth={0} />} onClick={() => void stopSession(s.key, 'turn')} title="Stop the current turn (Esc)">
         <span className="hidden sm:inline">Stop</span>
       </Button>
     );

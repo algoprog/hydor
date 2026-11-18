@@ -3,10 +3,9 @@
 // and the right column its conversation, live, so you watch it work and can answer it without leaving.
 import { useRef } from 'react';
 import { ExternalLink, Hand, Square, Undo2, X } from 'lucide-react';
-import { enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
 import { openSession } from '../../lib/nav';
-import { toastError, useSessions } from '../../lib/store';
+import { stopSession, useSessions } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
 import { Button, IconButton, useIsMobile } from '../../components/ui';
@@ -67,7 +66,7 @@ export function AgentBar({ k }: { k: string }) {
   return (
     <>
       {busy && (
-        <Button size="sm" icon={<Square size={12} className="fill-current" />} title="Stop the agent" onClick={() => void post(`/api/sessions/${enc(k)}/interrupt`).catch(toastError)}>
+        <Button size="sm" icon={<Square size={12} className="fill-current" />} title="Stop the agent" onClick={() => void stopSession(k, 'turn')}>
           Stop
         </Button>
       )}
