@@ -8,13 +8,22 @@ Experimente führt Trainings- und Evaluationsjobs für dich aus. Ein Job wartet,
 
 Klicke in der Werkzeugleiste auf **System** und dann auf **Experimente** oder öffne [Experimente](/system/experiments). Die Karte **Experimente** in der [Systemübersicht](/system) zeigt aktive Läufe. Ein Klick öffnet den jeweiligen Lauf.
 
-Die obere Zeile beschreibt die Warteschlange, etwa „2 laufen · 1 wartet auf eine GPU“. Daneben siehst du kleine Speicheranzeigen für die GPUs dieses Computers. Belegt einer deiner Läufe eine GPU, erscheint sie in der Akzentfarbe. Ein Klick öffnet den Lauf.
+Die obere Zeile beschreibt die Warteschlange, etwa „2 laufen · 1 wartet auf eine GPU“. Daneben siehst du kleine Speicheranzeigen für die GPUs dieses Computers. Belegt einer deiner Läufe eine GPU, erscheint sie in der Akzentfarbe. Fährst du darüber, siehst du, wie stark sie ausgelastet ist und welcher Lauf sie belegt; ein Klick öffnet den Lauf.
 
-Darunter stehen deine Läufe, nach Experiment gruppiert. Das Experiment mit dem neuesten Lauf steht zuerst. Jede Zeile zeigt Namen, wichtige Metriken mit ihren zuletzt ausgegebenen Werten, Startzeit, Status und Ausführungsort. Die Statusangaben bedeuten:
+Darunter stehen deine Läufe, nach Experiment gruppiert. Das Experiment mit dem neuesten Lauf steht zuerst. Jede Zeile zeigt den Namen des Laufs und rechts, wann er gestartet, beendet oder hinzugefügt wurde. Unter dem Namen stehen:
 
-- **Eingereiht**: Der Lauf wurde gerade hinzugefügt. **Warten auf eine GPU**, **Wartet** oder **In der Warteschlange des Clusters**: Der Lauf wäre an der Reihe, aber benötigte Ressourcen sind noch belegt. Beim Darüberfahren erfährst du den Grund.
+- Sein Status, ein Punkt und ein paar Worte, nach dem Ende mit der Dauer („Fertig nach 1 h 47 min“).
+- Solange er läuft, wie weit er ist, wenn seine Ausgabe es verrät: ein kleiner Balken, „54%“ und ungefähr die verbleibende Zeit.
+- Seine wichtigen Metriken: seine Kurven und die Metriken, die zeigen, wie gut er ist (Verlust, Accuracy, NDCG…), nie Verwaltungsangaben wie die Lernrate oder Token-Zahlen.
+- Wo er läuft, wenn deine Läufe an mehr als einem Ort laufen, und die GPUs eines laufenden Laufs.
+
+Die Statusangaben bedeuten:
+
+- **Eingereiht**: Der Lauf wurde gerade hinzugefügt. **Warten auf eine GPU**, **Warten, bis ein Lauf endet** (Jobs ohne GPU kommen abwechselnd dran, wenige gleichzeitig: siehe [Ausführungsorte](#where-runs-go)), **Wartet** oder **In der Warteschlange des Clusters**: Der Lauf wäre an der Reihe, aber benötigte Ressourcen sind noch belegt. Beim Darüberfahren erfährst du den Grund.
 - **Wird gestartet**, **Läuft seit 2 Std. 13 Min.**, **Anhalten**.
-- **Abgeschlossen**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Angehalten**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Nicht mehr vorhanden**, etwa nach einem Computerneustart.
+- **Fertig**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Angehalten**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Nicht mehr vorhanden**, etwa nach einem Computerneustart.
+
+In jedem Experiment stehen zuerst die Läufe, die gerade laufen, dann die wartenden in der Reihenfolge, in der sie starten, dann die beendeten, der letzte zuerst. Die ersten 10 werden angezeigt: **N mehr anzeigen** zeigt den Rest. Klicke auf den Namen eines Experiments, um es einzuklappen (dieses Gerät merkt sich das); eingeklappt nennt seine Zeile weiterhin, wie viele seiner Läufe laufen und warten.
 
 **Suchen** rechts oberhalb der Liste öffnet eine Suche nach Name, Experiment oder Befehl sowie Filter nach Status und Ausführungsort. **× N angezeigt** entfernt aktive Filter.
 
@@ -53,15 +62,17 @@ Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst
 - **Code**: Beim Start werden Commit, Branch und noch nicht committete Git-Änderungen des Arbeitsordners erfasst. Nicht eingecheckte Änderungen werden als Patch gespeichert, ohne Binärdateien und bis höchstens 2 MB. Hinzu kommt die Anzahl nicht von Git erfasster Dateien.
 - **Umgebung**: Computer, verwendete Python-Version und installierte Versionen von PyTorch, Transformers, JAX, TensorFlow und NumPy. Dafür werden Paketmetadaten gelesen, keine Pakete importiert. Bei GPU-Nutzung kommen CUDA- und Treiberversion sowie GPU-Namen hinzu.
 - **Einstellungen und Seed**, **Protokoll**, **Exit-Code** und ein eigener Ordner in den App-Daten mit Protokoll, Patch, Exit-Code und Metriken.
-- **Metriken** aus der laufenden Ausgabe: `key=value`-Paare wie `loss=0.42`, JSON-Objekte pro Zeile wie `{"step": 100, "loss": 0.42}`, ausgegebene Python-Dictionaries wie beim Hugging-Face-Trainer, Keras-Ausgaben wie „loss: 0.41 - accuracy: 0.87“ und die Metrikdatei. Der Schritt wird aus `step`, `global_step`, `iter` oder `epoch` gelesen. Für jede Metrik speichert die App den letzten und den besten Wert sowie eine Zeitreihe. Bei Verlust, Fehler, Perplexität und ähnlich benannten Metriken gelten kleinere Werte als besser, bei anderen größere.
+- **Metriken** aus der laufenden Ausgabe: `key=value`-Paare wie `loss=0.42`, JSON-Objekte pro Zeile wie `{"step": 100, "loss": 0.42}`, ausgegebene Python-Dictionaries wie beim Hugging-Face-Trainer, Keras-Ausgaben wie „loss: 0.41 - accuracy: 0.87“ und die Metrikdatei. Der Schritt wird aus `step`, `global_step`, `iter` oder `epoch` gelesen. Für jede Metrik speichert die App den letzten und den besten Wert sowie eine Zeitreihe. Bei Verlust, Fehler, Perplexität und ähnlich benannten Metriken gelten kleinere Werte als besser, bei anderen größere. Eine Metrik, die er immer wieder ausgibt, ist eine Kurve; eine Zahl, die er nur einmal ausgibt, ist ein Wert (seine Einstellungen am Anfang, seine Ergebnisse am Ende). Es werden bis zu 100 Metriken gespeichert: Gibt ein Lauf mehr aus, bleiben seine Kurven vor den Zahlen, die er nur einmal ausgegeben hat.
+- **Wie weit er ist**, wenn seine Ausgabe es verrät: ein Fortschrittsbalken (der von tqdm, wie ihn der Trainer von Hugging Face zeichnet, oder einer, der nach Training oder Schritten benannt ist), „step 120/1000“ oder eine Gesamtzahl von Schritten, die er ausgibt (`total_steps`, `max_steps`, `num_training_steps`…), neben seinen Schritten.
 
 ## Die Detailseite eines Laufs
 
 Klicke auf einen Lauf. Auf breiten Bildschirmen öffnet er sich neben der Liste, auf schmalen an ihrer Stelle mit einem Zurück-Pfeil.
 
 - Oben stehen Name und Aktionen: **Stoppen** während der Ausführung oder Wartezeit, **Erneut ausführen** zum Öffnen eines vorausgefüllten neuen Laufs und **Mehr** (⋯) mit **Befehl kopieren**, **Arbeitsordner in Dateien öffnen**, **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (in der Desktop-App; siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)) und nach Abschluss **Datensatz löschen**. Das Löschen entfernt Aufzeichnung, Protokoll, Patch und Metriken. Vom Job im Arbeitsordner erzeugte Dateien bleiben erhalten.
-- Darunter siehst du Status und Begründung, Ausführungsort sowie Start- und Endzeit.
-- **Metriken** zeigt jede Metrik über die Schritte hinweg mit letztem und bestem Wert. **Alle N** blendet mehr als vier Metriken ein.
+- Darunter siehst du Status und Begründung, Ausführungsort sowie Start- und Endzeit. Solange der Lauf läuft, siehst du, wie weit er ist, wenn seine Ausgabe es verrät: ein Balken, die erledigten Schritte von allen („5.900 von 10.878 · 54%“) und ungefähr die verbleibende Zeit, berechnet aus der bisherigen Dauer.
+- **Metriken** zeigt jede Metrik, die der Lauf mehrfach ausgegeben hat, über die Schritte hinweg, die aussagekräftigsten zuerst (Verlust und Scores vor Lernrate, Geschwindigkeit und Speicher), mit letztem und bestem Wert. **Alle N** blendet mehr als vier Metriken ein.
+- **Werte** zeigt die Zahlen, die der Lauf nur einmal ausgegeben hat, nach Namen: seine Einstellungen am Anfang, seine Ergebnisse am Ende. **Alle N** blendet mehr als zwölf ein, mit einem Feld, um einen Wert nach Namen zu finden. Ein Lauf ohne Kurven, etwa eine Evaluation, die ihre Ergebnisse einmal ausgibt, zeigt seine Werte zuerst.
 - **Protokoll** zeigt die Ausgabe, neueste Zeilen unten. **Folgen** hält bei laufenden Jobs die neueste Ausgabe im Blick. Scrollst du nach oben, wird das automatische Nachführen unterbrochen.
 - **Ausführung** zeigt Befehl, Ordner, Commit, Branch, Patch über **Änderungen ansehen**, Einstellungen, Seed und Umgebung sowie den ursprünglichen Lauf bei Wiederholungen und die Sitzung, die ihn gestartet hat.
 - **Ereignisse** zeigt mit Zeitstempeln Wartezeit, Start und Ende sowie Beobachtungen und Eingriffe des zuständigen Agenten. **Sitzung öffnen** führt zu deren Unterhaltung.
@@ -88,7 +99,7 @@ Startet ein Agent einen Lauf mit der Bitte um Rückmeldung nach Abschluss, also 
 
 ## Läufe vergleichen
 
-Markiere die gewünschten Läufe. Unten erscheint eine Leiste mit **Vergleichen**, **Tabelle erstellen** und × zum Aufheben der Auswahl. **Vergleichen** zeigt je Metrik ein Diagramm mit einer Linie pro Lauf. Einstellungen stehen nebeneinander; Unterschiede werden hervorgehoben.
+Markiere die gewünschten Läufe (das Kästchen erscheint, wenn du auf einen Lauf zeigst, und bei jedem Lauf, sobald du einen markiert hast). Unten erscheint eine Leiste mit **Vergleichen**, **Tabelle erstellen** und × zum Aufheben der Auswahl. **Vergleichen** zeigt je Metrik, die die Läufe mehrfach ausgegeben haben, ein Diagramm mit einer Linie pro Lauf, die Werte, die sie nur einmal ausgegeben haben, in einer Tabelle mit dem besten Wert jeder Zeile in Fett, und die Einstellungen der Läufe nebeneinander; Unterschiede werden hervorgehoben.
 
 Das Menü (⋯) eines Experiments bietet **Tabelle erstellen** aus abgeschlossenen Läufen, **Die letzten 6 vergleichen** und **Alle auswählen**.
 
@@ -149,7 +160,7 @@ Cluster-Jobs laufen in einem dortigen Ordner. Der Code muss bereits vorhanden se
 
 ## Auf dem Smartphone
 
-Die Liste füllt den Bildschirm; Metriken stehen je Lauf in einer eigenen Zeile. Ein geöffneter Lauf ersetzt die Liste und bietet einen Zurück-Pfeil. Das Protokoll wird auf Bildschirmbreite umgebrochen, **Folgen** arbeitet wie am Computer. Neuer Lauf, Vergleich und Tabellen öffnen sich vom unteren Bildschirmrand.
+Die Liste füllt den Bildschirm; Status und Metriken jedes Laufs stehen in so vielen Zeilen, wie sie brauchen, und das Kästchen zum Markieren eines Laufs ist immer sichtbar. Ein geöffneter Lauf ersetzt die Liste und bietet einen Zurück-Pfeil. Das Protokoll wird auf Bildschirmbreite umgebrochen, **Folgen** arbeitet wie am Computer. Neuer Lauf, Vergleich und Tabellen öffnen sich vom unteren Bildschirmrand.
 
 ## Frag einen Agenten
 

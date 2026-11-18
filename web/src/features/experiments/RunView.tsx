@@ -1,7 +1,8 @@
 // A run's page (/system/experiments/<id>): its status and why, Stop, Run again, Copy the command; its log following
-// live (newest at the bottom, Follow while it runs); its metrics over steps; what it ran from (commit, branch, the
-// changes not committed, settings, seed, environment); what the agent on call saw and did, with its sessions; its
-// folder in Files. A run kept on another machine is read through that machine.
+// live (newest at the bottom, Follow while it runs); how far it is while it runs; its metrics that are curves over
+// steps (the ones that matter most first) and, in a block of their own, the numbers it gave once (Values); what it
+// ran from (commit, branch, the changes not committed, settings, seed, environment); what the agent on call saw and
+// did, with its sessions; its folder in Files. A run kept on another machine is read through that machine.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Copy, FolderOpen, MoreHorizontal, Play, RotateCcw, Square, Trash2, X } from 'lucide-react';
 import type { MetricSeries, RunRecord } from '@shared/experiments';
@@ -13,8 +14,9 @@ import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { DiffView } from '../../components/DiffView';
-import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Throbber, useConfirm } from '../../components/ui';
-import { baseOf, copy, isActive, num, statusTone, statusWords, took, VIZ } from './api';
+import { Meter } from '../../components/charts';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Throbber, useConfirm } from '../../components/ui';
+import { baseOf, copy, isActive, leftWords, num, progressOf, rankMetrics, rankValues, statusTone, statusWords, took, VIZ } from './api';
 import { StepChart } from './Charts';
 
 interface View {
@@ -60,6 +62,46 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <div className="text-fg-3">{label}</div>
       <div className="min-w-0 break-words text-fg">{children}</div>
     </div>
+  );
+}
+
+/**
+ * The numbers a run gave once (its results, its settings), as name and value pairs: the first 12, all with "All N",
+ * and a box to find one when there are many.
+ */
+function Values({ names, last }: { names: string[]; last: Record<string, number> }) {
+  const [all, setAll] = useState(false);
+  const [find, setFind] = useState('');
+  const words = find.trim().toLowerCase();
+  const filtering = all && names.length > 24;
+  const list = filtering && words ? names.filter((k) => k.toLowerCase().includes(words)) : names;
+  const shown = all ? list : list.slice(0, 12);
+  return (
+    <Block
+      title="Values"
+      right={
+        names.length > 12 && (
+          <button type="button" onClick={() => setAll((a) => !a)} className="text-[12px] text-accent hover:underline">
+            {all ? 'Fewer' : `All ${names.length}`}
+          </button>
+        )
+      }
+    >
+      <div className="@container rounded-xl border border-line bg-panel px-3 py-2">
+        {filtering && <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a value" aria-label="Find a value" className={cx(inputCls, 'mb-2 h-8 text-[12.5px]')} />}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12.5px] @min-[640px]:grid-cols-3">
+          {shown.map((k) => (
+            <div key={k} className="flex min-w-0 items-baseline justify-between gap-2">
+              <span translate="no" title={k} className="min-w-0 truncate text-fg-3">
+                {k}
+              </span>
+              <span className="tnum shrink-0 text-fg">{num(last[k])}</span>
+            </div>
+          ))}
+        </div>
+        {filtering && words && !list.length && <p className="py-1 text-[12.5px] text-fg-3">No value is like that.</p>}
+      </div>
+    </Block>
   );
 }
 
@@ -282,8 +324,16 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
     );
 
   const r = v.run;
-  const metrics = Object.keys(v.series).filter((k) => v.series[k].length > 0);
+  // A chart is for a metric with a curve (two points or more), the ones that matter most first; the others are values.
+  const metrics = rankMetrics(
+    Object.keys(v.series).filter((k) => v.series[k].length >= 2),
+    () => true,
+  );
   const shown = allCharts ? metrics : metrics.slice(0, 4);
+  const last = r.metrics?.last ?? {};
+  const charted = new Set(metrics);
+  const values = rankValues(Object.keys(last).filter((k) => !charted.has(k)));
+  const progress = progressOf(r);
   const sessionLink = (key: string) => (machine ? goFull(machinePath(machine, sessionPath(key))) : go(sessionPath(key)));
   const env = Object.entries(r.environment ?? {});
   return (
@@ -298,6 +348,22 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
               {r.endedAt && r.startedAt && !going && <span className="text-fg-3">· after {took(r.endedAt - r.startedAt)}</span>}
               {r.exitCode !== undefined && r.exitCode !== null && !going && <span className="text-fg-3">· exit code {r.exitCode}</span>}
             </div>
+            {progress && (
+              <div className="space-y-1 pt-1">
+                <Meter percent={progress.pct} height={5} color="var(--accent)" className="max-w-[320px]" />
+                {/* Each part in an element of its own, so each is translated as one. */}
+                <p className="tnum text-[12.5px] text-fg-3">
+                  <span>{`${r.metrics!.progress!.done.toLocaleString(LOCALE)} of ${r.metrics!.progress!.total.toLocaleString(LOCALE)}`}</span>
+                  <span> · {progress.pct}%</span>
+                  {progress.left !== undefined && (
+                    <>
+                      {' · '}
+                      <span>{leftWords(progress.left)}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            )}
             {r.why && <p className="text-[13px] leading-relaxed text-fg-2">{r.why}</p>}
             <p className="text-[12.5px] text-fg-3">
               {[
@@ -312,6 +378,8 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
                 .join(' · ')}
             </p>
           </div>
+
+          {values.length > 0 && metrics.length === 0 && <Values names={values} last={last} />}
 
           {metrics.length > 0 && (
             <Block
@@ -340,6 +408,8 @@ export function RunView({ id, machine, onClose, onAgain, wide }: { id: string; m
               </div>
             </Block>
           )}
+
+          {values.length > 0 && metrics.length > 0 && <Values names={values} last={last} />}
 
           <Log id={id} base={base} initial={v.log} size={v.logSize} going={going} />
 

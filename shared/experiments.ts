@@ -98,7 +98,7 @@ export interface RunRecord extends JobSpec {
   /** What it ran with: Python, PyTorch, CUDA, the driver… as found. */
   environment?: Record<string, string>;
   logPath?: string;
-  metrics?: { last: Record<string, number>; best?: Record<string, number>; step?: number };
+  metrics?: RunMetrics;
   events?: RunEvent[];
   /** The run's own folder (its log, the patch, its exit code, its metrics and scores). */
   folder?: string;
@@ -227,6 +227,26 @@ export interface QueueNow {
 
 /** A metric over steps, thinned to a few hundred points: [step, value]. */
 export type MetricSeries = Record<string, [number, number][]>;
+
+/** How far a run has got, as its output last said: `done` of `total` (steps, iterations), read at `at` (ms). */
+export interface RunProgress {
+  done: number;
+  total: number;
+  at: number;
+}
+
+/**
+ * A run's metrics as last read: each one's last value, its best, the step. `repeated`: the metrics read more than
+ * once (a curve to chart), in the order they came; the others were printed once (settings at the start, results at
+ * the end). Records made before it was kept have no `repeated`. `progress`: while a phase is under way.
+ */
+export interface RunMetrics {
+  last: Record<string, number>;
+  best?: Record<string, number>;
+  step?: number;
+  repeated?: string[];
+  progress?: RunProgress;
+}
 
 /** A sweep: one command, settings' values expanded into runs of one group. */
 export interface SweepSpec {

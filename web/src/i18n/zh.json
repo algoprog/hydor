@@ -25882,5 +25882,11 @@
   "Import…": "导入…",
   "No other browser was found on this computer.": "在这台电脑上没有找到其他浏览器。",
   "No thanks": "不用了",
-  "Open System Settings": "打开系统设置"
+  "Open System Settings": "打开系统设置",
+  "{0} after {1}": "{0}，用时 {1}",
+  "about {0} left": "大约还剩 {0}",
+  "less than a minute left": "剩余不到一分钟",
+  "No value is like that.": "没有符合条件的值。",
+  "one of your runs holds it": "正被你的一次运行占用",
+  "Waiting for a run to end": "正在等待一次运行结束"
 }

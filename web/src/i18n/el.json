@@ -25863,5 +25863,11 @@
   "Import…": "Εισαγωγή…",
   "No other browser was found on this computer.": "Δεν βρέθηκε άλλο πρόγραμμα περιήγησης σε αυτόν τον υπολογιστή.",
   "No thanks": "Όχι, ευχαριστώ",
-  "Open System Settings": "Άνοιγμα ρυθμίσεων συστήματος"
+  "Open System Settings": "Άνοιγμα ρυθμίσεων συστήματος",
+  "{0} after {1}": "{0} μετά από {1}",
+  "about {0} left": "απομένουν περίπου {0}",
+  "less than a minute left": "απομένει λιγότερο από ένα λεπτό",
+  "No value is like that.": "Καμία τιμή δεν ταιριάζει.",
+  "one of your runs holds it": "τη χρησιμοποιεί μία από τις εκτελέσεις σας",
+  "Waiting for a run to end": "Σε αναμονή για να τελειώσει μια εκτέλεση"
 }

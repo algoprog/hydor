@@ -24611,5 +24611,11 @@
   "Import…": "Importieren …",
   "No other browser was found on this computer.": "Auf diesem Computer wurde kein anderer Browser gefunden.",
   "No thanks": "Nein danke",
-  "Open System Settings": "Systemeinstellungen öffnen"
+  "Open System Settings": "Systemeinstellungen öffnen",
+  "{0} after {1}": "{0} nach {1}",
+  "about {0} left": "noch etwa {0}",
+  "less than a minute left": "noch weniger als eine Minute",
+  "No value is like that.": "Keine passenden Werte gefunden.",
+  "one of your runs holds it": "durch einen deiner Läufe belegt",
+  "Waiting for a run to end": "Warten, bis ein Lauf endet"
 }

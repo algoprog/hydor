@@ -4,14 +4,18 @@
 // losses, errors, perplexity… by name, else higher, unless the job says), the step, and a series thinned to a few
 // hundred points for the charts. Also what the agent on call watches for in the text: NaN and out of memory.
 import fs from 'node:fs';
-import { betterOf, type MetricSeries } from '../../shared/experiments.ts';
+import { betterOf, type MetricSeries, type RunMetrics, type RunProgress } from '../../shared/experiments.ts';
 
 /** Points kept per metric for the charts: past twice this, every other older point goes. */
 const KEEP = 300;
 /** At most this many metrics per run (a log full of numbers stops adding new ones). */
-const MAX_METRICS = 100;
+export const MAX_METRICS = 100;
 /** Longer lines are not read for metrics (a dumped tensor, a base64 blob). */
 const MAX_LINE = 10_000;
+/** Metrics not kept, and how often each was read: at most this many are remembered (the oldest go first). */
+const MAX_PENDING = 2000;
+/** Keys that say how many steps the run will take; one of them in a line is the run's plan. */
+const PLAN_KEYS = new Set(['total_steps', 'max_steps', 'num_training_steps', 'num_train_steps', 'train_steps', 'plan_steps', 'steps_total', 'num_steps', 'n_steps', 'total_iters', 'max_iters', 'num_iters', 'total_iterations', 'max_iterations']);
 
 /** Keys that say where the run is, not how it does; the first found is the step. */
 const STEP_KEYS = ['step', 'global_step', 'iter', 'iteration', 'it', 'trainer/global_step', 'epoch'];
@@ -21,6 +25,10 @@ const NOT_METRIC = new Set(['seed', 'rank', 'local_rank', 'world_size', 'pid', '
 export interface Reading {
   values: Record<string, number>;
   step?: number;
+  /** An explicit "N of T" in the line (a progress bar of the training, "step 120/1000"). */
+  progress?: { done: number; total: number };
+  /** A total number of steps the run says it will take. */
+  plan?: number;
 }
 
 // ---- reading a line ------------------------------------------------------------------------------------------
@@ -132,7 +140,11 @@ const NUM = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?|[-+]?(?:nan
 const KEY = String.raw`[A-Za-z_][\w./@-]*`;
 const PAIR = new RegExp(String.raw`(?:^|[\s,;|(\[{])(${KEY})\s*=\s*(${NUM})(?=$|[\s,;|)\]}%])`, 'gi');
 const COLON = new RegExp(String.raw`(?:^|\s-\s|[\s|,])(${KEY}):\s+(${NUM})(?=$|[\s,;|%])`, 'gi');
-const STEP_TEXT = /\b(step|iter(?:ation)?|epoch)\s*[:=#]?\s*\[?(\d+)(?:\s*\/\s*\d+)?/i;
+const STEP_TEXT = /\b(step|iter(?:ation)?|epoch)\s*[:=#]?\s*\[?(\d+)(?:\s*\/\s*(\d+))?/i;
+const STEP_ALL = new RegExp(STEP_TEXT.source, 'gi');
+/** tqdm's bar: "Training:  10%|█  | 100/1000 [00:10<01:30": what it describes, then done and total. */
+const BAR = /^\s*(.*?)\s*(\d{1,3})%\|[^|]*\|\s*(\d+)\/(\d+)\s*\[/;
+const BAR_WHAT = /\b(train(ing)?|steps?|iter(ation)?s?)\b/i;
 
 const toNum = (s: string): number => (/nan/i.test(s) ? NaN : /inf/i.test(s) ? (s.startsWith('-') ? -Infinity : Infinity) : Number(s));
 
@@ -148,6 +160,14 @@ export function parseLine(raw: string): Reading | null {
   if (!line.trim() || line.length > MAX_LINE) return null;
   const values: Record<string, number> = {};
   let rest = line;
+  // A progress bar of the training: "Training:  10%|█  | 100/1000 [00:10<01:30]" (not an epoch's, not a download's).
+  let progress: Reading['progress'];
+  const bar = BAR.exec(line);
+  if (bar) {
+    const what = bar[1].trim().replace(/:$/, '').trim();
+    const total = Number(bar[4]);
+    if ((!what || (BAR_WHAT.test(what) && !/epoch/i.test(what))) && total >= 10) progress = { done: Number(bar[3]), total };
+  }
   // An object on the line (JSON, or a Python dict).
   const open = line.indexOf('{');
   const close = line.lastIndexOf('}');
@@ -166,19 +186,30 @@ export function parseLine(raw: string): Reading | null {
   const colons = [...rest.matchAll(COLON)];
   if (colons.length >= 2) for (const m of colons) if (!(m[1] in values)) values[m[1]] = toNum(m[2]);
   let step: number | undefined;
+  let plan: number | undefined;
   for (const k of STEP_KEYS) {
     const hit = Object.keys(values).find((x) => x.toLowerCase() === k);
     if (hit !== undefined && Number.isFinite(values[hit])) {
       step ??= values[hit];
     }
   }
+  // A total number of steps among the values stays a metric too.
+  for (const [k, v] of Object.entries(values)) if (PLAN_KEYS.has(k.toLowerCase()) && Number.isInteger(v) && v >= 2) plan ??= v;
   for (const k of Object.keys(values)) if (STEP_KEYS.includes(k.toLowerCase()) || NOT_METRIC.has(k.toLowerCase())) delete values[k];
-  if (!Object.keys(values).length) return null;
   if (step === undefined) {
     const m = STEP_TEXT.exec(rest);
-    if (m) step = Number(m[2]);
+    if (m && Object.keys(values).length) step = Number(m[2]);
   }
-  return step === undefined ? { values } : { values, step };
+  // "step 120/1000" (or iter, iteration; an epoch's "3/10" is not the run's progress).
+  if (!progress) {
+    for (const m of rest.matchAll(STEP_ALL)) {
+      if (/^epoch$/i.test(m[1]) || m[3] === undefined) continue;
+      if (Number(m[3]) >= 2) progress = { done: Number(m[2]), total: Number(m[3]) };
+      break;
+    }
+  }
+  if (!Object.keys(values).length && !progress && plan === undefined) return null;
+  return { values, ...(step !== undefined ? { step } : {}), ...(progress ? { progress } : {}), ...(plan !== undefined ? { plan } : {}) };
 }
 
 // ---- what the agent on call watches for in the text ---------------------------------------------------------
@@ -196,23 +227,33 @@ export function nanText(line: string): boolean {
 
 // ---- keeping a run's metrics ---------------------------------------------------------------------------------
 
-export interface MetricsSnapshot {
-  last: Record<string, number>;
-  best: Record<string, number>;
-  step?: number;
+export type MetricsSnapshot = RunMetrics;
+
+/** A metric that is not kept: how many times it was read, and the point of its last reading. */
+interface Pending {
+  n: number;
+  x: number;
+  v: number;
 }
 
 /**
  * A run's metrics as they come: last, best, step and series, and what the watcher needs (a metric gone NaN, a
  * loss more than doubled over its best for a while). Kept in the database between restarts (snapshot + series).
+ * Only MAX_METRICS are kept: when they are full, a metric read more than once takes the place of the latest one
+ * read only once (settings printed at the start must not crowd out the losses that follow).
  */
 export class Tracker {
   last: Record<string, number> = {};
   best: Record<string, number> = {};
   step?: number;
   series: MetricSeries = {};
+  /** How far the phase under way has got, and how many steps it will take, when the output says. */
+  progress?: RunProgress;
+  plan?: number;
   /** Readings of each metric so far (the step when a line gives none). */
   private count: Record<string, number> = {};
+  /** Readings of the metrics that are not kept, while there is no room for them. */
+  private pending = new Map<string, Pending>();
   /** For each loss, how many readings in a row have been over twice its best. */
   private over: Record<string, number> = {};
   /** Metrics that went NaN or infinite, and losses that diverged, since the last look. */
@@ -227,37 +268,98 @@ export class Tracker {
       this.last = { ...from.metrics.last };
       this.best = { ...from.metrics.best };
       this.step = from.metrics.step;
+      if (from.metrics.progress) this.progress = { ...from.metrics.progress };
+      // The plan comes back from the metric that says it (those are never given up).
+      for (const k of Object.keys(this.last)) if (isPlan(k, this.last[k])) this.plan ??= this.last[k];
     }
     if (from?.series) {
       this.series = from.series;
-      for (const [k, pts] of Object.entries(from.series)) this.count[k] = pts.length;
+      // A metric not kept has no series here (its rows were left from the time they were kept).
+      if (from.metrics) for (const k of Object.keys(this.series)) if (!(k in this.last)) delete this.series[k];
     }
+    // Kept metrics have been read once at least, twice when they were found repeating.
+    for (const k of Object.keys(this.last)) this.count[k] = Math.max(this.series[k]?.length ?? 0, from?.metrics?.repeated?.includes(k) ? 2 : 1);
   }
 
   snapshot(): MetricsSnapshot {
-    return { last: { ...this.last }, best: { ...this.best }, ...(this.step !== undefined ? { step: this.step } : {}) };
+    return {
+      last: { ...this.last },
+      best: { ...this.best },
+      ...(this.step !== undefined ? { step: this.step } : {}),
+      repeated: Object.keys(this.last).filter((k) => (this.count[k] ?? 0) >= 2),
+      ...(this.progress && this.progress.done < this.progress.total ? { progress: { ...this.progress } } : {}),
+    };
   }
 
   /** Steps as the log gives them, and what is added to them once they start again from 0 (a step counted per epoch). */
   private rawStep?: number;
   private offset = 0;
 
-  /** Takes one reading; true when it added anything. */
-  add(r: Reading): boolean {
+  /**
+   * Whether a metric that is not kept takes the place of one that is: when it is read for the second time, and
+   * there is a kept one that was read once (the latest such). Gives what was read of it before, or null.
+   */
+  private admit(k: string, v: number, x: number | undefined): Pending | null {
+    const was = this.pending.get(k);
+    const now: Pending = { n: (was?.n ?? 0) + 1, x: x ?? 1, v };
+    const victim = now.n >= 2 ? Object.keys(this.last).reverse().find((o) => (this.count[o] ?? 1) <= 1 && !isPlan(o, this.last[o])) : undefined;
+    if (victim === undefined) {
+      this.pending.set(k, now);
+      if (this.pending.size > MAX_PENDING) this.pending.delete(this.pending.keys().next().value!);
+      return null;
+    }
+    delete this.last[victim];
+    delete this.best[victim];
+    delete this.series[victim];
+    delete this.count[victim];
+    delete this.over[victim];
+    this.pending.delete(k);
+    return was ?? now;
+  }
+
+  /** Takes one reading; true when it added anything (or moved the progress). */
+  add(r: Reading, now = Date.now()): boolean {
     let added = false;
     let x: number | undefined;
+    let back = false;
+    if (r.plan !== undefined) this.plan = r.plan;
     if (r.step !== undefined && Number.isFinite(r.step)) {
       // A step that went back (counted per epoch, a second phase) keeps the series going forward.
-      if (this.rawStep !== undefined && r.step < this.rawStep) this.offset += this.rawStep;
+      if (this.rawStep !== undefined && r.step < this.rawStep) {
+        this.offset += this.rawStep;
+        back = true;
+      }
       this.rawStep = r.step;
       this.step = r.step;
       x = r.step + this.offset;
     }
+    // A new phase, as long as it is not said: what was planned and how far it got are not its.
+    if (back && !r.progress && r.plan === undefined) {
+      this.plan = undefined;
+      if (this.progress) added = true;
+      this.progress = undefined;
+    }
+    if (r.progress) {
+      this.progress = { ...r.progress, at: now };
+      added = true;
+    } else if (r.step !== undefined && Number.isFinite(r.step) && this.plan !== undefined && r.step <= this.plan) {
+      this.progress = { done: r.step, total: this.plan, at: now };
+      added = true;
+    }
     for (const [k, v] of Object.entries(r.values)) {
-      if (!(k in this.last) && Object.keys(this.last).length >= MAX_METRICS) continue;
+      let before: Pending | null = null;
+      if (!(k in this.last) && Object.keys(this.last).length >= MAX_METRICS) {
+        before = this.admit(k, v, x);
+        if (!before) continue;
+      }
       added = true;
       this.last[k] = v;
-      const n = (this.count[k] = (this.count[k] ?? 0) + 1);
+      // A metric that took a place read before has its readings so far counted (this one included).
+      const n = (this.count[k] = before ? before.n + 1 : (this.count[k] ?? 0) + 1);
+      if (before && Number.isFinite(before.v)) {
+        this.series[k] = [[before.x, before.v]];
+        this.best[k] = before.v;
+      }
       if (!Number.isFinite(v)) {
         if (!this.nan.includes(k)) this.nan.push(k);
         continue;
@@ -280,6 +382,11 @@ export class Tracker {
     }
     return added;
   }
+}
+
+/** Whether a metric is a total number of steps (a plan). */
+function isPlan(key: string, value: number): boolean {
+  return PLAN_KEYS.has(key.toLowerCase()) && Number.isInteger(value) && value >= 2;
 }
 
 /** The value of a metric at a step in a series: the last at or before it, once the series has got that far. */

@@ -1373,7 +1373,8 @@ agents that speak ACP and take MCP servers.
   colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in.
 - **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
   SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, settings, seed,
-  environment, log and metrics, drawn as charts. An agent on call wakes on NaN, out of memory, a stall, a crash or
+  environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it prints
+  once kept as values), and how far a run has got with about how long is left. An agent on call wakes on NaN, out of memory, a stall, a crash or
   divergence, and tells you or acts within your rules. Compare runs, sweep settings (every combination or a random
   sample, losing runs stopped early), and make **results tables** (mean ± std over seeds, the best in bold, paired or
   Welch tests with Holm's correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document of the

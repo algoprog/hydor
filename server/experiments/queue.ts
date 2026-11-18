@@ -24,6 +24,7 @@ import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
 import { addEvent, eventsOf, eventsSince, getRun, getSweep, insertRun, listRuns, newId, offsetsOf, runFolder, saveSeries, seriesOf, specOf, updateRun, waitDone, waitStarted, type RunInfo } from './records.ts';
+import { repairRecord, repairRecordSoon } from './repair.ts';
 import { remoteMachine, type RemoteRun } from './remote.ts';
 import { earlyStop, fillCommand, paramsOf, settingsLine, type Value } from './sweeps.ts';
 
@@ -342,8 +343,15 @@ function liveOf(d: Deps, r: RunRecord): Live {
   let L = live.get(r.id);
   if (!L) {
     const off = offsetsOf(d.db, r.id);
+    // A record made when the first metrics to come were the ones kept is fixed once, here.
+    let fixed: Tracker | null = null;
+    try {
+      fixed = repairRecord(d.db, r, !r.remote && placeOf(r.where).kind === 'local');
+    } catch (e) {
+      console.error(`[experiments] ${r.id}: its metrics could not be fixed:`, (e as Error)?.message ?? e);
+    }
     L = {
-      tracker: new Tracker(r.better, { metrics: r.metrics, series: seriesOf(d.db, r.id) }),
+      tracker: fixed ?? new Tracker(r.better, { metrics: r.metrics, series: seriesOf(d.db, r.id) }),
       log: off.log,
       file: off.file,
       carry: '',
@@ -371,9 +379,6 @@ function consume(L: Live, text: string, which: 'log' | 'file') {
   const carry = which === 'log' ? L.carry : L.fileCarry;
   const lines = (carry + text).split('\n');
   let rest = lines.pop() ?? '';
-  if (rest.length > 64 * 1024) rest = '';
-  if (which === 'log') L.carry = rest;
-  else L.fileCarry = rest;
   for (const line of lines) {
     const r = parseLine(line);
     if (r && L.tracker.add(r)) L.dirty = L.fresh = true;
@@ -382,6 +387,16 @@ function consume(L: Live, text: string, which: 'log' | 'file') {
       if (!L.nanLine && nanText(line)) L.nanLine = line.trim().slice(0, 300);
     }
   }
+  // A progress bar redraws itself on one line (\r) that ends only when the bar does: how far it is now is in its
+  // last whole redraw, read for the progress alone (its numbers come with the finished line).
+  const cr = rest.lastIndexOf('\r');
+  if (cr > 0) {
+    const bar = parseLine(rest.slice(rest.lastIndexOf('\r', cr - 1) + 1, cr));
+    if (bar?.progress && L.tracker.add({ values: {}, progress: bar.progress })) L.dirty = L.fresh = true;
+  }
+  if (rest.length > 64 * 1024) rest = '';
+  if (which === 'log') L.carry = rest;
+  else L.fileCarry = rest;
   L.outputAt = Date.now();
 }
 
@@ -1155,6 +1170,35 @@ export function tellRuns(d: Deps, ids: string[]) {
 export function resume(d: Deps) {
   useDeps(d);
   if (listRuns(d.db, { status: ACTIVE, limit: 1 }).length) wake();
+  // The records of runs that ended under an older rule for their metrics are fixed in the background, a little later.
+  const t = setTimeout(() => void repairEnded(d), 5000);
+  t.unref?.();
+}
+
+let repairing = false;
+
+/** Fixes the ended runs' metrics made under the old rule (see repair.ts), one at a time; tells the pages of those it changed. */
+export async function repairEnded(d: Deps) {
+  if (repairing) return;
+  repairing = true;
+  const changed: string[] = [];
+  try {
+    const ended = listRuns(d.db, { status: ['done', 'failed', 'stopped', 'lost'], limit: 5000, oldest: true }).filter((r) => r.metrics && !r.metrics.repeated && !r.remote);
+    for (const r of ended) {
+      try {
+        if (live.has(r.id) || busy.has(r.id)) continue;
+        if (await repairRecordSoon(d.db, r, placeOf(r.where).kind === 'local')) changed.push(r.id);
+      } catch (e) {
+        console.error(`[experiments] ${r.id}: its metrics could not be fixed:`, (e as Error)?.message ?? e);
+      }
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  } catch (e) {
+    console.error('[experiments] fixing metrics:', (e as Error)?.message ?? e);
+  } finally {
+    repairing = false;
+  }
+  if (changed.length) tellRuns(d, changed);
 }
 
 /** The queue now: how many run and wait, this computer's GPUs (and which run holds each), the jobs without a GPU. */

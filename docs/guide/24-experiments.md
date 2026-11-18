@@ -8,13 +8,22 @@ Experiments runs your training and evaluation jobs for you. A job waits until a 
 
 Click **System** on the rail, then the **Experiments** tab, or go to [Experiments](/system/experiments). The **Experiments** card on [System's overview](/system) lists the runs going now; click one to open it.
 
-The line at the top says what the queue is doing ("2 running · 1 waiting for a GPU"). Beside it, this computer's GPUs as small meters: the memory each one uses, in the accent colour when one of your runs holds it (click it to open that run).
+The line at the top says what the queue is doing ("2 running · 1 waiting for a GPU"). Beside it, this computer's GPUs as small meters: the memory each one uses, in the accent colour when one of your runs holds it (point at one to see how busy it is and which run holds it; click it to open that run).
 
-Below, your runs, grouped by experiment, the experiment with the newest run first. Each row shows the run's name, its key metrics (the last values of the first few it prints), when it started, and under them its status (a dot and a few words) and where it runs. The words for a status:
+Below, your runs, grouped by experiment, the experiment with the newest run first. Each row shows the run's name and, at the right, when it started, ended or was added. Under the name:
 
-- **In line**: it has just been added. **Waiting for a GPU**, **Waiting** or **In the cluster’s queue**: its turn has come, but what it needs is not free yet; hover over the row to see why.
+- Its status, a dot and a few words, with how long it took once it has ended ("Done after 1 h 47 min").
+- While it runs, how far it has got when its output says so: a small bar, "54%" and about how long is left.
+- Its key metrics: its curves and the metrics that say how well it does (losses, accuracy, NDCG…), never bookkeeping such as the learning rate or token counts.
+- Where it runs, when your runs are in more than one place, and a running run's GPUs.
+
+The words for a status:
+
+- **In line**: it has just been added. **Waiting for a GPU**, **Waiting for a run to end** (jobs without a GPU take turns, a few at a time: see [Where runs go](#where-runs-go)), **Waiting** or **In the cluster’s queue**: its turn has come, but what it needs is not free yet; hover over the row to see why.
 - **Starting**, **Running 2 h 13 min**, **Stopping**.
 - **Done** (it ended with exit code 0), **Failed**, **Stopped**, **Stopped early** (a sweep's early stop), **Went missing** (its process went missing, for example when the computer restarted).
+
+In each experiment, the runs going now come first, then those waiting, in the order they will start, then those that ended, the latest first. The first 10 show: **Show N more** shows the rest. Click an experiment's name to fold it away (this device remembers it); folded, its line still says how many of its runs are running and waiting.
 
 **Find**, at the right above the list, opens a search (by name, experiment or command) and filters by status and by where runs run. While a filter is on, **× N shown** beside it clears it.
 
@@ -53,15 +62,17 @@ The new run opens, so you can watch it start.
 - **Its code**: when it starts, the commit and branch of its folder's Git repository and whether there were changes not committed; if there were, a patch of them (binary files left out, at most 2 MB), and how many files Git does not track.
 - **Its environment**: the computer; the Python the command runs with and the versions of PyTorch, Transformers, JAX, TensorFlow and NumPy in it (read from the packages, nothing is imported); with GPUs, the CUDA and driver versions and the GPUs' names.
 - **Its settings and seed**, its **log**, its **exit code**, and its own folder in the app's data (its log, patch, exit code and metrics).
-- **Its metrics**, read from its output as it grows: `key=value` pairs (`loss=0.42`, as Lightning's progress bars print them), a JSON object on a line (`{"step": 100, "loss": 0.42}`), Python's printed dicts (as Hugging Face's Trainer prints them), Keras' "loss: 0.41 - accuracy: 0.87", and the metrics file. The step comes from `step`, `global_step`, `iter` or `epoch`. For each metric it keeps the last value, the best (lower is better for losses, errors, perplexity and the like by their names, higher for the others) and a series for the charts.
+- **Its metrics**, read from its output as it grows: `key=value` pairs (`loss=0.42`, as Lightning's progress bars print them), a JSON object on a line (`{"step": 100, "loss": 0.42}`), Python's printed dicts (as Hugging Face's Trainer prints them), Keras' "loss: 0.41 - accuracy: 0.87", and the metrics file. The step comes from `step`, `global_step`, `iter` or `epoch`. For each metric it keeps the last value, the best (lower is better for losses, errors, perplexity and the like by their names, higher for the others) and a series for the charts. A metric it prints again and again is a curve; a number it prints once is a value (its settings at the start, its results at the end). It keeps up to 100 metrics: when a run prints more, its curves are kept before numbers it printed once.
+- **How far it has got**, when its output says so: a progress bar (tqdm's, as Hugging Face's Trainer draws it, or one named for training or steps), "step 120/1000", or a total of steps it prints (`total_steps`, `max_steps`, `num_training_steps`…) beside its steps.
 
 ## A run's page
 
 Click a run. On a wide screen it opens beside the list; on a narrow one in its place, with an arrow back.
 
 - At the top: its name; **Stop** while it runs or waits; **Run again**, which opens New run filled in with its settings, to change before you start it; and **More** (⋯): **Copy the command**, **Its folder in Files**, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the desktop app; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)), and once it has ended **Delete the record** (its record, log, patch and metrics go; the files the job made in its own folder stay).
-- Its status and why, where it runs, and when it started or ended.
-- **Metrics**: each metric over steps, with its last value and its best. **All N** shows more than four.
+- Its status and why, where it runs, and when it started or ended. While it runs, how far it has got, when its output says so: a bar, the steps done of all of them ("5,900 of 10,878 · 54%") and about how long is left, worked out from how long it has taken so far.
+- **Metrics**: each metric it printed more than once, over steps, the most telling first (losses and scores before the learning rate, speed and memory), with its last value and its best. **All N** shows more than four.
+- **Values**: the numbers it printed once, by name: its settings at the start, its results at the end. **All N** shows more than twelve, with a box to find one by name. A run with no curves, such as an evaluation that prints its results once, shows its values first.
 - **Log**: the end of its output, newest at the bottom. While it runs, **Follow** keeps the newest in view; scroll up to read and it stops following.
 - **What it ran**: the command, the folder, the code (commit, branch, and **See the changes** for the patch), its settings, seed and environment, the run it is a new run of, and the session that started it.
 - **What happened**: its events, with their times: when it waited, started and ended, and what the agent on call saw and did, with **Open its session**.
@@ -88,7 +99,7 @@ A run an agent started with "tell me when it ends" (report) also sends that sess
 
 ## Compare runs
 
-Tick the box of each run you want: a bar at the bottom offers **Compare**, **Make a table** and × to untick them all. **Compare** shows one chart per metric, with a line per run, and the runs' settings side by side, with what differs between them marked.
+Tick the box of each run you want (it shows when you point at a run, and on every run once you have ticked one): a bar at the bottom offers **Compare**, **Make a table** and × to untick them all. **Compare** shows one chart per metric the runs printed more than once, with a line per run; the values they printed once in a table, the best of each row in bold; and the runs' settings side by side, with what differs between them marked.
 
 Each experiment's menu (⋯ beside its name) has **Make a table** (from its finished runs), **Compare the latest 6** and **Pick them all**.
 
@@ -149,7 +160,7 @@ A job for a cluster runs in a folder there (the code must be there already: clon
 
 ## On a phone
 
-The list fills the screen, each run's metrics on a line of their own. A run opens in the list's place, with an arrow back; its log wraps to the screen's width, and **Follow** works as on a computer. New run, Compare and the tables open from the bottom of the screen.
+The list fills the screen, each run's status and metrics on as many lines as they need, and the box to tick a run always shows. A run opens in the list's place, with an arrow back; its log wraps to the screen's width, and **Follow** works as on a computer. New run, Compare and the tables open from the bottom of the screen.
 
 ## Ask an agent
 

@@ -1,6 +1,7 @@
 // What the Experiments page reads and how it says it: runs (this machine's, and every connected machine's), the
-// queue now, a run's status in words, durations, metrics in a line, and the run's address. Changes come through the
-// app's socket ({ t: 'feature', id: 'experiments' }): the page reloads what changed.
+// queue now, a run's status in words (what a waiting run waits for, how long an ended one took, how far a running
+// one is), which metrics matter most and so come first, durations, metrics in a line, and the run's address. Changes
+// come through the app's socket ({ t: 'feature', id: 'experiments' }): the page reloads what changed.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExperimentsSettings, QueueNow, RunRecord, RunStatus } from '@shared/experiments';
 import { api, enc } from '../../lib/api';
@@ -27,13 +28,26 @@ export function took(ms: number): string {
   return `${Math.floor(h / 24)} days ${h % 24} h`;
 }
 
+/** What a waiting run waits for: a GPU, a slot (a run without a GPU ends first), the cluster's queue, or something else. */
+export type WaitKind = 'gpu' | 'slot' | 'cluster' | 'other';
+export function waitKind(r: Pick<RunRecord, 'why' | 'clusterJob'>): WaitKind {
+  const why = r.why ?? '';
+  // The server's words for each (queue.ts, gpus.ts), as patterns so they are not taken for the page's own words.
+  if (r.clusterJob || /^In the cluster/.test(why)) return 'cluster';
+  if (/^Waiting for one of your runs without a GPU/.test(why)) return 'slot';
+  if (/^Waiting for (1 GPU|\d+ GPUs)/.test(why) || /nvidia-smi/.test(why)) return 'gpu';
+  return 'other';
+}
+
 /** A run's status in a few words: "Running 2 h 13 min", "Waiting for a GPU", "Done", "Failed". */
 export function statusWords(r: RunRecord, now = Date.now()): string {
   switch (r.status) {
     case 'queued':
       return 'In line';
-    case 'waiting':
-      return /GPU/.test(r.why ?? '') && !r.clusterJob ? 'Waiting for a GPU' : r.clusterJob ? 'In the cluster’s queue' : 'Waiting';
+    case 'waiting': {
+      const k = waitKind(r);
+      return k === 'gpu' ? 'Waiting for a GPU' : k === 'slot' ? 'Waiting for a run to end' : k === 'cluster' ? 'In the cluster’s queue' : 'Waiting';
+    }
     case 'starting':
       return 'Starting';
     case 'running':
@@ -47,6 +61,40 @@ export function statusWords(r: RunRecord, now = Date.now()): string {
     case 'lost':
       return 'Lost';
   }
+}
+
+/** An ended run's status with how long it took ("Done after 1 h 47 min", "Failed after 12 s"); else statusWords. */
+export function endedWords(r: RunRecord, now = Date.now()): string {
+  if (isActive(r) || !r.startedAt || !r.endedAt) return statusWords(r, now);
+  const ms = Math.max(0, r.endedAt - r.startedAt);
+  return `${statusWords(r, now)} after ${ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : took(ms)}`;
+}
+
+/** How far a running run is (a whole percent) and, when it has gone long enough to tell, how long is left (ms). */
+export function progressOf(r: RunRecord): { pct: number; left?: number } | null {
+  const p = r.metrics?.progress;
+  if (r.status !== 'running' || !p || !(p.done > 0) || !(p.done < p.total)) return null;
+  const elapsed = p.at - (r.startedAt ?? p.at);
+  const left = elapsed >= 60_000 && p.done / p.total >= 0.01 ? (elapsed * (p.total - p.done)) / p.done : undefined;
+  return { pct: Math.round((p.done / p.total) * 100), left };
+}
+
+/** "about 41 min left", "less than a minute left". */
+export const leftWords = (ms: number) => (ms < 60_000 ? 'less than a minute left' : `about ${took(ms)} left`);
+
+/** The GPUs a run holds in words: "GPU 0", "GPUs 0–3" (three or more in a row), "GPUs 0, 2". */
+export function gpuWords(ids: number[]): string {
+  const s = [...new Set(ids)].sort((a, b) => a - b);
+  if (s.length === 1) return `GPU ${s[0]}`;
+  const parts: string[] = [];
+  for (let i = 0; i < s.length; ) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    if (j - i >= 2) parts.push(`${s[i]}–${s[j]}`);
+    else for (let k = i; k <= j; k++) parts.push(String(s[k]));
+    i = j + 1;
+  }
+  return `GPUs ${parts.join(', ')}`;
 }
 
 /** The status dot's colour. */
@@ -65,11 +113,67 @@ export function num(v: number | null | undefined): string {
   return String(Number(v.toPrecision(a >= 100 ? 5 : 4)));
 }
 
-/** The run's key metrics in a line: "loss 0.42 · acc 0.91". */
-export function metricsLine(r: RunRecord, n = 3): string {
+// How much a metric matters, by the words in its name: a quality number (loss, accuracy, F1…) most, a rate or a
+// learning rate less, bookkeeping (sizes, counts, times, steps) least. One that was read many times (a curve) gets more.
+// As arrays of single words: a string of several words would be taken for the page's own text (i18n:extract).
+const WORDS = (list: string[]) => new Set(list);
+const QUALITY = WORDS([
+  'loss', 'acc', 'accuracy', 'f1', 'bleu', 'rouge', 'rouge1', 'rouge2', 'rougel', 'chrf', 'meteor', 'ndcg', 'mrr',
+  'map', 'recall', 'precision', 'prec', 'auc', 'auroc', 'ppl', 'perplexity', 'bpb', 'bpc', 'nll', 'll', 'wer',
+  'cer', 'em', 'exact', 'score', 'reward', 'return', 'win', 'ksr', 'top1', 'top5', 'error', 'err', 'mse', 'mae',
+  'rmse', 'iou', 'dice', 'psnr', 'ssim', 'fid', 'kl', 'agreement', 'correct', 'hit', 'hits', 'success', 'pass',
+]);
+const HELD_OUT = WORDS(['val', 'valid', 'validation', 'dev', 'eval', 'test', 'heldout']);
+const RATE = WORDS(['lr', 'learning', 'grad', 'norm', 'throughput', 'mem', 'memory']);
+const BOOKKEEPING = WORDS([
+  'elapsed', 'time', 'seconds', 'secs', 'sec', 'duration', 'eta', 'epoch', 'n', 'num', 'count', 'total', 'size',
+  'params', 'tokens', 'bytes', 'positions', 'examples', 'words', 'seqs', 'batch', 'accum', 'world', 'rank', 'steps',
+  'step',
+]);
+const PER_SECOND = /per[^a-z]?(s|sec|secs|second|seconds)($|[^a-z])|\/s($|[^a-z])|_s_/;
+
+export function metricScore(name: string, repeated: boolean): number {
+  const low = name.toLowerCase();
+  // Words with their digits (f1, top5, rouge2); "acc@1" and "ksr@0.1" are acc and ksr.
+  const words = low.split(/[^a-z0-9]+/).filter(Boolean);
+  const has = (set: Set<string>) => words.some((w) => set.has(w));
+  let score = repeated ? 2 : 0;
+  if (has(QUALITY)) score += 4 + (has(HELD_OUT) ? 1 : 0);
+  else if (has(RATE) || PER_SECOND.test(low)) score -= 2;
+  else if (has(BOOKKEEPING)) score -= 5;
+  return score;
+}
+
+/** The names, the ones that matter most first (the order they came in otherwise). */
+export function rankMetrics(names: string[], repeated: (k: string) => boolean): string[] {
+  return names
+    .map((k, i) => ({ k, i, s: metricScore(k, repeated(k)) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.k);
+}
+
+/**
+ * Numbers a run printed once, as a list: those that say how well it did first (its results), the rest in the order
+ * it printed them (settings read best as the run listed them).
+ */
+export function rankValues(names: string[]): string[] {
+  return rankMetrics(names, () => false).filter((k) => metricScore(k, false) >= 4).concat(names.filter((k) => metricScore(k, false) < 4));
+}
+
+/** The run's metrics worth a glance (a curve or a quality number), the first `n` by how much they matter. */
+export function keyMetrics(r: RunRecord, n = 2): string[] {
+  const m = r.metrics;
+  if (!m) return [];
+  const rep = new Set(m.repeated ?? []);
+  return rankMetrics(Object.keys(m.last ?? {}), (k) => rep.has(k))
+    .filter((k) => metricScore(k, rep.has(k)) >= 2)
+    .slice(0, n);
+}
+
+/** The run's key metrics in a line: "train_loss 4.18 · val_acc 0.91". */
+export function metricsLine(r: RunRecord, n = 2): string {
   const last = r.metrics?.last ?? {};
-  return Object.keys(last)
-    .slice(0, n)
+  return keyMetrics(r, n)
     .map((k) => `${k} ${num(last[k])}`)
     .join(' · ');
 }

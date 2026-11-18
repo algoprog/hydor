@@ -30,9 +30,9 @@ import { endOfSlurm, parseSacct, parseSbatch, parseSqueue, reasonWords, saveClus
 import { chooseGpus, parseGpus, setGpuReader } from './gpus.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
-import { nanText, oomText, parseLine, Tracker } from './metrics.ts';
-import { cleanJob, forgetLive, forgetNotices, onCallBrief, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { addEvent, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveTable, updateRun, waitStarted, workOut } from './records.ts';
+import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
+import { cleanJob, forgetLive, forgetNotices, onCallBrief, repairEnded, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
+import { addEvent, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
 import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, shellWords } from './sweeps.ts';
@@ -197,7 +197,7 @@ test('a run’s metrics: best by name, steps going forward, series thinned, NaN 
   t.add({ values: { loss: 1.0, acc: 0.5 }, step: 1 });
   t.add({ values: { loss: 0.5, acc: 0.7 }, step: 2 });
   t.add({ values: { loss: 0.7, acc: 0.6 }, step: 3 });
-  assert.deepEqual(t.snapshot(), { last: { loss: 0.7, acc: 0.6 }, best: { loss: 0.5, acc: 0.7 }, step: 3 });
+  assert.deepEqual(t.snapshot(), { last: { loss: 0.7, acc: 0.6 }, best: { loss: 0.5, acc: 0.7 }, step: 3, repeated: ['loss', 'acc'] });
   // A step counted per epoch starts again from 0: the series goes on.
   t.add({ values: { loss: 0.4 }, step: 1 });
   assert.deepEqual(t.series.loss.at(-1), [4, 0.4]);
@@ -210,6 +210,71 @@ test('a run’s metrics: best by name, steps going forward, series thinned, NaN 
   d.add({ values: { loss: NaN }, step: 20 });
   assert.deepEqual(d.nan, ['loss']);
   assert.equal(d.best.loss, 0.55, 'NaN never becomes the best');
+});
+
+test('metrics read more than once take the place of the latest ones read once, when the 100 are full', () => {
+  const ones: Record<string, number> = {};
+  for (let i = 0; i < 120; i++) ones[`k${i}`] = i;
+  const t = new Tracker();
+  t.add({ values: ones });
+  assert.equal(Object.keys(t.last).length, 100);
+  assert.ok(!('k100' in t.last), 'the first 100 one-off numbers are kept');
+  for (let i = 1; i <= 30; i++) t.add({ values: { loss: 5 - i * 0.1, lr: 0.001 / i }, step: i * 10 });
+  const kept = Object.keys(t.last);
+  assert.equal(kept.length, 100);
+  assert.ok(t.series.loss.length >= 2 && t.series.lr.length >= 2, 'both are charted');
+  assert.equal(t.series.loss.length, 30, 'with the reading that was left out first too');
+  assert.deepEqual(t.series.loss[0], [10, 4.9]);
+  close(t.best.loss, 2);
+  assert.deepEqual(t.snapshot().repeated, ['loss', 'lr']);
+  // The latest one-offs gave their places: k99 to loss, k98 to lr.
+  assert.ok(!('k99' in t.last) && !('k98' in t.last) && !('k99' in t.series), 'the evicted ones are gone');
+  assert.ok('k0' in t.last && 'k97' in t.last, 'the first ones stay');
+  // Read once and the cap full: left out, as before.
+  const u = new Tracker();
+  u.add({ values: ones });
+  u.add({ values: { a1: 1, a2: 2, a3: 3, a4: 4, a5: 5 }, step: 1 });
+  assert.equal(Object.keys(u.last).length, 100);
+  assert.ok(!('a1' in u.last), 'one-off numbers after the first 100 are not kept');
+  assert.deepEqual(u.snapshot().repeated, []);
+  // What is kept and repeated survives a restart; the plan comes back from its metric.
+  const back = new Tracker(undefined, { metrics: t.snapshot(), series: t.series });
+  assert.deepEqual(back.snapshot().repeated, ['loss', 'lr']);
+  back.add({ values: { loss: 1 }, step: 400 });
+  assert.equal(back.series.loss.length, 31);
+  assert.equal(MAX_METRICS, 100);
+});
+
+test('progress: a training bar, "step 120/1000", a plan in the output; a new phase forgets it', () => {
+  assert.deepEqual(parseLine(' 45%|████▌     | 4500/10000 [12:34<15:20,  5.96it/s]'), { values: {}, progress: { done: 4500, total: 10000 } });
+  assert.deepEqual(parseLine('Training:  10%|█  | 100/1000 [00:10<01:30]'), { values: {}, progress: { done: 100, total: 1000 } });
+  assert.equal(parseLine('Loading checkpoint shards: 100%|██| 4/4 [00:02<00:00'), null);
+  assert.equal(parseLine('Epoch 0:  45%|████▌| 450/1000 ['), null);
+  assert.equal(parseLine('Training:  10%|█  | 5/8 [00:10<01:30]'), null, 'a short bar is not the training');
+  assert.deepEqual(parseLine('step 120/1000 loss=0.5'), { values: { loss: 0.5 }, step: 120, progress: { done: 120, total: 1000 } });
+  assert.deepEqual(parseLine('epoch 3/10 loss=0.5'), { values: { loss: 0.5 }, step: 3 });
+  assert.deepEqual(parseLine('{"plan_steps": 10878}'), { values: { plan_steps: 10878 }, plan: 10878 });
+  const t = new Tracker();
+  assert.ok(t.add({ values: { plan_steps: 10878 }, plan: 10878 }, 1000));
+  assert.equal(t.snapshot().progress, undefined, 'no step yet');
+  assert.ok(t.add({ values: { train_loss: 4.1 }, step: 5900 }, 2000));
+  assert.deepEqual(t.snapshot().progress, { done: 5900, total: 10878, at: 2000 });
+  assert.deepEqual(new Tracker(undefined, { metrics: t.snapshot() }).plan, 10878, 'the plan comes back with the record');
+  assert.ok(t.add({ values: { loss: 1 }, step: 10 }, 3000));
+  assert.equal(t.snapshot().progress, undefined, 'a step going back starts a phase of unknown length');
+  assert.equal(t.plan, undefined);
+  t.add({ values: {}, progress: { done: 100, total: 1000 } }, 4000);
+  assert.deepEqual(t.snapshot().progress, { done: 100, total: 1000, at: 4000 });
+  t.add({ values: {}, progress: { done: 1000, total: 1000 } }, 5000);
+  assert.equal(t.snapshot().progress, undefined, 'a phase that is done shows none');
+});
+
+test('saving a series drops the rows of metrics that are no longer kept', () => {
+  insertRun(db, { id: 'rser0001', spec: { command: 'true', cwd: tmp }, status: 'done' });
+  saveSeries(db, 'rser0001', { a: [[1, 1]], b: [[1, 2]] });
+  assert.deepEqual(Object.keys(seriesOf(db, 'rser0001')).sort(), ['a', 'b']);
+  saveSeries(db, 'rser0001', { a: [[1, 1], [2, 3]] });
+  assert.deepEqual(seriesOf(db, 'rser0001'), { a: [[1, 1], [2, 3]] });
 });
 
 // ---- GPUs and the queue's choices ---------------------------------------------------------------------------------
@@ -284,7 +349,7 @@ test('a job runs in tmux and is recorded: commit, branch, patch, settings, seed,
   assert.equal(x.untracked, 1);
   assert.match(fs.readFileSync(x.patchPath!, 'utf8'), /\+echo training harder/);
   assert.equal(x.seed, 7);
-  assert.deepEqual(x.metrics, { last: { loss: 0.4, acc: 0.8 }, best: { loss: 0.4, acc: 0.8 }, step: 2 });
+  assert.deepEqual(x.metrics, { last: { loss: 0.4, acc: 0.8 }, best: { loss: 0.4, acc: 0.8 }, step: 2, repeated: ['loss', 'acc'] });
   const log = fs.readFileSync(path.join(runFolder(r.id), 'log.txt'), 'utf8');
   assert.match(log, new RegExp(`hello from ${r.id} on \\[\\]`), 'its id in the environment, and no GPU for a job without one');
   assert.ok(fs.existsSync(path.join(runFolder(r.id), 'metrics.json')));
@@ -945,6 +1010,44 @@ test('the routes: a job’s mistakes in words, clusters added and refused, recor
     told.some((e: any) => e.t === 'feature' && e.id === 'experiments'),
     'open pages hear of changes',
   );
+});
+
+// Last: it fixes the metrics of every ended run of the others above.
+test('records made under the old rule are fixed once: from the series, or the log when at the cap', async () => {
+  // At the cap: 100 one-off numbers kept, and the log has them and then the curves.
+  const one: Record<string, number> = {};
+  for (let i = 0; i < 120; i++) one[`k${i}`] = i;
+  const id = 'rfix0001';
+  insertRun(db, { id, spec: { command: 'true', cwd: tmp }, status: 'done', info: { folder: runFolder(id) } });
+  fs.mkdirSync(runFolder(id), { recursive: true });
+  let log = JSON.stringify(one) + '\n';
+  for (let i = 1; i <= 30; i++) log += JSON.stringify({ step: i * 10, loss: 5 - i * 0.1, lr: 0.001 / i }) + '\n';
+  fs.writeFileSync(path.join(runFolder(id), 'log.txt'), log);
+  const kept = Object.fromEntries(Object.entries(one).slice(0, 100));
+  updateRun(db, id, { metrics: { last: kept, best: kept }, logOffset: Buffer.byteLength(log), endedAt: Date.now() });
+  saveSeries(db, id, Object.fromEntries(Object.entries(kept).map(([k, v]) => [k, [[1, v]] as [number, number][]])));
+  // Under the cap: repeated comes from the series.
+  const small = 'rfix0002';
+  insertRun(db, { id: small, spec: { command: 'true', cwd: tmp }, status: 'done' });
+  updateRun(db, small, { metrics: { last: { a: 2, b: 1 }, best: { a: 2, b: 1 } } });
+  saveSeries(db, small, { a: [[1, 1], [2, 2]], b: [[1, 1]] });
+  // Already fixed (has `repeated`) and one with no metrics: left alone.
+  const fixed = 'rfix0003';
+  insertRun(db, { id: fixed, spec: { command: 'true', cwd: tmp }, status: 'done' });
+  updateRun(db, fixed, { metrics: { last: { a: 2 }, repeated: [] } });
+  await repairEnded(deps);
+  const m = getRun(db, id)!.metrics!;
+  assert.deepEqual(m.repeated, ['loss', 'lr']);
+  assert.equal(Object.keys(m.last).length, 100);
+  assert.ok(m.last.loss === 2 && 'k0' in m.last && !('k99' in m.last));
+  assert.equal(seriesOf(db, id).loss.length, 30);
+  assert.ok(!('k99' in seriesOf(db, id)), 'the rows of what was given up are gone');
+  assert.deepEqual(getRun(db, small)!.metrics!.repeated, ['a']);
+  assert.deepEqual(getRun(db, fixed)!.metrics!.repeated, []);
+  // Once: a second pass changes nothing.
+  const before = JSON.stringify(getRun(db, id)!.metrics);
+  await repairEnded(deps);
+  assert.equal(JSON.stringify(getRun(db, id)!.metrics), before);
 });
 
 // ---- run ------------------------------------------------------------------------------------------------------------------

@@ -292,11 +292,14 @@ export function eventsSince(db: DB, kind: RunEvent['kind'], since: number): (Run
 
 // ---- metrics' series ---------------------------------------------------------------------------------------
 
+/** Writes a run's series; the rows of metrics no longer in it (given up for others) go. */
 export function saveSeries(db: DB, run: string, series: MetricSeries) {
   tables(db);
   const put = db.prepare('insert into exp_series (run, metric, points) values (?, ?, ?) on conflict(run, metric) do update set points = excluded.points');
+  const drop = db.prepare('delete from exp_series where run = ? and metric = ?');
   db.transaction(() => {
     for (const [k, pts] of Object.entries(series)) put.run(run, k, JSON.stringify(pts));
+    for (const r of db.prepare('select metric from exp_series where run = ?').all(run) as { metric: string }[]) if (!(r.metric in series)) drop.run(run, r.metric);
   })();
 }
 

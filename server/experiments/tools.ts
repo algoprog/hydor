@@ -196,7 +196,7 @@ function sweepTool(ctx: RunCtx): RunTool {
 const LIST: RunTool = {
   name: 'experiment_list',
   annotations: { readOnlyHint: true },
-  description: 'List runs of Experiments, newest first: their id, name, experiment (group), status (and why it waits or failed), where, settings, seed, metrics ({ last, best, step }) and when they started and ended.',
+  description: 'List runs of Experiments, newest first: their id, name, experiment (group), status (and why it waits or failed), where, settings, seed, metrics ({ last, best, step, repeated: the metrics printed more than once, which have curves (the others it printed once: settings, results), progress?: { done, total } while a phase is under way }) and when they started and ended.',
   inputSchema: {
     type: 'object',
     properties: {

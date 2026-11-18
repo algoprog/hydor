@@ -1,10 +1,11 @@
-// Compare: the runs you ticked, their metrics over steps on one chart per metric (a line per run), and their
-// settings side by side, with what differs between them marked.
+// Compare: the runs you ticked, their metrics over steps on one chart per metric (a line per run; only the metrics
+// that are curves in some run, the ones that matter most first), the numbers they gave once in a table of Values (the
+// best of each row in bold), and their settings side by side, with what differs between them marked.
 import { useEffect, useMemo, useState } from 'react';
-import type { MetricSeries, RunRecord } from '@shared/experiments';
+import { betterOf, type MetricSeries, type RunRecord } from '@shared/experiments';
 import { api } from '../../lib/api';
 import { cx, Dialog, Throbber } from '../../components/ui';
-import { baseOf, num, VIZ } from './api';
+import { baseOf, num, rankMetrics, rankValues, VIZ } from './api';
 import { StepChart } from './Charts';
 
 const ROWS: { label: string; of: (r: RunRecord) => string }[] = [
@@ -35,11 +36,19 @@ export function Compare({ runs, onClose }: { runs: RunRecord[]; onClose: () => v
       alive = false;
     };
   }, [runs, open]);
+  // A chart for each metric that is a curve (two points or more) in at least one run; the others go in the Values table.
   const metrics = useMemo(() => {
     const seen = new Set<string>();
-    for (const s of series ?? []) for (const [k, pts] of Object.entries(s ?? {})) if (pts.length) seen.add(k);
-    return [...seen];
+    for (const s of series ?? []) for (const [k, pts] of Object.entries(s ?? {})) if (pts.length >= 2) seen.add(k);
+    return rankMetrics([...seen], () => true);
   }, [series]);
+  const valueNames = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of runs) for (const k of Object.keys(r.metrics?.last ?? {})) if (!metrics.includes(k)) seen.add(k);
+    return rankValues([...seen]);
+  }, [runs, metrics]);
+  const [allValues, setAllValues] = useState(false);
+  useEffect(() => setAllValues(false), [runs]);
   // The seed has a row of its own.
   const params = useMemo(() => [...new Set(runs.flatMap((r) => Object.keys(r.params ?? {})))].filter((p) => p !== 'seed'), [runs]);
   const label = (r: RunRecord) => r.name ?? r.id;
@@ -85,8 +94,56 @@ export function Compare({ runs, onClose }: { runs: RunRecord[]; onClose: () => v
               </div>
             ))}
           </div>
-        ) : (
+        ) : valueNames.length ? null : (
           <p className="text-[13px] text-fg-3">None of these runs has metrics over steps yet.</p>
+        )}
+        {series && valueNames.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <h3 className="flex-1 text-[13px] font-semibold text-fg">Values</h3>
+              {valueNames.length > 15 && (
+                <button type="button" onClick={() => setAllValues((a) => !a)} className="text-[12px] text-accent hover:underline">
+                  {allValues ? 'Fewer' : `All ${valueNames.length}`}
+                </button>
+              )}
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-line">
+              <table className="w-full text-[12.5px]">
+                <thead>
+                  <tr className="bg-bg-1 text-left text-fg-3">
+                    <th className="px-3 py-1.5 font-medium">Metric</th>
+                    {runs.map((r, i) => (
+                      <th key={i} className="px-3 py-1.5 font-medium">
+                        <span className="mr-1.5 inline-block h-0.5 w-3 rounded-full align-middle" style={{ background: VIZ[i % VIZ.length] }} />
+                        <span translate="no">{label(r)}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(allValues ? valueNames : valueNames.slice(0, 15)).map((k) => {
+                    const vals = runs.map((r) => r.metrics?.last?.[k]);
+                    const have = vals.filter((x): x is number => x !== undefined && Number.isFinite(x));
+                    // The best of the row (its ties too) when two runs or more have a value.
+                    const sign = have.length > 1 ? (betterOf(k, runs.find((r) => r.better?.[k])?.better) === 'min' ? 1 : -1) : 0;
+                    const best = sign ? Math.min(...have.map((x) => sign * x)) : null;
+                    return (
+                      <tr key={k} className="border-t border-line align-top">
+                        <td translate="no" className="px-3 py-1.5 whitespace-nowrap text-fg-3">
+                          {k}
+                        </td>
+                        {vals.map((x, i) => (
+                          <td key={i} className={cx('tnum px-3 py-1.5', best !== null && x !== undefined && Number.isFinite(x) && sign * x === best ? 'font-semibold text-fg' : 'text-fg-2')}>
+                            {num(x)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-[12.5px]">

@@ -1,7 +1,9 @@
 // Experiments' own charts, drawn as the app's others are (2px lines, hairline grids, a crosshair with the values):
-// a metric over steps (one line per run when comparing), and a sweep's setting against its metric (a dot per run,
-// on a log scale when the values span a lot, like learning rates).
+// a metric over steps (one line per run when comparing; whole steps get whole-number ticks, big numbers read "12k"),
+// and a sweep's setting against its metric (a dot per run, on a log scale when the values span a lot, like learning
+// rates).
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { LOCALE } from '../../i18n/locale';
 import { cx } from '../../components/ui';
 import { num } from './api';
 
@@ -19,12 +21,21 @@ function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] 
   return [ref, w];
 }
 
-/** Round numbers for an axis from lo to hi, about `n` of them. */
-function ticks(lo: number, hi: number, n = 3): number[] {
+/** A number on an axis: as `num` says it, but from 10,000 up compact ("12k", "1.2M"). */
+function axis(v: number): string {
+  const a = Math.abs(v);
+  if (!Number.isFinite(v) || a < 1e4) return num(v);
+  const [d, unit] = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : [1e3, 'k'];
+  return `${v < 0 ? '−' : ''}${String(Number((a / d).toPrecision(3)))}${unit}`;
+}
+
+/** Round numbers for an axis from lo to hi, about `n` of them (whole numbers, at least 1 apart, with `whole`). */
+function ticks(lo: number, hi: number, n = 3, whole = false): number[] {
   if (!(hi > lo)) return [lo];
   const raw = (hi - lo) / n;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? raw;
+  const nice = [1, 2, 2.5, 5, 10].map((f) => f * mag).filter((s) => s >= raw && (!whole || (Number.isInteger(s) && s >= 1)));
+  const step = nice[0] ?? (whole ? Math.max(1, Math.ceil(raw)) : raw);
   const out: number[] = [];
   if (!(step > 0) || !Number.isFinite(lo) || !Number.isFinite(hi)) return [lo];
   for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9 && out.length < 50; v += step) out.push(Number(v.toPrecision(12)));
@@ -60,7 +71,9 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
       }
     if (!Number.isFinite(x0)) return null;
     const pad = (y1 - y0) * 0.08 || Math.abs(y1) * 0.05 || 1;
-    return { x0, x1: x1 > x0 ? x1 : x0 + 1, y0: y0 - pad, y1: y1 + pad };
+    // Steps that are all whole numbers (most are) get whole-number ticks: a short run never shows a step 1.5.
+    const whole = series.every((s) => s.points.every(([px]) => Number.isInteger(px)));
+    return { x0, x1: x1 > x0 ? x1 : x0 + 1, y0: y0 - pad, y1: y1 + pad, whole };
   }, [series]);
   if (!box)
     return (
@@ -71,7 +84,7 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
   const x = (v: number) => axisW + ((v - box.x0) / (box.x1 - box.x0)) * plotW;
   const y = (v: number) => top + plotH - ((v - box.y0) / (box.y1 - box.y0)) * plotH;
   const ys = ticks(box.y0, box.y1, 3);
-  const xs = ticks(box.x0, box.x1, Math.max(2, Math.floor(plotW / 90)));
+  const xs = ticks(box.x0, box.x1, Math.max(2, Math.floor(plotW / 90)), box.whole);
   const path = (pts: [number, number][]) => {
     let d = '';
     let pen = false;
@@ -108,14 +121,14 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
             <g key={i}>
               <line x1={axisW} x2={width} y1={y(g)} y2={y(g)} className="viz-grid" />
               <text x={axisW - 6} y={y(g) + 3.5} textAnchor="end" className="tnum fill-[var(--fg-3)] text-[10px]">
-                {num(g)}
+                {axis(g)}
               </text>
             </g>
           ))}
           <line x1={axisW} x2={width} y1={top + plotH} y2={top + plotH} className="viz-axis" />
           {xs.map((g, i) => (
             <text key={i} x={x(g)} y={height - 3} textAnchor={x(g) > width - 28 ? 'end' : 'middle'} className="tnum fill-[var(--fg-3)] text-[10px]">
-              {num(g)}
+              {axis(g)}
             </text>
           ))}
           {series.map((s, i) => (
@@ -135,7 +148,7 @@ export function StepChart({ series, height = 140, className }: { series: StepSer
       )}
       {hover !== null && (
         <div className="pointer-events-none absolute top-0 z-10 max-w-[260px] rounded-lg border border-line-2 bg-panel px-2.5 py-1.5 shadow-pop" style={{ left: Math.min(Math.max(x(hover) + 10, 0), Math.max(0, width - 200)) }}>
-          <div className="mb-0.5 text-[10.5px] text-fg-3">Step {num(Math.round(hover))}</div>
+          <div className="mb-0.5 text-[10.5px] text-fg-3">Step {Math.round(hover).toLocaleString(LOCALE)}</div>
           {series.map((s) => {
             const p = at(s.points, hover);
             return (
