@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.91.0 · 18 November 2026
+
+Chrome extensions in your own browser do what they should when you press their buttons, and you can pin or hide them
+as in Chrome.
+
+- **Extensions that did nothing now work**: pressing the button of an extension without a popup (MEGA, Stream Recorder and
+  many others) reaches it, with the tab you are on, and extensions that stopped as they started (Video DownloadHelper,
+  Stream Recorder) now run. Extensions that use Firefox's `browser` object, or a library that does, get the same help as
+  those that use `chrome`, and pressing the button of one that is not running says so instead of doing nothing.
+- **Your tabs, as Chrome gives them to extensions**: an extension sees the tab you are on (a popup that asks for the
+  current tab gets it), opens tabs in front as Chrome does, switches to them and closes them, and hears when tabs load,
+  change or close. It sees the requests of the pages it may read even while the ad blocker is on, so a video downloader
+  finds the videos of a page. Its downloads are saved like yours, with the name it gives them, it reads and sets the
+  cookies of the sites it may use, and its side panel opens under its button the way a popup does.
+- **Pin or unpin extensions**: only the extensions you pin have a button on the toolbar; the others are in the new
+  **Extensions** button, a puzzle piece. Its menu lists every extension that is on: click one to use it, press its pin to
+  show or hide its button, and **⋮** has **Options**, **Turn off** and **Remove**. Right-click a toolbar button to unpin
+  it, and the Extensions panel has a **Pin to toolbar** switch for each one. Extensions brought in from Chrome keep the
+  pins they had there; new ones start pinned.
+- An extension's row lists fewer parts that may not work: downloads, cookies, the side panel, page loads and background
+  pages work now.
+
 ## 0.90.1 · 18 November 2026
 
 The browser's address bar behaves as in any browser when you click into a page or press ⌘L there.
