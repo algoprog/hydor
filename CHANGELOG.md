@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.89.0 · 18 November 2026
+
+Your bookmarks are easier to find and to keep in order: the address bar offers them, the Bookmarks panel searches
+them, and AI sorts them into folders.
+
+- **Bookmarks in the address bar**: the bookmarks that match what you type now show among the suggestions even when
+  your history holds many pages with the same words, as one brought in from another browser does. A bookmark counts as
+  twenty visits, at least two of the bookmarks that match are always in the list, and when the list is cut to fit a
+  short window, pages of your history go first.
+- **Search your bookmarks**: the Bookmarks panel has a search box at its top. It finds bookmarks by the words in their
+  names and addresses, and folders by their names, each with where it is; **Show in folder** opens its folder in the
+  tree, and **Enter** opens the first one found.
+- **Organize with AI**: the sparkle button at the top of the Bookmarks panel sorts your bookmarks into folders by topic,
+  with the helper model (Settings → Models). **Keep my folders** leaves your folders and what is in them as they are, and
+  files the loose bookmarks (in Other bookmarks, or in an import's folders) into the folder that fits, one of yours or
+  a new one; **Start over** puts every bookmark into new folders and removes the old ones. The sites pinned on your
+  bookmarks bar stay where they are, only titles, addresses (without what follows a ? or #) and folder names are sent,
+  you can follow it and stop it, and **Undo** puts everything back. The search box (Ctrl+K) finds it too.
+
 ## 0.88.0 · 18 November 2026
 
 Experiments shows what matters about your runs: the curves you care about, how far each run has got, and a tidier
