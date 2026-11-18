@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.90.1 · 18 November 2026
+
+The browser's address bar behaves as in any browser when you click into a page or press ⌘L there.
+
+- **No stray highlight in the address bar**: in the desktop app, the address bar could show the site's name with a
+  highlight running past it, after you clicked into it and then into the page, pressed ⌘L (Ctrl+L on Windows and
+  Linux) while reading a page, or opened a new tab. It now lets go when the page takes the keyboard, and shows just
+  the site.
+- **⌘L and ⌘F from inside a page**: pressing ⌘L while a page had the keyboard left the keyboard with the page, so
+  what you typed went into the page instead of the address bar. Now the address bar gets it, with the address
+  selected, and ⌘F puts you in the find bar the same way.
+- **What you type stays**: when you switch to another app while typing in the address bar, what you typed is still
+  there when you come back.
+
 ## 0.90.0 · 18 November 2026
 
 All projects shows what goes on across your projects, now that the column beside it lists them.
