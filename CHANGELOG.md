@@ -3,6 +3,30 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.92.0 · 18 November 2026
+
+Ask beside a page can now do things on it too, its column is as wide as you drag it, and your own browser gets search
+shortcuts, a page zoom of your own and full-screen videos that work at the first press.
+
+- **Ask or Do**: Ask, beside the page in your own browser, has two ways at its top. **Ask** answers from a copy of the
+  page, as before. **Do** hands the page to an agent (Claude Code or Custom) in a tab of its own, with your sign-ins on
+  that site and only the browser, and you watch it work in the page's place. It takes the place of **Do this here…**,
+  and the address bar's row for the page follows the way you picked.
+- **A column you can resize**: drag the left edge of the column beside the page (Ask, an agent's conversation, history,
+  settings and the other panels) to make it wider or narrower. It keeps its width, and a double-click puts back the
+  usual one.
+- **Full-screen videos at the first press**: on a Mac, a video's full-screen button made only Hydor's window full
+  screen the first time, and it took a second press to fill the screen with the video. Now one press does it.
+- **Search shortcuts**: type a shortcut, a space and your words in the address bar to search a site: `yt` for YouTube,
+  `wiki` for Wikipedia, `gh` for GitHub, `scholar` for Google Scholar, `arxiv` for arXiv and `hf` for Hugging Face.
+  Add your own, or take some away, in **Browser settings**.
+- **Page zoom**: choose how big pages are in **Browser settings**; a site you zoom yourself keeps its own zoom. The ⋯
+  menu has a **Zoom** row with − and + as well.
+- **Check spelling**: turn the underlining of misspelled words on or off in **Browser settings**.
+- **Keyboard shortcuts**: ⋯ → **Keyboard shortcuts** lists every shortcut of the browser beside the page.
+- **Copy as Markdown link**: right-click a tab to copy its title and address as a Markdown link.
+- **A shorter menu**: **Open in your default browser** and **Do this here…** are gone from the ⋯ menu.
+
 ## 0.91.1 · 18 November 2026
 
 Custom on a Claude model of your plan only runs the tool calls Claude actually wrote, and subagents keep working through
