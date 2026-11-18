@@ -36,7 +36,7 @@ def open_shot(name):
     return Image.open(f'{src}/{name}.webp').convert('RGB')
 
 
-for name in ['readme-agents', 'readme-memory', 'readme-automation']:
+for name in ['readme-agents', 'readme-memory', 'readme-automation', 'readme-answers', 'readme-library']:
     frame(open_shot(name).resize(SIZE, Image.LANCZOS)).save(f'{dst}/{name}.webp', quality=80)
 
 # The phone over the session's window.

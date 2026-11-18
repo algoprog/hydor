@@ -36,8 +36,10 @@ function args() {
 }
 
 const o = args();
-// Another list of shots (the website's, website/shots.mjs) instead of the guide's.
-const SHOTS = o.shots ? (await import(pathToFileURL(path.resolve(o.shots)).href)).SHOTS : GUIDE_SHOTS;
+// Another list of shots (the website's, website/shots.mjs) instead of the guide's. It may also add to the demo what
+// only its own pictures show (prepare: the README's planned trip and deck).
+const LIST = o.shots ? await import(pathToFileURL(path.resolve(o.shots)).href) : null;
+const SHOTS = LIST ? LIST.SHOTS : GUIDE_SHOTS;
 if (!fs.existsSync(path.join(o.root, 'dist/server/index.js')) || !fs.existsSync(path.join(o.root, 'dist/web/index.html')))
   throw new Error('--root: a built copy of the app (dist/server and dist/web), made in a git worktree under /tmp (see README.md)');
 // A copy started by hand from a git checkout outside the temp folder sets itself up to start with the computer.
@@ -185,6 +187,15 @@ async function main() {
     await sleep(500);
   }
   const ctx = { base, home, sessions, api, out: o.out };
+  if (LIST?.prepare) {
+    const db = new Database(path.join(home, '.hydor', 'hydor.db'));
+    db.pragma('busy_timeout = 5000');
+    try {
+      Object.assign(ctx, await LIST.prepare({ ...ctx, db }));
+    } finally {
+      db.close();
+    }
+  }
 
   if (o.serve) {
     // To look around (password "a demo password"); what route() fakes shows only in the shots.

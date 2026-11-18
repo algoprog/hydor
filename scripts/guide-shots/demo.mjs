@@ -197,6 +197,101 @@ const numbered = (text) =>
     .map((l, i) => `${String(i + 1).padStart(6)}→${l}`)
     .join('\n');
 
+/** Alex's trip to Lisbon as the Trip planner app planned it: what its form was given, and its answer. */
+const TRIP = {
+  inputs: { destination: 'Lisbon', start: '2027-05-11', days: '4', travelers: 'Two adults', budget: 'Mid-range hotels', interests: 'Lots of walking, viewpoints, tiles and good food', pace: 'Balanced' },
+  result: {
+    overview:
+      'Four days on foot, one part of the city a day, with Sintra by train on the third. Stay in **Chiado**: central, flat enough at the end of a day, and on the tram lines. Mid-May is warm and mostly dry (19–24 °C), with long evenings for the viewpoints.',
+    days: [
+      { day: 1, date: '2027-05-11', area: 'Alfama and the castle', sight: 'São Jorge Castle', morning: 'Tram 28 up to São Jorge Castle and its walls', afternoon: 'The lanes of Alfama, down to the cathedral', evening: 'Dinner and fado in Mouraria' },
+      { day: 2, date: '2027-05-12', area: 'Belém by the river', sight: 'Jerónimos Monastery', morning: 'Jerónimos Monastery when it opens, before the queues', afternoon: 'Belém Tower and the riverside walk to MAAT', evening: 'Pastéis de Belém, then dinner in Santos' },
+      { day: 3, date: '2027-05-13', area: 'A day in Sintra', sight: 'Pena Palace', morning: 'The train from Rossio, then Pena Palace on a timed ticket', afternoon: 'Quinta da Regaleira and the old town', evening: 'Back by train, dinner in Chiado' },
+      { day: 4, date: '2027-05-14', area: 'Viewpoints and fado', sight: 'Miradouro de São Pedro de Alcântara', morning: 'The São Pedro de Alcântara viewpoint and Príncipe Real', afternoon: 'LX Factory, then the river at Cais do Sodré', evening: 'Sunset at Santa Catarina, then fado in Bairro Alto' },
+    ],
+    stops: [
+      { day: 1, date: '2027-05-11', area: 'Alfama', lat: 38.7113, lng: -9.1275 },
+      { day: 2, date: '2027-05-12', area: 'Belém', lat: 38.6975, lng: -9.2063 },
+      { day: 3, date: '2027-05-13', area: 'Sintra', lat: 38.7976, lng: -9.3904 },
+      { day: 4, date: '2027-05-14', area: 'Bairro Alto', lat: 38.7136, lng: -9.1462 },
+    ],
+    book_ahead: ['Pena Palace: a timed ticket, two weeks ahead', 'Fado dinner in Mouraria: a table, a week ahead', 'Jerónimos Monastery: tickets online, a few days ahead', 'The hotel in Chiado: now, as May fills up'],
+    budget: [
+      { item: 'Hotel, 4 nights', estimate: '€640–€880' },
+      { item: 'Food and drink', estimate: '€320–€440' },
+      { item: 'Sights and tickets', estimate: '€110' },
+      { item: 'Trams, metro and the Sintra train', estimate: '€45' },
+      { item: 'Total', estimate: '€1,115–€1,475' },
+    ],
+    tips: ['From the airport, the metro takes 25 minutes to the centre', 'A Viva Viagem card with “zapping” credit covers trams, metro and the Sintra train', 'Shoes with grip: the pavements are polished stone and steep'],
+  },
+};
+
+/**
+ * The Trip planner's run for Alex's Lisbon session, as use_app leaves it when the run is done: the run, and its card in
+ * the conversation under the reply. `recipe`: the template as the app has it (GET /api/apps/tpl:trip-planner).
+ */
+export function tripRun(db, s, recipe) {
+  const id = crypto.randomBytes(4).toString('hex');
+  const ended = s.lisbon.started + 95_000;
+  db.prepare(
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, result, cost_usd, asked_by, told, created_at, started_at, ended_at)
+     values (?, 'tpl:trip-planner', 'Trip planner', ?, 'session', 'done', ?, ?, 0.38, ?, 1, ?, ?, ?)`,
+  ).run(id, JSON.stringify(recipe), JSON.stringify(TRIP.inputs), JSON.stringify(TRIP.result), s.lisbon.key, s.lisbon.started, s.lisbon.started + 1000, ended);
+  db.prepare("insert into session_notes (id, key, kind, at, anchor, data) values (?, ?, 'app-run', ?, ?, ?)").run(
+    crypto.randomBytes(5).toString('hex'),
+    s.lisbon.key,
+    s.lisbon.started,
+    s.lisbon.ask,
+    JSON.stringify({ run: id, app: 'tpl:trip-planner', name: 'Trip planner', icon: recipe.icon, color: recipe.color }),
+  );
+  return id;
+}
+
+/** The trip's slides, which an agent made from the plan: a title and a slide a day, each over its picture. Returns its page. */
+export async function lisbonDeck(api, s) {
+  const pic = async (name) => (await api('POST', '/api/pages/assets', { data: `data:image/jpeg;base64,${fs.readFileSync(path.join(MEDIA, name)).toString('base64')}` })).src;
+  const [tram, belem, sintra, viewpoint] = [await pic('tram.jpg'), await pic('belem.jpg'), await pic('sintra.jpg'), await pic('viewpoint.jpg')];
+  const day = (n, picture, when, area, plan) => ({
+    els: [
+      { type: 'image', src: picture, x: 0, y: 0, w: 1280, h: 720, fit: 'cover', alt: area },
+      // Two fades into the dark from nothing, one over the other: the words below read on any picture, with no edge.
+      { type: 'shape', shape: 'rect', x: 0, y: 250, w: 1280, h: 470, fill: '#0b162600', fill2: '#0b1626cc', angle: 180 },
+      { type: 'shape', shape: 'rect', x: 0, y: 420, w: 1280, h: 300, fill: '#0b162600', fill2: '#0b1626cc', angle: 180 },
+      { type: 'text', text: when.toUpperCase(), x: 72, y: 496, w: 1000, h: 40, size: 24, bold: true, color: '#5cbcff' },
+      { type: 'text', text: `Day ${n} · ${area}`, x: 72, y: 534, w: 1136, h: 80, size: 56, bold: true, color: '#ffffff', role: 'title' },
+      { type: 'text', text: plan, x: 72, y: 616, w: 1136, h: 80, size: 24, color: '#d5dde8' },
+    ],
+    notes: `Day ${n}: ${plan}`,
+  });
+  const d = TRIP.result.days;
+  const line = (x) => [x.morning, x.afternoon, x.evening].join(' · ');
+  const { page } = await api('POST', '/api/pages', {
+    kind: 'slides',
+    title: 'Lisbon in 4 days',
+    sessionKey: s.lisbon.key,
+    description: 'The Lisbon trip day by day, from the Trip planner’s plan: a title slide and one slide a day over its picture.',
+    model: {
+      theme: 'midnight',
+      slides: [
+        {
+          els: [
+            { type: 'shape', shape: 'rect', x: 0, y: 0, w: 1280, h: 720, fill: '#0f2238', line: 'none' },
+            { type: 'image', src: tram, x: 640, y: 0, w: 640, h: 720, fit: 'cover', alt: 'A yellow tram on a Lisbon street' },
+            { type: 'text', text: 'Lisbon in 4 days', x: 72, y: 250, w: 540, h: 140, size: 64, bold: true, color: '#ffffff', role: 'title' },
+            { type: 'text', text: '11–14 May 2027 · two adults, on foot', x: 72, y: 390, w: 540, h: 60, size: 26, color: '#9fb4cc', role: 'subtitle' },
+          ],
+        },
+        day(1, tram, 'Tuesday 11 May', d[0].area, line(d[0])),
+        day(2, belem, 'Wednesday 12 May', d[1].area, line(d[1])),
+        day(3, sintra, 'Thursday 13 May', d[2].area, line(d[2])),
+        day(4, viewpoint, 'Friday 14 May', d[3].area, line(d[3])),
+      ],
+    },
+  });
+  return page;
+}
+
 /** Every session Alex has, newest work first. Returns them by name, each with its key. */
 export function makeSessions(home, projects, now, { shop, blog }) {
   const tasks = path.join(home, 'Hydor/Tasks');
@@ -369,9 +464,27 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     out.pictures = { key: t.key, cwd, at: t.t, pic, clip };
   }
 
+  // The trip planned with the Trip planner app (use_app). Its run and card (the plan, on a map) are put in by tripRun(),
+  // for the README's picture alone; elsewhere the conversation shows the call among the steps.
+  {
+    const cwd = path.join(tasks, '2026-10-31-lisbon-trip');
+    fs.mkdirSync(cwd, { recursive: true });
+    const t = new Transcript({ cwd, at: now - 30 * HOUR });
+    t.user('Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.');
+    const ask = t.last;
+    const started = t.t;
+    t.tool(own('use_app'), { app: 'trip-planner', inputs: TRIP.inputs }, {
+      say: "I'll plan it with your Trip planner app: it checks the dates against opening hours, events and travel times.",
+      text: 'Trip planner is done. Its card, with the answer as the app shows it, shows right under your reply.\n\n' + TRIP.result.overview,
+      ms: 96_000,
+    });
+    t.say(['Here is your plan: one area a day, all on foot or by tram, with Sintra by train on Thursday. Book the Pena Palace tickets and the fado dinner soon: both fill up in May.'], { out: 300 });
+    t.title('4 days in Lisbon in May').save(projects);
+    out.lisbon = { key: t.key, cwd, at: t.t, ask, started };
+  }
+
   // Plain conversations, for the session list.
   const plain = [
-    ['lisbon', path.join(tasks, '2026-10-31-lisbon-trip'), 30 * HOUR, 'Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.', 'Here is a day-by-day plan, with the neighbourhoods to stay in and what to book ahead.', '4 days in Lisbon in May'],
     ['thesis', path.join(home, 'Hydor/Projects/thesis'), 3 * HOUR, 'Outline chapter 3: the method, the survey and how I analysed the answers.', 'Here is an outline in five parts, with what each needs from your notes.', 'Outline chapter 3'],
     ['garden', path.join(home, 'Hydor/Projects/the-garden'), 50 * HOUR, 'Which vegetables can I still sow in November?', 'In zone 5b, garlic and broad beans go in now; spinach and lettuce under cover.', 'What to sow in November'],
     ['taxes', path.join(home, 'Hydor/Projects/taxes-2026'), 4 * DAY, 'Sort the receipts in this folder by quarter and add them up.', 'Done: 46 receipts in four folders, with a table of the totals.', 'Receipts by quarter'],

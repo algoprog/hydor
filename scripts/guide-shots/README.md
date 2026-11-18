@@ -24,7 +24,9 @@ rm /tmp/guide-shots-app/node_modules && git worktree remove --force /tmp/guide-s
 
 The README's pictures (`docs/media/readme-*.webp`) come from `readme-shots.mjs` the same way, then `readme-frame.py` (Pillow)
 gives the windows their rounded corners and puts the phone over the session's dimmed window; its header says how.
-`readme-answers.webp` and `readme-library.webp` need a planned trip and a deck of slides that the demo does not have.
+A list of shots may export `prepare(ctx)`, which run.mjs calls once the demo is seeded (with its API and its database) to
+add what only its pictures show: the README's and the website's add the Trip planner's run in the Lisbon session (its
+card, on the map) and the trip's slides in the Library (`tripRun` and `lisbonDeck` in demo.mjs).
 
 To take a shot from uncommitted changes, apply them to the worktree before building. `--out <dir>` writes the
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
