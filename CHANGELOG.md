@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.90.0 · 18 November 2026
+
+All projects shows what goes on across your projects, now that the column beside it lists them.
+
+- **An overview across projects**: on a computer the Projects page's column lists every project, so **All projects** no
+  longer repeats them as cards. It shows **Latest sessions** (the sessions last at work in any project, each with its
+  project's mark and name, and what a running one is doing) and **Lately in the Library** (the newest things your
+  projects keep there, each with its project's name).
+- **Where the work went**: the last 4 weeks as a bar a day in your projects' colours, as tall as the messages their
+  sessions were sent, with the total above it. Under it, each project that was at work with its share, the busiest
+  first, and the projects that were quiet.
+- **Shared with people** lists the projects other people have a link to, with how many people; click one to see who.
+- **The cards are still there** where no column lists your projects: on a phone, in a narrow window, with the sidebar
+  hidden, and while you are finding a project. The overview follows under them.
+
 ## 0.89.1 · 18 November 2026
 
 Wiki memory is simpler: no more lesson suggestions, and no switch of its own in each chat.
