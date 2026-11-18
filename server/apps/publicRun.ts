@@ -43,11 +43,11 @@ export function publicRunPrompt(o: { tools: string[]; textTools?: ToolSchema[]; 
   if (o.textTools?.length) {
     lines.push(
       '',
-      'Tools. To call one, write a tool call in exactly this form (one block per call), then stop and wait for the result:',
+      'Tools. To call one, write a tool call in exactly this form (one block per call; several in a row run together):',
       '<tool_call>',
       '{"name": "todo_write", "arguments": {"todos": [{"content": "Find sources", "status": "in_progress"}]}}',
       '</tool_call>',
-      'Results come back in <tool_response> blocks. When the task is done, answer without a tool call. The tools:',
+      'Then end your reply: write nothing after your calls. The app runs them and sends what they returned in your next message, in <tool_response> blocks, which only the app writes. When the task is done, answer without a tool call. The tools:',
       '<tools>',
       ...o.textTools.map((t) => JSON.stringify(t.function)),
       '</tools>',

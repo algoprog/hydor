@@ -27,6 +27,7 @@ import { setTeam, setTiers } from '../assistants/tiers.ts';
 import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
 import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
 import { childMode } from './modes.ts';
@@ -770,6 +771,68 @@ test('only the reply to the brief is checked: a later turn, answering a message,
   assert.equal(sessions.created.length, n, 'no helper started again');
   assert.match(sessions.delivered.at(-1)!.text, /it loads\.$/);
   verdict = '{"pass": true, "why": "it does the job"}';
+});
+
+/** Runs `fn` with a plan's model among Custom's (as Settings → Models lists it when Claude Code is signed in), then puts them back. */
+async function withPlanModel(fn: () => Promise<void>) {
+  const plan: AgentModel = { id: 'claude/sonnet', label: 'Claude Sonnet 5.5', provider: 'claude', baseUrl: '', model: 'sonnet', tools: 'text' };
+  fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: [...MODELS, plan] }));
+  try {
+    await fn();
+  } finally {
+    fs.writeFileSync(AGENT_FILE, JSON.stringify({ models: MODELS }));
+  }
+}
+
+test('a Claude Code parent’s Standard helper stays Claude Code on Sonnet, though Custom has a plan model of that name; its exact id, or a Custom parent, still gives Custom', async () => {
+  await withPlanModel(async () => {
+    const k = leadKey('plan1');
+    // The tier's model is Claude Code's own name, sonnet: the same program as its parent, with its own tools.
+    await call(k, 'start_child_session', { brief: 'Add the --json flag to the export command as specified.', tier: 'standard' });
+    let o = sessions.created.at(-1)!;
+    assert.equal(o.agent, 'claude');
+    assert.equal(o.acpAgent, undefined);
+    assert.equal(o.model, 'sonnet');
+    assert.equal((notesOf(db, k, 'child').at(-1)!.data as ChildNote).tier, 'standard');
+    // The model named by the plain name does the same.
+    await call(k, 'start_child_session', { brief: 'Same, on Sonnet by name.', model: 'sonnet' });
+    o = sessions.created.at(-1)!;
+    assert.equal(o.agent, 'claude');
+    assert.equal(o.model, 'sonnet');
+    // Its exact id in Custom's list is a request for Custom.
+    await call(k, 'start_child_session', { brief: 'Same, through Custom.', model: 'claude/sonnet' });
+    o = sessions.created.at(-1)!;
+    assert.equal(o.agent, 'acp');
+    assert.equal(o.acpAgent, 'console');
+    assert.equal(o.model, 'claude/sonnet');
+    // A Custom parent that names sonnet gets Custom's model of that name: it has no Claude Code of its own to stay with.
+    const custom = 'acp:plan-custom';
+    sessions.add(custom, { agent: 'acp', acpAgent: 'console', model: 'ollama/llama3', live: 'working', mode: 'edits', title: 'Custom lead', items: [user('Sort the files')] });
+    await call(custom, 'start_child_session', { brief: 'Sort the lines of every file in data/.', model: 'sonnet' });
+    o = sessions.created.at(-1)!;
+    assert.equal(o.agent, 'acp');
+    assert.equal(o.acpAgent, 'console');
+    assert.equal(o.model, 'claude/sonnet');
+  });
+});
+
+test('a helper whose turn a restart of the app cut is not run again a tier up; one that failed otherwise is', async () => {
+  const k = leadKey('cut1');
+  await call(k, 'start_child_session', { brief: 'Write the six tasks.', tier: 'quick', title: 'Cut' });
+  const a = newest();
+  sessions.all.get(a)!.items.push(said('Half done.'), { kind: 'turn', id: 'cut-1', seq: 9001, status: 'failed' } as TimelineItem, { kind: 'system', id: 'cut-2', seq: 9002, level: 'error', text: CUT_BY_RESTART } as TimelineItem);
+  sessions.all.get(a)!.live = 'idle';
+  const n = sessions.created.length;
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n, 'no helper started again');
+  // Any other error steps up, as before.
+  await call(k, 'start_child_session', { brief: 'Write the six tasks again.', tier: 'quick', title: 'Failed' });
+  const b = newest();
+  sessions.all.get(b)!.items.push(said('Half done.'), { kind: 'turn', id: 'cut-3', seq: 9003, status: 'failed' } as TimelineItem, { kind: 'system', id: 'cut-4', seq: 9004, level: 'error', text: 'The model refused' } as TimelineItem);
+  sessions.all.get(b)!.live = 'idle';
+  const m = sessions.created.length;
+  await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, m + 1, 'a helper started again, a tier up');
 });
 
 test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {

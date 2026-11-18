@@ -21,6 +21,16 @@ export class RpcPeer {
     private prefix: string,
   ) {}
 
+  /** The id the next call gets: noted before it goes out, so its answer is known after a restart. */
+  nextId(): string {
+    return `${this.prefix}-${this.seq + 1}`;
+  }
+
+  /** Whether an id is one of this peer's calls' (a call made before a restart has another prefix). */
+  owns(id: string): boolean {
+    return id.startsWith(`${this.prefix}-`);
+  }
+
   call<T = any>(method: string, params: unknown, timeoutMs = 60_000): Promise<T> {
     const id = `${this.prefix}-${++this.seq}`;
     return new Promise<T>((resolve, reject) => {

@@ -8,7 +8,8 @@
 // fresh. Claude: Anthropic lets only its own programs use a plan's sign-in, so each step is asked through Claude Code
 // itself (`claude -p`, with none of its own tools, settings or servers, and nothing saved). Claude Code takes a turn as
 // one message: the conversation goes to it as one, the earlier steps in order, and Custom's tools are described in the
-// instructions with their calls written as text (these models' tools are 'text', as for models that take none).
+// instructions with their calls written as text (these models' tools are 'text', as for models that take none). Claude Code
+// has no stop sequence to end a reply at its calls, so the app ends it there itself (CallGate) and stops the program.
 //
 // The server holds the sign-ins: Custom's agent process asks through its run's address (POST /agent/run/:token/model,
 // index.ts), which runs planChat here; the helper model and the app's other model calls run it in this process.
@@ -19,6 +20,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import type { AgentModel, ModelOption, SubscriptionModels, SubscriptionProvider } from '../../shared/types.ts';
 import { ContextOverflow, StreamCut, type ChatMessage, type ChatOptions, type Part, type Reply } from '../agent/llm.ts';
+import { CallGate } from '../agent/parse.ts';
 import { config } from '../config.ts';
 import { agentBaseEnv } from '../env.ts';
 import { spawnProgram } from '../platform.ts';
@@ -149,7 +151,7 @@ const STALL_MS = Number(process.env.HYDOR_STALL_MS) || 10 * 60_000;
 
 /** What Claude is told of the conversation it is given as one message. */
 const TRANSCRIPT_HEAD =
-  'The conversation so far follows, oldest first. <user> blocks are the user’s messages (and notes the app adds), <assistant> blocks are your own earlier replies with the tool calls you wrote in them, and <tool_response> blocks are what those calls returned. After the last block, write only your next reply as the assistant: a tool call, or your answer once the work is done. Do not write <assistant> or <user> tags yourself.';
+  'The conversation so far follows, oldest first. <user> blocks are the user’s messages (and notes the app adds), <assistant> blocks are your own earlier replies with the tool calls you wrote in them, and <tool_response> blocks are what those calls returned. After the last block, write only your next reply as the assistant: your tool calls, then end the reply there (the app runs them, and their results come in the next message), or your answer once the work is done. Never write <tool_response>, <assistant> or <user> blocks yourself: only the app does.';
 
 /** A picture as Claude takes it: from a data: address, else by its address. */
 function claudeImage(url: string): object {
@@ -230,10 +232,23 @@ async function claudeStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promis
   let stalled = false;
   let timer = setTimeout(() => ((stalled = true), stop()), STALL_MS);
   const trim = new TagTrim(o.onText);
+  // The reply ends where its calls end: what the model writes after them (results it imagines, more calls) is never shown
+  // or kept, and the program stops there.
+  const gate = new CallGate((t) => trim.push(t));
+  let cut = false;
+  const cutHere = () => {
+    if (cut) return;
+    cut = true;
+    stop();
+    // A program that does not stop when asked is made to.
+    setTimeout(() => child.exitCode === null && child.signalCode === null && child.kill('SIGKILL'), 5000).unref();
+  };
   let text = '';
   let reasoning = '';
   let finish: string | undefined;
   let result: Record<string, any> | null = null;
+  /** What the model was given and has written so far, from the stream (a reply cut short has no result to say it). */
+  const streamed = { in: 0, created: 0, cached: 0, out: 0 };
   let errText = '';
   let stderr = '';
   child.stderr.on('data', (b: Buffer) => (stderr = (stderr + b.toString()).slice(-4000)));
@@ -252,15 +267,25 @@ async function claudeStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promis
       } catch {
         continue;
       }
+      // Once the reply is over at its calls, the rest the program prints goes unread.
+      if (cut) continue;
       if (e.type === 'stream_event') {
         const ev = e.event ?? {};
         if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && typeof ev.delta.text === 'string') {
           text += ev.delta.text;
-          trim.push(ev.delta.text);
+          if (gate.push(ev.delta.text)) cutHere();
         } else if (ev.type === 'content_block_delta' && ev.delta?.type === 'thinking_delta' && typeof ev.delta.thinking === 'string') {
           reasoning += ev.delta.thinking;
           o.onReasoning(ev.delta.thinking);
-        } else if (ev.type === 'message_delta' && ev.delta?.stop_reason) finish = ev.delta.stop_reason === 'max_tokens' ? 'length' : 'stop';
+        } else if (ev.type === 'message_start' && ev.message?.usage) {
+          const u = ev.message.usage;
+          streamed.in = Number(u.input_tokens ?? 0);
+          streamed.created = Number(u.cache_creation_input_tokens ?? 0);
+          streamed.cached = Number(u.cache_read_input_tokens ?? 0);
+        } else if (ev.type === 'message_delta') {
+          if (ev.delta?.stop_reason) finish = ev.delta.stop_reason === 'max_tokens' ? 'length' : 'stop';
+          if (typeof ev.usage?.output_tokens === 'number') streamed.out = ev.usage.output_tokens;
+        }
       } else if (e.type === 'assistant' && Array.isArray(e.message?.content)) {
         // An error Claude Code reports in the reply's place ("API Error: …").
         const said = e.message.content.map((b: any) => (b?.type === 'text' ? b.text : '')).join('');
@@ -275,6 +300,15 @@ async function claudeStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promis
   }
   if (o.signal.aborted) throw new Error('aborted');
   if (stalled) throw new StreamCut(`${m.label} sent nothing for a long time`);
+  // Stopped where its calls end: the reply is what came before, and what it used is what the stream said (the words
+  // it wrote after the cut, which no result counts, roughly).
+  if (cut) {
+    const kept = gate.end();
+    trim.end();
+    const prompt = streamed.in + streamed.created + streamed.cached;
+    const completion = Math.max(streamed.out, Math.ceil(text.length / 4));
+    return { text: kept.replace(/^\s*<assistant>\s*/, '').replace(/\s*<\/assistant>\s*$/, ''), reasoning, calls: [], finish: 'stop', usage: { prompt, completion, ...(streamed.cached ? { cached: streamed.cached } : {}) } };
+  }
   const said = typeof result?.result === 'string' ? result.result : '';
   if (!result || result.is_error || (result.subtype && result.subtype !== 'success')) {
     const why = (errText || said || stderr.trim().split('\n').pop() || 'Claude Code gave no answer').slice(0, 600);
@@ -284,14 +318,15 @@ async function claudeStep(m: AgentModel, o: ChatOptions, a: PlanAccount): Promis
     if (text && !said) throw new StreamCut(`${m.label} stopped mid-reply: ${why}`);
     throw new Error(`${m.label} (through Claude Code): ${why}`);
   }
-  // No pieces streamed (an older Claude Code): the whole reply at once.
-  if (!text && said) trim.push(said);
+  // No pieces streamed (an older Claude Code): the whole reply at once, ended at its calls all the same.
+  if (!text && said) gate.push(said);
+  const kept = gate.end();
   trim.end();
   const u = result.usage ?? {};
   const cachedIn = Number(u.cache_read_input_tokens ?? 0);
   const prompt = Number(u.input_tokens ?? 0) + Number(u.cache_creation_input_tokens ?? 0) + cachedIn;
-  const reply = (text || said).replace(/^\s*<assistant>\s*/, '').replace(/\s*<\/assistant>\s*$/, '');
-  return { text: reply, reasoning, calls: [], finish, usage: { prompt, completion: Number(u.output_tokens ?? 0), ...(cachedIn ? { cached: cachedIn } : {}) } };
+  const reply = kept.replace(/^\s*<assistant>\s*/, '').replace(/\s*<\/assistant>\s*$/, '');
+  return { text: reply, reasoning, calls: [], finish: gate.stopped ? 'stop' : finish, usage: { prompt, completion: Number(u.output_tokens ?? 0), ...(cachedIn ? { cached: cachedIn } : {}) } };
 }
 
 // ---- Codex's models, on the ChatGPT plan's Responses API ----------------------------------------------

@@ -240,6 +240,9 @@ export function planLimitHit(turn: { error?: string; code?: number; data?: unkno
   return !turn.tools && text.length > 0 && text.length <= 160 && PLAN_ANSWER.test(text);
 }
 
+/** Why a turn ended when a restart of the app cut its agent's model call (its lead does not run it again a tier up for that). */
+export const CUT_BY_RESTART = 'The app restarted while this turn was waiting for its model, so the turn stopped there: send a message to carry on';
+
 export class AcpLive extends LiveAdapter {
   readonly agent = 'acp' as const;
   rpc: RpcPeer;
@@ -258,7 +261,8 @@ export class AcpLive extends LiveAdapter {
   private turn = { text: '', tools: 0 };
   /** Lines the agent printed in this run so far; each transcript entry notes how many were handled. */
   private ln = 0;
-  private caught: { handled: number; answered: Set<string> } | null = null;
+  /** After a restart: how far the replayed output was handled, the agent's requests answered, and the open turn's prompt call. */
+  private caught: { handled: number; answered: Set<string>; prompt?: string } | null = null;
   /** What the agent offers, for the pickers. */
   modes: { id: string; name: string; description?: string }[] = [];
   models: ModelOption[] = [];
@@ -389,6 +393,7 @@ export class AcpLive extends LiveAdapter {
     const run = `{"t":"run","run":${JSON.stringify(this.runner.meta.runId)}`;
     let prompted = 0;
     let ended = 0;
+    let promptCall: string | undefined;
     let inRun = false;
     let handled = 0;
     let answered = new Set<string>();
@@ -397,7 +402,11 @@ export class AcpLive extends LiveAdapter {
       fs.readFileSync(this.o.transcript, 'utf8')
         .split('\n')
         .forEach((l, i) => {
-          if (l.startsWith('{"t":"prompt"')) prompted = i + 1;
+          if (l.startsWith('{"t":"prompt"')) {
+            prompted = i + 1;
+            // A message sent during a turn has no call of its own: the turn's prompt is the last that has one.
+            promptCall = /"rpc":"([^"]*)"/.exec(l)?.[1] ?? promptCall;
+          }
           else if (l.startsWith('{"t":"end"')) ended = i + 1;
           else if (l.startsWith('{"t":"run"')) {
             inRun = l.startsWith(run);
@@ -411,7 +420,8 @@ export class AcpLive extends LiveAdapter {
     } catch {}
     this.prompting = prompted > ended;
     // A transcript from before runs were noted: take all of it as handled.
-    this.caught = handled || answered.size ? { handled, answered } : { handled: Infinity, answered: all };
+    const prompt = this.prompting ? promptCall : undefined;
+    this.caught = handled || answered.size ? { handled, answered, prompt } : { handled: Infinity, answered: all, prompt };
     return this.caught;
   }
 
@@ -490,8 +500,22 @@ export class AcpLive extends LiveAdapter {
       if (u.sessionUpdate === 'config_option_update') this.optionsChanged(u.configOptions);
       return;
     }
-    // The answer to a prompt sent before the server restarted (its call is gone): the turn ended.
-    if (m.id != null && m.result && 'stopReason' in m.result && this.prompting) this.turnEnded({ stopReason: m.result.stopReason });
+    // The answer to a prompt sent before the server restarted (its call is gone): the turn ended, as the agent says, or
+    // with what went wrong. Its model call cut by the restart (Custom's on a plan's model asks through the app) says so.
+    if (m.id != null && this.prompting && this.answersOpenPrompt(String(m.id), m)) {
+      if (!m.error) return void this.turnEnded({ stopReason: m.result.stopReason ?? 'end_turn' });
+      const said = String(m.error.message ?? 'The turn failed');
+      this.turnEnded({ error: /^(terminated|fetch failed)$|ECONNRESET|ECONNREFUSED|socket hang up|other side closed/i.test(said) ? CUT_BY_RESTART : said }, { code: m.error.code, data: m.error.data });
+    }
+  }
+
+  /** Whether an answer no call of this server waits for is the one to the open turn's prompt, sent before a restart. */
+  private answersOpenPrompt(id: string, m: Json): boolean {
+    const ended = !!m.result && typeof m.result === 'object' && 'stopReason' in m.result;
+    const want = this.caught?.prompt;
+    if (want) return id === want && (ended || !!m.error);
+    // A transcript from before prompts noted their call: a turn's end from any call, or an error to an earlier server's call.
+    return ended || (!!m.error && !this.rpc.owns(id));
   }
 
   /**
@@ -620,7 +644,8 @@ export class AcpLive extends LiveAdapter {
       this.record({ t: 'prompt', id, text, images: images.length || undefined });
       return;
     }
-    this.record({ t: 'prompt', id, text, images: images.length || undefined });
+    // With the id of the call that carries it, so its answer is known for the turn's end after a restart.
+    this.record({ t: 'prompt', id, text, images: images.length || undefined, rpc: this.rpc.nextId() });
     this.prompting = true;
     this.limitStopped = false;
     this.turn = { text: '', tools: 0 };

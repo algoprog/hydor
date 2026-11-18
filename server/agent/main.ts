@@ -19,7 +19,7 @@ import { chat, ContextOverflow, setPlanGateway, StreamCut, ToolsUnsupported, typ
 import { planClient } from './plan-client.ts';
 import { McpClient, mcpServers } from './mcp.ts';
 import { describeImages, fitImage, imagePart, keepImage, type Img } from './media.ts';
-import { parseCalls, StreamFilter, stripMarkup } from './parse.ts';
+import { cutAtCalls, parseCalls, StreamFilter, stripMarkup } from './parse.ts';
 import { parsePatch, shellPatch } from './patch.ts';
 import { alwaysLabel, decide, type Ask } from './permissions.ts';
 import { runningOf } from './procs.ts';
@@ -661,6 +661,13 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
     }
     s.usage = reply.usage ? { tokens: reply.usage.prompt + reply.usage.completion, at: s.messages.length + 1 } : undefined;
     account(s, m, reply.usage, sizes);
+    // A reply that writes its calls as text ends where they end: what a model writes after them (results it imagines,
+    // more calls on top of those) is neither run nor kept. Claude's replies are ended so as they stream (CallGate);
+    // this holds for every model that writes its calls (one that thinks in the text is left as it is).
+    if (!reply.calls.length && !/<think>/.test(reply.text)) {
+      const c = cutAtCalls(reply.text, true);
+      if (c.stop !== null) reply = { ...reply, text: reply.text.slice(0, c.stop).trimEnd(), finish: 'stop' };
+    }
     // Its tool calls: returned as such, or written in the text.
     let calls: Call[] = reply.calls.map((c) => ({ id: c.id, name: c.name, raw: c.arguments }));
     let inText = false;

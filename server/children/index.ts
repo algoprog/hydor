@@ -10,8 +10,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { MAX_RUNNING_DEFAULT, MAX_RUNNING_LIMIT, SWARM_SIZE_DEFAULT, SWARM_SIZE_LIMIT, type ChildNote, type ChildSettings } from '../../shared/children.ts';
 import { researchOf } from '../../shared/research.ts';
-import type { Agent, AgentModel, SessionSummary } from '../../shared/types.ts';
-import { acpAgents, CONSOLE_ID } from '../agents/acp.ts';
+import { isSubscription, type Agent, type AgentModel, type SessionSummary } from '../../shared/types.ts';
+import { acpAgents, CONSOLE_ID, CUT_BY_RESTART } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { capReached, childShare, spending } from '../budget/index.ts';
 import { confidentialKey, confidentialRun, privateHelper } from '../confidential/index.ts';
@@ -107,12 +107,24 @@ export function findModel(models: AgentModel[], q: string): AgentModel | undefin
 
 const modelList = (models: AgentModel[]) => models.map((m) => `${m.id} (${m.label})`).join(', ');
 
+/**
+ * The Custom model a child asked for by model alone (no agent named) is, when that makes it a Custom session: by its
+ * exact id, or by a name no program of its parent's own serves. Custom's models of your plans carry Claude Code's and
+ * Codex's own plain names (opus, sonnet, a Codex model's): a Claude Code or Codex parent's subagent asked for one, as
+ * its tier asks (Standard is sonnet for Claude Code), stays with its parent's program, with that program's own tools.
+ */
+function customModelFor(models: AgentModel[], model: string, parent: Agent): AgentModel | undefined {
+  const m = model ? findModel(models, model) : undefined;
+  if (!m || m.id.toLowerCase() === model.trim().toLowerCase()) return m;
+  return isSubscription(m.provider) && m.provider === parent ? undefined : m;
+}
+
 /** The agent and model a child runs with, from the tool's arguments; the same agent as the parent by default. */
 export function pickAgent(d: Deps, ctx: Pick<RunCtx, 'agent' | 'acpAgent' | 'key'>, agentArg: unknown, modelArg: unknown): Target {
   const models = customModels();
   const model = String(modelArg ?? '').trim();
   let want = String(agentArg ?? '').trim().toLowerCase();
-  if (!want) want = model && findModel(models, model) ? 'custom' : ctx.agent === 'acp' ? (ctx.acpAgent === CONSOLE_ID ? 'custom' : (ctx.acpAgent ?? 'custom')) : ctx.agent;
+  if (!want) want = customModelFor(models, model, ctx.agent) ? 'custom' : ctx.agent === 'acp' ? (ctx.acpAgent === CONSOLE_ID ? 'custom' : (ctx.acpAgent ?? 'custom')) : ctx.agent;
   if (want === 'custom' || want === CONSOLE_ID) {
     if (!models.length) throw new Error('Custom has no models yet: the user adds them in Settings → Models.');
     // A Custom parent's own model by default; from another agent, the model has to be named.
@@ -132,7 +144,7 @@ export function pickAgent(d: Deps, ctx: Pick<RunCtx, 'agent' | 'acpAgent' | 'key
 /** The program a child will run (for its tier's model), as pickAgent would choose it from the same arguments. */
 function programOf(ctx: Pick<RunCtx, 'agent' | 'acpAgent'>, agentArg: string, modelArg: string, models: AgentModel[]): { agent: Agent; acpAgent?: string } {
   let want = agentArg.trim().toLowerCase();
-  if (!want) want = modelArg && findModel(models, modelArg) ? 'custom' : ctx.agent === 'acp' ? (ctx.acpAgent === CONSOLE_ID ? 'custom' : (ctx.acpAgent ?? 'custom')) : ctx.agent;
+  if (!want) want = customModelFor(models, modelArg, ctx.agent) ? 'custom' : ctx.agent === 'acp' ? (ctx.acpAgent === CONSOLE_ID ? 'custom' : (ctx.acpAgent ?? 'custom')) : ctx.agent;
   if (want === 'custom' || want === CONSOLE_ID) return { agent: 'acp', acpAgent: CONSOLE_ID };
   if (want === 'claude' || want === 'claude code' || want === 'claude-code') return { agent: 'claude' };
   if (want === 'codex') return { agent: 'codex' };
@@ -329,17 +341,22 @@ async function startChild(
   const asked = isTier(a.tier) ? clampTier(a.tier, ceiling) : unasked;
   let tier: Tier | undefined = o.tierOverride ?? (named ? named.tier : modelArg ? undefined : asked);
   let tierEffort: string | undefined;
+  /** The program the tier's model was picked for, which the child then runs. */
+  let tierProgram = '';
   if (tier && !modelArg) {
     const prog = programOf(ctx, agentArg, modelArg, models);
     const pick = tierPick(d.db, tier, prog.agent, prog.acpAgent);
     // Custom's tier names one of its models; one that is gone is passed over.
-    if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) modelArg = pick.model;
+    if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) {
+      modelArg = pick.model;
+      tierProgram = prog.agent === 'acp' ? (prog.acpAgent === CONSOLE_ID ? 'custom' : (prog.acpAgent ?? 'custom')) : prog.agent;
+    }
     tierEffort = pick?.effort;
     // A tier that says nothing for the child's program (Custom before its tiers are set, another ACP agent) is no tier:
     // the child runs as it would have, with no tier to its name and none to step up to.
     if (!pick?.model && !pick?.effort && !o.tierOverride) tier = undefined;
   }
-  const target = pickAgent(d, ctx, agentArg, modelArg);
+  const target = pickAgent(d, ctx, agentArg || tierProgram, modelArg);
   const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
   // A campaign's members each change their part on a branch of their own.
   const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
@@ -714,6 +731,8 @@ async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Pro
   if (!x || !isTier(x.tier)) return null;
   // A turn its plan's usage limit stopped is no failure of the tier: another account takes it over, or it waits for the reset.
   if (d.sessions.stoppedAtLimit?.(key, startedAt) || LIMIT.test(turn.error ?? '')) return null;
+  // Nor is a turn a restart of the app cut short.
+  if ((turn.error ?? '').startsWith(CUT_BY_RESTART)) return null;
   const next = nextTier(x.tier);
   // By itself a subagent goes no higher than Best: Max is for its lead to ask for.
   if (!next || tierRank(next) > tierRank(lowerTier(x.max, 'best')!)) return null;

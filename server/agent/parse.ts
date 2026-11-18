@@ -246,9 +246,172 @@ export function stripMarkup(text: string): string {
     .trim();
 }
 
+// ---- where a reply that writes its calls as text ends ----------------------------------------------------
+//
+// A model that writes its tool calls as text (Claude's through Claude Code, which has no stop sequence to end the
+// reply there) may go on writing after them: the results it imagines (<tool_response> blocks, as the transcript shows
+// them), more calls on top of those, or more calls while it waits for an answer that cannot come in the same reply.
+// Seen 2026-11-18: a Custom subagent on Claude Opus wrote 100 calls with made-up results in one reply, and the app ran
+// them all, Slurm submissions and a commit among them. So such a reply ends where its calls end.
+
+/** Calls a reply may write in a row: more is a model waiting for results, not working. */
+export const MAX_TEXT_CALLS = 6;
+
+/** Where a call written as text opens, and what closes it. A group (<function_calls>) holds a step's calls and ends the reply. */
+const CALL_OPENERS: { re: RegExp; close: string; group?: boolean }[] = [
+  { re: /<tool_call>/g, close: '</tool_call>' },
+  { re: /<function_calls>/g, close: '</function_calls>', group: true },
+  { re: /<function_call>/g, close: '</function_call>' },
+  { re: /<invoke\s+name=["'][^"'<>]*["']\s*>/g, close: '</invoke>' },
+];
+/** What only the app or the transcript writes, at the start of a line: the reply is over before it. */
+const NOT_THE_MODELS = /(^|\n)[ \t]*(<(?:tool_response|tool_result|tool_output|function_results?|user)(?=[\s>/])|<\/assistant>)/g;
+/** Tags a piece of text at the end may still be the start of: it waits for the next piece. */
+const TAG_STARTS = ['<tool_call>', '<function_calls>', '<function_call>', '<invoke name=', '<tool_response', '<tool_result', '<tool_output', '<function_result', '<user>', '</assistant>'];
+
+export interface CallCut {
+  /** Where the reply ends (the text from here on goes), or null while it may go on. */
+  stop: number | null;
+  /** How much of the text is settled: kept whatever comes next. */
+  safe: number;
+}
+
+/** Fenced code blocks (``` or ~~~ lines) before `at`: an odd count means `at` is inside one. */
+const inFence = (text: string, at: number) => (text.slice(0, at).match(/(^|\n)[ \t]*(```|~~~)/g)?.length ?? 0) % 2 === 1;
+
+/**
+ * Where a reply that writes its calls as text ends, and how much of it is settled, from the text so far (`done`: all of
+ * it). It ends before anything only the app writes (a <tool_response> block, the transcript's <user> tag) at the start
+ * of a line outside a code fence; after its calls, at the first thing that is not another call (a group's closing
+ * </function_calls> ends it at once); before a call it already wrote; and after MAX_TEXT_CALLS calls. What a call holds
+ * (a file it writes, say) is never read for these, and a call still open when the reply ends is kept. A reply with
+ * <think> blocks in its text is the caller's to strip first.
+ */
+export function cutAtCalls(text: string, done: boolean): CallCut {
+  let at = 0;
+  /** The end of the last whole call, once there is one. */
+  let last = -1;
+  let calls = 0;
+  const seen = new Set<string>();
+  /** The first thing only the app writes, at or after `from`, outside a fence: the start of its line. */
+  const foreign = (from: number) => {
+    NOT_THE_MODELS.lastIndex = from;
+    for (let m = NOT_THE_MODELS.exec(text); m; m = NOT_THE_MODELS.exec(text)) {
+      const tag = m.index + m[0].length - m[2].length;
+      if (!inFence(text, tag)) return text.lastIndexOf('\n', tag) + 1;
+    }
+    return -1;
+  };
+  const opener = (from: number) => {
+    let best: { start: number; end: number; o: (typeof CALL_OPENERS)[number] } | null = null;
+    for (const o of CALL_OPENERS) {
+      o.re.lastIndex = from;
+      const m = o.re.exec(text);
+      if (m && (!best || m.index < best.start)) best = { start: m.index, end: m.index + m[0].length, o };
+    }
+    return best;
+  };
+  /** Text at the end that may still become a tag: where it starts (its line's start, when only space comes before it). */
+  const pending = (from: number) => {
+    if (done) return -1;
+    const lt = text.lastIndexOf('<');
+    if (lt < from) return -1;
+    const tail = text.slice(lt);
+    if (tail.includes('>') && !tail.startsWith('<invoke name=')) return -1;
+    if (!TAG_STARTS.some((s) => s.startsWith(tail) || tail.startsWith(s))) return -1;
+    const line = text.lastIndexOf('\n', lt) + 1;
+    return text.slice(Math.max(line, from), lt).trim() ? lt : Math.max(line, from);
+  };
+  for (;;) {
+    const next = opener(at);
+    if (last >= 0) {
+      // After a call: only room between calls, then another call.
+      const gap = text.slice(last, next ? next.start : text.length);
+      if (gap.trim()) {
+        // Unless all there is after them is what may still become another call's opening tag.
+        const wait = next ? -1 : pending(last);
+        return wait >= 0 && !text.slice(last, wait).trim() ? { stop: null, safe: last } : { stop: last, safe: last };
+      }
+      if (!next) return { stop: null, safe: done ? text.length : last };
+    } else {
+      const bad = foreign(at);
+      if (bad >= 0 && (!next || bad < next.start)) return { stop: bad, safe: bad };
+      if (!next) {
+        const wait = pending(at);
+        return { stop: null, safe: wait >= 0 ? wait : text.length };
+      }
+    }
+    const close = text.indexOf(next.o.close, next.end);
+    if (close < 0) return { stop: null, safe: last >= 0 ? last : next.start };
+    const end = close + next.o.close.length;
+    // The calls in it: a group's invokes one by one, or the block itself.
+    const bodies = next.o.group ? [...text.slice(next.end, close).matchAll(/<invoke\s+name=["'][^"'<>]*["']\s*>[\s\S]*?(<\/invoke>|$)/g)].map((m) => m[0]) : [text.slice(next.start, end)];
+    const before = last >= 0 ? last : next.start;
+    for (const b of bodies) {
+      const sig = b.replace(/\s+/g, ' ').trim();
+      // The same call again: the model is waiting for the first one's result.
+      if (seen.has(sig)) return { stop: before, safe: before };
+      seen.add(sig);
+    }
+    calls += Math.max(1, bodies.length);
+    last = end;
+    if (next.o.group || calls >= MAX_TEXT_CALLS) return { stop: end, safe: end };
+    at = end;
+  }
+}
+
+/**
+ * Lets the text of a reply that writes its calls as text through only as far as it is settled, and says when the reply
+ * is over (its calls written and something else begun): the text after that is never shown, and the caller stops the
+ * model. end() lets the rest through once the model has finished, and gives the reply as kept.
+ */
+export class CallGate {
+  private text = '';
+  private sent = 0;
+  private cut: number | null = null;
+
+  constructor(private emit: (t: string) => void) {}
+
+  /** Takes a piece of the reply; true once the reply is over (later pieces are dropped). */
+  push(t: string): boolean {
+    if (this.cut === null) {
+      this.text += t;
+      this.settle(cutAtCalls(this.text, false));
+    }
+    return this.cut !== null;
+  }
+
+  private settle(c: CallCut) {
+    const upTo = c.stop ?? c.safe;
+    if (upTo > this.sent) {
+      this.emit(this.text.slice(this.sent, upTo));
+      this.sent = upTo;
+    }
+    if (c.stop !== null) this.cut = c.stop;
+  }
+
+  /** The reply was cut where its calls end. */
+  get stopped(): boolean {
+    return this.cut !== null;
+  }
+
+  /** Lets the rest through, and gives the reply as kept. */
+  end(): string {
+    if (this.cut === null) this.settle(cutAtCalls(this.text, true));
+    const keep = this.cut ?? this.text.length;
+    if (keep > this.sent) {
+      this.emit(this.text.slice(this.sent, keep));
+      this.sent = keep;
+    }
+    return this.text.slice(0, keep).trimEnd();
+  }
+}
+
 const OPEN: [string, string, 'think' | 'call'][] = [
   ['<think>', '</think>', 'think'],
   ['<tool_call>', '</tool_call>', 'call'],
+  // Claude's own form, written without its <function_calls> group.
+  ['<invoke name=', '</invoke>', 'call'],
   ['<|tool_call_start|>', '<|tool_call_end|>', 'call'],
   ['<｜tool▁calls▁begin｜>', '<｜tool▁calls▁end｜>', 'call'],
   ['<|tool_calls_section_begin|>', '<|tool_calls_section_end|>', 'call'],

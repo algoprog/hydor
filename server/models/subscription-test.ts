@@ -35,6 +35,17 @@ process.stdin.on('end', () => {
   if (mode === 'limit') return out({ type: 'result', subtype: 'success', is_error: true, result: "You've hit your weekly limit · resets 5am (UTC)" });
   if (mode === 'out') return out({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login' });
   if (mode === 'long') return out({ type: 'result', subtype: 'success', is_error: true, result: 'Prompt is too long' });
+  if (mode === 'fabricate') {
+    // A reply that writes a call, then the result it imagines, then another call, and waits as if for it.
+    const delta = (text) => out({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } } });
+    out({ type: 'stream_event', event: { type: 'message_start', message: { usage: { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 100, output_tokens: 1 } } } });
+    delta('Checking.\\n');
+    delta('<tool_call>\\n{"name": "bash", ');
+    delta('"arguments": {"command": "ls"}}\\n</tool_call>');
+    delta('\\n<tool_response>\\nmade up\\n</tool_response>\\n');
+    delta('<tool_call>\\n{"name": "bash", "arguments": {"command": "pwd"}}\\n</tool_call>');
+    return setTimeout(() => out({ type: 'result', subtype: 'success', is_error: false, result: 'never read', usage: { input_tokens: 1, output_tokens: 1 } }), 8000);
+  }
   const said = JSON.stringify({ model: args[args.indexOf('--model') + 1], tools: args[args.indexOf('--tools') + 1], sys, blocks: msg.message.content.map((x) => x.type) });
   out({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hmm' } } });
   for (const piece of ['<assi', 'stant>', said.slice(0, 10), said.slice(10), '</assistant>'])
@@ -192,6 +203,29 @@ test('Claude answers through Claude Code: no tools of its own, the instructions 
   assert.deepEqual(r.usage, { prompt: 115, completion: 7, cached: 100 });
   assert.equal(r.calls.length, 0);
   assert.ok(!fs.readdirSync(os.tmpdir()).some((f) => f.startsWith('hydor-plan-')), 'the instructions’ file is removed');
+});
+
+test('a reply that writes a call and then a result of its own is ended at the call, and Claude Code is stopped at once', async () => {
+  const { models } = await planModels();
+  let shown = '';
+  process.env.FIRST_CLAUDE = 'fabricate';
+  const started = Date.now();
+  let r;
+  try {
+    r = await planChat(models[0], { messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'Hi' }], signal: new AbortController().signal, onText: (t) => (shown += t), onReasoning: () => {} });
+  } finally {
+    delete process.env.FIRST_CLAUDE;
+  }
+  assert.ok(Date.now() - started < 4000, 'the program was stopped, not waited for (it would have gone on for 8 seconds)');
+  assert.ok(r.text.endsWith('</tool_call>'), r.text);
+  assert.equal(r.text.match(/<tool_call>/g)?.length, 1, 'one call');
+  assert.equal(r.text, 'Checking.\n<tool_call>\n{"name": "bash", "arguments": {"command": "ls"}}\n</tool_call>');
+  assert.ok(!shown.includes('made up') && !shown.includes('tool_response') && !shown.includes('pwd'), `nothing after the call was shown: ${JSON.stringify(shown)}`);
+  assert.equal(shown, r.text, 'what was shown is the reply');
+  assert.equal(r.finish, 'stop');
+  assert.equal(r.usage?.prompt, 115, 'what it was given comes from the start of the stream');
+  assert.equal(r.usage?.cached, 100);
+  assert.ok((r.usage?.completion ?? 0) > 0);
 });
 
 test('an account at its limit hands the step to the next; one signed out is passed over afterwards', async () => {
