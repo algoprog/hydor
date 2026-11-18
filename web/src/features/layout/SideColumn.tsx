@@ -33,7 +33,7 @@ export function useNavWidth() {
 export function SideColumn({ label, actions, tour, tip, children }: { label: string; actions?: ReactNode; tour?: string; tip?: string; children: ReactNode }) {
   const sideOpen = useUI((s) => s.sideOpen);
   const connected = useApp((s) => s.connected);
-  const { width, max, set } = useNavWidth();
+  const { width } = useNavWidth();
   // Hiding and showing it slides it (Motion: Full): the column keeps its width inside and its box eases to it or to
   // nothing, clipping it only while it moves (so its resize handle keeps its grip, and dragging it is never eased).
   const [shown, setShown] = useState(sideOpen);
@@ -83,14 +83,26 @@ export function SideColumn({ label, actions, tour, tip, children }: { label: str
         </div>
         {children}
       </aside>
-      <div
-        role="separator" aria-label="Resize navigation" aria-orientation="vertical" aria-valuemin={180} aria-valuemax={max} aria-valuenow={width} tabIndex={0}
-        className="absolute top-0 right-0 z-20 h-full w-2 translate-x-1/2 cursor-col-resize touch-none hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none"
-        onPointerDown={(e) => { if (e.button === 0) { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); } }}
-        onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX - RAIL_WIDTH); }}
-        onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
-        onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); set(width + (e.key === 'ArrowLeft' ? -10 : 10)); } }}
-      />
+      <ColumnResizer />
     </div>
+  );
+}
+
+/**
+ * The edge of a column, dragged (or moved with the arrow keys) to change the width every column shares. Put it in the
+ * column, which is placed beside the rail. `inside`: within the column's edge only, where a native page beside it (the
+ * Browser's) would cover the half of it outside.
+ */
+export function ColumnResizer({ inside }: { inside?: boolean }) {
+  const { width, max, set } = useNavWidth();
+  return (
+    <div
+      role="separator" aria-label="Resize navigation" aria-orientation="vertical" aria-valuemin={180} aria-valuemax={max} aria-valuenow={width} tabIndex={0}
+      className={cx('absolute top-0 right-0 z-20 h-full cursor-col-resize touch-none hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none', inside ? 'w-1' : 'w-2 translate-x-1/2')}
+      onPointerDown={(e) => { if (e.button === 0) { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); } }}
+      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX - RAIL_WIDTH); }}
+      onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+      onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); set(width + (e.key === 'ArrowLeft' ? -10 : 10)); } }}
+    />
   );
 }

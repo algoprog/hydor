@@ -317,7 +317,7 @@ Auf der Seite Browser, auch aus einer Seite heraus, mit Strg unter Windows und L
 - **Strg+F** öffnet die Suche auf der Seite, und **Esc** schließt sie.
 - **Strg+D** setzt ein Lesezeichen für die Seite.
 - **Strg+H** öffnet den Verlauf und **Strg+J** die Downloads.
-- **Strg+B** klappt die Tab-Spalte weg und holt sie zurück.
+- **Strg+B** klappt die Tab-Spalte weg und holt sie zurück. Zieh an ihrem Rand, um sie breiter oder schmaler zu machen: Sie hat die Breite, die alle Spalten der App teilen.
 - **Strg+P** druckt die Seite.
 - **Strg+Umschalt+Entf** öffnet die Einstellungen bei **Browserdaten löschen**.
 - **Strg** mit **+**, **−** und **0** vergrößert, verkleinert und geht zurück auf 100 % (siehe [Zoom, Drucken und Vollbild](/guide/web#zoom-print-and-full-screen)).

@@ -44,6 +44,7 @@ import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Sheet, 
 import { live as socket } from '../../lib/ws';
 import { useAskRun } from '../guide/ask';
 import { NavButton } from '../layout/PageHeader';
+import { useNavWidth } from '../layout/SideColumn';
 import { AgentBody, AgentDialog, useAgentsRefresh } from './AgentTabs';
 import { AgentBar, AgentBox, AgentConversation } from './AgentView';
 import { askAboutTab, BrowserAskPanel, pickForAsk } from './BrowserAsk';
@@ -184,8 +185,10 @@ export function BrowserPage() {
 
 /** The tab column's top bar part: the app's logo, a new tab, and the fold of the column (Ctrl+B). */
 function BarLead({ open }: { open: boolean }) {
+  // Over the tab column, as wide as it (every column's width).
+  const { width } = useNavWidth();
   return (
-    <div className={cx('flex h-full shrink-0 items-center gap-0.5 border-r border-line pr-2', open ? 'w-[260px] pl-3.5' : 'pl-2')}>
+    <div className={cx('flex h-full shrink-0 items-center gap-0.5 border-r border-line pr-2', open ? 'pl-3.5' : 'pl-2')} style={open ? { width } : undefined}>
       {open && (
         <>
           {/* The rail names the section: the column shows the app's logo, as every column does. */}

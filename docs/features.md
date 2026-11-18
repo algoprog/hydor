@@ -244,7 +244,8 @@ agents that speak ACP and take MCP servers.
   - **The tab column**: the sites on your bookmarks bar pinned as tiles (five to a row, two rows, a **…** tile for the
     rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
     open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ×, a speaker to mute,
-    middle click to close, **New tab**); a title too long fades at its end and rolls to show the rest under the pointer.
+    middle click to close, **New tab**), resized by its edge like every column; a title too long fades at its end and rolls to
+    show the rest under the pointer.
   - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
     agent's conversation while you watch its tab; or **History**, **Downloads**, **Bookmarks**, **Extensions**, **Site

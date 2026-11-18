@@ -14,6 +14,7 @@ import { closeTab, newTab, switchTab, tabName, useAgentBrowsers, type AgentBrows
 import { Favicon, Speaker } from './TabStrip';
 import { useRowPhases } from '../../lib/flip';
 import { ColumnScroll } from '../layout/ColumnScroll';
+import { ColumnResizer, useNavWidth } from '../layout/SideColumn';
 
 /** A section's label with a chevron that folds it. */
 function Label({ children, open, onToggle, hint }: { children: string; open: boolean; onToggle: () => void; hint?: string }) {
@@ -81,13 +82,15 @@ function TabRow({ t, on, watching, onLeave, ghost }: { t: BrowserView['tabs'][nu
 }
 
 export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserView; watching: string | null; onWatch: (key: string) => void; onLeave: () => void }) {
+  // As wide as every other column, and resized the same way.
+  const { width } = useNavWidth();
   const browsers = useAgentBrowsers((s) => s.browsers);
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [tabsOpen, setTabsOpen] = useState(true);
   // A new tab opens its row and a closed one closes up, the rest following.
   const rows = useRowPhases(view.tabs);
   return (
-    <nav aria-label="Browser tabs" className="flex h-full w-[260px] shrink-0 flex-col border-r border-line bg-sidebar">
+    <nav aria-label="Browser tabs" className="relative flex h-full shrink-0 flex-col border-r border-line bg-sidebar" style={{ width }}>
       <ColumnScroll className="flex flex-col pb-3">
         <PinnedTiles />
         {browsers.length > 0 && (
@@ -123,6 +126,7 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
           )}
         </div>
       </ColumnScroll>
+      <ColumnResizer inside />
     </nav>
   );
 }

@@ -317,7 +317,7 @@ On the Browser page, from inside a page too, with Ctrl on Windows and Linux and 
 - **Ctrl+F** opens find in page, and **Esc** closes it.
 - **Ctrl+D** bookmarks the page.
 - **Ctrl+H** opens the history, and **Ctrl+J** the downloads.
-- **Ctrl+B** folds the tab column away, and brings it back.
+- **Ctrl+B** folds the tab column away, and brings it back. Drag its edge to make it wider or narrower: it keeps the width every column in the app shares.
 - **Ctrl+P** prints the page.
 - **Ctrl+Shift+Delete** opens the settings at **Clear browsing data**.
 - **Ctrl** with **+**, **−** and **0** zoom in, zoom out and go back to 100 % (see [Zoom, print and full screen](/guide/web#zoom-print-and-full-screen)).
