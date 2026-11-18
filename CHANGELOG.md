@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.85.1 · 18 November 2026
+
+Highlights work on the pages where they said "Select some words on the page first", the browser's right-click menu
+looks like the rest of the app, and PowerPoint files show as their slides.
+
+- **Highlights on more pages**: **Highlight** now finds the words you selected on sites that build their pages in ways
+  the first version missed, such as MDN, the BBC and Reddit, and words inside a page's own components. Words in a frame
+  inside a page (another page shown in it) cannot be highlighted, so the menu no longer offers it there.
+- **The right-click menu in the app's own look**: in the desktop app, a right click on a page opens a menu like the
+  app's other menus, with icons and in the language the app is in; **Esc** or a click outside closes it.
+- **PowerPoint files as their slides**: a .pptx opened from a reply or in Files now shows each slide as it looks, with
+  its pictures, shapes, tables, charts and background in place and its speaker notes under it, instead of only its
+  words. **Text** still shows the words, and **Pages** the LibreOffice layout where it is installed.
+- **Slides with too many words for their box**: where a deck uses a font this computer lacks, a box's words are made a
+  little smaller to fit instead of being cut off; and in every deck, the lines of a box that is too full no longer run
+  into each other.
+
 ## 0.85.0 · 18 November 2026
 
 Your own browser becomes a place to collect and organise what you read: highlight it, keep clean reader copies with
