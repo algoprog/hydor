@@ -18,6 +18,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Neues Design**](/settings?s=general&find=New%20theme): Aus jeder davon ein eigenes Design erstellen.
 - [**Importieren**](/settings?s=general&find=Import): Geteiltes Design hinzufügen.
 - [**Sprache**](/settings?s=general&find=Language): Die Sprache der App und der Agenten.
+- [**Bewegung**](/settings?s=general&find=Motion): Wie viel sich in der App bewegt: voll, ruhig (beim Öffnen einer Seite gleitet oder blendet nichts) oder gar nicht.
 - [**Senden, während ein Agent arbeitet**](/settings?s=general&find=Sending%20while%20an%20agent%20works): Enter sendet in den laufenden Durchgang oder reiht die Nachricht bis zu dessen Ende ein.
 - [**Terminalvorschläge**](/settings?s=general&find=Terminal%20suggestions): Graue Vervollständigungen nach dem Cursor in Terminals.
 - [**Nach dem Zurücksetzen von Nutzungslimits fortsetzen**](/settings?s=general&find=Resume%20after%20usage%20limits): Setzt eine Sitzung eine Minute nach dem Zurücksetzen des Limits eines Plans fort.

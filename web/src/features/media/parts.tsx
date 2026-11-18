@@ -6,6 +6,7 @@ import { ImageIcon, Play } from 'lucide-react';
 import { clipLength, type MediaItem } from '@shared/media';
 import { enc, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
+import { useArrival } from '../../lib/motion';
 import { startSessionWith } from '../../lib/startFiles';
 import { toastError } from '../../lib/store';
 import { cx } from '../../components/ui';
@@ -16,13 +17,15 @@ import { mediaUrl, withDownload } from './state';
 /** A still of an item: the picture itself (or its smaller copy), a video's still, a sound's shape. */
 export function Still({ m, className }: { m: MediaItem; className?: string }) {
   const [failed, setFailed] = useState(false);
+  const src = mu(mediaUrl(m, 'still'));
+  const arrival = useArrival(src);
   if (m.kind === 'audio') return <SoundFace m={m} progress={0} className={className} />;
   return (
-    <div className={cx('relative overflow-hidden bg-bg-2', className)}>
+    <div className={cx('relative overflow-hidden bg-bg-2', !failed && arrival.plate, className)}>
       {failed ? (
         <span className="absolute inset-0 flex items-center justify-center text-fg-3">{m.kind === 'video' ? <Play size={22} /> : <ImageIcon size={22} />}</span>
       ) : (
-        <img src={mu(mediaUrl(m, 'still'))} alt="" loading="lazy" draggable={false} onError={() => setFailed(true)} className="absolute inset-0 h-full w-full object-cover" />
+        <img ref={arrival.ref} src={src} alt="" loading="lazy" draggable={false} onLoad={arrival.onLoad} onError={() => setFailed(true)} className={cx('absolute inset-0 h-full w-full object-cover', arrival.className)} />
       )}
       {m.kind === 'video' && (
         <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">

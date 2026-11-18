@@ -1,6 +1,6 @@
 # Darstellung, Sprache und Updates
 
-Hier stellst du ein, wie Hydor aussieht und sich verhält: Hell- oder Dunkelmodus, eingebaute und eigene Designs, Sprache, Nachrichten während der Agentenarbeit, Autostart, Ruhezustand, Updates und Versionshinweise. Außerdem erfährst du, wie du dein Passwort änderst, dich abmeldest und wo die App Daten speichert.
+Hier stellst du ein, wie Hydor aussieht und sich verhält: Hell- oder Dunkelmodus, eingebaute und eigene Designs, Sprache, wie viel sich in der App bewegt, Nachrichten während der Agentenarbeit, Autostart, Ruhezustand, Updates und Versionshinweise. Außerdem erfährst du, wie du dein Passwort änderst, dich abmeldest und wo die App Daten speichert.
 
 ![Einstellungen → Allgemein: die Designs](images/app.webp)
 
@@ -84,6 +84,16 @@ Wenn du eine Sprache auswählst, wird die Seite in dieser Sprache neu geladen. D
 Übersetzt werden App-Texte sowie Datums- und Zeitformate. Von dir oder Agenten geschriebene Inhalte bleiben unverändert: Unterhaltungen, Memory-Notizen, eigene Namen und Beschreibungen, Dateien, Code und Terminals.
 
 Agenten werden gebeten, in deiner gewählten Sprache zu antworten, sofern du keine andere Sprache verwendest oder verlangst. Code, Befehle und Dateinamen bleiben unverändert. Der Hinweis erreicht Agenten beim Start oder Fortsetzen. Auch mobile Benachrichtigungen folgen der Sprache. Da die App bei jedem Öffnen die Sprache meldet, gilt bei verschieden eingestellten Geräten die zuletzt geöffnete Sprache für Agenten und Benachrichtigungen.
+
+## Festlegen, wie viel sich bewegt
+
+Unter [Einstellungen → App → Allgemein → Darstellung → Bewegung](/settings?s=general&find=Motion) legst du fest, wie viel sich in der App auf diesem Gerät bewegt:
+
+- **Voll** (zu Beginn): alles. Eine Schaltfläche gibt beim Drücken ein wenig nach und federt zurück, ein Symbol der Leiste neigt sich dem Mauszeiger zu, ein Kopieren wird zu einem Haken, der sich selbst zeichnet, ein Schalter federt, der Balken der Leiste gleitet zur geöffneten Seite, der Punkt einer Sitzung ändert sich mit ihrem Status (ein Ring breitet sich aus, wenn die Arbeit fertig ist, zwei Impulse, wenn sie dich braucht), Listen gleiten an ihre neuen Plätze und schließen sich, wo etwas verschwunden ist, Zahlen zählen zu ihren neuen Werten, das Posteingang-Abzeichen poppt auf, das Wasser im Logo steigt einmal, wenn eine Sitzung fertig ist, Bilder schimmern, bis sie da sind, und ein beendeter Schritt zeichnet seinen Haken. Vier weitere Dinge bewegen sich, wenn du etwas öffnest: die Spalte neben einer Seite (die rechte Spalte des Browsers, das Fenster **Agenten fragen** der Dateiseite) gleitet ein und aus, Seiten blenden ineinander über, wenn du von einer zur anderen wechselst (nicht zum oder vom Browser), und helles und dunkles Aussehen blenden beim Wechsel des Designs ineinander über.
+- **Ruhig**: alles bis auf die letzten vier. Beim Öffnen einer Seite gleitet oder blendet nichts.
+- **Aus**: nichts davon. Nur laufende Arbeit bleibt in Bewegung: das Wasser im Ω, solange etwas lädt, und die Punkte arbeitender Sitzungen.
+
+Jede Bewegung dauert etwa eine Zehntel- bis eine Viertelsekunde, hält nie auf, was du öffnest, und wiederholt sich nie, außer bei laufender Arbeit. Die Einstellung **Bewegung reduzieren** deines Geräts hat immer Vorrang: Ist sie aktiv, verhält sich die App, als wäre **Aus** gewählt, was auch hier steht. Die Wahl gilt für diesen Browser. Auf dem Handy laufen die Gleit- und Überblendeffekte nicht.
 
 ## Enter während der Agentenarbeit festlegen
 
@@ -251,6 +261,7 @@ Einige Einstellungen gelten pro Browser und können sich je Gerät unterscheiden
 
 - Hell-, Dunkel- oder Systemmodus und die jeweiligen Designs;
 - Sprache;
+- wie viel sich bewegt (**Bewegung**);
 - Enter-Verhalten während der Agentenarbeit;
 - Terminalvorschläge, der Benachrichtigungston und ob dieses Gerät Benachrichtigungen bekommt;
 - aktueller Ordner, offene und zuletzt verwendete Dateien sowie Listen- oder Kachelansicht und Sortierung. Angeheftete Ordner liegen serverseitig und sind überall gleich;
@@ -270,3 +281,4 @@ Der Rest wird von der App gespeichert und ist auf jedem Gerät gleich: Designs, 
 - „Halte den Computer nur während der Agentenarbeit wach, nicht vor geplanten Aufgaben.“
 - „Aktiviere die automatische Fortsetzung nach Nutzungslimits.“
 - „Schalte die Tipps wieder ein und zeige mir alle noch einmal von Anfang an.“
+- „Stell die Bewegung auf Ruhig.“ oder „Schalte die Animationen auf diesem Gerät aus.“

@@ -24263,5 +24263,11 @@
   "Your main {0} account is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts).": "Dein {0}-Hauptkonto ist abgemeldet, und kein anderes Konto und kein Custom-Modell konnte das übernehmen: Melde dich erneut an (Einstellungen → Agenten → Konten).",
   "Show in Finder": "Im Finder anzeigen",
   "Show in File Explorer": "Im Datei-Explorer anzeigen",
-  "This is not on this computer, or it is no longer there": "Das liegt nicht auf diesem Computer oder ist nicht mehr vorhanden."
+  "This is not on this computer, or it is no longer there": "Das liegt nicht auf diesem Computer oder ist nicht mehr vorhanden.",
+  "Calm": "Ruhig",
+  "Motion": "Bewegung",
+  "motion::Full": "Voll",
+  "Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins": "Voll, Ruhig (beim Öffnen einer Seite gleitet oder blendet nichts) oder Aus. Die Einstellung „Bewegung reduzieren“ deines Geräts hat immer Vorrang",
+  "How much of the app moves: full, calm (nothing slides or fades as you open a page), or none": "Wie viel sich in der App bewegt: voll, ruhig (beim Öffnen einer Seite gleitet oder blendet nichts) oder gar nicht",
+  "animation animations reduce motion calm full off transitions movement fade slide": "animation animationen bewegung reduzieren ruhig voll aus übergänge überblenden gleiten"
 }

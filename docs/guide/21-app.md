@@ -1,6 +1,6 @@
 # Look, language and updates
 
-How the app looks and behaves for you, and how it keeps itself up to date: dark or light mode, the built-in themes and your own, the language, what Enter does while an agent works, starting with the computer, keeping it awake while agents work, updates and release notes. It also covers your password, signing out, and where the app keeps its data.
+How the app looks and behaves for you, and how it keeps itself up to date: dark or light mode, the built-in themes and your own, the language, how much of the app moves, what Enter does while an agent works, starting with the computer, keeping it awake while agents work, updates and release notes. It also covers your password, signing out, and where the app keeps its data.
 
 ![Settings → General: the themes](images/app.webp)
 
@@ -84,6 +84,16 @@ Picking one reloads the page in that language. The choice is kept in this browse
 Only the app's own words change, and dates and times are written the way that language writes them. What people and agents wrote stays as it was: conversations, memory notes, the names and descriptions you gave things, files, code and terminals.
 
 Agents write to you in the language you pick: they are asked to, unless you write to them in another language or ask for one, and code, commands and file names stay as they are. This reaches each agent when it starts or resumes. Notifications come in the language too, on your phone as well. The app tells agents its language each time it opens, so if your devices are set to different languages, agents and notifications follow the one opened last.
+
+## Choose how much moves
+
+[Settings → App → General → Appearance → Motion](/settings?s=general&find=Motion) decides how much of the app moves on this device:
+
+- **Full** (at first): all of it. A button dips a little while you press it and springs back, a rail icon leans toward the pointer, a copy turns into a check that draws itself, a switch springs, the rail's bar glides to the page you opened, a session's dot changes with its status (a ring spreads when work finishes, two pulses when it needs you), lists glide to their new places and close up where something went, numbers count to their new values, the Inbox badge pops, the logo's water rises once when a session finishes, pictures shimmer until they arrive, and a step that finishes draws its check. Four more things move as you open something: the column beside a page (the Browser's right column, the Files page's **Ask an agent** panel) slides in and out, pages cross-fade as you go from one to another (not to or from the Browser), and the light and dark looks blend as you switch themes.
+- **Calm**: all of that except the last four. Nothing slides or fades as you open a page.
+- **Off**: none of it. Only work in progress keeps moving: the water in the Ω while something loads, and the dots of sessions at work.
+
+Each motion lasts about a tenth to a quarter of a second, never holds back what you open, and never repeats except work in progress. Your device's **Reduce motion** setting always wins: with it on, the app acts as if **Off** were picked, whatever it says here. The choice is kept in this browser. On a phone the slides and cross-fades don't play.
 
 ## Decide what Enter does while an agent works
 
@@ -251,6 +261,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 
 - the mode (dark, light or system) and which dark and light theme show;
 - the language;
+- how much moves (**Motion**);
 - what Enter does while an agent works;
 - terminal suggestions, the notification sound, and whether this device gets notifications;
 - the Files page's folder, open files, recent files, and how folders show (a list or tiles, and their order); pinned folders are kept on the server, the same on every device;
@@ -270,3 +281,4 @@ The rest is kept by the app and is the same on every device: themes you made, **
 - "Keep my computer awake only while agents work, not before scheduled tasks."
 - "Turn on resuming sessions after usage limits."
 - "Turn the tips back on, and show them all again from the start."
+- "Set Motion to Calm." or "Turn off the animations on this device."

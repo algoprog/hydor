@@ -4,6 +4,7 @@ import './styles.css';
 import { App } from './App';
 import { startLanguage } from './i18n';
 import { startHoverScroll } from './lib/hoverScroll';
+import { startMotion } from './lib/motion';
 import { endBoot } from './lib/boot';
 import { watchInstall } from './lib/install';
 
@@ -21,6 +22,8 @@ const portal = /^(?:\/m\/[a-z0-9-]+)?\/p\/([^/]+)\/?$/.test(location.pathname);
 
 // Text cut short with an ellipsis scrolls while a mouse rests on it, so all of it can be read.
 startHoverScroll();
+// How much moves here, on <html> for the stylesheet.
+startMotion();
 // The browser's offer to install the app comes once, as the page loads: kept for Settings → App → Use on your phone.
 watchInstall();
 

@@ -8,6 +8,7 @@ import { CodeBlock } from '../../Markdown';
 import { playgroundDoc, type PlayLang } from '../playground-doc';
 import { cx } from '../../ui';
 import { arr, Ask, Btn, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useAsk, useAui, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { CopyMark } from '../../CopyMark';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -40,7 +41,7 @@ function MiniCopy({ text, title, icon: Icon = CopyIcon }: { text: string | (() =
       }}
       className="inline-grid h-5 w-5 place-items-center rounded text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
     >
-      {ok ? <Check size={12} className="text-ok" /> : <Icon size={12} />}
+      <CopyMark done={ok} size={12} icon={Icon} />
     </button>
   );
 }
@@ -2066,7 +2067,7 @@ function Playground({ data, done }: { data: Data; done: boolean }) {
             </Btn>
           )}
           <Btn
-            icon={copied ? <Check size={13} className="text-ok" /> : <CopyIcon size={13} />}
+            icon={<CopyMark done={copied} />}
             onClick={() => {
               void copyText(text);
               setCopied(true);

@@ -7,6 +7,7 @@ import { DESCRIPTION_WORDS, wordCount, type PageInfo, type SiteInfo, type SiteVi
 import { del, enc, patch, post } from '../../lib/api';
 import { ago, basename, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
+import { useArrival } from '../../lib/motion';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderPicker } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Segmented, Throbber, useConfirm } from '../../components/ui';
@@ -23,10 +24,12 @@ export function Thumb({ page, className }: { page: PageInfo; className?: string 
   const ready = usePagesStore((s) => s.thumbs[page.id]) ?? page.thumb;
   const [failed, setFailed] = useState<string | null>(null);
   const show = ready && failed !== ready;
+  const src = mu(`/api/pages/${enc(page.id)}/thumb?v=${enc(ready ?? '')}`);
+  const arrival = useArrival(src);
   return (
-    <div className={cx('relative overflow-hidden bg-gradient-to-br', toneOf(page.id), className)}>
+    <div className={cx('relative overflow-hidden bg-gradient-to-br', toneOf(page.id), show && arrival.plate, className)}>
       {show ? (
-        <img src={mu(`/api/pages/${enc(page.id)}/thumb?v=${enc(ready)}`)} alt="" loading="lazy" draggable={false} onError={() => setFailed(ready)} className="absolute inset-0 h-full w-full object-cover object-top" />
+        <img ref={arrival.ref} src={src} alt="" loading="lazy" draggable={false} onLoad={arrival.onLoad} onError={() => setFailed(ready)} className={cx('absolute inset-0 h-full w-full object-cover object-top', arrival.className)} />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center text-[34px] font-semibold opacity-80">{firstLetter(page.title)}</span>
       )}

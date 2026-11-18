@@ -1749,7 +1749,19 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The rail's tiles: New (a new session) and Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Library, Projects, Apps, Agents), and below, after some space, Inbox (with a count of what waits on you) and the tools (Search, Usage, System, Settings, Help). The current page's tile is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device; a phone has no rail, and its drawer holds them all in one grid (hold one a moment to pick it up). On a computer, right-click a tile for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; the Library and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
+- Small, quiet motion, set per device in Settings → General → Appearance → Motion (Full, Calm or Off; the system's
+  Reduce motion always means Off). Full: buttons, rail tiles, session rows and chips dip to 97% while pressed; rail icons
+  lean to the pointer; a copy turns into a check that draws itself, holds for a moment and turns back; switches spring;
+  the rail's accent bar glides to the page you open; a session's dot turns green with one ring when work finishes and
+  pulses twice amber when it needs you, its status words cross-fading; the session list's rows and the Browser's tab
+  rows glide to their new places, a closed tab's row closing up and a new one opening; the Inbox count, the start page's
+  numbers and usage percentages count to their new values, and the Inbox badge pops; the logo's water rises once when a
+  session finishes; Library pictures shimmer until they load, then fade in; a step in a turn's outline that finishes
+  draws its check. Four things bend the old rule that what you open shows at once, in Full only and never on a phone: the
+  Browser's right column and the Files page's Ask panel slide in and out, pages cross-fade (not to or from the Browser),
+  and the theme blends when you switch between light and dark. Calm keeps all but those four; Off keeps only work in
+  progress moving (the throbber's water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
+- The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Library, Projects, Apps, Agents), and below, after some space, Inbox (with a count of what waits on you) and the tools (Search, Usage, System, Settings, Help). The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device; a phone has no rail, and its drawer holds them all in one grid (hold one a moment to pick it up). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; the Library and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,
   every setting, sessions (archived ones too, marked Archived) and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
   skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Pictures,

@@ -18,6 +18,7 @@
 - [**新建主题**](/settings?s=general&find=New%20theme)：以其中任意一个为基础，制作你自己的主题。
 - [**导入**](/settings?s=general&find=Import)：添加别人分享的主题。
 - [**语言**](/settings?s=general&find=Language)：应用显示所用的语言，也是智能体写作所用的语言。
+- [**动效**](/settings?s=general&find=Motion)：应用里有多少东西会动：完整、平静（打开页面时不滑动、不淡入淡出）或完全不动。
 - [**智能体工作时发送**](/settings?s=general&find=Sending%20while%20an%20agent%20works)：Enter 加入正在进行的这一轮，或等它结束。
 - [**终端建议**](/settings?s=general&find=Terminal%20suggestions)：终端中光标后的灰色补全建议。
 - [**用量限制解除后继续**](/settings?s=general&find=Resume%20after%20usage%20limits)：在套餐额度重置一分钟后继续会话。

@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { useTideOnFinish } from '../lib/tide';
 
 /*
  * Hydor's marks. The name is the ancient Greek ὕδωρ, "water", and the logo writes it HYDΩR: capitals of one even,
@@ -47,10 +48,13 @@ const TIDE_CREST = 'M-72 0 q9 -5.5 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 
  * The full logo, HYDΩR: `height` px tall (its capitals' height), the letters in the text's colour, the Ω in the sea's.
  * With `tide`, the pointer over it fills the Ω with the sea: the letter empties to a faint outline and bright water
  * rises in it, its crest a wave that keeps flowing and bobbing while the pointer stays, then drains away and the
- * letter is whole again (styles.css, "the logo's tide"). The letter itself never moves.
+ * letter is whole again (styles.css, "the logo's tide"). The letter itself never moves. The same plays once by itself
+ * when a session finishes while the app is open (lib/tide.ts).
  */
 export function Wordmark({ height = 16, className, tide }: { height?: number; className?: string; tide?: boolean }) {
   const id = useId();
+  // The water rises once by itself when a session finishes.
+  const up = useTideOnFinish(!!tide);
   return (
     <svg
       viewBox={`-4 -1 ${WORD_WIDTH + 8} 102`}
@@ -58,7 +62,7 @@ export function Wordmark({ height = 16, className, tide }: { height?: number; cl
       height={height}
       fill="none"
       strokeWidth={WORD_STROKE}
-      className={['shrink-0', tide && 'wordmark-tide', className].filter(Boolean).join(' ')}
+      className={['shrink-0', tide && 'wordmark-tide', up && 'tide-once', className].filter(Boolean).join(' ')}
       role="img"
       aria-label="Hydor"
     >

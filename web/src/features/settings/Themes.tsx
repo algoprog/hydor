@@ -7,7 +7,7 @@ import { Check, Copy, Download, Monitor, Moon, MoreHorizontal, Pencil, Plus, Sun
 import { BUILT_IN_THEMES, DEFAULT_THEME, THEME_TOKENS, cleanTheme, contrast, normalizeHex, themeColors, MAX_THEMES, type AppTheme, type ThemeBase, type ThemeColors, type ThemeToken } from '@shared/themes';
 import { put } from '../../lib/api';
 import { toast, toastError, useUI, type Theme } from '../../lib/store';
-import { applyTheme, paintTheme, pickTheme, setCustomThemes, useThemes } from '../../lib/theme';
+import { applyTheme, paintTheme, pickTheme, setCustomThemes, switchTheme, useThemes } from '../../lib/theme';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, inputCls, useConfirm, useMediaQuery } from '../../components/ui';
 
 /** A miniature of the app in a theme's colours: sidebar, a conversation, code and the composer. */
@@ -97,7 +97,7 @@ export function ThemeMode() {
       value={mode}
       onChange={(m) => {
         useUI.getState().set({ theme: m });
-        applyTheme();
+        switchTheme();
       }}
       options={[
         { value: 'dark', label: 'Dark', icon: <Moon size={13} /> },

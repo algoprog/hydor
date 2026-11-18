@@ -30,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
       <button
         ref={ref}
         className={cx(
-          'inline-flex items-center justify-center gap-1.5 rounded-[10px] font-medium whitespace-nowrap transition duration-150 select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45',
+          'inline-flex items-center justify-center gap-1.5 press rounded-[10px] font-medium whitespace-nowrap transition duration-150 select-none disabled:pointer-events-none disabled:opacity-45',
           size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-9 px-4 text-[13.5px]',
           variant === 'primary' && 'bg-accent text-accent-fg hover:opacity-90',
           variant === 'secondary' && 'bg-bg-2 text-fg ring-1 ring-line-2 ring-inset hover:bg-bg-3',
@@ -56,7 +56,7 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
         aria-label={label}
         title={label}
         className={cx(
-          'inline-flex shrink-0 items-center justify-center rounded-lg text-fg-3 transition duration-150 hover:bg-bg-2 hover:text-fg active:scale-95 disabled:pointer-events-none disabled:opacity-40',
+          'inline-flex shrink-0 items-center justify-center rounded-lg text-fg-3 transition duration-150 hover:bg-bg-2 hover:text-fg press disabled:pointer-events-none disabled:opacity-40',
           size === 'sm' ? 'h-7 w-7' : 'h-8.5 w-8.5',
           active && 'bg-bg-2 text-fg',
           className,
@@ -491,7 +491,7 @@ export const SettingChip = forwardRef<
         onClick={onClick}
         aria-expanded={open}
         className={cx(
-          'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]',
+          'press flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]',
           open && 'bg-bg-2',
           className,
         )}
@@ -512,7 +512,7 @@ export const SettingChip = forwardRef<
       onClick={onClick}
       aria-expanded={open}
       className={cx(
-        'group inline-flex h-8 max-w-[min(100%,18rem)] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors hover:bg-bg-2 disabled:opacity-50',
+        'group press inline-flex h-8 max-w-[min(100%,18rem)] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors hover:bg-bg-2 disabled:opacity-50',
         open && 'bg-bg-2',
         className,
       )}
@@ -721,9 +721,9 @@ export function Switch({ on, onChange, label, disabled, className }: { on: boole
       title={label}
       disabled={disabled}
       onClick={() => onChange(!on)}
-      className={cx('relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-40', on ? 'bg-accent' : 'bg-fg/20', className)}
+      className={cx('sw-track relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-40', on ? 'bg-accent' : 'bg-fg/20', className)}
     >
-      <span className={cx('inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200', on ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+      <span className={cx('sw-knob inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200', on ? 'translate-x-[18px]' : 'translate-x-0.5')} />
     </button>
   );
 }

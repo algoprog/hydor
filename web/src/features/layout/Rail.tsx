@@ -2,7 +2,7 @@
 // sidebar), the sections (Browser, Library, Projects, Apps, Agents), then the inbox and the tools (Search, Usage,
 // System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or the keyboard's focus. Each group of tools keeps the order you drag it into, on every device.
 // A phone has no rail: its drawer (Sidebar.tsx) holds the same.
-import { cloneElement, createContext, isValidElement, memo, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, createContext, isValidElement, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -15,11 +15,28 @@ import { MOD } from '../../lib/format';
 import { go, sessionPath } from '../../lib/nav';
 import { isStartingKey } from '../../lib/starting';
 import { useApp, useSessions, useUI } from '../../lib/store';
+import { Count } from '../../components/Count';
 import { cx, Kbd, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { openPalette } from '../palette/CommandPalette';
 import { columnOf } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
+
+/** How each tile's icon answers the pointer (styles.css, .ico-*): by tool, and the two tiles of the rail's own. */
+const ICON_MOTION: Record<string, string> = {
+  sessions: 'ico-lift',
+  browser: 'ico-turn',
+  pages: 'ico-tilt',
+  spaces: 'ico-rise',
+  apps: 'ico-grow',
+  agents: 'ico-beat',
+  inbox: 'ico-dip',
+  search: 'ico-tilt',
+  usage: 'ico-nudge',
+  system: 'ico-lift',
+  settings: 'ico-turn',
+  help: 'ico-beat',
+};
 
 /** The rail's width in px. */
 export const RAIL_WIDTH = 56;
@@ -76,11 +93,12 @@ interface DragBits {
   lifted: boolean;
 }
 
-/** One tile: an icon, named by the rail's tooltip; the one for the page that is open has its own background and an accent bar at the rail's edge. */
+/** One tile: an icon, named by the rail's tooltip; the one for the page that is open has its own background (and the rail's accent bar beside it). */
 function Tile({
   label,
   keys,
   icon,
+  motion,
   current,
   onClick,
   extra,
@@ -95,6 +113,8 @@ function Tile({
   /** Its shortcut, shown in the tooltip ("Ctrl+K"). */
   keys?: string;
   icon: ReactNode;
+  /** The tool's id: how its icon moves when the pointer is on the tile. */
+  motion?: string;
   current?: boolean;
   onClick: () => void;
   extra?: ReactNode;
@@ -128,14 +148,13 @@ function Tile({
         onMenu?.(e);
       }}
       className={cx(
-        'relative mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors',
+        'group press relative mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors',
         // The copy that follows the pointer while it is dragged, lifted off the page.
         floating ? 'bg-bg-2 text-fg shadow-lg ring-1 ring-line-2' : current ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg active:bg-bg-2',
         drag?.lifted && 'opacity-40',
       )}
     >
-      {current && !floating && <span aria-hidden className="absolute top-2 bottom-2 -left-2 w-[3px] rounded-r-full bg-accent" />}
-      {icon}
+      <span className={cx('ico', motion && ICON_MOTION[motion])}>{icon}</span>
       {extra}
     </button>
   );
@@ -165,6 +184,7 @@ function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; flo
       label={t.label}
       keys={t.keys ? `${MOD}${t.keys}` : undefined}
       icon={big(t.icon)}
+      motion={t.id}
       current={t.match}
       onClick={t.go}
       extra={t.extra}
@@ -181,16 +201,27 @@ function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; flo
 /** The inbox: how many things wait on you (sessions here and on other machines, calls the Outbox holds) as a pill on its icon. */
 function InboxTile({ current }: { current: boolean }) {
   const n = useInboxCount();
+  // A new thing waits: the pill pops and the tray dips once (not for what was there when the page opened).
+  const last = useRef(n);
+  const [grown, setGrown] = useState(0);
+  useEffect(() => {
+    if (n > last.current) setGrown((g) => g + 1);
+    last.current = n;
+  }, [n]);
+  const icon = <Inbox key={grown} size={19} className={grown ? 'ico-dip-once' : undefined} />;
   return (
     <Tile
       label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'}
-      icon={<Inbox size={19} />}
+      icon={icon}
+      motion="inbox"
       current={current}
       onClick={() => go('/inbox')}
       dataTip={n > 0 ? 'inbox' : undefined}
       extra={
         n > 0 ? (
-          <span className="tnum pointer-events-none absolute -top-0.5 left-[calc(50%+2px)] min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-semibold text-accent-fg">{n > 99 ? '99+' : n}</span>
+          <span key={grown} className={cx('tnum pointer-events-none absolute -top-0.5 left-[calc(50%+2px)] min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-semibold text-accent-fg', grown > 0 && 'badge-pop')}>
+            <Count value={n} format={(x) => (x > 99 ? '99+' : String(Math.round(x)))} />
+          </span>
         ) : undefined
       }
     />
@@ -218,6 +249,32 @@ export const Rail = memo(function Rail() {
   const inSessions = loc === '/' || loc.startsWith('/s/') || loc.startsWith('/review/');
   const sideOpen = useUI((s) => s.sideOpen);
   const columnShows = sideOpen && !!columnOf(loc);
+
+  // One accent bar for the rail, moved beside the tile of the page that is open (it glides there; styles.css, .rail-bar).
+  const area = useRef<HTMLElement | null>(null);
+  const bar = useRef<HTMLSpanElement>(null);
+  const [glide, setGlide] = useState(false);
+  const areaRef = useCallback((el: HTMLElement | null) => {
+    area.current = el;
+    return touchDragArea(el);
+  }, []);
+  const placeBar = useCallback(() => {
+    const b = bar.current;
+    const t = area.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!b) return;
+    b.style.opacity = t ? '1' : '0';
+    if (!t) return;
+    b.style.height = `${t.offsetHeight - 16}px`;
+    b.style.transform = `translateY(${t.offsetTop + 8}px)`;
+  }, []);
+  useLayoutEffect(placeBar);
+  useEffect(() => {
+    // It glides from the second place on: where the page opened, it is simply there.
+    const raf = requestAnimationFrame(() => setGlide(true));
+    const watch = new ResizeObserver(placeBar);
+    if (area.current) watch.observe(area.current);
+    return () => (cancelAnimationFrame(raf), watch.disconnect());
+  }, [placeBar]);
 
   const tools = useTools(go, openPalette, true);
   const [tip, tipApi] = useRailTip();
@@ -284,8 +341,9 @@ export const Rail = memo(function Rail() {
         accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
       >
         {/* The tiles scroll in a short window (their bar hidden), so none is left out. Touches on them may pick one up (lib/dragTouch). */}
-        <div ref={touchDragArea} onScroll={() => tipApi.hide(true)} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
+        <div ref={areaRef} onScroll={() => tipApi.hide(true)} className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span ref={bar} aria-hidden className={cx('rail-bar', glide && 'glide')} style={{ opacity: 0 }} />
+          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} motion="sessions" current={inSessions} onClick={sessions} />
           {group(sections)}
           <div className="min-h-2 flex-1" />
           <InboxTile current={loc === '/inbox'} />

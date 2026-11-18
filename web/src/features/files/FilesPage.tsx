@@ -17,6 +17,7 @@ import { FolderFinder } from '../../components/FolderPicker';
 import { cx, Throbber, IconButton, MenuBack, Popover, SheetsOnPhone, useIsMobile, useMediaQuery } from '../../components/ui';
 import { rememberFilesPlace, SystemHeader } from '../system/SystemHeader';
 import { goFolder } from './actions';
+import { SlideColumn } from '../../components/SlideColumn';
 import { FileAskButton, FileAskPanel, FileAskPill, useFileAsk } from './FileAsk';
 import { FileEditor } from './FileEditor';
 import { FileInEditor } from './FileInEditor';
@@ -56,7 +57,11 @@ export function FileView({ path, line, embedded, onDirty }: { path: string; line
       <div className="min-w-0 flex-1">
         <FileBody path={path} line={line} onDirty={onDirty} saveFirst={saveFirst} />
       </div>
-      {wide && panel}
+      {wide && (
+        <SlideColumn open={!!panel} width={400}>
+          {panel || null}
+        </SlideColumn>
+      )}
       {!wide && !ask.folded && panel && createPortal(<div className="fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top)] pb-[var(--safe-bottom)]">{panel}</div>, document.body)}
       {!wide && ask.open && ask.folded && <FileAskPill path={path} />}
     </div>

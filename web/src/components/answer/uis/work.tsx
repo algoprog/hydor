@@ -11,7 +11,6 @@ import {
   CircleDashed,
   CircleHelp,
   Clock,
-  Copy as CopyIcon,
   ExternalLink,
   Feather,
   FileDown,
@@ -38,6 +37,7 @@ import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
 import { arr, Ask, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtMoney, fmtNum, Head, hostOf, initials, isObj, Md, Meter, num, obj, Pic, Section, Seg, str, textOf, TONE, useKept, usePicOk, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { CopyMark } from '../../CopyMark';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
 
@@ -117,7 +117,7 @@ function CopyBtn({ text, children }: { text: string | (() => string); children: 
   const [ok, setOk] = useState(false);
   return (
     <Btn
-      icon={ok ? <Check size={14} className="text-ok" /> : <CopyIcon size={13} />}
+      icon={<CopyMark done={ok} size={14} />}
       onClick={() => {
         void copyText(typeof text === 'function' ? text() : text);
         setOk(true);

@@ -7,7 +7,7 @@ import type { KeepAwakeMode, KeepAwakeState, RetentionSettings, StartupState, Up
 import { api, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toast, toastError, useApp, useUI } from '../../lib/store';
+import { toast, toastError, useApp, useUI, type Motion } from '../../lib/store';
 import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
@@ -33,6 +33,7 @@ export function GeneralSettings() {
       <Group title="Appearance" actions={<ThemeMode />}>
         <ThemePicker />
         <Row label="Language" hint="Shown in the app; agents write to you in it too" control={<LanguageSelect />} />
+        <MotionSetting />
       </Group>
       <Group title="Sessions">
         <Row
@@ -87,6 +88,32 @@ export function GeneralSettings() {
         <StartersSetting />
       </Group>
     </Stack>
+  );
+}
+
+/** How much moves on this device: Full, Calm (nothing slides or fades as you open a page), or Off. */
+function MotionSetting() {
+  const motion = useUI((s) => s.motion);
+  return (
+    <Row
+      label="Motion"
+      hint="Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins"
+      control={
+        // "Full" here is how much moves (its own entry in the dictionaries: "motion::Full").
+        <span data-i18n="motion">
+          <Segmented<Motion>
+            size="sm"
+            value={motion}
+            onChange={(m) => useUI.getState().set({ motion: m })}
+            options={[
+              { value: 'full', label: 'Full' },
+              { value: 'calm', label: 'Calm' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+        </span>
+      }
+    />
   );
 }
 

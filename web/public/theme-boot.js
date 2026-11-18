@@ -5,6 +5,11 @@
   // In the Mac app this page follows its own starting page, where the water has already risen in the logo's Ω
   // (index.html #boot): it stays full rather than rising again.
   if (/HydorMac\//.test(navigator.userAgent)) root.classList.add('boot-full');
+  // How much moves (Settings → General → Appearance → Motion): the stylesheet's motion block reads it from <html>.
+  try {
+    var m = JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').motion;
+    root.dataset.motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : m === 'calm' || m === 'off' ? m : 'full';
+  } catch (e) {}
   try {
     var b = JSON.parse(localStorage.getItem('wa.theme.boot') || 'null');
     var mode = b ? b.mode : (JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').theme || 'dark');

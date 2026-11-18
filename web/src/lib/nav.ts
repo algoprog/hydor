@@ -1,11 +1,20 @@
 import { navigate } from 'wouter/use-browser-location';
 import { create } from 'zustand';
+import { crossFade } from './motion';
 import { machineBase, machineId, splitMachinePath } from './machine';
 import { useUI } from './store';
 
 /** Moves to a page of the machine this page shows. */
 export function go(path: string, replace = false) {
-  navigate(machineBase + path, { replace });
+  const to = machineBase + path;
+  // Pages cross-fade (Motion: Full), but not to or from the Browser (its page is a window of its own, which cannot be
+  // part of the picture), not for a change inside a page (its query or its # only), and not where code goes on at once
+  // from the new address (a section's # to scroll to, a redirect that replaces the page).
+  const here = location.pathname;
+  const target = to.split(/[?#]/)[0];
+  const page = (p: string) => p.slice(machineBase.length).split('/')[1] ?? '';
+  if (replace || to.includes('#') || target === here || page(target) === 'browser' || page(here) === 'browser') return navigate(to, { replace });
+  crossFade('page', () => navigate(to, { replace }));
 }
 
 /**

@@ -42,6 +42,8 @@ import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { setPlaceOrder, useToolOrder } from '../layout/toolOrder';
+import { Swap } from '../../components/Swap';
+import { useFlip } from '../../lib/flip';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -84,9 +86,32 @@ export function ActivityText({ s, className }: { s: SessionSummary; className?: 
 /** A coloured dot for sessions that are running: blue working, amber waiting, green ready. */
 export function StatusDot({ s, className }: { s: SessionSummary; className?: string }) {
   const a = activityOf(s);
+  const kind = !a ? '' : isWorking(a) ? 'working' : a.status === 'waiting' ? 'waiting' : a.kind === 'external' ? 'external' : 'ready';
+  const flash = useStatusFlash(kind);
   if (!a) return null;
   const tone = isWorking(a) ? 'bg-busy' : a.status === 'waiting' ? 'bg-warn' : a.kind === 'external' ? 'bg-fg-3' : 'bg-ok';
-  return <span className={cx('inline-block h-2 w-2 shrink-0 rounded-full', tone, isWorking(a) && 'breathe', className)} aria-hidden />;
+  return <span className={cx('status-dot inline-block h-2 w-2 shrink-0 rounded-full', tone, isWorking(a) && 'breathe', flash, className)} aria-hidden />;
+}
+
+/**
+ * What a dot does once, when its session's status changes while you look (never on first sight): from working to ready
+ * it turns green with one ring spreading; to needing you it pulses twice, then holds still (styles.css, .status-ready
+ * and .status-needs). Working keeps its soft breathing.
+ */
+function useStatusFlash(kind: string): string {
+  const was = useRef(kind);
+  const [flash, setFlash] = useState('');
+  useEffect(() => {
+    const before = was.current;
+    was.current = kind;
+    if (before === kind) return;
+    const next = kind === 'ready' && before === 'working' ? 'status-ready' : kind === 'waiting' ? 'status-needs' : '';
+    setFlash(next);
+    if (!next) return;
+    const t = window.setTimeout(() => setFlash(''), 1200);
+    return () => window.clearTimeout(t);
+  }, [kind]);
+  return flash;
 }
 
 /** Rows of these groups keep the order you drag them into; the others go newest first. */
@@ -343,21 +368,24 @@ const RowBody = memo(function RowBody({
           {marks}
         </span>
         <span className="mt-0.5 flex items-center gap-1 text-[12px] leading-4 text-fg-3">
-          {unread && a && !isWorking(a) && !inBackground(a) ? (
-            <span className="min-w-0 truncate text-ok">Done · {timeAgo(s.doneAt)}</span>
-          ) : running ? (
-            <ActivityText s={s} className="min-w-0" />
-          ) : (
-            <>
-              <span className="min-w-0 truncate" translate={translatable(where) ? undefined : 'no'}>
-                {where || '—'}
-              </span>
-              <span className="shrink-0" aria-hidden>
-                ·
-              </span>
-              <span className="shrink-0">{timeAgo(s.updatedAt)}</span>
-            </>
-          )}
+          {/* The words cross-fade when the status changes: working, waiting, done, or the folder and time. */}
+          <Swap id={unread && a && !isWorking(a) && !inBackground(a) ? 'done' : running ? (isWorking(a) ? 'working' : (a?.status ?? 'running')) : 'idle'}>
+            {unread && a && !isWorking(a) && !inBackground(a) ? (
+              <span className="min-w-0 truncate text-ok">Done · {timeAgo(s.doneAt)}</span>
+            ) : running ? (
+              <ActivityText s={s} className="min-w-0" />
+            ) : (
+              <>
+                <span className="min-w-0 truncate" translate={translatable(where) ? undefined : 'no'}>
+                  {where || '—'}
+                </span>
+                <span className="shrink-0" aria-hidden>
+                  ·
+                </span>
+                <span className="shrink-0">{timeAgo(s.updatedAt)}</span>
+              </>
+            )}
+          </Swap>
           <span className="flex-1" />
           {!running && <DiffStat added={s.stats.linesAdded} removed={s.stats.linesRemoved} className="text-[11px] opacity-70" compact />}
         </span>
@@ -380,6 +408,7 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onMore, menuOpe
       ref={drag.ref}
       style={drag.style}
       {...drag.attrs}
+      data-flip={s.key}
       role="button"
       tabIndex={0}
       onClick={() => {
@@ -400,7 +429,7 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onMore, menuOpe
         // the first ones always are, or they would appear a moment late when the closed drawer opens.
         // Their stand-in is a row's exact height, so drawing one never changes the list's height (Safari
         // keeps no scroll anchor: rows above that grew as they were drawn moved what was on screen).
-        'cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
+        'press cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
         !eager && (place ? '[contain-intrinsic-size:auto_36.25px] [content-visibility:auto]' : '[contain-intrinsic-size:auto_52.25px] [content-visibility:auto]'),
         drag.lifted && 'opacity-40',
       )}
@@ -428,7 +457,8 @@ const StartingRow = memo(function StartingRow({ s, active, home, touch, place }:
       tabIndex={0}
       onClick={() => go(sessionPath(s.key))}
       onKeyDown={(e) => e.key === 'Enter' && go(sessionPath(s.key))}
-      className="cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50"
+      data-flip={s.key}
+      className="press cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50"
     >
       <RowBody s={s} active={active} home={home} touch={touch} place={place} />
     </div>
@@ -800,6 +830,12 @@ export function SessionList({ query }: { query: string }) {
   const [overGroup, setOverGroup] = useState<string | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
+  // Rows glide to their new places (a session that went into Active or Pinned, a new order), but not while one is dragged.
+  const flip = useFlip(!!dragKey || !!dragPlace, loaded);
+  const listRef = useCallback((el: HTMLElement | null) => {
+    flip(el);
+    return touchDragArea(el);
+  }, [flip]);
 
   // Child sessions sit under their parent (folded), when it is listed too, and so do a program's own subagents (they
   // are never listed on their own).
@@ -1114,7 +1150,7 @@ export function SessionList({ query }: { query: string }) {
       }}
     >
       {/* Touches that land on the list may pick a row (or a group's heading) up (lib/dragTouch). */}
-      <div ref={touchDragArea}>
+      <div ref={listRef}>
         {listed.map((part) =>
           part.kind === 'places' ? (
             <Fragment key={`places:${part.first}`}>

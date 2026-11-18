@@ -318,6 +318,13 @@ type PartState = 'done' | 'now' | 'waiting' | 'stopped' | 'failed';
 
 /** A part's mark on the outline's line: a check when done, a dot while under way. */
 function Marker({ state }: { state: PartState }) {
+  // A part that finishes while you watch draws its check (not one that was done when it came into view).
+  const was = useRef(state);
+  const [drew, setDrew] = useState(false);
+  useLayoutEffect(() => {
+    if (was.current !== 'done' && state === 'done' && was.current === 'now') setDrew(true);
+    was.current = state;
+  }, [state]);
   return (
     <span
       className={cx(
@@ -325,7 +332,7 @@ function Marker({ state }: { state: PartState }) {
         state === 'now' ? 'border-busy' : state === 'waiting' || state === 'stopped' ? 'border-warn' : state === 'failed' ? 'border-err' : 'border-line-2 text-fg-3',
       )}
     >
-      {state === 'done' && <Check size={9} strokeWidth={3.2} />}
+      {state === 'done' && <Check size={9} strokeWidth={3.2} className={drew ? 'anim-draw' : undefined} />}
       {state === 'now' && <span className="h-1.5 w-1.5 rounded-full bg-busy" />}
       {state === 'waiting' && <span className="h-1.5 w-1.5 rounded-full bg-warn" />}
       {state === 'stopped' && <span className="h-1.5 w-1.5 rounded-[1px] bg-warn" />}

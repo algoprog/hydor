@@ -2,6 +2,7 @@
 // user's own themes (kept on the server, cached here so they paint before the app has loaded).
 import { create } from 'zustand';
 import { BUILT_IN_THEMES, DEFAULT_THEME, themeColors, themeVars, type AppTheme, type ThemeBase } from '@shared/themes';
+import { crossFade } from './motion';
 import { useUI } from './store';
 
 const CUSTOM_KEY = 'wa.themes.v1';
@@ -77,9 +78,14 @@ export function applyTheme() {
   } catch {}
 }
 
+/** The same as a person's change (a button, a menu): the old look blends into the new (Motion: Full). */
+export function switchTheme() {
+  crossFade('theme', applyTheme);
+}
+
 /** Uses a theme: it becomes its base's pick, and the mode switches to that base unless it follows the device. */
 export function pickTheme(t: AppTheme) {
   const ui = useUI.getState();
   ui.set({ ...(t.base === 'dark' ? { darkTheme: t.id } : { lightTheme: t.id }), ...(ui.theme === 'system' ? {} : { theme: t.base }) });
-  applyTheme();
+  switchTheme();
 }

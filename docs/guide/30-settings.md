@@ -18,6 +18,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**New theme**](/settings?s=general&find=New%20theme): Make a theme of your own from any of them.
 - [**Import**](/settings?s=general&find=Import): Add a theme someone shared.
 - [**Language**](/settings?s=general&find=Language): The language the app is shown in, and agents write in.
+- [**Motion**](/settings?s=general&find=Motion): How much of the app moves: full, calm (nothing slides or fades as you open a page), or none.
 - [**Sending while an agent works**](/settings?s=general&find=Sending%20while%20an%20agent%20works): Enter joins the running turn, or waits for it to end.
 - [**Terminal suggestions**](/settings?s=general&find=Terminal%20suggestions): Grey completions after the cursor in terminals.
 - [**Resume after usage limits**](/settings?s=general&find=Resume%20after%20usage%20limits): Continues a session a minute after a plan’s limit resets.

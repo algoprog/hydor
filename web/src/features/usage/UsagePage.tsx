@@ -14,6 +14,7 @@ import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { LOCALE } from '../../i18n/locale';
+import { Count } from '../../components/Count';
 
 function WindowRow({ w }: { w: UsageWindow }) {
   const left = w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent);
@@ -23,12 +24,12 @@ function WindowRow({ w }: { w: UsageWindow }) {
       <div className="mb-1.5 flex items-baseline gap-2">
         <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{w.label}</span>
         {critical && <AlertTriangle size={13} className="shrink-0 self-center text-[var(--status-critical)]" aria-label="Nearly used up" />}
-        <span className="shrink-0 text-[15px] font-semibold">{pct(w.usedPercent)}</span>
+        <span className="shrink-0 text-[15px] font-semibold">{w.usedPercent == null ? pct(null) : <Count value={w.usedPercent} format={pct} />}</span>
         <span className="shrink-0 text-[12px] text-fg-3">used</span>
       </div>
       <Meter percent={w.usedPercent} />
       <div className="mt-1 flex justify-between gap-3 text-[11.5px] text-fg-3">
-        <span>{left == null ? '' : `${pct(left)} left`}</span>
+        <span>{left == null ? '' : <Count value={left} format={(n) => `${pct(n)} left`} />}</span>
         <span title={w.resetsAt ? new Date(w.resetsAt).toLocaleString(LOCALE) : ''}>{w.resetsAt ? `resets ${untilText(w.resetsAt)}` : ''}</span>
       </div>
     </div>

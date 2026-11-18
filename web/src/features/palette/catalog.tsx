@@ -19,7 +19,7 @@ import { api } from '../../lib/api';
 import { bytes, timeAgo } from '../../lib/format';
 import { go, goApp } from '../../lib/nav';
 import { useUI } from '../../lib/store';
-import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
+import { allThemes, pickTheme, switchTheme } from '../../lib/theme';
 import { appPath, type Gallery } from '../apps/api';
 import { openReleaseNotes } from '../settings/Releases';
 import { settingsSections } from '../settings/SettingsPage';
@@ -120,7 +120,7 @@ const ACTS: Record<NonNullable<CatalogItem['act']>, { icon: ReactNode; run: () =
     icon: <Moon size={15} />,
     run: () => {
       useUI.getState().set({ theme: useUI.getState().theme === 'light' ? 'dark' : 'light' });
-      applyTheme();
+      switchTheme();
     },
   },
   sidebar: { icon: <PanelLeft size={15} />, run: () => useUI.getState().set({ sideOpen: !useUI.getState().sideOpen }), hint: 'Ctrl+B' },

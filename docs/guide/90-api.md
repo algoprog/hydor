@@ -18,7 +18,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 
 These live in the user's browser, one set per device, so they are not in the API. An agent changes them on the devices showing its session, with no card:
 
-- `PUT /device` — Body: `{ theme?: 'dark'|'light'|'system', themeName?: string — a theme's name ("Midnight", "Sage", or one of the user's), language?: 'en'|'de'|'zh'|'el' — reloads the page, sound?: boolean — a chime with each notice, enter?: 'join'|'queue' — what Enter does while an agent works, terminalSuggestions?: boolean, sidebar?: boolean — shown on a computer, groupSessions?: boolean — the sidebar's groups for projects and folders (false: the sessions by day only) }`.
+- `PUT /device` — Body: `{ theme?: 'dark'|'light'|'system', themeName?: string — a theme's name ("Midnight", "Sage", or one of the user's), motion?: 'full'|'calm'|'off' — how much of the app moves (the system's Reduce motion always wins), language?: 'en'|'de'|'zh'|'el' — reloads the page, sound?: boolean — a chime with each notice, enter?: 'join'|'queue' — what Enter does while an agent works, terminalSuggestions?: boolean, sidebar?: boolean — shown on a computer, groupSessions?: boolean — the sidebar's groups for projects and folders (false: the sessions by day only) }`.
 
 ## The guide and Agent Guidelines
 

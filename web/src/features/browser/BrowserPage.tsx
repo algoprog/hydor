@@ -87,6 +87,7 @@ import { Panel } from './Panel';
 import { PermissionsPanel } from './Permissions';
 import { PageView } from './PageView';
 import { TabColumn } from './TabColumn';
+import { SlideColumn } from '../../components/SlideColumn';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
@@ -682,18 +683,21 @@ function OwnBrowser() {
             </>
           )}
         </div>
-        {right &&
-          (mobile ? (
-            rightIsPanel ? (
-              right
-            ) : (
-              <Sheet open onClose={() => setAskOpen(false)} label="Ask" width={400}>
-                {right}
-              </Sheet>
-            )
+        {mobile ? (
+          right &&
+          (rightIsPanel ? (
+            right
           ) : (
-            <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg-1">{right}</aside>
-          ))}
+            <Sheet open onClose={() => setAskOpen(false)} label="Ask" width={400}>
+              {right}
+            </Sheet>
+          ))
+        ) : (
+          // Slides open and shut (Motion: Full); the page beside it follows.
+          <SlideColumn open={!!right} width={400}>
+            {right ? <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg-1">{right}</aside> : null}
+          </SlideColumn>
+        )}
       </div>
 
       <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={250}>

@@ -62,6 +62,7 @@ function formStep(t: ToolInfo) {
 interface DeviceSettings {
   theme?: 'dark' | 'light' | 'system';
   themeName?: string;
+  motion?: 'full' | 'calm' | 'off';
   language?: string;
   sound?: boolean;
   enter?: 'join' | 'queue';
@@ -81,6 +82,7 @@ onFeatureEvent('guide', (e) => {
     if (t) pickTheme(t);
   }
   if (d.theme || d.themeName) applyTheme();
+  if (d.motion) ui.set({ motion: d.motion });
   if (d.sound !== undefined) setNotifyPrefs({ sound: d.sound });
   if (d.enter)
     try {

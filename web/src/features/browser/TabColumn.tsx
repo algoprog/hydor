@@ -11,6 +11,7 @@ import { PinnedTiles } from './BookmarkBar';
 import { statusOf, titleOf } from './AgentTabs';
 import { closeTab, newTab, switchTab, tabName, useAgentBrowsers, type AgentBrowser } from './browsing';
 import { Favicon, Speaker } from './TabStrip';
+import { useRowPhases } from '../../lib/flip';
 
 /** A section's label with a chevron that folds it. */
 function Label({ children, open, onToggle, hint }: { children: string; open: boolean; onToggle: () => void; hint?: string }) {
@@ -47,10 +48,46 @@ function AgentRow({ b, selected, onOpen }: { b: AgentBrowser; selected: boolean;
   );
 }
 
+/** One of your tabs; `ghost`: it was just closed, and closes up while it goes (it can be neither used nor reached). */
+function TabRow({ t, on, watching, onLeave, ghost }: { t: BrowserView['tabs'][number]; on: boolean; watching: string | null; onLeave: () => void; ghost?: boolean }) {
+  return (
+    <div
+      role="tab"
+      aria-selected={on}
+      aria-hidden={ghost || undefined}
+      tabIndex={ghost ? -1 : 0}
+      title={t.title || t.url}
+      onClick={() => (watching && onLeave(), !t.active && void switchTab(t.id))}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), watching && onLeave(), void switchTab(t.id))}
+      // A middle click closes it, as in other browsers.
+      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+      onAuxClick={(e) => e.button === 1 && (e.preventDefault(), void closeTab(t.id))}
+      className={cx('group press flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none', ghost && 'pointer-events-none', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2/60 hover:text-fg')}
+    >
+      <Favicon tab={t} size={16} />
+      <span translate="no" className="min-w-0 flex-1 truncate">
+        {tabName(t)}
+      </span>
+      <Speaker tab={t} />
+      <button
+        aria-label="Close tab"
+        title="Close tab"
+        tabIndex={ghost ? -1 : undefined}
+        onClick={(e) => (e.stopPropagation(), void closeTab(t.id))}
+        className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg-3 hover:bg-bg-3 hover:text-fg', !on && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
+      >
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
 export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserView; watching: string | null; onWatch: (key: string) => void; onLeave: () => void }) {
   const browsers = useAgentBrowsers((s) => s.browsers);
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [tabsOpen, setTabsOpen] = useState(true);
+  // A new tab opens its row and a closed one closes up, the rest following.
+  const rows = useRowPhases(view.tabs);
   return (
     <nav aria-label="Browser tabs" className="flex h-full w-[260px] shrink-0 flex-col overflow-y-auto border-r border-line bg-sidebar pb-3">
       <PinnedTiles />
@@ -74,38 +111,11 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
         </Label>
         {tabsOpen && (
           <div role="tablist" className="px-1.5">
-            {view.tabs.map((t) => {
-              const on = t.active && !watching;
-              return (
-                <div
-                  key={t.id}
-                  role="tab"
-                  aria-selected={on}
-                  tabIndex={0}
-                  title={t.title || t.url}
-                  onClick={() => (watching && onLeave(), !t.active && void switchTab(t.id))}
-                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), watching && onLeave(), void switchTab(t.id))}
-                  // A middle click closes it, as in other browsers.
-                  onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-                  onAuxClick={(e) => e.button === 1 && (e.preventDefault(), void closeTab(t.id))}
-                  className={cx('group flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2/60 hover:text-fg')}
-                >
-                  <Favicon tab={t} size={16} />
-                  <span translate="no" className="min-w-0 flex-1 truncate">
-                    {tabName(t)}
-                  </span>
-                  <Speaker tab={t} />
-                  <button
-                    aria-label="Close tab"
-                    title="Close tab"
-                    onClick={(e) => (e.stopPropagation(), void closeTab(t.id))}
-                    className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg-3 hover:bg-bg-3 hover:text-fg', !on && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              );
-            })}
+            {rows.map(({ row: t, phase }) => (
+              <div role="presentation" key={phase === 'close' ? `gone:${t.id}` : t.id} className={cx('row-fold', phase && `row-${phase}`)}>
+                <TabRow t={t} on={t.active && !watching} watching={watching} onLeave={onLeave} ghost={phase === 'close'} />
+              </div>
+            ))}
             <button onClick={() => (watching && onLeave(), void newTab())} className="flex h-[34px] w-full items-center gap-2.5 rounded-lg pl-2.5 text-left text-[13px] text-fg-3 transition-colors hover:bg-bg-2/60 hover:text-fg-2">
               <Plus size={16} />
               New tab

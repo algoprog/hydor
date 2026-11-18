@@ -1,10 +1,11 @@
 // The answer UIs for writing (emails, alternatives to pick from, social posts, changes to a text, a text marked up with notes): their views, by name (shared/answer-ui/writing.ts has what each takes).
 import { Fragment, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, Bookmark, ChartNoAxesColumn, Check, Copy as CopyIcon, Ellipsis, Globe, Heart, ImageIcon, Lightbulb, Mail, MessageCircle, MessageSquare, Repeat2, Send, Share, Share2, Star, ThumbsUp } from 'lucide-react';
+import { ArrowRight, Bookmark, ChartNoAxesColumn, Check, Ellipsis, Globe, Heart, ImageIcon, Lightbulb, Mail, MessageCircle, MessageSquare, Repeat2, Send, Share, Share2, Star, ThumbsUp } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { arr, Ask, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, isObj, Md, num, obj, Pic, Ring, Seg, SpeakBtn, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { CopyMark } from '../../CopyMark';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -26,7 +27,7 @@ function CopyBtn({ text, label }: { text: string | (() => string); label: string
   const [ok, setOk] = useState(false);
   return (
     <Btn
-      icon={ok ? <Check size={13} className="text-ok" /> : <CopyIcon size={13} />}
+      icon={<CopyMark done={ok} />}
       onClick={() => {
         void copyText(typeof text === 'function' ? text() : text);
         setOk(true);
@@ -1764,7 +1765,7 @@ function RichCopy({ html, text, label }: { html: () => string; text: () => strin
       }}
       className="inline-grid h-7 w-7 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg"
     >
-      {ok ? <Check size={14} className="text-ok" /> : <CopyIcon size={14} />}
+      <CopyMark done={ok} size={14} />
     </button>
   );
 }

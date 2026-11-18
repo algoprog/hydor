@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
-import { Check, Copy, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import type { CardSource } from '@shared/boards';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
@@ -19,6 +19,7 @@ import { useApp } from '../lib/store';
 import { filePathsIn, fileRef, resolveFile } from './file-refs';
 import { machineBase, mu } from '../lib/machine';
 import { tr } from '../i18n/runtime';
+import { CopyMark } from './CopyMark';
 
 /** While a reply comes, an equation shown apart that is not finished yet waits for its end (not drawn as an error meanwhile). */
 function holdOpenMaths(src: string): string {
@@ -58,7 +59,7 @@ export function CopyButton({ text, className, label = 'Copy' }: { text: string |
       }}
       className={cx('inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg', className)}
     >
-      {done ? <Check size={13} className="anim-pop-in anim-draw text-ok" /> : <Copy size={13} />}
+      <CopyMark done={done} />
     </button>
   );
 }

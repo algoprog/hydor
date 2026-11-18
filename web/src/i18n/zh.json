@@ -25533,5 +25533,11 @@
 "Your main {0} account is signed out, and no other account or Custom model could do this: sign in again (Settings → Agents → Accounts).":"你的主 {0} 账户已退出登录，而且没有其他账户或 Custom 模型可以完成：请重新登录（设置 → 智能体 → 账户）。",
   "Show in Finder": "在访达中显示",
   "Show in File Explorer": "在文件资源管理器中显示",
-  "This is not on this computer, or it is no longer there": "它不在这台电脑上，或已不存在"
+  "This is not on this computer, or it is no longer there": "它不在这台电脑上，或已不存在",
+  "Calm": "平静",
+  "Motion": "动效",
+  "motion::Full": "完整",
+  "Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins": "完整、平静（打开页面时不滑动、不淡入淡出）或关闭。设备上的“减少动态效果”设置始终优先",
+  "How much of the app moves: full, calm (nothing slides or fades as you open a page), or none": "应用里有多少东西会动：完整、平静（打开页面时不滑动、不淡入淡出）或完全不动",
+  "animation animations reduce motion calm full off transitions movement fade slide": "动画 动效 减少动态效果 平静 完整 关闭 过渡 淡入淡出 滑动"
 }

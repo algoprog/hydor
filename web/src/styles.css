@@ -245,9 +245,26 @@ html {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- motion ---------------------------------------------------------------- */
-/* What you open shows at once, with no fade: pages, tabs, dialogs, menus, popovers, sheets, side panels and the
-   parts you unfold. Only what arrives by itself comes in softly: a message, a toast, a card asking you something. */
+/* ---- motion ---------------------------------------------------------------------------------------- */
+/* Quiet, and never in the way: what moves lasts about 90 to 240 ms, never holds content back, and never loops except
+   work in progress (the throbber, the working dots, a running step's light). Most of it answers you or tells you
+   something changed: a pressed button dips, a rail icon leans to the pointer, a copy turns into a check, a switch
+   springs, the rail's bar glides to the page you opened, a session's dot changes with its status, lists glide to their
+   new places, numbers count, a badge pops, the logo's water rises once when a session finishes, pictures shimmer
+   until they arrive, a finished step draws its check. Four things bend the old rule that what you open shows at once,
+   with no fade, because they make a change easier to follow than a cut does: the column beside a page slides, pages
+   and themes cross-fade (and the sidebar slides, in Shell.tsx). The rest of the rule stands: pages, tabs, dialogs, menus,
+   popovers, sheets and the parts you unfold show at once, and only what arrives by itself comes in softly: a message,
+   a toast, a card asking you something.
+
+   Settings → General → Appearance → Motion is on <html> as data-motion: full (all of it), calm (all but the four that
+   move as you open things) or off (none of it). The system's Reduce motion always means off (lib/motion.ts). So each
+   new motion here is gated by `html:not([data-motion=off])`, the four by `html[data-motion=full]`; a motion made in
+   script asks lib/motion.ts (motionOn, motionFull). The two curves are --ease-app and --spring. */
+:root {
+  --ease-app: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
 @keyframes fade-in {
   from {
@@ -463,23 +480,23 @@ html {
   display: inline-flex;
   transition: transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.group:hover .ico-lift {
+html:not([data-motion=off]) .group:hover .ico-lift {
   transform: translateY(-1.5px);
 }
-.group:hover .ico-rise {
+html:not([data-motion=off]) .group:hover .ico-rise {
   transform: translateY(-2px);
 }
-.group:hover .ico-nudge {
+html:not([data-motion=off]) .group:hover .ico-nudge {
   transform: translateX(2px);
 }
-.group:hover .ico-tilt {
+html:not([data-motion=off]) .group:hover .ico-tilt {
   transform: rotate(-12deg);
 }
-.group:hover .ico-turn {
+html:not([data-motion=off]) .group:hover .ico-turn {
   transform: rotate(60deg);
   transition-duration: 600ms;
 }
-.group:hover .ico-grow {
+html:not([data-motion=off]) .group:hover .ico-grow {
   transform: scale(1.12);
 }
 @keyframes beat {
@@ -494,7 +511,7 @@ html {
     transform: scale(0.95);
   }
 }
-.group:hover .ico-beat {
+html:not([data-motion=off]) .group:hover .ico-beat {
   animation: beat 700ms ease-out;
 }
 @keyframes spin-once {
@@ -615,6 +632,265 @@ html {
 }
 .anim-out {
   animation: slip-out 180ms ease-in both;
+}
+
+/* ---- what moves with you: the motion level's own rules (see the note at the top of this block) ------------------- */
+
+/* Press: buttons, rail tiles, rows, chips and cards dip to 97% while pressed, quickly, and spring back. Not when a
+   button inside the pressed thing is the one pressed (a row's ⋯). */
+html:not([data-motion=off]) .press {
+  transition-property: transform, color, background-color, border-color, opacity, box-shadow, filter;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-app);
+}
+html:not([data-motion=off]) .press:active:not(:has(button:active, a:active, [role='button']:active)) {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+
+/* Rail icons (and any icon in a .group): the inbox's tray dips. */
+@keyframes ico-dip {
+  0% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(2.5px);
+  }
+  100% {
+    transform: none;
+  }
+}
+html:not([data-motion=off]) .group:hover .ico-dip {
+  animation: ico-dip 420ms var(--ease-app);
+}
+/* A new thing in the inbox: the tray dips once (a class put on for a moment), the count pops. */
+html:not([data-motion=off]) .ico-dip-once {
+  animation: ico-dip 320ms var(--ease-app);
+}
+html:not([data-motion=off]) .badge-pop {
+  animation: pop-in 260ms var(--spring) both;
+}
+
+/* The rail's bar: one for the rail, moved to the page that is open. */
+.rail-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  pointer-events: none;
+}
+html:not([data-motion=off]) .rail-bar.glide {
+  transition:
+    transform 220ms var(--ease-app),
+    height 220ms var(--ease-app),
+    opacity 160ms var(--ease-app);
+}
+
+/* A switch: the knob springs a little past its place; the track changes colour. */
+html:not([data-motion=off]) .sw-knob {
+  transition-duration: 220ms;
+  transition-timing-function: var(--spring);
+}
+html:not([data-motion=off]) .sw-track {
+  transition-duration: 160ms;
+}
+
+/* A copy turns into a check that draws itself, holds (the caller holds it 1.2 s), and turns back. */
+.copy-swap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+.copy-swap > * {
+  grid-area: 1 / 1;
+}
+.copy-swap > .copy-to {
+  opacity: 0;
+}
+.copy-swap > .copy-to path {
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+}
+.copy-swap.done > .copy-from {
+  opacity: 0;
+}
+.copy-swap.done > .copy-to {
+  opacity: 1;
+}
+.copy-swap.done > .copy-to path {
+  stroke-dashoffset: 0;
+}
+html:not([data-motion=off]) .copy-swap > .copy-from {
+  transition:
+    opacity 160ms var(--ease-app),
+    transform 160ms var(--ease-app);
+}
+html:not([data-motion=off]) .copy-swap.done > .copy-from {
+  transform: scale(0.6);
+}
+html:not([data-motion=off]) .copy-swap > .copy-to {
+  transition: opacity 160ms var(--ease-app);
+}
+html:not([data-motion=off]) .copy-swap > .copy-to path {
+  transition: stroke-dashoffset 160ms var(--ease-app);
+}
+html:not([data-motion=off]) .copy-swap.done > .copy-to path {
+  transition: stroke-dashoffset 240ms var(--ease-app) 60ms;
+}
+
+/* A session's dot changes with its status: it turns green with one ring spreading when work finishes, and pulses
+   twice amber when it needs you, then holds still. Put on for a moment by the change (StatusDot), never on first sight. */
+@keyframes dot-ripple {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+@keyframes dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+  50% {
+    transform: scale(1.55);
+    filter: drop-shadow(0 0 3px var(--warn));
+  }
+}
+html:not([data-motion=off]) .status-dot {
+  transition: background-color 200ms var(--ease-app);
+}
+html:not([data-motion=off]) .status-ready::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--ok);
+  opacity: 0;
+  animation: dot-ripple 720ms var(--ease-app) 1 both;
+}
+html:not([data-motion=off]) .status-needs {
+  animation: dot-pulse 520ms var(--ease-app) 2;
+}
+/* A status line's words cross-fade: the new ones come up, the old ones go. */
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+@keyframes swap-out {
+  to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+html:not([data-motion=off]) .swap-in {
+  animation: swap-in 220ms var(--ease-app) both;
+}
+html:not([data-motion=off]) .swap-out {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: swap-out 220ms var(--ease-app) both;
+}
+
+/* A list's row that comes in opens its height and fades in; one that goes closes up (the rest follow: lib/flip.ts). */
+@keyframes row-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+@keyframes row-close {
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.row-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.row-open > *,
+.row-close > * {
+  min-height: 0;
+  overflow: hidden;
+}
+html:not([data-motion=off]) .row-open {
+  animation: row-open 160ms var(--ease-app) both;
+}
+html:not([data-motion=off]) .row-close {
+  animation: row-close 140ms var(--ease-app) both;
+}
+
+/* The logo's water rises once when a session finishes: the tide of a hover, played by itself (Wordmark). */
+html:not([data-motion=off]) .wordmark-tide.tide-once .logo-omega {
+  opacity: 0.3;
+  transition: opacity 240ms ease;
+}
+html:not([data-motion=off]) .wordmark-tide.tide-once .logo-tide {
+  transform: translateY(24px);
+  transition: transform 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+html:not([data-motion=off]) .wordmark-tide.tide-once :is(.logo-swell, .logo-bob) {
+  animation-play-state: running;
+}
+
+/* Pictures shimmer until they arrive (a faint sheen across a plate), then fade in. */
+@keyframes sheen {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+html:not([data-motion=off]) .sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--fg) 9%, transparent) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: sheen 1.3s linear infinite;
+}
+html:not([data-motion=off]) .img-in {
+  animation: overlay-in 180ms var(--ease-app) both;
+}
+/* A step that finishes while you watch draws its check; without motion it shows whole. */
+html[data-motion='off'] .anim-draw :is(path, polyline) {
+  animation: none;
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+}
+
+/* Full only, and not on a phone: the things that move as you open them. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-timing-function: linear;
+}
+html[data-vt='page']::view-transition-group(root) {
+  animation-duration: 90ms;
+}
+html[data-vt='theme']::view-transition-group(root) {
+  animation-duration: 200ms;
+}
+@media not (pointer: coarse) {
+  html[data-motion='full'] .col-slide {
+    transition:
+      width 160ms var(--ease-app),
+      transform 160ms var(--ease-app),
+      border-color 160ms var(--ease-app);
+  }
 }
 
 /* A model maker's initial (the OpenRouter search): its own hue, readable in both themes. */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, CircleDollarSign, FileDiff, FolderGit2, Gauge, MessageSquare, Minus, Plus, SquareTerminal, Table2, TextCursorInput, Users, X } from 'lucide-react';
 import type { StatsGranularity, StatsResponse, StatsTotals } from '@shared/types';
 import { api } from '../../lib/api';
@@ -7,6 +7,7 @@ import { AT_API_PRICES, compact, tildify, usd } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
+import { Count } from '../../components/Count';
 import { Columns, DivergingColumns, Legend, StackedColumns } from '../../components/charts';
 import { cx, Throbber, Segmented, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
@@ -477,18 +478,25 @@ function dollars(v: number): string {
 export function TodayStrip() {
   const [r, setR] = useState<StatsResponse | null>(null);
   useEffect(() => {
-    api<StatsResponse>(`/api/stats?granularity=day&count=1&tz=${encodeURIComponent(TZ)}`)
-      .then(setR)
-      .catch(() => {});
+    const load = () =>
+      api<StatsResponse>(`/api/stats?granularity=day&count=1&tz=${encodeURIComponent(TZ)}`)
+        .then(setR)
+        .catch(() => {});
+    void load();
+    // Kept current while the page is open: its numbers count to the new ones.
+    const every = window.setInterval(() => document.visibilityState === 'visible' && void load(), 60_000);
+    return () => window.clearInterval(every);
   }, []);
   const t = r?.totals;
   if (!t || (!t.prompts && !t.tokensOut)) return null;
   const cost = t.cost && t.cost >= 0.005 ? t.cost : 0;
   // Claude Code and Codex ran today: on a plan, the cost is not what you pay.
   const plan = !!r && ((r.byAgent?.claude?.tokensOut ?? 0) > 0 || (r.byAgent?.codex?.tokensOut ?? 0) > 0);
-  const parts = [t.sessions ? (t.sessions === 1 ? '1 session' : `${t.sessions} sessions`) : null, t.fileEdits ? (t.fileEdits === 1 ? '1 file edit' : `${t.fileEdits} file edits`) : null, cost ? usd(cost) : null].filter(
-    (x): x is string => !!x,
-  );
+  // The numbers count to their new values (Count); a single one reads as a word ("1 session").
+  const parts: { key: string; text: ReactNode }[] = [];
+  if (t.sessions) parts.push({ key: 'sessions', text: t.sessions === 1 ? '1 session' : <Count value={t.sessions} format={(n) => `${Math.round(n)} sessions`} /> });
+  if (t.fileEdits) parts.push({ key: 'edits', text: t.fileEdits === 1 ? '1 file edit' : <Count value={t.fileEdits} format={(n) => `${Math.round(n)} file edits`} /> });
+  if (cost) parts.push({ key: 'cost', text: <Count value={cost} format={usd} /> });
   const hint = [
     cost && plan ? AT_API_PRICES : cost ? 'At each model’s price' : null,
     t.linesAdded || t.linesRemoved ? `+${t.linesAdded.toLocaleString(LOCALE)} −${t.linesRemoved.toLocaleString(LOCALE)} lines` : null,
@@ -502,11 +510,11 @@ export function TodayStrip() {
     <button onClick={() => go('/stats')} title={hint} className="mt-3 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-md text-[12.5px] text-fg-2 hover:text-fg">
       <span className="font-medium text-fg">Today</span>
       {parts.map((p) => (
-        <span key={p} className="flex items-center gap-x-1.5">
+        <span key={p.key} className="flex items-center gap-x-1.5">
           <span className="text-fg-3" aria-hidden>
             ·
           </span>
-          <span className="tnum">{p}</span>
+          <span className="tnum">{p.text}</span>
         </span>
       ))}
     </button>
