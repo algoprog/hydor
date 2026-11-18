@@ -79,6 +79,7 @@ import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useUI } from '../../lib/store';
 import { tr, trIn } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton } from '../layout/PageHeader';
 import { SideColumn } from '../layout/SideColumn';
 import { ownBrowserHere } from '../browser/browsing';
@@ -967,7 +968,7 @@ export function Library() {
         {wide && (
           <SideColumn label="Library" tip="library" actions={newButton}>
             <h1 className="sr-only">Library</h1>
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">{items && <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} idle={!!browserShow} />}</div>
+            <ColumnScroll className="px-3 pt-1 pb-4">{items && <Places place={place} onPlace={toPlace} items={items} sites={sites} dropAt={over?.at} idle={!!browserShow} />}</ColumnScroll>
           </SideColumn>
         )}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">

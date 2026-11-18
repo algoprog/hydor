@@ -14,9 +14,10 @@ import { api, del, enc, post, put } from '../../lib/api';
 import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { lastAgent } from '../../lib/start';
-import { toast, toastError, useApp, useSessions } from '../../lib/store';
+import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { Badge, Button, cx, IconButton, inputCls, MenuItem, Popover, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { PlaceRow, PlacesLabel } from '../layout/PlaceRow';
 import { SideColumn } from '../layout/SideColumn';
@@ -536,6 +537,7 @@ export function AgentsPage() {
   const spaces = useSpaces();
   const act = useAgentActivity();
   const wide = useMediaQuery('(min-width: 1024px)');
+  const sideOpen = useUI((s) => s.sideOpen);
   const [edit, setEdit] = useState<Partial<Assistant> | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [find, setFind] = useState('');
@@ -581,7 +583,9 @@ export function AgentsPage() {
             : !!a.projects?.includes(by)) && found(a),
   );
   const builtinsShown = builtins.filter(found);
-  const showBuiltins = !wide || place === 'all';
+  // The built-in agents have rows of their own in the column: the page lists them only while the column is hidden (or
+  // on a phone), and among what a search finds.
+  const showBuiltins = !wide || (place === 'all' && (!sideOpen || !!words));
   useEffect(() => setFind(''), [place]);
   const chip = (key: string, label: string, n?: number) => (
     <button
@@ -599,7 +603,7 @@ export function AgentsPage() {
   const column = wide && (
     <SideColumn label="Agents" tip="agents" actions={<NewAgentMenu onImport={() => setImporting(true)} onInstall={() => setInstalling(true)} />}>
       <h1 className="sr-only">Agents</h1>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <ColumnScroll className="px-3 pt-1 pb-4">
         <nav aria-label="Places in Agents" className="space-y-0.5">
           <PlaceRow on={!id && place === 'all'} icon={icon(LayoutGrid)} label="All agents" count={st ? mine.length + builtins.length : 0} onClick={() => go(addressOf('all'))} />
           <PlaceRow on={place === 'mine' || (!!id && !builtins.some((a) => a.id === id) && mine.some((a) => a.id === id))} icon={icon(User)} label="Your agents" count={mine.length} onClick={() => go(addressOf('mine'))} />
@@ -633,7 +637,7 @@ export function AgentsPage() {
           <div className="mx-2.5 my-3 border-t border-line" />
           <PlaceRow on={schedules} icon={icon(CalendarDays)} label="Schedules" onClick={() => go(addressOf('schedules'))} />
         </nav>
-      </div>
+      </ColumnScroll>
     </SideColumn>
   );
   const header = !wide && (

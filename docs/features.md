@@ -69,7 +69,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
-- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). The Library, Apps, Projects, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept.
+- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). The Library, Apps, Projects, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept. A column's list shows its scroll bar whenever it holds more than fits (macOS would hide it until you scroll), and its foot fades while more is below.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
@@ -143,7 +143,7 @@ agents that speak ACP and take MCP servers.
   projects, tier, next run and what it spent this month. On a computer it has a column beside the rail, as the Library's
   (the logo, **New**, whose menu has New agent, Install an agent from a file and Import Claude Code agent files, and Hide;
   then All agents, Your agents, Needs you and On a schedule when some of yours are, Everywhere and each project that has
-  agents of its own, a row for each built-in agent that opens its page, and Schedules), a row with the place's name and a
+  agents of its own, a row for each built-in agent that opens its page (the page lists them too only while the column is hidden, or when a search finds them), and Schedules), a row with the place's name and a
   find box (by name and line), and an agent's own page keeps the column beside it; a phone keeps its header, tabs and
   chips. **New agent** drafts one from what you say it should do, with
   the helper model: its instructions, tools (switches for reading, editing, commands, the web, a browser, the computer
@@ -1805,8 +1805,8 @@ programs shows each program's version and what is out, with Check now, Update no
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
-- Help (on the rail): a guide to every part of the app, its topics grouped on one page (and, in a wide window, in a
-  column of the same kind as the Library's, with Ask an agent and Hide sidebar beside the logo), each with a picture of
+- Help (on the rail): a guide to every part of the app, its topics grouped on one page as cards (in a wide window, in a
+  column of the same kind as the Library's instead, with Hide sidebar beside the logo, the first page keeping its box and a few questions), each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same

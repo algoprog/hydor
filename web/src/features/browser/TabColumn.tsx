@@ -12,6 +12,7 @@ import { statusOf, titleOf } from './AgentTabs';
 import { closeTab, newTab, switchTab, tabName, useAgentBrowsers, type AgentBrowser } from './browsing';
 import { Favicon, Speaker } from './TabStrip';
 import { useRowPhases } from '../../lib/flip';
+import { ColumnScroll } from '../layout/ColumnScroll';
 
 /** A section's label with a chevron that folds it. */
 function Label({ children, open, onToggle, hint }: { children: string; open: boolean; onToggle: () => void; hint?: string }) {
@@ -89,40 +90,42 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
   // A new tab opens its row and a closed one closes up, the rest following.
   const rows = useRowPhases(view.tabs);
   return (
-    <nav aria-label="Browser tabs" className="flex h-full w-[260px] shrink-0 flex-col overflow-y-auto border-r border-line bg-sidebar pb-3">
-      <PinnedTiles />
-      {browsers.length > 0 && (
+    <nav aria-label="Browser tabs" className="flex h-full w-[260px] shrink-0 flex-col border-r border-line bg-sidebar">
+      <ColumnScroll className="flex flex-col pb-3">
+        <PinnedTiles />
+        {browsers.length > 0 && (
+          <div className="mt-2">
+            <Label open={agentsOpen} onToggle={() => setAgentsOpen((o) => !o)}>
+              Agents at work
+            </Label>
+            {agentsOpen && (
+              <div className="space-y-0.5 px-1.5">
+                {browsers.map((b) => (
+                  <AgentRow key={b.key} b={b} selected={watching === b.key} onOpen={() => onWatch(b.key)} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="mt-2">
-          <Label open={agentsOpen} onToggle={() => setAgentsOpen((o) => !o)}>
-            Agents at work
+          <Label open={tabsOpen} onToggle={() => setTabsOpen((o) => !o)}>
+            Tabs
           </Label>
-          {agentsOpen && (
-            <div className="space-y-0.5 px-1.5">
-              {browsers.map((b) => (
-                <AgentRow key={b.key} b={b} selected={watching === b.key} onOpen={() => onWatch(b.key)} />
+          {tabsOpen && (
+            <div role="tablist" className="px-1.5">
+              {rows.map(({ row: t, phase }) => (
+                <div role="presentation" key={phase === 'close' ? `gone:${t.id}` : t.id} className={cx('row-fold', phase && `row-${phase}`)}>
+                  <TabRow t={t} on={t.active && !watching} watching={watching} onLeave={onLeave} ghost={phase === 'close'} />
+                </div>
               ))}
+              <button onClick={() => (watching && onLeave(), void newTab())} className="flex h-[34px] w-full items-center gap-2.5 rounded-lg pl-2.5 text-left text-[13px] text-fg-3 transition-colors hover:bg-bg-2/60 hover:text-fg-2">
+                <Plus size={16} />
+                New tab
+              </button>
             </div>
           )}
         </div>
-      )}
-      <div className="mt-2">
-        <Label open={tabsOpen} onToggle={() => setTabsOpen((o) => !o)}>
-          Tabs
-        </Label>
-        {tabsOpen && (
-          <div role="tablist" className="px-1.5">
-            {rows.map(({ row: t, phase }) => (
-              <div role="presentation" key={phase === 'close' ? `gone:${t.id}` : t.id} className={cx('row-fold', phase && `row-${phase}`)}>
-                <TabRow t={t} on={t.active && !watching} watching={watching} onLeave={onLeave} ghost={phase === 'close'} />
-              </div>
-            ))}
-            <button onClick={() => (watching && onLeave(), void newTab())} className="flex h-[34px] w-full items-center gap-2.5 rounded-lg pl-2.5 text-left text-[13px] text-fg-3 transition-colors hover:bg-bg-2/60 hover:text-fg-2">
-              <Plus size={16} />
-              New tab
-            </button>
-          </div>
-        )}
-      </div>
+      </ColumnScroll>
     </nav>
   );
 }

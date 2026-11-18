@@ -13,6 +13,7 @@ import { go } from '../../lib/nav';
 import { useApp, useUI } from '../../lib/store';
 import { FolderChip } from '../../components/FolderPicker';
 import { cx, useIsMobile } from '../../components/ui';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SideColumn } from '../layout/SideColumn';
 import { InstructionsSettings, McpSettings } from './AgentSettings';
@@ -205,30 +206,32 @@ function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
 /** A computer: every section as a row of the column, under its group's name; the rows look as the Library's places do. */
 function SectionRows({ current, onOpen }: { current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
   return (
-    <nav aria-label="Settings sections" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pt-1 pb-4">
-      {groups().map((g, i) => (
-        <div key={g.label} className="space-y-0.5">
-          <div className={cx('px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase', i ? 'pt-4' : 'pt-1')}>{g.label}</div>
-          {g.items.map((d) => {
-            const on = d.id === current;
-            return (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => onOpen(d.id)}
-                aria-current={on ? 'page' : undefined}
-                className={cx('flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg')}
-              >
-                <span className="flex w-5 shrink-0 justify-center">
-                  <d.icon size={15} className="text-fg-3" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{d.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
+    <ColumnScroll className="px-3 pt-1 pb-4">
+      <nav aria-label="Settings sections" className="space-y-0.5">
+        {groups().map((g, i) => (
+          <div key={g.label} className="space-y-0.5">
+            <div className={cx('px-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase', i ? 'pt-4' : 'pt-1')}>{g.label}</div>
+            {g.items.map((d) => {
+              const on = d.id === current;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => onOpen(d.id)}
+                  aria-current={on ? 'page' : undefined}
+                  className={cx('flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-1 hover:text-fg')}
+                >
+                  <span className="flex w-5 shrink-0 justify-center">
+                    <d.icon size={15} className="text-fg-3" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{d.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+    </ColumnScroll>
   );
 }
 

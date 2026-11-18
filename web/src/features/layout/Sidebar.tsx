@@ -17,6 +17,7 @@ import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
+import { ColumnScroll } from './ColumnScroll';
 import { SideColumn } from './SideColumn';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
@@ -252,9 +253,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         </button>
       </div>
 
-      <div
+      <ColumnScroll
         data-tour="sessions"
-        className="min-h-0 flex-1 overflow-y-auto"
         onClick={(e) => {
           // A tap on a button in the list itself; not in a session's menu, which opens over it (React passes its clicks on here).
           const t = e.target as HTMLElement;
@@ -262,7 +262,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         }}
       >
         <SessionList query="" />
-      </div>
+      </ColumnScroll>
     </>
   );
 

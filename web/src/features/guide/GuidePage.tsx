@@ -9,6 +9,7 @@ import { BookOpen, Signpost, Sparkles } from 'lucide-react';
 import { Button, cx, Empty, IconButton, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
 import { go, goApp } from '../../lib/nav';
 import { toastError, useUI } from '../../lib/store';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { SideColumn } from '../layout/SideColumn';
 import { startTour } from '../tour/Tour';
@@ -142,7 +143,7 @@ export function GuidePage() {
       </Button>
     </Empty>
   ) : (
-    <HelpHome topics={topics} onOpen={open} column={column} />
+    <HelpHome topics={topics} onOpen={open} column={column} listed={column && sideOpen} />
   );
 
   const home = (
@@ -211,29 +212,14 @@ export function GuidePage() {
           </Button>
         )
       )}
-      {/* The column holds Ask an agent while it shows; hidden, it comes to this row. */}
-      {!sideOpen && !(ask.open && wide) && (
-        <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={showAsk}>
-          Ask an agent
-        </Button>
-      )}
     </div>
   );
   const sideColumn = column && (
-    <SideColumn
-      label="Help"
-      actions={
-        !(ask.open && wide) && (
-          <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={showAsk}>
-            Ask an agent
-          </Button>
-        )
-      }
-    >
+    <SideColumn label="Help">
       <h1 className="sr-only">Help</h1>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <ColumnScroll className="px-3 pt-1 pb-4">
         <HelpPlaces topics={topics} current={topic?.id ?? null} onHome={() => go('/guide')} onOpen={open} />
-      </div>
+      </ColumnScroll>
     </SideColumn>
   );
 

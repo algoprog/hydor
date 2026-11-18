@@ -25,6 +25,7 @@ import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, cx, Empty, IconButton, MenuItem, Popover, Tabs, Throbber, useMediaQuery } from '../../components/ui';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
 import { PlaceRow, PlacesLabel } from '../layout/PlaceRow';
 import { SideColumn } from '../layout/SideColumn';
@@ -537,9 +538,9 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
   const column = wide && (
     <SideColumn label="Apps" tip={tab === 'connected' ? 'connections' : 'apps'} actions={<NewAppMenu />}>
       <h1 className="sr-only">Apps</h1>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <ColumnScroll className="px-3 pt-1 pb-4">
         <Places place={place} onPlace={toPlace} counts={{ all: g ? own.length + ready.length : 0, pinned: pinned.length, recent: used.length || runs.length, own: own.length }} kinds={kinds.slice(1)} connected={connections?.length} />
-      </div>
+      </ColumnScroll>
     </SideColumn>
   );
   const frame = (main: ReactNode) => (

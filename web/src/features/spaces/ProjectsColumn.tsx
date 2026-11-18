@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Boxes, Library, Plus } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { go } from '../../lib/nav';
+import { ColumnScroll } from '../layout/ColumnScroll';
 import { PlaceRow, PlacesLabel } from '../layout/PlaceRow';
 import { SideColumn } from '../layout/SideColumn';
 import { NewSpaceDialog, SpaceMark } from './parts';
@@ -24,7 +25,7 @@ export function ProjectsColumn({ place, project, tip }: { place?: 'all' | 'share
         </Button>
       }
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <ColumnScroll className="px-3 pt-1 pb-4">
         <nav aria-label="Places in Projects" className="space-y-0.5">
           <PlaceRow on={place === 'all'} icon={<Boxes size={15} className="text-fg-3" />} label="All projects" count={spaces?.length} onClick={() => go('/projects')} />
           <PlaceRow on={place === 'shared'} icon={<Library size={15} className="text-fg-3" />} label="Shared knowledge" onClick={() => go('/knowledge')} />
@@ -37,7 +38,7 @@ export function ProjectsColumn({ place, project, tip }: { place?: 'all' | 'share
             </>
           )}
         </nav>
-      </div>
+      </ColumnScroll>
       <NewSpaceDialog open={making} group={false} onClose={() => setMaking(false)} onMade={(s) => go(`/projects/${s.id}`)} />
     </SideColumn>
   );
