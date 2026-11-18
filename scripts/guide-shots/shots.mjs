@@ -86,6 +86,7 @@ const startMenu = (id, label, o = {}) => ({
   id,
   height: o.height ?? 800,
   async take(p, ctx) {
+    if (o.before) await o.before(ctx);
     await ctx.go('/', { settle: 1500 });
     if (o.text) {
       await p.click('textarea');
@@ -193,6 +194,8 @@ export const SHOTS = [
   startMenu('research', 'Options', {
     text: 'Which heat pumps work best below −20 °C? Compare the models sold in Maine.',
     alone: true,
+    // Deep research explained already (it is, after its first use): picking it shows its settings, not the explanation.
+    before: (ctx) => ctx.api('PUT', '/api/tips', { explained: ['research'] }),
     then: async (p) => {
       await p.click(chip('[role="dialog"]', 'Research'), { wait: 700 });
       await p.click(chip('[role="dialog"]', 'Deep research'), { wait: 700 });
