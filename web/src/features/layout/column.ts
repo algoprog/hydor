@@ -1,10 +1,11 @@
 /**
  * The column beside the rail that a page has, if any (SideColumn.tsx): the sessions' on the start page, in a session
- * and in its review; the Library's; the Apps page's; Settings'; the Browser's own tab column, which the page draws itself. Every other
- * page uses the whole width. All of them read `useUI.sideOpen`, so Ctrl+B and the Hide and Show sidebar buttons mean the
+ * and in its review; the Library's; the Apps page's; Settings'; Projects' (also in a project, which it keeps lit); the
+ * Agents page's (also on an agent's page); Help's topics; the Browser's own tab column, which the page draws itself.
+ * Every other page uses the whole width. All of them read `useUI.sideOpen`, so Ctrl+B and the Hide and Show sidebar buttons mean the
  * column of the page you are on. The Library's and the Apps page's index only (its places, Connected apps included): a page, a picture or an app opened from them is shown whole.
  */
-export type Column = 'sessions' | 'library' | 'apps' | 'settings' | 'browser';
+export type Column = 'sessions' | 'library' | 'apps' | 'settings' | 'projects' | 'agents' | 'help' | 'browser';
 
 export function columnOf(loc: string): Column | null {
   if (loc === '/' || loc.startsWith('/s/') || loc.startsWith('/review/')) return 'sessions';
@@ -13,6 +14,12 @@ export function columnOf(loc: string): Column | null {
   // The Apps page: the gallery and Connected apps; an app, its runs and the builder (/apps/<id>…) use the whole width.
   if (loc === '/apps' || loc === '/apps/connected') return 'apps';
   if (loc === '/settings') return 'settings';
+  // Projects: the list, Shared knowledge, and each project's own pages (the column keeps the project you are in lit).
+  if (loc === '/projects' || loc.startsWith('/projects/') || loc === '/knowledge') return 'projects';
+  // Agents: the list and each agent's own page.
+  if (loc === '/agents' || loc.startsWith('/agents/')) return 'agents';
+  // Help: the guide's home and its topics.
+  if (loc === '/guide' || loc.startsWith('/guide/')) return 'help';
   if (loc === '/browser') return 'browser';
   return null;
 }
