@@ -130,7 +130,7 @@ if (own) {
       onBadge: (fn) => listen('hydor:browser-badge', fn),
       /**
        * The shortcuts your own tabs keep from their pages: Ctrl or ⌘ with T, W, L, R, F, P, D, H, J and 1 to 9, Ctrl+Tab and
-       * Ctrl+Shift+Tab, Ctrl or ⌘+Shift+T and Shift+Delete, F5, Alt with the arrows (⌘ with [ and ] on a Mac). Zoom is the app's own.
+       * Ctrl+Shift+Tab, Ctrl or ⌘+Shift+T, Ctrl or ⌘+Shift+N and Shift+Delete, F5, Alt with the arrows (⌘ with [ and ] on a Mac). Zoom is the app's own.
        */
       onKey: (fn) => listen('hydor:browser-key', fn),
       /** Find in one of your tabs ({ forward, findNext, matchCase }): { matches, active }; empty text stops it; null when it is not one of your tabs here. */
@@ -145,11 +145,11 @@ if (own) {
       openExternal: (url) => ipcRenderer.invoke('hydor:browser-open-external', String(url)),
       /** A tab's news as it changes ({ target, audible?, muted?, zoom?, blocked?, fullscreen? }); everything of a tab comes when it is shown. */
       onTabState: (fn) => listen('hydor:browser-tab-state', fn),
-      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in the Library, or ask about it), { cmd: 'picture-failed', message }, { cmd: 'highlight', target, url, title } (mark the selection in that tab), { cmd: 'unhighlight', id, url }. */
+      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in the Library, or ask about it), { cmd: 'picture-failed', message }, { cmd: 'highlight', target, url, title } (mark the selection in that tab), { cmd: 'unhighlight', id, url }, { cmd: 'open-private', url } (open that link in a private tab), { cmd: 'translate', target } (translate that tab's page, or show its original), { cmd: 'translate-text', text, url } (translate the selected words). */
       onCommand: (fn) => listen('hydor:browser-command', fn),
       /**
        * The right-click menu of one of your tabs, for this page to draw in the app's own look: { target, menu, x, y (the
-       * point, in this page's pixels), items: [{ id, label, enabled, args? } or { type: 'separator' }], still (a picture of
+       * point, in this page's pixels), items: [{ id, label, enabled, checked?, args? } or { type: 'separator' }], still (a picture of
        * the tab as it is, for its place while the menu lies over it) }. While anything listens, the system's menu does not show.
        */
       onMenu: (fn) => {
@@ -162,6 +162,12 @@ if (own) {
       },
       /** What was picked in that menu (an item's id; null: it closed with nothing picked); whether it was done. */
       menuPick: (target, menu, item) => ipcRenderer.invoke('hydor:browser-menu-pick', { target: String(target), menu: Number(menu), item: item === null || item === undefined ? null : String(item) }),
+      /** A PNG of what one of your tabs shows (`whole`: of the whole page, as tall as 16384 pixels at most), saved in Downloads and put on the clipboard: { path, name, copied }; null when it could not be made. */
+      capture: (target, whole) => ipcRenderer.invoke('hydor:browser-capture', { target: String(target), whole: !!whole }),
+      /** The page as a PDF saved in Downloads: { path, name }; null when it could not be made. */
+      savePdf: (target) => ipcRenderer.invoke('hydor:browser-pdf', { target: String(target) }),
+      /** Deletes the tab's site's cookies and stored data (the tab's own session: a private tab's too) and loads the tab again: { cleared, site }; null when it is not a web page of one of your tabs. */
+      clearSite: (target) => ipcRenderer.invoke('hydor:browser-clear-site', { target: String(target) }),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
     },

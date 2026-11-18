@@ -141,7 +141,7 @@ export type ToDesktop =
   /** Your answer to a site's permission request in your own browsing (`browser-permission`): allow or block it. */
   | { type: 'browser-permission-answer'; conn: string; id: string; allow: boolean }
   /** The ad blocker's setting for your own browsing: on or off, and the sites where ads are allowed (hosts). Sent at each change and once when that browser starts. */
-  | { type: 'browser-prefs'; adblock: boolean; allowAds: string[] }
+  | { type: 'browser-prefs'; adblock: boolean; allowAds: string[]; cookieBanners: boolean; darkPages: boolean; darkExcept: string[]; autoplay: boolean }
   /** Clear a profile's browsing data (Clear browsing data…): its cookies and site data, and cached files, from `since` (ms) on, or all of it. */
   | { type: 'browser-clear'; profile: string; cookies: boolean; cache: boolean; since?: number };
 

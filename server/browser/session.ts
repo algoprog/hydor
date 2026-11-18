@@ -88,7 +88,8 @@ class Chromium {
   private lock: Promise<unknown> = Promise.resolve();
   private compositor: { ctx: string; s: CdpSession } | null = null;
   private compositorCtx: string | null = null;
-  private downloads = new Map<string, { owner: SessionBrowser; name: string; url: string }>();
+  /** `priv`: it began in a private tab (it is saved, and never put in the list of downloads). */
+  private downloads = new Map<string, { owner: SessionBrowser; name: string; url: string; priv: boolean }>();
 
   private constructor(
     readonly profile: string,
@@ -232,6 +233,22 @@ class Chromium {
     return browserContextId;
   }
 
+  /**
+   * The private browser context of your own browsing, made when the first private tab opens: the desktop app keeps it in
+   * memory (`hydorPrivate`), apart from your sign-ins, and forgets everything in it when it is disposed. Its tabs are your
+   * browsing's own (the context is registered with it).
+   */
+  privateContext(owner: SessionBrowser): Promise<string> {
+    return this.serial(async () => {
+      if (owner.privateCtx) return owner.privateCtx;
+      const { browserContextId } = await this.cdp.send('Target.createBrowserContext', { disposeOnDetach: false, hydorPrivate: true });
+      this.contexts.set(browserContextId, owner);
+      owner.privateCtx = browserContextId;
+      await this.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: STAGING, eventsEnabled: true, browserContextId });
+      return browserContextId;
+    });
+  }
+
   async disposeContext(ctx: string) {
     this.contexts.delete(ctx);
     await this.cdp.send('Target.disposeBrowserContext', { browserContextId: ctx }).catch(() => {});
@@ -289,6 +306,12 @@ class Chromium {
     this.frames.set(info.targetId, tab);
     this.sessions.set(p.sessionId, tab);
     owner.pendingTabs++;
+    // A tab in your private context (a pop-up or a link a private tab opened too) is private.
+    const priv = !!owner.privateCtx && info.browserContextId === owner.privateCtx;
+    if (priv) {
+      tab.incognito = true;
+      owner.privateOpening++;
+    }
     // Set up before its page runs: the commands go out first, then it resumes (a popup waits on both).
     // Your own browsing in the desktop app has no page size of its own: the app's window gives each page one.
     const free = this.native && owner.key === BROWSING_KEY;
@@ -301,6 +324,7 @@ class Chromium {
     await init;
     owner.pendingTabs--;
     owner.adopt(tab, opener);
+    if (priv) owner.privateOpening--;
   }
 
   private detached(sessionId: string, targetId?: string) {
@@ -360,7 +384,7 @@ class Chromium {
     const tab = this.frames.get(p.frameId);
     if (!tab) return;
     const name = safeName(String(p.suggestedFilename || 'download'));
-    this.downloads.set(p.guid, { owner: ownerOf(tab), name, url: String(p.url ?? '') });
+    this.downloads.set(p.guid, { owner: ownerOf(tab), name, url: String(p.url ?? ''), priv: tab.incognito });
     ownerOf(tab).downloadStarted(name);
   }
 
@@ -371,7 +395,7 @@ class Chromium {
     const from = path.join(STAGING, p.guid);
     if (p.state !== 'completed') {
       fs.rmSync(from, { force: true });
-      return dl.owner.downloadEnded(dl.name, null, dl.url);
+      return dl.owner.downloadEnded(dl.name, null, dl.url, dl.priv);
     }
     try {
       const dir = dl.owner.downloadDir();
@@ -383,10 +407,10 @@ class Chromium {
         fs.copyFileSync(from, to);
         fs.rmSync(from, { force: true });
       }
-      dl.owner.downloadEnded(path.basename(to), to, dl.url);
+      dl.owner.downloadEnded(path.basename(to), to, dl.url, dl.priv);
     } catch (e) {
       console.error(`[browser] download: ${(e as Error).message}`);
-      dl.owner.downloadEnded(dl.name, null, dl.url);
+      dl.owner.downloadEnded(dl.name, null, dl.url, dl.priv);
     }
   }
 
@@ -587,6 +611,10 @@ export class SessionBrowser implements TabOwner {
   finishedDownloads: { name: string; path: string | null }[] = [];
   private emitTimer: NodeJS.Timeout | null = null;
   context: string | undefined;
+  /** Your own browsing's private browser context, while a private tab is open (made when the first opens, disposed when the last closes). */
+  privateCtx: string | undefined;
+  /** Private tabs being opened (a new one, a pop-up a private tab opened): the private context stays until they are in. */
+  privateOpening = 0;
   /** The proxy its own context's connections go through. */
   proxy: BrowserProxy | null = null;
 
@@ -665,7 +693,8 @@ export class SessionBrowser implements TabOwner {
 
   tabGone(tab: Tab) {
     // A tab of yours that closed on a page (not the browser closing) can be opened again.
-    if (this.key === BROWSING_KEY && !this.closed && /^(https?|file):\/\//i.test(tab.url) && tab.url.length <= 4000) {
+    // A private tab is not kept anywhere.
+    if (this.key === BROWSING_KEY && !this.closed && !tab.incognito && /^(https?|file):\/\//i.test(tab.url) && tab.url.length <= 4000) {
       closedTabs.unshift({ url: tab.url, title: tab.title, at: Date.now() });
       closedTabs.length = Math.min(closedTabs.length, MAX_CLOSED_TABS);
     }
@@ -673,11 +702,22 @@ export class SessionBrowser implements TabOwner {
     this.groups.forget(tab.targetId);
     for (const [id, r] of this.refs) if (r.tab === tab) this.refs.delete(id);
     if (this.active === tab) this.setActive(this.tabs[this.tabs.length - 1] ?? null);
-    // Your own browsing is never left without a tab (it is not closed by closing the last one, as an agent's is).
+    // The last private tab closing ends private browsing: the desktop app forgets the context's cookies, site data and cache.
+    if (tab.incognito) this.endPrivate();
+    // Your own browsing is never left without a tab (it is not closed by closing the last one, as an agent's is). Private
+    // tabs count as tabs: when the last normal one closes while private ones are open, no new one opens.
     if (!this.tabs.length && !this.closed && this.key === BROWSING_KEY) {
       if (!this.chromium.closed) void this.newTab().catch(() => {});
     } else if (!this.tabs.length && !this.closed) void this.close('Its last tab closed');
     this.changed();
+  }
+
+  /** Disposes the private context when no private tab is open or on its way, so the next private tab starts afresh. */
+  private endPrivate() {
+    const ctx = this.privateCtx;
+    if (!ctx || this.privateOpening > 0 || this.tabs.some((t) => t.incognito)) return;
+    this.privateCtx = undefined;
+    if (!this.chromium.closed) void this.chromium.disposeContext(ctx);
   }
 
   setActive(tab: Tab | null) {
@@ -693,9 +733,10 @@ export class SessionBrowser implements TabOwner {
     this.changed();
   }
 
-  downloadEnded(name: string, file: string | null, url = '') {
-    // What your own browsing downloads is kept in a list, for the search box (downloads.ts); an agent's browser keeps none.
-    if (this.key === BROWSING_KEY) {
+  downloadEnded(name: string, file: string | null, url = '', priv = false) {
+    // What your own browsing downloads is kept in a list, for the search box (downloads.ts); an agent's browser keeps none,
+    // and a private tab's download is saved but not listed (the view's short list of recent downloads shows it).
+    if (this.key === BROWSING_KEY && !priv) {
       try {
         addDownload(d().db, { name, path: file, url, failed: !file });
       } catch (e) {
@@ -730,6 +771,11 @@ export class SessionBrowser implements TabOwner {
         ...(t.canGoBack ? { canGoBack: true } : {}),
         ...(t.canGoForward ? { canGoForward: true } : {}),
         ...(groups.length && this.groups.groupOf(t.targetId) ? { group: this.groups.groupOf(t.targetId) } : {}),
+        ...(t.incognito ? { private: true } : {}),
+        ...(t.lang ? { lang: t.lang } : {}),
+        ...(t.translation ? { translation: t.translation } : {}),
+        ...(t.readerable ? { readerable: true } : {}),
+        ...(t.readerOn ? { reader: true } : {}),
       })),
       driver: this.driver,
       busy: this.busy,
@@ -752,10 +798,28 @@ export class SessionBrowser implements TabOwner {
     return this.newTab();
   }
 
-  async newTab(): Promise<Tab> {
-    const t = await this.chromium.newTab(this, this.context);
-    // The tab is in the list once it is set up (adopt): callers may count on it being there.
-    for (let i = 0; i < 100 && !this.tabs.includes(t) && !t.closed && !this.closed; i++) await sleep(20);
+  /** A new tab; `private`: in the private context (your own browsing only), made on the first one. */
+  async newTab(o: { private?: boolean } = {}): Promise<Tab> {
+    let t: Tab;
+    if (o.private) {
+      if (this.key !== BROWSING_KEY) throw new Error('Only your own browsing has private tabs');
+      this.privateOpening++;
+      try {
+        try {
+          t = await this.chromium.newTab(this, await this.chromium.privateContext(this));
+          for (let i = 0; i < 100 && !this.tabs.includes(t) && !t.closed && !this.closed; i++) await sleep(20);
+        } finally {
+          this.privateOpening--;
+        }
+      } catch (e) {
+        this.endPrivate();
+        throw e;
+      }
+    } else {
+      t = await this.chromium.newTab(this, this.context);
+      // The tab is in the list once it is set up (adopt): callers may count on it being there.
+      for (let i = 0; i < 100 && !this.tabs.includes(t) && !t.closed && !this.closed; i++) await sleep(20);
+    }
     this.setActive(t);
     return t;
   }
@@ -991,6 +1055,8 @@ export class SessionBrowser implements TabOwner {
       if (this.profile && !this.chromium.closed) await this.chromium.closeTab(t).catch(() => {});
     }
     if (this.context && !this.chromium.closed) await this.chromium.disposeContext(this.context);
+    if (this.privateCtx && !this.chromium.closed) await this.chromium.disposeContext(this.privateCtx);
+    this.privateCtx = undefined;
     this.proxy?.close();
     this.proxy = null;
     this.tabs = [];
@@ -1089,6 +1155,7 @@ export async function handOver(tabId: string, key: string, cwd: string): Promise
   const from = browserOf(BROWSING_KEY);
   const mine = from?.tabs.find((t) => t.targetId === tabId);
   if (!from || !mine || mine.closed) throw new HttpError(404, 'That tab is not open any more');
+  if (mine.incognito) throw new HttpError(409, 'A private tab can’t be given to an agent: its sign-ins are kept apart from the browser agents use');
   const url = mine.url;
   const site = siteOfUrl(url);
   if (!site) throw new HttpError(409, 'Open a page on a website in that tab first: an agent can be given only a tab that shows one');

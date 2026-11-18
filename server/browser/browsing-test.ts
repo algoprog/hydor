@@ -9,10 +9,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { BROWSING_KEY, inTabOrder, type BrowserPermissionAsk } from '../../shared/browser.ts';
+import { BROWSING_KEY, inTabOrder, READER_DEFAULTS, type BrowserPermissionAsk } from '../../shared/browser.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { openDb, type DB } from '../db.ts';
+import { HistoryRecorder } from './history.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { addHighlight } from './highlights.ts';
@@ -26,7 +27,9 @@ import { browserRoutes } from './routes.ts';
 import { addVisit, listHistory } from './history.ts';
 import { find } from '../find/index.ts';
 import { internalHeaders } from '../internal.ts';
-import { browserOf, closeAll, ensureBrowser, setBrowserDeps, takeClosedTab } from './session.ts';
+import { shownUrl } from './outline.ts';
+import { browserOf, closeAll, ensureBrowser, setBrowserDeps, SessionBrowser, takeClosedTab, closedTabList } from './session.ts';
+import type { Tab } from './tab.ts';
 import { setBrowserSettings, sessionOptions } from './settings.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -48,6 +51,8 @@ const check = async (name: string, fn: () => Promise<void> | void) => {
   }
 };
 const refused = (status: number, re: RegExp) => (e: unknown) => e instanceof HttpError && e.status === status && re.test(e.message);
+/** The settings that came with private tabs and the new browser settings, as they are before you change any (the app in English). */
+const NEWER = { cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, reader: READER_DEFAULTS };
 
 async function main() {
   // ---- the address bar ----
@@ -83,7 +88,7 @@ async function main() {
   };
   await check('prefs: Google, suggestions and the ad blocker on, until you change them', () => {
     const { db } = mem();
-    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: [] });
+    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: [], ...NEWER });
   });
   await check('prefs: checked, kept, and a bad one keeps nothing', () => {
     const { db, store } = mem();
@@ -99,14 +104,107 @@ async function main() {
     assert.throws(() => setBrowsingPrefs(db, { adblock: 1 }), refused(400, /true or false/));
     assert.equal(browsingPrefs(db).home, 'http://localhost:3000/start', 'the failed changes kept nothing');
     const p = setBrowsingPrefs(db, { engine: 'custom', customSearch: 'https://s.example/find?q=%s', suggest: false, adblock: false, allowAds: ['https://www.Shop.example/cart', 'bad host!', 'shop.example'] });
-    assert.deepEqual(p, { home: 'http://localhost:3000/start', engine: 'custom', customSearch: 'https://s.example/find?q=%s', suggest: false, adblock: false, allowAds: ['shop.example'] });
+    assert.deepEqual(p, { home: 'http://localhost:3000/start', engine: 'custom', customSearch: 'https://s.example/find?q=%s', suggest: false, adblock: false, allowAds: ['shop.example'], ...NEWER });
     assert.throws(() => setBrowsingPrefs(db, { customSearch: '' }), refused(400, /search page/), 'custom cannot lose its page');
     assert.equal(setBrowsingPrefs(db, { engine: 'bing', customSearch: null }).customSearch, undefined);
     // What is kept is checked when read, too.
     store.set('browser.browsing.prefs', JSON.stringify({ home: 'javascript:x', engine: 'custom', suggest: 'no', allowAds: 'a.com b.com' }));
-    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: ['a.com', 'b.com'] });
+    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: ['a.com', 'b.com'], ...NEWER });
     store.set('browser.browsing.prefs', 'junk');
     assert.equal(browsingPrefs(db).engine, 'google');
+  });
+  await check('prefs: the new settings are on or off, in the app’s language, and empty lists, until you change them', () => {
+    const { db, store } = mem();
+    assert.deepEqual(browsingPrefs(db), { ...DEFAULT_PREFS, ...NEWER });
+    assert.equal(browsingPrefs(db).translateTo, 'en');
+    store.set('ui.language', 'de');
+    assert.equal(browsingPrefs(db).translateTo, 'de', 'the app’s own language');
+    // Changing something else does not pin the language: it keeps following the app's.
+    setBrowsingPrefs(db, { autoplay: true });
+    assert.equal(browsingPrefs(db).translateTo, 'de');
+    store.set('ui.language', 'zh');
+    assert.equal(browsingPrefs(db).translateTo, 'zh');
+    assert.equal(setBrowsingPrefs(db, { translateTo: 'fr' }).translateTo, 'fr');
+    store.set('ui.language', 'el');
+    assert.equal(browsingPrefs(db).translateTo, 'fr', 'a language you picked stays');
+    assert.equal(browsingPrefs(db).autoplay, true);
+  });
+  await check('prefs: the new yes-or-no settings are kept, and anything else is 400 with nothing kept', () => {
+    const { db } = mem();
+    for (const k of ['cookieBanners', 'translateOffer', 'darkPages', 'autoplay'] as const) {
+      assert.throws(() => setBrowsingPrefs(db, { [k]: 'yes' }), refused(400, /true or false/), k);
+      assert.throws(() => setBrowsingPrefs(db, { [k]: 0 }), refused(400, /true or false/), k);
+      assert.equal(setBrowsingPrefs(db, { [k]: !DEFAULT_PREFS[k] })[k], !DEFAULT_PREFS[k], k);
+      assert.equal(setBrowsingPrefs(db, { [k]: DEFAULT_PREFS[k] })[k], DEFAULT_PREFS[k], k);
+    }
+    const p = setBrowsingPrefs(db, { cookieBanners: false, darkPages: true });
+    assert.deepEqual([p.cookieBanners, p.darkPages, p.translateOffer, p.autoplay], [false, true, true, false]);
+    assert.throws(() => setBrowsingPrefs(db, { autoplay: true, darkPages: 'x' }), refused(400, /true or false/));
+    assert.equal(browsingPrefs(db).autoplay, false, 'a bad change keeps none of its parts');
+  });
+  await check('prefs: translateTo is one of the languages pages can be translated into', () => {
+    const { db } = mem();
+    for (const v of ['xx', '', 'EN', 7, null, ['de']]) assert.throws(() => setBrowsingPrefs(db, { translateTo: v }), refused(400, /translateTo/), String(v));
+    assert.equal(setBrowsingPrefs(db, { translateTo: 'zh-TW' }).translateTo, 'zh-TW');
+    assert.equal(setBrowsingPrefs(db, { translateTo: 'ga' }).translateTo, 'ga');
+  });
+  await check('prefs: always and never languages are codes, once each, at most 100, and no language is in both', () => {
+    const { db, store } = mem();
+    for (const k of ['translateAlways', 'translateNever'] as const) {
+      for (const v of ['de', { 0: 'de' }, [1], ['xx'], ['de', 'nope'], null]) assert.throws(() => setBrowsingPrefs(db, { [k]: v }), refused(400, new RegExp(k)), `${k} ${JSON.stringify(v)}`);
+      assert.throws(() => setBrowsingPrefs(db, { [k]: Array.from({ length: 101 }, () => 'de') }), refused(400, new RegExp(k)), 'more than 100 (even as one language)');
+      assert.deepEqual(setBrowsingPrefs(db, { [k]: ['fr', 'de', 'fr'] })[k], ['fr', 'de'], 'each once');
+      assert.deepEqual(setBrowsingPrefs(db, { [k]: [] })[k], []);
+    }
+    setBrowsingPrefs(db, { translateAlways: ['fr', 'de'], translateNever: ['ja', 'ko'] });
+    // Setting one takes its languages out of the other.
+    let p = setBrowsingPrefs(db, { translateAlways: ['fr', 'ja'] });
+    assert.deepEqual([p.translateAlways, p.translateNever], [['fr', 'ja'], ['ko']]);
+    p = setBrowsingPrefs(db, { translateNever: ['fr', 'ru'] });
+    assert.deepEqual([p.translateAlways, p.translateNever], [['ja'], ['fr', 'ru']]);
+    // The same language in both of one change is refused, and nothing is kept.
+    assert.throws(() => setBrowsingPrefs(db, { translateAlways: ['it', 'es'], translateNever: ['es'] }), refused(400, /both/));
+    assert.deepEqual([browsingPrefs(db).translateAlways, browsingPrefs(db).translateNever], [['ja'], ['fr', 'ru']]);
+    p = setBrowsingPrefs(db, { translateAlways: ['it'], translateNever: ['es'] });
+    assert.deepEqual([p.translateAlways, p.translateNever], [['it'], ['es']]);
+    // What is kept is checked when read: bad codes go, and "always" wins where the kept lists disagree.
+    store.set('browser.browsing.prefs', JSON.stringify({ translateAlways: ['de', 'xx', 'de', 3], translateNever: ['de', 'fr'] }));
+    p = browsingPrefs(db);
+    assert.deepEqual([p.translateAlways, p.translateNever], [['de'], ['fr']]);
+    store.set('browser.browsing.prefs', JSON.stringify({ translateAlways: 'de', translateNever: { a: 1 } }));
+    assert.deepEqual([browsingPrefs(db).translateAlways, browsingPrefs(db).translateNever], [[], []]);
+    store.set('browser.browsing.prefs', JSON.stringify({ translateAlways: Array.from({ length: 300 }, (_, i) => ['de', 'fr', 'es'][i % 3]) }));
+    assert.deepEqual(browsingPrefs(db).translateAlways, ['de', 'fr', 'es']);
+  });
+  await check('prefs: sites for translation and dark pages are cleaned like the ad blocker’s', () => {
+    const { db, store } = mem();
+    const p = setBrowsingPrefs(db, { translateNeverSites: ['https://www.Bank.example/login', 'bad host!', 'bank.example', 'x.example:8080'], darkExcept: 'a.example, B.example' });
+    assert.deepEqual(p.translateNeverSites, ['bank.example', 'x.example:8080']);
+    assert.deepEqual(p.darkExcept, ['a.example', 'b.example']);
+    assert.deepEqual(p.allowAds, [], 'the ad blocker’s list is its own');
+    assert.deepEqual(setBrowsingPrefs(db, { darkExcept: [] }).darkExcept, []);
+    store.set('browser.browsing.prefs', JSON.stringify({ translateNeverSites: { a: 1 }, darkExcept: ['ok.example', '??'] }));
+    assert.deepEqual([browsingPrefs(db).translateNeverSites, browsingPrefs(db).darkExcept], [[], ['ok.example']]);
+  });
+  await check('prefs: reader view’s look is changed in parts, each checked', () => {
+    const { db, store } = mem();
+    assert.deepEqual(browsingPrefs(db).reader, { size: 19, theme: 'auto', font: 'serif' });
+    assert.deepEqual(setBrowsingPrefs(db, { reader: { size: 21 } }).reader, { size: 21, theme: 'auto', font: 'serif' }, 'the rest is kept');
+    assert.deepEqual(setBrowsingPrefs(db, { reader: { theme: 'sepia' } }).reader, { size: 21, theme: 'sepia', font: 'serif' });
+    assert.deepEqual(setBrowsingPrefs(db, { reader: { font: 'sans', size: 14 } }).reader, { size: 14, theme: 'sepia', font: 'sans' });
+    assert.deepEqual(setBrowsingPrefs(db, { reader: { size: 28, theme: 'dark', font: 'serif' } }).reader, { size: 28, theme: 'dark', font: 'serif' });
+    assert.deepEqual(setBrowsingPrefs(db, { reader: {} }).reader, { size: 28, theme: 'dark', font: 'serif' }, 'nothing given, nothing changed');
+    for (const size of [13, 29, 20.5, '20', null, NaN, 0]) assert.throws(() => setBrowsingPrefs(db, { reader: { size } }), refused(400, /text size/), String(size));
+    for (const theme of ['night', 'AUTO', '', 3]) assert.throws(() => setBrowsingPrefs(db, { reader: { theme } }), refused(400, /theme/), String(theme));
+    for (const font of ['mono', 7, null]) assert.throws(() => setBrowsingPrefs(db, { reader: { font } }), refused(400, /font/), String(font));
+    for (const reader of ['big', 5, null, [], [21]]) assert.throws(() => setBrowsingPrefs(db, { reader }), refused(400, /reader/), JSON.stringify(reader));
+    assert.throws(() => setBrowsingPrefs(db, { reader: { size: 20, theme: 'bad' } }), refused(400, /theme/));
+    assert.equal(browsingPrefs(db).reader.size, 28, 'a bad change keeps none of its parts');
+    store.set('browser.browsing.prefs', JSON.stringify({ reader: { size: 99, theme: 'sepia', font: 'mono' } }));
+    assert.deepEqual(browsingPrefs(db).reader, { size: 19, theme: 'sepia', font: 'serif' }, 'what is kept is checked part by part');
+    store.set('browser.browsing.prefs', JSON.stringify({ reader: 'x' }));
+    assert.deepEqual(browsingPrefs(db).reader, READER_DEFAULTS);
+    assert.notEqual(browsingPrefs(db).reader, READER_DEFAULTS, 'a copy: the defaults are never changed');
   });
   await check('the address bar searches with your engine, custom with its own page', () => {
     const p = { ...DEFAULT_PREFS };
@@ -236,6 +334,30 @@ async function main() {
     assert.doesNotMatch(snapshotMarkdown({ title: '', url: 'https://x.com/', text: '' }), /What I selected/);
   });
 
+  await check('tabs kept: private tabs are never kept, and the groups of the others stay right', () => {
+    const t = (url: string, o: { group?: string; active?: boolean; private?: boolean } = {}) => ({ url, active: !!o.active, ...(o.group ? { group: o.group } : {}), ...(o.private ? { private: true } : {}) });
+    assert.deepEqual(savableTabs([t('https://a.com/'), t('https://secret.example/', { private: true, active: true }), t('https://b.com/')]), { tabs: ['https://a.com/', 'https://b.com/'], active: 1 }, 'a private tab in front: the last kept one is');
+    assert.deepEqual(savableTabs([t('https://secret.example/', { private: true, active: true })]), { tabs: [], active: 0 });
+    const groups = [{ id: 'g1', name: 'Trip', color: 'green' as const }, { id: 'g2', name: 'Work', color: 'blue' as const }];
+    const kept = savableTabs([t('https://p.example/', { private: true }), t('https://a.com/', { group: 'g2' }), t('https://q.example/', { private: true, group: 'g1' }), t('https://b.com/'), t('https://c.com/', { group: 'g2', active: true })], groups);
+    assert.deepEqual(kept.tabs, ['https://a.com/', 'https://b.com/', 'https://c.com/']);
+    assert.deepEqual(kept.groups?.map((g) => g.id), ['g2'], 'a group only a private tab was in is not kept');
+    assert.deepEqual(kept.of, [0, null, 0]);
+    assert.equal(kept.active, 2);
+    // The keeper writes without them, and a change that is only a private tab opening writes nothing new.
+    const written: string[] = [];
+    const k = new TabsKeeper((j) => void written.push(j), 5);
+    const view = (...tabs: { id: string; url: string; active: boolean; private?: boolean }[]) => ({ open: true, tabs: tabs.map((x) => ({ ...x, title: '' })), groups: [] });
+    k.seen(view({ id: '1', url: 'https://a.com/', active: true }));
+    k.flush();
+    k.seen(view({ id: '1', url: 'https://a.com/', active: true }, { id: '2', url: 'https://secret.example/', active: false, private: true }));
+    k.flush();
+    assert.deepEqual(written.map((j) => JSON.parse(j).tabs), [['https://a.com/'], ['https://a.com/']], 'a private tab opening changes nothing that is kept');
+    k.seen(view({ id: '1', url: 'https://a.com/', active: false }, { id: '2', url: 'https://secret.example/', active: true, private: true }));
+    k.flush();
+    assert.ok(written.every((j) => !j.includes('secret')));
+  });
+
   // ---- permissions ----
   await check('permissions: remembered per site and permission, answered at once when known', () => {
     const store = new Map<string, string>();
@@ -270,6 +392,48 @@ async function main() {
     assert.equal(mem.forget('https://maps.example', 'geolocation'), true);
     assert.equal(mem.forget('https://maps.example', 'geolocation'), false);
   });
+  await check('permissions: a private tab’s request is asked, its answer is not kept, and only a kept refusal applies to it', () => {
+    const store = new Map<string, string>();
+    const mem = new PermissionMemory({ get: (k) => store.get(k), set: (k, v) => void store.set(k, v) });
+    const replies: string[] = [];
+    const shown: (BrowserPermissionAsk | null)[] = [];
+    const desk = new PermissionDesk(mem, { show: (a) => void shown.push(a), reply: (c, id, allow) => void replies.push(`${c}:${id}:${allow}`) }, 5000);
+    const ask = (id: string, origin: string, ephemeral: boolean, permission = 'geolocation') => desk.request({ conn: 'c', target: ephemeral ? 'p1' : 't1', id, permission, origin, ...(ephemeral ? { ephemeral } : {}) });
+    // Nothing known: asked, and an answer that would be kept is not.
+    ask('a', 'https://maps.example', true);
+    assert.equal(shown.at(-1)?.id, 'a');
+    assert.equal(desk.answer('a', true), true, 'remember is on by default');
+    assert.deepEqual(replies, ['c:a:true']);
+    assert.equal(mem.known('https://maps.example', 'geolocation'), undefined, 'not remembered');
+    assert.deepEqual(mem.list(), []);
+    assert.equal(store.size, 0, 'nothing written at all');
+    ask('b', 'https://maps.example', true);
+    assert.equal(replies.length, 1, 'asked again: the Allow of a private tab did not carry over');
+    desk.answer('b', false, true);
+    assert.equal(mem.known('https://maps.example', 'geolocation'), undefined, 'a refusal in a private tab is not kept either');
+    // An Allow kept for your normal tabs does not apply to a private one: it asks. A normal tab still gets it at once.
+    mem.remember('https://meet.example', 'media', ['audio'], true);
+    desk.request({ conn: 'c', target: 't1', id: 'n', permission: 'media', origin: 'https://meet.example', media: ['audio'] });
+    assert.equal(replies.at(-1), 'c:n:true');
+    desk.request({ conn: 'c', target: 'p1', id: 'p', permission: 'media', origin: 'https://meet.example', media: ['audio'], ephemeral: true });
+    assert.equal(replies.at(-1), 'c:n:true', 'nothing new was answered');
+    assert.equal(desk.count, 1);
+    assert.equal(shown.at(-1)?.id, 'p');
+    desk.answer('p', true);
+    assert.equal(mem.known('https://meet.example', 'media', ['audio']), true, 'the kept Allow is as it was');
+    assert.equal(replies.at(-1), 'c:p:true');
+    // A refusal kept for normal tabs applies at once to a private one.
+    mem.remember('https://ads.example', 'notifications', undefined, false);
+    ask('r', 'https://ads.example', true, 'notifications');
+    assert.equal(replies.at(-1), 'c:r:false');
+    assert.equal(desk.count, 0);
+    assert.equal(shown.at(-1), null);
+    // The words in the ask say nothing of privacy: it is the page's, as any other.
+    ask('s', 'https://s.example', true);
+    assert.deepEqual(Object.keys(shown.at(-1) ?? {}).sort(), ['id', 'origin', 'permission', 'tab']);
+    desk.answer('s', false);
+  });
+
   await check('permissions: an unanswered request is refused after a while, and when its tab goes', async () => {
     const mem = new PermissionMemory({ get: () => undefined, set: () => {} });
     const replies: string[] = [];
@@ -306,11 +470,163 @@ async function main() {
     assert.throws(() => checkHandoffStart(base({ extra: { browserHandoff: { tab: 'blank' } } }), env), refused(409, /website/));
     assert.throws(() => checkHandoffStart(base({ extra: { browserHandoff: {} as { tab: string } } }), env), refused(400, /which tab/));
   });
+  await check('do this here: a private tab can’t be given to an agent', () => {
+    const e2 = { ...env, tabUrl: (id: string) => (id === 'priv' ? 'https://mail.example.com/inbox' : env.tabUrl(id)), tabPrivate: (id: string) => id === 'priv' };
+    const give = (tab: string, e = e2) => () => checkHandoffStart(base({ extra: { browserHandoff: { tab } } }), e);
+    assert.throws(give('priv'), refused(409, /private tab can’t be given to an agent: its sign-ins are kept apart from the browser agents use/));
+    assert.equal(give('tab1')().extra?.browserOnly, true, 'a normal tab is given as before');
+    assert.throws(give('gone'), refused(404, /not open/), 'a tab that is not there is still 404');
+  });
   await check('do this here: the first message’s line', () => {
     const l = handoffLine({ title: 'Inbox “(3)”\nSneaky', url: 'https://mail.example.com/inbox?pw=abc', site: 'mail.example.com' });
     assert.match(l, /“Inbox \(3\) Sneaky” at https:\/\/mail\.example\.com\/inbox\?pw=hidden is open in your browser/);
     assert.match(l, /kept to mail\.example\.com/);
     assert.match(l, /browser_read/);
+  });
+
+  // ---- private tabs, with a made-up Chromium ----
+  type FakeTab = Tab & { url: string };
+  const fakeBrowser = () => {
+    const log = { disposed: [] as string[], contexts: 0, tabs: 0, failNext: false };
+    let b: SessionBrowser;
+    const tab = (url: string, incognito: boolean) => ({ targetId: `t${++log.tabs}`, url, title: url, incognito, closed: false, casting: false, loading: false, navigating: false, viewport: { w: 1280, h: 800 }, owner: b }) as unknown as FakeTab;
+    const chromium = {
+      closed: false,
+      contexts: new Map<string, SessionBrowser>(),
+      privateContext: async (owner: SessionBrowser) => {
+        if (!owner.privateCtx) {
+          owner.privateCtx = `ctx${++log.contexts}`;
+          chromium.contexts.set(owner.privateCtx, owner);
+        }
+        return owner.privateCtx;
+      },
+      disposeContext: async (c: string) => void (log.disposed.push(c), chromium.contexts.delete(c)),
+      newTab: async (owner: SessionBrowser, ctx: string | undefined) => {
+        if (log.failNext) {
+          log.failNext = false;
+          throw new Error('The new tab did not open');
+        }
+        const t = tab('about:blank', !!ctx && ctx === owner.privateCtx);
+        owner.adopt(t);
+        return t;
+      },
+    };
+    b = new SessionBrowser(BROWSING_KEY, '/tmp', chromium as never, '');
+    const open = async (url: string, o: { private?: boolean } = {}) => {
+      const t = await b.newTab(o);
+      t.url = url;
+      return t;
+    };
+    return { b, log, open, chromium };
+  };
+  await check('private tabs: made in a context of their own; it goes with the last private tab; none are kept in the closed tabs', async () => {
+    setBrowserDeps({ db: openDb(path.join(process.env.DATA_DIR!, 'browsing-private.db')), toSubscribers: () => {} } as unknown as Deps);
+    while (takeClosedTab()) {
+      // Start from none.
+    }
+    const { b, log, open, chromium } = fakeBrowser();
+    const n1 = await open('https://news.example/');
+    assert.equal(n1.incognito, false);
+    assert.equal(b.privateCtx, undefined, 'no private context until a private tab');
+    const p1 = await open('https://secret.example/one', { private: true });
+    const p2 = await open('https://secret.example/two', { private: true });
+    assert.deepEqual([p1.incognito, p2.incognito, b.privateCtx, log.contexts], [true, true, 'ctx1', 1], 'one context for them all');
+    assert.equal(chromium.contexts.get('ctx1'), b, 'its tabs are your browsing’s own');
+    assert.equal(b.active, p2);
+    assert.equal(b.view().tabs.filter((t) => t.private).length, 2);
+    assert.equal(b.view().tabs.find((t) => t.id === n1.targetId)?.private, undefined);
+    // A private tab closing is not for Ctrl+Shift+T, and while another is open the context stays.
+    b.tabGone(p1);
+    assert.deepEqual(closedTabList(), []);
+    assert.deepEqual(log.disposed, []);
+    // The last normal tab closing leaves the private one alone: no new tab opens. It is remembered as any other.
+    b.tabGone(n1);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.deepEqual(b.tabs, [p2]);
+    assert.equal(log.tabs, 3, 'no new tab was made');
+    assert.deepEqual(closedTabList().map((c) => c.url), ['https://news.example/']);
+    assert.equal(b.active, p2);
+    // The last private tab closing: the context is disposed (the app forgets its cookies, site data, cache), and a normal tab opens.
+    b.tabGone(p2);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.deepEqual(log.disposed, ['ctx1']);
+    assert.equal(b.privateCtx, undefined);
+    assert.equal(chromium.contexts.size, 0);
+    assert.deepEqual(closedTabList().map((c) => c.url), ['https://news.example/'], 'the private ones are not there');
+    assert.equal(b.tabs.length, 1, 'your browsing is never left without a tab');
+    assert.equal(b.tabs[0].incognito, false);
+    // The next private tab starts afresh.
+    const p3 = await open('https://secret.example/three', { private: true });
+    assert.deepEqual([p3.incognito, b.privateCtx, log.contexts], [true, 'ctx2', 2]);
+    // A private tab that is still opening (a pop-up on its way) keeps the context.
+    b.privateOpening = 1;
+    b.tabGone(p3);
+    assert.deepEqual(log.disposed, ['ctx1'], 'kept while a private tab is on its way in');
+    b.privateOpening = 0;
+    // A normal tab closing never touches it.
+    const p4 = await open('https://secret.example/four', { private: true });
+    const n2 = await open('https://other.example/');
+    b.tabGone(n2);
+    assert.equal(b.privateCtx, 'ctx2');
+    // The browser closing takes the context with it.
+    await b.close('test');
+    assert.deepEqual(log.disposed, ['ctx1', 'ctx2']);
+    assert.equal(b.privateCtx, undefined);
+    void p4;
+  });
+  await check('private tabs: a tab that did not open leaves no context behind; agents’ browsers have none', async () => {
+    const { b, log, open } = fakeBrowser();
+    log.failNext = true;
+    await assert.rejects(open('https://x.example/', { private: true }), /did not open/);
+    assert.deepEqual([b.privateCtx, log.disposed], [undefined, ['ctx1']]);
+    assert.equal(b.privateOpening, 0);
+    const { chromium } = fakeBrowser();
+    const agent = new SessionBrowser('claude:agent', '/tmp', chromium as never, '');
+    await assert.rejects(agent.newTab({ private: true }), /Only your own browsing has private tabs/);
+    assert.equal(agent.privateOpening, 0);
+  });
+  await check('private tabs: a private tab’s download is saved but never in the list of downloads', async () => {
+    const db = openDb(path.join(process.env.DATA_DIR!, 'browsing-private-dl.db'));
+    setBrowserDeps({ db, toSubscribers: () => {} } as unknown as Deps);
+    const { b } = fakeBrowser();
+    assert.equal(downloadCount(db), 0);
+    b.downloadStarted('plain.pdf');
+    b.downloadEnded('plain.pdf', '/tmp/plain.pdf', 'https://a.example/plain.pdf');
+    assert.equal(downloadCount(db), 1, 'a normal tab’s is listed');
+    b.downloadStarted('secret.pdf');
+    b.downloadEnded('secret.pdf', '/tmp/secret.pdf', 'https://secret.example/secret.pdf', true);
+    assert.equal(downloadCount(db), 1, 'a private tab’s is not');
+    b.downloadStarted('failed.pdf');
+    b.downloadEnded('failed.pdf', null, 'https://secret.example/failed.pdf', true);
+    assert.equal(downloadCount(db), 1);
+    assert.deepEqual(b.view().downloads.map((x) => [x.name, x.done, x.path]), [['failed.pdf', true, ''], ['secret.pdf', true, '/tmp/secret.pdf'], ['plain.pdf', true, '/tmp/plain.pdf']], 'the view’s short list shows it');
+  });
+  await check('private tabs: Group my tabs never sends them to the helper model', async () => {
+    const { b, open } = fakeBrowser();
+    const urls = ['https://a.example/', 'https://b.example/', 'https://c.example/'];
+    for (const u of urls) await open(u);
+    await open('https://secret.example/x', { private: true });
+    const sent: string[] = [];
+    const ask = (async (_db: unknown, o: { prompt: string }) => (sent.push(o.prompt), { groups: [] })) as unknown as Parameters<typeof groupWithAi>[2];
+    assert.deepEqual((await groupWithAi({} as DB, b, ask)).applied, 0);
+    assert.ok(sent[0].includes('a.example') && !sent[0].includes('secret.example'), sent[0]);
+    // Three tabs are needed without the private ones: with only two normal tabs and two private, nothing is asked.
+    const two = fakeBrowser();
+    await two.open('https://a.example/');
+    await two.open('https://b.example/');
+    await two.open('https://p1.example/', { private: true });
+    await two.open('https://p2.example/', { private: true });
+    await assert.rejects(groupWithAi({} as DB, two.b, ask), refused(409, /three tabs/));
+    assert.equal(sent.length, 1);
+  });
+  await check('private tabs: the history recorder skips them, and their typed addresses', () => {
+    const rdb = openDb(path.join(process.env.DATA_DIR!, 'browsing-private-history.db'));
+    const rec = new HistoryRecorder(rdb);
+    const tab = (id: string, url: string, title: string, priv = false) => ({ id, url, title, active: true, ...(priv ? { private: true } : {}) });
+    rec.typed('p', true);
+    rec.seen({ open: true, tabs: [tab('p', 'https://secret.example/', 'Secret', true), tab('n', 'https://plain.example/', 'Plain')] });
+    rec.seen({ open: true, tabs: [tab('p', 'https://secret.example/two', 'Secret two', true), tab('n', 'https://plain.example/', 'Plain')] });
+    assert.deepEqual(listHistory(rdb, { limit: 50 }).map((e) => e.url), ['https://plain.example/']);
   });
 
   // ---- for real, when a Chromium is installed ----
@@ -500,7 +816,7 @@ async function realBrowser() {
       await bad({ customSearch: 'https://s.example/' }, /%s/);
       await bad({ suggest: 'yes' }, /true or false/);
       const p = await call('PATCH', '/api/browser/browsing/prefs', { home: `${base}/home`, engine: 'custom', customSearch: `${base}/search?q=%s`, suggest: false, adblock: false, allowAds: ['https://www.Ads.example/x'] });
-      assert.deepEqual(p, { home: `${base}/home`, engine: 'custom', customSearch: `${base}/search?q=%s`, suggest: false, adblock: false, allowAds: ['ads.example'] });
+      assert.deepEqual(p, { home: `${base}/home`, engine: 'custom', customSearch: `${base}/search?q=%s`, suggest: false, adblock: false, allowAds: ['ads.example'], ...NEWER });
       assert.deepEqual(await call('GET', '/api/browser/browsing/prefs'), p);
     });
 
@@ -925,6 +1241,106 @@ async function realBrowser() {
       assert.equal(v.closed[24].url, `${base}/n2`);
       // The server's tabs list and the history do not turn them into new visits when they come back.
       await call('POST', '/api/browser/browsing/reopen', {});
+    });
+    await check('real: private tabs: in a context of their own, nothing kept, no group, a private copy, and the context goes with the last', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      const quiet = () => new Promise((r) => setTimeout(r, 700));
+      while (takeClosedTab()) {
+        // What the tests before closed is not what this one looks at.
+      }
+      const normal = () => b.tabs.filter((t) => !t.incognito);
+      assert.equal(b.privateCtx, undefined);
+      const r = await call('POST', '/api/browser/browsing/tabs', { url: `${base}/secret-one`, private: true });
+      assert.equal(r.view.tabs.filter((t: { private?: boolean }) => t.private).length, 1);
+      const one = b.tabs.find((t) => t.incognito)!;
+      assert.equal(one.owner, b, 'a tab of your own browsing');
+      assert.ok(b.privateCtx, 'the context was made');
+      assert.equal(b.chromium.contexts.get(b.privateCtx!), b);
+      assert.equal(b.active, one, 'in front');
+      const ctx = b.privateCtx;
+      await until('its page', () => one.title === 'Home' && one.url === `${base}/secret-one`, 20_000);
+      // A new private tab from the address bar joins the same context; a bad flag is refused.
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/secret-two`, newTab: true, private: true });
+      await until('two private tabs', () => b.tabs.filter((t) => t.incognito).length === 2);
+      assert.equal(b.privateCtx, ctx, 'one context for all private tabs');
+      await assert.rejects(call('POST', '/api/browser/browsing/tabs', { private: 'yes' }), /true or false/);
+      await assert.rejects(call('POST', '/api/browser/browsing/go', { text: 'x.example', newTab: true, private: 1 }), /true or false/);
+      // The same tab count of the others: a plain request still makes a normal tab.
+      const n = normal().length;
+      await call('POST', '/api/browser/browsing/tabs', { url: `${base}/other` });
+      await until('a normal tab', () => normal().length === n + 1);
+      assert.ok(normal().every((t) => t.owner === b));
+      // Kept apart: the cookie of a private page is not in a normal tab of the same site, and goes with the context.
+      await one.evaluate('document.cookie = "who=private; path=/"');
+      const other = b.tabs.find((t) => !t.incognito && t.title === 'Other')!;
+      assert.equal(await other.evaluate<string>('document.cookie'), '', 'a normal tab does not see it');
+      // Nothing of them in the history, the tabs kept, or the closed tabs; the tabs show as private.
+      await quiet();
+      assert.deepEqual(listHistory(db, { q: 'secret-one' }), []);
+      assert.deepEqual(listHistory(db, { q: 'secret-two' }), []);
+      assert.ok(listHistory(db, { q: '/other', limit: 50 }).length > 0, 'a normal page is');
+      const view = (await call('GET', '/api/browser/sessions/browsing')).view;
+      assert.equal(view.tabs.filter((t: { private?: boolean }) => t.private).length, 2);
+      assert.ok(!view.tabs.filter((t: { private?: boolean }) => !t.private).some((t: { id: string }) => b.tabs.find((x) => x.targetId === t.id)!.incognito));
+      const saved = savableTabs(view.tabs, view.groups);
+      assert.ok(saved.tabs.length > 0 && saved.tabs.every((u) => !u.includes('secret')), JSON.stringify(saved));
+      // No group, for a private tab: both routes; Group my tabs leaves them out.
+      const mate = normal()[0];
+      await assert.rejects(call('POST', '/api/browser/browsing/groups', { tabs: [one.targetId, mate.targetId] }), (e) => (e as { status?: number }).status === 400 && /Private tabs can’t be put in a group/.test((e as Error).message));
+      await assert.rejects(call('POST', '/api/browser/browsing/tabs/group', { tabs: [one.targetId], group: null }), /Private tabs can’t be put in a group/);
+      assert.equal(b.groups.list(b.tabs.map((t) => t.targetId)).length, 0);
+      // Do this here is refused for a private tab, at once and in handOver.
+      const { handOver } = await import('./session.ts');
+      await assert.rejects(handOver(one.targetId, 'claude:private-test', dataDir), (e) => (e as { status?: number }).status === 409 && /private tab can’t be given/.test((e as Error).message));
+      assert.equal(browserOf('claude:private-test'), undefined);
+      // A copy of a private tab is private, beside it; Ask about this page is refused on it, Save still works.
+      const had = new Set(b.tabs.filter((t) => t.incognito));
+      const dup = await call('POST', `/api/browser/browsing/tabs/${one.targetId}/duplicate`);
+      assert.equal(dup.view.tabs.filter((t: { private?: boolean }) => t.private).length, 3);
+      assert.equal(b.privateCtx, ctx);
+      const copy = b.tabs.find((t) => t.incognito && !had.has(t))!;
+      assert.equal(b.tabs.indexOf(copy), b.tabs.indexOf(one) + 1);
+      await until('the copy loads', () => copy.title === 'Home', 20_000);
+      await assert.rejects(call('POST', `/api/browser/browsing/tabs/${one.targetId}/snapshot`), (e) => (e as { status?: number }).status === 409 && /Agents never get a private tab’s pages: ask from a normal tab/.test((e as Error).message));
+      const snap = await call('POST', `/api/browser/browsing/tabs/${other.targetId}/snapshot`);
+      assert.equal(snap.url, shownUrl(`${base}/other`), 'a normal tab’s copy is still made');
+      // Save to the Library is an act of yours: it works on a private tab.
+      initPages(db);
+      assert.ok((await call('POST', `/api/browser/browsing/tabs/${one.targetId}/save-page`, {})).id);
+      // A normal tab's copy is normal.
+      const ndup = await call('POST', `/api/browser/browsing/tabs/${other.targetId}/duplicate`);
+      assert.equal(ndup.view.tabs.filter((t: { private?: boolean }) => t.private).length, 3);
+      // Closing a private tab keeps nothing for Ctrl+Shift+T; closing some leaves the context.
+      await call('DELETE', `/api/browser/browsing/tabs/${copy.targetId}`);
+      assert.ok(!closedTabList().some((c) => c.url.includes('secret')), 'not in the closed tabs');
+      assert.equal(b.privateCtx, ctx);
+      // Close every private tab: the context is gone, and the next private tab is a new one without the cookie.
+      const closed = await call('POST', '/api/browser/browsing/private/close');
+      assert.equal(closed.view.tabs.filter((t: { private?: boolean }) => t.private).length, 0);
+      assert.equal(b.privateCtx, undefined);
+      assert.equal(b.chromium.contexts.has(ctx!), false);
+      assert.ok(!closedTabList().some((c) => c.url.includes('secret')));
+      assert.equal((await call('POST', '/api/browser/browsing/private/close')).view.tabs.length, b.tabs.length, 'none open: nothing to do');
+      await call('POST', '/api/browser/browsing/tabs', { private: true });
+      const fresh = b.tabs.find((t) => t.incognito)!;
+      assert.notEqual(b.privateCtx, ctx, 'a new context');
+      await until('its home page', () => fresh.url === `${base}/home`, 20_000);
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/mail`, tab: fresh.targetId });
+      await until('the page', () => fresh.title === 'Inbox', 20_000);
+      assert.equal(await fresh.evaluate<string>('document.cookie'), '', 'what the last private tabs set is forgotten');
+      // The last normal tab closing while a private one is open opens nothing; the private ones closing leaves a normal tab.
+      for (const t of normal()) await call('DELETE', `/api/browser/browsing/tabs/${t.targetId}`);
+      await quiet();
+      assert.deepEqual(b.tabs.map((t) => t.incognito), [true], 'only the private tab is left');
+      await call('POST', '/api/browser/browsing/private/close');
+      await until('a normal tab', () => b.tabs.length === 1 && !b.tabs[0].incognito);
+      assert.equal(b.privateCtx, undefined);
+      // The browser closing takes the context with it.
+      await call('POST', '/api/browser/browsing/tabs', { private: true });
+      assert.ok(b.privateCtx);
+      await b.close('test');
+      assert.equal(b.privateCtx, undefined);
+      await call('POST', '/api/browser/browsing/open', {});
     });
     await check('real: clear browsing data: history here, cookies and cache told to the app (nobody here to tell)', async () => {
       await assert.rejects(call('POST', '/api/browser/browsing/clear', {}), /Pick what/);

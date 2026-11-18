@@ -42,8 +42,16 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   rank, and the search box finds them for the person at it, never for an agent's call. A vector goes with its page. The
   ad and tracker blocker is the app's (`desktop/adblock.cjs`): Ghostery's engine on the session of your own browsing,
   made from its lists once and kept as a file in the app's data folder, made again when a week old (the old file stays in
-  use when that fails). The server tells the app when the setting or the sites you allowed ads on change. Electron's own
+  use when that fails), with EasyList's cookie notice list added while **Hide cookie banners** is on. The server tells the app when the setting or the sites you allowed ads on change. Electron's own
   request handlers go before an extension's, so with the blocker on an extension's request blocking may not run.
+- **Your own browsing's private tabs, translation and reader view.** A private tab is a tab in a browser context of its
+  own that the app keeps in memory (`desktop/browser.cjs`: a partition that is never saved) and disposes of when the last
+  private tab closes, so its cookies, site data and cache go with it; the server never records its pages in the history,
+  the closed tabs or the tabs saved for the next start, and refuses to copy its page for an agent. Translating a page is
+  done by a code the app runs in the tab, out of reach of the page's own scripts: it finds the page's words, the server sends them
+  in pieces (what is on screen first) to the helper model and writes the translations back into the same text, watching
+  the page for words that come later. Reader view finds the article with Mozilla's Readability in the tab and shows it in a
+  closed shadow root over the page (`server/browser/reader-view.ts`); nothing leaves the tab.
 - **One memory, three parts.** Memory notes (short facts, in the app's database) are what every agent starts with;
   Wiki memory is linked Markdown articles with their sources, kept in plain files in a folder of yours (a shared
   wiki, and one folder for each project, by default inside it); documents are the files in knowledge bases, indexed

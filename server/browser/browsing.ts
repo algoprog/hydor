@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
-import { BROWSING_KEY, BROWSING_PROFILE, GROUP_COLORS, SEARCH_ENGINES, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type SearchEngine } from '../../shared/browser.ts';
+import { BROWSING_KEY, BROWSING_PROFILE, GROUP_COLORS, isTranslateLang, READER_DEFAULTS, SEARCH_ENGINES, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type ReaderPrefs, type SearchEngine } from '../../shared/browser.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -17,6 +17,7 @@ import { kvGet, kvSet, type DB } from '../db.ts';
 import { desktopChromium, onDesktop, tellDesktop } from '../desktop.ts';
 import { helperJson } from '../helper.ts';
 import type { Deps } from '../features/types.ts';
+import { userLang } from '../language/index.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { saveWebPage } from '../pages/webpage.ts';
 import { isArticle, saveReaderPage } from '../pages/reader.ts';
@@ -24,6 +25,8 @@ import { loadBookmarks } from './bookmarks.ts';
 import { checkProposal, cleanGroupName, isGroupColor, MAX_GROUPS } from './groups.ts';
 import { clearDownloads, listDownloads, removeDownload } from './downloads.ts';
 import { HighlightsLive } from './highlights-live.ts';
+import { ReaderViews, readerRoutes } from './reader-view.ts';
+import { PageTranslations, translateRoutes } from './translate.ts';
 import { highlightRoutes } from './highlights-routes.ts';
 import { clearHistory, HistoryRecorder, historyUrl, listHistory, removeHistory, suggest } from './history.ts';
 import { shownUrl } from './outline.ts';
@@ -100,7 +103,50 @@ export function addressOf(text: string): string | null {
 // ---- your settings for it -------------------------------------------------------------------------------------
 
 export const PREFS_KEY = 'browser.browsing.prefs';
-export const DEFAULT_PREFS: BrowsingPrefs = { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: [] };
+/** The settings before you change any (`translateTo` is the app's own language: browsingPrefs fills it in). */
+export const DEFAULT_PREFS: BrowsingPrefs = {
+  home: 'https://www.google.com/',
+  engine: 'google',
+  suggest: true,
+  adblock: true,
+  allowAds: [],
+  cookieBanners: true,
+  translateTo: 'en',
+  translateOffer: true,
+  translateAlways: [],
+  translateNever: [],
+  translateNeverSites: [],
+  darkPages: false,
+  darkExcept: [],
+  autoplay: false,
+  reader: READER_DEFAULTS,
+};
+
+const MAX_LANGS = 100;
+const READER_THEMES: readonly ReaderPrefs['theme'][] = ['auto', 'dark', 'light', 'sepia'];
+const READER_FONTS: readonly ReaderPrefs['font'][] = ['sans', 'serif'];
+const readerSize = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 14 && v <= 28;
+
+/** What is kept of a list of languages, checked: the codes of TRANSLATE_LANGS that are there, once each (anything else is dropped). */
+function keptLangs(v: unknown): string[] {
+  return Array.isArray(v) ? [...new Set(v.filter(isTranslateLang))].slice(0, MAX_LANGS) : [];
+}
+
+/** A list of languages in a change, or a 400 when it is not a list of at most 100 codes of TRANSLATE_LANGS. */
+function givenLangs(k: string, v: unknown): string[] {
+  if (!Array.isArray(v) || v.length > MAX_LANGS || !v.every(isTranslateLang)) throw new HttpError(400, `${k} should be a list of at most ${MAX_LANGS} language codes, such as ["de", "fr"]`);
+  return [...new Set(v as string[])];
+}
+
+/** How reader view shows articles as kept, each part checked (a wrong one is its default). */
+function keptReader(v: unknown): ReaderPrefs {
+  const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  return {
+    size: readerSize(r.size) ? r.size : READER_DEFAULTS.size,
+    theme: READER_THEMES.includes(r.theme as ReaderPrefs['theme']) ? (r.theme as ReaderPrefs['theme']) : READER_DEFAULTS.theme,
+    font: READER_FONTS.includes(r.font as ReaderPrefs['font']) ? (r.font as ReaderPrefs['font']) : READER_DEFAULTS.font,
+  };
+}
 
 /** Each engine's results page, with %s where the words go. */
 export const SEARCH_PAGES: Record<Exclude<SearchEngine, 'custom'>, string> = {
@@ -130,15 +176,21 @@ export function customTemplate(v: unknown): string | null {
   return t;
 }
 
-/** What is kept, checked: anything wrong in it is the default. */
-export function browsingPrefs(db: DB): BrowsingPrefs {
-  let v: Record<string, unknown> = {};
+/** The settings as kept, not yet checked. */
+function storedPrefs(db: DB): Record<string, unknown> {
   try {
     const raw = JSON.parse(kvGet(db, PREFS_KEY) ?? '{}');
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) v = raw;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
   } catch {}
+  return {};
+}
+
+/** What is kept, checked: anything wrong in it is the default. */
+export function browsingPrefs(db: DB): BrowsingPrefs {
+  const v = storedPrefs(db);
   const engine = (SEARCH_ENGINES as readonly unknown[]).includes(v.engine) ? (v.engine as SearchEngine) : DEFAULT_PREFS.engine;
   const custom = customTemplate(v.customSearch);
+  const always = keptLangs(v.translateAlways);
   return {
     home: homeAddress(v.home) ?? DEFAULT_PREFS.home,
     // A custom engine with no page of its own is Google.
@@ -147,6 +199,17 @@ export function browsingPrefs(db: DB): BrowsingPrefs {
     suggest: typeof v.suggest === 'boolean' ? v.suggest : DEFAULT_PREFS.suggest,
     adblock: typeof v.adblock === 'boolean' ? v.adblock : DEFAULT_PREFS.adblock,
     allowAds: cleanSites(v.allowAds),
+    cookieBanners: typeof v.cookieBanners === 'boolean' ? v.cookieBanners : DEFAULT_PREFS.cookieBanners,
+    translateTo: isTranslateLang(v.translateTo) ? v.translateTo : userLang(db),
+    translateOffer: typeof v.translateOffer === 'boolean' ? v.translateOffer : DEFAULT_PREFS.translateOffer,
+    translateAlways: always,
+    // A language is never in both lists: if the kept ones disagree, "always" wins.
+    translateNever: keptLangs(v.translateNever).filter((l) => !always.includes(l)),
+    translateNeverSites: cleanSites(v.translateNeverSites),
+    darkPages: typeof v.darkPages === 'boolean' ? v.darkPages : DEFAULT_PREFS.darkPages,
+    darkExcept: cleanSites(v.darkExcept),
+    autoplay: typeof v.autoplay === 'boolean' ? v.autoplay : DEFAULT_PREFS.autoplay,
+    reader: keptReader(v.reader),
   };
 }
 
@@ -171,14 +234,53 @@ export function setBrowsingPrefs(db: DB, patch: Record<string, unknown>): Browsi
     next.engine = patch.engine as SearchEngine;
   }
   if (next.engine === 'custom' && !next.customSearch) throw new HttpError(400, 'Give your own search page: a web address with %s where the words go');
-  for (const k of ['suggest', 'adblock'] as const) {
+  for (const k of ['suggest', 'adblock', 'cookieBanners', 'translateOffer', 'darkPages', 'autoplay'] as const) {
     if (patch[k] === undefined) continue;
     if (typeof patch[k] !== 'boolean') throw new HttpError(400, `${k} should be true or false`);
     next[k] = patch[k] as boolean;
   }
   if (patch.allowAds !== undefined) next.allowAds = cleanSites(patch.allowAds);
+  if (patch.translateNeverSites !== undefined) next.translateNeverSites = cleanSites(patch.translateNeverSites);
+  if (patch.darkExcept !== undefined) next.darkExcept = cleanSites(patch.darkExcept);
+  if (patch.translateTo !== undefined) {
+    if (!isTranslateLang(patch.translateTo)) throw new HttpError(400, 'translateTo should be a language code, such as "en" or "de"');
+    next.translateTo = patch.translateTo;
+  }
+  // A language is never in both lists: the one a change sets takes its languages out of the other.
+  const always = patch.translateAlways === undefined ? undefined : givenLangs('translateAlways', patch.translateAlways);
+  const never = patch.translateNever === undefined ? undefined : givenLangs('translateNever', patch.translateNever);
+  if (always && never && always.some((l) => never.includes(l))) throw new HttpError(400, 'A language can’t be in both translateAlways and translateNever');
+  if (always) {
+    next.translateAlways = always;
+    if (!never) next.translateNever = next.translateNever.filter((l) => !always.includes(l));
+  }
+  if (never) {
+    next.translateNever = never;
+    if (!always) next.translateAlways = next.translateAlways.filter((l) => !never.includes(l));
+  }
+  if (patch.reader !== undefined) {
+    const r = patch.reader as Record<string, unknown> | null;
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw new HttpError(400, 'reader should be an object: { size, theme, font }');
+    const reader = { ...next.reader };
+    if (r.size !== undefined) {
+      if (!readerSize(r.size)) throw new HttpError(400, 'The reader’s text size should be a whole number from 14 to 28');
+      reader.size = r.size;
+    }
+    if (r.theme !== undefined) {
+      if (!READER_THEMES.includes(r.theme as ReaderPrefs['theme'])) throw new HttpError(400, `The reader’s theme should be one of: ${READER_THEMES.join(', ')}`);
+      reader.theme = r.theme as ReaderPrefs['theme'];
+    }
+    if (r.font !== undefined) {
+      if (!READER_FONTS.includes(r.font as ReaderPrefs['font'])) throw new HttpError(400, `The reader’s font should be one of: ${READER_FONTS.join(', ')}`);
+      reader.font = r.font as ReaderPrefs['font'];
+    }
+    next.reader = reader;
+  }
   if (next.engine !== 'custom' && next.customSearch === undefined) delete next.customSearch;
-  kvSet(db, PREFS_KEY, JSON.stringify(next));
+  // The language pages are translated into follows the app's own until you pick one: it is not kept before.
+  const keep: Record<string, unknown> = { ...next };
+  if (patch.translateTo === undefined && !isTranslateLang(storedPrefs(db).translateTo)) delete keep.translateTo;
+  kvSet(db, PREFS_KEY, JSON.stringify(keep));
   return browsingPrefs(db);
 }
 
@@ -219,11 +321,12 @@ export interface SavedGroups {
 }
 
 /**
- * The open tabs as they are kept: their addresses (blank ones left out, at most 30) and which one was in front, and
+ * The open tabs as they are kept: their addresses (blank ones and private tabs left out, at most 30) and which one was in front, and
  * (only when some are grouped) their groups and which group each tab was in.
  */
-export function savableTabs(tabs: { url: string; active: boolean; group?: string }[], groups: BrowserGroup[] = []): { tabs: string[]; active: number } & Partial<SavedGroups> {
-  const keep = tabs.filter((t) => restorable(t.url)).slice(0, MAX_SAVED_TABS);
+export function savableTabs(tabs: { url: string; active: boolean; group?: string; private?: boolean }[], groups: BrowserGroup[] = []): { tabs: string[]; active: number } & Partial<SavedGroups> {
+  // Private tabs are never kept.
+  const keep = tabs.filter((t) => !t.private && restorable(t.url)).slice(0, MAX_SAVED_TABS);
   const at = keep.findIndex((t) => t.active);
   const base = { tabs: keep.map((t) => t.url), active: at < 0 ? Math.max(0, keep.length - 1) : at };
   const used = groups.filter((g) => keep.some((t) => t.group === g.id));
@@ -323,6 +426,8 @@ export interface PermissionRequest {
   permission: string;
   origin: string;
   media?: string[];
+  /** It comes from a private tab: asked of you, its answer is not kept, and an earlier Allow does not carry over (only a refusal does). */
+  ephemeral?: boolean;
 }
 
 /** What you answered, per site and permission ("https://meet.example|media:audio+video"). */
@@ -378,7 +483,7 @@ export class PermissionMemory {
   }
 }
 
-/** The requests waiting for you, one shown at a time; what you answered is kept (unless you say not to). */
+/** The requests waiting for you, one shown at a time; what you answered is kept (unless you say not to, or it came from a private tab). */
 export class PermissionDesk {
   private waiting: { req: PermissionRequest; timer: NodeJS.Timeout }[] = [];
   constructor(
@@ -387,10 +492,13 @@ export class PermissionDesk {
     private timeoutMs = ASK_MS,
   ) {}
 
-  /** A page asks: answered at once when you have answered before, else it waits for you. */
+  /**
+   * A page asks: answered at once when you have answered before, else it waits for you. A private tab's request is
+   * answered at once only by a refusal you kept: an Allow you gave your normal tabs is asked again.
+   */
   request(req: PermissionRequest) {
     const known = this.memory.known(req.origin, req.permission, req.media);
-    if (known !== undefined) return this.hooks.reply(req.conn, req.id, known);
+    if (known !== undefined && (!req.ephemeral || known === false)) return this.hooks.reply(req.conn, req.id, known);
     const timer = setTimeout(() => this.drop(req.id, false), this.timeoutMs);
     timer.unref?.();
     this.waiting.push({ req, timer });
@@ -401,7 +509,7 @@ export class PermissionDesk {
   answer(id: string, allow: boolean, remember = true): boolean {
     const w = this.waiting.find((x) => x.req.id === id);
     if (!w) return false;
-    if (remember) this.memory.remember(w.req.origin, w.req.permission, w.req.media, allow);
+    if (remember && !w.req.ephemeral) this.memory.remember(w.req.origin, w.req.permission, w.req.media, allow);
     this.drop(id, allow);
     return true;
   }
@@ -437,6 +545,8 @@ export interface HandoffEnv {
   enabled: boolean;
   /** The address of a tab of your own browsing, undefined when there is none. */
   tabUrl(tab: string): string | undefined;
+  /** Whether a tab of your own browsing is a private one. */
+  tabPrivate?(tab: string): boolean;
 }
 
 const NO_OTHERS: Record<'swarm' | 'research' | 'arena', string> = {
@@ -463,6 +573,7 @@ export function checkHandoffStart(o: CreateOpts, env: HandoffEnv): CreateOpts {
   if (!env.enabled) throw new HttpError(409, 'The browser is turned off in Settings → Browser');
   const url = env.tabUrl(h.tab);
   if (url === undefined) throw new HttpError(404, 'That tab is not open any more');
+  if (env.tabPrivate?.(h.tab)) throw new HttpError(409, 'A private tab can’t be given to an agent: its sign-ins are kept apart from the browser agents use');
   if (!siteOfUrl(url)) throw new HttpError(409, 'Open a page on a website in that tab first: an agent can be given only a tab that shows one');
   // Its browser is the tab's, in your browsing's profile: no other profile is picked for it.
   const { browser: _picked, ...extra } = o.extra as Record<string, unknown>;
@@ -475,7 +586,8 @@ export function checkHandoffStart(o: CreateOpts, env: HandoffEnv): CreateOpts {
  * there to attach (what its browser downloads lands there too).
  */
 export function browserHandoffStart(db: DB, o: CreateOpts): CreateOpts {
-  const checked = checkHandoffStart(o, { enabled: browserSettings(db).enabled, tabUrl: (id) => browserOf(BROWSING_KEY)?.tabs.find((t) => t.targetId === id && !t.closed)?.url });
+  const open = (id: string) => browserOf(BROWSING_KEY)?.tabs.find((t) => t.targetId === id && !t.closed);
+  const checked = checkHandoffStart(o, { enabled: browserSettings(db).enabled, tabUrl: (id) => open(id)?.url, tabPrivate: (id) => !!open(id)?.incognito });
   if (checked === o) return o;
   const cwd = path.join(BROWSER_DIR, 'handed', crypto.randomBytes(6).toString('hex'));
   fs.mkdirSync(cwd, { recursive: true, mode: 0o700 });
@@ -525,12 +637,13 @@ Answer with one JSON object and nothing else: {"groups":[{"name":"…","color":"
  * tab ids, a short name and a colour each; they are applied, and `before` is what Undo puts back.
  */
 export async function groupWithAi(db: DB, b: SessionBrowser, ask: typeof helperJson = helperJson): Promise<{ applied: number; before: ReturnType<SessionBrowser['groups']['snapshot']> }> {
-  const loose = b.tabs.filter((t) => !t.closed && !b.groups.groupOf(t.targetId) && /^(https?|file):\/\//i.test(t.url));
+  // Private tabs are never sent to the helper model (and are never put in a group).
+  const loose = b.tabs.filter((t) => !t.closed && !t.incognito && !b.groups.groupOf(t.targetId) && /^(https?|file):\/\//i.test(t.url));
   if (loose.length < 3) throw new HttpError(409, 'Open at least three tabs that are in no group first');
   const sent = loose.slice(0, 60).map((t) => ({ id: t.targetId, title: (t.title || '').replace(/\s+/g, ' ').trim().slice(0, 120), url: addressSent(t.url) }));
   const answer = await ask<{ groups?: unknown }>(db, { system: GROUP_SYSTEM, prompt: `<tabs>\n${JSON.stringify(sent)}\n</tabs>`, maxTokens: 1500, timeoutMs: 60_000, task: 'grouping your tabs' }, 'groups of tabs');
   // The tabs may have changed while the helper thought: only those still open and still in no group are grouped.
-  const free = new Set(b.tabs.filter((t) => !t.closed && !b.groups.groupOf(t.targetId)).map((t) => t.targetId));
+  const free = new Set(b.tabs.filter((t) => !t.closed && !t.incognito && !b.groups.groupOf(t.targetId)).map((t) => t.targetId));
   const plan = checkProposal(answer, new Set(sent.map((x) => x.id).filter((x) => free.has(x))));
   const before = b.groups.snapshot();
   for (const g of plan) b.groups.create(g.tabs, { name: g.name, color: g.color });
@@ -561,7 +674,7 @@ export function browsingRoutes(d: Deps) {
   /** Tells the app how to block ads (once the browser has started, and at each change of the settings). */
   const tellPrefs = () => {
     const p = browsingPrefs(db);
-    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds });
+    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds, cookieBanners: p.cookieBanners, darkPages: p.darkPages, darkExcept: p.darkExcept, autoplay: p.autoplay });
   };
   /**
    * Your browsing, started when it is not running, with the tabs it had last time (and the home page when it had none,
@@ -604,19 +717,25 @@ export function browsingRoutes(d: Deps) {
     });
   };
 
+  /** `private` in a request: true or false (none is false). */
+  const privateOf = (v: unknown): boolean => {
+    if (v !== undefined && typeof v !== 'boolean') throw new HttpError(400, 'private should be true or false');
+    return v === true;
+  };
   const blankOnly = (b: SessionBrowser) => b.tabs.length === 1 && b.tabs[0].url === 'about:blank';
   /** `typed`: it came from the address bar (its page counts as typed in the history). */
-  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean; typed?: boolean }): Promise<Tab> => {
+  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean; typed?: boolean; private?: boolean }): Promise<Tab> => {
     const target = barTarget(browsingPrefs(db), text);
     let t: Tab | undefined;
     if (o.tab) {
       t = b.tabs.find((x) => x.targetId === o.tab);
       if (!t) throw new HttpError(404, 'No such tab');
-    } else if (o.newTab && !blankOnly(b)) t = await b.newTab();
+    } else if (o.private && o.newTab) t = await b.newTab({ private: true });
+    else if (o.newTab && !blankOnly(b)) t = await b.newTab();
     else t = await b.tab();
     b.setActive(t);
     // Typing the address of the page you are on reloads it: not another visit.
-    if (o.typed && addressOf(text) && historyUrl(target)?.replace(/#.*$/s, '') !== historyUrl(t.url)?.replace(/#.*$/s, '')) recorder?.typed(t.targetId);
+    if (o.typed && addressOf(text) && historyUrl(target)?.replace(/#.*$/s, '') !== historyUrl(t.url)?.replace(/#.*$/s, '')) recorder?.typed(t.targetId, t.incognito);
     // A page that cannot load shows the browser's own error page: nothing more to say here.
     await t.navigate(target).catch(() => null);
     b.changed();
@@ -630,14 +749,15 @@ export function browsingRoutes(d: Deps) {
     return { key: BROWSING_KEY, view: b.view() };
   });
 
-  /** A new tab: at the address, or at the home page. */
+  /** A new tab: at the address, or at the home page; `private`: a new private tab (never the blank one that is reused). */
   app.post('/api/browser/browsing/tabs', async (req) => {
     const url = typeof B(req).url === 'string' ? B(req).url.trim() : '';
+    const priv = privateOf(B(req).private);
     const b = await browsing(false);
-    if (url) await go(b, url, { newTab: true });
+    if (url) await go(b, url, { newTab: true, private: priv });
     else {
-      // A browser with only a blank tab (it just started) uses it.
-      const t = blankOnly(b) ? b.tabs[0] : await b.newTab();
+      // A browser with only a blank tab (it just started) uses it, unless the tab is to be private.
+      const t = priv ? await b.newTab({ private: true }) : blankOnly(b) ? b.tabs[0] : await b.newTab();
       b.setActive(t);
       recorder?.quiet(t.targetId);
       void t.navigate(browsingPrefs(db).home).catch(() => {});
@@ -649,8 +769,9 @@ export function browsingRoutes(d: Deps) {
   app.post('/api/browser/browsing/go', async (req) => {
     const { text, tab, newTab } = B(req);
     if (typeof text !== 'string' || !text.trim()) throw new HttpError(400, 'Type an address or something to search for');
+    const priv = privateOf(B(req).private);
     const b = await browsing(false);
-    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab, typed: true });
+    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab, typed: true, private: priv });
     return { view: b.view() };
   });
 
@@ -692,11 +813,18 @@ export function browsingRoutes(d: Deps) {
     return ids;
   };
 
+  /** The ids as `tabIds` gives them, with none of a private tab (400): private tabs can’t be in a group. */
+  const groupable = (b: SessionBrowser, v: unknown): string[] => {
+    const ids = tabIds(b, v);
+    if (ids.some((id) => b.tabs.find((t) => t.targetId === id)?.incognito)) throw new HttpError(400, 'Private tabs can’t be put in a group');
+    return ids;
+  };
+
   /** Makes a group of tabs (a name and a colour are optional: a colour not in use yet is picked). */
   app.post('/api/browser/browsing/groups', async (req) => {
     const b = mine();
     const { name, color } = B(req);
-    const g = b.groups.create(tabIds(b, B(req).tabs), { name, color });
+    const g = b.groups.create(groupable(b, B(req).tabs), { name, color });
     b.changed();
     return { group: g, view: b.view() };
   });
@@ -729,7 +857,7 @@ export function browsingRoutes(d: Deps) {
     const b = mine();
     const group = B(req).group;
     if (group !== null && typeof group !== 'string') throw new HttpError(400, 'group should be a group’s id, or null for none');
-    b.groups.put(tabIds(b, B(req).tabs), group);
+    b.groups.put(groupable(b, B(req).tabs), group);
     b.changed();
     return { view: b.view() };
   });
@@ -740,7 +868,7 @@ export function browsingRoutes(d: Deps) {
     const { groups, of } = B(req);
     if (!Array.isArray(groups) || !of || typeof of !== 'object' || Array.isArray(of)) throw new HttpError(400, 'Send groups and of, as Group my tabs gave them');
     const clean = groups.slice(0, MAX_GROUPS).map((g: Record<string, unknown>) => ({ id: String(g?.id ?? ''), name: cleanGroupName(g?.name), color: isGroupColor(g?.color) ? g.color : ('grey' as const), ...(g?.folded === true ? { folded: true } : {}) }));
-    b.groups.restore({ groups: clean, of: Object.fromEntries(Object.entries(of as Record<string, unknown>).filter(([, v]) => typeof v === 'string') as [string, string][]) }, new Set(b.tabs.map((t) => t.targetId)));
+    b.groups.restore({ groups: clean, of: Object.fromEntries(Object.entries(of as Record<string, unknown>).filter(([, v]) => typeof v === 'string') as [string, string][]) }, new Set(b.tabs.filter((t) => !t.incognito).map((t) => t.targetId)));
     b.changed();
     return { view: b.view() };
   });
@@ -760,15 +888,23 @@ export function browsingRoutes(d: Deps) {
     const b = mine();
     const t = b.tabs.find((x) => x.targetId === P(req).id && !x.closed);
     if (!t) throw new HttpError(404, 'No such tab');
-    const copy = await b.newTab();
+    // The copy of a private tab is private.
+    const copy = await b.newTab(t.incognito ? { private: true } : {});
     // Beside the tab it came from (the tab list is in order of opening).
     b.tabs = b.tabs.filter((x) => x !== copy);
     b.tabs.splice(b.tabs.indexOf(t) + 1, 0, copy);
     const group = b.groups.groupOf(t.targetId);
-    if (group) b.groups.put([copy.targetId], group);
+    if (group && !copy.incognito) b.groups.put([copy.targetId], group);
     recorder?.quiet(copy.targetId);
     void copy.navigate(t.url).catch(() => {});
     b.changed();
+    return { view: b.view() };
+  });
+
+  /** Closes every private tab (the private context goes with the last: its cookies, site data and cache are forgotten). */
+  app.post('/api/browser/browsing/private/close', async () => {
+    const b = mine();
+    for (const t of b.tabs.filter((x) => x.incognito)) await b.closeTab(t);
     return { view: b.view() };
   });
 
@@ -794,6 +930,8 @@ export function browsingRoutes(d: Deps) {
   app.patch('/api/browser/browsing/prefs', async (req) => {
     const prefs = setBrowsingPrefs(db, B(req));
     tellPrefs();
+    // Articles shown in reader view take the new size, colours or font at once.
+    if (B(req).reader !== undefined) void readers.restyle();
     return prefs;
   });
 
@@ -841,6 +979,12 @@ export function browsingRoutes(d: Deps) {
   // Highlights: your marks on web pages, put back when a page loads (highlights-live.ts).
   const marks = new HighlightsLive(db, () => browserOf(BROWSING_KEY)?.tabs ?? []);
   highlightRoutes(d, marks, async (url) => go(await browsing(false), url, { newTab: true }));
+  // Reader view: a page's article shown over it, in the look you chose (reader-view.ts).
+  const readers = new ReaderViews(db, () => browserOf(BROWSING_KEY)?.tabs ?? []);
+  readerRoutes(d, readers);
+  // Translation: a page in another language translated in place by the helper model, what is on screen first (translate.ts).
+  const translations = new PageTranslations(db, () => browserOf(BROWSING_KEY)?.tabs ?? []);
+  translateRoutes(d, translations);
 
   app.post('/api/browser/browsing/history/clear', async (req) => {
     const since = sinceOf(B(req).since);
@@ -914,6 +1058,8 @@ export function browsingRoutes(d: Deps) {
     const b = browserOf(BROWSING_KEY);
     const t = b?.tabs.find((x) => x.targetId === P(req).id);
     if (!b || !t || t.closed) throw new HttpError(404, 'No such tab');
+    // The copy goes to an agent's session: what a private tab shows is never given to one.
+    if (t.incognito) throw new HttpError(409, 'Agents never get a private tab’s pages: ask from a normal tab');
     if (!/^(https?|file):/i.test(t.url)) throw new HttpError(409, 'That tab shows no page to copy');
     await t.waitLoad(3000);
     let text = '';
@@ -1017,7 +1163,9 @@ export function browsingRoutes(d: Deps) {
     if (m.type !== 'browser-permission') return;
     const b = browserOf(BROWSING_KEY);
     if (!b || b.chromium.conn !== m.conn || typeof m.id !== 'string') return void tellDesktop({ type: 'browser-permission-answer', conn: m.conn, id: m.id, allow: false });
-    desk.request({ conn: m.conn, target: m.target, id: m.id, permission: String(m.permission), origin: String(m.origin), ...(Array.isArray(m.media) ? { media: m.media.map(String) } : {}) });
+    // A private tab's request is asked of you, and its answer is not kept.
+    const priv = !!(b.chromium.tabOf(String(m.target)) ?? b.tabs.find((t) => t.targetId === m.target))?.incognito;
+    desk.request({ conn: m.conn, target: m.target, id: m.id, permission: String(m.permission), origin: String(m.origin), ...(Array.isArray(m.media) ? { media: m.media.map(String) } : {}), ...(priv ? { ephemeral: true } : {}) });
   });
   // Your tabs are kept as they change; a request whose tab closed, or whose browser stopped, is refused.
   const keeper = new TabsKeeper((json) => kv.set(TABS_KEY, json));
@@ -1027,6 +1175,8 @@ export function browsingRoutes(d: Deps) {
     keeper.seen(view);
     recorder?.seen(view);
     marks.seen(view);
+    readers.seen(view);
+    translations.seen(view);
     const b = browserOf(BROWSING_KEY);
     desk.prune((target) => !!b && !b.closed && b.tabs.some((t) => t.targetId === target));
   });

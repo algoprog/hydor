@@ -194,7 +194,7 @@ export function BrowserSettingsBody() {
         <Group title="Your own browsing" hint="The Browser page: pages you use yourself, which agents never get">
           <Row icon={<Bookmark size={16} />} label="Bookmarks" hint="Yours, with those from the other browsers on this computer" onClick={() => go('/browser?panel=bookmarks')} />
           <Row icon={<Puzzle size={16} />} label="Extensions" hint="Chrome extensions, in the desktop app" onClick={() => go('/browser?panel=extensions')} />
-          <Row icon={<SlidersHorizontal size={16} />} label="Browser settings" hint="Home page, search engine, ad blocker, history and clearing what it kept" onClick={() => go('/browser?panel=settings')} />
+          <Row icon={<SlidersHorizontal size={16} />} label="Browser settings" hint="Home page, search engine, translation, dark pages, ad blocker, history and clearing what it kept" onClick={() => go('/browser?panel=settings')} />
         </Group>
       )}
 

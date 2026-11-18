@@ -22,7 +22,7 @@ Die Werkzeugleiste ist eine Spalte aus Symbolen; zeigst du auf eines oder gehst 
 
 Dann die Bereiche der App (die Desktop-App hat fünf; in der Web-App und auf dem Smartphone sind es vier, ohne **Browser**):
 
-- **Browser**: ein eigener Browser, nur in der Desktop-App, mit Tabs, einer intelligenten Adressleiste, Lesezeichen, Verlauf, einem Werbeblocker und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
+- **Browser**: ein eigener Browser, nur in der Desktop-App, mit Tabs, privaten Tabs, einer intelligenten Adressleiste, Seitenübersetzung, Leseansicht, Lesezeichen, Verlauf, einem Werbeblocker und Chrome-Erweiterungen, aus dem du einem Agenten eine Seite übergeben kannst. Siehe [Dein eigener Browser](/guide/web#your-own-browser).
 - **Bibliothek**: erstellte Werkzeuge und Seiten, gespeicherte Bilder und Videos und deine Veröffentlichungen. Siehe [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
 - **Projekte**: Sitzungen, Dokumente und Richtlinien je Projekt sowie das für alle Sitzungen durchsuchbare gemeinsame Wissen. Siehe [Projekte und Wissen](/guide/projects).
 - **Apps**: wiederkehrende Aufgaben, für die du ein Formular ausfüllst und ein Agent die Arbeit übernimmt. Siehe [Apps](/guide/apps).

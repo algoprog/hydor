@@ -12,7 +12,10 @@ import { MOD } from '../../lib/format';
 import { cx, Kbd } from '../../components/ui';
 import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
 import { fitRows } from './omniboxFit';
+import { PrivateChip } from './Private';
+import { ReaderButtons } from './Reader';
 import { connectionOf, SiteInfo } from './SiteInfo';
+import { TranslateButton } from './Translate';
 
 /** One row of the list. */
 interface Row {
@@ -198,7 +201,7 @@ export function Omnibox({
     if (r?.kind === 'do') return onDoHere?.(r.text ?? text);
     const target = r ? (r.kind === 'search' ? r.text : r.url) : text;
     if (!target) return;
-    void goTo(target, inNew ? { newTab: true } : { tab: tab?.id }).then(() => !inNew && toPage(tab?.id));
+    void goTo(target, inNew ? { newTab: true, ...(tab?.private ? { private: true } : {}) } : { tab: tab?.id }).then(() => !inNew && toPage(tab?.id));
   };
   const take = () => {
     setTyped(typed + completion);
@@ -214,6 +217,7 @@ export function Omnibox({
 
   return (
     <div ref={box} className="relative flex h-9 min-w-0 flex-1 items-center rounded-[10px] bg-bg-2 ring-1 ring-line-2 transition-shadow focus-within:ring-accent/60">
+      {tab?.private && <PrivateChip compact={compact} />}
       {url && url !== 'about:blank' ? (
         <button
           ref={lock}
@@ -314,6 +318,8 @@ export function Omnibox({
           {percent}%
         </button>
       )}
+      {tab && <TranslateButton tab={tab} />}
+      {tab && <ReaderButtons tab={tab} />}
       <button
         aria-label={starred ? 'Remove the bookmark' : 'Bookmark this page'}
         title={starred ? 'Remove the bookmark' : 'Bookmark this page'}

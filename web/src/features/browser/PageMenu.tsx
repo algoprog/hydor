@@ -17,25 +17,40 @@ import {
   Highlighter,
   Image,
   ImagePlus,
+  Languages,
   Link,
+  Music,
+  Pause,
+  PictureInPicture2,
+  Play,
   Plus,
   Printer,
   Redo2,
+  Repeat,
   RotateCw,
   Scissors,
   Search,
+  SlidersHorizontal,
   Sparkles,
   SpellCheck,
   Star,
   TextSelect,
   Undo2,
+  VenetianMask,
+  Video,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
+import { BROWSING_KEY } from '@shared/browser';
 import { ContextMenu, type MenuEntry } from '../pages/common/menus';
 import type { PageMenuItem, PageMenuRequest } from './PageView';
+import { langLabel } from './languages';
+import { useBrowser } from './store';
 
 /** Each item's icon and words, by its id. An item this does not know keeps the desktop app's own words. */
 const KNOWN: Record<string, [ReactNode, string]> = {
   'open-link': [<Plus size={14} />, 'Open link in new tab'],
+  'open-link-private': [<VenetianMask size={14} />, 'Open link in private tab'],
   'open-link-external': [<ExternalLink size={14} />, 'Open link in your default browser'],
   'copy-link': [<Link size={14} />, 'Copy link address'],
   'read-link-later': [<Clock size={14} />, 'Read link later'],
@@ -62,18 +77,44 @@ const KNOWN: Record<string, [ReactNode, string]> = {
   inspect: [<Code size={14} />, 'Inspect'],
   'no-suggestions': [<SpellCheck size={14} />, 'No suggestions'],
   'add-to-dictionary': [<BookPlus size={14} />, 'Add to dictionary'],
+  'media-play': [<Play size={14} />, 'Play'],
+  'media-pause': [<Pause size={14} />, 'Pause'],
+  'media-mute': [<VolumeX size={14} />, 'Mute'],
+  'media-unmute': [<Volume2 size={14} />, 'Unmute'],
+  'media-loop': [<Repeat size={14} />, 'Loop'],
+  'media-controls': [<SlidersHorizontal size={14} />, 'Show controls'],
+  'media-pip': [<PictureInPicture2 size={14} />, 'Picture in picture'],
+  'open-video': [<Video size={14} />, 'Open video in new tab'],
+  'open-audio': [<Music size={14} />, 'Open audio in new tab'],
+  'save-video': [<Download size={14} />, 'Save video as…'],
+  'save-audio': [<Download size={14} />, 'Save audio as…'],
+  'copy-video-address': [<Link size={14} />, 'Copy video address'],
+  'copy-audio-address': [<Link size={14} />, 'Copy audio address'],
 };
 
 /** An item as the app's menus have it: its icon, its words in the app's language, and what a press does. */
-function entry(it: PageMenuItem, pick: (id: string) => void): MenuEntry {
+function entry(it: PageMenuItem, pick: (id: string) => void, translated: boolean): MenuEntry {
   if ('type' in it) return '-';
   const known = KNOWN[it.id];
   const a = it.args ?? {};
   // The words selected go in quotes, as they are; a suggested spelling is a word of the page's, never the app's.
+  // Translate says "Show original" while the page is translated (or on its way), else the language it would be translated into.
   const label =
-    it.id === 'search' && a.engine ? `Search ${a.engine} for “${a.text ?? ''}”` : it.id === 'ask' ? `Ask an agent about “${a.text ?? ''}”` : (known?.[1] ?? it.label);
-  const icon = it.id === 'search' ? <Search size={14} /> : it.id === 'ask' ? <Sparkles size={14} /> : known?.[0];
-  return { label, icon, disabled: !it.enabled, asIs: it.id.startsWith('spell-'), run: () => pick(it.id) };
+    it.id === 'search' && a.engine
+      ? `Search ${a.engine} for “${a.text ?? ''}”`
+      : it.id === 'ask'
+        ? `Ask an agent about “${a.text ?? ''}”`
+        : it.id === 'translate-selection'
+          ? `Translate “${a.text ?? ''}”`
+          : it.id === 'translate-page'
+            ? translated
+              ? 'Show original'
+              : a.lang
+                ? `Translate to ${langLabel(a.lang)}`
+                : 'Translate page'
+            : (known?.[1] ?? it.label);
+  const icon = it.id === 'search' ? <Search size={14} /> : it.id === 'ask' ? <Sparkles size={14} /> : it.id === 'translate-page' || it.id === 'translate-selection' ? <Languages size={14} /> : known?.[0];
+  return { label, icon, disabled: !it.enabled, ...(it.checked !== undefined ? { checked: it.checked } : {}), asIs: it.id.startsWith('spell-'), run: () => pick(it.id) };
 }
 
 /**
@@ -94,11 +135,17 @@ export function PageMenu({ req, onPick, onDone }: { req: PageMenuRequest; onPick
       done.current.onDone();
     });
   };
+  // The tab it was opened on: whether its page is translated (or being translated) decides the words of Translate.
+  const translated = useBrowser((s) => !!s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation && s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation?.state !== 'failed');
   const items = req.items.map((it) =>
-    entry(it, (id) => {
-      picked.current = id;
-      end();
-    }),
+    entry(
+      it,
+      (id) => {
+        picked.current = id;
+        end();
+      },
+      translated,
+    ),
   );
   // A little wider than the app's other menus: a page's items name what they act on ("Open link in your default browser").
   return <ContextMenu at={{ x: req.x, y: req.y }} items={items} onClose={end} title="Page" width={280} />;

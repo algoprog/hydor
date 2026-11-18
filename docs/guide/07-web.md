@@ -1,6 +1,6 @@
 # Search and the browser
 
-Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. It also covers the Browser page, a browser of your own in the desktop app (tabs, a smart address bar, bookmarks, history, an ad blocker, Chrome extensions), and handing a page of it to an agent. In the desktop app (Mac, Windows, Linux), the browser runs inside the app, and agents can also use the computer itself: its screen, mouse and keyboard.
+Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows and its sources, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. It also covers the Browser page, a browser of your own in the desktop app (tabs, private tabs, a smart address bar, bookmarks, history, an ad blocker, translation, reader view, extensions), and handing a page of it to an agent. In the desktop app (Mac, Windows, Linux), the browser runs inside the app, and agents can also use the computer itself: its screen, mouse and keyboard.
 
 ![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
 
@@ -256,35 +256,35 @@ In the desktop app, an agent's browser does not need the app's window: it keeps 
 
 The **Browser** page is a browser of your own inside the desktop app (Mac, Windows, Linux), next to the one agents use: open **Browser** on the rail, or go to [Browser](/browser). It is part of the desktop app only: the web app in a browser, and a phone, have no **Browser** button, and the address [Browser](/browser) there says so. The agents' browsers work everywhere, and you can watch them in their sessions.
 
-It has a bar across the top with a box that searches, opens, asks and tells an agent what to do; a column of your tabs, with the sites you pinned and the agents at work, at the left of the page; and, at the right, a column for asking about the page, for an agent's conversation and for the history, downloads, bookmarks, extensions and settings. It has back, forward and reload, bookmarks, history, Chrome extensions, an ad and tracker blocker, find in page, zoom, print and downloads. Its tabs are real pages in the app's window, with the speed and keys of any browser, and they connect to sites directly, as in any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say). If the browser can't start, the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
+It has a bar across the top with a box that searches, opens, asks and tells an agent what to do; a column of your tabs, with the sites you pinned and the agents at work, at the left of the page; and, at the right, a column for asking about the page, for an agent's conversation and for the history, downloads, bookmarks, extensions and settings. It has back, forward and reload, bookmarks, history, Chrome extensions, an ad and tracker blocker that hides cookie banners too, find in page, zoom, print and downloads. It also has [private tabs](/guide/web#private-tabs) that forget everything when you close them, [translation of a page](/guide/web#translate-a-page) into your language, [reader view](/guide/web#reader-view) for articles, [dark pages](/guide/web#dark-pages), [screenshots and saving a page as a PDF](/guide/web#screenshots-and-pdfs), and sites that may not play sound by themselves. Pointing at a link shows where it goes in a small box at the bottom left of the page (at the bottom right while the mouse is there), as in Chrome. Its tabs are real pages in the app's window, with the speed and keys of any browser, and they connect to sites directly, as in any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones and private ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say). If the browser can't start, the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
 
 ### The bar and the box
 
 A bar runs across the top of the page. At its left, over the tab column, are the app's logo, **New tab** (+) and **Hide tabs** (the same as Ctrl+B), which folds the tab column away until **Show tabs** brings it back. The rest of the bar is for the page you are on:
 
 - **Back**, **Forward**, **Reload** and **Home** are at the left of the box. While a page loads, Reload is **Stop**. **Home** opens your home page in the tab you are on, as **New tab** does in a new one.
-- The box in the middle is the address bar. At rest it shows the page's address as its site, with the rest of the address in a paler colour, and the reminder **Ctrl+L**. Click it, or press Ctrl+L, and it shows the whole address to change. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead. What it offers as you type is under [Suggestions](/guide/web#suggestions). Its padlock is at the left and its star at the right.
+- The box in the middle is the address bar. At rest it shows the page's address as its site, with the rest of the address in a paler colour, and the reminder **Ctrl+L**. Click it, or press Ctrl+L, and it shows the whole address to change. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead (a private one, when you are in a private tab). What it offers as you type is under [Suggestions](/guide/web#suggestions). Its padlock is at the left (in a private tab a purple **Private** chip comes first: see [Private tabs](/guide/web#private-tabs)). At the right are a button that translates the page when it is in another language than yours (see [Translate a page](/guide/web#translate-a-page)), a book button for reader view when the page has an article, with **Aa** beside it while it is on (see [Reader view](/guide/web#reader-view)), and its star.
 - The star at the end of the box bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away. The sites on the bar show as tiles at the top of the tab column.
 - **Save** keeps a readable copy of the page in the Library, as a reader view shows it: the article's text with its pictures and videos, without the site's menus, ads, comments and scripts (see [Web pages from your browser](/guide/library#web-pages-from-your-browser)). A note says "Saved to the Library" (or "Saved to" and the place), with **Open**. It lands among the Library's **Web pages**. The **▾** beside Save lists where it can go: **Not in a project**, each project, and the Library's folders in them. The place Save uses is marked in that menu: the one you picked last on this computer (**Not in a project** at first). The Library's **Bookmarks**, **Read later**, **Downloads**, **History** and **Highlights** chips list the same bookmarks, pages to read later, downloads, history and highlights as this page (see [Library](/guide/library)).
 - **Ask** opens the column beside the page to ask about it (see [Ask beside the page](/guide/web#ask-beside-the-page)); it shows lit while that column is there.
 - The buttons of your extensions come next, then, when the open tab is a Chrome Web Store page of an extension, **Add to Hydor** (see [Chrome extensions](/guide/web#chrome-extensions)).
-- **Menu** (⋯) has **Find in page**, **Print…**, **Open in your default browser**, **Read this page later** (see [Read later](/guide/web#read-later)), **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Highlights** (with how many the page has), **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links.
+- **Menu** (⋯) has **New private tab** (see [Private tabs](/guide/web#private-tabs)), then **Find in page**, **Translate page…** (**Show original** while the page is translated; see [Translate a page](/guide/web#translate-a-page)), **Reader view** and **Dark pages** (ticked while they are on; see [Reader view](/guide/web#reader-view) and [Dark pages](/guide/web#dark-pages)), then **Print…**, **Screenshot of what you see**, **Screenshot of the whole page** and **Save as PDF…** (see [Screenshots and PDFs](/guide/web#screenshots-and-pdfs)), then **Open in your default browser**, **Read this page later** (see [Read later](/guide/web#read-later)), **Do this here…** (see [Do this here](/guide/web#do-this-here)) and **Group my tabs with AI** (see [Group my tabs with AI](/guide/web#group-my-tabs-with-ai)), then **History**, **Downloads**, **Bookmarks**, **Highlights** (with how many the page has), **Extensions**, **Site permissions** and **Settings**, which open in the column at the right of the page (see [The column beside the page](/guide/web#the-column-beside-the-page)). **Open in your default browser** opens the page in the browser your computer uses for links. In a private tab, **Ask** and **Do this here…** are greyed out: agents never get a private tab.
 
-A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
+A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab, and [/browser?private=1](/browser?private=1) opens a new private tab (add `&url=https://example.com` to open that address in it).
 
 ### Suggestions
 
 As you type in the address bar, a list under it offers, with the words you typed in bold:
 
-- your open tabs ("Switch to tab": pick one to go to it instead of opening the page again),
+- your open tabs ("Switch to tab": pick one to go to it instead of opening the page again; your private tabs are among them while they are open, and nothing about them is kept afterwards),
 - your bookmarks and the pages of your history that match the words in their titles and addresses, the ones you go to often and lately first (addresses you typed yourself count most),
 - with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, bookmarks and pages of your history that are about what you typed even when their titles and addresses do not hold its words, after the ones that do (they show without bold words). The model that finds them runs on this computer, from a vector made of each page's title and address (without its query string) and kept in the app's database apart from everything else; it goes when the page does,
 - what you typed, as a search ("Search Google") or, when it looks like an address, as that address,
 - the search engine's own suggestions, when [Search suggestions](/guide/web#browser-settings) is on,
-- below those, when the open tab is a web page, **Ask about this page: “…”**, which opens Ask beside the page with what you typed as the question, and **Do it in a tab of its own: “…”**, which gives the tab to an agent that does what you typed there (see [Do this here](/guide/web#do-this-here)); it is the one of Claude Code and Custom you used last, Claude Code at first,
+- below those, when the open tab is a web page (and not a private tab, which agents never get), **Ask about this page: “…”**, which opens Ask beside the page with what you typed as the question, and **Do it in a tab of its own: “…”**, which gives the tab to an agent that does what you typed there (see [Do this here](/guide/web#do-this-here)); it is the one of Claude Code and Custom you used last, Claude Code at first,
 - last, **Ask an agent: “…”**, which starts a session with what you typed as its first message, on the agent and model the start page used last, and takes you to it.
 
-The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab. The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
+The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab (a private one, when you are in a private tab). The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
 
 ### The tab column
 
@@ -292,6 +292,7 @@ The column at the left of the page lists, from the top (**Hide tabs**, or Ctrl+B
 
 - **Pinned sites**: the items of your bookmarks bar as tiles, five to a row and two rows at most (a **…** tile lists the rest). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it. Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**. With nothing on the bookmarks bar there are no tiles; the star puts the page there (see [Bookmarks](/guide/web#bookmarks)).
 - **Agents at work**, while an agent has a browser open: a row for each, with its icon and a dot (blue while it works, amber when it waits for you or you drive), the session's title and what it is doing. Click one to see it (see [Agents at work](/guide/web#agents-at-work)). Its arrow folds the list.
+- **Private**, while you have private tabs open: a purple section with a mask and how many there are, and a row for each private tab (a tinted row, with a small mask on its icon). Click its label to fold the section; **Close private tabs** (×, when you point at the label) closes them all, and **New private tab** at its end opens another (see [Private tabs](/guide/web#private-tabs)). Private tabs are not in any group and can't be dragged into one.
 - **Tabs**: a row for each tab, with its icon, title, **⋯** and **×** (on the open tab, and on the one you point at). A title too long for the column fades out at its end, and rolls along to show the rest while you point at its row. The open tab is the marked row; click a row to show that tab, and a middle click closes it. Right-click a row, or press its **⋯**, for the tab's menu (see [Tab groups and the tab menu](/guide/web#tab-groups-and-the-tab-menu)). Tabs you put in a group sit under the group's header, and the sparkles button at the end of the **Tabs** label groups your tabs with AI. A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker. **New tab** at the end opens your home page. Closing the last tab leaves a blank one.
 - **Read later**, under the tabs: the pages you set aside (see [Read later](/guide/web#read-later)), newest first, each with its icon and title, and the number waiting. It is folded while nothing waits; its arrow opens it. Click a row to open that page in a new tab. Point at a row for **Mark as read** (it leaves the list) and **Remove**. **Show read** at the end brings the pages you have read back (**Hide read** puts them away again).
 
@@ -300,9 +301,9 @@ The column at the left of the page lists, from the top (**Hide tabs**, or Ctrl+B
 Right-click a tab (or press the **⋯** on a row you point at, or the menu key on a row you have focused) for its menu:
 
 - **Close tab**, **Close other tabs** and **Close tabs below** (the tabs under it in the column, as they are listed). Your browser always keeps one tab open.
-- **Duplicate** opens the same address in a new tab beside it, in the same group, and shows it. **Reload** reloads that tab, not only the one you have open.
+- **Duplicate** opens the same address in a new tab beside it, in the same group, and shows it (a private tab's copy is private). **Reload** reloads that tab, not only the one you have open.
 - **Copy address** and **Bookmark** (**Remove the bookmark** when it is bookmarked), which puts the page on the bookmarks bar.
-- **Add to group**, which lists your groups (the one the tab is in is ticked) and **New group…**, which makes a group of the tab and opens its name for you to type; and **Remove from group**.
+- **Add to group**, which lists your groups (the one the tab is in is ticked) and **New group…**, which makes a group of the tab and opens its name for you to type; and **Remove from group**. A private tab's menu has neither: private tabs can't be grouped.
 
 A group keeps tabs that belong together. It has a name, one of seven colours (grey, blue, green, amber, orange, red or purple) and is open or folded. In the column it is a header with its colour, its name ("Unnamed group" until you give one) and how many tabs it has; its tabs sit under it with a line in its colour down their side, and the tabs that are in no group come after the groups. Click the header to fold the group away or open it again; a folded group hides its tabs, except the one you have open. Double-click the name (or press F2) to rename it. You can drag a tab onto a group to put it in, and onto the tabs in no group to take it out. Right-click the header, or press its **⋯**, for the group's menu:
 
@@ -315,7 +316,7 @@ A group with no tab left is gone. Groups are kept with your tabs, so they come b
 
 ### Group my tabs with AI
 
-When you have many tabs open, the sparkles button at the end of the **Tabs** label (it shows when you point at the label), or **Menu** (⋯) → **Group my tabs with AI**, sorts the tabs that are in no group by what they are for. It needs at least three of them; tabs already in a group stay where they are.
+When you have many tabs open, the sparkles button at the end of the **Tabs** label (it shows when you point at the label), or **Menu** (⋯) → **Group my tabs with AI**, sorts the tabs that are in no group by what they are for. It needs at least three of them; tabs already in a group stay where they are, and private tabs are left out: they are never counted, never grouped and never sent anywhere.
 
 **What is sent, and to which model.** Only when you press the button, the title and address of each of those tabs (up to 60) go to the app's helper model, the one that writes session titles and memory notes ([Settings → Agents → Models → Helper model](/settings?s=models&find=Helper%20model)). On Automatic that is Claude Haiku through Claude Code, else Codex, both online; a model of your own on this computer keeps them here. An address goes without anything after a **?** or **#**, and a file's address as its name only. The pages' text and pictures are never sent, and nothing is sent at any other time. If a title is private, do not press it (or put a model on this computer as the helper).
 
@@ -336,7 +337,8 @@ Each tab has its own question: switch tabs and the column shows that tab's conve
 On the Browser page, from inside a page too, with Ctrl on Windows and Linux and ⌘ on a Mac:
 
 - **Ctrl+T** opens a new tab, and **Ctrl+W** closes the open one.
-- **Ctrl+Shift+T** opens the tab you closed last again; press it again for the one before.
+- **Ctrl+Shift+T** opens the tab you closed last again; press it again for the one before (private tabs are not on that list).
+- **Ctrl+Shift+N** opens a new private tab (**⇧⌘N** on a Mac).
 - **Ctrl+Tab** goes to the next tab and **Ctrl+Shift+Tab** to the one before. **Ctrl+1** to **Ctrl+8** go to that tab, and **Ctrl+9** to the last.
 - **Ctrl+L** goes to the address bar.
 - **Ctrl+R** (**F5** too) reloads.
@@ -359,21 +361,95 @@ On the Browser page, from inside a page too, with Ctrl on Windows and Linux and 
 - **Print**: **Ctrl+P**, or **Print…** in the menu or the right-click menu, opens your computer's print dialog for the page, with its backgrounds.
 - **Full screen**: when a video or a page asks to fill the screen, the app's window goes full screen and the page fills it. The page's own way out (Esc) brings the window back.
 
+### Screenshots and PDFs
+
+**Menu** (⋯) has three items that keep the page you are on as a file, for a web page or a file shown in the tab:
+
+- **Screenshot of what you see**: a picture of the part of the page that shows in the tab.
+- **Screenshot of the whole page**: a picture of the page from top to bottom, however far it scrolls (up to 16,384 pixels tall; when that cannot be taken, you get what you see).
+- **Save as PDF…**: the page as a PDF, with its backgrounds, as if you printed it.
+
+A screenshot is a PNG. It is saved in your Downloads folder, named after the page's title with the date and time ("Example 2026-11-18 at 14.30.05.png"), and put on the clipboard too, so you can paste it straight into a message or a document. A note says "Screenshot saved to Downloads and copied", with **Show in folder**. A PDF is saved in Downloads, named after the page's title, with a note "Saved as PDF in Downloads" and **Show in folder**. A name that is taken gets a number after it, and nothing is overwritten. They work in a private tab too.
+
 ### Right-click menu
 
 A right click in a page opens a menu with what applies where you clicked, in the app's own look and language like its other menus (**Esc** or a click outside closes it):
 
 - In a text field: spelling suggestions for a misspelt word, with **Add to dictionary**; then **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select all**.
-- On a link: **Open link in new tab**, **Open link in your default browser**, **Copy link address** and **Read link later** (see [Read later](/guide/web#read-later)).
+- On a link: **Open link in new tab**, **Open link in private tab** (see [Private tabs](/guide/web#private-tabs)), **Open link in your default browser**, **Copy link address** and **Read link later** (see [Read later](/guide/web#read-later)).
 - On a picture: **Open image in new tab**, **Save image as…** (into your Downloads folder), **Save image to Library**, **Ask about this image**, **Copy image** and **Copy image address**.
-- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens **Ask** beside the page with the selected words (up to 4,000 characters of them) and the page's address ready to go with your question (see [Ask beside the page](/guide/web#ask-beside-the-page)), and **Highlight**, which marks the words on the page and keeps them (see [Highlights](/guide/web#highlights)).
+- On a video: **Play** or **Pause**, **Mute** or **Unmute**, **Loop** and **Show controls** (ticked while they are on), **Picture in picture** (ticked while it shows), **Open video in new tab**, **Save video as…** (into your Downloads folder) and **Copy video address**. A sound has the same, as **Open audio in new tab**, **Save audio as…** and **Copy audio address**, without picture in picture. An item shows only when that video or sound can do it.
+- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens **Ask** beside the page with the selected words (up to 4,000 characters of them) and the page's address ready to go with your question (see [Ask beside the page](/guide/web#ask-beside-the-page)), **Translate “…”**, which shows the words translated into your language in a box (see [Translate a page](/guide/web#translate-a-page)), and **Highlight**, which marks the words on the page and keeps them (see [Highlights](/guide/web#highlights)).
 - On a highlight of yours: **Remove highlight**.
-- On the page itself, away from a field or selected text: **Back**, **Forward** and **Reload**.
+- On the page itself, away from a field or selected text: **Back**, **Forward** and **Reload**, and **Translate to German** (the language you translate into; **Show original** while the page is translated).
 - Always: **Bookmark this page**, **Read this page later** (on a web page), **Print…** and **Inspect**, which opens the page's developer tools.
+
+In a private tab the menu has no **Open link in private tab**, **Open link in new tab** and the other "in new tab" items open a private tab, and none of the **Ask** items (**Ask an agent about**, **Ask about this image**) are there, since agents never get a private tab.
 
 **Save image to Library** reads the picture with the tab's own sign-ins, so a picture behind a login works, and keeps it in the Library with the page as the place it came from. A note says "Saved to your Library", with **Open** (or "That picture is in your Library already" when you kept it before). It keeps PNG, JPEG, WebP, GIF and AVIF pictures of up to 50 MB; a bitmap or an icon becomes a PNG, and other kinds, such as SVG, are refused. The picture needs an http, https, data or blob address. Agents can read what is in the Library, so keep a picture there only when you are fine with that. **Ask about this image** reads the picture the same way and opens **Ask** beside the page with it ready to go with your question, together with a copy of the page.
 
 An extension's own items are never shown (see [What may not work](/guide/web#what-may-not-work)).
+
+### Private tabs
+
+A private tab is a tab that forgets. Open one with **Ctrl+Shift+N** (**⇧⌘N** on a Mac), **Menu** (⋯) → **New private tab**, **New private tab** at the end of the **Private** section in the tab column, or [/browser?private=1](/browser?private=1) (add `&url=https://example.com` to open that address in it). On a link, right-click → **Open link in private tab**; in a private tab itself that item is not there, and **Open link in new tab** opens a private tab (so do the other "in new tab" items, **Search** for selected words, and **Alt+Enter** in the address bar).
+
+A private tab looks like this:
+
+- Its row is in the purple **Private** section of the tab column, which says how many there are. **Close private tabs** (the × at the end of the label) closes them all.
+- A purple **Private** chip is at the start of the address bar. Press it to see what a private tab is and keeps, with **Close private tabs**.
+
+What a private tab keeps apart, and forgets:
+
+- **Sign-ins, cookies, site data and cached files** are kept in memory, apart from your other tabs: a site you are signed in to in a normal tab does not know you in a private one, and the other way round. All of them are forgotten when the last private tab closes, or when the app quits.
+- **Its pages are not kept** in your [history](/guide/web#history), in the **Recently closed** list (**Ctrl+Shift+T** skips them), or among the tabs that open again the next time you start the browser. Tabs you close are gone for good.
+- **Extensions do not run in it.** The ad blocker and the cookie banner hiding work as in any tab.
+- **Permissions** a site asks for (camera, location and the like) are asked again each time, and your answer is forgotten when the tab closes. A site you blocked in your normal tabs stays blocked.
+- **Downloads are saved** in your Downloads folder, but they are not added to the list of downloads that the Library's **Downloads** and the search box (Ctrl+K) keep.
+- What you ask for is still kept: **bookmarks**, **Read later**, **highlights**, and **Save** (to the Library). These stay after the private tab is gone, and show the page, so ask for them only when you are fine with that.
+- **Translating** works in a private tab as in any tab, so the page's words go to the helper model (see [Translate a page](/guide/web#translate-a-page)); leave a private page untranslated if that matters.
+- A private tab can't be put in a group, and **Group my tabs with AI** never counts or sends it.
+- **Agents never get a private tab.** **Ask** and **Do this here…** are greyed out, the address bar's **Ask about this page** and **Do it in a tab of its own** rows and the right-click menu's **Ask an agent about** and **Ask about this image** are not there, and the server refuses to copy its page for an agent (see [Hand a page to an agent](/guide/web#hand-a-page-to-an-agent)).
+
+Closing the last normal tab while private tabs are open leaves just the private ones; otherwise your browser always keeps one tab open. Private tabs are about this computer's own record: the sites you visit, your internet provider and your network can still see where you go, and a site you sign in to knows who you are.
+
+### Translate a page
+
+When a page is in another language than the one you read, a translate button (a small **Languages** icon) shows at the right of the address bar. It is lit while the page is translated, and pulses while it is on its way. Press it:
+
+- It says which language the page was found to be in ("Detected: German"), which the app works out on this computer from the page's words and its own language tag.
+- **Translate into** is the language to translate to. It is the app's own language at first; picking another one keeps it as your choice (it is also **Translate into** in [Browser settings](/guide/web#browser-settings)), and a page that is translated already is translated again into it.
+- **Translate** starts. While it works the line under it says "Translating… 12 of 40 parts", and the button turns into **Show original**, which puts every word of the page back as it was. When it is done the line says which language it was translated from and with which model. If it could not, the line says why, and the button reads **Try again**.
+- **Always translate German** (for the language found) translates pages in that language as soon as they load, from then on. **Never translate German** stops the button showing for it. **Never translate example.com** (the page's site) does the same for that site, whatever its language.
+- **Translation settings** opens [Browser settings](/guide/web#browser-settings) at **Translation**.
+
+What is on screen is translated first, then the rest of the page, and then whatever comes later, as you scroll or as the page changes itself, so it stays in your language. The page's layout, links and pictures stay as they are: only its words change, in place. Text fields, code and parts a site marks as not to be translated are left alone. A very long page is translated as far as about 150,000 characters past what is on screen.
+
+You can also use **Menu** (⋯) → **Translate page…** (**Show original** while it is translated), which opens the same box under the menu when the button is not shown, such as for a page that is in your language already. Right-click the page, away from a link, picture or selected words, and pick **Translate to German** (the language you translate into) or, while it is translated, **Show original**. Select some words, right-click and pick **Translate “…”** to translate just those (up to 5,000 characters): a **Translation** box shows them with their translation, a **Translate into** choice to try another language, and **Copy**.
+
+The language names, in the button and the lists, are in the app's language, with each language's own name beside them.
+
+**What is sent, and to which model.** Translating sends the words of the page, in pieces, to the app's helper model, the one that writes session titles and memory notes ([Settings → Agents → Models → Helper model](/settings?s=models&find=Helper%20model)); words you select to translate go there too. On Automatic that is Claude Haiku through Claude Code, else Codex, both online; a model of your own on this computer keeps the words here. Pictures and sign-ins are never sent. It happens when you press **Translate** or the menu items, and, for a language you set to **Always translate**, by itself as each page loads: if a page holds words you want to keep private, do not translate it (or put a model on this computer as the helper). Agents never see any of it, and are refused its routes.
+
+A translated page shows translated in [reader view](/guide/web#reader-view) too.
+
+### Reader view
+
+On a page that has an article, such as a news story, a blog post or a recipe, a book button (**Reader view**) shows at the right of the address bar. Press it and the article shows alone over the page, in a clean column: the site, the title, the author, how long it takes to read ("5 min read") and the date, then the text with its pictures, without the site's menus, ads and comments. Press the button again (**Leave reader view**) to go back to the page, or pick **Menu** (⋯) → **Reader view**, which is ticked while it is on. Opening a link in it leaves it, as going to any other page does. A page with no article to show has no button (and the menu item is greyed out; if a page turns out to have none, a note says "This page has no article to show in reader view").
+
+While reader view is on, **Aa** (**Reader view style**) opens how the article looks:
+
+- **Text size**, with **Smaller text** and **Larger text**: from 14 to 28 (19 at first).
+- **Colours**: **Auto** (follows the app's light or dark look), **Dark**, **Light** or **Sepia**.
+- **Font**: **Serif** or **Sans**.
+
+A change shows at once and is kept for every article. The arrow keys, **Page Down** and **Space** scroll the article. Nothing leaves the tab to make it: the page is read where it is, and no agent or model is involved.
+
+### Dark pages
+
+**Menu** (⋯) → **Dark pages** (ticked while it is on), or **Dark pages** in [Browser settings](/guide/web#browser-settings), shows web pages dark. A site that has a dark look of its own uses it, as it does when your computer is set to dark; a page without one is darkened by the browser's own automatic dark mode, so its light backgrounds turn dark and its text light. It is off at first, applies to every tab at once, and leaves the agents' browsers alone.
+
+Some pages look odd darkened (pictures, charts, colours that meant something). To show one site as it is, click its padlock and turn off **Dark pages on this site** (the switch is there while Dark pages is on). Such sites are listed under **Sites shown as they are** in the browser's settings, where the × beside one shows that site dark again.
 
 ### Read later
 
@@ -392,7 +468,7 @@ Press **Ctrl+H**, or **Menu** (⋯) → **History**, or go to [History](/browser
 - **Recently closed** (when you are not searching) lists tabs you closed lately: click one to open it again. **Ctrl+Shift+T** opens the newest.
 - **Clear browsing data…** opens the settings at that part.
 
-Your history stays on this computer, in the app's own database, and only your own browsing adds to it: web pages and files, the page each tab ends up on, its title as it settles. The last 20,000 pages are kept; the oldest go first. Agents never see it. It is what the address bar's [suggestions](/guide/web#suggestions) draw on.
+Your history stays on this computer, in the app's own database, and only your own browsing adds to it: web pages and files, the page each tab ends up on, its title as it settles. Pages in [private tabs](/guide/web#private-tabs) are never added, and a private tab you close is not in **Recently closed**. The last 20,000 pages are kept; the oldest go first. Agents never see it. It is what the address bar's [suggestions](/guide/web#suggestions) draw on.
 
 The files your browser downloads are kept in a list too: each one's name, where it was saved and the address it came from, the last 5,000. **Clear browsing data** with **Browsing history** ticked clears that list as well, for the same time range (the files stay where they were saved), and a page, bookmark or download that goes takes its place in search by meaning with it. The search box (Ctrl+K) finds your history, bookmarks and downloads, by their words and by what they are about, under **Browser** in **Search in** (see [Search everything with Ctrl+K](/guide/start#search-everything-with-ctrlk)). Agents never see any of it.
 
@@ -415,27 +491,44 @@ Your highlights stay on this computer, in the app's own database, and agents nev
 - **Search engine**: what the address bar searches with: Google (at first), DuckDuckGo, Bing, Brave, Ecosia, Startpage, or **Custom**, an address of your own with %s where your words go, such as `https://example.com/search?q=%s`.
 - **Search suggestions** (on at first): what you type in the address bar goes to your search engine as you type, as in any browser, so it can suggest searches. Startpage and a custom address give none. Turn it off to keep what you type on this computer; your open tabs, bookmarks and history still show.
 - **Block ads and trackers** (on at first), see below.
+- **Hide cookie banners** (on at first; it needs **Block ads and trackers** on, and is greyed out without it), see below.
+- **Translation**, for [translating pages](/guide/web#translate-a-page):
+  - **Translate into**: the language pages are translated into. It is the app's own language until you pick one.
+  - **Offer to translate pages in other languages** (on at first): shows the translate button in the address bar on a page in another language. Off, the button shows only on a page that is translated already; **Menu** (⋯) → **Translate page…** still works.
+  - **Always translate**: languages whose pages are translated as soon as they load. **Add a language** picks one; the × on a language takes it off.
+  - **Never translate**: languages the button is never shown for. A language is in one of these two lists at most.
+  - **Never translate these sites**: sites the button is never shown for and that are never translated by themselves ("No sites" until you add one with **Never translate** in the translate box); the × on a site takes it off.
+  - A note says what translating sends and to which model.
+- **Pages**:
+  - **Dark pages** (off at first): pages with no dark look of their own are shown in dark colours (see [Dark pages](/guide/web#dark-pages)).
+  - **Sites shown as they are**: the sites you turned **Dark pages on this site** off for, with a × to show one dark again.
+  - **Let sites play sound by themselves** (off at first): off, a page's sound waits until you click or type in it, while videos without sound still play; on, a page may start its sound at once, as it does in older browsers. It applies to tabs opened after you change it.
 - **Clear browsing data**: tick **Browsing history**, **Cookies and site data** (you are signed out of sites) and **Cached files**, pick a time range (**Last hour**, **Last 24 hours**, **Last 7 days** or **All time**) and press **Clear data**. The time range is for the history (and the list of downloads kept with it) alone: cookies, site data and cached files are always cleared for all time.
 
 ### Block ads and trackers
 
-Your own browser blocks ads and trackers, as an ad blocker does: it keeps the requests of known ad and tracking servers from going out, and hides the empty places that are left. It uses Ghostery's lists of ads and trackers (EasyList, EasyPrivacy and others), which the app downloads from GitHub when your browser first starts and refreshes every week (when it can't, it keeps the lists it has); nothing about you is sent with them. It blocks nothing in the agents' browsers. **Block ads and trackers** in the [browser's settings](/guide/web#browser-settings) turns it off.
+Your own browser blocks ads and trackers, as an ad blocker does: it keeps the requests of known ad and tracking servers from going out, and hides the empty places that are left. It uses Ghostery's lists of ads and trackers (EasyList, EasyPrivacy and others), which the app downloads from GitHub when your browser first starts and refreshes every week (when it can't, it keeps the lists it has); nothing about you is sent with them. It blocks nothing in the agents' browsers, and works in private tabs. **Block ads and trackers** in the [browser's settings](/guide/web#browser-settings) turns it off.
 
 With it on, a Chrome extension that blocks requests (an ad blocker of your own) may not run; turn the blocker off to give it the page.
 
 To let one site show its ads, click the padlock in the address bar and press **Allow ads on this site** (its subdomains too); the page reloads. **Block ads on this site** takes it back.
 
+**Hide cookie banners** (on at first, in the browser's settings, and only while the blocker is on) also hides the cookie notices many sites show, with EasyList's list of them added to the lists above. It hides a notice and does not answer it for you, so a site that waits for your answer may hold some of its content back: allow ads on that site from its padlock to see its notice again.
+
 ### The padlock
 
-The padlock at the start of the address bar shows whether the connection to the site is secure ("Not secure", with an open padlock, for an http page). Click it to see the site, whether its connection is secure, what you allowed or blocked for it (each with **Forget**, so it asks again), and, with the blocker on, how many ads and trackers were blocked on this page, with **Allow ads on this site** or **Block ads on this site**.
+The padlock at the start of the address bar shows whether the connection to the site is secure ("Not secure", with an open padlock, for an http page). Click it to see the site, whether its connection is secure, what you allowed or blocked for it (each with **Forget**, so it asks again), and, with the blocker on, how many ads and trackers were blocked on this page, with **Allow ads on this site** or **Block ads on this site**. On a web page it also has:
+
+- **Dark pages on this site**, a switch that shows while [dark pages](/guide/web#dark-pages) is on: turn it off to show this site as it is.
+- **Cookies and site data**, with **Delete**. It asks first ("Delete the cookies and site data of example.com? You’ll be signed out of it."); pressing **Delete** removes the cookies and stored site data of that site, its subdomains too (for `mail.example.com`, those of example.com), from this tab's own sign-ins (a private tab's are its own), and loads the page again. A note says what was deleted. Cached files stay: **Clear browsing data** in the browser's settings clears those, and everything of every site.
 
 ### Downloads
 
-A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder: the desktop app opens the system's file manager with the file selected (**Show in Finder**, **Show in File Explorer** or **Show in folder**; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
+A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. A download from a private tab is saved the same way and shows here, but it is not added to the list the Library's **Downloads** and the search box keep. Click a finished one to see it in its folder: the desktop app opens the system's file manager with the file selected (**Show in Finder**, **Show in File Explorer** or **Show in folder**; see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
 
 ### When a site asks for a permission
 
-When a page in your own browser asks to use your camera, your microphone, your location, notifications, your clipboard or the like, a bar above the page says so ("example.com wants to use your camera") with **Don’t allow** and **Allow**. Your answer is remembered for that site, so it asks only once; to see what you allowed or blocked, or to be asked again, open the padlock, or **Menu** (⋯) → **Site permissions**, and press **Forget** beside an answer. The agents' browsers there refuse every such request themselves, except to fill the screen and to copy to your clipboard. A page's pop-up question (an alert, a yes-or-no or a text prompt) shows above the page, as in the agents' browser (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
+When a page in your own browser asks to use your camera, your microphone, your location, notifications, your clipboard or the like, a bar above the page says so ("example.com wants to use your camera") with **Don’t allow** and **Allow**. Your answer is remembered for that site, so it asks only once; to see what you allowed or blocked, or to be asked again, open the padlock, or **Menu** (⋯) → **Site permissions**, and press **Forget** beside an answer. The agents' browsers there refuse every such request themselves, except to fill the screen and to copy to your clipboard. In a private tab the bar asks every time: your answer is forgotten when the tab closes, and an Allow you gave in a normal tab does not carry over (a site you blocked stays blocked). A page's pop-up question (an alert, a yes-or-no or a text prompt) shows above the page, as in the agents' browser (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
 
 ## Bookmarks
 
@@ -483,7 +576,7 @@ The desktop app's browser has part of what Chrome gives extensions. Content that
 
 ## Hand a page to an agent
 
-An agent never gets your own browser. You can give it one page of it, in two ways: **Ask about this page** gives it a copy to read, and **Do this here** gives it the tab. They work on a page of a website. **Ask** in the bar asks about the page (see [Ask beside the page](/guide/web#ask-beside-the-page)); **Do this here…** is in **Menu** (⋯) and opens a small box under the menu where you write what you want and send with **Ctrl+Enter** (⌘+Enter on a Mac). The box in the bar does both with what you type: its rows **Ask about this page: “…”** and **Do it in a tab of its own: “…”**.
+An agent never gets your own browser. You can give it one page of it, in two ways (a [private tab](/guide/web#private-tabs) can't be given: **Ask** and **Do this here…** are greyed out there, and the app refuses the copy of its page): **Ask about this page** gives it a copy to read, and **Do this here** gives it the tab. They work on a page of a website. **Ask** in the bar asks about the page (see [Ask beside the page](/guide/web#ask-beside-the-page)); **Do this here…** is in **Menu** (⋯) and opens a small box under the menu where you write what you want and send with **Ctrl+Enter** (⌘+Enter on a Mac). The box in the bar does both with what you type: its rows **Ask about this page: “…”** and **Do it in a tab of its own: “…”**.
 
 ### Ask about this page
 
@@ -572,7 +665,7 @@ Each profile in the list has **Log in to sites** (to log in to more), and a **�
 
 ### Your own browsing
 
-In the desktop app, [Settings → Browser](/settings?s=browser) also has a **Your own browsing** group ("The Browser page: pages you use yourself, which agents never get"), with three rows that open the Browser page's panels: [Bookmarks](/settings?s=browser&find=Bookmarks) ("Yours, with those from the other browsers on this computer"), [Extensions](/settings?s=browser&find=Extensions) ("Chrome extensions, in the desktop app") and [Browser settings](/settings?s=browser&find=Browser%20settings) ("Home page, search engine, ad blocker, history and clearing what it kept"). Elsewhere the group is not shown. See [Bookmarks](/guide/web#bookmarks), [Chrome extensions](/guide/web#chrome-extensions) and [Browser settings](/guide/web#browser-settings).
+In the desktop app, [Settings → Browser](/settings?s=browser) also has a **Your own browsing** group ("The Browser page: pages you use yourself, which agents never get"), with three rows that open the Browser page's panels: [Bookmarks](/settings?s=browser&find=Bookmarks) ("Yours, with those from the other browsers on this computer"), [Extensions](/settings?s=browser&find=Extensions) ("Chrome extensions, in the desktop app") and [Browser settings](/settings?s=browser&find=Browser%20settings) ("Home page, search engine, translation, dark pages, ad blocker, history and clearing what it kept"). Elsewhere the group is not shown. See [Bookmarks](/guide/web#bookmarks), [Chrome extensions](/guide/web#chrome-extensions) and [Browser settings](/guide/web#browser-settings).
 
 ## Let agents use your computer
 
@@ -643,6 +736,11 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "How do I reopen a tab I closed?" (**Ctrl+Shift+T**, or **Recently closed** in the history)
 - "How do I highlight words on a page and find them again?" (select them, right-click, **Highlight**; **Menu** → **Highlights** or the Library's **Highlights** list has them)
 - "Does my browser block ads, and where do its lists come from?"
+- "What does a private tab keep, and what does it forget?" (sign-ins, cookies and site data are kept apart and forgotten when the last private tab closes; its pages are not in history; downloads, bookmarks and what you save still are kept)
+- "Translate this page into English, and always translate Japanese pages." (the translate button in the address bar; **Always translate** is in **Browser settings** → **Translation**; the page's words go to the helper model)
+- "How do I read an article without the clutter, in a bigger font?" (the book button in the address bar, then **Aa**)
+- "Show web pages dark, except one site." (**Menu** → **Dark pages**, then that site's padlock → **Dark pages on this site**)
+- "How do I save a whole web page as a picture or a PDF?" (**Menu** → **Screenshot of the whole page** or **Save as PDF…**; both go to Downloads)
 - "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")
 - "Which Chrome extensions are in my browser, and which of them run in the agents' browsers too?"
 - "Add the extension at https://chromewebstore.google.com/detail/… to my browser." (the app asks you first, every time)

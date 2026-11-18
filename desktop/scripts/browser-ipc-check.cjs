@@ -22,8 +22,12 @@
 //   - the ad blocker: a request to a test ad host (a tiny list of its own, no network) fails while it is on, goes through when
 //     it is off or the site is one you allowed ads on, the count of what a page had blocked reaches the window's page, and
 //     the saved engine is kept a week, made again when older, and kept when the lists cannot be fetched.
+//   - private tabs (a `hydorPrivate` context: your own real pages in a partition kept in memory, cookies apart from the normal
+//     tabs', gone with the context; the menu's private items), pages shown dark (and kept dark across sites, except the ones
+//     excepted), the sound policy of new tabs, a picture and a PDF of a page saved in Downloads, deleting one site's data, the
+//     menu's video, audio and translation items, and the bubble that shows where a link goes.
 'use strict';
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, screen, session } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -83,6 +87,10 @@ document.onmousemove=()=>{};
   '/own': '<!doctype html><title>own page</title><body style="margin:0;background:rgb(255,0,0)"><h1 style="color:#fff">mine</h1>',
   '/marked': '<!doctype html><title>marked</title><body style="margin:0"><p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="11111111-1111-1111-1111-111111111111" style="font-size:30px">marked words</mark> plain<p id="bad" style="margin:0;padding:10px"><mark data-hydor-hl="22222222-2222-2222-2222-222222222222">not ours</mark>',
   '/words': '<!doctype html><title>words</title><body style="margin:0"><p>alpha beta alpha gamma alpha</p>',
+  // A page with a one-second video (a tiny WebM), and a link at the bottom left.
+  // Sound that tries to play by itself: its play() answers whether the page's policy allows it.
+  '/sound': '<!doctype html><title>sound</title><body><video id="v" src="/clip.webm" preload="auto"></video>',
+  '/video': '<!doctype html><title>video</title><body style="margin:0"><video id="v" src="/clip.webm" width="320" height="180" muted style="display:block"></video><a id="lnk" href="/words" style="position:fixed;left:0;bottom:0;width:120px;height:30px;background:#ccc">link</a>',
   '/marked-shadow': '<!doctype html><title>marked shadow</title><body style="margin:0"><div id="host"></div><script>host.attachShadow({ mode: "open" }).innerHTML = \'<p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="33333333-3333-3333-3333-333333333333" style="font-size:30px">marked words</mark></p>\'</script>',
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
   '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
@@ -90,7 +98,12 @@ document.onmousemove=()=>{};
 // A one-pixel PNG, served at /photo-of-cat.png (and what its request said of the page it came from).
 const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 let lastReferer = '';
+const CLIP = Buffer.from('GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAAYIEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHYTbuMU6uEElTDZ1OsggGETbuMU6uEHFO7a1OsggXy7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsirXsYMPQkBNgI1MYXZmNjAuMTYuMTAwV0GNTGF2ZjYwLjE2LjEwMESJiECPgAAAAAAAFlSua0CmrgEAAAAAAAA414EBc8WI/sDXPObDWxecgQAitZyDdW5kiIEAhoVWX1ZQOIOBASPjg4QF9eEA4ImwgUC6gTCagQKuAQAAAAAAAFzXgQJzxYjb9MsGa/o/YZyBACK1nIN1bmSIgQCGhkFfT1BVU1aqg2MuoFa7hATEtACDgQLhkZ+BAbWIQM9AAAAAAABiZIEQY6KTT3B1c0hlYWQBATgBgD4AAAAAABJUw2dA1nNzoGPAgGfImkWjh0VOQ09ERVJEh41MYXZmNjAuMTYuMTAwc3PWY8CLY8WI/sDXPObDWxdnyKFFo4dFTkNPREVSRIeUTGF2YzYwLjMxLjEwMiBsaWJ2cHhnyKFFo4hEVVJBVElPTkSHkzAwOjAwOjAxLjAwMDAwMDAwMABzc9djwItjxYjb9MsGa/o/YWfIokWjh0VOQ09ERVJEh5VMYXZjNjAuMzEuMTAyIGxpYm9wdXNnyKFFo4hEVVJBVElPTkSHkzAwOjAwOjAxLjAwODAwMDAwMAAfQ7Z1Q4zngQCji4IAAIAIC+S5oLyEo8KBAACAkAMAnQEqQAAwAABHCIWFiIWEiAICAnWqA/gD+gIHO3nizzMeXgD+/W7z/+OZNzDE/45t//FhPA4oyP/xUQCjioIAFYAIB8azDsajioIAKYAIB8azDsajioIAPYAIB8azDsajioIAUYAIB8azDsajioIAZYAIB8azDsajloEAZADRAQABEBAAGAAYWC/0AAiMAACjioIAeYAIB8azDsajioIAjYAIB8azDsajioIAoYAIB8azDsajioIAtYAIB8azDsajioIAyYAIB8azDsajloEAyADRAQABEBAAGAAYWC/0AAiMAACjioIA3YAIB8azDsajioIA8YAIB8azDsajioIBBYAIB8azDsajioIBGYAIB8azDsajioIBLYAIB8azDsajloEBLADRAQABEBAAGAAYWC/0AAiMAACjioIBQYAIB8azDsajioIBVYAIB8azDsajioIBaYAIB8azDsajioIBfYAIB8azDsajioIBkYAIB8azDsajloEBkADRAQABEBAAGAAYWC/0AAiMAACjioIBpYAIB8azDsajioIBuYAIB8azDsajioIBzYAIB8azDsajioIB4YAIB8azDsajioIB9YAIB8azDsajloEB9ADRAQABEBAAGAAYWC/0AAiMAACjioICCYAIB8azDsajioICHYAIB8azDsajioICMYAIB8azDsajioICRYAIB8azDsajioICWYAIB8azDsajloECWADRAQABEBAAGAAYWC/0AAiMAACjioICbYAIB8azDsajioICgYAIB8azDsajioIClYAIB8azDsajioICqYAIB8azDsajioICvYAIB8azDsajlYECvACxAQABEBAUYABhYL/QACIwAKOKggLRgAgHxrMOxqOKggLlgAgHxrMOxqOKggL5gAgHxrMOxqOKggMNgAgHxrMOxqOKggMhgAgHxrMOxqOWgQMgANEBAAEQEAAYABhYL/QACIwAAKOKggM1gAgHxrMOxqOKggNJgAgHxrMOxqOKggNdgAgHxrMOxqOKggNxgAgHxrMOxqOKggOFgAgHxrMOxqOWgQOEANEBAAEQEAAYABhYL/QACIwAAKOKggOZgAgHxrMOxqOKggOtgAgHxrMOxqOKggPBgAgHxrMOxqOKggPVgAgHxrMOxqCToYqCA+kACAfGsw7GdaKEAM3+YBxTu2uRu4+zgQC3iveBAfGCAmDwgRA=', 'base64');
 const site = http.createServer((req, res) => {
+  if (req.url.split('?')[0] === '/clip.webm') {
+    res.writeHead(200, { 'content-type': 'video/webm', 'content-length': CLIP.length });
+    return void res.end(CLIP);
+  }
   if (req.url.split('?')[0] === '/photo-of-cat.png') {
     lastReferer = String(req.headers.referer || '');
     res.writeHead(200, { 'content-type': 'image/png' });
@@ -634,7 +647,7 @@ app.whenReady().then(async () => {
       const base = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
       const labels = (tpl) => tpl.filter((i) => i.type !== 'separator').map((i) => i.label);
       const link = labels(t && browser.menuTemplate(t, { ...base, linkURL: 'https://example.com/a?b=c' }));
-      assert.deepEqual(link, ['Open link in new tab', 'Open link in your default browser', 'Copy link address', 'Read link later', 'Back', 'Forward', 'Reload', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
+      assert.deepEqual(link, ['Open link in new tab', 'Open link in private tab', 'Open link in your default browser', 'Copy link address', 'Read link later', 'Back', 'Forward', 'Reload', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       // A link that is not a web address (javascript:, mailto:) has only its copy.
       assert.deepEqual(labels(browser.menuTemplate(t, { ...base, linkURL: 'mailto:a@b.c' })).slice(0, 2), ['Copy link address', 'Back']);
       const img = labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'https://example.com/i.png' }));
@@ -642,7 +655,7 @@ app.whenReady().then(async () => {
       // Only an address the app can read is offered for the Library or a question (not a file: or chrome: picture).
       assert.ok(!labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'file:///tmp/a.png' })).includes('Save image to Library'));
       const sel = browser.menuTemplate(t, { ...base, selectionText: 'hello world' });
-      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Highlight', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
+      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Translate “hello world”', 'Highlight', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       const long = labels(browser.menuTemplate(t, { ...base, selectionText: 'x'.repeat(100) }))[1];
       assert.ok(long.length < 60 && long.includes('…'), long);
       const field = browser.menuTemplate(t, { ...base, isEditable: true, misspelledWord: 'helo', dictionarySuggestions: ['hello', 'help'], editFlags: { canUndo: true, canCut: true, canCopy: true, canPaste: true, canSelectAll: true } });
@@ -777,7 +790,7 @@ app.whenReady().then(async () => {
       await until(async () => (await page('__menus.length')) === 1, 5000, 'the menu at the page');
       const m = (await page('__menus'))[0];
       assert.equal(m.target, t.id);
-      assert.deepEqual(m.items.map((i) => i.id || '-'), ['copy', 'search', 'ask', 'highlight', '-', 'bookmark', 'read-later', 'print', '-', 'inspect']);
+      assert.deepEqual(m.items.map((i) => i.id || '-'), ['copy', 'search', 'ask', 'translate-selection', 'highlight', '-', 'bookmark', 'read-later', 'print', '-', 'inspect']);
       assert.deepEqual(m.items.find((i) => i.id === 'search'), { id: 'search', label: 'Search Google for “alpha beta”', enabled: true, args: { engine: 'Google', text: 'alpha beta' } });
       assert.ok(Math.abs(m.x - (100 + mx)) <= 1 && Math.abs(m.y - (80 + r.y)) <= 1, `the point: ${m.x}, ${m.y}`);
       assert.match(m.still, /^data:image\/jpeg;base64,/);
@@ -925,7 +938,12 @@ app.whenReady().then(async () => {
         // The lists are text, and uBlock's resources a JSON file.
         return new Response(/\.json$/.test(String(url)) ? '[]' : `||${AD_HOST}^\n`);
       };
-      const make = () => createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
+      // The engine without the cookie notices list (its own file), as the one that was there before it.
+      const make = () => {
+        const ab = createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
+        ab.setPrefs({ cookieBanners: false });
+        return ab;
+      };
       const file = path.join(dir, 'engine-ads-and-tracking.bin');
       try {
         const first = make();
@@ -958,6 +976,518 @@ app.whenReady().then(async () => {
         const fifth = make();
         assert.equal(await fifth.ready(), false);
         fifth.close();
+      } finally {
+        globalThis.fetch = realFetch;
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+
+    // ---- private tabs, dark pages, sound, pictures, a site's data, media and the bubble ----
+    const pagePrefs = (more) => browser.message({ type: 'browser-prefs', adblock: true, allowAds: [], cookieBanners: true, darkPages: false, darkExcept: [], autoplay: false, ...more });
+    const cookiesOf = (tab) => evalIn(tab.sid, 'document.cookie');
+    const tabOf = (tab) => browser.conns.get(CONN).targets.get(tab.targetId);
+    const baseParams = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
+    const ids = (tpl) => tpl.filter((i) => i.type !== 'separator').map((i) => i.id);
+
+    await check('a private context: its tabs are real pages in a partition kept in memory, with their own cookies, the blocker and the permission questions; its menu opens private tabs; disposing of it forgets it', async () => {
+      pagePrefs({});
+      const { browserContextId } = await cdp('Target.createBrowserContext', { hydorPrivate: true });
+      const priv = await openTab(`${appOrigin}/own`, { browserContextId });
+      const tp = tabOf(priv);
+      assert.ok(tp.ctx.private && !tp.offscreen && !tp.wc.isOffscreen(), 'a real page');
+      assert.equal(tp.ctx.partition, `hydor-private-${browserContextId.toLowerCase()}`);
+      assert.ok(!tp.ctx.persistent && !tp.wc.session.isPersistent(), 'in memory');
+      assert.equal(tp.wc.session.extensions.getAllExtensions().length, 0, 'no extensions');
+      assert.equal(browser.adblock.isOn(tp.wc.session), true, 'the blocker is on there');
+      // Cookies are apart, both ways.
+      await goTo(own, `${appOrigin}/own`);
+      await evalIn(priv.sid, `document.cookie = 'pc=1; path=/'; 1`);
+      await evalIn(own.sid, `document.cookie = 'nc=1; path=/'; 1`);
+      assert.equal(await cookiesOf(priv), 'pc=1');
+      assert.equal(await cookiesOf(own), 'nc=1');
+      // Permission questions go to the server, from a private tab as from a normal one.
+      for (const [tab, name] of [[priv, 'private'], [own, 'normal']]) {
+        const mark = toServerLog.length;
+        await evalIn(tab.sid, `navigator.geolocation.getCurrentPosition(() => {}, () => {}); 1`);
+        const ask = await until(() => toServerLog.slice(mark).find((m) => m.type === 'browser-permission' && m.target === tab.targetId), 3000, `the ${name} tab's permission question`);
+        assert.equal(ask.permission, 'geolocation');
+        browser.message({ type: 'browser-permission-answer', conn: CONN, id: ask.id, allow: false });
+      }
+      // Its menu: a link and an image open in a private tab again, with no "Open link in private tab" and no Ask items.
+      const shown = browser.conns.get(CONN).targets.get(priv.targetId);
+      const link = browser.menuTemplate(shown, { ...baseParams, linkURL: `${appOrigin}/popped` });
+      assert.ok(!ids(link).includes('open-link-private'));
+      const withAsk = { ...baseParams, selectionText: 'hello', mediaType: 'image', srcURL: `${appOrigin}/photo-of-cat.png` };
+      const rich = ids(browser.menuTemplate(shown, withAsk));
+      assert.ok(!rich.includes('ask') && !rich.includes('ask-image'), JSON.stringify(rich));
+      for (const keep of ['save-image-library', 'highlight', 'translate-selection', 'bookmark', 'read-later', 'search']) assert.ok(rich.includes(keep), `${keep} stays`);
+      let mark = events.length;
+      link.find((i) => i.id === 'open-link').click();
+      const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && m.params.targetInfo.browserContextId === browserContextId);
+      const opened = browser.conns.get(CONN).targets.get(att.params.targetInfo.targetId);
+      assert.ok(opened.ctx.private && !opened.offscreen, 'a private tab of the same context');
+      mark = events.length;
+      browser.menuTemplate(shown, { ...baseParams, mediaType: 'image', srcURL: `${appOrigin}/photo-of-cat.png` }).find((i) => i.id === 'open-image').click();
+      await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && m.params.targetInfo.browserContextId === browserContextId);
+      // A normal tab's menu: Open link in private tab asks the app; Ask items stay.
+      const normal = browser.menuTemplate(tabOf(own), { ...baseParams, linkURL: `${appOrigin}/popped` });
+      assert.equal(ids(normal).join(), 'open-link,open-link-private,open-link-external,copy-link,read-link-later,back,forward,reload,bookmark,read-later,print,inspect');
+      assert.ok(ids(browser.menuTemplate(tabOf(own), withAsk)).includes('ask-image'));
+      const n = await page('__cmds.length');
+      normal.find((i) => i.id === 'open-link-private').click();
+      await until(async () => (await page('__cmds.length')) === n + 1, 2000, 'the open-private command');
+      assert.deepEqual((await page('__cmds')).at(-1), { cmd: 'open-private', url: `${appOrigin}/popped` });
+      // Disposing of the context closes its tabs and forgets what it kept.
+      const ses = tp.wc.session;
+      await cdp('Target.disposeBrowserContext', { browserContextId });
+      assert.ok(!browser.conns.get(CONN).targets.has(priv.targetId) && !browser.conns.get(CONN).targets.has(att.params.targetInfo.targetId));
+      assert.equal(browser.adblock.isOn(ses), false, 'the blocker lets go of the session');
+      await until(async () => (await ses.cookies.get({})).length === 0, 3000, 'the private cookies to go');
+      assert.equal(await cookiesOf(own), 'nc=1', 'the normal tab keeps its own');
+      await evalIn(own.sid, `document.cookie = 'nc=; path=/; max-age=0'; 1`);
+      // Only your own browsing has private contexts: the flag does nothing for a plain one without it.
+      const plainCtx = await cdp('Target.createBrowserContext', {});
+      assert.ok(!browser.conns.get(CONN).contexts.get(plainCtx.browserContextId).private);
+      await cdp('Target.disposeBrowserContext', { browserContextId: plainCtx.browserContextId });
+    });
+
+    await check('Ctrl or ⌘+Shift+N inside a page goes to the app (and without Shift it does not)', async () => {
+      const t = ownT();
+      const keys = (input) => browser.shortcut(t, { control: false, meta: false, alt: false, shift: false, ...input });
+      assert.deepEqual(keys(ctrl({ key: 'N', shift: true })), { key: 'N' });
+      assert.equal(keys(ctrl({ key: 'n' })), null);
+      assert.equal(keys(ctrl({ key: 'N', shift: true, alt: true })), null);
+      const mark = await page('__keys.length');
+      let prevented = false;
+      t.wc.emit('before-input-event', { preventDefault: () => (prevented = true) }, { type: 'keyDown', control: !MAC, meta: MAC, alt: false, shift: true, key: 'N' });
+      assert.ok(prevented);
+      await until(async () => (await page('__keys.length')) === mark + 1, 2000, 'the key');
+      assert.equal((await page('__keys')).at(-1).key, 'N');
+    });
+
+    await check('pages shown dark: on, a site excepted, another site, a new tab, a pop-up, off; the server’s own media emulation is kept with it', async () => {
+      const dark = (tab) => evalIn(tab.sid, `matchMedia('(prefers-color-scheme: dark)').matches`);
+      const wait = (tab, want, what) => until(async () => (await dark(tab)) === want, 3000, what);
+      await goTo(own, `${appOrigin}/own`);
+      assert.equal(await dark(own), false);
+      pagePrefs({ darkPages: true, darkExcept: [] });
+      await wait(own, true, 'the page to go dark');
+      // Still dark on another page of the site, and on another site (localhost is another host of this machine).
+      await goTo(own, `${appOrigin}/words`);
+      assert.equal(await dark(own), true);
+      const other = appOrigin.replace('127.0.0.1', 'localhost');
+      await goTo(own, `${other}/words`);
+      assert.equal(await dark(own), true, 'another site');
+      // An exception: a site covers its subdomains, and www. does not matter.
+      pagePrefs({ darkPages: true, darkExcept: ['www.localhost'] });
+      await wait(own, false, 'the exception');
+      await goTo(own, `${appOrigin}/words`);
+      assert.equal(await dark(own), true, 'a site that is not excepted, reached from one that is');
+      await goTo(own, `${other}/words`);
+      assert.equal(await dark(own), false, 'an excepted site, reached from a dark one');
+      // The browser's own darkening is on too: a page with no dark look of its own (white) is drawn dark where it is shown.
+      await goTo(own, `${appOrigin}/words`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:100,y:80,w:640,h:400})`);
+      const shade = async () => {
+        try {
+          const px = (await ownT().wc.capturePage()).crop({ x: 300, y: 300, width: 4, height: 4 }).toBitmap();
+          return (px[0] + px[1] + px[2]) / 3;
+        } catch {
+          // A page that has just loaded may not have a frame to take yet.
+          return -1;
+        }
+      };
+      await until(async () => (await shade()) >= 0 && (await shade()) < 100, 4000, 'the white page to be drawn dark').catch(async (e) => {
+        throw new Error(`${e.message} (a pixel of it is ${await shade()})`);
+      });
+      // The server's own media emulation on the tab is merged with ours, not replaced by it.
+      await goTo(own, `${appOrigin}/words`);
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, own.sid);
+      assert.equal(await dark(own), true);
+      assert.equal(await evalIn(own.sid, `matchMedia('(prefers-reduced-motion: reduce)').matches`), true);
+      await cdp('Emulation.setEmulatedMedia', { features: [] }, own.sid);
+      assert.equal(await dark(own), true);
+      // A new tab is dark before its first page loads, and so is a pop-up.
+      const fresh = await openTab(`${appOrigin}/own`);
+      assert.equal(await dark(fresh), true, 'a new tab');
+      const mark = events.length;
+      await evalIn(fresh.sid, `window.open('/popped', 'dp'); 1`);
+      const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && m.params.targetInfo.openerId === fresh.targetId);
+      await cdp('Page.enable', {}, att.params.sessionId);
+      await cdp('Runtime.runIfWaitingForDebugger', {}, att.params.sessionId);
+      await until(async () => (await evalIn(att.params.sessionId, 'document.title')) === 'popped', 5000, 'the pop-up');
+      assert.equal(await dark({ sid: att.params.sessionId }), true, 'a pop-up');
+      await cdp('Target.closeTarget', { targetId: att.params.targetInfo.targetId });
+      // An agent's tab is left alone.
+      const bot = await openTab(`${appOrigin}/own`, { hydorAgent: true });
+      assert.equal(await dark(bot), false, 'an agent’s tab');
+      await cdp('Target.closeTarget', { targetId: bot.targetId });
+      pagePrefs({ darkPages: false });
+      await wait(own, false, 'the page to go light again');
+      await wait(fresh, false, 'the new tab to go light again');
+      await goTo(own, `${appOrigin}/words`);
+      await until(async () => (await shade()) > 200, 4000, 'the page to be drawn light again');
+      await cdp('Target.closeTarget', { targetId: fresh.targetId });
+    });
+
+    await check('sound that plays by itself: a tab made after the setting has its policy, and so has a pop-up of it; an agent’s tab keeps its own', async () => {
+      // What the policy does: a video with sound is let play with no click only where the policy lets it.
+      const plays = async (tab) => {
+        await until(async () => (await evalIn(tab.sid, `document.getElementById('v').readyState`)) >= 2, 5000, 'the sound to load');
+        return evalIn(tab.sid, `document.getElementById('v').play().then(() => 'plays', (e) => e.name)`);
+      };
+      const open = async (url, params) => {
+        const tab = await openTab(url, params);
+        return tab;
+      };
+      const a = await open(`${appOrigin}/sound`);
+      assert.equal(await plays(a), 'NotAllowedError', 'waits for you by default');
+      pagePrefs({ autoplay: true });
+      const b = await open(`${appOrigin}/sound`);
+      assert.equal(await plays(b), 'plays');
+      await evalIn(a.sid, `document.getElementById('v').pause(); 1`);
+      assert.equal(await plays(a), 'NotAllowedError', 'a tab made before it keeps its own');
+      const popupPlays = async (opener, name) => {
+        const mark = events.length;
+        await evalIn(opener.sid, `window.open('/sound', '${name}'); 1`);
+        const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && m.params.targetInfo.openerId === opener.targetId);
+        await cdp('Page.enable', {}, att.params.sessionId);
+        await cdp('Runtime.runIfWaitingForDebugger', {}, att.params.sessionId);
+        await until(async () => (await evalIn(att.params.sessionId, 'document.title')) === 'sound', 5000, 'the pop-up');
+        return [att, await plays({ sid: att.params.sessionId })];
+      };
+      const [att, first] = await popupPlays(b, 'ap');
+      assert.equal(first, 'plays', 'a pop-up');
+      pagePrefs({ autoplay: false });
+      const [att2, second] = await popupPlays(b, 'ap2');
+      assert.equal(second, 'NotAllowedError', 'a pop-up after the setting changed');
+      const bot = await open(`${appOrigin}/sound`, { hydorAgent: true });
+      assert.equal(await plays(bot), 'plays', 'an agent’s tab');
+      for (const x of [a.targetId, b.targetId, bot.targetId, att.params.targetInfo.targetId, att2.params.targetInfo.targetId]) await cdp('Target.closeTarget', { targetId: x });
+    });
+
+    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-downloads-'));
+    const png = (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    await check('a picture of the page (what shows, and the whole page) and a PDF are saved in Downloads, the picture is on the clipboard, a taken name gets (2)', async () => {
+      app.setPath('downloads', downloads);
+      await goTo(own, `${appOrigin}/agent`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:100,y:80,w:640,h:400})`);
+      await sleep(500);
+      const api = (call) => page(`hydorDesktop.browser.${call}`);
+      const id = JSON.stringify(own.targetId);
+      const visible = await api(`capture(${id}, false)`);
+      assert.ok(visible && visible.path.startsWith(downloads), JSON.stringify(visible));
+      assert.match(visible.name, /^agent page \d{4}-\d\d-\d\d at \d\d\.\d\d\.\d\d\.png$/);
+      const vb = fs.readFileSync(visible.path);
+      assert.ok(png(vb));
+      const dsf = await evalIn(own.sid, 'devicePixelRatio');
+      assert.equal(vb.readUInt32BE(16), Math.round(640 * dsf));
+      assert.equal(vb.readUInt32BE(20), Math.round(400 * dsf));
+      assert.equal(typeof visible.copied, 'boolean');
+      assert.equal(visible.copied, true, 'put on the clipboard');
+      assert.equal(await clipboard.has('image/png'), true, 'on the clipboard');
+      const whole = await api(`capture(${id}, true)`);
+      const wb = fs.readFileSync(whole.path);
+      assert.ok(png(wb));
+      assert.ok(wb.readUInt32BE(16) >= Math.round(600 * dsf) && wb.readUInt32BE(16) <= Math.round(640 * dsf), `the page’s width, less its scrollbar: ${wb.readUInt32BE(16)}`);
+      assert.ok(wb.readUInt32BE(20) >= 3000 * dsf - 2, `the whole page is ${wb.readUInt32BE(20)} pixels high`);
+      assert.notEqual(whole.path, visible.path);
+      const pdf = await api(`savePdf(${id})`);
+      assert.equal(pdf.name, 'agent page.pdf');
+      assert.equal(fs.readFileSync(pdf.path).subarray(0, 5).toString(), '%PDF-');
+      const again = await api(`savePdf(${id})`);
+      assert.equal(again.name, 'agent page (2).pdf');
+      // What is not one of your tabs (an agent's, a stranger's, one that is not shown) gets nothing.
+      assert.equal(await api(`capture(${JSON.stringify(agent.targetId)}, false)`), null);
+      assert.equal(await api(`savePdf('nope')`), null);
+      const fresh = await openTab(`${appOrigin}/own`);
+      assert.equal(await api(`capture(${JSON.stringify(fresh.targetId)}, false)`), null, 'not shown');
+      await cdp('Target.closeTarget', { targetId: fresh.targetId });
+      // A title with characters a file name cannot have.
+      await evalIn(own.sid, `document.title = 'a/b: c*d?  <e>|f "g"'; 1`);
+      const odd = await api(`savePdf(${id})`);
+      assert.equal(odd.name, 'a b c d e f g.pdf');
+    });
+
+    await check('delete this site’s data: its cookies and storage go (subdomains too, other sites’ stay), the tab loads again; a private tab clears its own session', async () => {
+      await goTo(own, `${appOrigin}/words`);
+      const ses = ownT().wc.session;
+      await evalIn(own.sid, `document.cookie = 'k=1; path=/'; localStorage.setItem('x', '1'); 1`);
+      await ses.cookies.set({ url: 'http://sub.example.org/', name: 'sub', value: '1', domain: 'example.org' });
+      await ses.cookies.set({ url: 'http://www.example.co.uk/', name: 'uk', value: '1', domain: 'example.co.uk' });
+      await ses.cookies.set({ url: 'http://other.co.uk/', name: 'keep', value: '1' });
+      await ses.cookies.set({ url: 'http://keep.test/', name: 'keep', value: '1' });
+      const names = async () => (await ses.cookies.get({})).map((c) => `${c.domain}|${c.name}`).sort();
+      const before = await names();
+      assert.ok(before.includes('127.0.0.1|k'), before.join());
+      const done = await page(`hydorDesktop.browser.clearSite(${JSON.stringify(own.targetId)})`);
+      assert.deepEqual(done, { cleared: true, site: '127.0.0.1' });
+      await until(async () => (await evalIn(own.sid, `document.cookie + '|' + localStorage.getItem('x')`)) === '|null', 5000, 'the site’s data to go (and the page to load again)');
+      assert.ok(!(await names()).includes('127.0.0.1|k'));
+      assert.ok((await names()).includes('keep.test|keep'), 'another site keeps its cookie');
+      // The site of a host, as well as can be told.
+      for (const [host, site] of [['www.example.com', 'example.com'], ['a.b.example.co.uk', 'example.co.uk'], ['example.com.au', 'example.com.au'], ['mail.foo.ru', 'foo.ru'], ['localhost', 'localhost'], ['127.0.0.1', '127.0.0.1'], ['x.example.org', 'example.org'], ['a.b.ne.jp', 'b.ne.jp']]) assert.equal(browser.siteOfHost(host), site, host);
+      await ses.cookies.remove('http://keep.test/', 'keep');
+      await ses.cookies.remove('http://other.co.uk/', 'keep');
+      await ses.cookies.remove('http://www.example.co.uk/', 'uk');
+      // A private tab: its own cookies go, the normal tab's stay.
+      const { browserContextId } = await cdp('Target.createBrowserContext', { hydorPrivate: true });
+      const priv = await openTab(`${appOrigin}/words`, { browserContextId });
+      await evalIn(priv.sid, `document.cookie = 'pk=1; path=/'; 1`);
+      await evalIn(own.sid, `document.cookie = 'nk=1; path=/'; 1`);
+      assert.deepEqual(await page(`hydorDesktop.browser.clearSite(${JSON.stringify(priv.targetId)})`), { cleared: true, site: '127.0.0.1' });
+      await until(async () => (await cookiesOf(priv)) === '', 5000, 'the private cookie to go');
+      assert.equal(await cookiesOf(own), 'nk=1');
+      await evalIn(own.sid, `document.cookie = 'nk=; path=/; max-age=0'; 1`);
+      await cdp('Target.disposeBrowserContext', { browserContextId });
+      // Not a web page, or not a tab: nothing.
+      assert.equal(await page(`hydorDesktop.browser.clearSite(${JSON.stringify(agent.targetId)})`), null);
+      assert.equal(await page(`hydorDesktop.browser.clearSite('nope')`), null);
+    });
+
+    let pipWorks = null;
+    await check('video and audio in the right-click menu: its items, what they do to the element, and whether picture in picture works here', async () => {
+      await goTo(own, `${appOrigin}/video`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:100,y:80,w:640,h:400})`);
+      await until(async () => (await evalIn(own.sid, `document.getElementById('v').readyState`)) >= 2, 5000, 'the video to load');
+      const t = ownT();
+      const flags = { inError: false, isPaused: true, isMuted: false, hasAudio: true, isLooping: false, isControlsVisible: false, canToggleControls: true, canPrint: false, canSave: true, canShowPictureInPicture: true, isShowingPictureInPicture: false, canRotate: false, canLoop: true };
+      const src = `${appOrigin}/clip.webm`;
+      const params = { ...baseParams, x: 60, y: 60, pageURL: `${appOrigin}/video`, mediaType: 'video', srcURL: src, mediaFlags: flags };
+      const tpl = browser.menuTemplate(t, params);
+      assert.equal(ids(tpl).slice(0, 5).join(), 'media-play,media-mute,media-loop,media-controls,media-pip');
+      assert.deepEqual(tpl.filter((i) => 'checked' in i).map((i) => [i.id, i.checked]), [['media-loop', false], ['media-controls', false], ['media-pip', false]]);
+      assert.deepEqual(ids(tpl).slice(5, 8), ['open-video', 'save-video', 'copy-video-address']);
+      assert.equal(tpl.find((i) => i.id === 'open-video').label, 'Open video in new tab');
+      const playing = browser.menuTemplate(t, { ...params, mediaFlags: { ...flags, isPaused: false, isMuted: true, isLooping: true, isControlsVisible: true, isShowingPictureInPicture: true } });
+      assert.deepEqual(ids(playing).slice(0, 5), ['media-pause', 'media-unmute', 'media-loop', 'media-controls', 'media-pip']);
+      assert.deepEqual(playing.filter((i) => 'checked' in i).map((i) => i.checked), [true, true, true]);
+      // What it has not: no sound, no controls to toggle, no way to save, a blob: source.
+      const bare = ids(browser.menuTemplate(t, { ...params, mediaFlags: { ...flags, hasAudio: false, canToggleControls: false, canShowPictureInPicture: false, canSave: false } }));
+      assert.ok(!bare.some((i) => /media-(mute|unmute|controls|pip)|save-video/.test(i)), bare.join());
+      const blob = ids(browser.menuTemplate(t, { ...params, srcURL: 'blob:http://x/1' }));
+      assert.ok(!blob.some((i) => /^(open|save|copy)-video/.test(i)), blob.join());
+      const audio = ids(browser.menuTemplate(t, { ...params, mediaType: 'audio' }));
+      assert.deepEqual(audio.filter((i) => /audio/.test(i)), ['open-audio', 'save-audio', 'copy-audio-address']);
+      assert.ok(!audio.includes('media-pip'), 'no picture in picture for audio');
+      assert.ok(!ids(browser.menuTemplate(t, params)).includes('translate-page'), 'not on a video');
+      // The items act on the element at the click (the isolated world is the menu's own, the page's scripts cannot see it).
+      const state = () => evalIn(own.sid, `(() => { const v = document.getElementById('v'); return { muted: v.muted, loop: v.loop, controls: v.controls, paused: v.paused }; })()`);
+      const pick = async (id, list = tpl) => (list.find((i) => i.id === id).click(), sleep(250));
+      assert.equal((await state()).muted, true);
+      await pick('media-unmute', playing);
+      assert.equal((await state()).muted, false);
+      await pick('media-mute');
+      assert.equal((await state()).muted, true);
+      await pick('media-loop');
+      assert.equal((await state()).loop, true);
+      await pick('media-controls');
+      assert.equal((await state()).controls, true);
+      await pick('media-play');
+      await until(async () => (await state()).paused === false, 3000, 'the video to play');
+      await pick('media-pause', playing);
+      await until(async () => (await state()).paused === true, 3000, 'the video to pause');
+      // A click that is not on the element finds it by its box, and one with the page zoomed finds it by the zoom.
+      t.wc.setZoomFactor(2);
+      await sleep(200);
+      await pick('media-loop', browser.menuTemplate(t, { ...params, x: 100, y: 100 }));
+      assert.equal((await state()).loop, false, 'at a zoom of 200 %, 100 is 50 in the page');
+      t.wc.setZoomFactor(1);
+      // Its commands that go on: copy, open (a new tab), save (a download starts).
+      tpl.find((i) => i.id === 'copy-video-address').click();
+      await until(async () => (await clipboard.readText()) === src, 3000, 'the address on the clipboard');
+      const mark = events.length;
+      tpl.find((i) => i.id === 'open-video').click();
+      const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && m.params.targetInfo.type === 'page');
+      await cdp('Target.closeTarget', { targetId: att.params.targetInfo.targetId });
+      const dl = events.length;
+      tpl.find((i) => i.id === 'save-video').click();
+      await waitEvent('Browser.downloadWillBegin', (m) => events.indexOf(m) >= dl && m.params.url === src);
+      // Picture in picture: whether this Electron has it. The item is only there when it works.
+      pipWorks = await t.wc.executeJavaScriptInIsolatedWorld(1000, [{ code: `(async () => { const v = document.getElementById('v'); try { if (!document.pictureInPictureEnabled) return 'disabled'; await v.play(); await v.requestPictureInPicture(); const on = document.pictureInPictureElement === v; await document.exitPictureInPicture().catch(() => {}); return on ? 'works' : 'no element'; } catch (e) { return String(e && e.name) + ': ' + String(e && e.message); } })()` }], true);
+      console.log('  [pip]', pipWorks);
+    });
+
+    await check('translation items: Translate this page on the page itself (the language it asks for), Translate “…” for a selection; only on web pages; they ask the app', async () => {
+      const t = ownT();
+      const eng = { name: 'Google', template: 'https://www.google.com/search?q=%s', translateTo: 'de' };
+      const plain = browser.menuTemplate(t, baseParams, eng);
+      const item = plain.find((i) => i.id === 'translate-page');
+      assert.ok(item && item.label === 'Translate this page');
+      assert.deepEqual(item.args, { lang: 'de' });
+      assert.deepEqual(ids(plain).slice(0, 4), ['back', 'forward', 'reload', 'translate-page']);
+      // Not on a link, a picture, a video, words, a field, or a page that is not a website.
+      for (const more of [{ linkURL: 'https://example.com/' }, { mediaType: 'image', srcURL: 'https://example.com/i.png' }, { mediaType: 'video', srcURL: 'https://example.com/v.webm', mediaFlags: {} }, { selectionText: 'x' }, { isEditable: true }, { pageURL: 'about:blank' }, { pageURL: 'chrome-error://chromewebdata/' }]) {
+        assert.ok(!ids(browser.menuTemplate(t, { ...baseParams, ...more }, eng)).includes('translate-page'), JSON.stringify(more));
+      }
+      assert.ok(ids(browser.menuTemplate(t, { ...baseParams, pageURL: 'file:///tmp/a.html' }, eng)).includes('translate-page'), 'a file is a page');
+      const sel = browser.menuTemplate(t, { ...baseParams, selectionText: 'hello world' }, eng);
+      const ts = sel.find((i) => i.id === 'translate-selection');
+      assert.equal(ts.label, 'Translate “hello world”');
+      assert.deepEqual(ts.args, { text: 'hello world' });
+      assert.ok(!ids(browser.menuTemplate(t, { ...baseParams, selectionText: 'x', pageURL: 'about:blank' }, eng)).includes('translate-selection'));
+      assert.ok(!ids(browser.menuTemplate(t, { ...baseParams, selectionText: 'x', isEditable: true }, eng)).includes('translate-selection'));
+      const n = await page('__cmds.length');
+      item.click();
+      ts.click();
+      await until(async () => (await page('__cmds.length')) === n + 2, 3000, 'the translate commands');
+      const [a, b] = (await page('__cmds')).slice(-2);
+      assert.deepEqual([a, b], [{ cmd: 'translate', target: t.id }, { cmd: 'translate-text', text: 'hello world', url: `${appOrigin}/words` }]);
+      // The selection is taken from the page whole (up to 5,000 characters), as asking an agent does.
+      await goTo(own, `${appOrigin}/words`);
+      await t.wc.executeJavaScript(`document.body.innerHTML = '<p id=p>${'word '.repeat(2000)}</p>'; getSelection().selectAllChildren(document.getElementById('p')); 1`, true);
+      browser.menuTemplate(t, { ...baseParams, selectionText: 'word '.repeat(150) }, eng).find((i) => i.id === 'translate-selection').click();
+      await until(async () => (await page('__cmds.length')) === n + 3, 3000, 'the long translate command');
+      const long = (await page('__cmds')).at(-1);
+      assert.equal(long.cmd, 'translate-text');
+      assert.equal(long.text.length, 5000);
+    });
+
+    await check('the link bubble: shown over the bottom left corner of the page with the address, to the right while the mouse is there, in front of the page, and gone when the address is empty or the page is taken away', async () => {
+      await goTo(own, `${appOrigin}/video`);
+      const id = JSON.stringify(own.targetId);
+      await page(`hydorDesktop.browser.show(${id}, {x:100,y:80,w:640,h:400})`);
+      await sleep(300);
+      const t = ownT();
+      const tb = t.view.getBounds();
+      const bubble = () => browser.bubble(win);
+      const text = () => bubble().view.webContents.executeJavaScript(`document.getElementById('b').textContent`, true);
+      const last = () => win.contentView.children[win.contentView.children.length - 1];
+      assert.equal(bubble(), null, 'none until a link is pointed at');
+      // The mouse is somewhere else.
+      const real = screen.getCursorScreenPoint;
+      const at = (x, y) => {
+        const o = win.getContentBounds();
+        screen.getCursorScreenPoint = () => ({ x: o.x + x, y: o.y + y });
+      };
+      at(tb.x + 300, tb.y + 100);
+      try {
+        t.wc.emit('update-target-url', {}, 'https://example.com/%E4%B8%AD/page?x=1');
+        await until(() => bubble() && bubble().shown, 3000, 'the bubble');
+        assert.equal(await text(), 'https://example.com/中/page?x=1', 'decoded where that is safe');
+        let b = bubble();
+        assert.ok(win.contentView.children.includes(b.view) && last() === b.view, 'in front of the page');
+        assert.equal(b.bounds.height, 24);
+        assert.equal(b.bounds.y, tb.y + tb.height - 24, '0 px from the page’s bottom edge');
+        assert.ok(b.bounds.x >= tb.x && b.bounds.x <= tb.x + 8 && b.side === 'left', `at the left: ${JSON.stringify(b.bounds)}`);
+        assert.ok(b.bounds.width > 100 && b.bounds.width < 400, `sized to its words: ${b.bounds.width}`);
+        // An address that stays encoded when decoding could hide something (a space, a direction mark).
+        t.wc.emit('update-target-url', {}, 'https://example.com/a%20b%E2%80%AEc');
+        await until(async () => (await text()).includes('%20'), 3000, 'the encoded address');
+        // The mouse comes to the corner: it goes to the right, and back when the mouse leaves.
+        at(tb.x + 10, tb.y + tb.height - 12);
+        await until(() => bubble().side === 'right', 2000, 'the bubble to move to the right');
+        b = bubble();
+        assert.equal(b.bounds.x + b.bounds.width, tb.x + tb.width - 4, 'at the page’s right edge');
+        at(tb.x + 300, tb.y + 100);
+        await until(() => bubble().side === 'left', 2000, 'the bubble to come back');
+        // A long address is shortened in the middle: the host and the end stay, at most two thirds of the page wide.
+        const longUrl = `https://www.example.com/${'folder/'.repeat(40)}the-end.html`;
+        t.wc.emit('update-target-url', {}, longUrl);
+        await until(async () => (await text()).includes('…'), 3000, 'the shortened address').catch(async (e) => { throw new Error(`${e.message}: ${JSON.stringify(await text())} ${JSON.stringify(bubble().bounds)} shown ${bubble().shown}`); });
+        const shortened = await text();
+        assert.ok(shortened.startsWith('https://www.example.com/') && shortened.endsWith('the-end.html'), shortened);
+        assert.ok(bubble().bounds.width <= Math.floor((tb.width * 2) / 3) + 1, `${bubble().bounds.width} of ${tb.width}`);
+        // The tab's view put in front again (it is placed again as it moves): the bubble is still above it, and moves with it.
+        await page(`hydorDesktop.browser.show(${id}, {x:120,y:90,w:600,h:380})`);
+        await sleep(200);
+        assert.equal(last(), bubble().view, 'still in front');
+        assert.equal(bubble().bounds.y, 90 + 380 - 24);
+        // The colours follow the app's theme: light here (its page has no dark class), dark when it has.
+        const colours = () => bubble().view.webContents.executeJavaScript(`getComputedStyle(document.getElementById('b')).backgroundColor`, true);
+        assert.equal(await colours(), 'rgb(255, 255, 255)');
+        await page(`document.documentElement.classList.add('dark'); 1`);
+        await sleep(2100);
+        t.wc.emit('update-target-url', {}, 'https://example.com/dark');
+        await until(async () => (await colours()) === 'rgb(31, 31, 35)', 3000, 'the dark bubble');
+        await page(`document.documentElement.classList.remove('dark'); 1`);
+        // Gone when the address is empty.
+        t.wc.emit('update-target-url', {}, '');
+        await until(() => !bubble().shown && !win.contentView.children.includes(bubble().view), 2000, 'the bubble to go');
+        // Gone when the page is taken away, hidden or full screen, or a menu is over it.
+        for (const [what, away, back] of [
+          ['taken away', () => page(`hydorDesktop.browser.hide(${id})`), () => page(`hydorDesktop.browser.show(${id}, {x:100,y:80,w:640,h:400})`)],
+          ['covered by a menu', async () => {
+            const build = Menu.buildFromTemplate;
+            Menu.buildFromTemplate = () => ({ popup() {} });
+            try {
+              t.wc.emit('context-menu', {}, { ...baseParams, x: 50, y: 50, pageURL: `${appOrigin}/video` });
+              await sleep(1000);
+            } finally {
+              Menu.buildFromTemplate = build;
+            }
+          }, async () => {}],
+        ]) {
+          await sleep(100);
+          t.wc.emit('update-target-url', {}, 'https://example.com/x');
+          await until(() => bubble().shown, 3000, `the bubble before it is ${what}`);
+          await away();
+          await until(() => !bubble().shown && !win.contentView.children.includes(bubble().view), 2000, `the bubble to go when the page is ${what}`);
+          await back();
+          await sleep(200);
+        }
+        // Not for a tab that is not shown, and not for an agent's.
+        const agentT = browser.conns.get(CONN).targets.get(agent.targetId);
+        agentT.wc.emit('update-target-url', {}, 'https://example.com/agent');
+        await sleep(200);
+        assert.ok(!bubble().shown, 'an agent’s tab has none');
+        // Window hidden: gone with the page.
+        t.wc.emit('update-target-url', {}, 'https://example.com/y');
+        await until(() => bubble().shown, 3000, 'the bubble before the window hides');
+        win.emit('hide');
+        await until(() => !bubble().shown, 2000, 'the bubble to go with the window');
+        win.emit('show');
+        await sleep(200);
+        // And when its page goes to another one.
+        t.wc.emit('update-target-url', {}, 'https://example.com/z');
+        await until(() => bubble().shown, 3000, 'the bubble before the page changes');
+        await goTo(own, `${appOrigin}/words`);
+        await until(() => !bubble().shown, 2000, 'the bubble to go when the page changes');
+      } finally {
+        screen.getCursorScreenPoint = real;
+      }
+    });
+
+    await check('the ad blocker with cookie notices: the setting changes the engine on the sessions; its list is saved apart and the plain one is the fallback', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-cookies-'));
+      const realFetch = globalThis.fetch;
+      const asked = [];
+      let offline = false;
+      globalThis.fetch = async (url) => {
+        asked.push(String(url));
+        if (offline) throw new Error('no network');
+        return new Response(/\.json$/.test(String(url)) ? '[]' : /cookie/.test(String(url)) ? `||cookie-banner.${AD_HOST}^\n` : `||${AD_HOST}^\n`);
+      };
+      const make = () => createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
+      const ses = session.fromPartition('hydor-ipc-cookie-test');
+      try {
+        const ab = make();
+        ab.attach(ses);
+        ab.setPrefs({ adblock: true });
+        assert.equal(await ab.ready(), true);
+        await until(() => ab.hidesCookieNotices(ses), 5000, 'the cookie notices engine');
+        assert.ok(asked.some((u) => /easylist-cookie\.txt$/.test(u)), 'EasyList’s cookie list');
+        assert.ok(!asked.some((u) => /annoyances/.test(u)), 'not the broader annoyances lists');
+        assert.ok(fs.existsSync(path.join(dir, 'engine-ads-tracking-cookies.bin')));
+        // Off: the engine without them, made once (saved apart); on again: the first, from its file.
+        ab.setPrefs({ cookieBanners: false });
+        await until(() => ab.isOn(ses) && !ab.hidesCookieNotices(ses), 5000, 'the plain engine');
+        assert.ok(fs.existsSync(path.join(dir, 'engine-ads-and-tracking.bin')));
+        const n = asked.length;
+        ab.setPrefs({ cookieBanners: true });
+        await until(() => ab.hidesCookieNotices(ses), 5000, 'the cookie notices engine again');
+        assert.equal(asked.length, n, 'a fresh file is used as it is');
+        ab.close();
+        // No network and no cookie file, but the plain one is there: it does (the blocker is not lost for the new setting).
+        fs.rmSync(path.join(dir, 'engine-ads-tracking-cookies.bin'));
+        offline = true;
+        const again = make();
+        again.attach(ses);
+        again.setPrefs({ adblock: true, cookieBanners: true });
+        assert.equal(await again.ready(), true);
+        assert.equal(again.isOn(ses), true);
+        again.close();
       } finally {
         globalThis.fetch = realFetch;
         fs.rmSync(dir, { recursive: true, force: true });

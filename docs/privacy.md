@@ -55,7 +55,9 @@ These need nothing from you and are on from the first start, except where noted.
 (or Codex if Claude is not signed in), with your own sign-in. It names new sessions from your first message, and,
 with memory on (it is on by default), writes memory notes, tidies them and learns from your conversations; it
 also checks steps in Auto mode, drafts agents, reads pages for one question and, before a Naget Search, reads the
-filters the words of a web search state (a site, dates, a kind of page). Those go to Anthropic or OpenAI
+filters the words of a web search state (a site, dates, a kind of page). In your own browser it also translates the
+words of a page when you ask it to (or for a language you set to always be translated), and groups your tabs by their
+titles and addresses when you press the button. Those go to Anthropic or OpenAI
 the way a session does, so they carry words of yours.
 
 ## Only when you turn something on or use it
@@ -73,7 +75,7 @@ None of these happens until you do the thing in the first column.
 | Add a Chrome extension from the Chrome Web Store (a link, an id, or **Add to Hydor**) | `clients2.google.com`, and the address it sends the download to | The extension's id, and a request for its file, once for each time you add it. |
 | Type something that is not an address in the Browser page's address bar | The search engine you chose in the browser's settings (Google at first; DuckDuckGo, Bing, Brave, Ecosia, Startpage or your own address) | Your search words, as the page you open. This is your own browser. |
 | Type in the Browser page's address bar, with **Search suggestions** on (it is at first) | The suggestion service of the search engine you chose (`suggestqueries.google.com`, `duckduckgo.com`, `api.bing.com`, `search.brave.com` or `ac.ecosia.org`; Startpage and your own address have none) | What you type, as you type it, as in any browser. Turn **Search suggestions** off in the browser's settings to stop it. |
-| Browse in the Browser page (and when its ad blocker first starts, then about every week) | The sites you open; `raw.githubusercontent.com`, for the blocker's lists (Ghostery's, kept in its repository on GitHub) | What any browser sends the sites you open: your own browser connects to them directly. The blocker's lists (EasyList, EasyPrivacy, uBlock Origin's and others) are downloaded once and refreshed weekly; nothing about you is sent with them but what any download sends. Your own browser keeps its sign-ins in a profile of its own on this computer. |
+| Browse in the Browser page (and when its ad blocker first starts, then about every week) | The sites you open; `raw.githubusercontent.com`, for the blocker's lists (Ghostery's, kept in its repository on GitHub) | What any browser sends the sites you open: your own browser connects to them directly. The blocker's lists (EasyList, EasyPrivacy, uBlock Origin's and others) are downloaded once and refreshed weekly; nothing about you is sent with them but what any download sends. Your own browser keeps its sign-ins in a profile of its own on this computer; a private tab keeps its own apart, in memory, and forgets them when the last private tab closes. |
 | Set up the picture tools on this computer | `huggingface.co`, `pypi.org`, `files.pythonhosted.org` | Downloads of three models and Python packages, once. Your pictures stay on your computer. |
 | Link a Telegram bot | `api.telegram.org` | Your bot's token, and what the chat carries: your messages, the agents' replies, buttons and notices. Hydor asks Telegram for new messages (long polling) while the bot is linked. |
 | Press **Notify this device** | The push service of your browser (Google, Mozilla or Apple) | An encrypted message that a session finished or needs you. The push service cannot read it; it sees that one was sent, its size, and your server's address. |

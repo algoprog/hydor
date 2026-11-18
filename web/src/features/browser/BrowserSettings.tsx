@@ -8,6 +8,7 @@ import { Button, inputCls, Switch, Throbber } from '../../components/ui';
 import { Group, Row, Select, Stack } from '../settings/kit';
 import { activeTab, clearBrowsingData, ENGINE_NAMES, isWebPage, KEY, loadPrefs, savePrefs, usePrefs } from './browsing';
 import { Panel } from './Panel';
+import { PagesGroup, TranslationGroup } from './TranslationSettings';
 import { useBrowser } from './store';
 
 type Range = 'hour' | 'day' | 'week' | 'all';
@@ -27,7 +28,7 @@ function Check({ on, onChange, children }: { on: boolean; onChange: (v: boolean)
   );
 }
 
-export function BrowserSettingsPanel({ onClose, focusClear }: { onClose: () => void; focusClear?: boolean }) {
+export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: { onClose: () => void; focusClear?: boolean; focusTranslation?: number }) {
   const prefs = usePrefs((s) => s.prefs);
   const tab = activeTab(useBrowser((s) => s.views[KEY]));
   const [home, setHome] = useState('');
@@ -37,6 +38,7 @@ export function BrowserSettingsPanel({ onClose, focusClear }: { onClose: () => v
   const [range, setRange] = useState<Range>('hour');
   const [busy, setBusy] = useState(false);
   const clear = useRef<HTMLDivElement>(null);
+  const translation = useRef<HTMLDivElement>(null);
   useEffect(() => void loadPrefs(), []);
   // The fields start from what is kept (once it arrives).
   const loaded = !!prefs;
@@ -50,6 +52,11 @@ export function BrowserSettingsPanel({ onClose, focusClear }: { onClose: () => v
   useEffect(() => {
     if (focusClear) clear.current?.scrollIntoView({ block: 'start' });
   }, [focusClear, loaded]);
+
+  // "Translation settings" in the translate popover opens this scrolled to its group (each press, whether the panel was open or not).
+  useEffect(() => {
+    if (focusTranslation) translation.current?.scrollIntoView({ block: 'start' });
+  }, [focusTranslation, loaded]);
 
   const saveHome = async (v: string) => {
     const t = v.trim();
@@ -129,7 +136,17 @@ export function BrowserSettingsPanel({ onClose, focusClear }: { onClose: () => v
             </Group>
             <Group title="Ads">
               <Row label="Block ads and trackers" hint="Extensions that block ads may not run while this is on" control={<Switch on={prefs.adblock} label="Block ads and trackers" onChange={(v) => void savePrefs({ adblock: v })} />} />
+              <Row
+                label="Hide cookie banners"
+                hint="Hides the cookie notices many sites show, using EasyList’s list of them. A site that waits for your answer may hold some of its content back: allow ads on it from its padlock to see its notice again."
+                disabled={!prefs.adblock}
+                control={<Switch on={prefs.cookieBanners} label="Hide cookie banners" disabled={!prefs.adblock} onChange={(v) => void savePrefs({ cookieBanners: v })} />}
+              />
             </Group>
+            <div ref={translation}>
+              <TranslationGroup />
+            </div>
+            <PagesGroup />
             <div ref={clear}>
               <Group title="Clear browsing data">
                 <div className="space-y-0.5 p-4">

@@ -60,6 +60,12 @@ export interface DesktopBrowserBridge {
   menuPick?(target: string, menu: number, item: string | null): Promise<boolean>;
   /** Which search engine the right-click menu searches with (an older app does not have it). */
   setPrefs?(prefs: { engine: string; customSearch?: string }): Promise<void> | void;
+  /** A picture of a tab's page (what shows, or all of it) saved to Downloads and put on the clipboard when it can be; null when none was made (an older app does not have it). */
+  capture?(target: string, whole: boolean): Promise<{ path: string; name: string; copied: boolean } | null>;
+  /** A tab's page as a PDF file in Downloads (an older app does not have it). */
+  savePdf?(target: string): Promise<{ path: string; name: string } | null>;
+  /** Deletes the cookies and site data of a tab's site; which site it was (an older app does not have it). */
+  clearSite?(target: string): Promise<{ cleared: boolean; site: string } | null>;
 }
 
 /** What a tab's state said changed. */
@@ -81,10 +87,13 @@ export type PageCommand =
   | { cmd: 'ask-image'; path: string; name: string; url: string; title: string }
   | { cmd: 'picture-failed'; message: string }
   | { cmd: 'highlight'; target: string; url: string; title: string }
-  | { cmd: 'unhighlight'; id: string; url: string };
+  | { cmd: 'unhighlight'; id: string; url: string }
+  | { cmd: 'open-private'; url: string }
+  | { cmd: 'translate'; target: string }
+  | { cmd: 'translate-text'; text: string; url: string };
 
 /** An item of a page's right-click menu: what the desktop app offers where you clicked (its id names it), or a line. */
-export type PageMenuItem = { type: 'separator' } | { id: string; label: string; enabled: boolean; args?: { engine?: string; text?: string } };
+export type PageMenuItem = { type: 'separator' } | { id: string; label: string; enabled: boolean; checked?: boolean; args?: { engine?: string; text?: string; lang?: string } };
 
 /** A page's right-click menu for the app to draw: the point clicked (in the app's own pixels), its items, and a picture of the page as it was. */
 export interface PageMenuRequest {

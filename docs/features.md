@@ -235,15 +235,17 @@ agents that speak ACP and take MCP servers.
 - **Your own browser** (the **Browser** tool on the rail, in the desktop app only: the web app and a
   phone have no Browser button, and `/browser` there says it is part of the desktop app; the agents' browsers work
   everywhere): its tabs are real pages in the app's window, connecting to sites directly like any browser, kept between
-  visits (up to 30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open
+  visits (up to 30; private tabs are not kept). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open
   addresses on your own network.
   - **A bar and three columns**: a bar across the top (back, forward, reload, home, the address box, **Save**, **Ask**, your
-    extensions' buttons, **Add to Hydor** on a Web Store page, and a ⋯ menu), under it the **tab column** (Ctrl/⌘+B folds
+    extensions' buttons, **Add to Hydor** on a Web Store page, and a ⋯ menu), a purple **Private** chip in a private tab, and
+    the translate and reader view buttons at the end of the address box when a page can use them, under it the **tab column** (Ctrl/⌘+B folds
     it away), the page, and a **column beside the page** that shows only when something is in it. Nothing is laid over
     the page: it narrows to make room.
   - **The tab column**: the sites on your bookmarks bar pinned as tiles (five to a row, two rows, a **…** tile for the
     rest; click, middle or Ctrl click for a new tab, right-click to edit), **Agents at work** (a row for each agent's
-    open browser with a dot for working or waiting for you), and your **Tabs** (icon, title, ⋯, ×, a speaker to mute,
+    open browser with a dot for working or waiting for you), a purple **Private** section while private tabs are open
+    (**Close private tabs**, **New private tab**), and your **Tabs** (icon, title, ⋯, ×, a speaker to mute,
     middle click to close, **New tab**), resized by its edge like every column; a title too long fades at its end and rolls to
     show the rest under the pointer; and **Read later**, a quiet section under the tabs, folded while nothing waits.
     **A tab's menu** (right-click, or its ⋯): close it, the others or the ones below;
@@ -251,7 +253,7 @@ agents that speak ACP and take MCP servers.
     (one of seven), a name and the tab count, folded or opened by a click, its tabs under it (drag a tab on or off a group);
     the header's menu renames, colours, opens a new tab in it, ungroups or closes it. Groups are kept with the tabs for the next
     start. **Group my tabs with AI** (the sparkles in the **Tabs** row, or the ⋯ menu) sends the titles and addresses of the
-    tabs in no group, without what follows a ? or #, to the helper model, only when pressed, and makes the groups it answers
+    tabs in no group (never a private tab), without what follows a ? or #, to the helper model, only when pressed, and makes the groups it answers
     with, with **Undo**.
   - **The column beside the page**: **Ask** about the page (a copy of its text goes to a new session with the agent the
     start page used last, each tab with its own question, its conversation right there, **Open as a session**); an
@@ -279,11 +281,40 @@ agents that speak ACP and take MCP servers.
     browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
     the history, the files staying where they are.
   - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
-    trackers**, and **Clear browsing data** (history with the list of downloads, cookies and site data, cached files, with
-    a time range for the history).
+    trackers**, **Hide cookie banners**, **Translation** (what to translate into, the offer, languages to always or never
+    translate, sites never translated), **Pages** (**Dark pages**, **Sites shown as they are**, **Let sites play sound by
+    themselves**) and **Clear browsing data** (history with the list of downloads, cookies and site data, cached files,
+    with a time range for the history).
   - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
     padlock's popover counts what was blocked on the page and lets you **Allow ads on this site**. An extension's own
-    request blocking may not run while it is on.
+    request blocking may not run while it is on. **Hide cookie banners** (on at first, with the blocker on) adds
+    EasyList's cookie notice list: it hides a notice and does not answer it, and allowing ads on a site shows its notice
+    again.
+  - **Private tabs** (Ctrl/⌘+Shift+N, **New private tab** in the ⋯ menu and the tab column, **Open link in private tab**,
+    `/browser?private=1`): a purple **Private** section in the tab column and a **Private** chip in the address bar.
+    Their sign-ins, cookies, site data and cache are kept apart, in memory, and forgotten when the last private tab
+    closes or the app quits; their pages are not kept in history, in **Recently closed** or among the tabs that open
+    again at the next start; their downloads are saved but not listed in the Library's Downloads; extensions do not run
+    in them; a site's permission answers are asked again and forgotten; bookmarks, Read later, highlights and Save
+    still keep what you ask for. They can't be grouped, and agents never get them: no **Ask**, **Do this here** or
+    Ask items in the right-click menu, and the server refuses a copy of their page.
+  - **Translate a page**: a button in the address bar when a page is in another language than the one you translate
+    into (the app's own at first); the popover has **Translate** / **Show original** / **Try again** with a progress line,
+    **Translate into**, **Always translate** and **Never translate** for the language, **Never translate** for the site
+    and **Translation settings**. What is on screen is translated first, then the rest and what comes later; **Show
+    original** puts every word back. Also **Menu** → **Translate page…**, the right-click menu (**Translate to** your
+    language, or **Translate “…”** for selected words, in a **Translation** box with **Copy**). The words go to the helper
+    model (Claude Haiku online on Automatic; a model on this computer keeps them here).
+  - **Reader view**: a book button in the address bar on a page with an article shows it alone in a clean column (site,
+    title, author, reading time, date), with **Aa** for text size, colours (**Auto**, **Dark**, **Light**, **Sepia**) and
+    font (**Serif**, **Sans**), kept for every article; also **Menu** → **Reader view**. Nothing leaves the tab.
+  - **Dark pages**: **Menu** → **Dark pages** (or the setting) shows pages with no dark look of their own dark, and uses a
+    site's own dark look; the padlock's **Dark pages on this site** shows one site as it is.
+  - **Screenshots and PDFs**: **Menu** → **Screenshot of what you see**, **Screenshot of the whole page** (PNG, saved in
+    Downloads and copied to the clipboard, with **Show in folder**) and **Save as PDF…** (in Downloads).
+  - **Sound that plays by itself** waits until you click or type in the page (muted video still plays), unless you turn
+    on **Let sites play sound by themselves**. Pointing at a link shows its address in a small box at the bottom left of
+    the page.
   - **Highlights**: select words on a page, right-click and choose Highlight, and they are marked in a soft yellow and kept;
     each time you open the page they are found by their words (and the words round them) and marked again, once the
     page has loaded and again a moment later (words inside a page's components too; not those in a frame inside it).
@@ -293,13 +324,15 @@ agents that speak ACP and take MCP servers.
     highlights go to a new session, only when you ask). Kept privately on this computer by the page's address (without its
     #fragment and tracking parameters); agents are refused them.
   - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
-    **Forget**.
+    **Forget**, and **Cookies and site data** → **Delete** (asks first, signs you out of the site and reloads the page).
   - **A right-click menu** on pages, in the app's own look and language: Back, Forward, Reload; for a link, open it in a new tab or your default browser
     and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to
     Library** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
-    about this image** (opens Ask beside the page with the picture attached); for selected text, Copy, Search with your
-    engine, Ask an agent about it (opens Ask beside the page, quoting up to 4,000 characters) and Highlight; on a highlight of
-    yours, Remove highlight; in a field, spelling
+    about this image** (opens Ask beside the page with the picture attached); for a link, also **Open link in private tab**;
+    for a video or a sound, play or pause, mute, loop, controls, picture in picture, open, save and copy its address; for
+    selected text, Copy, Search with your engine, Ask an agent about it (opens Ask beside the page, quoting up to 4,000
+    characters), **Translate “…”** and Highlight; on a highlight of
+    yours, Remove highlight; on the page itself, also **Translate to** your language; in a field, spelling
     suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this page, Read this page later, Print… and Inspect.
   - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
     the Library's **Read later** chip beside Bookmarks; each page has **Mark as read** (it leaves the list; **Show read**
@@ -311,6 +344,7 @@ agents that speak ACP and take MCP servers.
     folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and Allow,
     remembered for the site), a page's pop-up questions.
   - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, B, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
+    Ctrl/⌘+Shift+N for a private tab;
     Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→).
 - **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac

@@ -17,12 +17,20 @@
 //     that place of the window); not shown, it rests in a window nobody sees and stops drawing until shown again.
 // What the app's own page may ask (preload.cjs, `window.hydorDesktop.browser`) is answered by registerIpc.
 //
-// What people expect of a browser is here for your own tabs: the right-click menu, zoom, print, muting, full-screen video,
-// find in page with its match count, opening a page in the default browser, the shortcuts, and clearing browsing data; and
-// the ad blocker of the browsing profile (adblock.cjs), whose count of what a page had blocked goes to the window with the
-// tab's other news (sound, zoom, full screen) as `hydor:browser-tab-state`.
+// What people expect of a browser is here for your own tabs: the right-click menu (with its video and audio items and the
+// translation ones, which only ask the app), zoom, print, muting, full-screen video, find in page with its match count,
+// opening a page in the default browser, the shortcuts, a picture of the page or a PDF of it saved in Downloads, deleting
+// one site's data, the address a link points at shown in a small bubble over the page's corner (as Chrome does), and clearing
+// browsing data; and the ad blocker of the browsing profile (adblock.cjs), whose count of what a page had blocked goes to the
+// window with the tab's other news (sound, zoom, full screen) as `hydor:browser-tab-state`.
+//
+// Private tabs are your own tabs in a context of their own (`Target.createBrowserContext` with `hydorPrivate: true`, on
+// the browsing connection only): a partition that is never saved (`hydor-private-<id>`), so its cookies and storage go when
+// the context is disposed of or the browser closes. The ad blocker works there too; extensions do not. The server's
+// `browser-prefs` also bring whether pages are shown dark (`darkPages`, except `darkExcept`), whether sound may play by
+// itself (`autoplay`: it decides the policy of tabs made after it) and whether cookie notices are hidden (`cookieBanners`).
 'use strict';
-const { BrowserWindow, Menu, WebContentsView, clipboard, ipcMain, nativeImage, session, shell } = require('electron');
+const { BrowserWindow, Menu, WebContentsView, ClipboardItem, app, clipboard, ipcMain, nativeImage, nativeTheme, screen, session, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -54,6 +62,17 @@ const ENGINES = {
  * quality at which small text stays clean. */
 const STILL_PIXELS = 16_000_000;
 const STILL_QUALITY = 90;
+/** The bubble that shows where a link goes: its height, its distance from the page's side, how far the mouse must be from it, and how often that is looked at. */
+/** Whether this Electron lets a video go into picture in picture (its own check says so: desktop/scripts/browser-ipc-check.cjs). */
+const PIP = true;
+const BUBBLE_H = 24;
+const BUBBLE_SIDE = 4;
+const BUBBLE_AWAY = 14;
+const BUBBLE_POLL_MS = 100;
+/** The tallest a picture of a whole page is, in CSS pixels, and the longest an address shown or a selection translated is. */
+const WHOLE_PAGE_MAX = 16_384;
+const BUBBLE_TEXT_MAX = 2000;
+const TRANSLATE_MAX = 5000;
 /** Frames to the window: at most this many a second, while someone watches. */
 const WATCH_FPS = 30;
 const IDLE_FPS = 10;
@@ -70,6 +89,117 @@ const withTimeout = (p, ms, what) => {
   ]);
 };
 const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0));
+/** Text on the clipboard (Electron's clipboard answers with a promise). */
+const copyText = (text) => void Promise.resolve(clipboard.writeText(String(text))).catch(() => {});
+
+/** A page's host in lower case (no trailing dot), or ''. */
+const hostOf = (url) => {
+  try {
+    return new URL(String(url)).hostname.toLowerCase().replace(/\.$/, '');
+  } catch {
+    return '';
+  }
+};
+
+/** A host as the dark pages setting keeps it: in lower case, without www. */
+const plainHost = (h) => String(h || '').trim().toLowerCase().replace(/^\.+/, '').replace(/\.+$/, '').replace(/^www\./, '');
+
+/** Whether a host is a site, or under one, of this list (a site covers its subdomains, www. or not). */
+const inSites = (host, sites) => {
+  const h = plainHost(host);
+  return !!h && sites.some((s) => h === s || h.endsWith('.' + s));
+};
+
+/** The second-level names that sit under a country's two letters (co.uk, com.au, ac.jp, ne.jp…). */
+const COUNTRY_SECOND = new Set(['co', 'com', 'org', 'net', 'gov', 'edu', 'ac', 'ne', 'or', 'go', 'gob', 'mil', 'nom', 'sch', 'ltd', 'plc', 'ind', 'biz', 'info']);
+
+/**
+ * The site a host belongs to, as well as can be told without a list of public suffixes: the last two names of its host, or
+ * three when the last is a country's two letters and the one before it is a short second-level name (co.uk, com.au).
+ * An address of numbers, and a host of one name (localhost), is its own site.
+ */
+function siteOfHost(host) {
+  const h = String(host || '').toLowerCase().replace(/\.$/, '');
+  if (!h || h.includes(':') || /^\d+(\.\d+){3}$/.test(h)) return h;
+  const labels = h.split('.');
+  if (labels.length <= 2) return h;
+  const last = labels[labels.length - 1];
+  const before = labels[labels.length - 2];
+  const three = last.length === 2 && (COUNTRY_SECOND.has(before) || before.length <= 2);
+  return labels.slice(three ? -3 : -2).join('.');
+}
+
+/** What a title is as the start of a file's name: no character a file system dislikes, no more than `max` letters. */
+function fileSafe(title, max = 80) {
+  let name = String(title || '').replace(/[\\/:*?"<>|\u0000-\u001f\u007f‎‏‪-‮]+/g, ' ').replace(/\s+/g, ' ').trim();
+  name = Array.from(name).slice(0, max).join('').replace(/^\.+/, '').replace(/[. ]+$/, '').trim();
+  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(name) ? `${name}_` : name;
+}
+
+/** Writes a file named `<base><ext>` in a folder, or `<base> (2)<ext>`, `(3)`… when that is taken; the path it has. */
+async function writeFree(dir, base, ext, bytes) {
+  await fs.promises.mkdir(dir, { recursive: true });
+  for (let n = 1; n < 1000; n++) {
+    const file = path.join(dir, `${base}${n > 1 ? ` (${n})` : ''}${ext}`);
+    try {
+      await fs.promises.writeFile(file, bytes, { flag: 'wx' });
+      return file;
+    } catch (e) {
+      if (!e || e.code !== 'EEXIST') throw e;
+    }
+  }
+  throw new Error('There is no free name for the file.');
+}
+
+/** `YYYY-MM-DD at HH.MM.SS` of a moment, in this computer's time. */
+function stamp(d = new Date()) {
+  const two = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} at ${two(d.getHours())}.${two(d.getMinutes())}.${two(d.getSeconds())}`;
+}
+
+/** A link's address as the bubble shows it: decoded (%E4%B8%AD as the letters) where that cannot hide anything, else as it is. */
+function shownAddress(url) {
+  let text = String(url || '').slice(0, BUBBLE_TEXT_MAX);
+  try {
+    const plain = decodeURI(text);
+    // A decoded address with a space, a control or a direction mark in it could show one thing and mean another.
+    if (!/[\p{C}\p{Z}]/u.test(plain)) text = plain;
+  } catch {}
+  return text;
+}
+
+/**
+ * The little page of the bubble (a data: address, nothing from the net): `__bubble(text, widest, dark)` sets its words, shortened
+ * in the middle to fit `widest` pixels (the start, with the host, and the end of the address stay), its colours, and answers
+ * the width it needs.
+ */
+const BUBBLE_PAGE = `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+#b{box-sizing:border-box;height:${BUBBLE_H}px;display:inline-block;max-width:100%;padding:0 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:12px/${BUBBLE_H - 2}px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;cursor:default}
+#b{--bg:#ffffff;--bd:#d4d4d8;--fg:#27272a}
+#b.dark{--bg:#1f1f23;--bd:#3f3f46;--fg:#e4e4e7}
+</style><div id="b"></div><script>
+const b=document.getElementById('b');
+const wide=()=>Math.ceil(b.getBoundingClientRect().width);
+window.__bubble=(text,widest,dark)=>{
+  b.className=dark?'dark':'';
+  // Measured as wide as it wants to be (the width it is let have is a limit, not a measure).
+  b.style.maxWidth='none';
+  b.textContent=text;
+  if(wide()>widest){
+    const host=/^[a-z][a-z0-9+.-]*:\\/\\/[^/?#]*/i.exec(text);
+    const head=host?host[0]:'';
+    const rest=text.slice(head.length);
+    const make=(n)=>{const a=Math.ceil(n*0.4);return head+rest.slice(0,a)+'\\u2026'+rest.slice(rest.length-(n-a))};
+    let lo=0,hi=rest.length;
+    while(lo<hi){const mid=Math.ceil((lo+hi)/2);b.textContent=make(mid);if(wide()<=widest)lo=mid;else hi=mid-1}
+    b.textContent=make(lo);
+  }
+  const w=Math.min(wide(),widest);
+  b.style.maxWidth=widest+'px';
+  return w;
+};
+</script>`;
 
 /** Chrome's own user agent as this Electron makes it, without Electron's words and the app's. */
 function plainUserAgent() {
@@ -144,6 +274,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   const extended = new WeakSet();
   let host = null;
   let ua = null;
+  /** What the server's `browser-prefs` say that this module acts on (the blocker has its own). */
+  const settings = { darkPages: false, darkExcept: [], autoplay: false };
   /** The ad blocker of the browsing profile, when this app has it (adblock.cjs). */
   let adblock = null;
   if (adblockOptions) {
@@ -170,6 +302,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   function park(t) {
     if (t.gone) return;
+    bubbleOff(t);
     exitFullScreen(t);
     try {
       if (t.shownIn && !t.shownIn.isDestroyed()) t.shownIn.contentView.removeChildView(t.view);
@@ -183,16 +316,20 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   // ---- sessions (partitions) ----------------------------------------------------------------------------------------
 
-  const partitionOf = (conn, ctxId) => {
+  const partitionOf = (conn, ctxId, isPrivate = false) => {
+    if (ctxId && isPrivate) return `hydor-private-${ctxId.toLowerCase()}`;
     if (ctxId) return `hydor-ctx-${ctxId.toLowerCase()}`;
     if (conn.profile === BROWSING) return 'persist:hydor-browsing';
     if (conn.profile) return `persist:hydor-profile-${conn.profile.replace(/[^\w.-]/g, '_')}`;
     return `hydor-fresh-${conn.id}`;
   };
 
-  /** A context of a connection: its default one (id '') or one made with Target.createBrowserContext. */
-  async function makeContext(conn, id, proxy) {
-    const ctx = { id, partition: partitionOf(conn, id), conn, ses: null, download: null, granted: new Set(), persistent: false, asks: new Map() };
+  /**
+   * A context of a connection: its default one (id '') or one made with Target.createBrowserContext. A private one (`private`)
+   * has a partition that is only in memory, and is your own browsing's: its tabs are your own tabs.
+   */
+  async function makeContext(conn, id, proxy, { private: isPrivate = false } = {}) {
+    const ctx = { id, partition: partitionOf(conn, id, isPrivate), conn, ses: null, download: null, granted: new Set(), persistent: false, private: isPrivate, asks: new Map() };
     const ses = session.fromPartition(ctx.partition);
     ctx.ses = ses;
     ctx.persistent = ctx.partition.startsWith('persist:');
@@ -205,7 +342,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (!extended.has(ses)) {
       extended.add(ses);
       guardSession(ses);
-      if (adblock && ctx.persistent && conn.profile === BROWSING && !ctx.id) adblock.attach(ses);
+      if (adblock && conn.profile === BROWSING && (ctx.private || (ctx.persistent && !ctx.id))) adblock.attach(ses);
       if (ctx.persistent && ext) {
         try {
           ext.prepare(ses);
@@ -229,8 +366,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (ALWAYS.has(permission)) return callback(true);
       const ctx = own();
       const t = wc ? byWc.get(wc.id) : null;
-      // Only your own tabs ask you; the agents' browsers refuse everything else, and so does a page that is not a tab here.
-      if (!ctx || !t || t.offscreen || ctx.conn.profile !== BROWSING || ctx.id) return callback(false);
+      // Only your own tabs ask you (those of your browsing's default context and of its private ones); the agents' browsers
+      // refuse everything else, and so does a page that is not a tab here.
+      if (!ctx || !t || t.offscreen || ctx.conn.profile !== BROWSING || (ctx !== ctx.conn.defaultCtx && !ctx.private)) return callback(false);
       let origin = '';
       try {
         origin = new URL(details.requestingUrl || wc.getURL()).origin;
@@ -287,7 +425,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   /** The view and its page's handlers; not yet a target the server knows. */
   function makeTarget(conn, ctx, o) {
     const offscreen = o.offscreen;
-    const prefs = { partition: ctx.partition, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: !offscreen, ...(offscreen ? { offscreen: true } : {}) };
+    const prefsNow = () => ({ partition: ctx.partition, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: !offscreen, ...(offscreen ? { offscreen: true } : { autoplayPolicy: autoplayPolicy() }) });
+    const prefs = prefsNow();
     const view = o.webContents ? new WebContentsView({ webContents: o.webContents }) : new WebContentsView({ webPreferences: prefs });
     const wc = view.webContents;
     const t = {
@@ -321,6 +460,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       blocked: 0,
       fs: null,
       finding: null,
+      /** Whether this tab shows pages dark now (what was last sent to its page), and the bubble that has its link's address. */
+      dark: false,
+      darkMedia: null,
+      bubble: null,
     };
     byWc.set(wc.id, t);
     hostWindow().contentView.addChildView(view);
@@ -347,13 +490,57 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     // Pop-ups open as tabs of this browser, in the same partition and drawn the same way as their opener.
     wc.setWindowOpenHandler(() => ({
       action: 'allow',
-      overrideBrowserWindowOptions: { show: false, webPreferences: { ...prefs } },
+      // The sound policy is the one the setting says when the pop-up opens (a tab's own is fixed when it was made).
+      overrideBrowserWindowOptions: { show: false, webPreferences: prefsNow() },
       createWindow: (options) => popup(t, options),
     }));
     return t;
   }
 
   // ---- your own tabs: what a browser does for a page you use ----------------------------------------------------------
+
+  /** Sound that plays by itself: the page's own policy. By default it waits until you click or type in the page (muted video plays). */
+  const autoplayPolicy = () => (settings.autoplay ? 'no-user-gesture-required' : 'document-user-activation-required');
+
+  // ---- pages shown dark -----------------------------------------------------------------------------------------------
+
+  /** Whether a page of this address is shown dark: the setting is on and its site is not one you made an exception for. */
+  const darkFor = (url) => settings.darkPages && !inSites(hostOf(url), settings.darkExcept);
+
+  /**
+   * Puts one of your tabs' pages dark or back, as the setting and its site say: the browser's own darkening (auto dark mode) for
+   * a page with no dark look, and the page's preference for a dark look (`prefers-color-scheme`) for a page that has one. The
+   * server's own `Emulation.setEmulatedMedia` to the tab (pageCommand) is merged with it, not replaced.
+   */
+  async function applyDark(t, url) {
+    if (t.gone || t.offscreen || t.wc.isDestroyed() || !t.dbg.isAttached()) return;
+    const on = darkFor(url ?? t.wc.getURL());
+    if (on === t.dark) return;
+    t.dark = on;
+    await setDark(t, on);
+  }
+  async function setDark(t, on) {
+    try {
+      await t.dbg.sendCommand('Emulation.setAutoDarkModeOverride', on ? { enabled: true } : {});
+    } catch (e) {
+      // A Chromium without it still has the page's preference below.
+      log('automatic dark mode is not there', String((e && e.message) || e));
+    }
+    try {
+      await t.dbg.sendCommand('Emulation.setEmulatedMedia', mediaOf(t, on));
+    } catch {}
+  }
+  /** The media emulation of a tab: what the server set, and a preference for dark when the page is shown dark and the server set none. */
+  function mediaOf(t, on) {
+    const own = t.darkMedia || {};
+    const features = (Array.isArray(own.features) ? own.features : []).filter((f) => f && typeof f.name === 'string');
+    if (on && !features.some((f) => f.name === 'prefers-color-scheme')) features.push({ name: 'prefers-color-scheme', value: 'dark' });
+    return { ...(own.media !== undefined ? { media: own.media } : {}), features };
+  }
+  /** Every one of your tabs again, after the setting changed. */
+  function applyDarkAll() {
+    for (const conn of conns.values()) for (const t of conn.targets.values()) if (!t.offscreen && !t.gone) void applyDark(t);
+  }
 
   /** The window's page that shows a tab (or the main window's), for the tab's news and what the menu asks. */
   function uiOf(t) {
@@ -414,8 +601,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   /**
    * A page you use takes keys itself, and the app's shortcuts would never reach the app's page: those go to it (Ctrl or ⌘
-   * with T, W, L, R, F, P, D, H, J, B (the tab column), 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl or ⌘+Shift+T and Shift+Delete; F5; Alt with the
-   * arrows, and ⌘ with [ and ] on a Mac). Zoom (Ctrl or ⌘ with + − 0) is the app's own, done here.
+   * with T, W, L, R, F, P, D, H, J, B (the tab column), 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl or ⌘+Shift+T, Ctrl or ⌘+Shift+N and
+   * Shift+Delete; F5; Alt with the arrows, and ⌘ with [ and ] on a Mac). Zoom (Ctrl or ⌘ with + − 0) is the app's own, done here.
    */
   function shortcut(t, input) {
     const mod = MAC ? input.meta : input.control;
@@ -425,6 +612,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const hit =
       (mod && !input.alt && /^[twlrfpdhjb]$/.test(lower)) ||
       (mod && !input.alt && /^[1-9]$/.test(k)) ||
+      (mod && input.shift && !input.alt && lower === 'n') ||
       (input.control && !input.alt && k === 'Tab') ||
       (mod && input.shift && !input.alt && k === 'Delete') ||
       (k === 'F5' && !mod && !input.alt) ||
@@ -451,8 +639,16 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (!d.isMainFrame || d.isSameDocument) return;
       t.blocked = 0;
       tabState(t, { blocked: 0 });
+      bubbleOff(t);
+      // Dark or not by the site it goes to (and again once it is there: a redirect may have taken it to another).
+      void applyDark(t, d.url);
     });
-    wc.on('did-navigate', () => tabState(t, { zoom: zoomOf(t) }));
+    wc.on('did-navigate', () => {
+      tabState(t, { zoom: zoomOf(t) });
+      void applyDark(t);
+    });
+    wc.on('update-target-url', (_e, url) => void bubbleShow(t, url));
+    wc.on('render-process-gone', () => bubbleOff(t));
     wc.on('enter-html-full-screen', () => enterFullScreen(t));
     wc.on('leave-html-full-screen', () => leaveFullScreen(t));
     wc.on('found-in-page', (_e, r) => {
@@ -474,6 +670,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       t.bounds = { x: 0, y: 0, width, height };
       t.view.setBounds(t.bounds);
     };
+    bubbleOff(t);
     t.fs = { win, was: win.isFullScreen(), fit };
     try {
       if (!t.fs.was) win.setFullScreen(true);
@@ -507,28 +704,156 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (!t.wc.isDestroyed()) t.wc.executeJavaScript('document.fullscreenElement && document.exitFullscreen()', true).catch(() => {});
   }
 
+  // ---- the address a link points at ------------------------------------------------------------------------------------
+
+  /**
+   * One bubble for each window: a transparent view laid over the corner of the tab shown there (the tab's own page draws over
+   * the window's, so it has to be a view of its own, put in front of the tab's). { win, view, ready, seq, t, text, width,
+   * side, poll, shown, dark, darkAt }.
+   */
+  const bubbles = new WeakMap();
+
+  function bubbleFor(win) {
+    let b = bubbles.get(win);
+    if (b) return b;
+    const view = new WebContentsView({ webPreferences: { partition: 'hydor-bubble', sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: false } });
+    view.setBackgroundColor('#00000000');
+    const wc = view.webContents;
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+    wc.on('will-navigate', (e) => e.preventDefault());
+    b = { win, view, ready: null, seq: 0, t: null, text: '', width: 0, side: 'left', poll: null, shown: false, dark: null, darkAt: 0 };
+    b.ready = wc.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(BUBBLE_PAGE)}`).then(
+      () => true,
+      () => false,
+    );
+    bubbles.set(win, b);
+    win.once('closed', () => {
+      bubbleHide(b);
+      try {
+        if (!wc.isDestroyed()) wc.close({ waitForBeforeUnload: false });
+      } catch {}
+    });
+    return b;
+  }
+
+  /** Whether the app is dark now: its own theme (a class of its page), else the system's. */
+  async function bubbleDark(b) {
+    if (b.dark !== null && Date.now() - b.darkAt < 2000) return b.dark;
+    let dark = nativeTheme.shouldUseDarkColors;
+    try {
+      const ui = b.win.webContents;
+      if (!ui.isDestroyed()) dark = !!(await withTimeout(ui.executeJavaScript("document.documentElement.classList.contains('dark')", true), 400, 'The theme'));
+    } catch {}
+    b.dark = dark;
+    b.darkAt = Date.now();
+    return dark;
+  }
+
+  /** The address a link points at (a page's `update-target-url`; '' when the mouse leaves it) shown over the tab's corner. */
+  async function bubbleShow(t, url) {
+    const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : null;
+    // Only a tab you see has one: not a parked, closed or full-screen tab, and not one with a menu over it.
+    if (!url || !win || t.gone || t.fs || t.wc.isDestroyed() || (openMenu && openMenu.t === t)) return bubbleOff(t);
+    const b = bubbleFor(win);
+    const seq = ++b.seq;
+    b.t = t;
+    t.bubble = b;
+    const text = shownAddress(url);
+    const widest = Math.max(60, Math.floor((t.view.getBounds().width * 2) / 3));
+    if (!(await b.ready)) return;
+    const dark = await bubbleDark(b);
+    if (b.seq !== seq || t.gone) return;
+    let width = 0;
+    try {
+      width = await withTimeout(b.view.webContents.executeJavaScript(`__bubble(${JSON.stringify(text)}, ${widest}, ${dark})`, true), 1000, 'The bubble');
+    } catch (e) {
+      return void log('the link bubble did not show', String((e && e.message) || e));
+    }
+    if (b.seq !== seq || t.gone || t.shownIn !== win) return;
+    b.text = text;
+    b.width = Math.max(20, Math.min(widest, Math.ceil(Number(width) || 0)));
+    b.shown = true;
+    bubbleLay(b);
+    // The mouse may come to the corner it is in: looked at while it shows.
+    b.poll ??= setInterval(() => bubbleLay(b), BUBBLE_POLL_MS);
+    b.poll.unref?.();
+  }
+
+  /**
+   * Puts the bubble where it belongs: the bottom left corner of the tab, 0 px from its bottom edge, or the bottom right
+   * while the mouse is over (or near) the left one, and in front of the tab's own view.
+   */
+  function bubbleLay(b) {
+    const { win, t } = b;
+    if (!b.shown || !t || t.gone || win.isDestroyed() || t.shownIn !== win || t.fs) return bubbleHide(b);
+    const tb = t.view.getBounds();
+    const width = Math.min(b.width, tb.width);
+    const y = tb.y + tb.height - BUBBLE_H;
+    const left = tb.x + BUBBLE_SIDE;
+    let side = 'left';
+    try {
+      const c = screen.getCursorScreenPoint();
+      const o = win.getContentBounds();
+      const cx = c.x - o.x;
+      const cy = c.y - o.y;
+      if (cx >= left - BUBBLE_AWAY && cx <= left + width + BUBBLE_AWAY && cy >= y - BUBBLE_AWAY && cy <= y + BUBBLE_H + BUBBLE_AWAY) side = 'right';
+    } catch {}
+    b.side = side;
+    const want = { x: side === 'left' ? left : tb.x + tb.width - BUBBLE_SIDE - width, y, width, height: BUBBLE_H };
+    try {
+      const now = b.view.getBounds();
+      if (now.x !== want.x || now.y !== want.y || now.width !== want.width || now.height !== want.height) b.view.setBounds(want);
+      // Adding a view again brings it to the front: after the tab's own (placed again) it is the last of the window's.
+      const kids = win.contentView.children;
+      if (kids[kids.length - 1] !== b.view) win.contentView.addChildView(b.view);
+    } catch (e) {
+      log('the link bubble could not be placed', String((e && e.message) || e));
+    }
+  }
+
+  function bubbleHide(b) {
+    b.seq++;
+    b.shown = false;
+    b.t = null;
+    clearInterval(b.poll);
+    b.poll = null;
+    try {
+      if (!b.win.isDestroyed() && b.win.contentView.children.includes(b.view)) b.win.contentView.removeChildView(b.view);
+    } catch {}
+  }
+
+  /** The tab's bubble goes, if it has the window's (a tab that is parked, closed, full screen or has a menu over it, or whose link the mouse left). */
+  function bubbleOff(t) {
+    const b = t.bubble;
+    if (b && b.t === t) bubbleHide(b);
+  }
+
   // ---- the right-click menu ----------------------------------------------------------------------------------------
 
   /** The search engine as the server has it (the app's own page asks it), for the menu's "Search Google for …". */
-  let engine = { name: 'Google', template: ENGINES.google[1] };
+  let engine = { name: 'Google', template: ENGINES.google[1], translateTo: '' };
   async function readEngine() {
     const win = mainWindow();
     if (!win || win.isDestroyed()) return;
     try {
       const p = await withTimeout(win.webContents.executeJavaScript("fetch('/api/browser/browsing/prefs', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).catch(() => null)"), 600, 'The search engine');
       if (!p || typeof p !== 'object') return;
-      if (ENGINES[p.engine]) engine = { name: ENGINES[p.engine][0], template: ENGINES[p.engine][1] };
+      // The language "Translate this page" goes to (the app does the translating).
+      if (typeof p.translateTo === 'string' && /^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$/.test(p.translateTo)) engine = { ...engine, translateTo: p.translateTo };
+      if (ENGINES[p.engine]) engine = { ...engine, name: ENGINES[p.engine][0], template: ENGINES[p.engine][1] };
       else if (p.engine === 'custom' && typeof p.customSearch === 'string' && /^https?:\/\/.+%s/i.test(p.customSearch)) {
         let name = 'your search engine';
         try {
           name = new URL(p.customSearch.replace('%s', 'x')).hostname.replace(/^www\./, '');
         } catch {}
-        engine = { name, template: p.customSearch };
+        engine = { ...engine, name, template: p.customSearch };
       }
     } catch {}
   }
 
   const web = (u) => /^https?:\/\//i.test(String(u || ''));
+  /** A click on the page itself: not on a link, a picture, a video or audio, words or a field. */
+  const plainPage = (params) => !params.linkURL && !params.isEditable && !String(params.selectionText || '').trim() && !(params.mediaType && params.mediaType !== 'none');
   const short = (text, n = 30) => {
     const one = String(text).replace(/\s+/g, ' ').trim();
     return one.length > n ? `${one.slice(0, n - 1)}…` : one;
@@ -693,13 +1018,73 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
    * thousand characters of it), so the page itself is asked for the whole of it, when its main frame holds the same words.
    */
   async function askAbout(t, text, url) {
+    const words = await wholeSelection(t, text);
+    uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text: words.slice(0, QUOTE_MAX), url });
+  }
+
+  /** The whole selection of the page when its main frame holds the same words as the menu's (cut short) copy, else that copy. */
+  async function wholeSelection(t, text) {
     let words = text;
     try {
       const plain = (v) => String(v || '').replace(/\s+/g, ' ').trim();
       const whole = String(await withTimeout(t.wc.executeJavaScript('String(window.getSelection() || "")', true), 800, 'The selection')).trim();
       if (plain(whole).length > plain(text).length && plain(whole).startsWith(plain(text).slice(0, 200))) words = whole;
     } catch {}
-    uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text: words.slice(0, QUOTE_MAX), url });
+    return words;
+  }
+
+  /** Words picked in a page, for the app to translate (it shows the translation). */
+  async function translateAbout(t, text, url) {
+    const words = await wholeSelection(t, text);
+    uiOf(t)?.send('hydor:browser-command', { cmd: 'translate-text', text: words.slice(0, TRANSLATE_MAX), url });
+  }
+
+  // ---- video and audio: the items of the menu act on the element that was clicked -------------------------------------------
+
+  /**
+   * Does something to the video or audio at a click, in a world of its own that the page's scripts cannot see (as a click
+   * of yours, so play() and picture in picture are allowed). The element is the one at the point (into open shadow roots),
+   * else the video or audio whose box holds the point, the one with this source first.
+   */
+  async function mediaDo(t, params, op) {
+    const z = t.wc.getZoomFactor() || 1;
+    const x = Number(params.x) / z;
+    const y = Number(params.y) / z;
+    const code = `(async () => {
+      const x = ${JSON.stringify(x)}, y = ${JSON.stringify(y)}, src = ${JSON.stringify(String(params.srcURL || ''))};
+      const isMedia = (e) => e && (e instanceof HTMLVideoElement || e instanceof HTMLAudioElement);
+      let m = null;
+      let e = document.elementFromPoint(x, y);
+      for (let i = 0; e && e.shadowRoot && i < 32; i++) { const d = e.shadowRoot.elementFromPoint(x, y); if (!d || d === e) break; e = d; }
+      if (isMedia(e)) m = e;
+      else if (e && e.closest) { const c = e.closest('video,audio'); if (isMedia(c)) m = c; }
+      if (!m) {
+        const all = [];
+        const walk = (root) => { for (const el of root.querySelectorAll('*')) { if (isMedia(el)) all.push(el); if (el.shadowRoot) walk(el.shadowRoot); } };
+        walk(document);
+        const inside = all.filter((el) => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
+        m = inside.find((el) => el.currentSrc === src) || inside[0] || null;
+      }
+      if (!m) return 'none';
+      const op = ${JSON.stringify(op)};
+      if (op === 'play') await m.play();
+      else if (op === 'pause') m.pause();
+      else if (op === 'mute') m.muted = true;
+      else if (op === 'unmute') m.muted = false;
+      else if (op === 'loop') m.loop = !m.loop;
+      else if (op === 'controls') m.controls = !m.controls;
+      else if (op === 'pip') {
+        if (document.pictureInPictureElement === m) await document.exitPictureInPicture();
+        else await m.requestPictureInPicture();
+      }
+      return 'done';
+    })()`;
+    try {
+      const r = await withTimeout(t.wc.executeJavaScriptInIsolatedWorld(1000, [{ code }], true), 5000, 'The media');
+      if (r === 'none') log('no video or audio where you clicked');
+    } catch (e) {
+      log('a video or audio item did not work', op, String((e && e.message) || e));
+    }
   }
 
   /** Pages that keep your highlights: websites and files (not a blank page, an error page or an extension's). */
@@ -724,10 +1109,14 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
    * The items of the menu for a click in one of your tabs, as a template for Menu.buildFromTemplate: what the page offers
    * where you clicked (a link, an image, selected text, a field) and what any page has. Each has an id (the window's page
    * draws the menu by them, in the app's own look and language: menuInPage), and those whose words change have them in
-   * `args` too.
+   * `args` too. An item may have `checked` (Loop, Show controls, Picture in picture). A private tab opens its links and
+   * pictures in a private tab again, has no "Open link in private tab", and no Ask items (agents never get a private tab).
    */
   function menuTemplate(t, params, eng = engine) {
     const { wc } = t;
+    const isPrivate = !!t.ctx.private;
+    /** A new tab for an address: of the same private context when this tab is private. */
+    const open = (url) => void openTab(url, t).catch((e) => log('a tab could not open', String((e && e.message) || e)));
     const items = [];
     const sep = () => items.length && items[items.length - 1].type !== 'separator' && items.push({ type: 'separator' });
     const flags = params.editFlags || {};
@@ -744,22 +1133,39 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
     if (params.linkURL) {
       if (web(params.linkURL)) {
-        items.push({ id: 'open-link', label: 'Open link in new tab', click: () => void openTab(params.linkURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+        items.push({ id: 'open-link', label: 'Open link in new tab', click: () => open(params.linkURL) });
+        if (!isPrivate) items.push({ id: 'open-link-private', label: 'Open link in private tab', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'open-private', url: params.linkURL }) });
         items.push({ id: 'open-link-external', label: 'Open link in your default browser', click: () => void shell.openExternal(params.linkURL).catch(() => {}) });
       }
-      items.push({ id: 'copy-link', label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) });
+      items.push({ id: 'copy-link', label: 'Copy link address', click: () => copyText(params.linkURL) });
       if (web(params.linkURL)) items.push({ id: 'read-link-later', label: 'Read link later', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'later', url: params.linkURL, title: String(params.linkText || '').trim() }) });
       sep();
     }
     if (params.mediaType === 'image' && params.srcURL) {
-      if (web(params.srcURL)) items.push({ id: 'open-image', label: 'Open image in new tab', click: () => void openTab(params.srcURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+      if (web(params.srcURL)) items.push({ id: 'open-image', label: 'Open image in new tab', click: () => open(params.srcURL) });
       items.push({ id: 'save-image-as', label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
       if (readable(params.srcURL)) {
         items.push({ id: 'save-image-library', label: 'Save image to Library', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
-        items.push({ id: 'ask-image', label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
+        if (!isPrivate) items.push({ id: 'ask-image', label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
       }
       items.push({ id: 'copy-image', label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });
-      items.push({ id: 'copy-image-address', label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) });
+      items.push({ id: 'copy-image-address', label: 'Copy image address', click: () => copyText(params.srcURL) });
+      sep();
+    }
+    if ((params.mediaType === 'video' || params.mediaType === 'audio') && params.mediaFlags) {
+      const kind = params.mediaType;
+      const f = params.mediaFlags;
+      const src = String(params.srcURL || '');
+      const act = (op) => () => void mediaDo(t, params, op);
+      if (!f.inError) items.push(f.isPaused ? { id: 'media-play', label: 'Play', click: act('play') } : { id: 'media-pause', label: 'Pause', click: act('pause') });
+      if (f.hasAudio !== false) items.push(f.isMuted ? { id: 'media-unmute', label: 'Unmute', click: act('unmute') } : { id: 'media-mute', label: 'Mute', click: act('mute') });
+      if (f.canLoop !== false) items.push({ id: 'media-loop', label: 'Loop', checked: !!f.isLooping, click: act('loop') });
+      if (f.canToggleControls) items.push({ id: 'media-controls', label: 'Show controls', checked: !!f.isControlsVisible, click: act('controls') });
+      if (kind === 'video' && f.canShowPictureInPicture && PIP) items.push({ id: 'media-pip', label: 'Picture in picture', checked: !!f.isShowingPictureInPicture, click: act('pip') });
+      sep();
+      if (web(src)) items.push({ id: `open-${kind}`, label: `Open ${kind} in new tab`, click: () => open(src) });
+      if (web(src) && f.canSave !== false) items.push({ id: `save-${kind}`, label: `Save ${kind} as…`, click: () => wc.downloadURL(src) });
+      if (/^(https?|file):/i.test(src)) items.push({ id: `copy-${kind}-address`, label: `Copy ${kind} address`, click: () => copyText(src) });
       sep();
     }
     if (params.isEditable) {
@@ -775,8 +1181,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     if (text) {
       if (!params.isEditable) items.push({ id: 'copy', label: 'Copy', click: () => wc.copy() });
       const words = short(text);
-      items.push({ id: 'search', label: `Search ${eng.name} for “${words}”`, args: { engine: eng.name, text: words }, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
-      items.push({ id: 'ask', label: `Ask an agent about “${words}”`, args: { text: words }, click: () => void askAbout(t, text, page) });
+      items.push({ id: 'search', label: `Search ${eng.name} for “${words}”`, args: { engine: eng.name, text: words }, click: () => open(eng.template.replace('%s', encodeURIComponent(text))) });
+      if (!isPrivate) items.push({ id: 'ask', label: `Ask an agent about “${words}”`, args: { text: words }, click: () => void askAbout(t, text, page) });
+      if (!params.isEditable && marksOn(page)) items.push({ id: 'translate-selection', label: `Translate “${words}”`, args: { text: words }, click: () => void translateAbout(t, text, page) });
       if (!params.isEditable && !inFrame && marksOn(page)) items.push({ id: 'highlight', label: 'Highlight', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'highlight', target: t.id, url: page, title: wc.getTitle() }) });
       sep();
     }
@@ -790,6 +1197,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       items.push({ id: 'back', label: 'Back', enabled: nav.canGoBack(), click: () => nav.goBack() });
       items.push({ id: 'forward', label: 'Forward', enabled: nav.canGoForward(), click: () => nav.goForward() });
       items.push({ id: 'reload', label: 'Reload', click: () => wc.reload() });
+      // On the page itself (not on a link, a picture or a video), the app translates it (or shows the original again).
+      if (plainPage(params) && marksOn(page)) items.push({ id: 'translate-page', label: 'Translate this page', args: { lang: String(eng.translateTo || engine.translateTo || '') }, click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'translate', target: t.id }) });
       sep();
     }
     items.push({ id: 'bookmark', label: 'Bookmark this page', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'bookmark', url: page, title: wc.getTitle() }) });
@@ -837,10 +1246,11 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (it.type === 'separator') list.push({ type: 'separator' });
       else {
         items.set(it.id, it);
-        list.push({ id: it.id, label: it.label, enabled: it.enabled !== false, ...(it.args ? { args: it.args } : {}) });
+        list.push({ id: it.id, label: it.label, enabled: it.enabled !== false, ...(typeof it.checked === 'boolean' ? { checked: it.checked } : {}), ...(it.args ? { args: it.args } : {}) });
       }
     }
     openMenu = { id, t, ui, items };
+    bubbleOff(t);
     const still = await stillOf(t);
     if (!openMenu || openMenu.id !== id || t.gone || t.wc.isDestroyed() || ui.isDestroyed()) return true;
     const b = t.view.getBounds();
@@ -870,8 +1280,11 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
 
   async function popupMenu(t, params) {
     if (t.gone || t.wc.isDestroyed()) return;
-    // The engine is only asked for when words are selected: that is the one item that needs it.
-    if (String(params.selectionText || '').trim()) await readEngine();
+    // A menu over the page takes the link bubble away.
+    bubbleOff(t);
+    // The server's prefs are only asked for when an item needs them: words selected (the search engine, translating them) or
+    // a click on the page itself (the language "Translate this page" goes to).
+    if (String(params.selectionText || '').trim() || (plainPage(params) && marksOn(params.pageURL || t.wc.getURL()))) await readEngine();
     // Whether the click is on one of your highlights (a page of a site or a file, not in a field).
     const here = params.pageURL || t.wc.getURL();
     const hl = marksOn(here) && !params.isEditable ? await highlightAt(t, params) : '';
@@ -883,7 +1296,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : mainWindow();
     if (!win || win.isDestroyed() || t.gone || t.wc.isDestroyed()) return;
     try {
-      Menu.buildFromTemplate(tpl).popup({ window: win });
+      // An item with `checked` is a checkbox in the system's menu.
+      Menu.buildFromTemplate(tpl.map((it) => (typeof it.checked === 'boolean' ? { ...it, type: 'checkbox' } : it))).popup({ window: win });
     } catch (e) {
       log('the menu did not open', String((e && e.message) || e));
     }
@@ -900,6 +1314,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     conn.targets.set(t.id, t);
     conn.sessions.set(t.sid, t);
     if (conn.fetch) await t.dbg.sendCommand('Fetch.enable', conn.fetch).catch(() => {});
+    // Dark or not before its first page loads (the server resumes the tab after it has heard of it).
+    await applyDark(t, '');
     t.ready = true;
     if (conn.discover) event(conn, 'Target.targetCreated', { targetInfo: { ...infoOf(t), attached: false } });
     event(conn, 'Target.attachedToTarget', { sessionId: t.sid, targetInfo: infoOf(t), waitingForDebugger: true });
@@ -918,8 +1334,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       ctx = conn.contexts.get(p.browserContextId);
       if (!ctx) throw new RpcError(-32602, 'Failed to find browser context with id ' + p.browserContextId);
     }
-    // Your own browsing's tabs are real pages; everything else, and an agent's tab there, is drawn off screen.
-    const own = conn.profile === BROWSING && ctx === conn.defaultCtx && !p.hydorAgent;
+    // Your own browsing's tabs (and its private ones) are real pages; everything else, and an agent's tab there, is drawn off screen.
+    const own = conn.profile === BROWSING && !p.hydorAgent && (ctx === conn.defaultCtx || ctx.private);
     const t = makeTarget(conn, ctx, { offscreen: !own, agent: !own });
     try {
       await loadBlank(t.wc);
@@ -948,6 +1364,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const t = makeTarget(conn, ctx, { offscreen: opener.offscreen, agent: opener.agent, opener, webContents: options.webContents });
     t.dbg.attach('1.3');
     t.dbg.on('message', (_e, method, params, sessionId) => onPageEvent(t, method, params, sessionId));
+    if (!t.offscreen) void applyDark(t, opener.wc.isDestroyed() ? '' : opener.wc.getURL());
     // Chrome holds a pop-up until the server has set it up; here it is already on its way, so the guard goes on before
     // it asks for anything (the debugger's Fetch is answered at once), and its session is known from the start.
     conn.sessions.set(t.sid, t);
@@ -992,6 +1409,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     t.gone = true;
     const { conn } = t;
     byWc.delete(t.wc.id);
+    bubbleOff(t);
     clearTimeout(t.newsTimer);
     clearTimeout(t.finding && t.finding.timer);
     // A page that was full screen takes the window back out of it.
@@ -1028,6 +1446,16 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
   }
 
+  /** A context's session is let go: what its in-memory partition held (cookies, storage, cache, sign-ins) is cleared, and the blocker leaves it. */
+  function forgetSession(ctx) {
+    const { ses } = ctx;
+    if (ctx.private && adblock) adblock.detach(ses);
+    ses.clearStorageData().catch(() => {});
+    ses.clearCache().catch(() => {});
+    ses.clearAuthCache().catch(() => {});
+    if (sessions.get(ses) === ctx) sessions.delete(ses);
+  }
+
   function closeConn(conn, why) {
     if (conn.closed) return;
     conn.closed = true;
@@ -1039,11 +1467,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     for (const ctx of [conn.defaultCtx, ...conn.contexts.values()]) {
       for (const w of ctx.asks.values()) w.done(false);
       // What an in-memory partition (a fresh profile's, a context's) held goes with it.
-      if (!ctx.persistent) {
-        ctx.ses.clearStorageData().catch(() => {});
-        ctx.ses.clearCache().catch(() => {});
-      }
-      if (sessions.get(ctx.ses) === ctx) sessions.delete(ctx.ses);
+      if (!ctx.persistent) forgetSession(ctx);
+      else if (sessions.get(ctx.ses) === ctx) sessions.delete(ctx.ses);
     }
     log('browser closed', conn.id, why || '');
   }
@@ -1157,8 +1582,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       case 'Target.getBrowserContexts':
         return { browserContextIds: [...conn.contexts.keys()] };
       case 'Target.createBrowserContext': {
+        // A private context is your own browsing's alone (an agent's browser has none).
+        if (p.hydorPrivate && conn.profile !== BROWSING) throw new RpcError(-32602, 'Only your own browsing has private contexts');
         const id = hex32();
-        const ctx = await makeContext(conn, id, p.proxyServer ? { server: String(p.proxyServer), bypass: String(p.proxyBypassList || '') } : conn.proxy);
+        const ctx = await makeContext(conn, id, p.proxyServer ? { server: String(p.proxyServer), bypass: String(p.proxyBypassList || '') } : conn.proxy, { private: !!p.hydorPrivate });
         conn.contexts.set(id, ctx);
         return { browserContextId: id };
       }
@@ -1168,9 +1595,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
         conn.contexts.delete(ctx.id);
         for (const t of [...byWc.values()]) if (t.ctx === ctx) destroyTarget(t, false);
         for (const w of ctx.asks.values()) w.done(false);
-        ctx.ses.clearStorageData().catch(() => {});
-        ctx.ses.clearCache().catch(() => {});
-        if (sessions.get(ctx.ses) === ctx) sessions.delete(ctx.ses);
+        forgetSession(ctx);
         return {};
       }
       case 'Fetch.enable': {
@@ -1244,6 +1669,13 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
           break;
         case 'Emulation.clearDeviceMetricsOverride':
           t.css = null;
+          break;
+        case 'Emulation.setEmulatedMedia':
+          // On one of your tabs the server's media (a print look, a colour scheme) is kept with the dark look of this module's.
+          if (!t.offscreen) {
+            t.darkMedia = p;
+            return t.dbg.sendCommand(method, mediaOf(t, t.dark));
+          }
           break;
         default:
       }
@@ -1341,7 +1773,13 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       return true;
     }
     if (m.type === 'browser-prefs') {
-      if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds });
+      if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds, cookieBanners: m.cookieBanners });
+      if (typeof m.autoplay === 'boolean') settings.autoplay = m.autoplay;
+      if (typeof m.darkPages === 'boolean' || Array.isArray(m.darkExcept)) {
+        if (typeof m.darkPages === 'boolean') settings.darkPages = m.darkPages;
+        if (Array.isArray(m.darkExcept)) settings.darkExcept = [...new Set(m.darkExcept.map(plainHost).filter(Boolean))];
+        applyDarkAll();
+      }
       return true;
     }
     if (m.type === 'browser-clear') {
@@ -1361,11 +1799,14 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     for (const conn of [...conns.values()]) closeConn(conn, why);
   }
 
-  /** A tab of your own browsing, opened by an extension (the server takes it as yours). */
-  async function openTab(url) {
-    const conn = [...conns.values()].find((c) => c.profile === BROWSING && !c.closed);
-    if (!conn) return false;
-    await createTarget(conn, { url: String(url) });
+  /**
+   * A tab of your own browsing, opened by an extension or by the menu of another tab (the server takes it as yours): when
+   * `from` is a private tab, a tab of the same private context.
+   */
+  async function openTab(url, from = null) {
+    const conn = from && !from.gone ? from.conn : [...conns.values()].find((c) => c.profile === BROWSING && !c.closed);
+    if (!conn || conn.closed) return false;
+    await createTarget(conn, { url: String(url), ...(from && from.ctx.private ? { browserContextId: from.ctx.id } : {}) });
     return true;
   }
 
@@ -1454,6 +1895,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       w.bounds = b;
       try {
         setBoundsOnce(t, b);
+        if (t.bubble && t.bubble.t === t) bubbleLay(t.bubble);
       } catch {}
     }
   }
@@ -1474,6 +1916,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
         if (Date.now() - t.focusAt < 3000) t.wc.focus();
         t.focusAt = 0;
       }
+      // The tab's view was put in front (or moved): the bubble over it is put in front of that.
+      if (t.bubble && t.bubble.t === t) bubbleLay(t.bubble);
     } catch (e) {
       log('a page could not be shown', String((e && e.message) || e));
     }
@@ -1878,6 +2322,109 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
   }
 
+  // ---- a picture or a PDF of a page, and deleting a site's data -------------------------------------------------------------
+
+  /** What a file made of a page is named after: its title, else its site. */
+  const nameOfPage = (t) => fileSafe(t.wc.getTitle()) || fileSafe(hostOf(t.wc.getURL()).replace(/^www\./, '')) || 'Page';
+
+  /**
+   * A PNG of what one of your tabs shows (`whole` false), or of the whole page, as tall as 16384 CSS pixels at most (what the
+   * visible part is when that cannot be taken). It is saved in the computer's Downloads folder, as "<title> <date> at <time>.png",
+   * and put on the clipboard. { path, name, copied }, or null when it is not one of your tabs, or is not shown.
+   */
+  async function capture(e, target, whole) {
+    if (!fromOwnPage(e)) return null;
+    const t = ownTab(target);
+    // A page that is not shown does not draw, and cannot be photographed.
+    if (!t || t.wc.isDestroyed() || !t.shownIn) return null;
+    try {
+      let png = null;
+      if (whole) {
+        try {
+          const m = await withTimeout(t.dbg.sendCommand('Page.getLayoutMetrics'), 5000, 'The page size');
+          const size = m.cssContentSize || m.contentSize;
+          const width = Math.min(Math.ceil(size.width), WHOLE_PAGE_MAX);
+          const height = Math.min(Math.ceil(size.height), WHOLE_PAGE_MAX);
+          if (!(width > 0 && height > 0)) throw new Error('the page has no size');
+          const shot = await withTimeout(t.dbg.sendCommand('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 } }), 30_000, 'The picture');
+          png = Buffer.from(shot.data, 'base64');
+        } catch (err) {
+          log('the whole page could not be photographed; the visible part is', String((err && err.message) || err));
+        }
+      }
+      if (!png) {
+        const img = await withTimeout(t.wc.capturePage(), 5000, 'The picture');
+        if (img.isEmpty()) return null;
+        png = img.toPNG();
+      }
+      const name = `${nameOfPage(t)} ${stamp()}`;
+      const file = await writeFree(app.getPath('downloads'), name, '.png', png);
+      let copied = false;
+      try {
+        await withTimeout(clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]), 5000, 'The clipboard');
+        copied = true;
+      } catch (err) {
+        log('the picture could not be put on the clipboard', String((err && err.message) || err));
+      }
+      return { path: file, name: path.basename(file), copied };
+    } catch (err) {
+      log('a picture of the page could not be made', String((err && err.message) || err));
+      return null;
+    }
+  }
+
+  /** The page as a PDF (with its backgrounds), saved in Downloads as "<title>.pdf": { path, name }, or null. */
+  async function savePdf(e, target) {
+    if (!fromOwnPage(e)) return null;
+    const t = ownTab(target);
+    if (!t || t.wc.isDestroyed()) return null;
+    try {
+      const pdf = await withTimeout(t.wc.printToPDF({ printBackground: true }), 60_000, 'The PDF');
+      const file = await writeFree(app.getPath('downloads'), nameOfPage(t), '.pdf', pdf);
+      return { path: file, name: path.basename(file) };
+    } catch (err) {
+      log('a PDF of the page could not be made', String((err && err.message) || err));
+      return null;
+    }
+  }
+
+  /**
+   * Deletes what the tab's site (its host's last two names; three under co.uk and the like) has kept in this tab's own session:
+   * every cookie of the site and its subdomains, and the storage of its origins (the page's own and the site's, on http and
+   * https); then the tab loads again. A private tab's session is its own. { cleared, site }, or null.
+   */
+  async function clearSite(e, target) {
+    if (!fromOwnPage(e)) return null;
+    const t = ownTab(target);
+    if (!t || t.wc.isDestroyed()) return null;
+    let url;
+    try {
+      url = new URL(t.wc.getURL());
+    } catch {
+      return null;
+    }
+    if (!/^https?:$/.test(url.protocol)) return null;
+    const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    const site = siteOfHost(host);
+    const { ses } = t.ctx;
+    try {
+      for (const c of await ses.cookies.get({ domain: site })) {
+        const dom = String(c.domain || '').replace(/^\./, '').toLowerCase();
+        if (dom !== site && !dom.endsWith('.' + site)) continue;
+        await ses.cookies.remove(`${c.secure ? 'https' : 'http'}://${dom}${c.path || '/'}`, c.name).catch(() => {});
+      }
+      const origins = new Set([url.origin, `http://${host}`, `https://${host}`, `http://${site}`, `https://${site}`]);
+      for (const origin of origins) {
+        await ses.clearStorageData({ origin, storages: ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'filesystem', 'websql'] }).catch(() => {});
+      }
+      if (!t.wc.isDestroyed()) t.wc.reload();
+      return { cleared: true, site };
+    } catch (err) {
+      log('a site’s data could not be deleted', String((err && err.message) || err));
+      return null;
+    }
+  }
+
   let registered = false;
   function registerIpc() {
     if (registered) return;
@@ -1896,6 +2443,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     ipcMain.handle('hydor:browser-print', (e, target) => print(e, target));
     ipcMain.handle('hydor:browser-mute', (e, a) => mute(e, a && a.target, a && a.muted));
     ipcMain.handle('hydor:browser-open-external', (e, url) => openExternal(e, url));
+    ipcMain.handle('hydor:browser-capture', (e, a) => capture(e, a && a.target, !!(a && a.whole)));
+    ipcMain.handle('hydor:browser-pdf', (e, a) => savePdf(e, a && a.target));
+    ipcMain.handle('hydor:browser-clear-site', (e, a) => clearSite(e, a && a.target));
     ipcMain.on('hydor:browser-frame-ack', (e, target) => frameTaken(e, target));
     ipcMain.on('hydor:browser-menus', (e, on) => menusFrom(e, !!on));
     ipcMain.handle('hydor:browser-menu-pick', (e, a) => menuPick(e, a && a.target, a && a.menu, a && a.item));
@@ -1910,10 +2460,16 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     /** What the app tells the extensions (a stand-in for tests, and for the window's page). */
     browsingSession,
     // For desktop/scripts/browser-ipc-check.cjs, which calls what the page's messages call.
-    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal, menuPick },
+    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal, menuPick, capture, savePdf, clearSite },
+    /** The link bubble of a window, for the checks: { view, shown, text, side, bounds }, or null. */
+    bubble: (win) => {
+      const b = bubbles.get(win);
+      return b ? { view: b.view, shown: b.shown, text: b.text, side: b.side, bounds: b.view.getBounds() } : null;
+    },
     menuTemplate,
     highlightAt,
     shortcut,
+    siteOfHost,
     adblock,
     conns,
   };

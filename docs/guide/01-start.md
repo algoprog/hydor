@@ -22,7 +22,7 @@ The rail is a column of icons; point at one, or move to it with Tab, and a toolt
 
 Then the sections of the app (the desktop app has five; the web app and a phone have four, with no **Browser**):
 
-- **Browser**: a browser of your own, only in the desktop app, with tabs, a smart address bar, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
+- **Browser**: a browser of your own, only in the desktop app, with tabs, private tabs, a smart address bar, page translation, reader view, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
 - **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).

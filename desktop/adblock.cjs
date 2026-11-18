@@ -3,10 +3,15 @@
 // trackers and their scripts) and hides what is left of them with the cosmetic filters its frame preload injects.
 //
 // How it hooks in:
-//   - The engine is the prebuilt ads-and-tracking one (EasyList, EasyPrivacy, uBlock's and Peter Lowe's lists, as Ghostery
-//     builds them), made once and kept as a file in the app's data folder; a file older than 7 days is made again from the
-//     lists (checked when the browser starts and once a day), and when that fails (no network) the old file is kept and
-//     used. The engine loads the first time the browsing browser starts, so someone who never opens it downloads nothing.
+//   - The engine is made from Ghostery's ads-and-tracking lists (EasyList, EasyPrivacy, uBlock's and Peter Lowe's lists), and
+//     with `cookieBanners` on (the default) from the EasyList cookie notices list besides: that one list only, not the broader
+//     "annoyances" lists (pop-ups, newsletter boxes, chat widgets) the package's full engine adds, which break more pages.
+//     Each of the two engines is made once and kept as a file of its own in the app's data folder; a file older than 7 days is
+//     made again from the lists (checked when the browser starts and once a day), and when that fails (no network) the old
+//     file is kept and used (an engine with cookie notices that cannot be made, and has no file, is the one without them if
+//     that file is there). The engine loads the first time the browsing browser starts, so someone who never opens it
+//     downloads nothing; changing the setting loads the other engine (when its file is not fresh yet) and swaps it in on the
+//     sessions that block, and until it is there the one in use goes on.
 //   - `enableBlockingInSession` puts the engine's handlers on the session: webRequest.onBeforeRequest and onHeadersReceived,
 //     and a frame preload with two ipcMain handlers for the cosmetic filters. The engine's own handlers are arrow functions
 //     the session calls through the engine at the time of a request, so this module replaces them on the engine object with
@@ -18,11 +23,23 @@
 //     its requests are never blocked and no cosmetic filter runs on it. The engine gets `@@||host^$document` exceptions for
 //     them as well (which it honours for its cosmetic and scriptlet rules; its network matching ignores a $document
 //     exception for the requests of that page, which is why the host check above is the one that counts).
+//   - The session of each private context (browser.cjs attaches it) blocks as your own browsing's does, and is detached when
+//     the context is disposed of.
 //   - The count of what a tab had blocked since its last main-frame navigation is in browser.cjs (`onBlocked` gets the id
 //     of the page's webContents).
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+
+/** The two channels the engine's frame preload asks its cosmetic filters over (the engine's own handlers are for one session at a time). */
+const COSMETIC_CHANNELS = ['@ghostery/adblocker/inject-cosmetic-filters', '@ghostery/adblocker/is-mutation-observer-enabled'];
+const ipc = () => {
+  try {
+    return require('electron').ipcMain || null;
+  } catch {
+    return null;
+  }
+};
 
 /** A file of the engine older than this is made again. */
 const STALE_MS = 7 * 24 * 3600 * 1000;
@@ -30,7 +47,10 @@ const STALE_MS = 7 * 24 * 3600 * 1000;
 const CHECK_MS = 24 * 3600 * 1000;
 const RETRY_MS = 3600 * 1000;
 const FETCH_MS = 60_000;
-const FILE = 'engine-ads-and-tracking.bin';
+/** The saved file of each engine: without and with the cookie notices list. */
+const FILES = { plain: 'engine-ads-and-tracking.bin', cookies: 'engine-ads-tracking-cookies.bin' };
+/** EasyList's cookie notices list as the package ships it (its own address is in `fullLists`, found there first). */
+const COOKIE_LIST = 'https://raw.githubusercontent.com/ghostery/adblocker/master/packages/adblocker/assets/easylist/easylist-cookie.txt';
 
 /** A site as the setting keeps it: a host in lower case, without a leading dot. Anything else is not a site. */
 const siteOf = (s) => {
@@ -51,15 +71,19 @@ const hostOf = (url) => {
  * @param {string} o.dir                          where the engine's file is kept (made when needed)
  * @param {() => string} o.modulePath             the folder of @ghostery/adblocker-electron (the server's packages)
  * @param {(webContentsId: number) => void} o.onBlocked   a request of this page was blocked
- * @param {object} [o.engine]                     a ready engine in place of the prebuilt one (for tests)
+ * @param {object} [o.engine]                     a ready engine in place of the made ones (for tests)
+ * @param {{ plain?: object, cookies?: object }} [o.engines]   ready engines for each variant, as `engine` for one (for tests)
  */
-function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }) {
+function createAdblock({ log, dir, modulePath, onBlocked, engine: givenOne = null, engines: givenEach = null }) {
+  const given = givenOne || givenEach ? { plain: givenEach?.plain || givenOne, cookies: givenEach?.cookies || givenOne } : null;
   let lib = null;
   let failed = false;
-  /** The engine in use, and the sites it has exceptions for. */
-  let engine = null;
-  let excepted = new Set();
-  let prefs = { adblock: true, allowAds: [] };
+  /** The engines made so far, by variant ('plain', 'cookies'); each remembers the sites it has exceptions for. */
+  const engines = new Map();
+  const prefs = { adblock: true, allowAds: [], cookieBanners: true };
+  const variant = () => (prefs.cookieBanners ? 'cookies' : 'plain');
+  /** The engine to block with: the one the setting wants, else any that is there (until the wanted one is made). */
+  const current = () => engines.get(variant()) || engines.get(prefs.cookieBanners ? 'plain' : 'cookies') || null;
   /** Whether the server has said yet (its first word comes as your browser starts): nothing is downloaded before it. */
   let told = false;
   /** The sessions this blocks in when it is on, and the engine each has now. */
@@ -122,33 +146,59 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
     };
   }
 
-  /** The engine's exceptions are what `prefs.allowAds` says. */
-  function syncExceptions() {
+  /** An engine's exceptions are what `prefs.allowAds` says. */
+  function syncExceptions(engine) {
     if (!engine) return;
+    const had = engine.hydorExcepted || new Set();
     const want = new Set(prefs.allowAds);
-    const added = [...want].filter((s) => !excepted.has(s)).map((s) => `@@||${s}^$document`);
-    const removed = [...excepted].filter((s) => !want.has(s)).map((s) => `@@||${s}^$document`);
+    const added = [...want].filter((s) => !had.has(s)).map((s) => `@@||${s}^$document`);
+    const removed = [...had].filter((s) => !want.has(s)).map((s) => `@@||${s}^$document`);
     if (!added.length && !removed.length) return;
     try {
       engine.updateFromDiff({ added, removed });
-      excepted = want;
+      engine.hydorExcepted = want;
     } catch (e) {
       log('the ad blocker could not take the sites you allowed', String((e && e.message) || e));
     }
   }
 
+  /**
+   * The engine registers its two cosmetic filter handlers on ipcMain each time it enables a session, and removes them when it
+   * disables one: a second session (a private context's) would fail to enable, and one session's leaving would take them from the
+   * others. So they are taken off before an engine enables a session, and put back after, once, answering each page by the engine
+   * its session blocks with.
+   */
+  function routeCosmetics() {
+    const main = ipc();
+    if (!main) return;
+    for (const c of COSMETIC_CHANNELS) main.removeHandler(c);
+    if (!enabled.size) return;
+    main.handle(COSMETIC_CHANNELS[0], (event, url, msg) => {
+      const e = enabled.get(event.sender.session);
+      return e ? e.onInjectCosmeticFilters(event, url, msg) : undefined;
+    });
+    main.handle(COSMETIC_CHANNELS[1], (event) => {
+      const e = enabled.get(event.sender.session);
+      return e ? e.onIsMutationObserverEnabled(event) : false;
+    });
+  }
+
   /** Every attached session blocks (or not) as the setting and the engine say. */
   function apply() {
+    let changed = false;
     for (const ses of attached) {
       const had = enabled.get(ses);
-      const want = prefs.adblock ? engine : null;
+      const want = prefs.adblock ? current() : null;
       if (had === want) continue;
+      changed = true;
       try {
         if (had) {
           if (had.isBlockingEnabled(ses)) had.disableBlockingInSession(ses);
           enabled.delete(ses);
         }
         if (want) {
+          const main = ipc();
+          if (main) for (const c of COSMETIC_CHANNELS) main.removeHandler(c);
           want.enableBlockingInSession(ses);
           enabled.set(ses, want);
         }
@@ -156,12 +206,13 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
         log('the ad blocker did not switch', String((e && e.message) || e));
       }
     }
+    if (changed) routeCosmetics();
   }
 
   const fsp = fs.promises;
-  const file = () => path.join(dir, FILE);
-  const caching = () => ({
-    path: file(),
+  const file = (v) => path.join(dir, FILES[v]);
+  const caching = (v) => ({
+    path: file(v),
     // A file older than a week is as good as none: the engine is made again, and the old file is the fallback below.
     read: async (p) => {
       const st = await fsp.stat(p);
@@ -177,50 +228,63 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
   });
   const download = (url) => fetch(url, { signal: AbortSignal.timeout(FETCH_MS) });
 
-  async function make() {
+  /** Makes the engine of a variant: [the engine, the variant it is]. Null when there is none (no network and no saved file). */
+  async function make(v) {
     const { ElectronBlocker } = lib;
     try {
-      return await ElectronBlocker.fromPrebuiltAdsAndTracking(download, caching());
+      if (v === 'cookies') {
+        const list = (lib.fullLists || []).find((u) => /\/easylist-cookie\.txt$/.test(u)) || COOKIE_LIST;
+        return [await ElectronBlocker.fromLists(download, [...lib.adsAndTrackingLists, list], {}, caching(v)), v];
+      }
+      return [await ElectronBlocker.fromPrebuiltAdsAndTracking(download, caching(v)), v];
     } catch (e) {
       log('the ad blocker lists could not be fetched', String((e && e.message) || e));
     }
-    // No network: the old file does.
-    try {
-      const old = ElectronBlocker.deserialize(new Uint8Array(await fsp.readFile(file())));
-      log('the ad blocker goes on with its saved lists');
-      return old;
-    } catch {
-      return null;
+    // No network: the old file does, or else (for the cookie notices) the one without them.
+    for (const other of v === 'cookies' ? ['cookies', 'plain'] : ['plain']) {
+      try {
+        const old = ElectronBlocker.deserialize(new Uint8Array(await fsp.readFile(file(other))));
+        log('the ad blocker goes on with its saved lists');
+        return [old, other];
+      } catch {}
     }
+    return null;
   }
 
-  /** Whether the saved file is still within its week. */
-  const fresh = () => {
+  /** Whether the saved file of a variant is still within its week. */
+  const fresh = (v) => {
     try {
-      return Date.now() - fs.statSync(file()).mtimeMs <= STALE_MS;
+      return Date.now() - fs.statSync(file(v)).mtimeMs <= STALE_MS;
     } catch {
       return false;
     }
   };
 
-  /** Loads the engine (one load at a time) and puts it to work; later it looks again by itself (see the top). */
+  /**
+   * Loads the engine the setting wants (one load at a time) and puts it to work; later it looks again by itself (see the
+   * top). The setting may change meanwhile: then the other one is made after this one.
+   */
   function load() {
     loading ??= (async () => {
-      let next = given;
-      if (!next && library()) next = await make();
-      if (next) {
+      for (let round = 0; round < 2; round++) {
+        const v = variant();
+        let made = given ? [given[v], v] : null;
+        if (!made && library()) made = await make(v);
+        if (!made) break;
+        const [next, as] = made;
         patch(next);
-        engine = next;
-        excepted = new Set();
-        syncExceptions();
+        engines.set(as, next);
+        syncExceptions(next);
         apply();
+        // Done, unless the setting changed while this loaded and the engine it wants now is not there yet: another round.
+        if (as !== v || variant() === v || engines.has(variant())) break;
       }
-      return !!engine;
+      return engines.size > 0;
     })().finally(() => {
       loading = null;
       if (given) return;
       clearTimeout(timer);
-      timer = setTimeout(() => void refresh(), engine ? CHECK_MS : RETRY_MS);
+      timer = setTimeout(() => void refresh(), engines.size ? CHECK_MS : RETRY_MS);
       timer.unref?.();
     });
     return loading;
@@ -229,7 +293,7 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
   function refresh() {
     // Off: no fresh lists either (turning it on again loads them).
     if (!prefs.adblock) return undefined;
-    return engine && fresh() ? undefined : load();
+    return engines.has(variant()) && fresh(variant()) ? undefined : load();
   }
 
   return {
@@ -238,22 +302,36 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
       attached.add(ses);
       apply();
       // Nothing is downloaded while blocking is off: the lists come the first time it is on.
-      if (!engine && prefs.adblock && (told || given)) void load();
+      if (!engines.size && prefs.adblock && (told || given)) void load();
     },
-    /** What the server says (`browser-prefs`): on or off, and the sites you allowed ads on. */
+    /** A session no longer blocks (a private context that was disposed of): it is let go, with what the engine put on it. */
+    detach(ses) {
+      attached.delete(ses);
+      const had = enabled.get(ses);
+      enabled.delete(ses);
+      try {
+        if (had && had.isBlockingEnabled(ses)) had.disableBlockingInSession(ses);
+      } catch {}
+      if (had) routeCosmetics();
+    },
+    /** What the server says (`browser-prefs`): on or off, the sites you allowed ads on, and whether cookie notices are hidden. */
     setPrefs(p) {
       if (!p || typeof p !== 'object') return;
       told = true;
       if (typeof p.adblock === 'boolean') prefs.adblock = p.adblock;
       if (Array.isArray(p.allowAds)) prefs.allowAds = [...new Set(p.allowAds.map(siteOf).filter(Boolean))];
-      syncExceptions();
+      if (typeof p.cookieBanners === 'boolean') prefs.cookieBanners = p.cookieBanners;
+      for (const e of engines.values()) syncExceptions(e);
       apply();
-      if (!engine && prefs.adblock && attached.size) void load();
+      // The engine the setting wants is made when it is not there yet (the one in use goes on until then).
+      if (prefs.adblock && attached.size && !engines.has(variant())) void load();
     },
     /** Whether the engine is in use on this session. */
     isOn: (ses) => enabled.has(ses),
-    /** Resolves once the engine is loaded (false when it could not be). */
-    ready: () => (engine ? Promise.resolve(true) : load()),
+    /** Whether the engine in use on this session is the one that also hides cookie notices. */
+    hidesCookieNotices: (ses) => enabled.has(ses) && enabled.get(ses) === engines.get('cookies'),
+    /** Resolves once an engine is loaded (false when none could be). */
+    ready: () => (engines.size ? Promise.resolve(true) : load()),
     /** Whether a site has its ads allowed. */
     allows: (host) => allowed(String(host || '').toLowerCase()),
     close() {
@@ -263,8 +341,10 @@ function createAdblock({ log, dir, modulePath, onBlocked, engine: given = null }
           enabled.get(ses).disableBlockingInSession(ses);
         } catch {}
       }
+      const had = enabled.size;
       enabled.clear();
       attached.clear();
+      if (had) routeCosmetics();
     },
   };
 }

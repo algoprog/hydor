@@ -1,6 +1,6 @@
 // One tab of a session's browser: its page target over CDP, what it is loading, its dialogs, and what
 // the agent does in it (one action at a time): read it as an outline, look at it, click, type, scroll.
-import type { BrowserDialog } from '../../shared/browser.ts';
+import type { BrowserDialog, TabTranslation } from '../../shared/browser.ts';
 import { CdpError, CdpSession } from './cdp.ts';
 import { captureJpeg, jpegWidth } from './jpeg.ts';
 import { keyEvents, parseKey } from './keys.ts';
@@ -85,6 +85,16 @@ export class Tab {
   canGoForward = false;
   /** Every request of this tab passes the guard (a tab of your own browsing handed to an agent). */
   guarded = false;
+  /** A private tab of your own browsing: it is in the private browser context (session.ts), and nothing of it is kept. */
+  incognito = false;
+  /**
+   * Your own browsing: the language its page is in as found when it loaded (translate.ts), the page's translation, whether
+   * reader view can show its article and whether it shows it (reader-view.ts). A new document starts without them.
+   */
+  lang: string | undefined;
+  translation: TabTranslation | undefined;
+  readerable = false;
+  readerOn = false;
   private navTimer: NodeJS.Timeout | null = null;
   private inflight = new Map<string, number>();
   private quietSince = Date.now();
@@ -288,6 +298,10 @@ export class Tab {
     this.userTyped.clear();
     this.vaultTyped.clear();
     this.fileChooser = null;
+    this.lang = undefined;
+    this.translation = undefined;
+    this.readerable = false;
+    this.readerOn = false;
   }
 
   private loaded() {

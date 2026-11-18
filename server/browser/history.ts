@@ -222,7 +222,7 @@ interface Seen {
 /**
  * Records your own browsing's history from the changes of its view: each page a tab ends up on (a website or a file)
  * is a visit, and its title is set as it settles. A page opened from the address bar counts as typed (`typed`); the
- * pages tabs restore at a start are not visits (`quiet`).
+ * pages tabs restore at a start are not visits (`quiet`). A private tab's pages are never recorded.
  */
 export class HistoryRecorder {
   private seenTabs = new Map<string, Seen>();
@@ -233,9 +233,9 @@ export class HistoryRecorder {
     private now: () => number = Date.now,
   ) {}
 
-  /** The tab's next page came from the address bar. */
-  typed(tab: string) {
-    this.typedAt.set(tab, this.now());
+  /** The tab's next page came from the address bar (a private tab's never counts: nothing of it is kept). */
+  typed(tab: string, priv = false) {
+    if (!priv) this.typedAt.set(tab, this.now());
   }
 
   /** The tab's next page is not a visit (a restored tab, a start's home page). */
@@ -253,6 +253,8 @@ export class HistoryRecorder {
     const live = new Set<string>();
     for (const t of view.tabs) {
       live.add(t.id);
+      // Nothing a private tab shows is kept: it is not even followed.
+      if (t.private) continue;
       const url = historyUrl(t.url);
       const title = t.title ?? '';
       const st = this.seenTabs.get(t.id);

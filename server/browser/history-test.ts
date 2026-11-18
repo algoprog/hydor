@@ -379,6 +379,37 @@ async function main() {
     assert.equal(entry('d.example').visits, 2);
   });
 
+  await check('recording: a private tab’s pages are never recorded, nor its typed addresses, titles or restored pages', () => {
+    const db = fresh();
+    const now = NOW;
+    const rec = new HistoryRecorder(db, () => now);
+    const tab = (id: string, url: string, title: string, o: { private?: boolean; loading?: boolean } = {}): BrowserTab => ({ id, url, title, active: true, ...(o.private ? { private: true } : {}), ...(o.loading ? { loading: true } : {}) });
+    const view = (...tabs: BrowserTab[]) => ({ open: true, tabs });
+    const urls = () => listHistory(db, { limit: 200 }).map((e) => e.url).sort();
+    // Typed in a private tab (the recorder is told it is one), then its page loads and settles.
+    rec.typed('p', true);
+    rec.seen(view(tab('p', 'https://secret.example/', 'secret.example', { private: true, loading: true }), tab('n', 'https://plain.example/', 'Plain')));
+    rec.seen(view(tab('p', 'https://secret.example/', 'Secret page', { private: true }), tab('n', 'https://plain.example/', 'Plain')));
+    rec.seen(view(tab('p', 'https://secret.example/two', 'Two', { private: true }), tab('n', 'https://plain.example/', 'Plain')));
+    assert.deepEqual(urls(), ['https://plain.example/'], 'only the normal tab’s page');
+    assert.equal(listHistory(db, { q: 'secret' }).length, 0);
+    // A quiet (restored) private tab and one typed with the old call: still nothing, and nothing waits to count for a later page.
+    rec.quiet('q');
+    rec.seen(view(tab('q', 'https://secret.example/three', 'Three', { private: true })));
+    rec.typed('t');
+    rec.seen(view(tab('t', 'https://typed.example/', 'Typed', { private: true })));
+    assert.deepEqual(urls(), ['https://plain.example/']);
+    // Normal tabs are unaffected.
+    rec.typed('n', false);
+    rec.seen(view(tab('n', 'https://next.example/', 'Next')));
+    const next = listHistory(db, { q: 'next.example' })[0];
+    assert.deepEqual([next.visits, next.typed], [1, 1], 'a normal tab typed as before');
+    // The browser closing and opening again: the same private page is still no visit.
+    rec.seen({ open: false, tabs: [] });
+    rec.seen(view(tab('p', 'https://secret.example/', 'Secret page', { private: true })));
+    assert.deepEqual(urls(), ['https://next.example/', 'https://plain.example/']);
+  });
+
   // ---- your browsing by meaning, with a made-up embedder ----
   // Concepts as fixed random directions (words alike share one), a text as the sum of its words' (as find-test.ts does).
   const SAME: Record<string, string> = { vacation: 'travel', holiday: 'travel', lisbon: 'travel', trip: 'travel', itinerary: 'travel', pasta: 'food', carbonara: 'food', spaghetti: 'food', recipe: 'food' };

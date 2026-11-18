@@ -1,10 +1,10 @@
 // What the tabs of your own browser share: their site icons, the speaker of one that plays sound, and the dropdown that
 // lists them on a phone (on a computer the tab column does, TabColumn).
 import { useRef, useState } from 'react';
-import { ChevronDown, Globe, Plus, Volume2, VolumeX, X } from 'lucide-react';
+import { ChevronDown, Globe, Plus, VenetianMask, Volume2, VolumeX, X } from 'lucide-react';
 import type { BrowserTab, BrowserView } from '@shared/browser';
 import { cx, IconButton, Popover, Throbber } from '../../components/ui';
-import { closeTab, desktopBrowser, newTab, switchTab, tabName, useTabState } from './browsing';
+import { closePrivateTabs, closeTab, desktopBrowser, newTab, switchTab, tabName, useTabState } from './browsing';
 
 /** The site a tab is on (as the app's site icon route takes it), or '' for a page with no host to ask about. */
 export function hostOfTab(url: string): string {
@@ -21,8 +21,17 @@ export function hostOfTab(url: string): string {
  * or a globe while it has none (or it did not load).
  */
 export function Favicon({ tab, size = 14 }: { tab: BrowserTab; size?: number }) {
-  if (tab.loading) return <Throbber size={size} className="shrink-0" />;
-  return <SiteIcon url={tab.url} size={size} />;
+  const icon = tab.loading ? <Throbber size={size} className="shrink-0" /> : <SiteIcon url={tab.url} size={size} />;
+  if (!tab.private) return icon;
+  // A private tab: a small purple mask at the icon's corner.
+  return (
+    <span className="relative flex shrink-0" title="Private tab">
+      {icon}
+      <span aria-hidden className="absolute -right-1 -bottom-1 flex h-[11px] w-[11px] items-center justify-center rounded-full bg-sidebar text-codex ring-1 ring-sidebar">
+        <VenetianMask size={9} strokeWidth={2.5} />
+      </span>
+    </span>
+  );
 }
 
 /** The icon of the site an address is on (a globe when it has none). */
@@ -74,7 +83,7 @@ export function TabMenu({ view }: { view: BrowserView }) {
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Tabs">
         <div className="max-h-[60vh] overflow-y-auto">
           {view.tabs.map((t) => (
-            <div key={t.id} className={cx('flex items-center gap-1 rounded-lg pr-1 pl-2.5', t.active && 'bg-bg-2')}>
+            <div key={t.id} className={cx('flex items-center gap-1 rounded-lg pr-1 pl-2.5', t.private && !t.active && 'bg-codex/5', t.active && (t.private ? 'bg-codex/10' : 'bg-bg-2'))}>
               <button
                 onClick={() => {
                   void switchTab(t.id);
@@ -102,6 +111,28 @@ export function TabMenu({ view }: { view: BrowserView }) {
             <Plus size={14} className="text-fg-3" />
             New tab
           </button>
+          <button
+            onClick={() => {
+              void newTab(undefined, { private: true });
+              setOpen(false);
+            }}
+            className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] hover:bg-bg-2"
+          >
+            <VenetianMask size={14} className="text-codex" />
+            New private tab
+          </button>
+          {view.tabs.some((t) => t.private) && (
+            <button
+              onClick={() => {
+                void closePrivateTabs();
+                setOpen(false);
+              }}
+              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] hover:bg-bg-2"
+            >
+              <X size={14} className="text-codex" />
+              Close private tabs
+            </button>
+          )}
         </div>
       </Popover>
     </>

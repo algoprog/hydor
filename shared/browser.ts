@@ -18,7 +18,121 @@ export interface BrowserTab {
   canGoForward?: boolean;
   /** The group it is in (your own browsing's tabs), by its id in the view's `groups`. */
   group?: string;
+  /**
+   * A private tab of your own browsing: its sign-ins, cookies, site data and cache are kept apart, in memory, and forgotten
+   * when the last private tab closes; its pages are not kept in the history, the list of closed tabs or the tabs reopened at
+   * the next start.
+   */
+  private?: boolean;
+  /** The language its page is in, as found when it loaded (a code of TRANSLATE_LANGS, such as 'de'), when translation is offered. */
+  lang?: string;
+  /** Its page's translation, from when it starts until the page shows its own words again. */
+  translation?: TabTranslation;
+  /** Its page has an article that reader view can show. */
+  readerable?: boolean;
+  /** Reader view shows on it now. */
+  reader?: boolean;
 }
+
+/** A page's translation in your own browsing (server/browser/translate.ts). */
+export interface TabTranslation {
+  /** Pieces are still on their way, all found so far are done, or the model could not translate. */
+  state: 'translating' | 'translated' | 'failed';
+  /** The language it is translated into (a code of TRANSLATE_LANGS). */
+  to: string;
+  /** The language the page was in, when known. */
+  from?: string;
+  /** The pieces of the page translated, and found, so far. */
+  done: number;
+  total: number;
+  /** Why it failed, in a sentence. */
+  error?: string;
+  /** The model that translates, by its name ("Claude Haiku"). */
+  model?: string;
+}
+
+/**
+ * The languages pages are translated into and from: a code (ISO 639-1, and zh-TW for Chinese in traditional characters), its
+ * English name and its own. The first ones are the app's own languages.
+ */
+export const TRANSLATE_LANGS: readonly { code: string; name: string; native: string }[] = [
+  { code: 'en', name: 'English', native: 'English' },
+  { code: 'de', name: 'German', native: 'Deutsch' },
+  { code: 'zh', name: 'Chinese (Simplified)', native: '简体中文' },
+  { code: 'el', name: 'Greek', native: 'Ελληνικά' },
+  { code: 'zh-TW', name: 'Chinese (Traditional)', native: '繁體中文' },
+  { code: 'fr', name: 'French', native: 'Français' },
+  { code: 'es', name: 'Spanish', native: 'Español' },
+  { code: 'it', name: 'Italian', native: 'Italiano' },
+  { code: 'pt', name: 'Portuguese', native: 'Português' },
+  { code: 'nl', name: 'Dutch', native: 'Nederlands' },
+  { code: 'sv', name: 'Swedish', native: 'Svenska' },
+  { code: 'da', name: 'Danish', native: 'Dansk' },
+  { code: 'no', name: 'Norwegian', native: 'Norsk' },
+  { code: 'fi', name: 'Finnish', native: 'Suomi' },
+  { code: 'is', name: 'Icelandic', native: 'Íslenska' },
+  { code: 'pl', name: 'Polish', native: 'Polski' },
+  { code: 'cs', name: 'Czech', native: 'Čeština' },
+  { code: 'sk', name: 'Slovak', native: 'Slovenčina' },
+  { code: 'sl', name: 'Slovenian', native: 'Slovenščina' },
+  { code: 'hr', name: 'Croatian', native: 'Hrvatski' },
+  { code: 'sr', name: 'Serbian', native: 'Српски' },
+  { code: 'bg', name: 'Bulgarian', native: 'Български' },
+  { code: 'mk', name: 'Macedonian', native: 'Македонски' },
+  { code: 'ro', name: 'Romanian', native: 'Română' },
+  { code: 'hu', name: 'Hungarian', native: 'Magyar' },
+  { code: 'sq', name: 'Albanian', native: 'Shqip' },
+  { code: 'lt', name: 'Lithuanian', native: 'Lietuvių' },
+  { code: 'lv', name: 'Latvian', native: 'Latviešu' },
+  { code: 'et', name: 'Estonian', native: 'Eesti' },
+  { code: 'ru', name: 'Russian', native: 'Русский' },
+  { code: 'uk', name: 'Ukrainian', native: 'Українська' },
+  { code: 'be', name: 'Belarusian', native: 'Беларуская' },
+  { code: 'tr', name: 'Turkish', native: 'Türkçe' },
+  { code: 'ka', name: 'Georgian', native: 'ქართული' },
+  { code: 'hy', name: 'Armenian', native: 'Հայերեն' },
+  { code: 'az', name: 'Azerbaijani', native: 'Azərbaycan' },
+  { code: 'kk', name: 'Kazakh', native: 'Қазақ' },
+  { code: 'ar', name: 'Arabic', native: 'العربية' },
+  { code: 'he', name: 'Hebrew', native: 'עברית' },
+  { code: 'fa', name: 'Persian', native: 'فارسی' },
+  { code: 'ur', name: 'Urdu', native: 'اردو' },
+  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+  { code: 'mr', name: 'Marathi', native: 'मराठी' },
+  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+  { code: 'th', name: 'Thai', native: 'ไทย' },
+  { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+  { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
+  { code: 'ms', name: 'Malay', native: 'Bahasa Melayu' },
+  { code: 'tl', name: 'Filipino', native: 'Filipino' },
+  { code: 'ja', name: 'Japanese', native: '日本語' },
+  { code: 'ko', name: 'Korean', native: '한국어' },
+  { code: 'sw', name: 'Swahili', native: 'Kiswahili' },
+  { code: 'am', name: 'Amharic', native: 'አማርኛ' },
+  { code: 'ca', name: 'Catalan', native: 'Català' },
+  { code: 'eu', name: 'Basque', native: 'Euskara' },
+  { code: 'gl', name: 'Galician', native: 'Galego' },
+  { code: 'cy', name: 'Welsh', native: 'Cymraeg' },
+  { code: 'ga', name: 'Irish', native: 'Gaeilge' },
+  { code: 'af', name: 'Afrikaans', native: 'Afrikaans' },
+];
+
+/** Whether a code is one of TRANSLATE_LANGS. */
+export const isTranslateLang = (v: unknown): v is string => typeof v === 'string' && TRANSLATE_LANGS.some((l) => l.code === v);
+
+/** A language's English name by its code (the code itself when it is not one of them). */
+export const langName = (code: string): string => TRANSLATE_LANGS.find((l) => l.code === code)?.name ?? code;
+
+/** How reader view shows an article: text size in CSS pixels (14 to 28), colours (`auto` follows the app's theme), and font. */
+export interface ReaderPrefs {
+  size: number;
+  theme: 'auto' | 'dark' | 'light' | 'sepia';
+  font: 'sans' | 'serif';
+}
+
+export const READER_DEFAULTS: ReaderPrefs = { size: 19, theme: 'auto', font: 'serif' };
 
 /** The colours a tab group may have: the app's own (blue, green, amber, red and purple are its info, ok, warn, err and codex colours, orange its claude colour). */
 export const GROUP_COLORS = ['grey', 'blue', 'green', 'amber', 'orange', 'red', 'purple'] as const;
@@ -362,6 +476,25 @@ export interface BrowsingPrefs {
   adblock: boolean;
   /** Sites where ads are allowed (hosts, without www.). */
   allowAds: string[];
+  /** Hide cookie banners (with the ad blocker on): EasyList's cookie notice list added to its lists. On at first. */
+  cookieBanners: boolean;
+  /** The language pages are translated into (a code of TRANSLATE_LANGS): the app's own language at first. */
+  translateTo: string;
+  /** Offer to translate a page whose language is not `translateTo` (a button in the address bar). On at first. */
+  translateOffer: boolean;
+  /** Languages whose pages are translated as soon as they load, and languages never offered (codes of TRANSLATE_LANGS). */
+  translateAlways: string[];
+  translateNever: string[];
+  /** Sites never offered or translated by themselves (hosts, without www.). */
+  translateNeverSites: string[];
+  /** Pages without a dark look of their own are shown dark (Chromium's auto dark mode). Off at first. */
+  darkPages: boolean;
+  /** Sites shown as they are while dark pages is on (hosts, without www.). */
+  darkExcept: string[];
+  /** Pages may play sound by themselves, before you click or type in them. Off at first: sound waits until you use the page. */
+  autoplay: boolean;
+  /** How reader view shows articles. */
+  reader: ReaderPrefs;
 }
 
 /** A page you visited in your own browser. */

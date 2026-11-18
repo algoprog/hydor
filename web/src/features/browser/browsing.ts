@@ -14,6 +14,7 @@ import {
   type ExtensionsState,
   type HistoryEntry,
   type LaterItem,
+  type ReaderPrefs,
   type SuggestResult,
 } from '@shared/browser';
 import type { PageHighlight } from '@shared/highlights';
@@ -22,6 +23,7 @@ import { machineId } from '../../lib/machine';
 import { openFile, openSession } from '../../lib/nav';
 import { canReveal, reveal } from '../../lib/reveal';
 import { agentKey, lastAgent, startSettings } from '../../lib/start';
+import { activeBase } from '../../lib/theme';
 import { toast, toastError, useApp, useToasts } from '../../lib/store';
 import { desktopBrowser, nativePages, type TabStateChange } from './PageView';
 import { useBrowser } from './store';
@@ -84,18 +86,18 @@ export async function openBrowsing(url?: string): Promise<BrowserView> {
 }
 
 /** What was typed in the address bar: an address is opened, anything else searched. */
-export async function goTo(text: string, o: { tab?: string; newTab?: boolean } = {}) {
+export async function goTo(text: string, o: { tab?: string; newTab?: boolean; private?: boolean } = {}) {
   try {
-    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/go', { text, ...o })).view);
+    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/go', { text, ...o, ...(o.private ? { private: true } : {}) })).view);
   } catch (e) {
     toastError(e);
   }
 }
 
-/** Opens a new tab (at `url`, else the home page); the view after it, which has the new tab in front. */
-export async function newTab(url?: string): Promise<BrowserView | null> {
+/** Opens a new tab (at `url`, else the home page), a private one with `private`; the view after it, which has the new tab in front. */
+export async function newTab(url?: string, o: { private?: boolean } = {}): Promise<BrowserView | null> {
   try {
-    return takeView((await post<{ view: BrowserView }>('/api/browser/browsing/tabs', url ? { url } : {})).view);
+    return takeView((await post<{ view: BrowserView }>('/api/browser/browsing/tabs', { ...(url ? { url } : {}), ...(o.private ? { private: true } : {}) })).view);
   } catch (e) {
     toastError(e);
     return null;
@@ -110,6 +112,17 @@ export async function closeTab(id: string) {
   try {
     if ((useBrowser.getState().views[KEY]?.tabs.length ?? 0) <= 1) await post('/api/browser/browsing/tabs', {});
     takeView((await post<{ view: BrowserView }>(`/api/browser/sessions/${enc(KEY)}/tab`, { id, close: true })).view);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** Closes every private tab (your browsing keeps at least one tab: a new one opens first when only private ones are left). */
+export async function closePrivateTabs() {
+  try {
+    const tabs = useBrowser.getState().views[KEY]?.tabs ?? [];
+    if (tabs.length && tabs.every((t) => t.private)) await post('/api/browser/browsing/tabs', {});
+    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/private/close')).view);
   } catch (e) {
     toastError(e);
   }
@@ -130,6 +143,56 @@ export const duplicateTab = (id: string) => post<{ view: BrowserView }>(`/api/br
 
 /** Reloads one tab, not only the one in front. */
 export const reloadTab = (id: string) => post<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/reload`).then((r) => void takeView(r.view), toastError);
+
+// ---- translation, reader view, screenshots and a site's data ------------------------------------------------------
+
+/** Starts translating a tab's page (into `to`, else the language set in the browser's settings); progress comes in the view's `translation`. */
+export const translateTab = (id: string, to?: string) =>
+  post<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/translate`, to ? { to } : {}).then((r) => (takeView(r.view), true), (e) => (toastError(e), false));
+
+/** Shows a tab's page in its own words again. */
+export const showOriginal = (id: string) =>
+  del<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/translate`).then((r) => (takeView(r.view), true), (e) => (toastError(e), false));
+
+/** Words translated (the right-click menu's Translate “…”): the text, the language it was in when found, and the model that did it. Throws with the server's words. */
+export const translateText = (text: string, to?: string) => post<{ text: string; from?: string; model: string }>('/api/browser/browsing/translate', { text, ...(to ? { to } : {}) });
+
+/** Turns reader view on or off in a tab; the app's own look goes along, for the reader's colours when they are on Auto. 409: the page has no article. */
+export const setReader = (id: string, on: boolean) =>
+  post<{ view: BrowserView }>(`/api/browser/browsing/tabs/${enc(id)}/reader`, { on, theme: activeBase() }).then((r) => (takeView(r.view), true), (e) => (toastError(e), false));
+
+/** A picture of a tab's page (what shows, or all of it), saved to Downloads and copied when it could be. */
+export async function screenshotTab(id: string, whole: boolean) {
+  try {
+    const r = await desktopBrowser()?.capture?.(id, whole);
+    if (!r) return;
+    useToasts.getState().push('ok', r.copied ? 'Screenshot saved to Downloads and copied' : 'Screenshot saved to Downloads', { label: 'Show in folder', run: () => showDownload(r.path) });
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** A tab's page as a PDF file in Downloads. */
+export async function savePageAsPdf(id: string) {
+  try {
+    const r = await desktopBrowser()?.savePdf?.(id);
+    if (!r) return;
+    useToasts.getState().push('ok', 'Saved as PDF in Downloads', { label: 'Show in folder', run: () => showDownload(r.path) });
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+/** Deletes the cookies and site data of a tab's site (you are signed out of it). */
+export async function deleteSiteData(id: string) {
+  try {
+    const r = await desktopBrowser()?.clearSite?.(id);
+    if (!r?.cleared) return;
+    toast(`Deleted the cookies and site data of ${r.site}`, 'ok');
+  } catch (e) {
+    toastError(e);
+  }
+}
 
 // ---- tab groups ------------------------------------------------------------------------------------------------
 
@@ -442,7 +505,7 @@ function takePrefs(p: BrowsingPrefs) {
 }
 
 /** Changes some of them; false when the server refused (its words are shown). */
-export async function savePrefs(p: Partial<BrowsingPrefs>): Promise<boolean> {
+export async function savePrefs(p: Partial<Omit<BrowsingPrefs, 'reader'>> & { reader?: Partial<ReaderPrefs> }): Promise<boolean> {
   try {
     takePrefs(await patch<BrowsingPrefs>('/api/browser/browsing/prefs', p));
     return true;

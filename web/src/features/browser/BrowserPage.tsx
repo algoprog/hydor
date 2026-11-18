@@ -15,6 +15,8 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkPlus,
+  BookOpenText,
+  Camera,
   Clock,
   Download,
   Ellipsis,
@@ -24,6 +26,8 @@ import {
   Highlighter,
   History,
   Home,
+  Languages,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -31,10 +35,12 @@ import {
   Puzzle,
   RotateCw,
   Search,
+  Scan,
   Settings,
   ShieldQuestion,
   Sparkles,
   Star,
+  VenetianMask,
   WandSparkles,
   X,
 } from 'lucide-react';
@@ -78,6 +84,11 @@ import {
   navigate,
   newTab,
   openBrowsing,
+  savePageAsPdf,
+  savePrefs,
+  screenshotTab,
+  setReader,
+  showOriginal,
   ownBrowserHere,
   permissionWords,
   reopenClosed,
@@ -102,6 +113,7 @@ import type { LiveViewApi } from './LiveView';
 import { Panel } from './Panel';
 import { PermissionsPanel } from './Permissions';
 import { PageView } from './PageView';
+import { isTranslated, openTranslatePopover, openTranslateText, togglePageTranslation, TranslatePopover, TranslateTextDialog, useTranslateUI } from './Translate';
 import { TabColumn } from './TabColumn';
 import { SlideColumn } from '../../components/SlideColumn';
 import { TabMenu } from './TabStrip';
@@ -247,6 +259,10 @@ function OwnBrowser() {
   const [saving, setSaving] = useState(false);
   // The history's "Clear browsing data…" opens the settings at that section.
   const [clearAt, setClearAt] = useState(false);
+  // "Translation settings" in the translate popover opens the settings at its Translation group (a count, so each press scrolls).
+  const [translationAt, setTranslationAt] = useState(0);
+  const translateAt = useTranslateUI((s) => s.at);
+  const settingsAsked = useTranslateUI((s) => s.settings);
   const menuRef = useRef<HTMLButtonElement>(null);
   const address = useRef<HTMLInputElement>(null);
   const live = useRef<LiveViewApi>(null);
@@ -256,6 +272,7 @@ function OwnBrowser() {
   // Starts your browser (with the tabs it had), opening an address from the page's own (?url=) in a new tab.
   const params = new URLSearchParams(search);
   const urlParam = params.get('url');
+  const privateParam = params.get('private') === '1';
   const panelParam = params.get('panel');
   useEffect(() => {
     listenBrowser();
@@ -269,11 +286,14 @@ function OwnBrowser() {
   useEffect(() => {
     let live = true;
     setError(null);
-    openBrowsing(urlParam ?? undefined).then(
-      () => {
-        if (!urlParam) return;
+    // ?private=1 opens a new private tab (at ?url= when given); the parameters go once it is done.
+    openBrowsing(privateParam ? undefined : (urlParam ?? undefined)).then(
+      async () => {
+        if (!urlParam && !privateParam) return;
+        if (privateParam) await newTab(urlParam ?? undefined, { private: true });
         const p = new URLSearchParams(window.location.search);
         p.delete('url');
+        p.delete('private');
         go(`/browser${p.size ? `?${p}` : ''}`, true);
       },
       (e) => live && setError(e instanceof Error ? e.message : String(e)),
@@ -281,7 +301,7 @@ function OwnBrowser() {
     return () => {
       live = false;
     };
-  }, [urlParam]);
+  }, [urlParam, privateParam]);
   useEffect(() => {
     if (isPanel(panelParam)) (setAskOpen(false), setPanel(panelParam));
   }, [panelParam]);
@@ -303,6 +323,16 @@ function OwnBrowser() {
   const marked = useMemo(() => (tab?.url ? nodes.filter((n) => n.url === tab.url) : []), [nodes, tab?.url]);
   const canHand = !!tab && /^https?:/i.test(tab.url);
   const canAsk = !!tab && isWebPage(tab.url);
+  const prefsNow = usePrefs((s) => s.prefs);
+  const priv = !!tab?.private;
+  // Asking about a page is for tabs agents can get: not a private one (its column closes).
+  useEffect(() => {
+    if (priv) setAskOpen(false);
+  }, [priv]);
+  const translated = isTranslated(tab);
+  const canReader = !!tab && canHand && !!(tab.readerable || tab.reader);
+  const capture = desktopBrowser()?.capture;
+  const savePdf = desktopBrowser()?.savePdf;
   // How many highlights this page has (the Highlights item of the menu says it).
   const pageMarks = usePageHighlights(tab?.url);
 
@@ -341,14 +371,24 @@ function OwnBrowser() {
     setAskOpen(false);
     setPanel(p);
   };
-  const togglePanel = (p: PanelId) => (setClearAt(false), openPanel(panel === p ? null : p));
+  const togglePanel = (p: PanelId) => (setClearAt(false), setTranslationAt(0), openPanel(panel === p ? null : p));
+  // The translate popover's "Translation settings".
+  const askedBefore = useRef(settingsAsked);
+  useEffect(() => {
+    if (!settingsAsked || settingsAsked === askedBefore.current) return;
+    askedBefore.current = settingsAsked;
+    setClearAt(false);
+    setTranslationAt(settingsAsked);
+    openPanel('settings');
+  }, [settingsAsked]); // eslint-disable-line react-hooks/exhaustive-deps
   const openAsk = () => {
+    if (tab?.private) return;
     setPanel(null);
     setAskOpen(true);
   };
   // Ask about the page: its column opens with the question already on its way.
   const askAbout = (q: string) => {
-    if (!tab) return;
+    if (!tab || tab.private) return;
     openAsk();
     void askAboutTab(tab, q, run);
   };
@@ -406,6 +446,10 @@ function OwnBrowser() {
       if (k.mod && !k.alt && !k.shift && key === 't') {
         own();
         void newTab().then(() => address.current?.focus());
+      } else if (k.mod && !k.alt && k.shift && key === 'n') {
+        // A new private tab, as in other browsers.
+        own();
+        void newTab(undefined, { private: true }).then(() => address.current?.focus());
       } else if (k.mod && !k.alt && !k.shift && key === 'w' && active) {
         void closeTab(active.id);
       } else if (k.mod && !k.alt && !k.shift && key === 'l') {
@@ -472,7 +516,8 @@ function OwnBrowser() {
       listenTabs((c) => {
         if (c.cmd === 'ask') {
           const t = activeTab(st.current.view);
-          if (!t) return;
+          // Agents never get private tabs.
+          if (!t || t.private) return;
           pickForAsk(t.id, { text: c.text, url: c.url });
           setPanel(null);
           setAskOpen(true);
@@ -484,7 +529,7 @@ function OwnBrowser() {
           void keepPicture(c);
         } else if (c.cmd === 'ask-image') {
           const t = activeTab(st.current.view);
-          if (!t) return;
+          if (!t || t.private) return;
           pickForAsk(t.id, { text: '', url: c.url, image: { path: c.path, name: c.name } });
           setPanel(null);
           setAskOpen(true);
@@ -494,6 +539,13 @@ function OwnBrowser() {
           void highlightSelection(c.target);
         } else if (c.cmd === 'unhighlight') {
           void deleteHighlight(c.id);
+        } else if (c.cmd === 'open-private') {
+          void newTab(c.url, { private: true });
+        } else if (c.cmd === 'translate') {
+          const t = st.current.view?.tabs.find((x) => x.id === c.target);
+          if (t) togglePageTranslation(t);
+        } else if (c.cmd === 'translate-text') {
+          openTranslateText(c.text, c.url);
         }
       }),
     [],
@@ -548,7 +600,7 @@ function OwnBrowser() {
           <MenuItem icon={<BookmarkPlus size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), void save())}>
             Save
           </MenuItem>
-          <MenuItem icon={<Sparkles size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), openAsk())}>
+          <MenuItem icon={<Sparkles size={14} />} disabled={!canAsk || priv} onClick={() => (setMenu(false), openAsk())}>
             Ask
           </MenuItem>
           {store && (
@@ -559,6 +611,10 @@ function OwnBrowser() {
           <MenuSep />
         </>
       )}
+      <MenuItem icon={<VenetianMask size={14} />} hint={mobile ? undefined : <Kbd>{MOD === '⌘' ? '⇧⌘N' : 'Ctrl+Shift+N'}</Kbd>} onClick={() => (setMenu(false), void newTab(undefined, { private: true }).then(() => address.current?.focus()))}>
+        New private tab
+      </MenuItem>
+      <MenuSep />
       <MenuItem
         icon={<Search size={14} />}
         hint={mobile ? undefined : <Kbd>{MOD}F</Kbd>}
@@ -570,19 +626,39 @@ function OwnBrowser() {
       >
         Find in page
       </MenuItem>
+      <MenuItem icon={<Languages size={14} />} disabled={!tab || !canHand} onClick={() => (setMenu(false), tab && (translated ? void showOriginal(tab.id) : openTranslatePopover(tab, prefsNow)))}>
+        {translated ? 'Show original' : 'Translate page…'}
+      </MenuItem>
+      <MenuItem icon={<BookOpenText size={14} />} checked={!!tab?.reader} disabled={!canReader} onClick={() => (setMenu(false), tab && void setReader(tab.id, !tab.reader))}>
+        Reader view
+      </MenuItem>
+      <MenuItem icon={<Moon size={14} />} checked={!!prefsNow?.darkPages} disabled={!prefsNow} onClick={() => (setMenu(false), void savePrefs({ darkPages: !prefsNow?.darkPages }))}>
+        Dark pages
+      </MenuItem>
+      <MenuSep />
       <MenuItem icon={<Printer size={14} />} disabled={!tab || !canHand} hint={mobile ? undefined : <Kbd>{MOD}P</Kbd>} onClick={() => (setMenu(false), tab && void desktopBrowser()?.print(tab.id))}>
         Print…
       </MenuItem>
+      <MenuItem icon={<Camera size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, false))}>
+        Screenshot of what you see
+      </MenuItem>
+      <MenuItem icon={<Scan size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, true))}>
+        Screenshot of the whole page
+      </MenuItem>
+      <MenuItem icon={<FileDown size={14} />} disabled={!tab || !canAsk || !savePdf} onClick={() => (setMenu(false), tab && void savePageAsPdf(tab.id))}>
+        Save as PDF…
+      </MenuItem>
+      <MenuSep />
       <MenuItem icon={<ExternalLink size={14} />} disabled={!tab || !canHand} onClick={() => (setMenu(false), tab && void desktopBrowser()?.openExternal(tab.url))}>
         Open in your default browser
       </MenuItem>
       <MenuItem icon={<Clock size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), tab && void addLater(tab.url, tab.title || tab.url))}>
         Read this page later
       </MenuItem>
-      <MenuItem icon={<WandSparkles size={14} />} disabled={!canHand} onClick={() => (setMenu(false), setDoOpen(true))}>
+      <MenuItem icon={<WandSparkles size={14} />} disabled={!canHand || priv} onClick={() => (setMenu(false), setDoOpen(true))}>
         Do this here…
       </MenuItem>
-      <MenuItem icon={<Sparkles size={14} />} disabled={grouping || view.tabs.length < 3} onClick={() => (setMenu(false), void groupWithAi())}>
+      <MenuItem icon={<Sparkles size={14} />} disabled={grouping || view.tabs.filter((t) => !t.private).length < 3} onClick={() => (setMenu(false), void groupWithAi())}>
         Group my tabs with AI
       </MenuItem>
       <MenuSep />
@@ -639,9 +715,9 @@ function OwnBrowser() {
       ) : panel === 'history' ? (
         <HistoryPanel tab={tab?.id} onClose={close} onClear={() => (setClearAt(true), openPanel('settings'))} />
       ) : (
-        <BrowserSettingsPanel focusClear={clearAt} onClose={close} />
+        <BrowserSettingsPanel focusClear={clearAt} focusTranslation={translationAt} onClose={close} />
       );
-  } else if (!watching && askOpen && tab) right = <BrowserAskPanel tab={tab} onClose={() => setAskOpen(false)} />;
+  } else if (!watching && askOpen && tab && !priv) right = <BrowserAskPanel tab={tab} onClose={() => setAskOpen(false)} />;
   // On a phone every one of them is a sheet over the page (the panels bring their own).
   const rightIsPanel = !watching && !!panel;
 
@@ -678,7 +754,7 @@ function OwnBrowser() {
             {watching ? (
               <AgentBox k={watching} onBack={leave} />
             ) : (
-              <Omnibox inputRef={address} tab={tab} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} compact={mobile} onAskPage={canAsk ? askAbout : undefined} onDoHere={canHand ? (w) => void doHere(w) : undefined} />
+              <Omnibox inputRef={address} tab={tab} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} compact={mobile} onAskPage={canAsk && !priv ? askAbout : undefined} onDoHere={canHand && !priv ? (w) => void doHere(w) : undefined} />
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -690,7 +766,7 @@ function OwnBrowser() {
                   <SaveButton where={where} disabled={!canAsk} saving={saving} onSave={() => void save()} />
                 )}
                 {!mobile && (
-                  <Button size="sm" icon={<Sparkles size={14} />} aria-pressed={askOpen && !panel} disabled={!tab} onClick={() => (askOpen && !panel ? setAskOpen(false) : openAsk())} className={cx(askOpen && !panel && '!bg-accent-soft !text-accent')}>
+                  <Button size="sm" icon={<Sparkles size={14} />} aria-pressed={askOpen && !panel} disabled={!tab || priv} title={priv ? 'Agents don’t get private tabs' : undefined} onClick={() => (askOpen && !panel ? setAskOpen(false) : openAsk())} className={cx(askOpen && !panel && '!bg-accent-soft !text-accent')}>
                     Ask
                   </Button>
                 )}
@@ -761,9 +837,11 @@ function OwnBrowser() {
         )}
       </div>
 
-      <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={250}>
+      <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={290}>
         {menuItems}
       </Popover>
+      {tab && <TranslatePopover anchor={menuRef} open={translateAt === 'menu'} onClose={() => useTranslateUI.setState({ at: null })} tab={tab} />}
+      <TranslateTextDialog />
       {tab && <HandOffPopover anchor={menuRef} open={doOpen} tab={tab.id} title={tab.title || tab.url} onClose={() => setDoOpen(false)} onStarted={started} />}
     </div>
   );

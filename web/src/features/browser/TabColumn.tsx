@@ -2,7 +2,7 @@
 // at work, and your tabs, one row each. Ctrl+B folds it away. An agent's row shows its browser in the page's place
 // (the page column and the right column take it over); a click on one of your tabs leaves it again.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, Check, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Palette, Pencil, Plus, RotateCcw, RotateCw, Sparkles, Ungroup, X, XCircle } from 'lucide-react';
+import { Bookmark, Check, ChevronDown, ChevronRight, Copy, CopyPlus, Ellipsis, FolderMinus, Folders, Palette, Pencil, Plus, RotateCcw, RotateCw, Sparkles, Ungroup, VenetianMask, X, XCircle } from 'lucide-react';
 import { GROUP_COLORS, inTabOrder, type BrowserGroup, type BrowserView, type GroupColor, type LaterItem } from '@shared/browser';
 import { Throbber } from '../../components/ui';
 import { ContextMenu, isMenuKey, type ContextMenuAt, type MenuEntry } from '../pages/common/menus';
@@ -12,7 +12,7 @@ import { FadeText } from '../../components/FadeText';
 import { cx } from '../../components/ui';
 import { PinnedTiles } from './BookmarkBar';
 import { statusOf, titleOf } from './AgentTabs';
-import { closeTab, closeTabs, duplicateTab, editGroup, groupTabs, groupWithAi, isWebPage, laterShown, loadLater, markLater, moveToGroup, newTab, newTabIn, reloadTab, removeGroup, removeLater, switchTab, tabName, useAgentBrowsers, useBookmarks, useGrouping, useLater, type AgentBrowser } from './browsing';
+import { closePrivateTabs, closeTab, closeTabs, duplicateTab, editGroup, groupTabs, groupWithAi, isWebPage, laterShown, loadLater, markLater, moveToGroup, newTab, newTabIn, reloadTab, removeGroup, removeLater, switchTab, tabName, useAgentBrowsers, useBookmarks, useGrouping, useLater, type AgentBrowser } from './browsing';
 import { toggleBookmark } from './BookmarkBar';
 import { Favicon, SiteIcon, Speaker } from './TabStrip';
 import { useRowPhases } from '../../lib/flip';
@@ -20,10 +20,11 @@ import { ColumnScroll } from '../layout/ColumnScroll';
 import { ColumnResizer, useNavWidth } from '../layout/SideColumn';
 
 /** A section's label with a chevron that folds it, and buttons at its end (`actions`: they show when you point at the label). */
-function Label({ children, open, onToggle, hint, actions }: { children: string; open: boolean; onToggle: () => void; hint?: string; actions?: ReactNode }) {
+function Label({ children, open, onToggle, hint, actions, icon, tone }: { children: string; open: boolean; onToggle: () => void; hint?: string; actions?: ReactNode; icon?: ReactNode; tone?: string }) {
   return (
     <div className="group flex h-7 items-center pr-1.5">
-      <button onClick={onToggle} aria-expanded={open} className="flex h-7 min-w-0 flex-1 items-center gap-1 pl-3.5 text-left text-[12px] text-fg-3 hover:text-fg-2">
+      <button onClick={onToggle} aria-expanded={open} className={cx('flex h-7 min-w-0 flex-1 items-center gap-1 pl-3.5 text-left text-[12px]', tone ?? 'text-fg-3 hover:text-fg-2')}>
+        {icon}
         <span>{children}</span>
         {hint && <span className="tnum">{hint}</span>}
         <span className="flex-1" />
@@ -85,7 +86,7 @@ function TabRow({ t, on, watching, onLeave, onMenu, ghost }: { t: Tab; on: boole
       aria-hidden={ghost || undefined}
       tabIndex={ghost ? -1 : 0}
       title={t.title || t.url}
-      draggable={!ghost}
+      draggable={!ghost && !t.private}
       onDragStart={(e) => (e.dataTransfer.setData(DRAG, t.id), (e.dataTransfer.effectAllowed = 'move'))}
       onClick={() => (watching && onLeave(), !t.active && void switchTab(t.id))}
       onKeyDown={(e) => {
@@ -100,7 +101,11 @@ function TabRow({ t, on, watching, onLeave, onMenu, ghost }: { t: Tab; on: boole
       // A middle click closes it, as in other browsers.
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
       onAuxClick={(e) => e.button === 1 && (e.preventDefault(), void closeTab(t.id))}
-      className={cx('group press flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none', ghost && 'pointer-events-none', on ? 'bg-bg-2 font-medium text-fg' : 'text-fg-2 hover:bg-bg-2/60 hover:text-fg')}
+      className={cx(
+        'group press flex h-[34px] cursor-default items-center gap-2.5 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors select-none',
+        ghost && 'pointer-events-none',
+        on ? (t.private ? 'bg-codex/12 font-medium text-fg' : 'bg-bg-2 font-medium text-fg') : t.private ? 'bg-codex/5 text-fg-2 hover:bg-codex/10 hover:text-fg' : 'text-fg-2 hover:bg-bg-2/60 hover:text-fg',
+      )}
     >
       <Favicon tab={t} size={16} />
       <FadeText text={tabName(t)} className="flex-1" />
@@ -281,11 +286,15 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
   const [renaming, setRenaming] = useState<string | null>(null);
   const [overLoose, setOverLoose] = useState(false);
   const [overGroup, setOverGroup] = useState<string | null>(null);
+  const [privateOpen, setPrivateOpen] = useState(true);
   const groups = view.groups ?? [];
-  // Each group with its tabs, then the tabs in no group: the order they are shown in.
-  const ordered = inTabOrder(view.tabs, groups).flatMap((x) => x.tabs);
+  // The private tabs come first, in a section of their own (they are in no group); then each group with its tabs, then the tabs in no group: the order they are shown in.
+  const privateTabs = view.tabs.filter((t) => t.private);
+  const ordered = [...privateTabs, ...inTabOrder(view.tabs.filter((t) => !t.private), groups).flatMap((x) => x.tabs)];
   // A new tab opens its row and a closed one closes up, the rest following.
-  const rows = useRowPhases(ordered);
+  const allRows = useRowPhases(ordered);
+  const privateRows = allRows.filter((r) => r.row.private);
+  const rows = allRows.filter((r) => !r.row.private);
   const groupOf = (id: string | undefined) => groups.find((g) => g.id === id);
 
   // The rows in the order shown, as runs: a header and its tabs, or tabs in no group.
@@ -331,8 +340,8 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
       { label: 'Reload', icon: <RotateCw size={14} />, run: () => void reloadTab(t.id) },
       { label: 'Copy address', icon: <Copy size={14} />, disabled: !t.url || t.url === 'about:blank', run: () => void navigator.clipboard?.writeText(t.url).then(() => toast('Copied the address', 'ok'), () => {}) },
       { label: marked.length ? 'Remove the bookmark' : 'Bookmark', icon: <Bookmark size={14} />, disabled: !isWebPage(t.url), run: () => void toggleBookmark(t.url, t.title, marked) },
-      '-',
-      {
+      !t.private && '-',
+      !t.private && {
         label: 'Add to group',
         icon: <Folders size={14} />,
         items: [
@@ -348,7 +357,7 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
           },
         ],
       },
-      mine && { label: 'Remove from group', icon: <FolderMinus size={14} />, run: () => void moveToGroup([t.id], null) },
+      !t.private && mine && { label: 'Remove from group', icon: <FolderMinus size={14} />, run: () => void moveToGroup([t.id], null) },
     ];
   };
 
@@ -366,6 +375,42 @@ export function TabColumn({ view, watching, onWatch, onLeave }: { view: BrowserV
                 {browsers.map((b) => (
                   <AgentRow key={b.key} b={b} selected={watching === b.key} onOpen={() => onWatch(b.key)} />
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+        {privateTabs.length > 0 && (
+          <div className="mt-2">
+            <Label
+              open={privateOpen}
+              onToggle={() => setPrivateOpen((o) => !o)}
+              icon={<VenetianMask size={13} className="shrink-0" />}
+              tone="text-codex hover:opacity-80"
+              hint={String(privateTabs.length)}
+              actions={
+                <button
+                  aria-label="Close private tabs"
+                  title="Close private tabs"
+                  onClick={() => (watching && onLeave(), void closePrivateTabs())}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-codex opacity-0 group-hover:opacity-100 hover:bg-codex/10 focus-visible:opacity-100"
+                >
+                  <X size={13} />
+                </button>
+              }
+            >
+              Private
+            </Label>
+            {privateOpen && (
+              <div role="tablist" className="px-1.5">
+                {privateRows.map(({ row: t, phase }) => (
+                  <div role="presentation" key={phase === 'close' ? `gone:${t.id}` : t.id} className={cx('row-fold', phase && `row-${phase}`)}>
+                    <TabRow t={t} on={t.active && !watching} watching={watching} onLeave={onLeave} onMenu={(at) => setMenu({ at, tab: t.id })} ghost={phase === 'close'} />
+                  </div>
+                ))}
+                <button onClick={() => (watching && onLeave(), void newTab(undefined, { private: true }))} className="flex h-[34px] w-full items-center gap-2.5 rounded-lg pl-2.5 text-left text-[13px] text-codex/80 transition-colors hover:bg-codex/10 hover:text-codex">
+                  <Plus size={16} />
+                  New private tab
+                </button>
               </div>
             )}
           </div>
