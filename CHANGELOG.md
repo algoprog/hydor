@@ -3,6 +3,53 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.84.0 · 18 November 2026
+
+A new look for the whole app: a rail of icons down the left edge, the same kind of column beside every page that has a
+list, and a Browser built around your pages, with Ask and your agents beside them. The Library keeps web pages and your
+browser's lists, the desktop apps show files in Finder or File Explorer, and the app moves a little, quietly, as you
+use it.
+
+- **A rail of icons**: on a computer every page has a rail down its left edge: Sessions, Browser, Library, Projects,
+  Apps and Agents at the top, Inbox, Search, Usage, System, Settings and Help at the bottom. A tooltip names each icon,
+  with its shortcut. Phones keep their icons at the bottom.
+- **One kind of column**: the sidebar with your sessions shows on the start page and in sessions; the Library, Apps,
+  Projects, Agents, Help and Settings each have a column of the same kind, with Hydor's logo at the top, their own
+  places and **Hide sidebar** (Ctrl+B). Every column has the same width, shows its scroll bar when it holds more than
+  fits, and fades at its foot while there is more below, and a page no longer repeats what its column lists.
+- **The sessions sidebar** starts with the logo, and its Search sessions field is gone: the search box (Ctrl+K) finds
+  sessions, archived ones too. A session's subagents are listed with those at work or waiting for you first, then the
+  most recent.
+- **The Browser, redesigned** (desktop app): one bar across the top goes to an address, searches, asks about the page,
+  or hands a task to an agent in a tab of its own; a column holds your pinned sites, the agents at work and your tabs;
+  **Ask** answers about the page beside it; and an agent's tab opens with its conversation beside it, with **Stop** and
+  **Take over**. Opening a menu no longer makes the page flash, and a hidden sidebar can always be shown again.
+- **Your browsing, found by meaning**: the address bar and the search box find pages in your history, bookmarks and
+  downloads by what they are about (with search by meaning on), beside the usual suggestions. Agents never see them.
+- **The Library keeps web pages**: **Save to the Library** in the Browser saves the page you are on, the **Web pages**
+  chip shows them, and in the desktop app the Library also has your browser's **Bookmarks**, **Downloads** and
+  **History**.
+- **Show in Finder** (File Explorer on Windows, the folder on Linux): the desktop apps open the system's file manager
+  at a file or folder, from Files, the file viewer, the Library's pictures and videos, downloads, sessions, projects
+  and more.
+- **Apps, Projects, Agents and Help** have columns of their own: the kinds of apps and Connected apps; your projects
+  and Shared knowledge; your agents' places, the built-in agents and Schedules; the guide's topics, with Help's first
+  page now just its box and a few questions. Each page has the Library's row, its title at the left and a find box at
+  the right.
+- **Motion**: buttons dip a little as you press them, a copy turns into a check, lists glide to their new places,
+  numbers count to their new values, and the sidebar slides as you hide or show it. **Settings → General →
+  Appearance → Motion** turns it down (Calm) or off, and your system's Reduce motion always means Off.
+- **Claude Code's and Codex's own subagents** show and behave like Hydor's: the same card under the turn that started
+  them, a row in the work tray and a place under their lead in the sidebar, and **Open** shows each one's whole
+  conversation, live while it works.
+- **Signed-out accounts**: when Claude Code, Codex or Grok Build turns an account away for its sign-in, background work
+  moves to another account or model, a session moves to another signed-in account with usage left, and Hydor asks you
+  to sign in again only when nothing else can do the work.
+- **Fixes**: an HTML file in a deeper folder opens as a page again, and an HTML page no longer flashes white as it
+  opens or changes; the conversation no longer flashes as you scroll up to earlier messages; an agent's browser,
+  watched larger or full screen, is sharp instead of stretched and blurred; and search by meaning keeps within the
+  computer's memory.
+
 ## 0.83.0 · 17 November 2026
 
 Your own browser grows into one you can use every day, in the desktop app: a smart address bar, Google as the home
