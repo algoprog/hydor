@@ -1,10 +1,11 @@
 // Script test for the work tray's list (work.ts): which Hydor subagents (child sessions) and background tasks it holds, their states, the
-// order (what needs you, what runs, what ended newest first), the line that sums them up, and what Stop says it stops.
+// order (what needs you, what runs, what ended newest first), the line that sums them up, what Stop says it stops, and how a
+// turn's group of subagents counts its rows and orders them.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/lib/work-test.ts && node dist/dev/work-test.js
 import assert from 'node:assert/strict';
 import type { BackgroundTask, SessionSummary, TimelineItem, ToolSubagent } from '@shared/types';
-import { childrenOf, childState, needsLine, programSubs, stopWords, taskKindLabel, taskKindOf, taskState, workItems, workSummary } from './work';
+import { childrenOf, childState, groupCounts, groupOrder, isLiveState, needsLine, programSubs, stopWords, taskKindLabel, taskKindOf, taskState, workItems, workSummary, type WorkState } from './work';
 
 let n = 0;
 const ses = (more: Partial<SessionSummary> = {}): SessionSummary => ({ key: `claude:c${++n}`, agent: 'claude', id: String(n), title: `Child ${n}`, stats: {} as SessionSummary['stats'], ...more });
@@ -182,6 +183,34 @@ test('what Stop says it stops: the turn, the subagents and the background tasks,
   assert.equal(stopWords(false, 2, 0).note, 'Stops 2 subagents');
   assert.equal(stopWords(false, 0, 1).note, 'Stops 1 background task');
   assert.equal(stopWords(false, 0, 3).label, 'Stop 3 background tasks');
+});
+
+test('a group counts its rows by state, only the states that have any, in the header’s order', () => {
+  assert.deepEqual(groupCounts([]), []);
+  assert.deepEqual(groupCounts(['done', 'running', 'done', 'failed', 'needs', 'running', 'running', 'stopped']), [
+    { state: 'needs', n: 1 },
+    { state: 'running', n: 3 },
+    { state: 'done', n: 2 },
+    { state: 'stopped', n: 1 },
+    { state: 'failed', n: 1 },
+  ]);
+  assert.deepEqual(groupCounts(['done', 'done']), [{ state: 'done', n: 2 }]);
+  assert.deepEqual(['needs', 'running', 'done', 'stopped', 'failed'].map((x) => isLiveState(x as WorkState)), [true, true, false, false, false]);
+});
+
+test('an open group lists what needs you, then what runs in start order, then failed rows, then what ended newest first', () => {
+  const r = (id: string, state: WorkState, startedAt?: number, endedAt?: number) => ({ id, state, startedAt, endedAt });
+  const rows = [r('d-old', 'done', 1, 50), r('run-late', 'running', 30), r('fail', 'failed', 5, 9), r('run-early', 'running', 10), r('need', 'needs', 40), r('stop', 'stopped', 2, 70), r('d-new', 'done', 3, 90), r('run-tie-a', 'running', 20), r('run-tie-b', 'running', 20)];
+  const o = groupOrder(rows);
+  assert.deepEqual(o.live.map((x) => x.id), ['need', 'run-early', 'run-tie-a', 'run-tie-b', 'run-late']);
+  assert.deepEqual(o.failed.map((x) => x.id), ['fail']);
+  assert.deepEqual(o.ended.map((x) => x.id), ['d-new', 'stop', 'd-old']);
+  // Every row is in exactly one list, and the rows given are not reordered.
+  assert.equal(o.live.length + o.failed.length + o.ended.length, rows.length);
+  assert.equal(rows[0]!.id, 'd-old');
+  // An ended row with no end time counts from when it began.
+  assert.deepEqual(groupOrder([r('a', 'done', 5), r('b', 'done', 8), r('c', 'done', 1, 100)]).ended.map((x) => x.id), ['c', 'b', 'a']);
+  assert.deepEqual(groupOrder([]), { live: [], failed: [], ended: [] });
 });
 
 console.log(`${passed}/${total} passed`);

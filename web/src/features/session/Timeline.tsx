@@ -952,7 +952,7 @@ const SegmentView = memo(function SegmentView({
         )),
       ]}
       {!live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
-      {/* The subagents of the program's own this turn started: a card each, like a Hydor subagent's. */}
+      {/* The subagents of the program's own this turn started: one group, like Hydor subagents have. */}
       {subCalls.length > 0 && <ProgramCards items={subCalls} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}

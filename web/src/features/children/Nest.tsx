@@ -1,6 +1,6 @@
 // Subagents in the sidebar: Hydor's (child sessions) and the ones Claude Code and Codex run themselves, under their
 // parent, folded by default, with a line on how many there are and what they are doing. Only those at work or waiting
-// for you show (and the one on screen): a finished one is on its card in the session and in its work tray. Open while
+// for you show (and the one on screen): a finished one is in its turn's group in the session and in its work tray. Open while
 // one of them is on screen.
 import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';

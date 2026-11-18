@@ -201,6 +201,37 @@ export function workSummary(items: WorkItem[]): WorkSummary {
   return { text, needs, children: k, tasks: t };
 }
 
+/** A state that is still going: waiting for you, or at work. */
+export const isLiveState = (state: WorkState): boolean => state === 'needs' || state === 'running';
+
+/** The states a group's header counts, in the order it shows them. */
+const COUNT_ORDER: WorkState[] = ['needs', 'running', 'done', 'stopped', 'failed'];
+
+/** How many of a group's subagents stand in each state, only the states that have any, in the order the header shows them. */
+export function groupCounts(states: WorkState[]): { state: WorkState; n: number }[] {
+  return COUNT_ORDER.map((state) => ({ state, n: states.filter((x) => x === state).length })).filter((c) => c.n > 0);
+}
+
+/**
+ * The rows of an open group, in the order it lists them: `live` (what needs you first, then what runs, each the one that
+ * started first on top, so rows keep their places), `failed` (in start order too), and `ended` (done or stopped, the one
+ * that ended last first). Rows that tie keep the order they came in.
+ */
+export function groupOrder<T extends { state: WorkState; startedAt?: number; endedAt?: number }>(rows: T[]): { live: T[]; failed: T[]; ended: T[] } {
+  const at = (r: T) => r.startedAt ?? 0;
+  const indexed = rows.map((r, i) => ({ r, i }));
+  const by = (keep: (r: T) => boolean, cmp: (a: T, b: T) => number) =>
+    indexed
+      .filter((x) => keep(x.r))
+      .sort((a, b) => cmp(a.r, b.r) || a.i - b.i)
+      .map((x) => x.r);
+  return {
+    live: by((r) => isLiveState(r.state), (a, b) => Number(b.state === 'needs') - Number(a.state === 'needs') || at(a) - at(b)),
+    failed: by((r) => r.state === 'failed', (a, b) => at(a) - at(b)),
+    ended: by((r) => r.state === 'done' || r.state === 'stopped', (a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0)),
+  };
+}
+
 /** "1 needs you", "2 need you". */
 export const needsLine = (n: number) => `${n} need${n === 1 ? 's' : ''} you`;
 

@@ -11,8 +11,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - The work tray, one line above the prompt bar, gathers what a session started: its subagents and its
   background tasks (commands, monitors, workflows). Folded, it sums them up (“2 subagents and 1 background
   task running”, “1 needs you”) with a **Stop all**; opened, every one is a row in the same look, with its state,
-  what it cost, **Open** and a stop button, and its kind (“Hydor subagent · Claude Code · Sonnet 5.5” for a session of its
-  own that Hydor started, “Claude Code subagent · Explore · Haiku 5.5” for one Claude Code or Codex runs inside the
+  what it cost, **Open** and a stop button (a stop sign: a square in a circle), and its kind (“Hydor subagent ·
+  Claude Code · Sonnet 5.5” for a session of its own that Hydor started, “Claude Code subagent · Explore · Haiku 5.5” for one Claude Code or Codex runs inside the
   session), with who runs it on hover. **Open** takes you to a subagent's own conversation, a Hydor one's or a
   program's; a command, a monitor or a workflow opens in a side panel with its output, refreshed as it runs.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
@@ -641,19 +641,28 @@ agents that speak ACP and take MCP servers.
   to Ask first in one click. A scheduled task can start for each new item in an account (a deal, a file, a ticket,
   a payment) or before each event in a connected calendar (see Scheduled tasks).
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
-  session of its own that Hydor starts, with any agent and model, each a card in its conversation that opens to
-  the reply; it shows under its parent in the sidebar while it works or waits for you (and while you have it open), and
-  in the work tray above the prompt bar, and you can talk to
-  it. A Claude Code or Codex subagent is one the program runs inside the session, and it shows the same way: a card
-  under the turn that started it (the program's icon, its title, its kind and model, how it stands, **Open**, and a
-  stop button for Claude Code's, which asks first), one line with the Hydor ones under its lead in the sidebar
-  (“5 subagents · 1 needs you”), a row in the tray, and a page of its own with its whole conversation, read-only and
-  live while it works, with a bar that leads back to its lead (**Open parent**). When one that worked in the
-  background comes back, its lead's conversation shows “Reply from …” (a Codex subagent's reply is fetched when you
-  open the line), in place between the steps it came among. You cannot talk to it, resume, fork or delete it (its
-  lead can talk to it), its spending is its lead's own and it has no share of a spending cap, and Codex's cannot be
-  stopped one by one. A Codex session counts its subagents as running work, as Claude Code's does: “Working · 2
-  subagents running”, no Done marker until they end.
+  session of its own that Hydor starts, with any agent and model; it shows under its parent in the sidebar while it
+  works or waits for you (and while you have it open), and in the work tray above the prompt bar, it opens to its
+  reply, and you can talk to it. A Claude Code or Codex subagent is one the program runs inside the session, and it
+  shows the same way. The subagents one turn started show together as one card under that turn (the Hydor ones in
+  one, the program's own in another): its top line says how many and of what kind, with what they share (“6 Claude
+  Code subagents · Sonnet 5.5”, “3 Hydor subagents · Claude Code · Sonnet 5.5”, “4 researchers” in a deep research)
+  and how they stand (“5 working · 1 done”, “1 needs you”), and folds or unfolds on a click; it is open while any
+  works or needs you and folds to that line once all have finished. Under it, a line for each: a dot in its state's
+  colour, its title, on a wide screen its kind, model, agent and tier, and how it stands (how long it has worked,
+  “Needs you”, “3 min ago”, “Stopped”, “Failed”), with a Hydor subagent's cost, and “Stepped up from” its first tier
+  and why on hover; a click opens it. While others work, the finished ones fold into one line (“4 finished: …”),
+  failed ones stay, and past six at work the card shows five with **Show 3 more**. A turn with one subagent shows it
+  as a one-line card. **Stop** shows on a line you point at (a small stop button on a touch screen): a Hydor
+  subagent stops at once, a Claude Code one asks first, a Codex one cannot be stopped one by one; the card's **⋯**
+  menu has **Stop 5 subagents**, which stops them all without asking. The sidebar gathers them with the Hydor
+  ones in one line under their lead (“5 subagents · 1 needs you”), the tray has a row for each, and a program's
+  subagent opens as a page with its whole conversation, read-only and live while it works, with a bar that leads
+  back to its lead (**Open parent**). When one that worked in the background comes back, its lead's conversation shows “Reply from …” (a
+  Codex subagent's reply is fetched when you open the line), in place between the steps it came among. You cannot
+  talk to a program's subagent, resume, fork or delete it (its lead can talk to it), its spending is its lead's own
+  and it has no share of a spending cap, and Codex's cannot be stopped one by one. A Codex session counts its
+  subagents as running work, as Claude Code's does: “Working · 2 subagents running”, no Done marker until they end.
 - **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers

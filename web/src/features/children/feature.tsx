@@ -1,6 +1,6 @@
 // Hydor subagents (child sessions): an agent hands parts of a job to new sessions (any agent or model here), and their
-// replies come back to it. A card for each in the parent's conversation, them folded under their
-// parent in the sidebar, a line in a subagent pointing back to its parent, and Settings → Subagents.
+// replies come back to it. A compact group of each turn's subagents in the parent's conversation, the subagents folded under
+// their parent in the sidebar, a line in a subagent pointing back to its parent, and Settings → Subagents.
 import { CornerDownRight, Network } from 'lucide-react';
 import { MAX_RUNNING_LIMIT, SWARM_SIZE_LIMIT } from '@shared/children';
 import { leadsSwarm } from '@shared/swarm';
@@ -11,7 +11,7 @@ import { openSession } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import type { WebFeature } from '../registry';
 import { saveChildSettings, useChildSettingsState } from '../swarm/state';
-import { ChildCard } from './ChildCard';
+import { ChildGroup } from './ChildGroup';
 import { TierLine } from './TierLine';
 
 /** In a Hydor subagent, above the message box: where its replies go. */
@@ -75,7 +75,7 @@ function ChildSettingsBody() {
 
 export const childrenFeature: WebFeature = {
   id: 'children',
-  noteViews: { child: ChildCard, tier: TierLine },
+  noteViews: { child: ChildGroup, tier: TierLine },
   SessionDock: ParentDock,
   settings: [{ id: 'children', label: 'Subagents', icon: Network, sub: 'Agents handing parts of a job to subagents, and swarms for hard problems', Body: ChildSettingsBody }],
 };

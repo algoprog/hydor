@@ -1,9 +1,10 @@
 // One row for everything a session started: a Hydor subagent (a child session) or a background task (its program's own
-// subagent, a command, a monitor, a workflow). The work tray above the message box lists them, and a Hydor subagent's card in the conversation is the same row in
-// a card, so the two look alike: an icon with its status dot, the title (two lines at most), under it what it is, how
-// it stands and what it cost, and on the right a way in and Stop while it runs.
+// subagent, a command, a monitor, a workflow). The work tray above the message box lists them, each in this row: an icon
+// with its status dot, the title (two lines at most), under it what it is, how it stands and what it cost, and on the
+// right a way in and Stop while it runs. In the conversation, the subagents a turn started are one compact group instead
+// (features/children/SubagentGroup), with the dot, status and Stop words of a row of its own.
 import type { ReactNode } from 'react';
-import { Activity, Bot, ChevronRight, Square, SquareTerminal, Workflow, type LucideIcon } from 'lucide-react';
+import { Activity, Bot, ChevronRight, CircleStop, SquareTerminal, Workflow, type LucideIcon } from 'lucide-react';
 import { usd } from '@shared/budget';
 import type { BackgroundTask, SessionSummary } from '@shared/types';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
@@ -159,7 +160,6 @@ export function WorkRow({
   onOpen,
   onStop,
   stopLabel,
-  card,
   className,
 }: {
   icon: ReactNode;
@@ -176,12 +176,10 @@ export function WorkRow({
   /** The Stop button, while it runs. */
   onStop?: () => void;
   stopLabel?: string;
-  /** In the conversation: its own card, as the rest of the page's cards are. */
-  card?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cx('flex items-stretch', card && 'mt-3 overflow-hidden rounded-2xl border border-line bg-panel', className)}>
+    <div className={cx('flex items-stretch', className)}>
       <button type="button" onClick={onOpen} disabled={!onOpen} className={cx('flex min-w-0 flex-1 items-start gap-3 px-3.5 py-2.5 text-left transition-colors', onOpen && 'hover:bg-bg-2')}>
         <span className="mt-0.5 shrink-0">{icon}</span>
         <span className="min-w-0 flex-1">
@@ -205,18 +203,17 @@ export function WorkRow({
       </button>
       {onStop && (
         <IconButton size="sm" label={stopLabel ?? 'Stop'} className="mr-1.5 self-center" onClick={onStop}>
-          <Square size={12} />
+          <CircleStop size={13} />
         </IconButton>
       )}
     </div>
   );
 }
 
-/** A subagent of the session's own program as a row (in the tray, or as a card in the conversation with `card`). */
-export function ProgramSubRow({ lead, sub, card, onOpen, onStop }: { lead: Pick<SessionSummary, 'agent' | 'acpAgent' | 'acpName'>; sub: ProgramSub; card?: boolean; onOpen?: () => void; onStop?: () => void }) {
+/** A subagent of the session's own program as a row (in the work tray). */
+export function ProgramSubRow({ lead, sub, onOpen, onStop }: { lead: Pick<SessionSummary, 'agent' | 'acpAgent' | 'acpName'>; sub: ProgramSub; onOpen?: () => void; onStop?: () => void }) {
   return (
     <WorkRow
-      card={card}
       icon={<ProgramIcon agent={lead.agent} acpName={lead.acpName} state={sub.state} />}
       title={sub.title}
       kind={<ProgramKind lead={lead} sub={sub} />}

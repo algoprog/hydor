@@ -310,7 +310,7 @@ Who may hand work to whom:
 - An agent with **Other agents may hand it work** off takes work from none.
 - A named agent works in its own projects only, and never with a freer permission mode than the session that asked.
 
-In the conversation, each Hydor subagent shows as a card under the turn that started it, with the agent it works as (or "Hydor subagent"), its tier, program and model, what it is doing, and what it cost, and, when it stepped up, from which tier and why; **Open** opens its conversation. A project's **Agents** tab shows which of its agents hand work to which.
+In the conversation, the Hydor subagents a turn started show together as one card under that turn, a line for each, with its title, the agent it works as (or "Hydor subagent"), its tier, program and model, how it stands, and what it cost, and, when it stepped up, from which tier and why (point at the line); click a line to open its conversation. See [Subagents](/guide/sessions#subagents). A project's **Agents** tab shows which of its agents hand work to which.
 
 An agent that keeps a conversation of its own takes the work in its inbox instead of a new session, and its answer comes back when it gets to it (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 

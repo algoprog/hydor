@@ -310,7 +310,7 @@ Dabei gilt:
 - Bei deaktiviertem **Andere Agenten dürfen ihm Arbeit übergeben** nimmt ein Agent keine solchen Aufträge an.
 - Benannte Agenten bleiben auf ihre Projekte und höchstens die Berechtigungen der beauftragenden Sitzung beschränkt.
 
-In der Unterhaltung erscheint jeder Hydor-Subagent als Karte unter dem Durchgang, der ihn gestartet hat, mit dem Agenten, als der er arbeitet (oder „Hydor-Subagent“), seiner Leistungsstufe, seinem Programm und Modell, was er gerade tut und was er gekostet hat und, wenn er hochgestuft wurde, von welcher Stufe aus und warum; **Öffnen** öffnet seine Unterhaltung. Der Tab **Agenten** eines Projekts zeigt, welche seiner Agenten Arbeit an welche übergeben.
+In der Unterhaltung erscheinen die Hydor-Subagenten, die ein Durchgang gestartet hat, gemeinsam als eine Karte unter diesem Durchgang, mit einer Zeile für jeden: mit seinem Titel, dem Agenten, als der er arbeitet (oder „Hydor-Subagent“), seiner Leistungsstufe, seinem Programm und Modell, seinem Stand und den Kosten und, wenn er hochgestuft wurde, von welcher Stufe aus und warum (zeige auf die Zeile); ein Klick auf eine Zeile öffnet seine Unterhaltung. Siehe [Subagenten](/guide/sessions#subagents). Der Tab **Agenten** eines Projekts zeigt, welche seiner Agenten Arbeit an welche übergeben.
 
 Ein Agent, der eine eigene Unterhaltung führt, nimmt die Arbeit in seinem Posteingang statt in einer neuen Sitzung an, und seine Antwort kommt, wenn er dazu kommt (siehe [Ein Agent mit einer eigenen Unterhaltung](#an-agent-with-a-conversation-of-its-own)).
 

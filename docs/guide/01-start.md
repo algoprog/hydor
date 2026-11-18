@@ -94,7 +94,7 @@ The status dot says how a session is doing:
 
 The browser tab shows how many sessions wait on you, as in "(2) Hydor".
 
-Subagents, the sessions that an agent started for parts of its job (Hydor subagents) and the ones its program ran inside the session (Claude Code's and Codex's own), sit folded under it while they are at work or waiting for you, with a line such as "3 subagents · 1 needs you"; click it to see them. Once one finishes it leaves the sidebar, unless you have it open: it is still on its card in the conversation and in the line above the message box. See [Subagents](/guide/sessions#subagents).
+Subagents, the sessions that an agent started for parts of its job (Hydor subagents) and the ones its program ran inside the session (Claude Code's and Codex's own), sit folded under it while they are at work or waiting for you, with a line such as "3 subagents · 1 needs you"; click it to see them. Once one finishes it leaves the sidebar, unless you have it open: it is still in the subagents card in the conversation and in the line above the message box. See [Subagents](/guide/sessions#subagents).
 
 Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Rename folder** (for a session not in a project), **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 

@@ -25670,5 +25670,11 @@
   "Signed out: sign in again to use these models": "Αποσυνδεδεμένο: συνδέσου ξανά για να χρησιμοποιήσεις αυτά τα μοντέλα",
   "subscription plan claude chatgpt codex claude code sign in login account use plan usage no api key models custom": "συνδρομή πακέτο Claude ChatGPT Codex Claude Code σύνδεση λογαριασμός χρήση πακέτου χωρίς κλειδί API μοντέλα Custom",
   "The models of your Claude and ChatGPT plans, which Custom can use through Claude Code and Codex": "Τα μοντέλα των πακέτων Claude και ChatGPT σου, που το Custom μπορεί να χρησιμοποιεί μέσω Claude Code και Codex",
-  "Your subscriptions": "Οι συνδρομές σου"
+  "Your subscriptions": "Οι συνδρομές σου",
+  "{0} {1} subagent{2}": "Υποπράκτορες του {1}: {0}",
+  "{0} Hydor subagent{1}": "Υποπράκτορες του Hydor: {0}",
+  "{0} researcher{1}": "Ερευνητές: {0}",
+  "{0} stopped": "διακόπηκαν: {0}",
+  "{0} finished": "{0} ολοκληρωμένοι",
+  "Stepped up from {0}: {1}": "Ανέβηκε από {0}: {1}"
 }
