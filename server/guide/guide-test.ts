@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
+import { appPageLink } from '../../shared/app-pages.ts';
 import { OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import { headingId, parseTopic, topicId, translatedTopic } from '../../shared/guide.ts';
 import { TIP_GUIDE } from '../../shared/tips.ts';
@@ -111,7 +112,6 @@ test('the guide’s index (docs/guide/README.md) lists every topic once and link
 
 test('the guide’s links land: other topics and their sections, Settings sections, the app’s pages', () => {
   const sections = new Set(SECTIONS.map(([id]) => id));
-  const pages = /^\/(?:$|\?|s\/|guide|settings|projects|knowledge|apps|agents|browser|answers|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
   const bad: string[] = [];
   for (const t of topics)
     for (const m of t.body.matchAll(/\]\((\/[^)\s]*)\)/g)) {
@@ -129,7 +129,8 @@ test('the guide’s links land: other topics and their sections, Settings sectio
         else if (s[2] && !OPTIONS.some(([sid, find]) => sid === s[1] && find === decodeURIComponent(s[2]))) bad.push(`${t.id}: ${href} (no such option in shared/find-catalog.ts)`);
         continue;
       }
-      if (!pages.test(href)) bad.push(`${t.id}: ${href} (not one of the app’s pages)`);
+      // As a reply's link opens it: a page of the app, not a file of that path (shared/app-pages.ts).
+      if (!appPageLink(href)) bad.push(`${t.id}: ${href} (not one of the app’s pages)`);
     }
   assert.deepEqual(bad, []);
 });

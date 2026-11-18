@@ -7,6 +7,7 @@ import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
 import { FileText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
+import { appPageLink, isAppPage } from '@shared/app-pages';
 import type { CardSource } from '@shared/boards';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
 import { codexCitations, FILE_CITATION } from '@shared/file-citations';
@@ -159,17 +160,18 @@ function normalizePath(p: string): string {
   return out.join('/') || '/';
 }
 
-/** The app's own pages, which a link to this site's address opens here rather than in a new tab. */
-const APP_PAGE = /^\/(?:$|s\/|guide|settings|spaces|knowledge|apps|pages|inbox|usage|stats|arena|system|files|search|git|terminal|preview|answers|review\/)/;
-
-/** A link to this app itself (an agent's, to /settings?s=memory): its path, else null. */
+/**
+ * A link to one of this app's own pages (shared/app-pages.ts), which opens here rather than in a new tab or the file
+ * viewer: its path, else null. An agent writes it from the top (/settings?s=memory, as the guide does) or with this
+ * site's address.
+ */
 function appPath(h: string): string | null {
-  if (!/^https?:\/\//i.test(h)) return null;
+  if (!/^https?:\/\//i.test(h)) return appPageLink(h);
   try {
     const u = new URL(h);
     if (u.origin !== location.origin) return null;
     const p = u.pathname.slice(machineBase.length && u.pathname.startsWith(machineBase) ? machineBase.length : 0) || '/';
-    return APP_PAGE.test(p) ? `${p}${u.search}${u.hash}` : null;
+    return isAppPage(p) ? `${p}${u.search}${u.hash}` : null;
   } catch {
     return null;
   }
@@ -177,13 +179,14 @@ function appPath(h: string): string | null {
 
 /**
  * Links: local paths open in the app's file viewer (a file an agent cites, from Codex's file citations, as a chip with
- * a file's icon); links to this app's own pages open here. In a document (`baseDir` set), relative links are files next
- * to it and `#section` links scroll to that heading. In the guide (`app`), `/…` links are the app's pages.
+ * a file's icon); links to this app's own pages open here, `/settings?s=memory` as well as this site's address. In a
+ * document (`baseDir` set), relative links are files next to it and `#section` links scroll to that heading. In the
+ * guide (`app`), every `/…` link is one of the app's pages.
  */
 function makeLink(baseDir?: string, app?: boolean): Components['a'] {
   return function Link({ href, title, children }) {
     const h = href ?? '';
-    const own = app && h.startsWith('/') && !h.startsWith('//') ? h : appPath(h);
+    const own = app && h.startsWith('/') && !h.startsWith('//') ? h : title === FILE_CITATION ? null : appPath(h);
     if (own) {
       return (
         <a
