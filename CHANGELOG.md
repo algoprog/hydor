@@ -30,6 +30,14 @@ does more of what you expect of a browser.
 - **Video and sound**: right-click a video or a sound for Play, Mute, Loop, Show controls, Picture in picture, and
   saving it or copying its address.
 
+## 0.86.2 · 18 November 2026
+
+The desktop apps of 0.86.0 and 0.86.1 come out with this version.
+
+- **The desktop apps catch up**: the Mac, Windows and Linux apps of 0.86.0 and 0.86.1 never came out, because a test of
+  the Windows app stopped their release after the app itself had passed it. This version brings both to the desktop
+  apps, and changes nothing else.
+
 ## 0.86.1 · 18 November 2026
 
 Links in an agent's reply to the app's own pages now take you there.

@@ -140,4 +140,14 @@ if (health && !WIN) {
   } else console.log('Quitting the app stopped its server.');
 }
 if (!ok) process.exitCode = 1;
-setTimeout(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }), WIN ? 2000 : 0);
+// A scratch folder Windows still holds a moment after (a program the app started, on its way out) is no fault of the app.
+setTimeout(
+  () => {
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    } catch (e) {
+      console.warn(`Could not remove ${tmp} (${e.code ?? e.message}); left for the system to clear.`);
+    }
+  },
+  WIN ? 2000 : 0,
+);
