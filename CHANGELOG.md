@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.97.1 · 19 November 2026
+
+Updating the desktop app now shows how far the download has got, and the app restarts into the new version behind its
+logo.
+
+- **Download progress**: while a new version downloads, **Settings → General** shows a bar filling with water, how much
+  is done and how many megabytes have come ("Downloading Hydor … 40%", "38 of 94 MB"), then "Checking the new
+  version…". A download you started with **Update now** also shows in a note in the corner of every other page, since
+  the app restarts as soon as it is in; one the app started by itself stays quiet there.
+- **A calm restart**: after **Restart now** (or **Restart to Update** in the menu, or when the minute is up), the whole
+  window clears to the Hydor logo, water rising in its Ω, with "Updating to Hydor …", until it closes and opens again
+  as the new version on the same logo. If the new version can't be put in place, the logo gives way to the app as it
+  was, with a note that says why.
+- Updating another machine's desktop app from here shows how far its download has got, too.
+
 ## 0.97.0 · 19 November 2026
 
 Hydor now speaks Spanish, French, Brazilian Portuguese and Japanese, and its website comes in all eight of its languages.
