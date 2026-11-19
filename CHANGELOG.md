@@ -3,6 +3,15 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.94.2 · 19 November 2026
+
+Folders in a file's path now open in the same window.
+
+- **A folder in the path above a file in the file window** (where a file opens from a conversation or a project's
+  Files) now shows in that window, with the file picked, instead of closing it and going to the Files page.
+- **‹** at the window's top goes back to what it showed before: from a folder to the file, from a file to its folder.
+  **Open in Files** still takes you to the Files page.
+
 ## 0.94.1 · 19 November 2026
 
 A shorter hint in the home page's message box.
