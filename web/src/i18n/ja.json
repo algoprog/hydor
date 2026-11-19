@@ -24530,5 +24530,15 @@
   "{0} files git does not track": "Gitが追跡していないファイル：{0}件",
   "{0} is text": "{0}はテキストです",
   "{0} lines match": "{0}行が一致",
-  "{0} shown": "{0}件を表示中"
+  "{0} shown": "{0}件を表示中",
+  "Checking the new version": "新しいバージョンを確認中",
+  "Checking the new version…": "新しいバージョンを確認しています…",
+  "Downloading Hydor {0}": "Hydor {0}をダウンロードしています",
+  "Give your password when asked, and Hydor opens again by itself. Running agents carry on.": "求められたらパスワードを入力してください。Hydorは自動的に再び開きます。実行中のエージェントは動き続けます。",
+  "Hydor closes and opens again by itself in a moment. Running agents carry on.": "まもなくHydorが閉じて、自動的に再び開きます。実行中のエージェントは動き続けます。",
+  "Hydor restarts into it once it is downloaded. Running agents carry on.": "ダウンロードが完了すると、Hydorが再起動します。実行中のエージェントは動き続けます。",
+  "The update did not install: {0}": "アップデートをインストールできませんでした：{0}",
+  "Updating Hydor": "Hydorをアップデート中",
+  "Updating to Hydor {0}": "Hydor {0}にアップデート中",
+  "{0} of {1} MB": "{0} / {1} MB"
 }

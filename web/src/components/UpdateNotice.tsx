@@ -1,12 +1,41 @@
 // The Mac app's new version, downloaded by itself and about to install: a note over every page that counts down the
 // minute before the app restarts into it, with Restart now and Later (it asks again in 4 hours). It sits with the
-// toasts, and shows as it is, without fading in. Then, while the app restarts, a line that says so.
-import { useEffect, useMemo, useState } from 'react';
+// toasts, and shows as it is, without fading in. Before it, a download you started with Update now: a card with the
+// progress, unless Settings → General is open, which shows it itself. Then, while the app restarts, a line that says
+// so (in a browser tab: the desktop app's window shows the whole-window screen instead, UpdateScreen.tsx).
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { CircleArrowUp } from 'lucide-react';
 import type { UpdateState } from '@shared/types';
 import { post } from '../lib/api';
+import { machineId } from '../lib/machine';
+import { inDesktopApp } from '../lib/notify';
 import { toastError, useApp } from '../lib/store';
+import { downloadOf, mb } from '../lib/updates';
+import { DownloadBar } from './DownloadBar';
 import { Button, Throbber } from './ui';
+
+// The pages that show the download themselves (Settings → General's version row): the card in the corner stays away
+// while one is open.
+let holders = 0;
+const listeners = new Set<() => void>();
+const heard = () => listeners.forEach((l) => l());
+
+/** A page that shows the download itself calls this when it opens, and the function it returns when it closes. */
+export function holdDownloadNote(): () => void {
+  holders++;
+  heard();
+  return () => {
+    holders--;
+    heard();
+  };
+}
+
+const listen = (l: () => void) => {
+  listeners.add(l);
+  return () => void listeners.delete(l);
+};
+/** Whether a page that shows the download itself is open. */
+const useHeld = () => useSyncExternalStore(listen, () => holders > 0);
 
 /** Restart now: this page reloads into the new version once the app is back with it (lib/store.ts). */
 export async function restartToUpdate() {
@@ -51,14 +80,43 @@ export function UpdateNotice() {
     return () => clearInterval(t);
   }, [deadline]);
   useEffect(() => setBusy(false), [ready?.version, deadline]);
+  const away = useHeld();
 
-  if (restarting)
+  // A download you started (the app's own, in the background, stays quiet: Settings shows it).
+  const d = downloadOf(update);
+  if (d && update && !update.running?.auto && !away) {
+    return (
+      <div role="status" className="pointer-events-auto w-[min(92vw,340px)] rounded-xl border border-line bg-elevated px-3.5 py-3 text-[13px] shadow-lg">
+        <div className="flex items-start gap-2.5">
+          <CircleArrowUp size={16} className="mt-0.5 shrink-0 text-accent" />
+          <div className="min-w-0 flex-1">
+            {d.checking ? (
+              <div className="font-medium text-fg">Checking the new version…</div>
+            ) : (
+              <div className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 font-medium text-fg">{d.to ? `Downloading Hydor ${d.to}` : 'Downloading the new version'}</span>
+                <span className="tnum text-fg-3">{`${Math.round(d.share * 100)}%`}</span>
+              </div>
+            )}
+            <DownloadBar share={d.share} className="mt-2" />
+            {!d.checking && <p className="tnum mt-1.5 text-[12.5px] text-fg-3">{`${mb(d.done)} of ${mb(d.total)} MB`}</p>}
+            <p className="mt-1.5 text-[12.5px] leading-snug text-fg-3">Hydor restarts into it once it is downloaded. Running agents carry on.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (restarting) {
+    // The desktop app's window shows the whole-window screen instead (UpdateScreen.tsx).
+    if (inDesktopApp && !machineId) return null;
     return (
       <div role="status" className="pointer-events-auto flex w-[min(92vw,340px)] items-center gap-2.5 rounded-xl border border-line bg-elevated px-3.5 py-2.5 text-[13px] text-fg-2 shadow-lg">
         <Throbber className="shrink-0 text-fg-3" />
         <span className="min-w-0 flex-1">Opening the new version, this page reconnects by itself…</span>
       </div>
     );
+  }
   if (!ready || deadline == null) return null;
   const left = Math.max(0, Math.ceil((deadline - now) / 1000));
   const act = async (fn: () => Promise<void>) => {

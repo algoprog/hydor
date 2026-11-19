@@ -18,6 +18,7 @@ import { MachineOld, openedAnyway } from './features/machines/MachineOld';
 import { CrashGuard } from './components/CrashGuard';
 import { Throbber } from './components/ui';
 import { Toasts } from './components/Toasts';
+import { UpdateScreen } from './components/UpdateScreen';
 import { Login, Setup } from './features/auth/AuthScreens';
 
 // The app itself is a file of its own, asked for the moment the page loads, beside the question of who is signed in:
@@ -163,6 +164,7 @@ export function App() {
         </Router>
       )}
       <Toasts shell={auth === 'ok' && !down && !holding && !older} />
+      {auth === 'ok' && <UpdateScreen />}
     </>
   );
 }

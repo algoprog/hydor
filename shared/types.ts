@@ -1449,8 +1449,12 @@ export interface UpdateState {
   auto: boolean;
   /** The server comes back by itself after it exits, its agents left running (the installer's service, the Docker image, the Mac app in a folder it may replace itself in). */
   canRestart: boolean;
-  /** download: the Mac app getting and checking a new version. */
-  running?: { phase: 'pull' | 'download' | 'install' | 'build' | 'restart'; since: number; auto: boolean };
+  /**
+   * download: the Mac app getting and checking a new version; restart: installing it (the app closes and opens again).
+   * The desktop apps also say which version (`to`) and, while downloading, how many bytes have come of how many (`done`
+   * reaches `total`, then it is checked and, on a Mac, unpacked).
+   */
+  running?: { phase: 'pull' | 'download' | 'install' | 'build' | 'restart'; since: number; auto: boolean; to?: string; done?: number; total?: number };
   /** The Mac app: a new version downloaded and checked, waiting to be installed. */
   ready?: UpdateReady;
   last?: UpdateResult;

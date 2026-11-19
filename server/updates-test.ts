@@ -132,6 +132,27 @@ await atest('a download that breaks off carries on from its last byte', async ()
   assert.match(asked[1] ?? '', /^bytes=[1-9]\d*-$/, 'the second from where the first stopped');
 });
 
+await atest('it says how far it has got as bytes come, carrying on from where a try broke off, up to the whole file', async () => {
+  plan = ['cut'];
+  const seen: number[] = [];
+  await download(url, at('progress.zip'), WANT, { ...quick, onProgress: (n) => seen.push(n) });
+  assert.ok(got(at('progress.zip')));
+  assert.equal(seen[0], 0, 'nothing yet');
+  assert.equal(seen.at(-1), FILE.length, 'all of it at the end');
+  assert.ok(
+    seen.every((n, i) => i === 0 || n >= seen[i - 1]),
+    'it never goes back: the second try counts on from the bytes the first one kept',
+  );
+  const from = Number(/^bytes=(\d+)-$/.exec(asked[1] ?? '')?.[1]);
+  assert.ok(seen.includes(from), 'it said where the first try stopped');
+  // A part kept from before: it starts from there.
+  fs.writeFileSync(at('kept.zip.part'), FILE.subarray(0, 700_000));
+  const again: number[] = [];
+  await download(url, at('kept.zip'), WANT, { ...quick, onProgress: (n) => again.push(n) });
+  assert.equal(again[0], 700_000, 'from the part it had');
+  assert.equal(again.at(-1), FILE.length);
+});
+
 await atest('one that goes quiet is dropped after the stall, and the next try carries on', async () => {
   plan = ['quiet'];
   const t = Date.now();

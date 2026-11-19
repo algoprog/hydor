@@ -7,9 +7,9 @@
 //
 // In the desktop apps (desktop.ts) it is by version instead: the newest release on GitHub says which version is
 // out and where each system's builds are (hydor-mac.json, hydor-windows.json, hydor-linux.json). The app looks a
-// minute after it starts and then every 4 hours. With updates on, it downloads a new version at once (a download that
-// breaks off or goes quiet, as when the computer sleeps, carries on from its last byte; one that gets nowhere keeps
-// what it has and tries again an hour later), checks it (and
+// minute after it starts and then every 4 hours. With updates on, it downloads a new version at once (the pages show how
+// far it has got; a download that breaks off or goes quiet, as when the computer sleeps, carries on from its last byte;
+// one that gets nowhere keeps what it has and tries again an hour later), checks it (and
 // unpacks a Mac's), says so (a notification, and a note in every open page that counts down a minute, with Restart
 // now and Later), then hands it to the app, which installs it its own way (desktop/main.cjs) and starts again: a Mac
 // app or an AppImage goes back to the version before if the new one does not start. Later puts it off for 4 hours;
@@ -58,6 +58,8 @@ export const STALL = 60_000;
  * say). When they run out the download stops for now, keeping what it has, and tries again after RETRY.
  */
 export const WAITS = [3_000, 10_000, 30_000, 60_000];
+/** A download's progress goes to the pages this often at most (and its last byte at once). */
+const PROGRESS_EVERY = 500;
 
 let check: { behind: number; latest?: string; checkedAt: number; error?: string } | null = null;
 let running: UpdateState['running'];
@@ -456,7 +458,8 @@ async function sha512Of(file: string): Promise<string> {
 }
 
 /**
- * Downloads `url` into `dest`, checked against the size and SHA-512 the release names. It carries on where it stopped:
+ * Downloads `url` into `dest`, checked against the size and SHA-512 the release names, saying how many bytes it has as
+ * they come (`onProgress`: from where it carries on, then each piece). It carries on where it stopped:
  * a try that breaks off, or gets nothing for `stall` ms (a connection gone quiet, the computer asleep), is followed by
  * one from its last byte (a range request), at once while each gets further and after each of `waits` while they
  * don't. When those run out it throws an error on the way (NET) and leaves what it got in `dest`.part, which the next
@@ -466,9 +469,9 @@ export async function download(
   url: string,
   dest: string,
   want: { size: number; sha512: string },
-  o: { stall?: number; waits?: number[]; headers?: Record<string, string> } = {},
+  o: { stall?: number; waits?: number[]; headers?: Record<string, string>; onProgress?: (done: number) => void } = {},
 ): Promise<void> {
-  const { stall = STALL, waits = WAITS, headers = {} } = o;
+  const { stall = STALL, waits = WAITS, headers = {}, onProgress } = o;
   const part = `${dest}.part`;
   const size = () => {
     try {
@@ -479,12 +482,13 @@ export async function download(
   };
   if (size() > want.size) fs.rmSync(part, { force: true });
   let best = size();
+  onProgress?.(best);
   let misses = 0;
   while (size() < want.size) {
     const from = size();
     let why = new Error('the file ended early', { cause: NET });
     try {
-      await getFrom(url, part, from, stall, headers);
+      await getFrom(url, part, from, stall, headers, onProgress);
     } catch (e) {
       if (!onTheWay(e)) throw e;
       why = e as Error;
@@ -513,9 +517,10 @@ export async function download(
 
 /**
  * One try at a download: from byte `from` on (a range request) onto the end of `part`, or the whole file over it
- * when the server sends that. A failure on the way is an error on the way (NET); a refusal (404, say) a plain one.
+ * when the server sends that, saying how many bytes the part holds as each piece comes. A failure on the way is an
+ * error on the way (NET); a refusal (404, say) a plain one.
  */
-async function getFrom(url: string, part: string, from: number, stall: number, headers: Record<string, string>): Promise<void> {
+async function getFrom(url: string, part: string, from: number, stall: number, headers: Record<string, string>, onProgress?: (done: number) => void): Promise<void> {
   const ac = new AbortController();
   const quiet = setTimeout(() => ac.abort(new Error('the connection went quiet', { cause: NET })), stall);
   try {
@@ -547,7 +552,12 @@ async function getFrom(url: string, part: string, from: number, stall: number, h
     // A 200 is the whole file, from its start: it goes over the part.
     const out = fs.createWriteStream(part, { flags: ranged ? 'a' : 'w' });
     const body = Readable.fromWeb(r.body as import('node:stream/web').ReadableStream);
-    body.on('data', () => quiet.refresh());
+    let got = ranged ? from : 0;
+    body.on('data', (c: Buffer) => {
+      quiet.refresh();
+      got += c.length;
+      onProgress?.(got);
+    });
     try {
       await pipeline(body, out);
     } catch (e) {
@@ -610,10 +620,10 @@ async function teamOf(app: string): Promise<string | null> {
 }
 
 /**
- * Downloads this copy's build, checks it is the one the release names, and for a Mac unpacks it next to the others.
- * Its path: the new Hydor.app, AppImage, installer (.exe) or package (.deb).
+ * Downloads this copy's build (saying how far it has got), checks it is the one the release names, and for a Mac
+ * unpacks it next to the others. Its path: the new Hydor.app, AppImage, installer (.exe) or package (.deb).
  */
-async function fetchBuild(to: string, file: Feed['files'][string]): Promise<string> {
+async function fetchBuild(to: string, file: Feed['files'][string], onProgress?: (done: number) => void): Promise<string> {
   const dir = path.join(desktop!.cache, 'updates');
   const mac = desktop!.platform === 'mac';
   const ext = { app: '.zip', nsis: '-setup.exe', appimage: '.AppImage', deb: '.deb', dir: '', dev: '.zip' }[desktop!.format];
@@ -622,7 +632,7 @@ async function fetchBuild(to: string, file: Feed['files'][string]): Promise<stri
   fs.mkdirSync(dir, { recursive: true });
   // What earlier downloads left goes, but for that part.
   for (const n of fs.readdirSync(dir)) if (n !== `${path.basename(zip)}.part`) fs.rmSync(path.join(dir, n), { recursive: true, force: true });
-  await download(file.url, zip, file, { headers: userAgent() });
+  await download(file.url, zip, file, { headers: userAgent(), onProgress });
   if (!mac) {
     if (desktop!.format === 'appimage') fs.chmodSync(zip, 0o755);
     return zip;
@@ -672,7 +682,19 @@ async function updateApp(db: DB, auto: boolean, then: 'install' | 'wait') {
       return done({ ok: true, to: from });
     }
     to = f.version;
-    const app = await fetchBuild(to, file);
+    const version = to;
+    const total = file.size;
+    let toldAt = 0;
+    // How far it has got, for the version row and the note in the pages: twice a second at most, the last byte at once.
+    const progress = (done: number) => {
+      if (running?.phase !== 'download') return;
+      running = { ...running, to: version, done: Math.min(done, total), total };
+      const now = Date.now();
+      if (done < total && now - toldAt < PROGRESS_EVERY) return;
+      toldAt = now;
+      ctx?.onChange(updateState());
+    };
+    const app = await fetchBuild(to, file, progress);
     // A signed Mac app takes only a build signed by the same developer.
     const team = desktop!.platform === 'mac' ? await teamOf(desktop!.app) : null;
     if (team) {
@@ -745,7 +767,7 @@ function installReady(db: DB, auto: boolean) {
   kvSet(db, 'update.last', JSON.stringify({ ok: true, from, to: r.version, at, auto }));
   kvSet(db, 'update.skip', '');
   kvSet(db, 'update.later', '');
-  running = { phase: 'restart', since: at, auto };
+  running = { phase: 'restart', since: at, auto, to: r.version };
   emit();
   if (!tellDesktop({ type: 'install', app: r.app, from, to: r.version })) {
     kvSet(db, 'update.last', JSON.stringify({ ok: false, from, to: r.version, at, auto, error: 'the app around the server did not answer' }));

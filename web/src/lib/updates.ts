@@ -12,6 +12,21 @@ export const UPDATE_PHASE: Record<NonNullable<UpdateState['running']>['phase'], 
   restart: 'Restarting, this page reconnects by itself',
 };
 
+/** Megabytes, whole, for how much of a download has come. */
+export const mb = (n: number) => Math.round(n / 1e6);
+
+/**
+ * A desktop app's new version coming down: which version, how many bytes of how many, and how much of it (0 to 1).
+ * `checking` is when the bytes are all in and it is being checked and unpacked. Null when no download is running, or
+ * its size is not known yet (the first instant), and for a copy from git.
+ */
+export function downloadOf(update: UpdateState | undefined) {
+  const run = update?.kind === 'app' ? update.running : undefined;
+  if (!run || run.phase !== 'download' || !run.total) return null;
+  const done = run.done ?? 0;
+  return { to: run.to, done, total: run.total, share: Math.max(0, Math.min(1, done / run.total)), checking: done >= run.total };
+}
+
 /** Why a desktop app cannot update itself where it is (as the server says when you try). */
 export function cannotUpdate(update: UpdateState): string {
   switch (update.format) {

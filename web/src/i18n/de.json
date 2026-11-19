@@ -25184,5 +25184,15 @@
   "One swarm member": "Ein Schwarm-Mitglied",
   "{0} campaign members": "{0} Kampagnenmitglieder",
   "{0} subagents": "{0} Subagenten",
-  "{0} swarm members": "{0} Schwarm-Mitglieder"
+  "{0} swarm members": "{0} Schwarm-Mitglieder",
+  "Checking the new version": "Neue Version wird geprüft",
+  "Checking the new version…": "Neue Version wird geprüft …",
+  "Downloading Hydor {0}": "Hydor {0} wird heruntergeladen",
+  "Give your password when asked, and Hydor opens again by itself. Running agents carry on.": "Gib bei Aufforderung dein Passwort ein, dann öffnet sich Hydor von selbst wieder. Laufende Agents machen einfach weiter.",
+  "Hydor closes and opens again by itself in a moment. Running agents carry on.": "Hydor schließt sich gleich und öffnet sich von selbst wieder. Laufende Agents machen einfach weiter.",
+  "Hydor restarts into it once it is downloaded. Running agents carry on.": "Hydor startet nach dem Download damit neu. Laufende Agents machen einfach weiter.",
+  "The update did not install: {0}": "Das Update wurde nicht installiert: {0}",
+  "Updating Hydor": "Hydor wird aktualisiert",
+  "Updating to Hydor {0}": "Aktualisierung auf Hydor {0}",
+  "{0} of {1} MB": "{0} von {1} MB"
 }

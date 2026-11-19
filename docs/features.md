@@ -1868,10 +1868,13 @@ programs shows each program's version and what is out, with Check now, Update no
   awake: also only while agents work, or never; the screen may still turn off, and closing a laptop's lid still puts
   it to sleep); and they update
   themselves release by release: they look every 4 hours, download and
-  check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
-  it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open
-  page that counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the
-  icon's menu), and swap it in with agents carrying on. A Mac app and an AppImage go back to the version before if the
+  check a new build as soon as it is out (Settings → General shows how far the download has got, a bar with its
+  megabytes, and so does a note in the corner of every page for one started with Update now; a download that breaks
+  off, as when the computer sleeps, carries on from where it stopped, and one that gets nowhere tries again an hour
+  later), say so (a notification, and a note in every open page that counts down a minute, with Restart now and Later,
+  which puts it off for 4 hours; Restart to Update in the icon's menu), and swap it in with agents carrying on: while
+  it installs, the window shows only the Hydor logo with water rising in its Ω and "Updating to Hydor …", until it
+  closes and opens again on the new version, on the same logo. A Mac app and an AppImage go back to the version before if the
   new one does not start; on Windows the new version's installer runs without its window; the .deb installs once you
   give your password.
 - In the desktop apps, a file or folder on this computer can be shown selected in the system's own file manager, from

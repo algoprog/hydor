@@ -11,8 +11,9 @@ import { toast, toastError, useApp, useUI, type Motion } from '../../lib/store';
 import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
-import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
-import { beforeRewrite, cannotUpdate, UPDATE_PHASE as PHASE } from '../../lib/updates';
+import { holdDownloadNote, restartToUpdate, updateLater } from '../../components/UpdateNotice';
+import { DownloadBar } from '../../components/DownloadBar';
+import { beforeRewrite, cannotUpdate, downloadOf, mb, UPDATE_PHASE as PHASE } from '../../lib/updates';
 import { machineId } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { BeforeRewrite } from '../machines/BeforeRewrite';
@@ -140,6 +141,8 @@ function VersionRow() {
   const update = useApp((s) => s.boot?.update);
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(false);
+  // The corner card of a download stays away while this row shows it.
+  useEffect(() => holdDownloadNote(), []);
   const check = async () => {
     setBusy(true);
     try {
@@ -195,6 +198,8 @@ function VersionRow() {
   let hint: ReactNode;
   let control: ReactNode;
   let detail: string | undefined;
+  let progress: ReactNode;
+  const d = downloadOf(update);
   if (!update) {
     hint = 'Updates are checked daily for copies installed from git';
     control = (
@@ -203,6 +208,27 @@ function VersionRow() {
         {notes}
       </>
     );
+  } else if (update.running && d && !d.checking) {
+    hint = (
+      <span className="inline-flex items-center gap-2 text-fg-2">
+        <span>{d.to ? `Downloading Hydor ${d.to}` : 'Downloading the new version'}</span>
+        <span className="tnum text-fg-3">{`${Math.round(d.share * 100)}%`}</span>
+      </span>
+    );
+    progress = (
+      <div className="space-y-1.5">
+        <DownloadBar share={d.share} className="max-w-[360px]" />
+        <p className="tnum">{`${mb(d.done)} of ${mb(d.total)} MB`}</p>
+      </div>
+    );
+    control = notes;
+  } else if (update.running && d) {
+    hint = (
+      <span className="inline-flex items-center gap-2 text-fg-2">
+        <Throbber className="text-fg-3" /> Checking the new version…
+      </span>
+    );
+    control = notes;
   } else if (update.running) {
     hint = (
       <span className="inline-flex items-center gap-2 text-fg-2">
@@ -269,8 +295,9 @@ function VersionRow() {
   }
   return (
     <Row label={`Hydor ${version ?? ''}`.trim()} hint={hint} info={about} control={control}>
-      {(detail || last) && (
+      {(progress || detail || last) && (
         <div className="space-y-1 text-[12.5px] leading-snug text-fg-3">
+          {progress}
           {detail && <p>{detail}</p>}
           {last && (
             <p className={cx(!last.ok && 'text-warn')}>

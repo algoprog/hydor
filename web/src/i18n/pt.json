@@ -24530,5 +24530,15 @@
   "{0} files git does not track": "{0} arquivos que o git não rastreia",
   "{0} is text": "{0} é texto",
   "{0} lines match": "{0} linhas correspondem",
-  "{0} shown": "{0} exibidas"
+  "{0} shown": "{0} exibidas",
+  "Checking the new version": "Verificando a nova versão",
+  "Checking the new version…": "Verificando a nova versão…",
+  "Downloading Hydor {0}": "Baixando o Hydor {0}",
+  "Give your password when asked, and Hydor opens again by itself. Running agents carry on.": "Digite sua senha quando solicitado, e o Hydor abrirá novamente por conta própria. Os agentes em execução continuam normalmente.",
+  "Hydor closes and opens again by itself in a moment. Running agents carry on.": "O Hydor fecha e abre novamente por conta própria em instantes. Os agentes em execução continuam normalmente.",
+  "Hydor restarts into it once it is downloaded. Running agents carry on.": "O Hydor reinicia com a nova versão assim que o download terminar. Os agentes em execução continuam normalmente.",
+  "The update did not install: {0}": "A atualização não foi instalada: {0}",
+  "Updating Hydor": "Atualizando o Hydor",
+  "Updating to Hydor {0}": "Atualizando para o Hydor {0}",
+  "{0} of {1} MB": "{0} de {1} MB"
 }

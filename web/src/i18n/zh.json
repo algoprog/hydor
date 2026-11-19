@@ -26405,5 +26405,17 @@
   "One swarm member": "1 位集群成员",
   "{0} campaign members": "{0} 位战役成员",
   "{0} subagents": "{0} 个子智能体",
-  "{0} swarm members": "{0} 位集群成员"
+  "{0} swarm members": "{0} 位集群成员",
+  "Checking the new version": "正在检查新版本",
+  "Checking the new version…": "正在检查新版本…",
+  "Downloading Hydor {0}": "正在下载 Hydor {0}",
+  "Give your password when asked, and Hydor opens again by itself. Running agents carry on.": "请在系统提示时输入你的密码，Hydor 会自动重新打开。正在运行的智能体会继续运行。",
+  "Hydor closes and opens again by itself in a moment. Running agents carry on.": "Hydor 稍后会自动关闭并重新打开。正在运行的智能体会继续运行。",
+  "Hydor restarts into it once it is downloaded. Running agents carry on.": "下载完成后，Hydor 会自动重启并切换到新版本。正在运行的智能体会继续运行。",
+  "The update did not install: {0}": "更新未能安装：{0}",
+  "Updating Hydor": "正在更新 Hydor",
+  "Updating to Hydor {0}": "正在更新到 Hydor {0}",
+  "experiments::Run": "运行",
+  "experiments::Runs": "运行记录",
+  "{0} of {1} MB": "{0} / {1} MB"
 }

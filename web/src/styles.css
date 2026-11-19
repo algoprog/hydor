@@ -1620,6 +1620,75 @@ html[data-motion='full'] .anim-modal-soft {
   animation: tour-card-in 400ms 200ms ease-out backwards;
 }
 
+/* The desktop app installing a new version (UpdateScreen.tsx): the loading logo of index.html #boot, played again. The
+   app clears to the page colour (as lib/boot.ts clears it, reversed) and the logo comes in as its exit played
+   backwards; the words follow, and the sea under them rises slowly. The water runs under every Motion setting, as the
+   throbber does (it is work in progress): only the system's Reduce motion stops it. */
+html:not([data-motion=off]) .update-screen {
+  animation: overlay-in 420ms ease-out both;
+}
+html:not([data-motion=off]) .update-mark {
+  animation: update-mark-in 480ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+}
+@keyframes update-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+/* Opacity only: the words are placed with Tailwind's translate. */
+html:not([data-motion=off]) .update-words {
+  animation: overlay-in 500ms ease-out 650ms both;
+}
+.update-fill {
+  transform: translateY(112px);
+  animation: update-fill 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+}
+.update-ebb {
+  animation: update-ebb 3.2s ease-in-out 1.9s infinite;
+}
+.update-bob {
+  animation: update-bob 2.6s ease-in-out infinite;
+}
+.update-swell {
+  animation: update-swell 1.5s linear infinite;
+}
+@keyframes update-fill {
+  to {
+    transform: translateY(8px);
+  }
+}
+@keyframes update-ebb {
+  50% {
+    transform: translateY(12px);
+  }
+}
+@keyframes update-bob {
+  50% {
+    transform: translateY(4px);
+  }
+}
+@keyframes update-swell {
+  to {
+    transform: translateX(-36px);
+  }
+}
+.update-screen .tour-sea-waves {
+  transition-duration: 18s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-fill {
+    transform: translateY(8px);
+    animation: none !important;
+  }
+  .update-ebb,
+  .update-bob,
+  .update-swell {
+    animation: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

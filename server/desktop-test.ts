@@ -143,9 +143,12 @@ if (!process.env.HYDOR_TEST_SIDE) {
   const { openDb, kvGet } = await import('./db.ts');
   const { checkUpdates, laterUpdate, setAutoUpdate, startUpdate, updateState, watchUpdates } = await import('./updates.ts');
   const { askDesktop } = await import('./desktop.ts');
+  type UpdateState = NonNullable<ReturnType<typeof updateState>>;
   fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
   const db = openDb(path.join(process.env.DATA_DIR!, 'test.db'));
-  watchUpdates(db, () => {});
+  /** What the pages are told, in turn. */
+  const told: UpdateState[] = [];
+  watchUpdates(db, (u) => u && told.push(u));
   const feed = (name: string) => (process.env.HYDOR_UPDATE_FEED = `${process.env.HYDOR_TEST_FEED}/${name}`);
   const until = async (ok: () => boolean, what: string, ms = 5000) => {
     for (let t = Date.now(); !ok(); await new Promise((r) => setTimeout(r, 25))) if (Date.now() - t > ms) throw new Error(`waited too long for ${what}`);
@@ -252,10 +255,14 @@ if (!process.env.HYDOR_TEST_SIDE) {
     ok('a download that is not the build the release names is refused');
 
     feed('good.json');
+    told.length = 0;
     startUpdate(false);
     u = await settled();
     assert.equal(u.running?.phase, 'restart', 'it waits for the app to swap and restart');
+    assert.equal(u.running?.to, '9.9.9', 'the pages know which version it installs');
     assert.deepEqual([u.last?.ok, u.last?.to, u.last?.auto], [true, '9.9.9', false]);
+    const got = told.map((t) => t.running).find((r) => r?.phase === 'download' && !!r.total && r.done === r.total);
+    assert.deepEqual([got?.to, got?.total], ['9.9.9', ZIP.length], 'the pages saw the download through to its last byte');
   }
   // Let the messages reach the app before leaving.
   await new Promise((r) => setTimeout(r, 200));

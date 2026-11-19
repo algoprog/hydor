@@ -13,7 +13,8 @@ import { endBoot } from '../../lib/boot';
 import { machineId, machinePath } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { useApp } from '../../lib/store';
-import { beforeRewrite, cannotUpdate, UPDATE_PHASE } from '../../lib/updates';
+import { beforeRewrite, cannotUpdate, downloadOf, UPDATE_PHASE } from '../../lib/updates';
+import { DownloadBar } from '../../components/DownloadBar';
 import { Button, Throbber } from '../../components/ui';
 import { BeforeRewrite } from './BeforeRewrite';
 
@@ -115,6 +116,7 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
   // A desktop app that cannot replace itself where it is says why, and is updated there.
   const stuck = update && update.kind === 'app' && !update.canRestart ? cannotUpdate(update) : '';
   const running = update?.running;
+  const d = downloadOf(update);
   // Its last update (this one, or one before, by itself too) could not fast-forward past Hydor's rewritten history.
   const rewrite = !updating && !!update?.last && !update.last.ok && beforeRewrite(version, update.last.error);
   return (
@@ -135,10 +137,19 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
         {stuck && <p className="mt-2 text-[13px] leading-relaxed text-warn">{stuck}</p>}
         {problem && <p className="mt-2 text-[13px] leading-relaxed text-warn">{problem}</p>}
         {rewrite && <BeforeRewrite name={name} />}
-        {updating && (
+        {updating && d && !d.checking && (
+          <div className="mt-3 text-[13px] text-fg-2">
+            <p className="flex items-center gap-2">
+              <span>{d.to ? `Downloading Hydor ${d.to}` : 'Downloading the new version'}</span>
+              <span className="tnum text-fg-3">{`${Math.round(d.share * 100)}%`}</span>
+            </p>
+            <DownloadBar share={d.share} className="mt-2" />
+          </div>
+        )}
+        {updating && !(d && !d.checking) && (
           <p className="mt-3 flex items-center gap-2 text-[13px] text-fg-2">
             <Throbber className="shrink-0 text-fg-3" />
-            {running ? (update?.kind === 'app' && running.phase === 'restart' ? 'Opening the new version, this page reconnects by itself' : UPDATE_PHASE[running.phase]) : 'Starting the update'}…
+            {d ? 'Checking the new version' : running ? (update?.kind === 'app' && running.phase === 'restart' ? 'Opening the new version, this page reconnects by itself' : UPDATE_PHASE[running.phase]) : 'Starting the update'}…
           </p>
         )}
         <div className="mt-5 flex flex-wrap gap-2">
