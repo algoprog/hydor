@@ -77,7 +77,7 @@ export function Lightbox() {
 
   if (!open || !img) return null;
   return createPortal(
-    <div className="scrim holds fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.78]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div className="scrim holds fixed inset-0 z-[70] flex flex-col [--scrim:0.78]" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
         <span className="min-w-0 flex-1 truncate">{img.name ?? ''}</span>
         {images.length > 1 && (
@@ -150,7 +150,7 @@ export function VideoBox() {
   }, [src]);
   if (!src) return null;
   return createPortal(
-    <div className="scrim holds fixed inset-0 z-[70] flex flex-col [--scrim-blur:14px] [--scrim:0.85]" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
+    <div className="scrim holds fixed inset-0 z-[70] flex flex-col [--scrim:0.85]" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
       <div className="flex shrink-0 items-center gap-2 px-3 pt-[max(8px,var(--safe-top))] pb-2 text-[13px] text-white/80">
         <span className="min-w-0 flex-1 truncate" translate="no">
           {title}

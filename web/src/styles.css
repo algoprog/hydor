@@ -921,7 +921,8 @@ html[data-vt='theme']::view-transition-group(root) {
   color: hsl(var(--h) 55% 72%);
 }
 
-/* Behind dialogs, drawers and the tour: the page dims and softens, so what is in front stands out. */
+/* Behind the phone's drawer and the tour: the page dims (and, behind the drawer, softens), so what is in front stands
+   out. Windows dim it without the blur (.scrim.holds, below). */
 .scrim {
   background-color: rgb(0 0 0 / var(--scrim, 0.34));
   -webkit-backdrop-filter: blur(var(--scrim-blur, 7px)) saturate(1.15);
@@ -934,10 +935,12 @@ html[data-vt='theme']::view-transition-group(root) {
     background-color: rgb(0 0 0 / 0.55);
   }
 }
-/* A scrim that holds what stands in front (a dialog, a sheet, a page, a picture) dims and softens the page on a layer of
-   its own beneath it. On the scrim itself, the blur took in all it held: each frame of a page or a list scrolling in a
-   dialog was drawn again through it, a known cause of flicker in Chrome, worst on macOS. (The drawer's and the tour's
-   scrims hold nothing, and fade or cut a hole in themselves, which would take the blur off a layer inside them.) */
+/* A scrim that holds what stands in front (a dialog, a sheet, a page, a picture) only dims the page, on a layer of its
+   own beneath it (which fades in as a window opens), a little deeper than --scrim says, as no blur softens what is
+   behind. A blur there, the whole window wide under a list or a page scrolling or a video playing in front, made Chrome
+   on macOS (the Mac app too) drop the whole window and its dim for a frame now and then while it scrolled; a blur on
+   the scrim itself also took in all it held, so each such frame was drawn again through it. (The drawer's and the
+   tour's scrims hold nothing, and fade or cut a hole in themselves, which would take a layer inside them along.) */
 .scrim.holds {
   background-color: transparent;
   -webkit-backdrop-filter: none;
@@ -949,15 +952,11 @@ html[data-vt='theme']::view-transition-group(root) {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-color: rgb(0 0 0 / var(--scrim, 0.34));
-  -webkit-backdrop-filter: blur(var(--scrim-blur, 7px)) saturate(1.15);
-  backdrop-filter: blur(var(--scrim-blur, 7px)) saturate(1.15);
+  background-color: rgb(0 0 0 / calc(var(--scrim, 0.34) + 0.1));
 }
 @media (prefers-reduced-transparency: reduce) {
   .scrim.holds::before {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background-color: rgb(0 0 0 / 0.55);
+    background-color: rgb(0 0 0 / max(0.55, calc(var(--scrim, 0.34) + 0.1)));
   }
 }
 
