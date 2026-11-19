@@ -350,7 +350,7 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
   );
 });
 
-/** A tile, shaped like a card: the file's picture on top (4:3), its kind for a document, its name, when it changed, ⋯. */
+/** A tile, shaped like a card: the file's picture on top (4:3), its kind for a document, its name, when it changed, ⋯; a folder's is slim (its icon and name). */
 const Tile = memo(function Tile({
   e,
   picked,
@@ -369,48 +369,83 @@ const Tile = memo(function Tile({
   const press = useRef<number | null>(null);
   const dir = isDir(e);
   const badge = dir ? null : kindBadge(e.name);
-  return (
-    <div
-      ref={ref}
-      role="row"
-      aria-selected={picked}
-      data-path={e.path}
-      draggable={!TOUCH}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onClick={onClick}
-      onContextMenu={(ev) => {
-        ev.preventDefault();
-        onMenu(ref.current!, { x: ev.clientX, y: ev.clientY });
+  // What every tile does with the pointer, the keys' focus, a drag and a long press.
+  const handlers = {
+    ref,
+    role: 'row',
+    'aria-selected': picked,
+    'data-path': e.path,
+    draggable: !TOUCH,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    onClick,
+    onContextMenu: (ev: React.MouseEvent) => {
+      ev.preventDefault();
+      onMenu(ref.current!, { x: ev.clientX, y: ev.clientY });
+    },
+    onTouchStart: () => {
+      press.current = window.setTimeout(() => {
+        press.current = null;
+        onLongPress();
+      }, 480);
+    },
+    onTouchEnd: (ev: React.TouchEvent) => {
+      if (press.current === null) ev.preventDefault();
+      else clearTimeout(press.current);
+    },
+    onTouchMove: () => press.current && clearTimeout(press.current),
+    title: e.path,
+  };
+  const state = cx(picked ? 'border-accent/60 bg-accent/8' : 'border-line hover:border-line-2', focused && 'outline-1 -outline-offset-1 outline-accent/50', drop && 'bg-accent/15 outline-1 -outline-offset-1 outline-accent/70');
+  const more = (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={`More for “${e.name}”`}
+      onClick={(ev) => {
+        ev.stopPropagation();
+        onMenu(ev.currentTarget);
       }}
-      onTouchStart={() => {
-        press.current = window.setTimeout(() => {
-          press.current = null;
-          onLongPress();
-        }, 480);
-      }}
-      onTouchEnd={(ev) => {
-        if (press.current === null) ev.preventDefault();
-        else clearTimeout(press.current);
-      }}
-      onTouchMove={() => press.current && clearTimeout(press.current)}
-      className={cx(
-        'press-card group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel transition-colors select-none [-webkit-touch-callout:none]',
-        picked ? 'border-accent/60 bg-accent/8' : 'border-line hover:border-line-2',
-        focused && 'outline-1 -outline-offset-1 outline-accent/50',
-        drop && 'bg-accent/15 outline-1 -outline-offset-1 outline-accent/70',
-      )}
-      title={e.path}
+      className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 opacity-0 group-hover:opacity-100 hover:bg-bg-2 hover:text-fg focus-visible:opacity-100 max-md:opacity-100"
     >
-      <div className={cx('relative aspect-[4/3] overflow-hidden border-b border-line', dir ? 'bg-accent/[0.06]' : 'bg-bg-1')}>
-        {dir ? (
-          <span className="absolute inset-0 flex items-center justify-center text-accent/80">
-            <Folder size={64} strokeWidth={1.3} fill="currentColor" fillOpacity={0.14} />
-          </span>
-        ) : (
-          <FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />
-        )}
+      <Ellipsis size={15} />
+    </button>
+  );
+  const pick = (className: string) => (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={picked ? `Unpick ${e.name}` : `Pick ${e.name}`}
+      onClick={(ev) => {
+        ev.stopPropagation();
+        onPick();
+      }}
+      className={cx('flex size-6 items-center justify-center rounded-md transition-opacity', className, picked || picking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 max-md:hidden')}
+    >
+      <span className={cx('flex size-5 items-center justify-center rounded-md border shadow-sm', picked ? 'border-accent bg-accent text-accent-fg' : 'border-line-2 bg-bg-1/90')}>
+        {picked && <Check size={12} strokeWidth={3} />}
+      </span>
+    </button>
+  );
+  // A folder: a slim card of its icon and name (the box to pick it over its icon), so many folders take little room.
+  if (dir)
+    return (
+      <div {...handlers} className={cx('press-card group relative flex h-12 min-w-0 cursor-pointer items-center gap-2 rounded-xl border bg-panel pr-1 pl-2.5 transition-colors select-none [-webkit-touch-callout:none]', state)}>
+        <span className="relative flex size-6 shrink-0 items-center justify-center text-accent/80">
+          <Folder size={19} strokeWidth={1.7} fill="currentColor" fillOpacity={0.14} className={cx('transition-opacity', picked || picking ? 'opacity-0' : 'group-hover:opacity-0 max-md:group-hover:opacity-100')} />
+          {pick('absolute inset-0')}
+        </span>
+        <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">
+          {e.name}
+        </span>
+        {more}
+      </div>
+    );
+  return (
+    <div {...handlers} className={cx('press-card group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel transition-colors select-none [-webkit-touch-callout:none]', state)}>
+      <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-bg-1">
+        <FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />
         {badge && (
           <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">{badge}</span>
         )}
@@ -420,38 +455,11 @@ const Tile = memo(function Tile({
           <div translate="no" className="truncate text-[13.5px] leading-5 font-medium text-fg">
             {e.name}
           </div>
-          <div className="truncate text-[12px] leading-4 text-fg-3">{e.mtime ? tr(`Changed ${ago(e.mtime)}`) : dir ? '' : bytes(e.size)}</div>
+          <div className="truncate text-[12px] leading-4 text-fg-3">{e.mtime ? tr(`Changed ${ago(e.mtime)}`) : bytes(e.size)}</div>
         </div>
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={`More for “${e.name}”`}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            onMenu(ev.currentTarget);
-          }}
-          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 opacity-0 group-hover:opacity-100 hover:bg-bg-2 hover:text-fg focus-visible:opacity-100 max-md:opacity-100"
-        >
-          <Ellipsis size={15} />
-        </button>
+        {more}
       </div>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={picked ? `Unpick ${e.name}` : `Pick ${e.name}`}
-        onClick={(ev) => {
-          ev.stopPropagation();
-          onPick();
-        }}
-        className={cx(
-          'absolute top-2 right-2 flex size-6 items-center justify-center rounded-md transition-opacity',
-          picked || picking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 max-md:hidden',
-        )}
-      >
-        <span className={cx('flex size-5 items-center justify-center rounded-md border shadow-sm', picked ? 'border-accent bg-accent text-accent-fg' : 'border-line-2 bg-bg-1/90')}>
-          {picked && <Check size={12} strokeWidth={3} />}
-        </span>
-      </button>
+      {pick('absolute top-2 right-2')}
     </div>
   );
 });
@@ -1105,10 +1113,13 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
       {creating && <NameInput dir={creating === 'dir'} initial={creating === 'notebook' ? untitled(entries ?? [], '.ipynb') : undefined} onDone={create} />}
       {f && !items.length && !extraShown && <div className="px-4 py-8 text-center text-[13px] text-fg-3">Nothing here is called “{filter.trim()}”.</div>}
       {grid ? (
-        <div className="grid grid-cols-2 gap-2.5 p-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-3">
-          {shown.slice(0, firstFile).map(gridCell)}
-          {extra?.render({ grid: true, filter: f })}
-          {shown.slice(firstFile).map(gridCell)}
+        // The folders first, slim, in a grid of their own; then the pictures: what the project kept, and the files.
+        <div className="space-y-2.5 p-3 sm:space-y-3">
+          {firstFile > 0 && <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-3">{shown.slice(0, firstFile).map(gridCell)}</div>}
+          <div className="grid grid-cols-2 gap-2.5 empty:hidden sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-3">
+            {extra?.render({ grid: true, filter: f })}
+            {shown.slice(firstFile).map(gridCell)}
+          </div>
         </div>
       ) : (
         <div role="rowgroup">

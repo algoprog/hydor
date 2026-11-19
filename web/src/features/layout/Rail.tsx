@@ -1,5 +1,5 @@
 // The rail: a narrow column of icons at the left edge of every page on a computer. Sessions (which shows or hides the
-// sidebar), the sections (Browser, Apps, Agents), the inbox and Search right under them (they stay there), then, below
+// sidebar), the sections (Browser, Agents, Apps), the inbox and Search right under them (they stay there), then, below
 // a gap, the tools (Usage, System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or
 // the keyboard's focus. The sections and the tools each keep the order you drag them into, on every device.
 // A phone has no rail: its drawer (Sidebar.tsx) holds the same.

@@ -27,8 +27,8 @@ const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
 const usual = [...SIDEBAR_TOOLS];
 
-test('the usual order: the sections (Browser, Apps, Agents), then Search, Usage, System, Settings, Help', () => {
-  assert.deepEqual(usual, ['browser', 'apps', 'agents', 'search', 'usage', 'system', 'settings', 'help']);
+test('the usual order: the sections (Browser, Agents, Apps), then Search, Usage, System, Settings, Help', () => {
+  assert.deepEqual(usual, ['browser', 'agents', 'apps', 'search', 'usage', 'system', 'settings', 'help']);
   assert.deepEqual(SECTION_TOOLS, usual.slice(0, 3), 'the rail\'s upper group comes first in the usual order');
 });
 
