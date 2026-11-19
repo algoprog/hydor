@@ -19,9 +19,9 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `CLAUDE_BIN` | `~/.local/bin/claude`, else `claude` | The Claude Code executable. One named here is used as it is: the app does not update it |
 | `CODEX_BIN` | the Codex installed with the app | The Codex executable. One named here is used as it is: the app does not update it |
 | `DISABLE_AUTOUPDATER` | unset (`1` in Docker) | Claude Code's own: `1` turns its updates off, and the app's daily update then leaves your Claude Code alone too (**Update now** in Settings → Accounts → Agent programs still updates it) |
-| `CLAUDE_CONFIG_DIR` | `~/.claude` | Where Claude Code keeps its data |
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | Where Claude Code keeps its data. Set for the app (or a `HOME` of its own given it), its agents' Claude Code uses it too, so they keep their sign-in and sessions where the app reads them |
 | `CLAUDE_CODE_TMPDIR` | your `TMPDIR`, else `/tmp` | Claude Code's own: where it keeps its temporary files (in `claude-<your user id>`). Set here or in your shell, the agents' Claude Code uses it. Unset and where Claude Code can't make that folder (`/tmp` closed to you), the app points it at `tmp/` in `DATA_DIR`, since Claude Code does not start without it |
-| `CODEX_HOME` | `~/.codex` | Where Codex keeps its data |
+| `CODEX_HOME` | `~/.codex` | Where Codex keeps its data. Set for the app (or a `HOME` of its own given it), its agents' Codex uses it too |
 | `HYDOR_EMBED` | `on` | `off`: search by meaning starts off on a new install, so the app never sets it up on its own (a test's or a demo's copy); Settings → Memory still turns it on. Once Settings has turned it on or off, that wins |
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads memory's search by meaning uses (it runs on the CPU, through ONNX Runtime) |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with ONNX Runtime 1.23+, tokenizers and NumPy to run it with instead |

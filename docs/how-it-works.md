@@ -17,7 +17,8 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 - **Agents outlive the server.** Each live agent runs under a detached runner that holds its input and output
   and logs everything. Restart or upgrade the server and it reconnects, replaying what it missed. The server talks to
   a runner over a Unix socket only you can open; on Windows over a named pipe, which hears nothing from a client
-  until it gives the key written in your data folder.
+  until it gives the key written in your data folder. A runner whose folder is deleted while its agent runs (the data
+  folder of a copy of the app, removed) stops the agent within a minute, since no server could reach it again.
 - **The desktop apps carry the server.** The Mac, Windows and Linux apps start the server with the Node.js inside
   them, talk to it over a message channel (its address, updates, quitting), and start it again whenever it exits. On
   Windows and from an AppImage, each version runs from a copy of itself in your local data folder, so agents that

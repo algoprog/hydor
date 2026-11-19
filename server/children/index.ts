@@ -620,13 +620,16 @@ const reportedTurn = (d: Deps, key: string) => parseExtra((d.db.prepare('select 
 /**
  * Turns of children that ended while the app was down (or were missed) and were never reported: after a
  * start, each recent child that is not working and whose latest finished turn is not yet reported is.
+ * Not one another app runs (a terminal, VS Code, another copy of Hydor on this computer): its turns are that app's to
+ * report, and one still going there reads as ended here. On 2026-11-19 a copy of the app tried out on a copy of its
+ * sessions judged a subagent's running turn this way, and ran it again on Best beside the one at work.
  */
 export async function catchUp(d: Deps) {
   const rows = d.db.prepare(`select key, extra from app_sessions where instr(extra, '"parent":') > 0`).all() as { key: string; extra: string }[];
   for (const r of rows) {
     const x = parseExtra(r.extra);
     const s = d.sessions.summary(r.key);
-    if (typeof x.parent !== 'string' || !s || busy(s) || !d.sessions.summary(x.parent) || (s.updatedAt ?? 0) < Date.now() - 24 * 3600_000) continue;
+    if (typeof x.parent !== 'string' || !s || busy(s) || s.external || !d.sessions.summary(x.parent) || (s.updatedAt ?? 0) < Date.now() - 24 * 3600_000) continue;
     try {
       const turn = lastTurn((await d.sessions.timeline(r.key)).parser.items);
       if (turn?.prompt && turn.status && x.reported !== turn.prompt.id) await reportTurn(d, { key: r.key, startedAt: turn.prompt.ts ?? 0, external: false });

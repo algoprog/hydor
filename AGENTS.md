@@ -14,7 +14,9 @@ npm test                  # every test that needs nothing beyond a checkout; npm
 ```
 
 Each test is a script beside the code it checks (`*-test.ts`, `tests.ts`), run with a scratch `DATA_DIR`
-(docs/development.md). Nothing here may use a GPU: keep `CUDA_VISIBLE_DEVICES` empty.
+(docs/development.md). Nothing here may use a GPU: keep `CUDA_VISIBLE_DEVICES` empty. A scratch copy of the app gets
+its own `HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` under `/tmp` as well, and never a copy of the app's sessions: one
+that shares your Claude Code folder carries on with them beside the app at work (docs/development.md).
 
 ## Releases: every version has its release notes
 

@@ -27,6 +27,14 @@ mail server, GreenMail in Docker: its first lines say how to start one). One by 
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
+A scratch copy of the app (its own `DATA_DIR` and `PORT`, to try a change in a browser) shares your computer with the
+app you use. Give it a `HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` of its own under `/tmp` too: its agents keep their
+sign-ins and sessions there, so they never carry on with yours, and nothing it starts shows up in the app you use.
+Pointed at your own Claude Code folder (`CLAUDE_CONFIG_DIR=~/.claude`, to use your sign-in), never give it a copy of
+the app's sessions (the `sessions` and `app_sessions` tables): it takes them for its own, and wakes your sessions and
+subagents to deliver their reports, in processes of its own beside the app at work. Deleting its `DATA_DIR` stops
+any agent it left running within a minute.
+
 Use on your phone (`server/phone/`) never runs the computer's own `tailscale` in tests: `phone-test.ts` plays it with
 `server/phone/fake-tailscale.mjs`, a stand-in that answers `version`, `status --json` and `serve` from a state file
 beside it (its first lines say how). To try the section in a scratch copy of the app, copy the fake into a folder of its

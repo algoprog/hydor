@@ -6,7 +6,7 @@
 // appends its stdout to out.log, and serves a Unix socket (<runDir>/sock; on Windows a
 // named pipe, see RunnerAddress) through which the web server writes to the agent's
 // stdin and receives live output.
-// The runner outlives web-server restarts; the agent ends when its stdin closes.
+// The runner outlives web-server restarts; the agent ends when its stdin closes, or when <runDir> is deleted.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -122,7 +122,11 @@ function finish(code: number | null, signal: NodeJS.Signals | null, error?: stri
   exited = true;
   for (const t of stopTimers) clearTimeout(t);
   const info = { code, signal, error: error ?? null, at: Date.now() };
-  fs.writeFileSync(path.join(runDir, 'exit.json'), JSON.stringify(info));
+  try {
+    fs.writeFileSync(path.join(runDir, 'exit.json'), JSON.stringify(info));
+  } catch {
+    // Its folder is gone (below): nobody is left to read it.
+  }
   broadcast(encodeFrame(FRAME_CONTROL, JSON.stringify({ op: 'exit', ...info })));
   for (const c of clients) c.end();
   server.close();
@@ -169,6 +173,17 @@ const server = net.createServer((sock) => {
 
 process.on('SIGTERM', () => stop(2000));
 process.on('SIGINT', () => stop(2000));
+
+// The app removes a run folder only once its agent has ended. One gone while the agent runs went with its app's data
+// folder (a copy of the app tried out under /tmp, deleted once done with): no app can reach this runner again, and its
+// agent went on working unseen, for a week in one case (eleven such runners on 2026-11-19). Missing at two checks in a
+// row, the agent is stopped. HYDOR_RUNNER_CHECK_MS shortens the wait for a test.
+const CHECK_MS = Number(process.env.HYDOR_RUNNER_CHECK_MS) || 30_000;
+let missing = 0;
+setInterval(() => {
+  if (fs.existsSync(runDir)) missing = 0;
+  else if (++missing >= 2) stop();
+}, CHECK_MS).unref();
 
 try {
   fs.rmSync(sockPath, { force: true });

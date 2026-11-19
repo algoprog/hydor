@@ -162,6 +162,7 @@ function finish(read: Record<string, string>): Record<string, string> {
   if (!env.CLAUDE_CODE_TMPDIR && process.env.CLAUDE_CODE_TMPDIR) env.CLAUDE_CODE_TMPDIR = process.env.CLAUDE_CODE_TMPDIR;
   // Grok Build's home, likewise (its default account's sign-in and sessions: server/accounts.ts grokHome).
   if (!env.GROK_HOME && process.env.GROK_HOME) env.GROK_HOME = process.env.GROK_HOME;
+  ownFolders(env, { home: config.home, loginHome: user.homedir, claudeDir: process.env.CLAUDE_CONFIG_DIR, codexHome: process.env.CODEX_HOME });
   claudeTemp(env);
   const local = path.join(user.homedir, '.local/bin');
   if (!(env.PATH ?? '').split(':').includes(local)) env.PATH = `${local}:${env.PATH ?? '/usr/bin:/bin'}`;
@@ -176,6 +177,20 @@ function finish(read: Record<string, string>): Record<string, string> {
   env.TERM = 'xterm-256color';
   env.COLORTERM = 'truecolor';
   return env;
+}
+
+/**
+ * The agents keep their sign-ins and sessions where this app reads them. A copy of the app started with a Claude Code
+ * or Codex folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME, or a HOME other than your login's, as a copy tried out
+ * under /tmp has) gives its agents that folder too. From the login shell they got yours, so on 2026-11-19 such a copy,
+ * given a copy of the app's sessions, went on with the sessions of the app in use in second processes, and the subagent
+ * it started showed there at the top, outside its lead. On Windows the agents take this process's variables as they are.
+ * An app started with your own folders changes nothing.
+ */
+export function ownFolders(env: Record<string, string>, own: { home: string; loginHome: string; claudeDir?: string; codexHome?: string }) {
+  const moved = path.resolve(own.home) !== path.resolve(own.loginHome);
+  if (own.claudeDir || moved) env.CLAUDE_CONFIG_DIR = own.claudeDir || path.join(own.home, '.claude');
+  if (own.codexHome || moved) env.CODEX_HOME = own.codexHome || path.join(own.home, '.codex');
 }
 
 /** Where the agents' Claude Code keeps its temporary files when /tmp can't have them (claudeTemp). */

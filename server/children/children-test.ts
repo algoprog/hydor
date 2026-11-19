@@ -12,7 +12,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { childLabel, childReplyOf, type ChildNote } from '../../shared/children.ts';
-import type { Agent, AgentModel, LiveState, SessionSummary, TimelineItem } from '../../shared/types.ts';
+import type { Agent, AgentModel, ExternalState, LiveState, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { budget } from '../budget/index.ts';
 import { kvSet, openDb } from '../db.ts';
@@ -82,6 +82,8 @@ interface Fake {
   model?: string;
   mode?: string;
   live?: LiveState['status'];
+  /** Run by another app (a terminal, another copy of Hydor on this computer). */
+  external?: ExternalState;
   items: TimelineItem[];
 }
 
@@ -112,6 +114,7 @@ class Sessions extends EventEmitter {
       model: f.model,
       stats: {} as any,
       live: f.live ? { status: f.live, startedAt: 1, pendingApprovals: 0, mode: f.mode, model: f.model } : null,
+      external: f.external ?? null,
       extra: extra ? JSON.parse(extra) : undefined,
       updatedAt: Date.now(),
     };
@@ -1085,6 +1088,33 @@ test('stop all: a child cut short with its parent is not reported back, and a re
   await reportTurn(deps, { key: 'claude:sc', startedAt: Date.now() + 1000, external: false });
   assert.equal(sessions.delivered.length, n.delivered + 2);
   assert.match(sessions.delivered.at(-1)!.text, /Later\.$/);
+});
+
+test('at a start, a helper another app runs is left to it: its turn is neither judged nor reported until that app lets go', async () => {
+  const k = leadKey('elsewhere');
+  await call(k, 'start_child_session', { brief: 'Re-annotate the rows on the cluster, then build the dataset.', tier: 'standard', title: 'Re-annotate' });
+  const a = newest();
+  const mine = () => ({ created: sessions.created.filter((o) => o.extra?.parent === k).length, told: sessions.delivered.filter((m) => m.key === k).length });
+  const before = mine();
+  // What a copy of the app tried out on a copy of the sessions saw on 2026-11-19: a helper at work in the app in use,
+  // not running here, its transcript so far read as a turn that ended on a line about its next step.
+  verdict = '{"pass": false, "why": "it only says what it will do next"}';
+  finish(a, 'Next I sync the source tree and set up a smoke pool.');
+  sessions.all.get(a)!.live = undefined;
+  sessions.all.get(a)!.external = { status: 'working', client: 'another app', pid: 4242 };
+  await catchUp(deps);
+  assert.deepEqual(mine(), before, 'not run again a tier up beside the one at work, nor its lead woken');
+  // Between turns there, it is still that app's.
+  sessions.all.get(a)!.external = { status: 'idle', client: 'terminal', pid: 4242 };
+  await catchUp(deps);
+  assert.deepEqual(mine(), before);
+  // Let go of there, the turn it ended is this app's to report, as any other one it missed.
+  verdict = '{"pass": true, "why": "it does the job"}';
+  sessions.all.get(a)!.external = undefined;
+  finish(a, 'Re-annotated the rows; the new dataset is built.');
+  await catchUp(deps);
+  assert.deepEqual(mine(), { created: before.created, told: before.told + 1 });
+  assert.match(sessions.delivered.filter((m) => m.key === k).at(-1)!.text, /the new dataset is built\.$/);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------
