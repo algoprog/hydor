@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.96.1 · 19 November 2026
+
+Windows open with a soft motion, Pinned folds away like Active, and projects start folded.
+
+- **Windows come in softly**: dialogs and windows (a project's details, a file, the agent editor, a page opened over
+  the app) grow in gently over a page that dims behind them, and on a phone they rise from the bottom of the screen.
+  Side panels slide in from the right, and the search box and the picture viewer fade in. This is part of **Motion:
+  Full** (Settings → App → General); with **Calm** or **Off** they open at once.
+- **Pinned folds**: click the **Pinned** heading to fold it away, as **Active** does. Folded, both say how many sessions
+  they hold, with a dot when one finished since you last looked, and the session you have open stays in sight. While
+  Pinned is folded, drag a session onto the **Drop here to pin** box under its heading to pin it.
+- **Projects start folded**: each project and folder under **Projects** now starts as its heading, with how many
+  sessions it holds, so the list stays short. Open the ones you want: they stay as you left them.
+
 ## 0.96.0 · 19 November 2026
 
 Experiments, redesigned: every experiment has a page with its runs as a table, their curves on shared charts and which
