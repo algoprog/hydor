@@ -376,7 +376,10 @@ export class ClaudeLive extends LiveAdapter {
     } catch {
       return;
     }
-    this.touch();
+    // An answer to the app's own request (a usage read, a rename) is not the agent at work. The app reads each account's
+    // usage every few minutes through one of its running sessions, which kept that one in the sidebar's Active group,
+    // on top of the list, and running for good (never idle long enough to be stopped).
+    if (m.type !== 'control_response') this.touch();
     switch (m.type) {
       case 'control_response':
         this.onControlResponse(m.response ?? {});

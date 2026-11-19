@@ -206,6 +206,24 @@ const tests: [string, () => void | Promise<void>][] = [
       assert.equal(t.adapter['queueTimers'].size, 0);
     },
   ],
+  [
+    "an answer to the app's own request (a usage read) is not the agent at work: when it last was stays as it was",
+    async () => {
+      const runner = new EventEmitter() as any;
+      const sent: any[] = [];
+      runner.writeLine = (m: any) => sent.push(m);
+      const a = new ClaudeLive(runner, { sessionId: 's' } as any);
+      a.lastActivity = 1000;
+      const read = a.usage();
+      const req = sent.find((m) => m.type === 'control_request' && m.request?.subtype === 'get_usage');
+      assert.ok(req, 'the usage read is asked of the agent');
+      runner.emit('line', JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: req.request_id, response: { rate_limits: {} } } }), false);
+      assert.deepEqual(await read, { rate_limits: {} });
+      assert.equal(a.lastActivity, 1000, 'a usage read leaves the session where it was in the list (not Active, not on top)');
+      runner.emit('line', JSON.stringify({ type: 'system', subtype: 'status', status: null }), false);
+      assert.ok(a.lastActivity > 1000, 'what the agent prints of its own still counts');
+    },
+  ],
 ];
 
 let passed = 0;

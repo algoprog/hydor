@@ -348,6 +348,15 @@ function alive(pid: number): boolean {
   }
 }
 
+/** When a file was last written, or null when there is none. */
+function mtimeOf(file: string | null | undefined): number | null {
+  try {
+    return file ? fs.statSync(file).mtimeMs : null;
+  } catch {
+    return null;
+  }
+}
+
 /** SIGTERM, then SIGKILL if the process is still there after a few seconds. */
 async function endProcess(pid: number) {
   const wait = async (ms: number) => {
@@ -474,6 +483,15 @@ export class SessionManager extends EventEmitter {
       // stopped an idle agent, and 42 of them were left running with 11 GB.
       const last = runner.lastOutputAt();
       if (last !== null) adapter.lastActivity = Math.min(adapter.lastActivity, last);
+      // Nor did it start with this server: its run did. And an idle one was last at work when its transcript was last
+      // written, though its output log can be newer (the answers to the app's usage reads, which go through a running
+      // session of each account). Otherwise, after each restart (an update), the sidebar's Active group (anything at
+      // work or started in the last 5 minutes) filled with every session whose agent still ran, finished days ago.
+      if (meta.createdAt > 0) adapter.state.startedAt = Math.min(adapter.state.startedAt, meta.createdAt);
+      if (adapter.state.status === 'idle') {
+        const written = mtimeOf(this.transcriptFor(k));
+        if (written !== null) adapter.lastActivity = Math.min(adapter.lastActivity, written);
+      }
       this.attach({ key: k, agent: meta.agent, cwd: meta.cwd, adapter, runner, account: opts.account || undefined, apiCredit: !!opts.apiCredit || undefined });
       if (adapter instanceof AcpLive) adapter.restored();
       console.log(`[restore] reattached ${k} (${adapter.state.status})`);
