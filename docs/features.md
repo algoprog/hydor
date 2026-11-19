@@ -1682,7 +1682,7 @@ programs shows each program's version and what is out, with Check now, Update no
   Cancel question before closing it, CRLF files saved as CRLF, a right-click menu, Go to line, a status bar (line and column,
   language, indentation, line ends, wrap) and a shortcuts list. Above every open file (Word, Excel, CSV and LaTeX too)
   its path is a row of links: Home, then each folder going to it in Files with the next step picked, "…" for the folders
-  between, the file's name showing it in its folder; the same in the window over a conversation, which closes first. Ask, beside an open file, has an agent change it
+  between, the file's name showing it in its folder; in the window over a conversation the folder opens in that window, with ‹ back to the file. Ask, beside an open file, has an agent change it
   or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
   takes in each change as it is written (every second while an agent works), the changed lines tinted for a
   moment and your place kept. Word, Excel, CSV and LaTeX files open in the

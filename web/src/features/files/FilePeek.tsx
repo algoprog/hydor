@@ -1,14 +1,15 @@
 // A file opened from a session (one the agent handed over or changed, a link in its reply) shows in a
 // dialog over the conversation, which stays where it was. The Files page is a click away, and its ⋯ starts
-// a session with the file or adds it to a space. A folder (a link to one in a reply) shows there too, as the
-// Files page shows it: its folders open in place, and a file opened from it has a way back to it.
+// a session with the file or adds it to a space. A folder (a link to one in a reply, or one in the path above
+// a file there) shows there too, as the Files page shows it: its folders and files open in place, and Back
+// returns to what the dialog showed before.
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { ChevronLeft, Folder, FolderOpen, X } from 'lucide-react';
 import { api } from '../../lib/api';
-import { basename } from '../../lib/format';
-import { go, showInFiles, useFilePeek } from '../../lib/nav';
+import { basename, inside, joinPath, pathParts } from '../../lib/format';
+import { go, showInFiles, useFilePeek, type Peeked } from '../../lib/nav';
 import { Button, IconButton, Throbber } from '../../components/ui';
 import { useDiscardGuard } from '../settings/Instructions';
 import { goFolder } from './actions';
@@ -17,7 +18,14 @@ import { FolderView } from './FolderView';
 import { searchUrl } from './SearchView';
 import { FileMore } from './SpaceMenu';
 
-const shut = () => useFilePeek.setState({ file: null, leave: undefined });
+const shut = () => useFilePeek.setState({ file: null, show: undefined });
+
+/** The item right in folder `dir` on the way to `p` (`p` itself when it is in it); none when `p` is not below `dir`. */
+function toward(dir: string, p: string): string | undefined {
+  if (p === dir || !inside(p, dir)) return undefined;
+  const step = pathParts(p)[pathParts(dir).length];
+  return step ? joinPath(dir, step) : undefined;
+}
 
 /** Whether the path is a folder: known when it was opened as one, else asked of the server (null while it answers). */
 function useIsFolder(path: string | undefined, known?: boolean): boolean | null {
@@ -56,12 +64,22 @@ export function FilePeek() {
     return true;
   }, [leave]);
 
-  // What goes elsewhere from the dialog (the file's path above it) closes it through the same guard.
+  /** Shows another file or folder in the dialog, with Back to this one; asks first about changes not saved. */
+  const show = useCallback(
+    async (to: Peeked) => {
+      if (!(await leave())) return false;
+      useFilePeek.setState((s) => ({ file: { ...to, back: s.file ? { ...s.file, dir: folder === true || undefined } : undefined } }));
+      return true;
+    },
+    [leave, folder],
+  );
+
+  // The file's path above it goes to its folders here, through the same guard.
   useEffect(() => {
     if (!open) return;
-    useFilePeek.setState({ leave: close });
-    return () => useFilePeek.setState({ leave: undefined });
-  }, [open, close]);
+    useFilePeek.setState({ show });
+    return () => useFilePeek.setState({ show: undefined });
+  }, [open, show]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,10 +93,11 @@ export function FilePeek() {
     return () => document.removeEventListener('keydown', k);
   }, [open, close, folder]);
 
-  /** Back to the folder the file was opened from, with the file picked there. */
+  /** Back to what the dialog showed before: a folder with the way to what it shows now picked in it. */
   const back = async () => {
-    if (!file?.from || !(await leave())) return;
-    useFilePeek.setState({ file: { path: file.from, dir: true, sel: file.path } });
+    const to = file?.back;
+    if (!file || !to || !(await leave())) return;
+    useFilePeek.setState({ file: to.dir ? { ...to, sel: toward(to.path, file.path) ?? to.sel } : to });
   };
   const inFiles = async () => {
     if (!file || !(await close())) return;
@@ -97,9 +116,9 @@ export function FilePeek() {
               aria-label={basename(file.path) || file.path}
               className="flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
             >
-              <div className={file.from ? 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-2' : 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-5'}>
-                {file.from && (
-                  <IconButton label="Back to the folder" onClick={() => void back()}>
+              <div className={file.back ? 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-2' : 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-5'}>
+                {file.back && (
+                  <IconButton label={file.back.dir ? 'Back to the folder' : 'Back to the file'} onClick={() => void back()}>
                     <ChevronLeft size={18} />
                   </IconButton>
                 )}
@@ -124,8 +143,8 @@ export function FilePeek() {
                   <FolderView
                     dir={file.path}
                     select={file.sel ?? null}
-                    onDir={(d) => useFilePeek.setState({ file: { path: d, dir: true } })}
-                    onFile={(p) => useFilePeek.setState({ file: { path: p, from: file.path } })}
+                    onDir={(d) => void show({ path: d, dir: true })}
+                    onFile={(p) => void show({ path: p })}
                     onSearch={(q) => void close().then((ok) => ok && go(searchUrl({ q, in: file.path })))}
                     embedded
                   />

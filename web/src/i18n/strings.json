@@ -4412,6 +4412,7 @@
 "Back to the colours it had":"web/src/features/images/studio/MakeDrawing.tsx",
 "Back to the defaults":"web/src/features/settings/TiersSection.tsx",
 "Back to the document":"web/src/features/pages/docs/Compare.tsx",
+"Back to the file":"web/src/features/files/FilePeek.tsx",
 "Back to the folder":"web/src/features/files/FilePeek.tsx",
 "Back to the grid":"web/src/features/pages/sheets/Board.tsx",
 "Back to the latest":"web/src/features/pages/PagesPage.tsx",
