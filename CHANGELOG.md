@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.99.0 · 19 November 2026
+
+Projects have a page of their own again, the machine row says which machine finished something, and updates from git
+show how far they have got.
+
+- **A place for all your projects**: **Projects** is back on the rail, right before **Agents**. Its page shows every
+  project as a card: what it is about, its folder, its sessions, documents and skills, what is working in it now, when
+  it was last at work and a few weeks of its activity. Find a project by name, sort them by recent activity, name or
+  most sessions, start a session in one, or click it to open its details. Files dropped on a card go into its folder,
+  and the folders you work in that are not projects yet are listed below, each a click from becoming one. There is
+  still no Library: what agents keep stays in its project's **Files**.
+- **Which machine finished what**: when you use several machines, the machine row at the top of the sidebar now counts
+  the sessions that finished on your other machines since you last looked there, beside the dot for sessions waiting
+  on you. Its menu lists them under each machine by name, and a click opens one on its machine. With the sidebar
+  hidden, a dot on the rail's **Sessions** button tells you the same.
+- **Updates you can follow**: updating a copy installed from git (on a server, say) now shows a percentage, a bar, the
+  step it is on and about how long is left, read from what each step is doing: getting the new version, installing
+  packages, building. In the machine row, a machine being updated says "Updating · 45%", and "Restarting…" while it
+  comes back. A machine still on an older Hydor can't report this yet, so its first update shows an estimate.
+- If you dragged the rail's buttons into your own order, a new button now takes its usual place instead of going to
+  the end.
+
 ## 0.98.0 · 19 November 2026
 
 Agents can now walk you through code step by step, and show a program running line by line.
