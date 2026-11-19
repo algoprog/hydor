@@ -119,7 +119,7 @@ export const COMPARE: AnswerUiSpec[] = [
     id: 'choices',
     title: 'Choices',
     group: 'compare',
-    use: 'Options as cards with pictures, tags and prices to pick one or several from; the pick goes to the message box as the answer.',
+    use: 'Options as cards with pictures, tags and prices to pick one or several from; Send my choice sends the pick as the answer.',
     keywords: 'choices options pick one choose select which would you like vote alternatives menu poll decide',
     shape: `{
   question?: string

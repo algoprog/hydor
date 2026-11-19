@@ -32,7 +32,7 @@ import { useSignIn } from '../accounts/signin';
 import { FeatureComposerButtons, FeatureSessionOptions } from '../registry';
 import { SessionAccount } from './SessionAccount';
 import { SessionAssistantPicker, useSessionAssistant } from '../assistants/AssistantPicker';
-import { putText } from '../../lib/featureEvents';
+import { composeAction, putText, type ComposeDetail } from '../../lib/featureEvents';
 
 const HANDOFF_EVENT = 'wa:handoff';
 /** The session menu's "Continue in Codex": session `key`'s message box sets its next message to go to `agent` (`acp`: Custom's "console"). */
@@ -208,17 +208,29 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // What the listener below needs fresh (it is set up once per session): the box as it is now, and the latest send.
   const now = useRef({ text, atts, busy, locked, move: !!move });
   now.current = { text, atts, busy, locked, move: !!move };
-  const sendRef = useRef<(opposite?: boolean, override?: string) => Promise<void>>(async () => {});
+  const sendRef = useRef<(opposite?: boolean, override?: string, alone?: boolean) => Promise<boolean>>(async () => false);
+  // Words a card sent last, and when: the same ones again a moment later (a double click) are not sent twice.
+  const lastSent = useRef({ text: '', at: 0 });
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string; files?: Attachment[]; send?: boolean }>).detail;
-      if (!d || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
-      // A follow-up's button: into an empty box that can send, it goes at once, as if Enter were pressed.
+      const d = (e as CustomEvent<Omit<ComposeDetail, 'files'> & { files?: Attachment[] }>).detail;
+      // Taken already by another box of this session (it shows in two places): it goes once.
+      if (!d || d.result || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
       const n = now.current;
-      if (d.send && d.text.trim() && !d.replace && !d.files?.length && !n.text.trim() && !n.atts.length && !n.busy && !n.locked && !n.move) {
-        void sendRef.current(false, d.text);
+      // A card's Send button goes at once, as if its words were typed and sent, and what is being written stays in the
+      // box; a follow-up's button (send: 'empty') goes at once into an empty box and otherwise joins what is written.
+      const act = composeAction(d, { text: n.text, files: n.atts.length, canSend: !n.busy && !n.locked && !n.move }, lastSent.current);
+      if (act !== 'add') {
+        d.result = 'sent';
+        if (act === 'again') return;
+        lastSent.current = { text: d.text.trim(), at: Date.now() };
+        // Not sent after all (a dialog said no): the words wait in the box instead.
+        void sendRef.current(false, d.text, true).then((went) => {
+          if (!went) setText((cur) => putText(cur, d.text));
+        });
         return;
       }
+      d.result = 'added';
       // A choice changed in a page: the new one takes the old one's place, if that is still there.
       setText((cur) => putText(cur, d.text, d.replace));
       // A picture of a part of a PDF asked about comes with its words (Files' reader).
@@ -341,15 +353,20 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // The id a message goes with: the same each time it is sent again (its answer lost on the way, or Send pressed again
   // after an error), so the server sends it once; a new one once it went, or once what is sent changes.
   const sending = useRef<{ what: string; id: string } | null>(null);
-  const send = async (opposite = false, override?: string) => {
+  // `alone`: `override` goes as a message of its own, without the box's files, and what is in the box stays there.
+  // Says whether it went (or is on its way): not when there was nothing to send, or a dialog said no.
+  const send = async (opposite = false, override?: string, alone = false): Promise<boolean> => {
     const t = (override ?? text).trim();
-    if (move) return handOff(t);
-    if ((!t && !atts.length) || busy || locked) return;
-    if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
+    if (move) {
+      await handOff(t);
+      return true;
+    }
+    if ((!t && !(atts.length && !alone)) || busy || locked) return false;
+    if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return false;
     // Sent just after Stop: the session shows what it does with the message, no longer the stop.
     stopOverridden(key);
     const queue = working && !takeover && (waitsMemory || (followUpPref() === 'queue') !== opposite);
-    const list = atts;
+    const list = alone ? [] : atts;
     setBusy(true);
     // The message shows these pictures the moment it does, not once the agent has written it down (lib/attachments.ts).
     const went = sendingPictures(key, t, list, queue);
@@ -372,8 +389,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         });
     // The box is empty again, but its text is kept until the server answers: should the page close, it comes back.
     keepSending(key, t);
-    setText('');
-    setAtts([]);
+    if (!alone) {
+      setText('');
+      setAtts([]);
+    }
     window.dispatchEvent(new Event('wa:follow'));
     const what = `${takeover ? 'takeover' : queue ? 'queue' : 'message'}\u0000${t}\u0000${list.map((a) => `${a.id}:${a.name}`).join('|')}`;
     if (sending.current?.what !== what) sending.current = { what, id: `send-${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}` };
@@ -404,6 +423,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
       sendDone(key);
       setBusy(false);
     }
+    // It went, or it failed on the way and is back in the box with a notice.
+    return true;
   };
 
   sendRef.current = send;

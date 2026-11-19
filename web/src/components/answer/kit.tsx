@@ -11,11 +11,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { ChevronDown, ExternalLink, MessageSquarePlus, Play, Star, Volume2 } from 'lucide-react';
+import { Check, ChevronDown, ExternalLink, MessageSquarePlus, Play, Star, Volume2 } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
 import { LOCALE } from '../../i18n/locale';
 import { tr } from '../../i18n/runtime';
-import { composeInsert } from '../../lib/featureEvents';
+import { composeInsert, type Composed } from '../../lib/featureEvents';
+export type { Composed } from '../../lib/featureEvents';
 import { mu } from '../../lib/machine';
 import { toast } from '../../lib/store';
 import { openLightbox } from '../Lightbox';
@@ -584,18 +585,33 @@ export function Btn({ children, onClick, primary, icon, className, disabled, tit
   );
 }
 
-/** Puts words in the session's message box (the user sends them, or changes them first); with `send`, an empty box sends them at once. */
-export function useAsk(): (text: string, opts?: { send?: boolean }) => void {
+/**
+ * Puts words in the session's message box (the user sends them, or changes them first). With `send: true` they are sent
+ * at once as a message of their own (a button that says Send), and what is being written stays in the box; with
+ * `send: 'empty'` only when the box is empty, else they join what is being written (a follow-up). Says what became of
+ * them: 'sent', 'added' (in the box, as when the session cannot take a message now), or nothing (no conversation here).
+ */
+export function useAsk(): (text: string, opts?: { send?: boolean | 'empty' }) => Composed | undefined {
   const { sessionKey, demo } = useAui();
   return useCallback(
-    (text: string, opts?: { send?: boolean }) => {
-      if (demo || !sessionKey) {
-        toast(tr('In a conversation, this goes to your message box'), 'info');
-        return;
-      }
-      composeInsert(text, sessionKey, undefined, opts);
+    (text: string, opts?: { send?: boolean | 'empty' }) => {
+      const r = demo || !sessionKey ? undefined : composeInsert(text, sessionKey, undefined, opts);
+      // A demo, a board, or a conversation not on screen: no message box to take them.
+      if (!r) toast(opts?.send === true ? tr('In a conversation, this is sent to the agent') : tr('In a conversation, this goes to your message box'), 'info');
+      return r;
     },
     [sessionKey, demo],
+  );
+}
+
+/** What a Send button's words became, beside it: "Sent", or "In your message box" when the session could not take them now. */
+export function SentNote({ how, className }: { how: Composed | boolean | null | undefined; className?: string }) {
+  if (!how) return null;
+  return (
+    <span className={cx('inline-flex items-center gap-1.5 text-[12.5px] text-fg-3', className)}>
+      <Check size={14} className="text-ok" />
+      {how === 'sent' ? tr('Sent') : tr('In your message box')}
+    </span>
   );
 }
 

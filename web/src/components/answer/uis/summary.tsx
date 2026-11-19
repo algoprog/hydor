@@ -767,7 +767,7 @@ function FollowUps({ data, done }: { data: Data; done: boolean }) {
               disabled={!done}
               title={x.ask && x.ask !== x.label ? x.ask : undefined}
               onClick={() => {
-                ask(text, { send: true });
+                ask(text, { send: 'empty' });
                 setUsed((u) => ({ ...u, [i]: true }));
               }}
               className={cx(

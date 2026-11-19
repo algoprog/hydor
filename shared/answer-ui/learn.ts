@@ -687,7 +687,7 @@ Node = { name: string, note?: md, icon?: string, children?: Node[] }   // icon: 
     id: 'practice',
     title: 'Practice problems',
     group: 'learn',
-    use: 'Problems to answer in your own words or numbers, checked in place: hints one at a time, the worked solution after a try, and a score; open answers go to the message box for the tutor to check.',
+    use: 'Problems to answer in your own words or numbers, checked in place: hints one at a time, the worked solution after a try, and a score; open answers are sent to the tutor to check.',
     keywords: 'practice problems exercises homework worksheet tutor maths physics calculation answer check hints solution score try again drill',
     shape: `{
   title?: string

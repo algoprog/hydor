@@ -1539,7 +1539,7 @@ programs shows each program's version and what is out, with Check now, Update no
   cover summaries and notes (key points, callouts, fact sheets, definitions, glossaries, FAQs, tabs, columns, quotes,
   cards, fact checks that weigh each claim's evidence with a tally of verdicts that filters them, follow-up buttons at
   the end of an answer that send the next question when tapped), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose
-  weights re-rank the options, choices that go to the message box, picks, rankings, scorecards, head-to-heads, 2×2
+  weights re-rank the options, choices whose pick is sent as your answer, picks, rankings, scorecards, head-to-heads, 2×2
   quadrants (named points, or numbered ones with a key below when the names would not fit), SWOT, troubleshooters and wizards that ask one question at a time, a wheel, dice or coin that picks for
   you, Venn diagrams), shopping (products, product grids, spec sheets, price history, homes to buy or rent), places and travel (places on a map,
   one place, day-by-day itineraries with maps, directions, flights, stays, weather, world clocks, currency, departure
@@ -1568,7 +1568,9 @@ programs shows each program's version and what is out, with Check now, Update no
   the other parts of the answer show, in one lookup, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
   with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
   answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one
-  is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data**,
+  is kept on that device; a button that says Send (your pick, a quiz score, practice results, where a wheel stopped)
+  sends it at once as your next message and shows Sent, leaving what you are writing in the box (into the box instead
+  when the session cannot take a message just then); an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data**,
   **Copy as text** and **Full screen** (the card alone over the page, as wide as the window, scrolling when tall) sit on each, and under
   its … **Save as picture** (a PNG of the card as it looks, in the current theme, at twice its size, named after its title) and **Copy as
   picture** where the browser allows it; a card with a map, a library-drawn plot, a video player or a playground's output inside has no

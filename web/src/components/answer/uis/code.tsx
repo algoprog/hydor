@@ -1,7 +1,7 @@
 // The answer UIs for code (code in tabs, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories): their views, by name (shared/answer-ui/code.ts has what each takes).
 import { Fragment, lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, MessageSquarePlus, OctagonX, Play, RotateCcw, Route, Scale, Search, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
+import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, Play, RotateCcw, Route, Scale, Search, Send, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
@@ -2076,7 +2076,7 @@ function Playground({ data, done }: { data: Data; done: boolean }) {
           >
             {copied ? tr('Copied') : tr('Copy')}
           </Btn>
-          <Btn icon={<MessageSquarePlus size={13} />} onClick={() => ask(`${tr('Here is my code:')}\n${fence}${lang ?? given}\n${text.replace(/\n+$/, '')}\n${fence}\n`)}>
+          <Btn icon={<Send size={13} />} onClick={() => ask(`${tr('Here is my code:')}\n${fence}${lang ?? given}\n${text.replace(/\n+$/, '')}\n${fence}`, { send: true })}>
             {tr('Send my code')}
           </Btn>
           {runnable && <span className="ml-auto hidden text-[11.5px] text-fg-3 @lg:inline">{tr('{0}+Enter runs it').replace('{0}', mac ? '⌘' : 'Ctrl')}</span>}

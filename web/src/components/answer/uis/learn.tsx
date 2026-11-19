@@ -63,7 +63,7 @@ import { tr, trIn } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { normalizeMath } from '../../markdown-math';
 import { cx } from '../../ui';
-import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Data } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, SentNote, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Composed, type Data } from '../kit';
 import { useWidth } from '../charts';
 
 const LETTERS = 'ABCDEFGH';
@@ -170,7 +170,7 @@ function Quiz({ data, done }: { data: Data; done: boolean }) {
   };
   const send = () => {
     const missed = qs.map((q, i) => ({ q, i })).filter(({ q, i }) => !(q.answer.length && (picked[i] ?? []).length === q.answer.length && (picked[i] ?? []).every((p) => q.answer.includes(p))));
-    ask(`${tr('I scored {0} out of {1} on the quiz.').replace('{0}', String(score)).replace('{1}', String(total))}${missed.length ? ` ${tr('I missed:')} ${missed.map(({ q, i }) => `${i + 1}. ${q.q.replace(/\s+/g, ' ').slice(0, 120)}`).join('; ')}` : ''}`);
+    ask(`${tr('I scored {0} out of {1} on the quiz.').replace('{0}', String(score)).replace('{1}', String(total))}${missed.length ? ` ${tr('I missed:')} ${missed.map(({ q, i }) => `${i + 1}. ${q.q.replace(/\s+/g, ' ').slice(0, 120)}`).join('; ')}` : ''}`, { send: true });
   };
   const cur = Math.min(Math.max(0, num(at) ?? 0), Math.max(0, total - 1));
   const summary = finished && (
@@ -1542,7 +1542,7 @@ function FillBlanks({ data, done }: { data: Data; done: boolean }) {
   };
   const send = () => {
     const missed = cloze.blanks.map((b, i) => ({ b, v: valueOf(i), ok: right(i) })).filter((x) => !x.ok);
-    ask(`${headOf(data)}${fill(tr('I got {0} of {1} blanks right.'), score, n)}${missed.length ? ` ${tr('My mistakes:')} ${missed.map((x) => `${x.v || '—'} → ${x.b[0]}`).join('; ')}` : ''}`);
+    ask(`${headOf(data)}${fill(tr('I got {0} of {1} blanks right.'), score, n)}${missed.length ? ` ${tr('My mistakes:')} ${missed.map((x) => `${x.v || '—'} → ${x.b[0]}`).join('; ')}` : ''}`, { send: true });
   };
   const body = useMemo(
     () => (
@@ -1731,6 +1731,7 @@ function Matching({ data, done }: { data: Data; done: boolean }) {
     const wrong = pairs.map((p, l) => ({ p, l })).filter(({ l }) => !good(l));
     ask(
       `${headOf(data)}${fill(tr('I matched {0} of {1} pairs right.'), score, n)}${wrong.length ? ` ${tr('My mistakes:')} ${wrong.map(({ p, l }) => `${plainOf(p.left, 50)} → ${links.has(l) ? plainOf(pairs[links.get(l)!].right, 50) : '—'}`).join('; ')}` : ''}`,
+      { send: true },
     );
   };
   const columns = arr(data.columns ?? data.headings).map((c) => textOf(c));
@@ -1891,7 +1892,7 @@ function Ordering({ data, done }: { data: Data; done: boolean }) {
     setShown(false);
   };
   const send = () =>
-    ask(`${headOf(data)}${fill(tr('I put {0} of {1} in the right place.'), score, n)} ${tr('My order:')} ${order.map((it, p) => `${p + 1}. ${plainOf(items[it].text, 60)}`).join('; ')}`);
+    ask(`${headOf(data)}${fill(tr('I put {0} of {1} in the right place.'), score, n)} ${tr('My order:')} ${order.map((it, p) => `${p + 1}. ${plainOf(items[it].text, 60)}`).join('; ')}`, { send: true });
   const ends = arr(data.ends ?? data.labels).map((x) => textOf(x));
   const prompt = str(data.prompt ?? data.instructions);
   const shownList = isShown ? items.map((_, i) => i) : order;
@@ -2045,7 +2046,7 @@ function Conjugation({ data, done }: { data: Data; done: boolean }) {
     setMarks((x) => Object.fromEntries(Object.entries(isObj(x) ? x : {}).filter(([k]) => !k.startsWith(`${at}:`))) as Record<string, FormMark>);
   const send = () => {
     const again = forms.filter((_, r) => markOf(r) === 'again');
-    ask(`${fill(tr('Practising “{0}” ({1}): I knew {2} of {3} forms.'), verb, tense?.name ?? '', known, forms.length)}${again.length ? ` ${tr('Not yet:')} ${again.map((f) => `${f.person} ${f.form}`.trim()).join(', ')}` : ''}`);
+    ask(`${fill(tr('Practising “{0}” ({1}): I knew {2} of {3} forms.'), verb, tense?.name ?? '', known, forms.length)}${again.length ? ` ${tr('Not yet:')} ${again.map((f) => `${f.person} ${f.form}`.trim()).join(', ')}` : ''}`, { send: true });
   };
   const six = forms.length === 6;
   const anyIrregular = forms.some((f) => f.irregular);
@@ -2558,7 +2559,7 @@ function Rubric({ data, done }: { data: Data; done: boolean }) {
           {done && (
             <div className="flex items-center gap-1.5">
               <Copy text={summary} label={tr('Copy as text')} />
-              <Btn primary icon={<Send size={13} />} onClick={() => ask(`${tr('My grading with the rubric:')}\n${summary()}`)}>
+              <Btn primary icon={<Send size={13} />} onClick={() => ask(`${tr('My grading with the rubric:')}\n${summary()}`, { send: true })}>
                 {tr('Send')}
               </Btn>
             </div>
@@ -2907,7 +2908,7 @@ function Chess({ data, done }: { data: Data; done: boolean }) {
                   <Btn icon={<RotateCcw size={13} />} onClick={() => (setGuesses({}), go(0))}>
                     {tr('Start over')}
                   </Btn>
-                  <Btn primary icon={<Send size={13} />} onClick={() => ask(`${headOf(data)}${fill(tr('I guessed {0} of {1} moves.'), rightCount, tried.length)}`)}>
+                  <Btn primary icon={<Send size={13} />} onClick={() => ask(`${headOf(data)}${fill(tr('I guessed {0} of {1} moves.'), rightCount, tried.length)}`, { send: true })}>
                     {tr('Send my result')}
                   </Btn>
                 </Outcome>
@@ -3066,6 +3067,8 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
   const [triesRaw, setTries] = useKept<Record<number, number>>('tries', {});
   const [resRaw, setRes] = useKept<Record<number, string>>('res', {});
   const [lastRaw, setLast] = useKept<Record<number, string>>('last', {});
+  // What became of an open answer sent for checking: 'sent', or 'added' to the message box when the session could not take it.
+  const [howRaw, setHow] = useKept<Record<number, Composed>>('how', {});
   const [hintsRaw, setHints] = useKept<Record<number, number>>('hints', {});
   const [solRaw, setSol] = useKept<Record<number, boolean>>('sol', {});
   const [atRaw, setAt] = useKept<number>('at', 0);
@@ -3074,6 +3077,7 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
   const triesOf = rec<number>(triesRaw);
   const res = rec<string>(resRaw);
   const last = rec<string>(lastRaw);
+  const how = rec<Composed>(howRaw);
   const hintsOf = rec<number>(hintsRaw);
   const sol = rec<boolean>(solRaw);
   const total = ps.length;
@@ -3098,7 +3102,8 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
     const p = ps[i];
     const typed = (vals[i] ?? '').trim();
     if (!done || !p || !typed) return;
-    ask(`${fill(tr('Problem {0}: {1}'), i + 1, plainOf(p.q))}\n${fill(tr('My answer: {0}'), typed)}`);
+    const went = ask(`${fill(tr('Problem {0}: {1}'), i + 1, plainOf(p.q))}\n${fill(tr('My answer: {0}'), typed)}`, { send: true });
+    if (went) setHow((h) => ({ ...rec<Composed>(h), [i]: went }));
     bump(i);
     setLast((l) => ({ ...rec<string>(l), [i]: typed }));
     setRes((r) => ({ ...rec<string>(r), [i]: 'sent' }));
@@ -3108,6 +3113,7 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
     setTries({});
     setRes({});
     setLast({});
+    setHow({});
     setHints({});
     setSol({});
     setAt(0);
@@ -3131,7 +3137,7 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
       if (sol[i]) parts.push(tr('solution shown'));
       if (parts.length) lines.push(`${i + 1}: ${parts.join(', ')}.`);
     });
-    ask(`${headOf(data)}${auto.length ? fill(tr('Practice results: {0} of {1} right.'), right, auto.length) : tr('Practice results:')} ${lines.join(' ')}`.trim());
+    ask(`${headOf(data)}${auto.length ? fill(tr('Practice results: {0} of {1} right.'), right, auto.length) : tr('Practice results:')} ${lines.join(' ')}`.trim(), { send: true });
   };
 
   const card = (i: number) => {
@@ -3168,7 +3174,7 @@ function Practice({ data, done }: { data: Data; done: boolean }) {
               <Btn primary icon={<Send size={13} />} disabled={!done || !val.trim()} onClick={() => send(i)}>
                 {tr('Send for checking')}
               </Btn>
-              {sent && last[i] === val.trim() && <span className="text-[12.5px] text-fg-3">{tr('In your message box: send it to have it checked.')}</span>}
+              {sent && last[i] === val.trim() && (how[i] === 'sent' ? <SentNote how="sent" /> : <span className="text-[12.5px] text-fg-3">{tr('In your message box: send it to have it checked.')}</span>)}
             </div>
           </div>
         ) : (

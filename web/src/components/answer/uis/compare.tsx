@@ -1,12 +1,12 @@
 // The answer UIs that compare options and help decide: their views, by name (shared/answer-ui/compare.ts has what each takes).
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, Coins, Dices, Flag, Info, MessageSquarePlus, Minus, RotateCcw, RotateCw, Shuffle, ThumbsDown, ThumbsUp, TriangleAlert, Trophy, X } from 'lucide-react';
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, Coins, Dices, Flag, Info, Minus, RotateCcw, RotateCw, Send, Shuffle, ThumbsDown, ThumbsUp, TriangleAlert, Trophy, X } from 'lucide-react';
 import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
 import { dotsAndCorners, placeLabels, quadrantOf, wrapName } from '../quadrant-layout';
-import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, SentNote, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Composed, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -313,7 +313,8 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
   const options = arr(data.options ?? data.choices ?? data.items).map((o) => (isObj(o) ? o : { title: str(o) }));
   const multiple = yes(data.multiple);
   const [picked, setPicked] = useKept<number[]>('picked', []);
-  const [sent, setSent] = useKept<boolean>('sent', false);
+  // What became of the pick sent: 'sent', or 'added' (true before 0.92.3) when it went to the message box instead.
+  const [sent, setSent] = useKept<Composed | boolean>('sent', false);
   const ask = useAsk();
   const chosen = (Array.isArray(picked) ? picked : []).filter((i) => typeof i === 'number' && i < options.length);
   const picOks = usePicsOk(options.map((o) => o.image));
@@ -327,8 +328,8 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
     });
   };
   const send = () => {
-    ask(`${tr('I’ll go with:')} ${chosen.map((i) => textOf(options[i], 'title', 'name', 'label')).join(', ')}`);
-    setSent(true);
+    const how = ask(`${tr('I’ll go with:')} ${chosen.map((i) => textOf(options[i], 'title', 'name', 'label')).join(', ')}`, { send: true });
+    if (how) setSent(how);
   };
   const [group] = useState(() => `aui-choice-${Math.random().toString(36).slice(2, 8)}`);
   return (
@@ -380,13 +381,8 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
       </div>
       {done && options.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
-          {sent && chosen.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-3">
-              <Check size={14} className="text-ok" />
-              {tr('In your message box')}
-            </span>
-          )}
-          <Btn primary disabled={!chosen.length} icon={<MessageSquarePlus size={14} />} onClick={send}>
+          {chosen.length > 0 && <SentNote how={sent} />}
+          <Btn primary disabled={!chosen.length} icon={<Send size={14} />} onClick={send}>
             {tr('Send my choice')}
           </Btn>
         </div>
@@ -1058,6 +1054,7 @@ function DecisionTree({ data, done }: { data: Data; done: boolean }) {
       ]
         .filter(Boolean)
         .join('\n'),
+      { send: true },
     );
   const Icon = END_ICON[cur.tone];
   const backAndOver = trail.length > 0 && (
@@ -1147,7 +1144,7 @@ function DecisionTree({ data, done }: { data: Data; done: boolean }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           {backAndOver || <span />}
           {end && trail.length > 0 && (
-            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={send}>
+            <Btn primary icon={<Send size={14} />} onClick={send}>
               {tr('Send my answers')}
             </Btn>
           )}
@@ -1308,7 +1305,7 @@ function Wheel({ options, done, title }: { options: PickOption[]; done: boolean;
               {at === null ? tr('Spin') : tr('Spin again')}
             </Btn>
             {shown && (
-              <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('The wheel picked: {0}').replace('{0}', shown.label)))}>
+              <Btn primary icon={<Send size={14} />} onClick={() => ask(withTitle(title, tr('The wheel picked: {0}').replace('{0}', shown.label)), { send: true })}>
                 {tr('Send it')}
               </Btn>
             )}
@@ -1400,7 +1397,7 @@ function DiceRoll({ count, sides, done, title }: { count: number; sides: number;
             {kept ? tr('Roll again') : tr('Roll')}
           </Btn>
           {kept && !tumble && (
-            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('I rolled {0}').replace('{0}', `${kept.join(' + ')}${count > 1 ? ` = ${sum}` : ''}`)))}>
+            <Btn primary icon={<Send size={14} />} onClick={() => ask(withTitle(title, tr('I rolled {0}').replace('{0}', `${kept.join(' + ')}${count > 1 ? ` = ${sum}` : ''}`)), { send: true })}>
               {tr('Send it')}
             </Btn>
           )}
@@ -1454,7 +1451,7 @@ function CoinFlip({ faces, done, title }: { faces: PickOption[]; done: boolean; 
             {side === null ? tr('Flip') : tr('Flip again')}
           </Btn>
           {shown && (
-            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('The coin came up: {0}').replace('{0}', shown.label)))}>
+            <Btn primary icon={<Send size={14} />} onClick={() => ask(withTitle(title, tr('The coin came up: {0}').replace('{0}', shown.label)), { send: true })}>
               {tr('Send it')}
             </Btn>
           )}
@@ -1518,7 +1515,7 @@ function DrawNames({ options, count, done, title }: { options: PickOption[]; cou
             {kept ? trIn('random', 'Draw again') : k > 1 ? trIn('random', 'Draw {0}').replace('{0}', String(k)) : trIn('random', 'Draw')}
           </Btn>
           {kept && !shuffle && (
-            <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('Drawn: {0}').replace('{0}', kept.map((i) => options[i].label).join(', '))))}>
+            <Btn primary icon={<Send size={14} />} onClick={() => ask(withTitle(title, tr('Drawn: {0}').replace('{0}', kept.map((i) => options[i].label).join(', '))), { send: true })}>
               {tr('Send it')}
             </Btn>
           )}
