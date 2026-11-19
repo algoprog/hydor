@@ -486,7 +486,6 @@
   "· after": "· danach",
   "· after {0}": "· nach {0}",
   "· an agent if it fails": "· bei einem Fehler übernimmt ein Agent",
-  "· arrows compare with the {0}": "· Pfeile vergleichen mit dem {0}",
   "· arXiv {0}": "· arXiv {0}",
   "· at most {0} with the cap of {1} a run": "· höchstens {0} mit der Ausgabenlimit von {1} pro Lauf",
   "· best for {0}": "· am besten für {0}",
@@ -14588,9 +14587,6 @@
   "Previews are off": "Die Vorschau ist deaktiviert",
   "Previews are off (PREVIEW_PORT=0)": "Vorschauen sind deaktiviert (PREVIEW_PORT=0)",
   "Previews to read": "Vorschauen zum Lesen",
-  "previous 12 months": "letzten 12 Monate",
-  "previous 26 weeks": "letzten 26 Wochen",
-  "previous 30 days": "letzten 30 Tage",
   "Previous cut": "Vorheriger Schnitt",
   "Previous day": "Vorheriger Tag",
   "Previous marker or clip edge": "Vorherige Markierung oder Clipkante",
@@ -24700,5 +24696,11 @@
   "Your lists": "Deine Listen",
   "your own browsing home page search engine google duckduckgo bing suggestions search shortcuts site search keywords yt wiki github youtube wikipedia page zoom default zoom check spelling spell check underline ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app": "eigenes Surfen Startseite Suchmaschine Google DuckDuckGo Bing Vorschläge Suchkürzel Kürzel Website-Suche Stichwörter yt wiki gh YouTube Wikipedia Seitenzoom Standardzoom Zoom Rechtschreibung prüfen Rechtschreibprüfung unterstreichen Werbeblocker Werbung blockieren Tracker Cookie-Banner übersetzen Übersetzung dunkle Seiten Autoplay Ton Leseansicht Browserdaten löschen Verlauf Cookies Cache Desktop-App",
   "Zoom in ({0}+)": "Vergrößern ({0}+)",
-  "Zoom out ({0}−)": "Verkleinern ({0}−)"
+  "Zoom out ({0}−)": "Verkleinern ({0}−)",
+  "compared with yesterday up to the same hour": "verglichen mit gestern bis zur selben Stunde",
+  "compared with last week up to the same day and hour": "verglichen mit der letzten Woche bis zum selben Tag und zur selben Stunde",
+  "compared with last month up to the same day and hour": "verglichen mit dem letzten Monat bis zum selben Tag und zur selben Stunde",
+  "compared with last year up to the same day and hour": "verglichen mit dem letzten Jahr bis zum selben Tag und zur selben Stunde",
+  "The app restarted while this turn was waiting for its model, so the turn stopped there: send a message to carry on": "Die App wurde neu gestartet, während dieser Durchlauf auf sein Modell wartete, daher endete der Durchlauf dort: Sende eine Nachricht, um weiterzumachen",
+  "The turn failed": "Der Durchlauf ist fehlgeschlagen"
 }

@@ -1,6 +1,7 @@
 // Activity stats: per-hour rows from the indexer, grouped into the viewer's local
 // days, ISO weeks, months or years; for every agent or one (each ACP agent by name: Custom, Gemini CLI…),
-// and every model or one.
+// and every model or one. The totals and breakdowns cover the whole window, or one period of it: the page asks
+// for the one that holds now (today, this week…), compared with the period before up to the same point.
 import { ACP_PRESETS, acpAgents, CONSOLE_ID } from './agents/acp.ts';
 import { rateFor } from './prices.ts';
 import type { Agent, ModelUsage, StatsBucket, StatsGranularity, StatsResponse, StatsTotals } from '../shared/types.ts';
@@ -62,18 +63,22 @@ function add(t: StatsTotals, r: Row, cost = 0) {
   t.genMs += r.gen_ms;
 }
 
-/** Local calendar date (y, m 1-12, d) of an instant in `tz`. */
-function localDate(fmt: Intl.DateTimeFormat, ms: number): [number, number, number] {
+/** Local calendar date and hour (y, m 1-12, d, h 0-23) of an instant in `tz`. */
+function localDate(fmt: Intl.DateTimeFormat, ms: number): [number, number, number, number] {
   let y = 0;
   let m = 0;
   let d = 0;
+  let h = 0;
   for (const p of fmt.formatToParts(ms)) {
     if (p.type === 'year') y = Number(p.value);
     else if (p.type === 'month') m = Number(p.value);
     else if (p.type === 'day') d = Number(p.value);
+    else if (p.type === 'hour') h = Number(p.value) % 24;
   }
-  return [y, m, d];
+  return [y, m, d, h];
 }
+
+const dateFormat = (timeZone: string) => new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23' });
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -131,6 +136,33 @@ function keyStart(g: StatsGranularity, key: string): number {
   return civil(y, m, d);
 }
 
+/** A period's key as the buckets name it ("2026", "2026-11", "2026-11-18"; any day of a week names its Monday), or null. */
+export function periodKey(g: StatsGranularity, s: string): string | null {
+  const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(s.trim());
+  if (!match) return null;
+  const [y, m, d] = [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+  if (g === 'year') return m ? null : String(y);
+  if (m < 1 || m > 12) return null;
+  if (g === 'month') return d ? null : `${y}-${pad(m)}`;
+  const t = new Date(civil(y, m, d));
+  if (!d || t.getUTCMonth() + 1 !== m || t.getUTCDate() !== d) return null;
+  return keyFor(g, y, m, d);
+}
+
+/** The key of the period just before. */
+function prevKeyOf(g: StatsGranularity, key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  if (g === 'year') return String(y - 1);
+  if (g === 'month') return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
+  const t = new Date(civil(y, m, d) - (g === 'week' ? 7 : 1) * 86400_000);
+  return keyFor(g, t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+
+/** Local hours from the start of a period to an hour in it: how far into it the hour is. */
+function hoursInto(g: StatsGranularity, key: string, y: number, m: number, d: number, h: number): number {
+  return Math.round((civil(y, m, d) - keyStart(g, key)) / 86400_000) * 24 + h;
+}
+
 /** An agent's name in the stats: Claude Code, Codex, or an ACP agent's ("acp:console" is Custom). */
 function agentName(db: DB, id: string): string {
   if (id === 'claude') return 'Claude Code';
@@ -141,23 +173,36 @@ function agentName(db: DB, id: string): string {
   return [...acpAgents(db), ...ACP_PRESETS].find((a) => a.id === acp)?.name ?? acp;
 }
 
-export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: string; agent?: string; model?: string; count?: number }): StatsResponse {
+/**
+ * `period`: "current" (the period that holds now) or a period's key (periodKey) makes the totals, the breakdowns and
+ * `previous` cover that period alone rather than the whole window; `previous` is then the period before it, up to the
+ * same point while the period is still running (Monday to Wednesday 15:00 of last week, on a Wednesday at 15:00).
+ * `now` is for tests.
+ */
+export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: string; agent?: string; model?: string; count?: number; period?: string; now?: number }): StatsResponse {
   const g = q.granularity;
   let tz = q.tz || 'UTC';
   let fmt: Intl.DateTimeFormat;
   try {
-    fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric' });
+    fmt = dateFormat(tz);
   } catch {
     tz = 'UTC';
-    fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric' });
+    fmt = dateFormat(tz);
   }
   // All agents, one kind (claude, codex, acp), or one ACP agent (acp:console is Custom).
   const agent = q.agent === 'claude' || q.agent === 'codex' || q.agent === 'acp' || /^acp:[\w.-]{1,64}$/.test(q.agent ?? '') ? q.agent! : 'all';
   const kind = agent.startsWith('acp') ? 'acp' : agent;
   const onlyModel = q.model?.trim() || undefined;
   const n = Math.max(1, Math.min(q.count ?? DEFAULT_COUNT[g], 400));
-  const now = Date.now();
-  const today = localDate(fmt, now);
+  const now = q.now ?? Date.now();
+  const [ty, tm, td, th] = localDate(fmt, now);
+  const today: [number, number, number] = [ty, tm, td];
+  // The one period asked for, and the one before it (to the same point while it runs).
+  const nowKey = keyFor(g, ty, tm, td);
+  const pKey = q.period === 'current' ? nowKey : q.period ? periodKey(g, q.period) : null;
+  const pPrev = pKey ? prevKeyOf(g, pKey) : null;
+  const running = pKey === nowKey;
+  const nowInto = hoursInto(g, nowKey, ty, tm, td, th);
 
   const first = db.prepare('select min(hour) as h from activity').get() as { h: number | null };
   const firstYear = first.h != null ? localDate(fmt, first.h * 3_600_000)[0] : today[0];
@@ -176,8 +221,10 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
   }
   const prevKeys = new Set(g === 'year' ? [] : all.slice(0, all.length - keys.length));
   const startKey = g === 'year' ? keys[0] : all[0];
+  // From the window's start, or the start of the period before the one asked for when that is earlier.
+  const from = Math.min(keyStart(g, startKey), pPrev ? keyStart(g, pPrev) : Infinity);
   // Two days of slack either side of the local-midnight boundary.
-  const fromHour = Math.floor((keyStart(g, startKey) - 2 * 86400_000) / 3_600_000);
+  const fromHour = Math.floor((from - 2 * 86400_000) / 3_600_000);
 
   // Folders and models of the sessions, and of those whose transcript is gone (deleted, or cleaned up as inactive).
   const cwdOf = new Map<string, string>();
@@ -215,22 +262,43 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
   const byAgent: Record<Agent, StatsTotals & { roots?: Set<string> }> = { claude: emptyTotals(), codex: emptyTotals(), acp: emptyTotals() };
   const agentRoots: Record<Agent, Set<string>> = { claude: new Set(), codex: new Set(), acp: new Set() };
   const projects = new Map<string, StatsTotals & { cwd: string; roots: Set<string> }>();
-  const hourKey = new Map<number, string>();
+  // The whole window's totals, when the rest covers one period.
+  const win = emptyTotals();
+  const winRoots = new Set<string>();
+  // Each agent with activity in the window, with its output there: what the page's agent filter offers.
+  const winAgents = new Map<string, number>();
+  // Each hour's period, and how far into it the hour is.
+  const hourKey = new Map<number, { k: string; into: number }>();
 
   for (const r of rows) {
-    let k = hourKey.get(r.hour);
-    if (k === undefined) {
-      const [y, m, d] = localDate(fmt, r.hour * 3_600_000);
-      k = keyFor(g, y, m, d);
-      hourKey.set(r.hour, k);
+    let hk = hourKey.get(r.hour);
+    if (hk === undefined) {
+      const [y, m, d, h] = localDate(fmt, r.hour * 3_600_000);
+      const key = keyFor(g, y, m, d);
+      hk = { k: key, into: hoursInto(g, key, y, m, d, h) };
+      hourKey.set(r.hour, hk);
     }
+    const k = hk.k;
     const b = buckets.get(k);
+    // What the totals and breakdowns count, and what they are compared with: the window and the same number of
+    // periods before it, or the period asked for and the one before it.
+    const counted = pKey ? k === pKey : !!b;
+    const before = pKey ? k === pPrev && (!running || hk.into <= nowInto) : prevKeys.has(k);
+    if (!b && !counted && !before) continue;
     const model = modelOf.get(r.key) ?? '(unknown)';
-    const rt = b || prevKeys.has(k) ? rate(model) : null;
+    const rt = rate(model);
     const cost = rt ? (r.tokens_in * rt.input + r.tokens_cached * (rt.cacheRead ?? rt.input) + r.tokens_out * rt.output) / 1e6 : 0;
     if (b) {
       add(b, r, cost);
       b.roots.add(r.root);
+      const wa = agentOfRow(r);
+      winAgents.set(wa, (winAgents.get(wa) ?? 0) + r.tokens_out);
+      if (pKey) {
+        add(win, r, cost);
+        winRoots.add(r.root);
+      }
+    }
+    if (counted) {
       add(totals, r, cost);
       totalRoots.add(r.root);
       add(byAgent[r.agent], r, cost);
@@ -253,7 +321,7 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
       mu.tokensCached += r.tokens_cached;
       mu.tokensOut += r.tokens_out;
       if (mu.cost !== null) mu.cost += cost;
-    } else if (prevKeys.has(k)) {
+    } else if (before) {
       add(previous, r, cost);
       prevRoots.add(r.root);
     }
@@ -262,6 +330,9 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
   totals.sessions = totalRoots.size;
   previous.sessions = prevRoots.size;
   for (const a of ['claude', 'codex', 'acp'] as const) byAgent[a].sessions = agentRoots[a].size;
+  // Claude Code, Codex, then the rest by their output.
+  const agentOrder = (a: { id: string; tokensOut: number }, b: { id: string; tokensOut: number }) =>
+    (a.id === 'claude' ? -2 : a.id === 'codex' ? -1 : 0) - (b.id === 'claude' ? -2 : b.id === 'codex' ? -1 : 0) || b.tokensOut - a.tokensOut;
   return {
     granularity: g,
     tz,
@@ -269,13 +340,17 @@ export function computeStats(db: DB, q: { granularity: StatsGranularity; tz?: st
     model: onlyModel,
     firstAt: first.h != null ? first.h * 3_600_000 : undefined,
     firstByAgent,
+    period: pKey ? { key: pKey, label: labelFor(g, pKey), start: keyStart(g, pKey), current: running } : undefined,
+    window: pKey ? { ...win, sessions: winRoots.size } : undefined,
     buckets: [...buckets.values()].map(({ roots, ...b }) => ({ ...b, sessions: roots.size })),
     totals,
     previous,
     byAgent,
-    agents: [...byAgentId.entries()]
-      .map(([id, { roots, ...t }]) => ({ ...t, id, name: agentName(db, id), sessions: roots.size }))
-      .sort((a, b) => (a.id === 'claude' ? -2 : a.id === 'codex' ? -1 : 0) - (b.id === 'claude' ? -2 : b.id === 'codex' ? -1 : 0) || b.tokensOut - a.tokensOut),
+    agents: [...byAgentId.entries()].map(([id, { roots, ...t }]) => ({ ...t, id, name: agentName(db, id), sessions: roots.size })).sort(agentOrder),
+    windowAgents: [...winAgents.entries()]
+      .map(([id, tokensOut]) => ({ id, tokensOut }))
+      .sort(agentOrder)
+      .map(({ id }) => ({ id, name: agentName(db, id) })),
     projects: [...projects.values()]
       .map(({ roots, ...p }) => ({ ...p, sessions: roots.size }))
       .sort((a, b) => b.linesAdded + b.linesRemoved - (a.linesAdded + a.linesRemoved) || b.tokensOut - a.tokensOut)

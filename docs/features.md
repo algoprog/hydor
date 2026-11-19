@@ -1754,7 +1754,8 @@ programs shows each program's version and what is out, with Check now, Update no
   usage limits is on); one you stopped yourself never does.
 - Usage: how much of each plan's limits (Claude Code, Codex and Grok Build, each account) you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
-  model or one.
+  model or one: today, this week, this month or this year so far, against the period before up to the same point,
+  with a bar for each day, week, month or year.
 - Every session is kept, whatever the agent's own program does: Claude Code is told to keep its conversations,
   and the app keeps its own link to every conversation file (no extra disk), so one that gets deleted comes back.
   Sessions nobody used for a year are deleted (Settings → General → Delete inactive sessions: on or off, and how

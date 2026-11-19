@@ -1213,7 +1213,6 @@
 "· about":"· περίπου",
 "· about {0} tokens/s":"· περίπου {0} tokens/s",
 "· an agent if it fails":"· ένας πράκτορας αν αποτύχει",
-"· arrows compare with the {0}":"· τα βέλη συγκρίνουν με {0}",
 "· at most {0} with the cap of {1} a run":"· το πολύ {0} με όριο {1} ανά εκτέλεση",
 "· by":"· από",
 "· cannot start":"· δεν μπορεί να ξεκινήσει",
@@ -6293,9 +6292,6 @@
 "Previews are off":"Οι προεπισκοπήσεις είναι ανενεργές",
 "Previews are off (PREVIEW_PORT=0)":"Οι προεπισκοπήσεις είναι ανενεργές (PREVIEW_PORT=0)",
 "Previous":"Προηγούμενο",
-"previous 12 months":"προηγούμενους 12 μήνες",
-"previous 26 weeks":"προηγούμενες 26 εβδομάδες",
-"previous 30 days":"προηγούμενες 30 ημέρες",
 "Price":"Τιμή",
 "price drop track deal":"πτώση τιμής παρακολούθηση προσφορά",
 "Price watch":"Παρακολούθηση τιμής",
@@ -25952,5 +25948,11 @@
 "Your lists":"Οι λίστες σας",
 "your own browsing home page search engine google duckduckgo bing suggestions search shortcuts site search keywords yt wiki github youtube wikipedia page zoom default zoom check spelling spell check underline ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app":"δικό σας πρόγραμμα περιήγησης αρχική σελίδα μηχανή αναζήτησης google duckduckgo bing προτάσεις συντομεύσεις αναζήτησης συντόμευση αναζήτηση σε ιστότοπο λέξεις-κλειδιά yt wiki gh youtube wikipedia ζουμ σελίδων προεπιλεγμένο ζουμ ζουμ έλεγχος ορθογραφίας ορθογραφία υπογράμμιση αποκλεισμός διαφημίσεων διαφημίσεις ιχνηλάτες banner για cookies μετάφραση σκούρες σελίδες αυτόματη αναπαραγωγή ήχος προβολή ανάγνωσης εκκαθάριση δεδομένων περιήγησης ιστορικό cookies κρυφή μνήμη εφαρμογή υπολογιστή",
 "Zoom in ({0}+)":"Μεγέθυνση ({0}+)",
-"Zoom out ({0}−)":"Σμίκρυνση ({0}−)"
+"Zoom out ({0}−)":"Σμίκρυνση ({0}−)",
+"compared with yesterday up to the same hour":"σε σύγκριση με χθες μέχρι την ίδια ώρα",
+"compared with last week up to the same day and hour":"σε σύγκριση με την προηγούμενη εβδομάδα μέχρι την ίδια ημέρα και ώρα",
+"compared with last month up to the same day and hour":"σε σύγκριση με τον προηγούμενο μήνα μέχρι την ίδια ημέρα και ώρα",
+"compared with last year up to the same day and hour":"σε σύγκριση με πέρυσι μέχρι την ίδια ημέρα και ώρα",
+"The app restarted while this turn was waiting for its model, so the turn stopped there: send a message to carry on":"Η εφαρμογή επανεκκινήθηκε ενώ αυτός ο γύρος περίμενε το μοντέλο του, γι’ αυτό ο γύρος σταμάτησε εκεί: στείλτε ένα μήνυμα για να συνεχίσει",
+"The turn failed":"Ο γύρος απέτυχε"
 }

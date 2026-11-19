@@ -14,8 +14,28 @@ import { LOCALE } from '../../i18n/locale';
 import { ModelPricesDialog } from './ModelPrices';
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+/** What the charts and the per-period table cover. */
 const WINDOW: Record<StatsGranularity, string> = { day: 'Last 30 days', week: 'Last 26 weeks', month: 'Last 12 months', year: 'By year' };
-const PREV: Record<StatsGranularity, string> = { day: 'previous 30 days', week: 'previous 26 weeks', month: 'previous 12 months', year: '' };
+/** What the tiles and the tables under the charts count: the period that holds now, so far. */
+const NOW: Record<StatsGranularity, string> = { day: 'Today', week: 'This week', month: 'This month', year: 'This year' };
+/** What their arrows compare it with. */
+const SAME_POINT: Record<StatsGranularity, string> = {
+  day: 'compared with yesterday up to the same hour',
+  week: 'compared with last week up to the same day and hour',
+  month: 'compared with last month up to the same day and hour',
+  year: 'compared with last year up to the same day and hour',
+};
+
+/** A period's dates in the app's language: "Wed, Nov 18", "Nov 16 – 22", "November 2026", "2026". */
+function periodDates(g: StatsGranularity, key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  if (g === 'year' || !m) return String(y);
+  const start = Date.UTC(y, m - 1, d || 1);
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(LOCALE, { ...o, timeZone: 'UTC' });
+  if (g === 'month') return f({ month: 'long', year: 'numeric' }).format(start);
+  if (g === 'day') return f({ weekday: 'short', month: 'short', day: 'numeric' }).format(start);
+  return f({ month: 'short', day: 'numeric' }).formatRange(start, start + 6 * 86400_000);
+}
 
 function Delta({ cur, prev }: { cur: number; prev: number }) {
   if (!prev) return null;
@@ -125,10 +145,11 @@ export function StatsBody() {
       localStorage.setItem('wa.stats.g', g);
     } catch {}
     setLoading(true);
-    api<StatsResponse>(`/api/stats?granularity=${g}&agent=${encodeURIComponent(agent)}&tz=${encodeURIComponent(TZ)}${model ? `&model=${encodeURIComponent(model)}` : ''}`)
+    // The tiles and the tables count the period that holds now; the charts, the window.
+    api<StatsResponse>(`/api/stats?granularity=${g}&period=current&agent=${encodeURIComponent(agent)}&tz=${encodeURIComponent(TZ)}${model ? `&model=${encodeURIComponent(model)}` : ''}`)
       .then((r) => {
         setData(r);
-        if (agent === 'all' && !model) setAgents(r.agents.map(({ id, name }) => ({ id, name })));
+        if (agent === 'all' && !model) setAgents((r.windowAgents ?? r.agents).map(({ id, name }) => ({ id, name })));
       })
       .catch(toastError)
       .finally(() => setLoading(false));
@@ -137,8 +158,12 @@ export function StatsBody() {
   const sz = useIsMobile() ? 'sm' : 'md';
   const t = data?.totals;
   const p = data?.previous;
-  const hasPrev = g !== 'year' && !!p && (p.prompts > 0 || p.tokensOut > 0);
+  const hasPrev = !!p && (p.prompts > 0 || p.tokensOut > 0);
   const b = (data?.buckets ?? []).map((x) => ({ ...x, label: periodLabel(g, x.key, x.label) }));
+  // The whole window, for the per-period table's total (an older server sends only totals, for the window).
+  const w = data?.window ?? t;
+  // While another granularity loads, the period shown is still the old one's.
+  const shownG = data?.granularity ?? g;
 
   return (
     <div>
@@ -190,8 +215,7 @@ export function StatsBody() {
             ]}
           />
           <span className="text-[12px] text-fg-3 sm:ml-auto">
-            {g === 'month' && b.length > 0 && b.length < 12 ? `Since ${b[0].label}` : WINDOW[g]}
-            {hasPrev && ` · arrows compare with the ${PREV[g]}`} · {TZ}
+            {g === 'month' && b.length > 0 && b.length < 12 ? `Since ${b[0].label}` : WINDOW[g]} · {TZ}
           </span>
         </div>
 
@@ -201,33 +225,47 @@ export function StatsBody() {
           </div>
         ) : (
           <div className={cx('space-y-4 transition-opacity', loading && 'opacity-60')}>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Tile i={0} icon={<Plus size={13} />} label="Lines added" format={whole} cur={t!.linesAdded} prev={hasPrev ? p!.linesAdded : undefined} />
-              <Tile i={1} icon={<Minus size={13} />} label="Lines removed" format={whole} cur={t!.linesRemoved} prev={hasPrev ? p!.linesRemoved : undefined} />
-              <Tile
-                i={2}
-                icon={<TextCursorInput size={13} />}
-                label="Input tokens"
-                format={whole}
-                sub={`${compact(t!.tokensIn)} fresh · ${compact(t!.tokensCached)} cached`}
-                cur={t!.tokensIn + t!.tokensCached}
-                prev={hasPrev ? p!.tokensIn + p!.tokensCached : undefined}
-              />
-              <Tile i={3} icon={<MessageSquare size={13} />} label="Output tokens" format={whole} cur={t!.tokensOut} prev={hasPrev ? p!.tokensOut : undefined} />
-              <Tile
-                i={4}
-                icon={<Gauge size={13} />}
-                label="Output speed"
-                format={(n) => `${num(Math.round(n))} tok/s`}
-                sub="avg over reply generation"
-                cur={tps(t!)}
-                prev={hasPrev ? tps(p!) : undefined}
-              />
-              <Tile i={5} icon={<CircleDollarSign size={13} />} label="API cost (est.)" format={dollars} sub="the same tokens at API prices" cur={t!.cost ?? 0} prev={hasPrev ? (p!.cost ?? 0) : undefined} />
-              <Tile i={6} icon={<TextCursorInput size={13} />} label="Prompts" format={whole} sub={`${compact(t!.turns)} turns`} cur={t!.prompts} prev={hasPrev ? p!.prompts : undefined} />
-              <Tile i={7} icon={<Users size={13} />} label="Sessions" format={whole} cur={t!.sessions} prev={hasPrev ? p!.sessions : undefined} />
-              <Tile i={8} icon={<SquareTerminal size={13} />} label="Commands" format={whole} sub={`${compact(t!.toolCalls)} tool calls`} cur={t!.commands} prev={hasPrev ? p!.commands : undefined} />
-              <Tile i={9} icon={<FileDiff size={13} />} label="File edits" format={whole} cur={t!.fileEdits} prev={hasPrev ? p!.fileEdits : undefined} />
+            <div>
+              {data.period && (
+                <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] text-fg-3">
+                  <h2 className="text-[14px] font-semibold text-fg">{NOW[shownG]}</h2>
+                  <span>{periodDates(shownG, data.period.key)}</span>
+                  {hasPrev && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{SAME_POINT[shownG]}</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Tile i={0} icon={<Plus size={13} />} label="Lines added" format={whole} cur={t!.linesAdded} prev={hasPrev ? p!.linesAdded : undefined} />
+                <Tile i={1} icon={<Minus size={13} />} label="Lines removed" format={whole} cur={t!.linesRemoved} prev={hasPrev ? p!.linesRemoved : undefined} />
+                <Tile
+                  i={2}
+                  icon={<TextCursorInput size={13} />}
+                  label="Input tokens"
+                  format={whole}
+                  sub={`${compact(t!.tokensIn)} fresh · ${compact(t!.tokensCached)} cached`}
+                  cur={t!.tokensIn + t!.tokensCached}
+                  prev={hasPrev ? p!.tokensIn + p!.tokensCached : undefined}
+                />
+                <Tile i={3} icon={<MessageSquare size={13} />} label="Output tokens" format={whole} cur={t!.tokensOut} prev={hasPrev ? p!.tokensOut : undefined} />
+                <Tile
+                  i={4}
+                  icon={<Gauge size={13} />}
+                  label="Output speed"
+                  format={(n) => `${num(Math.round(n))} tok/s`}
+                  sub="avg over reply generation"
+                  cur={tps(t!)}
+                  prev={hasPrev ? tps(p!) : undefined}
+                />
+                <Tile i={5} icon={<CircleDollarSign size={13} />} label="API cost (est.)" format={dollars} sub="the same tokens at API prices" cur={t!.cost ?? 0} prev={hasPrev ? (p!.cost ?? 0) : undefined} />
+                <Tile i={6} icon={<TextCursorInput size={13} />} label="Prompts" format={whole} sub={`${compact(t!.turns)} turns`} cur={t!.prompts} prev={hasPrev ? p!.prompts : undefined} />
+                <Tile i={7} icon={<Users size={13} />} label="Sessions" format={whole} cur={t!.sessions} prev={hasPrev ? p!.sessions : undefined} />
+                <Tile i={8} icon={<SquareTerminal size={13} />} label="Commands" format={whole} sub={`${compact(t!.toolCalls)} tool calls`} cur={t!.commands} prev={hasPrev ? p!.commands : undefined} />
+                <Tile i={9} icon={<FileDiff size={13} />} label="File edits" format={whole} cur={t!.fileEdits} prev={hasPrev ? p!.fileEdits : undefined} />
+              </div>
             </div>
 
             {view === 'table' ? (
@@ -257,7 +295,7 @@ export function StatsBody() {
                       ))}
                       <tr className="border-t border-line-2 font-semibold">
                         <td className="py-1.5 pr-4">Total</td>
-                        {totalsRow(t!).map((v, i) => (
+                        {totalsRow(w!).map((v, i) => (
                           <td key={i} className="py-1.5 pr-4 text-right">
                             {num(v)}
                           </td>
@@ -335,7 +373,7 @@ export function StatsBody() {
             )}
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card title="By agent">
+              <Card title="By agent" sub={NOW[shownG]}>
                 <div className="overflow-x-auto">
                 <table className="tnum w-full text-[12.5px]">
                   <thead>
@@ -372,7 +410,16 @@ export function StatsBody() {
                 </table>
                 </div>
               </Card>
-              <Card title="Top projects" sub="by lines changed">
+              <Card
+                title="Top projects"
+                sub={
+                  <>
+                    <span>{NOW[shownG]}</span>
+                    <span aria-hidden> · </span>
+                    <span>by lines changed</span>
+                  </>
+                }
+              >
                 <div className="overflow-x-auto">
                 <table className="tnum w-full table-fixed text-[12.5px] sm:table-auto">
                   <thead>
@@ -406,6 +453,8 @@ export function StatsBody() {
                 title="By model"
                 sub={
                   <span>
+                    <span>{NOW[shownG]}</span>
+                    <span aria-hidden> · </span>
                     {model ? 'Showing one model · ' : 'Click a model to see it alone · '}
                     <button onClick={() => setPricing(true)} className="text-accent hover:underline">
                       Model prices

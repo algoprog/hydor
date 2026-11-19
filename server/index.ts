@@ -68,7 +68,7 @@ import { Phone, phoneRoutes } from './phone/index.ts';
 import { isAbsPath, trimSep, within } from './platform.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
-import { computeStats } from './stats.ts';
+import { computeStats, periodKey } from './stats.ts';
 import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
@@ -1596,11 +1596,13 @@ app.put('/api/claude-retention', async (req) => {
   setClaudeRetention(!!(req.body as { keep?: boolean })?.keep);
   return claudeRetention();
 });
-app.get('/api/stats', async (req) => {
+app.get('/api/stats', async (req, reply) => {
   const q = req.query as Record<string, string>;
-  if (db.prepare("select 1 from sessions where model like 'openrouter/%' limit 1").get()) await refreshOpenRouterPrices();
   const g = (['day', 'week', 'month', 'year'] as const).find((x) => x === q.granularity) ?? 'day';
-  return computeStats(db, { granularity: g, tz: q.tz, agent: q.agent, model: q.model, count: q.count ? Number(q.count) : undefined });
+  if (q.period && q.period !== 'current' && !periodKey(g, q.period))
+    return reply.code(400).send({ error: 'The period is "current" or one that fits the granularity: a day (2026-11-18), any day of a week, a month (2026-11) or a year (2026).' });
+  if (db.prepare("select 1 from sessions where model like 'openrouter/%' limit 1").get()) await refreshOpenRouterPrices();
+  return computeStats(db, { granularity: g, tz: q.tz, agent: q.agent, model: q.model, count: q.count ? Number(q.count) : undefined, period: q.period || undefined });
 });
 
 // ---- pull requests --------------------------------------------------------------------------

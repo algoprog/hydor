@@ -907,13 +907,23 @@ export interface StatsResponse {
   agent: string;
   /** The one model shown, when the page asked for one. */
   model?: string;
+  /**
+   * The one period the totals, `previous` and the breakdowns cover, when one was asked for (the page asks for the
+   * current one: today, this week, this month, this year). `current`: it holds now, so it is counted so far.
+   */
+  period?: { key: string; label: string; start: number; current: boolean };
+  /** The whole window's totals, when the rest covers one period. */
+  window?: StatsTotals;
   buckets: StatsBucket[];
+  /** The window's totals, or the one period's. */
   totals: StatsTotals;
-  /** The same number of buckets just before this window. */
+  /** The same number of buckets just before the window; for one period, the period before it, up to the same point while the period runs. */
   previous: StatsTotals;
   byAgent: Record<Agent, StatsTotals>;
-  /** Each agent with activity in the window, by name: Claude Code, Codex, then each ACP agent (Custom…). */
+  /** Each agent with activity in the window (or the one period), by name: Claude Code, Codex, then each ACP agent (Custom…). */
   agents: (StatsTotals & { id: string; name: string })[];
+  /** Each agent with activity in the whole window, in the same order: what the page's agent filter offers. */
+  windowAgents?: { id: string; name: string }[];
   projects: (StatsTotals & { cwd: string })[];
   byModel: ModelUsage[];
 }

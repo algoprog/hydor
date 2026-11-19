@@ -93,14 +93,14 @@ The **Activity** tab (`/stats`) counts what the agents did, from the sessions th
 
 At the top:
 
-- **Daily** (the last 30 days), **Weekly** (26 weeks), **Monthly** (12 months, or since your history starts) or **Yearly** (by year). The page remembers your pick.
+- **Daily**, **Weekly**, **Monthly** or **Yearly**: the period the numbers count, and one bar per day, week, month or year in the charts. The page remembers your pick.
 - **All**, or one agent: **Claude**, **Codex**, **Custom**, and any other agent that has done something here (Gemini CLI, OpenCode…).
 - A model's chip, when you picked one model in **By model** below: the page then counts that model alone. Click the chip (its **✕**) to see every model again.
 - **Charts** or **Table**.
 
-The line beside them names the range and your time zone. Days, weeks and months follow your time zone.
+The line beside them names the range the charts and the table cover (the last 30 days, the last 26 weeks, the last 12 months or since your history starts, or every year) and your time zone. Days, weeks and months follow your time zone, and a week starts on Monday.
 
-The tiles show the totals for the range:
+Under them is the period so far, **Today**, **This week**, **This month** or **This year**, with its dates. The tiles show its totals:
 
 - **Lines added** and **Lines removed**
 - **Input tokens** (what the models read: fresh and cached) and **Output tokens** (what they wrote)
@@ -108,11 +108,11 @@ The tiles show the totals for the range:
 - **API cost (est.)**: what the same tokens would cost through the API
 - **Prompts** (with the number of turns), **Sessions**, **Commands** (with the number of tool calls) and **File edits**
 
-The small arrow on a tile compares with the same length of time just before ("arrows compare with the previous 30 days"). It's neutral: more isn't better or worse.
+The small arrow on a tile compares with the period before, up to the same point: on a Wednesday at 15:00, this week with last week from Monday until Wednesday 15:00; today with yesterday until the same hour. The line beside the period's name says so ("compared with last week up to the same day and hour"). It's neutral: more isn't better or worse.
 
-**Charts** shows lines changed (added up, removed down), input tokens (fresh and cached), output tokens, output speed, and small charts for prompts, sessions, commands and file edits, one bar per day, week, month or year. **Table** lists the same numbers per period, newest first, with a total.
+**Charts** shows lines changed (added up, removed down), input tokens (fresh and cached), output tokens, output speed, and small charts for prompts, sessions, commands and file edits, one bar per day, week, month or year over the range; the last bar is the period so far. **Table** lists the same numbers per period, newest first, with the total for the whole range.
 
-Below, in both views:
+Below, in both views, the period so far again, as the tiles count it:
 
 - **By agent**: each agent by name (Claude Code, Codex, Custom, Gemini CLI and the others that did something), with sessions, prompts, lines, input and output.
 - **Top projects**: the folders with the most lines changed.
@@ -178,6 +178,7 @@ There is no button to clear Activity. Deleting a session yourself (its menu → 
 - "Turn on resuming sessions after usage limits."
 - "Continue my session 'Refactor auth' when the Codex limit resets."
 - "What would last month's work have cost at API prices, by model?"
+- "How does this week compare with last week so far?"
 - "Why does the Today line on my start page show $3.10 when I am on a plan?"
 - "Count my Ollama models as free in the cost estimates."
 - "How much did Custom do this month, and with which models?"

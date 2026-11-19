@@ -1222,7 +1222,6 @@
 "· about":"· 约",
 "· about {0} tokens/s":"· 约 {0} tokens/s",
 "· an agent if it fails":"· 失败时由智能体接手",
-"· arrows compare with the {0}":"· 箭头表示与 {0} 相比",
 "· at most {0} with the cap of {1} a run":"· 按每次运行 {1} 的上限，最多 {0}",
 "· by":"· 来自",
 "· cannot start":"· 无法启动",
@@ -6287,9 +6286,6 @@
 "Previews are off":"预览已关闭",
 "Previews are off (PREVIEW_PORT=0)":"预览已关闭（PREVIEW_PORT=0）",
 "Previous":"上一个",
-"previous 12 months":"此前 12 个月",
-"previous 26 weeks":"此前 26 周",
-"previous 30 days":"此前 30 天",
 "Price":"价格",
 "price drop track deal":"降价 追踪 优惠",
 "Price watch":"价格监控",
@@ -25971,5 +25967,11 @@
 "Your lists":"你的列表",
 "your own browsing home page search engine google duckduckgo bing suggestions search shortcuts site search keywords yt wiki github youtube wikipedia page zoom default zoom check spelling spell check underline ad blocker block ads trackers cookie banners translate translation dark pages autoplay sound reader view clear browsing data history cookies cache desktop app":"自己的浏览 主页 搜索引擎 google duckduckgo bing 搜索建议 搜索快捷词 快捷词 站内搜索 关键词 yt wiki gh youtube 维基百科 页面缩放 默认缩放 缩放 检查拼写 拼写检查 下划线 广告拦截器 拦截广告 跟踪器 Cookie 横幅 翻译 深色网页 自动播放 声音 阅读视图 清除浏览数据 历史记录 cookie 缓存 桌面应用",
 "Zoom in ({0}+)":"放大（{0}+）",
-"Zoom out ({0}−)":"缩小（{0}−）"
+"Zoom out ({0}−)":"缩小（{0}−）",
+"compared with yesterday up to the same hour":"与昨天截至同一小时相比",
+"compared with last week up to the same day and hour":"与上周截至同一天同一小时相比",
+"compared with last month up to the same day and hour":"与上个月截至同一天同一小时相比",
+"compared with last year up to the same day and hour":"与去年截至同一天同一小时相比",
+"The app restarted while this turn was waiting for its model, so the turn stopped there: send a message to carry on":"应用在这一轮等待模型时重新启动了，所以这一轮在那里停止了：发送一条消息即可继续",
+"The turn failed":"这一轮失败了"
 }

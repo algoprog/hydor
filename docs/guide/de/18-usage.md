@@ -93,14 +93,14 @@ Der Tab **Aktivität** (`/stats`) erfasst die Arbeit der Agenten aus den Sitzung
 
 Oben wählst du:
 
-- **Täglich** für die letzten 30 Tage, **Wöchentlich** für 26 Wochen, **Monatlich** für zwölf Monate oder seit Beginn deiner Historie und **Jährlich** nach Kalenderjahr. Die Seite merkt sich deine Auswahl.
+- **Täglich**, **Wöchentlich**, **Monatlich** oder **Jährlich**: der Zeitraum, den die Zahlen erfassen, und in den Diagrammen ein Balken pro Tag, Woche, Monat oder Jahr. Die Seite merkt sich deine Auswahl.
 - **Alle** oder einen Agenten: **Claude**, **Codex**, **Custom** und weitere hier bereits aktive Agenten wie Gemini CLI oder OpenCode.
 - Ein Modell, wenn du es weiter unten unter **Nach Modell** ausgewählt hast. Die Seite zeigt dann nur dessen Werte. Mit dem **✕** an seiner Markierung wechselst du zurück zu allen Modellen.
 - **Diagramme** oder **Tabelle**.
 
-Daneben stehen Zeitraum und Zeitzone. Tage, Wochen und Monate richten sich nach deiner Zeitzone.
+Daneben stehen der Bereich, den die Diagramme und die Tabelle abdecken (die letzten 30 Tage, die letzten 26 Wochen, die letzten zwölf Monate oder seit Beginn deiner Historie, oder alle Jahre), und deine Zeitzone. Tage, Wochen und Monate richten sich nach deiner Zeitzone, und eine Woche beginnt am Montag.
 
-Die Kacheln zeigen die Summen für den gewählten Zeitraum:
+Darunter steht der laufende Zeitraum, **Heute**, **Diese Woche**, **Diesen Monat** oder **Dieses Jahr**, mit seinen Daten. Die Kacheln zeigen seine Summen:
 
 - **Zeilen hinzugefügt** und **Zeilen entfernt**;
 - **Eingabetoken**, also neu eingelesene und aus dem Cache gelesene Token, und **Ausgabetoken**, also erzeugten Text;
@@ -108,11 +108,11 @@ Die Kacheln zeigen die Summen für den gewählten Zeitraum:
 - **API-Kosten (geschätzt)** für dieselbe Tokenmenge bei API-Abrechnung;
 - **Prompts** mit der Anzahl der Durchläufe, **Sitzungen**, **Befehle** mit der Anzahl der Tool-Aufrufe und **Dateiänderungen**.
 
-Der kleine Pfeil auf einer Kachel vergleicht den Wert mit dem unmittelbar vorhergehenden gleich langen Zeitraum, etwa den vorherigen 30 Tagen. Die Anzeige ist neutral: Mehr bedeutet weder besser noch schlechter.
+Der kleine Pfeil auf einer Kachel vergleicht mit dem Zeitraum davor, bis zum selben Punkt: Am Mittwoch um 15:00 Uhr wird diese Woche mit der letzten Woche von Montag bis Mittwoch 15:00 Uhr verglichen, heute mit gestern bis zur selben Stunde. Die Zeile neben dem Namen des Zeitraums sagt das („verglichen mit der letzten Woche bis zum selben Tag und zur selben Stunde“). Die Anzeige ist neutral: Mehr bedeutet weder besser noch schlechter.
 
-**Diagramme** zeigt geänderte Zeilen, hinzugefügte nach oben und entfernte nach unten, Eingabetoken mit neuem und aus dem Cache gelesenem Anteil, Ausgabetoken und Ausgabegeschwindigkeit. Hinzu kommen kleine Balkendiagramme für Prompts, Sitzungen, Befehle und Dateiänderungen. Jeder Balken entspricht einem Tag, einer Woche, einem Monat oder einem Jahr. **Tabelle** zeigt dieselben Werte je Zeitraum, neueste zuerst, mit einer Gesamtsumme.
+**Diagramme** zeigt geänderte Zeilen, hinzugefügte nach oben und entfernte nach unten, Eingabetoken mit neuem und aus dem Cache gelesenem Anteil, Ausgabetoken und Ausgabegeschwindigkeit. Hinzu kommen kleine Balkendiagramme für Prompts, Sitzungen, Befehle und Dateiänderungen. Jeder Balken entspricht einem Tag, einer Woche, einem Monat oder einem Jahr des Bereichs; der letzte Balken ist der laufende Zeitraum. **Tabelle** zeigt dieselben Werte je Zeitraum, neueste zuerst, mit der Gesamtsumme für den ganzen Bereich.
 
-Darunter findest du in beiden Ansichten:
+Weiter unten findest du in beiden Ansichten noch einmal den laufenden Zeitraum, so gezählt wie in den Kacheln:
 
 - **Nach Agent**: jeder Agent mit Namen (Claude Code, Codex, Custom, Gemini CLI und die anderen, die etwas getan haben), mit Sitzungen, Prompts, Zeilen, Eingabe und Ausgabe.
 - **Top-Projekte**: die Ordner mit den meisten geänderten Zeilen.
@@ -178,6 +178,7 @@ Es gibt keinen Knopf zum Leeren der Aktivitätsdaten. Löschst du eine Sitzung s
 - „Aktiviere die automatische Fortsetzung nach Nutzungslimits.“
 - „Setze meine Sitzung ‚Refactor auth‘ fort, sobald das Codex-Limit zurückgesetzt ist.“
 - „Was hätte die Arbeit des letzten Monats zu API-Preisen je Modell gekostet?“
+- „Wie schneidet diese Woche bisher im Vergleich zur letzten Woche ab?“
 - „Warum zeigt die Heute-Zeile auf meiner Startseite $3.10, obwohl ich ein Abo habe?“
 - „Zähle meine Ollama-Modelle bei der Kostenschätzung als kostenlos.“
 - „Wie viel hat Custom diesen Monat erledigt und mit welchen Modellen?“
