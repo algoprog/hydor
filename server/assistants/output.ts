@@ -1,7 +1,7 @@
 // What an agent hands back, and where it goes. An agent with an output (fields to fill in, places to send each result)
 // gets hand_back in its sessions: the result is checked against its fields as an app's answer is (the agent fixes what
-// the check says and calls again), then written to a file in its folder, kept as a page in the Library (the same page
-// each run, as a new version, or a new page each run), added as a row to a Library spreadsheet (resultSheet.ts),
+// the check says and calls again), then written to a file in its folder, kept as a page (the same page
+// each run, as a new version, or a new page each run), added as a row to a spreadsheet (resultSheet.ts),
 // emailed to people from a connected mail account (resultMail.ts), posted to a webhook (signed with a key from the
 // vault, only to the hosts the key is allowed for) and sent as a notification, as its output says. Every result is kept
 // in the agent's history (results.ts), for its page.
@@ -141,7 +141,7 @@ interface Delivery {
   now?: Date;
 }
 
-/** The Library changed: its lists and an open editor hear of it, and the page's picture is taken again. */
+/** The pages changed: their lists and an open editor hear of it, and the page's picture is taken again. */
 function libraryChanged(x: Delivery, id: string) {
   x.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
   refreshThumbs(x.deps as Deps, [id]);
@@ -181,7 +181,7 @@ async function deliver(t: OutputTarget, x: Delivery): Promise<Omit<ResultSent, '
     if (t.each === 'new') {
       const p = createPage(x.db, { title: heading, html, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back on ${stamp(now).date}` });
       libraryChanged(x, p.id);
-      return { detail: `the Library, as "${p.title}"`, page: p.id };
+      return { detail: `a page, "${p.title}"`, page: p.id };
     }
     // The same page each run, as a new version of it: made by the first run, named after the agent.
     const { id, gone } = pageFor(x, 'library', t.page);
@@ -190,7 +190,7 @@ async function deliver(t: OutputTarget, x: Delivery): Promise<Omit<ResultSent, '
       : createPage(x.db, { title: x.agent.name, html, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back last: a new version each run` });
     if (!id) setMade(x.db, x.agent.id, 'library', p.id);
     libraryChanged(x, p.id);
-    return { detail: `the Library, "${p.title}" version ${p.version}${gone ? ' (the page picked is no longer there)' : ''}`, page: p.id };
+    return { detail: `the page "${p.title}", version ${p.version}${gone ? ' (the page picked is no longer there)' : ''}`, page: p.id };
   }
   if (t.kind === 'sheet') {
     // Read, add the row and save with nothing in between, so two runs at once each add their own.
@@ -257,7 +257,7 @@ export async function handOn(x: Delivery): Promise<AgentResult['sent']> {
 /** A place an agent's results go, in words for it: which file, which page, who an email goes to. */
 export function placeWords(t: OutputTarget): string {
   if (t.kind === 'file') return `the file ${t.path}`;
-  if (t.kind === 'library') return t.each === 'new' ? 'a new page in the Library each time' : 'a page in the Library, updated each time';
+  if (t.kind === 'library') return t.each === 'new' ? 'a new page each time' : 'a page, updated each time';
   if (t.kind === 'email') return `an email to ${t.to.join(', ')}`;
   return PLACE[t.kind];
 }

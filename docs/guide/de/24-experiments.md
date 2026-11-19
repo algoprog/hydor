@@ -119,7 +119,7 @@ Anschließend kannst du:
 
 - **LaTeX kopieren**: erzeugt eine `table` mit booktabs-Linien. Ergänze `\usepackage{booktabs}` in der Präambel. Bestwerte verwenden `\textbf`, dazu kommen `$\pm$`, Signifikanzzeichen und eine erklärende Beschriftung.
 - **Markdown kopieren** oder **CSV herunterladen**: mit Mittelwert, Standardabweichung, Laufanzahl und p-Werten je Metrik.
-- **In ein LaTeX-Dokument einfügen**: Wähle ein LaTeX-Dokument aus der [Bibliothek](/library) und eine seiner Dateien. Die Tabelle wird vor `\end{document}` eingefügt, bei Dateien ohne diesen Befehl am Ende. Eine zuvor dort von der App erstellte Tabelle wird ersetzt; deine Beschriftung und dein Label bleiben erhalten. Wie bei eigenen Änderungen entsteht eine neue Dokumentversion.
+- **In ein LaTeX-Dokument einfügen**: Wähle eines deiner LaTeX-Dokumente (in den Dateien eines Projekts oder bei seiner Unterhaltung behalten) und eine seiner Dateien. Die Tabelle wird vor `\end{document}` eingefügt, bei Dateien ohne diesen Befehl am Ende. Eine zuvor dort von der App erstellte Tabelle wird ersetzt; deine Beschriftung und dein Label bleiben erhalten. Wie bei eigenen Änderungen entsteht eine neue Dokumentversion.
 
 Beim Kopieren oder Einfügen wird die Tabelle gespeichert. Im LaTeX steht unmittelbar vor tabular die Zeile `% hydor:table <id>`. Behalte sie bei, damit die Prüfung vor einer Einreichung Werte aus den Läufen neu berechnen und Änderungen erkennen kann. **Ergebnistabellen** im oberen Menü (⋯) listet gespeicherte Tabellen. Du kannst sie erneut kopieren oder einfügen oder mit **Neu berechnen** aus dem aktuellen Stand der Läufe aktualisieren.
 

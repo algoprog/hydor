@@ -227,7 +227,7 @@ export function DesignEdit({
         label: title || tr('The design'),
         put: async (r) => {
           if (!r.src) return;
-          if (!(await editRef.current?.html().catch(() => ''))) throw new Error('The design it came from is closed: Save a copy keeps the picture in your Library.');
+          if (!(await editRef.current?.html().catch(() => ''))) throw new Error('The design it came from is closed: Save a copy keeps the picture as a file of its own.');
           const data = await pageData(r.src);
           cmd('select', { path });
           cmd('picture', { src: data });
@@ -242,7 +242,7 @@ export function DesignEdit({
     const el = sel?.el;
     const v = el?.video;
     const src = v ? videoSrcOf(v.src) : null;
-    if (!el || !src) return toast('Only a video from your device, the Library or made with AI opens in the video editor');
+    if (!el || !src) return toast('Only a video from your device, a saved one or made with AI opens in the video editor');
     const path = el.path;
     editKeptVideo(src, {
       title: tr('Video'),

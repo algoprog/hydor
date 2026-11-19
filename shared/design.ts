@@ -1,4 +1,4 @@
-// Designs: posters, flyers, social posts, cards, as in Canva or Adobe Express. A design is a page of the Library like any
+// Designs: posters, flyers, social posts, cards, as in Canva or Adobe Express. A design is a kept page like any
 // other (it opens, saves, keeps its versions, exports and is published as pages are), whose body holds one or more
 // artboards of a fixed size, each with its elements placed on it where they are, as a slide holds its parts:
 //

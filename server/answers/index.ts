@@ -17,12 +17,12 @@ export const HOW_TO_WRITE = [
 ].join(' ');
 
 /**
- * How a card reads its numbers from a Library spreadsheet or a data file (shared/answer-ui/data-ref.ts): said once,
+ * How a card reads its numbers from a saved spreadsheet or a data file (shared/answer-ui/data-ref.ts): said once,
  * after the UIs, when find_ui gives one that can.
  */
 export const REF_HOW = [
-  'Reading numbers from a spreadsheet or a file: the UIs above that say "Or from a spreadsheet or a file" take, in place of their values, where the numbers are and what of them to show, and read them each time they are shown (a card pinned to a board stays current with its spreadsheet). Use it when the numbers live in a spreadsheet of the user’s Library or in a data file, when there are more than a few dozen rows, or for a card the user may pin and keep; type the values in for a few numbers of your own.',
-  '- from: {"sheet": "Shop numbers", "range": "Sales"}: a Library spreadsheet by its name or id; range a tab’s name for all of it (rows added later are read too: best for a card to keep), whole columns ("Sales!A:D"), cells ("Sales!A1:D400": those alone) or a named range; the first tab unless set; the first row holds the headings. Or {"file": "data/sales.csv"}: a CSV, TSV, JSON, JSONL or GeoJSON file in the session’s folder (a path from it) or its project’s (a full path), up to 50 MB (JSON 20 MB) and 1,000,000 rows.',
+  'Reading numbers from a spreadsheet or a file: the UIs above that say "Or from a spreadsheet or a file" take, in place of their values, where the numbers are and what of them to show, and read them each time they are shown (a card pinned to a board stays current with its spreadsheet). Use it when the numbers live in a spreadsheet the user saved or in a data file, when there are more than a few dozen rows, or for a card the user may pin and keep; type the values in for a few numbers of your own.',
+  '- from: {"sheet": "Shop numbers", "range": "Sales"}: a saved spreadsheet by its name or id; range a tab’s name for all of it (rows added later are read too: best for a card to keep), whole columns ("Sales!A:D"), cells ("Sales!A1:D400": those alone) or a named range; the first tab unless set; the first row holds the headings. Or {"file": "data/sales.csv"}: a CSV, TSV, JSON, JSONL or GeoJSON file in the session’s folder (a path from it) or its project’s (a full path), up to 50 MB (JSON 20 MB) and 1,000,000 rows.',
   '- Columns by their headings, as they are or summed up: sum(Revenue), avg, median, count() (rows), count(Revenue) (filled cells), distinct (different values), min, max, first, last; "… as Label" names one. Grouped rows give a column that is not grouped by its first value.',
   "- where: a filter such as \"Region = 'EU' and Revenue > 1000\": = != < <= > >=, in ('A', 'B'), contains 'x', starts with, ends with, is empty, is not empty, between 1 and 5, and, or, not, brackets. Words go in single quotes and match in any case; a heading with spaces goes in [brackets]; dates written 2026-01-31 compare in order.",
   '- groupBy: a heading (or a list): a row for each of its values. sort: a heading or what the card shows, "-" first for the highest first ("-sum(Revenue)"). limit: how many rows.',
@@ -118,7 +118,7 @@ export function findUiTool(): RunTool {
 
 export const answers: Feature = {
   id: 'answers',
-  // Cards that read their data from a Library spreadsheet or a data file (data.ts).
+  // Cards that read their data from a saved spreadsheet or a data file (data.ts).
   routes: dataRoutes,
   tools: () => [findUiTool()],
 };

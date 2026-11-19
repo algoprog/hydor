@@ -1,6 +1,6 @@
 // Kinds of thing an agent makes on request, each with what it is asked to make: a slide added to a deck open, a new
 // deck, a document, a section added to a document open, a page, a part added to a page open, a spreadsheet. People
-// pick one in a gallery (the editors' "made with AI" items, and New in the Library), say what it is about if they
+// pick one in a gallery (the editors' "made with AI" items, and New), say what it is about if they
 // like, and the request is made from its `ask`, their words and where it goes (content-asks.ts); agents asked for one
 // by name read the same `ask` with how_to_make (server/pages/content-types.ts). An `ask` says what goes in it, in what
 // order, how it looks and where a picture, a drawing or a chart helps; it is English for the agent, never shown as

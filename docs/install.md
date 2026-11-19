@@ -19,7 +19,7 @@ date. [Back to the README](../README.md).
   and uses it). With Docker or the installer, a Chrome or Chromium on the
   computer is used when there is one, and Settings → Browser can download Chrome for Testing (about 170 MB) when there
   is not (the Docker image has its own).
-- Search by meaning (memory and the Library found by what they mean, as well as by their words) is on unless you turn
+- Search by meaning (memory and what you keep, found by what they mean, as well as by their words) is on unless you turn
   it off in Settings → Memory, and sets itself up a minute after the app first starts: it needs Python 3.10 or newer
   (or [uv](https://docs.astral.sh/uv/), which brings its own; the Docker image has Python), about 2 GB of disk (6 GB
   with an NVIDIA GPU) and a 1.2 GB model download, once. Without them, everything is found by its words alone.
@@ -38,8 +38,8 @@ date. [Back to the README](../README.md).
   - On a Mac, [MacTeX](https://tug.org/mactex/) has them all (BasicTeX does not: New → LaTeX names the
     `sudo tlmgr install …` that adds what it lacks). On Windows, [MiKTeX](https://miktex.org/) installs what a
     document needs the first time it is typeset, so every template is offered; TeX Live for Windows has them all.
-- Optional: [ffmpeg](https://ffmpeg.org/) (`sudo apt install ffmpeg`), for the Library to take a video's frames,
-  which its title and description are written from, and stills of videos, and a sound's length and shape; and for
+- Optional: [ffmpeg](https://ffmpeg.org/) (`sudo apt install ffmpeg`), for taking a video's frames (a project's Files show one as a video's picture; its title and description are
+  written from them), stills of videos, and a sound's length and shape; and for
   voice samples in any format (without it, WAV and MP3 only). Without it, a video's description comes from the
   words it was made from. The Docker image has it (`--build-arg FFMPEG=false` leaves it out).
 

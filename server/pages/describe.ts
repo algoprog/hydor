@@ -1,7 +1,7 @@
-// Descriptions of what comes into the Library without one: a file added (dropped on the Library, opened in New, saved
+// Descriptions of what is kept without one: a file added (dropped on a project's Files, opened in New, saved
 // to it from Files or a conversation), a page kept from a conversation, or an agent's save that left it out. The helper
 // model (Settings → Models) reads the start of it and says what it is in a few sentences, as the agent that saves
-// something does (at most DESCRIPTION_WORDS words); the Library's search, the search box and agents then find it by
+// something does (at most DESCRIPTION_WORDS words); the search box and agents then find it by
 // it. One at a time, in the background, so adding a folder of files never waits for it. A description written
 // meanwhile (by the user, or an agent) stays. What a confidential session saved is read only by a helper model that
 // runs on this computer, when there is one. Without a helper that answers, it stays without one, found by its title.
@@ -18,7 +18,7 @@ import { describePage, pageInfo, pageSource } from './store.ts';
 const READ = 6000;
 
 const SYSTEM = [
-  `You write the description of something kept in a person's library (a page, a slide deck, a document, a spreadsheet, a LaTeX document, a notebook or a diagram), so that they and their agents find it again by searching.`,
+  `You write the description of something a person has kept (a page, a slide deck, a document, a spreadsheet, a LaTeX document, a notebook or a diagram), so that they and their agents find it again by searching.`,
   `In at most ${DESCRIPTION_WORDS} words, and best in two or three sentences: what it is, what it holds or covers, and what it is for, with the names, topics, places and dates someone would search for.`,
   'Write in the language the item is written in. Answer with the description alone: no title, no quotes, no lead-in such as "This document".',
 ].join(' ');

@@ -1,9 +1,9 @@
-// Answer cards that read their data from a Library spreadsheet or a data file (shared/answer-ui/data-ref.ts says how a
+// Answer cards that read their data from a saved spreadsheet or a data file (shared/answer-ui/data-ref.ts says how a
 // card names it and what it shows of it). The page drawing such a card asks here, with the card's data and the session
 // (or the board) it is drawn in:
 //   POST /api/answers/data   { ui, data, session?, board? } → { data, source, readAt, matched, rows, shown?, total?, notes }
 // What a card may read:
-// - A spreadsheet of the Library, by its id or name (the most recently changed of that name), a tab and a range (the
+// - A saved spreadsheet, by its id or name (the most recently changed of that name), a tab and a range (the
 //   first row its headings), or a named range; but not one made in a confidential session, unless the card is drawn in
 //   that session or in another confidential one (as get_page keeps them from other sessions' agents).
 // - A CSV, TSV, JSON, JSONL or GeoJSON file in the session's folder or a folder of its project (the project's own, its
@@ -28,7 +28,7 @@ import { readBook } from '../pages/sheets.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceById, spaceOfSession } from '../spaces/index.ts';
 
-/** Where a card is drawn: the session of its reply, or the board (a Library page) it is pinned to. */
+/** Where a card is drawn: the session of its reply, or the board (a saved page) it is pinned to. */
 export interface DrawnIn {
   session?: string;
   board?: string;
@@ -93,7 +93,7 @@ export function readerFor(db: DB, at: DrawnIn): Reader {
   let session = typeof at.session === 'string' && at.session ? at.session : undefined;
   if (typeof at.board === 'string' && at.board) {
     const board = pageInfo(db, at.board);
-    if (!board) throw new HttpError(404, 'That board is no longer in the Library.');
+    if (!board) throw new HttpError(404, 'That board is no longer there.');
     if (board.space && spaceById(db, board.space)) folders.push(...projectFolders(db, board.space));
     session ??= board.sessionKey;
   }
@@ -191,15 +191,15 @@ export const keptSources = () => tables.size;
 function sheetPage(db: DB, name: string) {
   const byId = pageInfo(db, name);
   if (byId && !byId.app) {
-    if (byId.kind !== 'sheet') throw new HttpError(400, `“${byId.title}” in the Library is not a spreadsheet.`);
+    if (byId.kind !== 'sheet') throw new HttpError(400, `“${byId.title}” is not a spreadsheet.`);
     return byId;
   }
   const want = name.replace(/\s+/g, ' ').trim().toLowerCase();
   const all = listPages(db).filter((p) => p.title.replace(/\s+/g, ' ').trim().toLowerCase() === want);
   const sheet = all.find((p) => p.kind === 'sheet');
   if (sheet) return sheet;
-  if (all.length) throw new HttpError(400, `“${all[0].title}” in the Library is not a spreadsheet.`);
-  throw new HttpError(404, `There is no spreadsheet called “${name}” in the Library.`);
+  if (all.length) throw new HttpError(400, `“${all[0].title}” is not a spreadsheet.`);
+  throw new HttpError(404, `There is no spreadsheet called “${name}”.`);
 }
 
 /** A cell's value for a card: numbers as numbers, dates and times as they are written (2026-01-31), errors as empty. */
@@ -494,7 +494,7 @@ const KINDS: Record<string, 'csv' | 'tsv' | 'json' | 'jsonl'> = { '.csv': 'csv',
 async function readFileRef(reader: Reader, given: string): Promise<{ kept: Kept; source: CardData['source'] }> {
   const file = fileFor(reader, given);
   const kind = KINDS[path.extname(file).toLowerCase()];
-  if (!kind) throw new HttpError(400, `${path.basename(file)} is not a file a card reads: give a CSV, TSV, JSON or JSONL file (or a spreadsheet of the Library).`);
+  if (!kind) throw new HttpError(400, `${path.basename(file)} is not a file a card reads: give a CSV, TSV, JSON or JSONL file (or a saved spreadsheet).`);
   const st = await fs.promises.stat(file).catch(() => null);
   if (!st?.isFile()) throw new HttpError(404, `There is no file ${given}.`);
   const max = kind === 'json' ? REF_LIMITS.jsonBytes : REF_LIMITS.fileBytes;

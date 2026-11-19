@@ -2,8 +2,8 @@
 // OpenRouter's models (two image models: one for most pictures, Best, and one for simple ones, Quick: icons,
 // backgrounds, textures; a video model, a music model and a voice and sound model; each list opens in a dialog, to
 // search and sort), the picture tools on this computer (cutouts and erasing, free and private: set up or removed
-// here, with what they are doing), and the model that writes the titles and descriptions of what you keep in the
-// Library: where it runs (the app's choice, OpenRouter, Claude, a model of your own) and which. Making them uses
+// here, with what they are doing), and the model that writes the titles and descriptions of what you keep:
+// where it runs (the app's choice, OpenRouter, Claude, a model of your own) and which. Making them uses
 // the OpenRouter key from Settings → Models; without one, this says where to add it.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { AudioLines, Check, Copy, Cpu, ExternalLink, Film, HardDriveDownload, ImagePlay, KeyRound, MessagesSquare, Mic, Music, PenLine, Search, Sparkles, Trash2, Type, X } from 'lucide-react';
@@ -552,7 +552,7 @@ export function ImagesSettings() {
       )}
       <Group
         title="Making images"
-        info="Ask any agent for a picture, a short video, a song or a voice-over (“a logo for my bakery”, “ten seconds of waves at dusk”, “a jingle for my podcast”) and it makes it with a model through OpenRouter, once you have checked its settings and price on a short form. Keep what you like in your Library. Each image is paid for with your OpenRouter key."
+        info="Ask any agent for a picture, a short video, a song or a voice-over (“a logo for my bakery”, “ten seconds of waves at dusk”, “a jingle for my podcast”) and it makes it with a model through OpenRouter, once you have checked its settings and price on a short form. Keep what you like. Each image is paid for with your OpenRouter key."
         actions={img ? <Switch on={img.enabled} onChange={(on) => void saveImg({ enabled: on })} label="Let agents make images" /> : wait}
       >
         <ModelRow
@@ -639,7 +639,7 @@ export function ImagesSettings() {
         />
       </Group>
       <Group
-        title="Captions in the Library"
+        title="Captions for what you keep"
         info="Each picture or video you keep gets a title and a description, written by a model that sees images. It sees a video as ten of its frames on one picture; a sound, which it cannot hear, it describes from what it was made from."
       >
         {med ? <Captions st={med} onSave={(p, m) => void saveCaptions(p, m)} /> : <Row label="Where it runs" control={wait} />}

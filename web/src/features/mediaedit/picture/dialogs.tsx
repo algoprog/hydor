@@ -1,6 +1,6 @@
 // The picture editor's dialogs: Image size (pixels or per cent, its shape kept or not, every layer made larger or
 // smaller), Canvas size (room added or taken on the sides the anchor says, see-through or a colour), an amount (feather,
-// grow, shrink, a stroke's width), a picture from the Library to add as a layer, and how the picture is saved (its size,
+// grow, shrink, a stroke's width), a kept picture to add as a layer, and how the picture is saved (its size,
 // its kind of file and quality, where it goes).
 import { useEffect, useMemo, useState } from 'react';
 import { IMAGE_FORMATS, LIMITS, type ImageFormat } from '@shared/mediaedit';
@@ -92,7 +92,7 @@ export function NewPictureDialog({ open, onClose, onCreate }: { open: boolean; o
       }
     >
       <div className="space-y-3 text-[13px]">
-        <p className="text-[12.5px] leading-snug text-fg-3">A blank picture opens in a tab of its own; Save keeps it in your Library.</p>
+        <p className="text-[12.5px] leading-snug text-fg-3">A blank picture opens in a tab of its own; Save keeps it.</p>
         <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Size">
           {NEW_PRESETS.map((p) => (
             <button
@@ -255,7 +255,7 @@ export function AmountDialog({ ask, onClose }: { ask: { title: string; label: st
   );
 }
 
-/** A picture of the Library to add as a layer. */
+/** A kept picture to add as a layer. */
 export function LibraryPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (url: string, title: string) => void }) {
   const items = useMedia((s) => s.items);
   useEffect(() => {
@@ -263,11 +263,11 @@ export function LibraryPicker({ open, onClose, onPick }: { open: boolean; onClos
   }, [open]);
   const pictures = useMemo(() => (items ?? []).filter((m) => m.kind === 'image').slice(0, 120), [items]);
   return (
-    <Dialog open={open} onClose={onClose} title="A picture from the Library" width={640}>
+    <Dialog open={open} onClose={onClose} title="A kept picture" width={640}>
       {!items ? (
-        <p className="py-6 text-center text-[13px] text-fg-3">Looking in the Library</p>
+        <p className="py-6 text-center text-[13px] text-fg-3">Looking in your kept pictures</p>
       ) : !pictures.length ? (
-        <Empty title="No pictures in the Library yet" />
+        <Empty title="No kept pictures yet" />
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {pictures.map((m) => (

@@ -101,7 +101,7 @@ Each sync after the first moves only what changed since the last one. A paper yo
 - **The columns**: one a line; **Task**, **Data**, **Method**, **Metrics**, **Results** and **Limits** until you change them.
 - **Project**: the project of yours its spreadsheet goes in. A line "my reading list" with nothing after it then takes that project's papers.
 
-It reads three papers at a time (the whole paper from an open copy, or its abstract when there is none), has a quick model fill in each row, writes what the papers say together, and keeps the matrix as a spreadsheet in your [Library](/guide/library#spreadsheets), with a second sheet that lists the papers. Its view has **The matrix** (how many it read, **Open in the Library**, **Copy as a table**, the matrix itself, the papers it could not read and why, and **Another column**: name one, and **Make it again with it** runs it again with that column too), **Papers** (each with what it does in a sentence, and what it was read from) and **Across the papers** (where they agree and disagree and what is still open, with **Copy it**).
+It reads three papers at a time (the whole paper from an open copy, or its abstract when there is none), has a quick model fill in each row, writes what the papers say together, and keeps the matrix as a [spreadsheet](/guide/library#spreadsheets) in the project's files, with a second sheet that lists the papers. Its view has **The matrix** (how many it read, **Open the spreadsheet**, **Copy as a table**, the matrix itself, the papers it could not read and why, and **Another column**: name one, and **Make it again with it** runs it again with that column too), **Papers** (each with what it does in a sentence, and what it was read from) and **Across the papers** (where they agree and disagree and what is still open, with **Copy it**).
 
 ### Papers that back a claim
 
@@ -125,7 +125,7 @@ It runs code on this computer and can take hours: it keeps within your limits, a
 
 ## Check a paper before you submit
 
-Before a paper goes out, the LaTeX editor checks it as a venue's desk and its reviewers would: its references, whether it gives you away, its pages and fonts, the parts the venue asks for, and the numbers in its tables. Open your paper ([your LaTeX documents](/library?kind=tex)) and pick **Tools → Check before submitting**.
+Before a paper goes out, the LaTeX editor checks it as a venue's desk and its reviewers would: its references, whether it gives you away, its pages and fonts, the parts the venue asks for, and the numbers in its tables. Open your paper (a LaTeX document, among its project's files: the project's details → **Files**) and pick **Tools → Check before submitting**.
 
 1. Pick where it goes: **ACL Rolling Review** (a long or a short paper; **EMNLP** and **NAACL** take papers through it), **SIGIR** (full or short), **CIKM**, **WSDM**, **TheWebConf**, **KDD**, **NeurIPS**, **ICLR**, **ICML**, **AAAI**, **An IEEE journal**, **An ACM journal**, or **Other**, with a page limit and **Reviewed anonymously** of your own. A line under it says what the venue asks: its page limit, what does not count toward it, whether it reviews anonymously and the parts it requires. Venues change their rules every year, so the line links to the call for papers too. The check remembers the venue for each paper, and the first time picks the one the paper's own style points to.
 2. **Check** typesets the paper, reads its PDF, looks its references up online and shows what it finds as it comes. Only the references' titles, DOIs and arXiv ids are sent, to Crossref, arXiv, OpenAlex, Semantic Scholar and DBLP; what the services said is kept a few days, and one that did not answer is named under the findings. OpenAlex and Semantic Scholar answer programs more readily with a free key of your own: add it in [Keys](/apps/connected?tab=keys) as OPENALEX_API_KEY (for api.openalex.org) or SEMANTIC_SCHOLAR_API_KEY (for api.semanticscholar.org), and the check uses it.
@@ -142,7 +142,7 @@ The button with a finding's file and line shows it in the source. Where a change
 
 **Add as comments** puts the open findings on their words as the document's comments (see [LaTeX documents](/guide/library#latex-documents)), so you, the people you share the paper with and agents see each where it is; an agent asked to answer the comments fixes them and resolves them. Check again, and it says how many are fixed since the last check, how many are left and how many are new; **Add as comments** then resolves the comments of those fixed.
 
-Agents run the same check on a paper of your Library or a LaTeX project of yours: "check my paper for ACL before I submit it".
+Agents run the same check on a paper you kept or a LaTeX project of yours: "check my paper for ACL before I submit it".
 
 ### Numbers that match your runs
 
@@ -176,7 +176,7 @@ What is not saved yet is saved first, so each gets the paper as you see it.
 
 ## Review, answer and present your paper
 
-Four ready-made apps, under **Writing** on [the Apps page](/apps), help with your own paper: the **Reviewer simulator** reviews your draft as a venue's reviewers would, the **Rebuttal workbench** drafts your answer to the reviews you got, **Paper to talk, poster and thread** makes what you present it with, and the **Figure doctor** makes its plots fit for print. The first three read your paper from a PDF, a .tex file or a LaTeX project's folder on this computer, a link, or a LaTeX document of your Library (paste its address); **Or upload it** takes a PDF instead.
+Four ready-made apps, under **Writing** on [the Apps page](/apps), help with your own paper: the **Reviewer simulator** reviews your draft as a venue's reviewers would, the **Rebuttal workbench** drafts your answer to the reviews you got, **Paper to talk, poster and thread** makes what you present it with, and the **Figure doctor** makes its plots fit for print. The first three read your paper from a PDF, a .tex file or a LaTeX project's folder on this computer, a link, or a LaTeX document you kept (paste its address); **Or upload it** takes a PDF instead.
 
 ### Reviewer simulator
 
@@ -204,7 +204,7 @@ Its view has **Points raised** (the rebuttal in a line; **All points**, **Misrea
 
 - **Your paper** (its LaTeX project's folder is best, for its figures; from arXiv, its source is fetched for them), **The talk's length, in minutes** (15 unless you change it), **Audience** (**Researchers in the field**, **Researchers in other fields** or **A general audience**), what to make (**Slides**, **An A0 poster**, **A thread (X, Bluesky, LinkedIn)** and **A project page**) and **Project** (the project of yours what it makes goes in).
 
-It plans the talk (about a slide a minute, one idea each, from the problem to the take-away), a program shares out the minutes so they add up to the length, and then it makes what you asked for side by side: the slides, which you edit and present in the Library ([Slides](/guide/library#slides)), the poster as a LaTeX document ([LaTeX documents](/guide/library#latex-documents)), the posts, and the project page, ready for you to publish ([Publish a page](/guide/library#publish-a-page)).
+It plans the talk (about a slide a minute, one idea each, from the problem to the take-away), a program shares out the minutes so they add up to the length, and then it makes what you asked for side by side: the slides, which you edit and present from the project's files ([Slides](/guide/library#slides)), the poster as a LaTeX document ([LaTeX documents](/guide/library#latex-documents)), the posts, and the project page, ready for you to publish ([Publish a page](/guide/library#publish-a-page)).
 
 Its view has **What was made** (the talk's message and an opening line, then each thing made, with **Open it**), **The talk** (the talk as one strip, each slide as wide as its minutes, then each slide: its minutes, title, points, figure, equation and what to say) and **Thread** (**X**, **Bluesky** and **LinkedIn** show each one's posts, numbered, each with **Copy**, and **Copy the thread**; LinkedIn's one post has **Copy the post**).
 
@@ -250,7 +250,7 @@ Each set is a run of its own, and keeps its texts and your labels as the app's r
 3. An agent makes a worktree of the repository on a new branch (sprint/…), beside your checkout, which it never changes. There it writes the plan (SPRINT.md) and the code the runs need, commits them, and lists the runs: a baseline and each hypothesis's, with seeds. Those that would go past your GPU hours are left out, and named.
 4. It waits for you again, before any GPU time is spent: start the runs, or say no, and the sprint stops there (the plan and the code stay on the branch).
 5. Experiments runs them, tagged with the sprint, and the sprint waits for them all to end.
-6. A results table compares each condition with the baseline, with significance; an agent analyses the runs in a Jupyter notebook, saved in your [Library](/library), decides each hypothesis (supported, not supported or unclear, with its evidence) and writes a short report.
+6. A results table compares each condition with the baseline, with significance; an agent analyses the runs in a Jupyter notebook, kept in the project's files, decides each hypothesis (supported, not supported or unclear, with its evidence) and writes a short report.
 
 Its view has **The sprint** (the question, how it went, its branch, and each hypothesis with its verdict and evidence), **Runs** (the results table, and each run with its metric) and **Report** (to read and copy, with **Open the notebook** and what to try next). Run from the API or a schedule, nobody is there to approve, so it goes straight through.
 
@@ -267,19 +267,19 @@ Its view has **Results** (the best run's settings and metric, what it found, wha
 
 ## Reports: your week and your lab notebook
 
-Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you did from what Hydor knows of your work: your sessions (those here, and the Claude Code and Codex sessions in VS Code or a terminal that Hydor reads), your commits in the Git repositories they worked in, your Experiments runs, what you made in the Library and the papers you marked read in your Reading list. Sessions with memory off and Confidential sessions are left out, and so is the work of sessions agents start for parts of a task (it counts as their parent's). Both open on a page of their own, and can update by themselves.
+Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you did from what Hydor knows of your work: your sessions (those here, and the Claude Code and Codex sessions in VS Code or a terminal that Hydor reads), your commits in the Git repositories they worked in, your Experiments runs, what you made or kept and the papers you marked read in your Reading list. Sessions with memory off and Confidential sessions are left out, and so is the work of sessions agents start for parts of a task (it counts as their parent's). Both open on a page of their own, and can update by themselves.
 
 ### Weekly progress report
 
 **Weekly progress report** turns your week into an update for your advisor, your team or a manager: what got done, results with their numbers, problems and what blocks you, next week's plan, and questions to ask. It opens on its own page with this week's report (the seven days up to the day it is written): its title and summary, the week in numbers, then **Done this week**, **Results**, **Problems and blockers**, **Next week** and **Questions**.
 
-- **Copy as Markdown**, and **Copy as an email** (a subject line, then a short note that opens and closes as yours would), put it on your clipboard; **Save as a document** keeps it in your Library, to change and export as Word or PDF.
+- **Copy as Markdown**, and **Copy as an email** (a subject line, then a short note that opens and closes as yours would), put it on your clipboard; **Save as a document** keeps it as a document, to change and export as Word or PDF.
 - **Update** writes this week's report now. **Earlier**, under it, lists the earlier weeks, each a click away.
 - **Settings**, the sliders at the top: **Update automatically** (off until you turn it on) writes a new one each Friday at 16:00; under the switch, pick other days (**Every day**, **On weekdays**, **Once a week on** a day) and the time. It is a [scheduled task](/guide/tasks), so [Settings → Scheduled tasks](/settings?s=tasks) lists it too. Below it: **Who it is for** (your advisor, your team or a manager: it writes for them), **Projects** (all of them, or some, by name) and **What to include** ("research only, no costs").
 
 ### Lab notebook
 
-**Lab notebook** keeps a dated entry for each day you worked: what was tried, what was found and decided, and what is still open, with links to that day's sessions, commits, runs, files and Library items. Its entries are the app's own records, kept apart from [memory](/guide/memory). It opens on its own page with them, newest first:
+**Lab notebook** keeps a dated entry for each day you worked: what was tried, what was found and decided, and what is still open, with links to that day's sessions, commits, runs, files and kept items. Its entries are the app's own records, kept apart from [memory](/guide/memory). It opens on its own page with them, newest first:
 
 - **Search the notebook** finds entries by their words and by what they mean (when [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) is on), best first; **All entries** brings them all back.
 - **Copy its link**, under each entry, copies the address of its own page, which shows the entry as it was written: to cite it in a paper, a report or a note.

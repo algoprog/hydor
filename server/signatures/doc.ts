@@ -1,4 +1,4 @@
-// A saved signature placed into a document of the Library as a picture block, on the left and sized for a signature
+// A saved signature placed into a document as a picture block, on the left and sized for a signature
 // line: right after the paragraph with the words an agent names ("Signature:"), in place of placeholder words (the
 // paragraph goes when they were all it held), after a table whose cell holds the words (a cell holds words only), or
 // at the end. The document is checked again as a whole (normalizeDoc) before it is kept.
@@ -60,7 +60,7 @@ const clip = (s: string, n: number, end: boolean) => {
  * and the words around it. Throws, in words an agent can act on, when the spot is not there.
  */
 export function placeInDoc(doc: Doc, src: string, spot: DocSpot, o: { widthMm: number; alt: string }): { doc: Doc; where: string; spot: PlaceSpot; before: string; after: string } {
-  if (spot.cell) throw new Error('A document of the Library keeps words alone in a table’s cells: name the words in the cell with after (the signature goes right after the table), or words elsewhere.');
+  if (spot.cell) throw new Error('A document keeps words alone in a table’s cells: name the words in the cell with after (the signature goes right after the table), or words elsewhere.');
   const textMm = Math.max(20, textWidthMm(doc.page));
   const img: ImageBlock = { id: newId(), type: 'image', src, w: Math.min(1, Math.max(0.05, Math.round((o.widthMm / textMm) * 1000) / 1000)), align: 'left', alt: o.alt };
   const blocks = doc.blocks.slice();

@@ -1,26 +1,26 @@
 // The requests made from the kinds an agent makes (content-types.ts), as they go to the agent: a kind's ask, the
-// person's words and where it goes (composeAsk), and what "Turn it into" in the Library asks (turnAsk), with the kinds
+// person's words and where it goes (composeAsk), and what "Turn it into" asks (turnAsk), with the kinds
 // each can be turned into. Words for the agent, in English, never shown as the app's own (the i18n extractor leaves
 // this file out; New's own "Or describe it" says the same starts in the app's language). It takes only types from the
 // list of kinds, so the pages that use it do not load the list.
 import type { ContentKind, ContentType } from './content-types.ts';
 
-/** How a request for something new starts, as New in the Library's "Or describe it" does (its ASK_FOR, in English). */
+/** How a request for something new starts, as New's "Or describe it" does (its ASK_FOR, in English). */
 export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet' | 'design' | 'diagram', string> = {
-  page: 'Make me a page and keep it in my Library: ',
-  design: 'Make me a design and keep it in my Library: ',
-  deck: 'Make me slides and keep them in my Library: ',
-  doc: 'Write me a document and keep it in my Library: ',
-  sheet: 'Make me a spreadsheet and keep it in my Library: ',
-  diagram: 'Make me a diagram and keep it in my Library: ',
+  page: 'Make me a page and keep it: ',
+  design: 'Make me a design and keep it: ',
+  deck: 'Make me slides and keep them: ',
+  doc: 'Write me a document and keep it: ',
+  sheet: 'Make me a spreadsheet and keep it: ',
+  diagram: 'Make me a diagram and keep it: ',
 };
 
-/** The kinds of page the Library holds, as "Turn it into" names them. */
+/** The kinds of kept page, as "Turn it into" names them. */
 export type PageKindName = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
 /** What Turn it into makes. */
 export type TurnTo = 'slides' | 'doc' | 'page' | 'diagram';
 
-/** What each kind can be turned into, from the Library: the others of slides, a document, a page and a diagram. */
+/** What each kind can be turned into: the others of slides, a document, a page and a diagram. */
 export const TURN_INTO: Record<PageKindName, TurnTo[]> = {
   page: ['slides', 'doc', 'diagram'],
   slides: ['doc', 'page', 'diagram'],
@@ -47,7 +47,7 @@ export interface ComposeContext {
   /** A new deck's theme (a preset's id and name) and the slides' shape. */
   theme?: { id: string; label: string };
   ratio?: '16:9' | '4:3';
-  /** Something new: the Library folder it goes in, as a path ("Thesis/Drafts"). */
+  /** Something new: the folder it goes in, as a path ("Thesis/Drafts"). */
   folder?: string;
   /** Something new: the language the app is shown in, when not English ("Greek"). */
   lang?: string;
@@ -96,7 +96,7 @@ export function composeAsk(t: ContentType | null, words: string, c: ComposeConte
   const named = c.title?.trim() ? ` Call it “${quoted(c.title)}”.` : '';
   const look =
     kind === 'deck' && (c.theme || c.ratio) ? ` Make it${c.theme ? ` in the ${c.theme.label} theme (the preset “${c.theme.id}”)` : ''}${c.ratio ? `${c.theme ? ',' : ''} with ${c.ratio === '4:3' ? 'standard 4:3' : 'wide 16:9'} slides` : ''}.` : '';
-  const into = c.folder?.trim() ? ` Keep it in my Library folder “${quoted(c.folder)}”.` : '';
+  const into = c.folder?.trim() ? ` Keep it in my folder “${quoted(c.folder)}”.` : '';
   const lang = c.lang && c.lang !== 'English' ? ` Write it in ${c.lang}.` : '';
   const design = kind === 'design' ? ` Make it ${c.size ? `a ${quoted(c.size.label)}, ${Math.round(c.size.w)}×${Math.round(c.size.h)} pixels` : 'the size that suits it'}, as a design (how_to_make “design” says how), so I can change it as in Canva.` : '';
   const diagram = kind === 'diagram' ? ' Make it with save_diagram, so I can change it as in draw.io.' : '';
@@ -105,20 +105,20 @@ export function composeAsk(t: ContentType | null, words: string, c: ComposeConte
 
 const NOUN: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', board: 'board' };
 
-/** The request that makes another kind from something in the Library, which stays as it is. */
+/** The request that makes another kind from something kept, which stays as it is. */
 export function turnAsk(o: { from: PageKindName; to: TurnTo; id: string; title: string; folder?: string }): string {
   const noun = NOUN[o.from];
   const mine = `my ${noun} “${quoted(o.title)}” (saved page ${o.id})`;
   const numbers = o.from === 'sheet' || o.from === 'notebook' || o.from === 'board';
   const body =
     o.to === 'diagram'
-      ? `Make a diagram from ${mine} and keep it in my Library: read it with get_page, then draw what it says with save_diagram, as the diagram that shows it best: its steps and decisions as a flowchart, its parts and how they connect as a block or architecture diagram, its ideas as a mind map, its people as an org chart, its stages as a timeline${numbers ? ', its table’s rows as shapes and the links between them as connectors' : ''}; short words in each shape, a calm palette, one look for each kind of thing.`
+      ? `Make a diagram from ${mine} and keep it: read it with get_page, then draw what it says with save_diagram, as the diagram that shows it best: its steps and decisions as a flowchart, its parts and how they connect as a block or architecture diagram, its ideas as a mind map, its people as an org chart, its stages as a timeline${numbers ? ', its table’s rows as shapes and the links between them as connectors' : ''}; short words in each shape, a calm palette, one look for each kind of thing.`
       : o.to === 'slides'
-      ? `Make slides from ${mine} and keep them in my Library: read it with get_page, then make a deck that tells what it says: a title slide, then a slide for each main point in its order (a title that says the point, a few short bullets), ${numbers ? 'its numbers as charts and big numbers, its tables as small tables' : 'its numbers as charts or big numbers, its tables and pictures where they help'}, pictures of your own where they would help, and speaker notes with what to say.`
+      ? `Make slides from ${mine} and keep them: read it with get_page, then make a deck that tells what it says: a title slide, then a slide for each main point in its order (a title that says the point, a few short bullets), ${numbers ? 'its numbers as charts and big numbers, its tables as small tables' : 'its numbers as charts or big numbers, its tables and pictures where they help'}, pictures of your own where they would help, and speaker notes with what to say.`
       : o.to === 'doc'
-        ? `Write a document from ${mine} and keep it in my Library: read it with get_page, then write what it says in full, as a document to read, print and change: a title, a short summary, headings for its parts in their order, paragraphs${o.from === 'slides' ? ' (the slides’ points and their speaker notes written out)' : numbers ? ' that explain its numbers' : ''}, and its tables and pictures.`
-        : `Make a page from ${mine} and keep it in my Library: read it with get_page, then make a page that shows it well on any screen, a phone too: ${numbers ? 'a dashboard of its numbers, the key figures as cards, charts of them and its tables, the data written into the page' : 'its title and parts as sections with headings, a bar to jump between them, its pictures and its tables'}.`;
-  const into = o.folder?.trim() ? ` Put it in my Library folder “${quoted(o.folder)}”, beside it.` : '';
+        ? `Write a document from ${mine} and keep it: read it with get_page, then write what it says in full, as a document to read, print and change: a title, a short summary, headings for its parts in their order, paragraphs${o.from === 'slides' ? ' (the slides’ points and their speaker notes written out)' : numbers ? ' that explain its numbers' : ''}, and its tables and pictures.`
+        : `Make a page from ${mine} and keep it: read it with get_page, then make a page that shows it well on any screen, a phone too: ${numbers ? 'a dashboard of its numbers, the key figures as cards, charts of them and its tables, the data written into the page' : 'its title and parts as sections with headings, a bar to jump between them, its pictures and its tables'}.`;
+  const into = o.folder?.trim() ? ` Put it in my folder “${quoted(o.folder)}”, beside it.` : '';
   return `${body} Write it in the language the ${noun} is in.${into} Leave the ${noun} itself as it is.`;
 }
 
@@ -127,7 +127,7 @@ export function turnAsk(o: { from: PageKindName; to: TurnTo; id: string; title: 
 /**
  * What a session is asked to make (`extra.make`): its agent hears it in full from the pages capability, while the
  * person's message says it in short, in their words. A kind picked in the gallery (or the words alone), what it is
- * about and where it goes; or what Turn it into makes, from which page of the Library.
+ * about and where it goes; or what Turn it into makes, from which kept page.
  */
 export interface MakeExtra {
   /** The kind picked in the gallery ("slide.swot"); left out when the words alone say what. */
@@ -142,13 +142,13 @@ export interface MakeExtra {
   at?: string;
   /** A slide: whether the deck is in the web format. */
   webDeck?: boolean;
-  /** Something new: its name, a deck's theme and shape, its Library folder, the app's language. */
+  /** Something new: its name, a deck's theme and shape, its folder, the app's language. */
   title?: string;
   theme?: { id: string; label: string };
   ratio?: '16:9' | '4:3';
   folder?: string;
   lang?: string;
-  /** Turn it into: the page of the Library it is made from, and what it becomes. */
+  /** Turn it into: the kept page it is made from, and what it becomes. */
   turn?: { from: PageKindName; to: TurnTo; id: string; title: string };
   /** A design: its size. */
   size?: { label: string; w: number; h: number };

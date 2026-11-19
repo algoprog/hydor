@@ -1,4 +1,4 @@
-// Answer cards that read their numbers from a spreadsheet of the Library or a data file, instead of holding them. A card's
+// Answer cards that read their numbers from a saved spreadsheet or a data file, instead of holding them. A card's
 // data says where they are (`from`: a spreadsheet by its name or id, a tab and a range, or a CSV, TSV, JSON or JSONL file)
 // and what of them it shows: columns by their headings, sums and counts (`sum(Revenue)`), groups (`groupBy`), a filter
 // (`where: "Region = 'EU'"`, in a small language of its own read here: nothing is run), an order (`sort`) and a limit.
@@ -66,7 +66,7 @@ const fmt = (n: number) => n.toLocaleString('en-US');
 
 // ---- where the data is ---------------------------------------------------------------------------------------------
 
-/** A source as a card names it: a spreadsheet of the Library (its name or id, a tab, a range) or a file. */
+/** A source as a card names it: a saved spreadsheet (its name or id, a tab, a range) or a file. */
 export interface RefSource {
   sheet?: string;
   tab?: string;

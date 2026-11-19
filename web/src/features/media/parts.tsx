@@ -1,4 +1,4 @@
-// The Library's pictures, videos and sounds (shown among its other things, by space: pages/Library.tsx): a still to
+// Kept pictures, videos and sounds (shown among the files of their project): a still to
 // show one by (a sound's shape, with a button to play it where it is), and what its menus do (write its title again,
 // start a session with it, download it). Each opens at its own place (/media/<id>).
 import { useState } from 'react';
@@ -55,7 +55,7 @@ function SoundFace({ m, progress, className }: { m: MediaItem; progress: number;
 }
 
 /**
- * A sound's card picture in the Library: its face, which opens it (`onOpen`), and a button to play it right there,
+ * A sound's card picture, kept: its face, which opens it (`onOpen`), and a button to play it right there,
  * with its length beside it (the time played, while it plays).
  */
 export function SoundTile({ m, onOpen, className }: { m: MediaItem; onOpen: () => void; className?: string }) {
@@ -82,7 +82,7 @@ export async function recaption(m: MediaItem) {
   }
 }
 
-/** The start page, with the Library's copy in its message box: the new session gets it with its first message. */
+/** The start page, with the kept item's copy in its message box: the new session gets it with its first message. */
 export const startSessionWithMedia = (m: MediaItem) => startSessionWith([{ path: m.file, size: m.bytes, name: `${m.title}${/\.[a-z0-9]+$/i.exec(m.file)?.[0] ?? ''}` }]);
 
 export function downloadMedia(m: MediaItem) {

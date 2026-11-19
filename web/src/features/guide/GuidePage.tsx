@@ -52,7 +52,7 @@ const RENAMED: Record<string, Record<string, string>> = {
 
 /** Topics renamed since links to them were made: an old address opens the new one, at the same section. */
 const MOVED: Record<string, { to: string; sections: Record<string, string> }> = {
-  // Pages became the Library, with the images and videos kept there (2 November 2026); its sections kept their names.
+  // Pages became this topic (2 November 2026), with the images and videos kept there; its sections kept their names.
   pages: { to: 'library', sections: {} },
   // Projects were called spaces in their addresses until 5 November 2026; the sections kept their names.
   spaces: { to: 'projects', sections: {} },
@@ -85,7 +85,7 @@ export function GuidePage() {
   const [loc] = useLocation();
   const mobile = useIsMobile();
   const wide = useMediaQuery('(min-width: 1280px)');
-  // On a computer the guide has a column of its own, as the Library's; narrower, the page keeps its header.
+  // On a computer the guide has a column of its own, as on the Apps and Settings pages; narrower, the page keeps its header.
   const column = useMediaQuery('(min-width: 1024px)');
   const topics = useGuide((s) => s.topics);
   const ask = useAsk();
@@ -193,7 +193,7 @@ export function GuidePage() {
     />
   );
 
-  // The row at the top of the page on a computer, as the Library's: in a topic, its title at the left and the find box at
+  // The row at the top of the page on a computer, as on the other pages: in a topic, its title at the left and the find box at
   // the right, over the text's column; on the home (its own big box below), Take the tour in the page's top right corner.
   const toolbar = column && (
     <div className={cx('mx-auto flex min-h-8.5 items-center gap-x-3 px-4 pt-5 sm:px-6', topic ? 'max-w-[820px]' : 'max-w-none')}>

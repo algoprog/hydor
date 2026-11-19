@@ -189,7 +189,7 @@ const hand = async (id: string, v: Record<string, unknown>) => {
 
 test('A row in a spreadsheet: the first run makes one named after the agent, later runs add rows to it, as new versions', async () => {
   const a = saveAssistant(db, { name: 'Bookkeeper', instructions: 'Keep the books.', output: { fields: FIELDS, to: [{ kind: 'sheet' }] } });
-  assert.match(outputNote(a), /a row in a Library spreadsheet/);
+  assert.match(outputNote(a), /a row in a spreadsheet/);
   assert.match(outputNote(a), /plain numbers/);
   const first = await hand(a.id, { spent: 12, note: 'Bread' });
   assert.match(first, /Handed back\. It went to "Bookkeeper", row 2 of Results/);

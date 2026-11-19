@@ -1,9 +1,9 @@
-// Finding things in the Library: its pages of every kind (pages, slide decks, documents, spreadsheets, LaTeX documents
-// and notebooks) and the pictures, videos and sounds kept there, by their titles and descriptions. Hybrid, as memory's
+// Finding kept things: pages of every kind (pages, slide decks, documents, spreadsheets, LaTeX documents
+// and notebooks) and the pictures, videos and sounds kept, by their titles and descriptions. Hybrid, as memory's
 // notes are found (memory/search.ts): one list by words (BM25 over each one's title, which counts twice, its kind and
 // its description; a plural and a longer word's start match too), another by meaning (the vector the search box keeps
 // for each, made the moment it is made or changed: find/index.ts, with search by meaning on), the two joined by rank
-// (reciprocal rank fusion: scores of different kinds never have to be compared). The Library's search field asks it as
+// (reciprocal rank fusion: scores of different kinds never have to be compared). The search box asks it as
 // you type (GET /api/library/search), and agents through get_page's query.
 import type { MediaItem } from '../../shared/media.ts';
 import type { PageInfo } from '../../shared/pages.ts';
@@ -59,7 +59,7 @@ interface Entry {
 }
 
 /**
- * What the Library holds that fits the query best, best first. `pages`: only these (an agent's, without what is out of
+ * What is kept that fits the query best, best first. `pages`: only these (an agent's, without what is out of
  * its reach); `media`: false leaves pictures, videos and sounds out. Meaning takes part when its model answers now, or
  * (`wait`) within that many milliseconds; `meaning` in the answer says whether it did.
  */

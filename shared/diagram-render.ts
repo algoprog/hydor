@@ -1,5 +1,5 @@
 // A diagram's pages drawn as SVG, the same drawing for the editor (each item on its own, as it changes), the viewer, the
-// Library's picture of it and every file it is saved as. Colours an item does not give are the theme's: in a file,
+// picture of it in the Files and every file it is saved as. Colours an item does not give are the theme's: in a file,
 // the light theme's (or the dark one's, when asked); where the page can follow the app's theme (the editor, the viewer),
 // each such colour also carries a class the page's stylesheet points at the theme's colours, so the same drawing reads
 // in light and dark. Words left without a colour on a filled shape take the colour that reads on that fill.

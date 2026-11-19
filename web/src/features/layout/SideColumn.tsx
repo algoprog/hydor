@@ -7,7 +7,7 @@ import { Wordmark } from '../../components/Logo';
 import { cx, IconButton } from '../../components/ui';
 import { RAIL_WIDTH } from './Rail';
 
-/** The column's width, one for every page that has one (the sessions', the Library's, Settings'): kept in the settings, bounded by the window. */
+/** The column's width, one for every page that has one (the sessions', the Apps page's, Settings'): kept in the settings, bounded by the window. */
 export function useNavWidth() {
   const navigationWidth = useUI((s) => s.navigationWidth);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);

@@ -596,7 +596,7 @@ const dataUrl = (b: Buffer, mime = 'image/png') => `data:${mime};base64,${b.toSt
     const before = listMedia(db).length;
     const over = await run({ library: lib.id, flip: 'horizontal', save_to_library: 'replace' });
     const after = getMedia(db, lib.id)!;
-    ok(!over.isError && /in the Library in place of/.test(over.text) && listMedia(db).length === before && after.title === lib.title, `a Library picture is edited and written over, its title kept: ${over.text.split('\n').pop()}`);
+    ok(!over.isError && /kept in place of/.test(over.text) && listMedia(db).length === before && after.title === lib.title, `a Library picture is edited and written over, its title kept: ${over.text.split('\n').pop()}`);
     const beside = await run({ library: lib.id, rotate: 90, save_to_library: 'copy' });
     ok(!beside.isError && /as a new picture beside/.test(beside.text) && listMedia(db).length === before + 1, 'or kept beside it as a new one');
     ok((await run({ path: 'quarters.png', save_to_library: 'replace' })).isError, 'save_to_library goes with a Library picture');

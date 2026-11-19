@@ -3,7 +3,7 @@
 // editor keeps (recordings, files from this device, sounds made with AI: audio-store.ts), and an edit (shared/
 // mediaedit-audio.ts) made with ffmpeg (audio-plan.ts) as a job: in line (two are made at once), measured first where
 // Normalize or Loudness need to know how loud it is, made with its progress, stopped when asked, then put where it was
-// asked to go: kept for a video ("naget-sound:…"), over a Library sound or as a new one, over a file (the old one to the
+// asked to go: kept for a video ("naget-sound:…"), over a kept sound or as a new one, over a file (the old one to the
 // Trash) or as a copy beside it, or (an agent's) into its session's folder. A job is kept in memory for an hour after it
 // ends. Without ffmpeg on this computer, the picture tools' portable one does it.
 //
@@ -163,7 +163,7 @@ async function readFacts(file: string): Promise<Omit<SoundFacts, 'ffmpeg' | 'why
   };
 }
 
-/** The sound `src` names: a kept one, a deck's video, a Library sound or video, or a file (a sound, or a video's sound); throws what is wrong. */
+/** The sound `src` names: a kept one, a deck's video, a kept sound or video, or a file (a sound, or a video's sound); throws what is wrong. */
 export async function soundOf(db: DB, src: unknown, o: { cwd?: string } = {}): Promise<Sound> {
   const s = typeof src === 'string' ? src.trim() : '';
   if (!s) throw new HttpError(400, 'src: the sound');
@@ -185,7 +185,7 @@ export async function soundOf(db: DB, src: unknown, o: { cwd?: string } = {}): P
     name = 'video';
   } else if (media) {
     const m = mustMedia(db, media[1]);
-    if (m.kind !== 'audio' && m.kind !== 'video') throw new HttpError(400, 'That Library item is a picture, not a sound');
+    if (m.kind !== 'audio' && m.kind !== 'video') throw new HttpError(400, 'That kept item is a picture, not a sound');
     file = m.file;
     name = m.title;
     extra = { media: m };
@@ -274,7 +274,7 @@ export type SoundTo = SoundSaveTo | { into: string; name: string };
 /** An edit checked and ready to make. */
 export interface PreparedSound {
   d: Deps;
-  /** Someone it is shared with makes it, through their link (their name): a Library sound saved over says so. */
+  /** Someone it is shared with makes it, through their link (their name): a kept sound saved over says so. */
   who?: string;
   source: Sound;
   recipe: SoundRecipe;
@@ -544,7 +544,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
     j.view.media = item.id;
     return;
   }
-  // A new sound in the Library (a copy of an item goes in its project and folder).
+  // A new kept sound (a copy of an item goes in its project and folder).
   const from = 'media' in to ? mustMedia(db, to.media) : p.source.media;
   const named = path.join(dir, madeName(p, ext));
   await fs.promises.rename(out, named);
@@ -561,10 +561,10 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
 
 const SOUND_MIME: Record<string, string> = { mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', flac: 'audio/flac' };
 
-/** A Library sound's file swapped for an edited one: its size, length, shape and hash with it, its title and description kept. */
+/** A kept sound's file swapped for an edited one: its size, length, shape and hash with it, its title and description kept. */
 export async function replaceLibrarySound(d: Deps, m: MediaItem, from: string, ext: string, who?: string): Promise<MediaItem> {
   initMedia(d.db);
-  if (m.kind !== 'audio') throw new HttpError(400, 'That Library item is not a sound: save it as a new one');
+  if (m.kind !== 'audio') throw new HttpError(400, 'That kept item is not a sound: save it as a new one');
   const name = `${m.id}.${ext}`;
   const to = path.join(MEDIA_DIR, name);
   const tmp = path.join(MEDIA_DIR, `.${m.id}.${crypto.randomBytes(4).toString('hex')}.tmp`);
@@ -652,7 +652,7 @@ export async function prepareSound(d: Deps, b: Partial<SoundEditAsk> & { to?: un
   }
   const to = o.to ?? saveToOf(b.to);
   if ('file' in to && appsOwn(soundPathOf(to.file))) throw new HttpError(403, 'That file is part of the app’s own data: it is not written from here.');
-  if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'audio') throw new HttpError(400, 'That Library item is not a sound: save the edit as a new one');
+  if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'audio') throw new HttpError(400, 'That kept item is not a sound: save the edit as a new one');
   const own = keptKind(source.file);
   let out = outputOf(b.out, own ?? 'mp3');
   // Written over a file, it stays the kind it was.

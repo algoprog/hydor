@@ -1,5 +1,5 @@
 // Which editor each kind of page opens in (a page of HTML opens in the Studio; a notebook in the notebook page's view; a board in its grid of cards). Each loads the first time a page
-// of its kind opens (the Pages library asks for them once it shows), so the app itself starts no slower for them.
+// of its kind opens (a page's own place asks for them once it shows), so the app itself starts no slower for them.
 import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
 import type { PageInfo } from '@shared/pages';
 import { Throbber } from '../../components/ui';

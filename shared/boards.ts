@@ -1,4 +1,4 @@
-// Boards: a kind of the Library that keeps answer cards (shared/answer-ui) in a grid, each pinned from a reply (its
+// Boards: a kind of kept page that keeps answer cards (shared/answer-ui) in a grid, each pinned from a reply (its
 // toolbar's … → Pin to a board) or put there by an agent (save_board). A card keeps the answer UI's name and its data as
 // the ```ui block held it when it was pinned (inline JSON, or a reference the block reads its data from), so the board
 // draws it with the same view as the reply did. What the server and the pages share: the format, its sizes, and the
@@ -7,7 +7,7 @@
 // The board as it is kept (server/pages/boards.ts writes it a card a line, so two versions read as a diff of lines):
 //   { "format": 1, "cap"?: 5 | null, "cards": [BoardCard, …] }   the cards in their order on the board (the first at the
 //   top left); cap: the board's monthly spending cap for its cards' refreshes (left out: $5; null: off)
-// A board's title and description are the Library's, as every kind's are (shared/pages.ts PageInfo). How cards refresh
+// A board's title and description are the page's, as every kind's are (shared/pages.ts PageInfo). How cards refresh
 // themselves is in shared/board-refresh.ts.
 import { answerUi, type AnswerUiSpec } from './answer-ui/index.ts';
 import { cleanCap, cleanRefresh, RefreshError, type CardRefresh } from './board-refresh.ts';

@@ -4,8 +4,8 @@
 // type, C/X/V copy, cut and paste cells, Shift+M merges them, Shift+↑/↓ picks several). A right click on a cell, or its ⋯,
 // has its menu: run it, the cells above or below it, copy, cut, paste, duplicate, split, merge, move, change its type,
 // clear or fold its output, delete. Outline lists the Markdown headings. A run asked while the kernel starts waits for it.
-// A file of this computer opens here from Files; a notebook of the Library opens here too (`library`), kept as
-// versions by the Library and run in a folder of its own.
+// A file of this computer opens here from Files; a kept notebook opens here too (`library`), kept as
+// versions by the app and run in a folder of its own.
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Braces, Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ChevronUp, ClipboardPaste, Combine, Copy, CopyPlus, Download, Eraser, FastForward, Keyboard, ListEnd, ListStart, ListTree, MoreHorizontal, Pencil, Play, Plus, Power, RotateCw, Save, Scissors, Sparkles, Square, SquareSplitVertical, Trash2, X } from 'lucide-react';
 import type { KernelEnv, KernelInfo, KernelStatus } from '@shared/types';
@@ -35,14 +35,14 @@ type Caret = number | 'start' | 'end';
 let clipboard: ClipCell[] = [];
 const OUTLINE_KEY = 'wa.nb.outline';
 
-/** What an agent asked from the Library is about ("In cell 3 (code): "). */
+/** What an agent asked from a kept notebook is about ("In cell 3 (code): "). */
 export interface NotebookScope {
   id: string;
   label: string;
   lead: string;
 }
 
-/** A notebook of the Library: its kept version, how it saves, and the Library's own parts of its bar. */
+/** A kept notebook: its kept version, how it saves, and its own parts of its bar. */
 export interface LibraryNotebook {
   /** The notebook as kept; `key` changes with each version. */
   doc: { key: string; model: unknown } | null;
@@ -655,7 +655,7 @@ function KernelPicker({
 /**
  * `embedded`: in a dialog over another page, so there is no Back button (the dialog closes instead); `onDirty` tells it of
  * unsaved changes. From Files, `fileActions` end its bar (Ask an agent about the file) and `saveFirst` saves before an
- * agent is asked. `library`: a notebook of the Library rather than a file (`path` is then the file its kernel runs from).
+ * agent is asked. `library`: a kept notebook rather than a file (`path` is then the file its kernel runs from).
  */
 export default function NotebookView({
   path,
@@ -712,7 +712,7 @@ export default function NotebookView({
   readOnlyRef.current = readOnly;
   const lib = useRef(library);
   lib.current = library;
-  // Runs that ended after the notebook was saved bring their outputs: after the file changed, or after the Library's
+  // Runs that ended after the notebook was saved bring their outputs: after the file changed, or after the kept
   // version was saved (when the page opened) or shown (a newer version since, already with what ran before it).
   const reloadedAt = useRef(0);
   const since = () => (lib.current ? Math.max(lib.current.savedAt, reloadedAt.current) : mtime.current);
@@ -727,7 +727,7 @@ export default function NotebookView({
   S.current = { doc, active, editing, kernel, anchor };
   useEffect(() => localStorage.setItem(OUTLINE_KEY, outlineOpen ? '1' : '0'), [outlineOpen]);
 
-  /** The Library's kept version, as the notebook to show. */
+  /** The kept version, as the notebook to show. */
   const loadModel = useCallback((model: unknown) => {
     try {
       const parsed = parseNotebook(JSON.stringify(model ?? {}));
@@ -767,7 +767,7 @@ export default function NotebookView({
     load();
   }, [load]);
 
-  // Another version of the Library's notebook (an agent's, or this page's own save): shown, unless changes here are unsaved.
+  // Another version of this kept notebook (an agent's, or this page's own save): shown, unless changes here are unsaved.
   const docKey = library?.doc?.key;
   const firstKey = useRef(docKey);
   useEffect(() => {
@@ -797,7 +797,7 @@ export default function NotebookView({
       setSaving(true);
       try {
         if (l) {
-          // The Library keeps it as a new version; its page then shows that version.
+          // It is kept as a new version; its page then shows that version.
           if (!(await l.onSave!(JSON.parse(serializeNotebook(d.nb))))) return false;
           dispatch({ type: 'saved', cells: d.nb.cells });
           return true;
@@ -819,7 +819,7 @@ export default function NotebookView({
     },
     [path],
   );
-  // Saved before an agent is asked about it (Files' Ask, the Library's Ask), so it works on what is shown.
+  // Saved before an agent is asked about it (Files' Ask, the kept notebook's Ask), so it works on what is shown.
   const saveNow = useCallback(() => (isDirty(S.current.doc) ? save() : Promise.resolve(true)), [save]);
   if (saveFirst) saveFirst.current = saveNow;
   if (library?.saveNowRef) library.saveNowRef.current = saveNow;
@@ -827,7 +827,7 @@ export default function NotebookView({
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  // Edits by agents or terminals: reload when nothing here is unsaved, otherwise ask. (The Library's pages hear of new versions.)
+  // Edits by agents or terminals: reload when nothing here is unsaved, otherwise ask. (Kept pages hear of new versions.)
   useEffect(() => {
     if (lib.current) return;
     const t = setInterval(async () => {
@@ -1284,7 +1284,7 @@ export default function NotebookView({
     if (handled) e.preventDefault();
   };
 
-  // What an agent asked from the Library now would be about: the whole notebook, or the cell picked.
+  // What an agent asked from a kept notebook now would be about: the whole notebook, or the cell picked.
   const scopeKey = useRef('');
   useEffect(() => {
     const tell = lib.current?.onScopes;

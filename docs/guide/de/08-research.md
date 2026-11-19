@@ -50,13 +50,13 @@ Die Recherche verwendet App-Websuche und Seitenabruf; siehe [Suche und Browser](
 
 ### Den Fortschritt verfolgen
 
-Eine Leiste über dem Nachrichtenfeld der leitenden Sitzung zeigt, was die Recherche gerade tut: **Tiefgehende Recherche** · „Planung“, dann „Runde 1 von 2 · Aktive Forscher: 4“, zwischen den Runden „Berichte werden gelesen“, „Quellen werden geprüft“, während Forscher die wichtigsten Aussagen prüfen, „Bericht wird geschrieben“ und am Ende „Bericht fertig“ · und wie viel vom Budget verbraucht ist („12 von 60 Suchanfragen“). Sobald der Bericht da ist, öffnet ihn **Bericht öffnen** rechts in der Leiste: die Seite in der Bibliothek oder das Word-Dokument. Zeige auf die Leiste, um die Einstellungen der Recherche zu sehen und was der Bericht sein wird.
+Eine Leiste über dem Nachrichtenfeld der leitenden Sitzung zeigt, was die Recherche gerade tut: **Tiefgehende Recherche** · „Planung“, dann „Runde 1 von 2 · Aktive Forscher: 4“, zwischen den Runden „Berichte werden gelesen“, „Quellen werden geprüft“, während Forscher die wichtigsten Aussagen prüfen, „Bericht wird geschrieben“ und am Ende „Bericht fertig“ · und wie viel vom Budget verbraucht ist („12 von 60 Suchanfragen“). Sobald der Bericht da ist, öffnet ihn **Bericht öffnen** rechts in der Leiste: die Seite oder das Word-Dokument. Zeige auf die Leiste, um die Einstellungen der Recherche zu sehen und was der Bericht sein wird.
 
 Jeder Recherche-Agent hat eine Zeile in der einen Karte, die sich die Recherche-Agenten in der Unterhaltung der Leitung teilen („Forscher: 4“), und steht unter der Leitung in der Seitenleiste, wie andere [Hydor-Subagenten](/guide/research#follow-subagents). Zurückgesendete Berichte erscheinen als Zeile „Antwort von“ mit Titel und Ergebnisanfang. Ein Klick öffnet den Bericht. In der Recherche-Agentensitzung steht „Recherchiert für“ mit dem Titel der Leitung; **Leitung** führt zurück.
 
 ### Der Bericht
 
-- **Seite**: Der Bericht wird als bleibende Seite gespeichert, in der Unterhaltung angezeigt und in der Bibliothek aufbewahrt. Siehe [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
+- **Seite**: Der Bericht wird als bleibende Seite gespeichert, in der Unterhaltung angezeigt und in den Dateien des Projekts der Sitzung aufbewahrt (seine Details → **Dateien**); hat die Sitzung kein Projekt, bleibt sie bei der Unterhaltung. Siehe [Seiten, Dokumente und Bilder](/guide/library).
 - **Word**: Ein .docx-Dokument im Sitzungsordner, erstellt mit dem Skill **word-documents**, erscheint als Dateikarte zum Öffnen oder Herunterladen. Siehe [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice#open-or-download-the-files-an-agent-made).
 
 Tiefgehende Recherche führt viele Agenten gleichzeitig aus. Setze vorher im selben Optionsmenü ein Ausgabenlimit, das Leitung und alle Recherche-Agenten einschließt. Siehe [Ein Ausgabenlimit setzen](/guide/research#put-a-spending-cap-on-a-session).

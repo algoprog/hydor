@@ -1,4 +1,4 @@
-// Folders in the Library, to sort what it keeps: pages, slides, documents, spreadsheets, LaTeX documents and notebooks
+// Folders that sorted what was kept (no longer shown; older calls still name one): pages, slides, documents, spreadsheets, LaTeX documents and notebooks
 // (the pages table), and the pictures, videos and sounds kept (the media table). A folder is in one place, a project or
 // none, at its top or in another folder of that place (eight deep at most); what is in a folder is in its place too, so
 // a folder moved to another project takes what it holds along, and something put in a folder of another project moves
@@ -11,7 +11,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { spaceById } from '../spaces/index.ts';
 
-/** The tables whose rows go in folders: the Library's pages, and the pictures, videos and sounds it keeps. */
+/** The tables whose rows go in folders: the kept pages, and the pictures, videos and sounds kept. */
 export type ItemTable = 'pages' | 'media';
 
 export function initFolders(db: DB) {
@@ -76,7 +76,7 @@ export function folderById(db: DB, id: string): LibFolder | null {
 
 export function mustFolder(db: DB, id: unknown): LibFolder {
   const f = typeof id === 'string' ? folderById(db, id) : null;
-  if (!f) throw new HttpError(404, 'There is no such folder in the Library (GET /api/pages lists them)');
+  if (!f) throw new HttpError(404, 'There is no such folder (GET /api/pages lists them)');
   return f;
 }
 
@@ -141,7 +141,7 @@ export function makeFolder(db: DB, o: { name: unknown; parent?: string | null; s
   const parent = o.parent ? mustFolder(db, o.parent) : null;
   const space = parent ? (parent.space ?? null) : (o.space ?? null);
   if (parent && depthOf(db, parent.id) >= FOLDER_LIMITS.depth) throw new HttpError(400, `Folders go ${FOLDER_LIMITS.depth} deep at most`);
-  if ((db.prepare('select count(*) as n from library_folders').get() as { n: number }).n >= FOLDER_LIMITS.count) throw new HttpError(409, `The Library holds ${FOLDER_LIMITS.count} folders at most`);
+  if ((db.prepare('select count(*) as n from library_folders').get() as { n: number }).n >= FOLDER_LIMITS.count) throw new HttpError(409, `At most ${FOLDER_LIMITS.count} folders are kept`);
   if (how === 'number') name = freeName(db, name, parent?.id ?? null, space);
   else if (taken(db, name, parent?.id ?? null, space)) throw new HttpError(409, `There is a folder “${name}” there already`);
   let id = crypto.randomBytes(5).toString('hex');
@@ -225,13 +225,13 @@ export function deleteFolder(db: DB, id: string): { moved: number; media: boolea
 }
 
 /**
- * Something of the Library put in a folder (its place becomes the folder's), or (null) out of any, at its place's top.
+ * Something kept put in a folder (its place becomes the folder's), or (null) out of any, at its place's top.
  * An app's screen stays with its app.
  */
 export function putInFolder(db: DB, table: ItemTable, id: string, folder: string | null) {
   if (!folderColumn(db, table)) throw new HttpError(404, 'Not found');
   const row = db.prepare(`select * from ${table} where id = ?`).get(id) as { app?: string | null } | undefined;
-  if (!row) throw new HttpError(404, table === 'pages' ? 'No saved page with that id' : 'There is no such item in the Library');
+  if (!row) throw new HttpError(404, table === 'pages' ? 'No saved page with that id' : 'There is no such kept item');
   if (row.app) throw new HttpError(400, 'An app’s screen stays with its app');
   if (folder === null) {
     db.prepare(`update ${table} set folder = null where id = ?`).run(id);

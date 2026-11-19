@@ -6,7 +6,7 @@ import type { VideoEditAsk, VideoEditJob, VideoFacts, VideoText } from '@shared/
 import { api, del, enc, post } from '../../../lib/api';
 import { mu } from '../../../lib/machine';
 
-/** Where the browser plays a source from: a deck's video or picture, a Library item's file, a sound kept here, or a file's path. */
+/** Where the browser plays a source from: a deck's video or picture, a kept item's file, a sound kept here, or a file's path. */
 export function playUrl(src: string): string {
   const kept = /^naget-video:([a-f0-9]{16,64})$/.exec(src);
   if (kept) return mu(`/api/pages/videos/${kept[1]}`);

@@ -1,7 +1,7 @@
 // Share with people, opened from anywhere in the app: a project (its page's menu, its card, its overview), or one thing
-// of the Library (a page's Share menu, a picture's, video's or sound's page, a card's menu). One dialog for the whole
+// of what is kept (a page's Share menu, a picture's, video's or sound's page, a card's menu). One dialog for the whole
 // app (the shell holds it), loaded the first time it opens. useSharedThings says which things are shared, and with how
-// many people, for the marks the Library shows on them.
+// many people, for the marks kept things show.
 import { lazy, Suspense, useEffect } from 'react';
 import { create } from 'zustand';
 import type { Space } from '@shared/spaces';

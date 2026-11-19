@@ -9,7 +9,7 @@
 // Page (the whole page's look). Beside the page when there is room, else a drawer under it that folds. Words
 // are written in the page itself as in Notion (server/pages/writing.ts); what it asks for while you write (an
 // emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked, and it is told
-// the Library's pages, for links to them ("@").
+// your pages, for links to them ("@").
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Search, Smartphone, Tablet, Undo2, ZoomIn } from 'lucide-react';
 import type { PageComment, PageCommentOp } from '@shared/page-comments';
@@ -220,7 +220,7 @@ export function Studio({
   onRequest?: (r: MadeRequest) => void;
   /** Saves now, if there are changes (before an agent is asked about the page): false when it did not. */
   saveNowRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
-  /** A page of the Library: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */
+  /** A page kept by the app: comments on its blocks (kept by the app, outside the page) show in Edit's Comments tab. */
   pageId?: string;
   /** Resolve with AI on its comments (common/commentAi.tsx); left out, they offer none. */
   commentAi?: CommentAi;
@@ -269,7 +269,7 @@ export function Studio({
   // Room for the three screen sizes as buttons; else one button with a menu.
   const roomy = useMediaQuery('(min-width: 1180px)');
   const labels = useMemo(() => editorLabels(), []);
-  // The Library's pages, for links to them ("@" in the page): the editor gets them as it starts and as they change.
+  // Your pages, for links to them ("@" in the page): the editor gets them as it starts and as they change.
   const library = usePagesStore((s) => s.pages);
   useEffect(() => {
     if (!usePagesStore.getState().pages) usePagesStore.getState().loadPages().catch(() => {});
@@ -281,7 +281,7 @@ export function Studio({
     if (mode === 'edit') editRef.current?.cmd('pages', pageRefs);
   }, [pageRefs, mode]);
 
-  // Comments on the page's blocks (a page of the Library's): kept by the app outside the page, shown in Edit, beside it.
+  // Comments on the page's blocks (a page kept by the app): kept by the app outside the page, shown in Edit, beside it.
   const [comments, setComments] = useState<PageComment[]>([]);
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState<{ on: PageComment['on']; quote: string } | null>(null);
@@ -564,7 +564,7 @@ export function Studio({
   };
   // The AI on the page, and a database's AI column and files (pageAi.ts).
   const ai = usePageAi(cmd, pageId);
-  // Where the page is in the Library, for its breadcrumbs (pageTools.ts).
+  // Where the page is, for its breadcrumbs (pageTools.ts).
   const crumbs = useCrumbs(pageId, doc?.title ?? '');
   const crumbsRef = useRef(crumbs);
   crumbsRef.current = crumbs;

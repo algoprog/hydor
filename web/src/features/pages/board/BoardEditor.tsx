@@ -1,4 +1,4 @@
-// A board of the Library (shared/boards.ts): the answer cards pinned to it, each drawn by the same view as in a reply
+// A board (shared/boards.ts): the answer cards pinned to it, each drawn by the same view as in a reply
 // (CardView), in a grid that lays out by the room it has: twelve columns on a computer, where S, M, L and Wide span 3,
 // 4, 6 and 12 of them; six on a narrower window (S and M half of it); one on a phone. Each card has its title and where it
 // came from above it (or, for a card that keeps itself up to date, when it was updated, what a refresh costs and how often:
@@ -7,7 +7,7 @@
 // in the card. Cards are dragged by their handle to reorder them on a computer. The bar has Refresh all and the board's
 // monthly cap for refreshes; a board whose refreshes reached it says so at the top.
 //
-// Every change is saved at once as a new version (versions on each change, as the Library keeps them): the change is
+// Every change is saved at once as a new version (versions on each change, as every page keeps them): the change is
 // made here at once, then kept in order, one after another; when the board was saved meanwhile (an agent added a card),
 // the change is made again on the newest version and kept on top of it, so nothing either did is lost.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';

@@ -1,8 +1,8 @@
 // The gallery of kinds an agent makes (index.ts opens it): a box that finds one by name, the kind's groups as chips, and
 // its types as small cards (an icon, a name, a line). One picked shows what it is and a box for what it is about (its
 // hint as the example), then Make it composes the request (shared/content-asks.ts) and sends it on its way: through
-// the Ask panel of the page open, to the caller, or to the start page for something new. As a picker (New in the
-// Library), a card goes back as it is picked. The cards scroll inside a box of fixed height, so the dialog keeps its
+// the Ask panel of the page open, to the caller, or to the start page for something new. As a picker (the
+// New dialog), a card goes back as it is picked. The cards scroll inside a box of fixed height, so the dialog keeps its
 // size and place as they are filtered; on a phone it is a sheet from the bottom. Nothing fades or moves in.
 import { useMemo, useRef, useState } from 'react';
 import { Search, Sparkles, X } from 'lucide-react';

@@ -1,6 +1,6 @@
 // Sound an agent made (generate_audio), with its reply: while the model works a card that says what it makes and
 // for how long it has been at it (a song takes a minute or two); then the sound in the app's own player (its shape
-// to seek along), its title from its file's name, Edit (the sound editor), download, the files and keeping it in the Library, the lyrics a
+// to seek along), its title from its file's name, Edit (the sound editor), download, the files and keeping it, the lyrics a
 // song came with under it. Without an OpenRouter key, a way to Settings.
 import { useEffect, useState } from 'react';
 import { AudioLines, ChevronRight, Download, FolderOpen, KeyRound, Mic, Music, SlidersHorizontal, VolumeX } from 'lucide-react';

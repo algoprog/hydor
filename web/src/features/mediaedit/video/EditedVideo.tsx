@@ -1,5 +1,5 @@
 // What edit_video made, with the agent's reply: while ffmpeg works, a line saying so; then the video as generate_video's
-// card shows it (to play, download, edit again and keep in the Library), or a frame or a GIF as generate_image's card
+// card shows it (to play, download, edit again and keep it), or a frame or a GIF as generate_image's card
 // shows pictures; when it could not be made, why.
 import type { ToolItem } from '@shared/types';
 import { Throbber } from '../../../components/ui';

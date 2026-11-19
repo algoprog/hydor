@@ -202,7 +202,7 @@ export interface MenuArgs {
   video(): void;
   /** A video from this device. */
   videoFile(): void;
-  /** Free photos (openly licensed), a chart from a spreadsheet of the Library, slides of another deck. */
+  /** Free photos (openly licensed), a chart from a spreadsheet of yours, slides of another deck. */
   freePhoto?: () => void;
   sheetChart?: () => void;
   reuseSlides?: () => void;

@@ -1,8 +1,8 @@
 # Projekte und Wissen
 
-Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
+Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt, wie du die Details eines Projekts öffnest, Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
 
-![Die Projektseite: die neuesten Sitzungen deiner Projekte, was sie in der Bibliothek ablegen und wohin die Arbeit ging](images/projects.webp)
+![Die Details eines Projekts in einem Fenster über der Seite: seine Sitzungen, seine neuesten Dateien und was jede Sitzung darin bekommt, unter seinen Tabs](images/projects.webp)
 
 ## Was ein Projekt ist
 
@@ -19,48 +19,24 @@ Sitzungen gehören danach zu einem Projekt, wo sie arbeiten. Jede Sitzung, die i
 
 Ein Projekt kann andere Projekte zusammenfassen. Das ist eine **Gruppe**; siehe [Projekte zu einer Gruppe verbinden](#bring-projects-together-in-a-group).
 
-## Die Projektseite öffnen
+## Die Details eines Projekts öffnen
 
-Klicke in der Werkzeugleiste auf **Projekte**. Öffne auf dem Smartphone zuerst das Seitenleistenmenü: Dort stehen **Projekte** unter den Werkzeugen. Auch die Suche nach „Projekte“ mit Strg+K beziehungsweise ⌘K führt dorthin.
+Ein Projekt hat keine eigene Seite: Seine Details öffnen sich in einem Fenster über der Seite, auf der du gerade bist; sie bleibt abgedunkelt dahinter. Es gibt mehrere Wege dorthin:
 
-Auf einem Computer hat die Seite wie die Bibliothek eine Spalte neben der Werkzeugleiste: das Logo mit **Neues Projekt** und **Seitenleiste ausblenden** oben, darunter:
+- **Aus der Seitenleiste**: Fahre in der Sitzungsliste über die Überschrift eines Projekts und klicke auf das ⓘ (**Projektdetails**); auf einem Touchscreen ist es immer da. Dasselbe bewirkt ein Klick auf das Zeichen des Projekts am Anfang seiner Überschrift, ebenso sein Menü ⋯: **Projektdetails** ist sein erster Eintrag. Öffne auf dem Smartphone zuerst die Seitenleiste: Sie ist ein Menü, das sich einblendet.
+- **Aus der Suche**: Tippe den Namen des Projekts in die Suche (Strg+K, auf dem Mac ⌘K) und wähle es aus. Ein Projekt ohne Sitzungen hat noch keine Überschrift in der Seitenleiste, daher ist das der Weg dorthin (ein gerade erstelltes Projekt öffnet sein Fenster von selbst).
+- **Über einen Link**: Auch ein Link zu einem Projekt in einer Benachrichtigung oder in der Antwort eines Agenten öffnet das Fenster über der Seite, auf der du gerade bist.
 
-- **Alle Projekte** mit der Zahl deiner Projekte;
-- **Gemeinsames Wissen** für Dokumente, die alle Sitzungen durchsuchen können. Siehe [Gemeinsames Wissen](#shared-knowledge-documents-every-session-can-search);
-- unter der Überschrift **Projekte** eine Zeile für jedes deiner Projekte mit seinem Zeichen, seinem Namen und der Zahl seiner Sitzungen. Ein Klick öffnet seine Seite (siehe [Die Projektseite](#a-projects-own-page)).
+Das Fenster zeigt, was ein Projekt enthält:
 
-Der Bereich, in dem du bist, ist in der Spalte markiert, und er bleibt es, wenn du ein Projekt öffnest, sodass du von einem Projekt zum anderen wechseln kannst, ohne zurückzugehen. **Seitenleiste ausblenden** (Strg+B, auf dem Mac ⌘B) blendet die Spalte aus, **Seitenleiste anzeigen** am Anfang der obersten Zeile der Seite holt sie zurück. Auf dem Smartphone und in einem schmalen Fenster gibt es keine Spalte: Die Seite hat dann eine Kopfzeile mit zwei Tabs, **Alle Projekte** und **Gemeinsames Wissen**, und **Neues Projekt** oben rechts.
+- **Die Kopfzeile** in der Farbe des Projekts: sein Zeichen und sein Name, darunter, worum es geht (sein Ordner, wenn es keine Beschreibung hat; eine Gruppe sagt „Bringt … zusammen“ und nennt die Namen ihrer Projekte). Rechts startet **Neue Sitzung** eine Sitzung im Projekt (auf dem Smartphone der Stift); **Mehr** (⋯) enthält das Menü des Projekts (siehe [Das Menü des Projekts](#the-projects-menu)); und ✕ schließt das Fenster.
+- **Seine Tabs**: **Übersicht**, **Dateien**, **Memory**, **Skills**, **Agenten** und **Einstellungen** (siehe [Das Detailfenster eines Projekts](#a-projects-details-window)).
 
-Die Seite neben der Spalte beginnt mit einer Zeile: **Alle Projekte** links und rechts ein Feld zum Suchen eines Projekts (**Projekt suchen**). Tippe einen Teil des Namens oder dessen, worum es im Projekt geht, und die Seite zeigt die passenden Projekte als Karten; Esc oder ✕ leert das Feld.
-
-Die Spalte listet deine Projekte schon, darum zeigt die Seite daneben, was projektübergreifend passiert:
-
-- **Neueste Sitzungen**: die Sitzungen, die zuletzt in einem deiner Projekte gearbeitet haben, die neueste zuerst. Jede zeigt das Zeichen ihres Projekts, ihren Titel, den Namen des Projekts, was sie gerade tut, solange sie läuft („Arbeitet“, „Braucht dich“), und wie lange ihre letzte Arbeit her ist. Ein Klick öffnet sie. **Mehr anzeigen** listet bis zu 30 davon, **Weniger anzeigen** geht zurück auf 8.
-- **Zuletzt in der Bibliothek**: die sechs neuesten Dinge, die deine Projekte in der Bibliothek haben (Seiten, Folien, Dokumente, Bilder und Videos), jeweils mit dem Namen ihres Projekts. Ein Klick öffnet sie; **Bibliothek öffnen** zeigt alles.
-- **Wohin die Arbeit ging**: die letzten 4 Wochen, Tag für Tag. Jeder Balken ist ein Tag, so hoch wie die Zahl der Nachrichten, die die Sitzungen deiner Projekte an diesem Tag bekamen, in den Farben der Projekte, an die sie gingen; zeige auf einen Balken, um sein Datum und die Anzahl zu sehen. Über den Balken steht die Summe („86 Nachrichten · 14 Sitzungen“), darunter jedes Projekt, das gearbeitet hat, das aktivste zuerst, mit einer Linie so lang wie sein Anteil und der Zahl seiner Nachrichten. Ein Klick auf ein Projekt öffnet es. **Ruhig in diesen 4 Wochen** nennt die Projekte, in denen in dieser Zeit nichts lief.
-- **Mit anderen geteilt**: die Projekte, auf die andere Personen einen Link haben, mit der Zahl der Personen. Ein Klick zeigt, wer, und erlaubt, es zu ändern (siehe [Ein Projekt mit Personen teilen](#share-a-project-with-people)). Das erscheint nur, solange du ein Projekt teilst.
-- **Projekte gruppieren**, sobald du mindestens zwei Projekte hast, die keine Gruppen sind (siehe [Projekte zu einer Gruppe verbinden](#bring-projects-together-in-a-group)).
-
-Ein Teil, der nichts zu zeigen hat, entfällt.
-
-Die Projekte erscheinen als Karten überall dort, wo keine Spalte sie auflistet: auf dem Smartphone und in einem schmalen Fenster, solange die Spalte ausgeblendet ist, solange du ein Projekt suchst und solange keines deiner Projekte eine Sitzung oder etwas in der Bibliothek hat. Die Teile oben folgen dann unter den Karten.
-
-Jede Projektkarte zeigt:
-
-- ein Streifen in der Farbe des Projekts mit seinem Zeichen: ein abgerundetes Quadrat in dieser Farbe mit dem ersten Buchstaben des Namens (das Zeichen einer Gruppe hat ein zweites Quadrat dahinter, und auf dem Streifen steht **Gruppe**). Ein Projekt, das Hydor von selbst erstellt hat, sagt auf seinem Streifen, wo es es gefunden hat: **Von Claude Code**, **Von Codex** oder **Von Claude Code und Codex**, mit den Zeichen der Programme (siehe [Projekte, die in Claude Code und Codex gefunden wurden](#projects-found-in-claude-code-and-codex)). In der Ecke steht **Mehr** (⋯), dasselbe Menü wie oben auf der Seite des Projekts;
-- sein Name und darunter, worum es geht, oder sein Ordner, wenn es keine Beschreibung hat. Eine Gruppe sagt „Bringt … zusammen“ und nennt die Namen ihrer Projekte;
-- was es enthält: wie viele Sitzungen (jede Sitzung darin, egal ob du sie hier gestartet hast oder ob sie im Ordner des Projekts arbeitet), wie viele Dinge in der Bibliothek, Dokumente und Skills;
-- die Zeit seit der letzten Sitzungsaktivität sowie **Neue Sitzung** zum direkten Start im Projekt.
-
-Ein Klick auf die Karte oder auf die Zeile des Projekts in der Spalte öffnet das Projekt. Auch sein Name in der Suche per Strg+K führt direkt dorthin. Ohne Projekte erklärt die Seite deren Nutzen in drei kurzen Abschnitten mit **Projekt erstellen**.
-
-Ziehe lokale Dateien auf eine Projektkarte, um sie hinzuzufügen. Währenddessen steht etwa „Ablegen, um zu ‚Abschlussarbeit‘ hinzuzufügen“. Dokumente, Tabellen, Folien, LaTeX und Notebooks werden Bibliotheksseiten, Bilder, Videos und Audio werden dort gespeichert. Andere Dateien landen im Projektordner. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
-
-Am Ende der Seite (nicht, während du ein Projekt suchst) listet **Ordner, in denen du arbeitest** Ordner auf, in denen du in letzter Zeit gearbeitet hast und die zu Projekten werden könnten (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
+Schließe es mit ✕, mit Esc oder mit einem Klick auf die abgedunkelte Seite außerhalb. Auch der Wechsel zu einer anderen Seite schließt es: etwa wenn du ein Dokument aus dem Tab **Dateien** öffnest oder einem Link folgst. Auf dem Smartphone füllt das Fenster den Bildschirm. Esc schließt zuerst ein Menü oder einen Dialog über dem Fenster und danach das Fenster.
 
 ## Ein Projekt erstellen
 
-1. Klicke auf der [Projektseite](/projects) auf **Neues Projekt**. Auch im Ordnermenü der Startseite gibt es **Neues Projekt** (siehe [Eine Sitzung in einem Projekt starten](#start-a-session-in-a-project)).
+1. Klicke auf das **+** am Ende der Überschrift **Projekte** der Seitenleiste (es erscheint, wenn du über die Überschrift fährst, und ist auf einem Touchscreen immer da) und wähle **Neues Projekt …**. Auch die Filterschaltfläche der Seitenleiste (**Sitzungen filtern und gruppieren**) hat **Neues Projekt …**, ebenso das Ordnermenü der Startseite neben seiner Überschrift **Projekte** (siehe [Eine Sitzung in einem Projekt starten](#start-a-session-in-a-project)). Die Überschrift eines Ordners in der Seitenleiste hat **Zum Projekt machen** (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
 2. Fülle das Fenster aus:
    - **Name**: wie du das Projekt nennst, etwa „Steuern 2026“, „Der Garten“ oder „Abschlussarbeit“. Bis zu 60 Zeichen. Es ist das einzige Feld, das du ausfüllen musst. Das Quadrat daneben ist das Zeichen des Projekts, in der Farbe, die es bekommt: Klicke darauf, um eine andere der acht Farben auszuwählen (Bernstein, Blau, Grün, Rosa, Violett, Türkis, Orange, Schiefergrau). Wenn du keine auswählst, bekommen Projekte die Farben der Reihe nach.
    - **Dateien ablegen**: Wähle eine der beiden Möglichkeiten.
@@ -73,9 +49,9 @@ Am Ende der Seite (nicht, während du ein Projekt suchst) listet **Ordner, in de
 4. Lasse **Ein Agent dafür** aktiviert, um einen Projektagenten erstellen zu lassen; siehe [Agenten](#agents). Alternativ schaltest du es aus.
 5. Klicke **Projekt erstellen** oder drücke Enter im Namensfeld.
 
-Neue Ordner entstehen unter **Projekte** am Speicherort der Aufgabenordner. „Taxes 2026“ bekommt etwa `~/Hydor/Projects/taxes-2026`, sofern du den Ort nicht geändert hast; siehe [Aufgabenordner verschieben](/guide/agents#move-task-folders). Bei vergebenem Namen folgen `-2`, `-3` und so weiter. Von der Projektseite aus öffnet sich das neue Projekt, von der Startseite aus wird es für die nächste Sitzung ausgewählt.
+Neue Ordner entstehen unter **Projekte** am Speicherort der Aufgabenordner. „Taxes 2026“ bekommt etwa `~/Hydor/Projects/taxes-2026`, sofern du den Ort nicht geändert hast; siehe [Aufgabenordner verschieben](/guide/agents#move-task-folders). Bei vergebenem Namen folgen `-2`, `-3` und so weiter. Aus der Seitenleiste heraus öffnen sich die Details des neuen Projekts in einem Fenster, von der Startseite aus wird es für die nächste Sitzung ausgewählt.
 
-Zwei weitere Dinge stellst du danach im Tab **Einstellungen** des Projekts ein: den Agenten, als der seine Sitzungen beginnen, und die Projekte, die es zusammenbringt. Seine Notizen, sein Wiki und seine Dokumente findest du im Tab **Memory**, seine Skills im Tab **Skills** und weitere Ordner im Tab **Dateien**.
+Zwei weitere Dinge stellst du danach im Tab **Einstellungen** des Projekts ein: den Agenten, als der seine Sitzungen beginnen, und die Projekte, die es zusammenbringt. Seine Notizen, sein Wiki und seine Dokumente findest du im Tab **Memory**, seine Skills im Tab **Skills** und weitere Ordner im Tab **Dateien** (siehe [Das Detailfenster eines Projekts](#a-projects-details-window)).
 
 ### Ein Projekt für einen vorhandenen Ordner
 
@@ -90,27 +66,25 @@ Hydor listet die Sitzungen auf, die du außerhalb von Hydor in Claude Code und C
 - **Was ausgenommen ist**: dein persönlicher Ordner; versteckte Ordner (außer den Ordnern der eigenen Projekte von Codex); temporäre Ordner; die Ordner, die die App für sich selbst anlegt (Aufgabenordner, Läufe von Apps, Worktrees und ihre Daten); Ordner, die du als **Kein Projekt** markiert hast; und Ordner, die ein Projekt schon hat: sein eigener Ordner, einer, mit dem es arbeitet, oder ein Ordner darin.
 - **Zeitpunkt**: nach dem Einlesen vorhandener Sitzungen beim Hydor-Start, danach etwa innerhalb einer Minute nach neuen Sitzungen.
 - **Name**: der Name, den du dem Ordner in der Seitenleiste gegeben hast (**Umbenennen**), sonst der Name des Codex-Projekts, sonst der eigene Name des Ordners. Wenn ein Projekt schon diesen Namen hat, kommt der Name des übergeordneten Ordners davor („client/app“), danach eine Zahl.
-- **Auf der Projektseite**: Seine Karte sagt auf ihrem Streifen, wo es gefunden wurde: **Von Claude Code**, **Von Codex** oder **Von Claude Code und Codex**, mit den Zeichen der Programme. Fahre darüber, um „Hydor hat dieses Projekt für einen Ordner erstellt, in dem du mit Claude Code arbeitest“ zu lesen (oder Codex, oder beide). So gefundene Projekte stehen nach den Projekten, die du schon hast, das zuletzt aktive zuerst.
-- **In der Seitenleiste**: Seine Gruppe ist die Gruppe des Projekts, mit seinem Zeichen und Namen und nach dem Namen den Zeichen der Programme. Fahre über den Namen oder öffne das **⋯** der Überschrift, um zu sehen, woher seine Sitzungen kamen (**Außerhalb von Hydor gestartet**), wie bei der Gruppe eines Ordners.
-- **Vollständiges Projekt**: Der Arbeitsordner bleibt unverändert, ohne Verschieben oder Kopieren. Dokumente, Skills, Richtlinien, Agenten, Bibliothek und Freigaben funktionieren wie gewohnt. Du kannst umbenennen, beschreiben und löschen. Claude-Code-Skills aus `.claude/skills` erscheinen weiterhin unter **Skills**; CLAUDE.md und AGENTS.md werden wie bisher gelesen.
+- **In der Seitenleiste**: Seine Gruppe ist die Gruppe des Projekts, mit seinem Zeichen und Namen und nach dem Namen den Zeichen der Programme, in denen es gefunden wurde. Fahre über den Namen oder öffne das **⋯** der Überschrift, um zu sehen, woher seine Sitzungen kamen (**Außerhalb von Hydor gestartet**), wie bei der Gruppe eines Ordners. Sein Detailfenster öffnet sich wie das jedes Projekts (siehe [Die Details eines Projekts öffnen](#open-a-projects-details)); es sagt nicht, wo das Projekt gefunden wurde.
+- **Vollständiges Projekt**: Der Arbeitsordner bleibt unverändert, ohne Verschieben oder Kopieren. Dokumente, Skills, Richtlinien, Agenten, Dateien und Freigaben funktionieren wie gewohnt. Du kannst umbenennen, beschreiben und löschen. Claude-Code-Skills aus `.claude/skills` erscheinen weiterhin unter **Skills**; CLAUDE.md und AGENTS.md werden wie bisher gelesen.
 - **Nach dem Löschen** erstellt Hydor es nicht erneut automatisch. Du kannst aber selbst wieder ein Projekt anlegen; siehe [Ein Projekt löschen](#delete-a-project).
 
-Die Herkunftsstreifen auf der [Projektseite](/projects) machen erkannte Projekte sichtbar.
+Welche Projekte so entstanden sind, erkennst du an den Zeichen der Programme nach dem Namen eines Projekts in der Seitenleiste, oder du fragst einen Agenten.
 
 ### Arbeitsordner ohne Projekt
 
-Unter den Projekten auf der [Projektseite](/projects) erscheinen bis zu sechs Vorschläge aus den letzten 90 Tagen: Arbeitsordner oder Ordner, in denen Sitzungen von anderswo Dateien geändert haben, die noch keinem Projekt gehören. Häufig und kürzlich verwendete stehen oben. Unterordner eines Git-Projekts zählen zum gesamten Projekt. Die Karte zeigt Name, Pfad, Sitzungszahl und letzte Verwendung.
+Ein Ordner, in dem mindestens zwei deiner Sitzungen arbeiten und den noch kein Projekt hat, bekommt in der Seitenleiste unter **Projekte** eine eigene Gruppe mit dem Namen des Ordners. Fahre über ihre Überschrift und öffne ihr **⋯**, dort steht **Zum Projekt machen**: Das Fenster **Neues Projekt** öffnet sich mit ausgewähltem Ordner und ausgefülltem Namen. Dasselbe Menü hat **Umbenennen**, **Ursprünglichen Ordnernamen verwenden** (sobald du ihn umbenannt hast) und **In Dateien öffnen**.
 
-- **Projekt erstellen** öffnet das Fenster **Neues Projekt** mit ausgewähltem Ordner und ausgefülltem Namen.
-- ✕ mit **Kein Projekt** entfernt den Vorschlag und verhindert die automatische Projekterstellung. Siehe [Automatisch erkannte Projekte](#projects-found-in-claude-code-and-codex). Der Ordner bleibt unverändert und kann weiter manuell über **Neues Projekt** aufgenommen werden.
+Wenn du selbst ein Projekt für einen Ordner erstellst (oder im Fenster **Neues Projekt**), erscheinen die Ordner, in denen deine Sitzungen in letzter Zeit, in den letzten 90 Tagen, gearbeitet oder Dateien geändert haben, während sie woanders arbeiteten, und die noch kein Projekt hat, unter **Kürzlich verwendet, noch in keinem Projekt**, sodass ein Tipp genügt, um einen auszuwählen (siehe [Ein Projekt erstellen](#make-a-project)). Häufig und kürzlich verwendete stehen oben. Unterordner eines Git-Projekts zählen zum gesamten Projekt.
 
-Ordner, in denen du mit Claude Code und Codex arbeitest, werden von selbst zu Projekten, daher enthält diese Liste vor allem Ordner, in denen du aus Hydor gearbeitet hast. Dein persönlicher Ordner, versteckte Ordner, temporäre Ordner und die Ordner, die die App für sich selbst anlegt (Aufgabenordner, Läufe von Apps, Worktrees), werden nie vorgeschlagen. Sobald ein Projekt einen Ordner hat, als eigenen oder als einen der Ordner, mit denen es arbeitet, verschwindet er aus der Liste. Dieselben Ordner stehen im Fenster **Neues Projekt** unter **Kürzlich verwendet, noch in keinem Projekt**.
+Ordner, in denen du mit Claude Code und Codex arbeitest, werden von selbst zu Projekten, daher sind das vor allem Ordner, in denen du aus Hydor gearbeitet hast. Dein persönlicher Ordner, versteckte Ordner, temporäre Ordner und die Ordner, die die App für sich selbst anlegt (Aufgabenordner, Läufe von Apps, Worktrees), werden nie vorgeschlagen. Sobald ein Projekt einen Ordner hat, als eigenen oder als einen der Ordner, mit denen es arbeitet, verschwindet er aus ihnen. Damit Hydor aus einem Ordner nicht von selbst ein Projekt macht, bitte einen Agenten darum: Er führt eine Liste von Ordnern, die keine Projekte sind, und das Löschen eines Projekts nimmt seinen Ordner dort auf (siehe [Ein Projekt löschen](#delete-a-project)).
 
 ## Eine Projektsitzung starten
 
 Dafür gibt es zwei Wege:
 
-- **Vom Projekt aus**: **Neue Sitzung** auf der Projektkarte oder oben auf der Projektseite, auf dem Smartphone der Stift, öffnet die Startseite mit ausgewähltem Projekt und dessen bisheriger Auswahl. Ohne gespeicherte Auswahl wird gegebenenfalls der Projektagent gewählt.
+- **Vom Projekt aus**: der Stift am Ende seiner Überschrift in der Seitenleiste oder **Neue Sitzung** oben in seinem Detailfenster, auf dem Smartphone der Stift, öffnet die Startseite mit ausgewähltem Projekt und dessen bisheriger Auswahl. Ohne gespeicherte Auswahl wird gegebenenfalls der Projektagent gewählt.
 - **Von der Startseite aus**: Öffne den Ordner-Chip in der Zeile unter dem Nachrichtenfeld. Sein Menü hat zwei kurze Listen: **Projekte**, die fünf zuletzt aktiven (und das ausgewählte, falls es nicht darunter ist), jedes mit seinem Zeichen, seinem Namen und seinem Ordner; dann **Ordner**, der verwendete Ordner und die, die du zuletzt verwendet hast; dann **Neuer Aufgabenordner**. **Neu** neben der Überschrift **Projekte** erstellt ein Projekt und wählt es aus. Gib oben im Feld einen Teil eines Namens ein, um ein beliebiges Projekt oder einen beliebigen Ordner zu finden. Der eigene Ordner eines Projekts wird nie als Ordner aufgeführt: Wenn du ihn über seinen Namen oder Pfad findest oder ihn vorher auf der Startseite als Ordner ausgewählt hast, ist er das Projekt, und die Sitzung arbeitet im Projekt.
 
 Wenn du ein Projekt auswählst, zeigt der Chip sein Zeichen und seinen Namen statt eines Ordners, und die Sitzung arbeitet im Ordner des Projekts. In einem Projekt, in dem du noch nichts ausgewählt hast, zeigt der Chip **Agent** den eigenen Agenten des Projekts, wenn es einen hat, mit dem Programm, dem Modell und den Berechtigungen, die dieser Agent vorschlägt, sonst **Allgemein**; in einem, in dem du schon etwas ausgewählt hast, zeigt er, was du dort ausgewählt hast. Du kannst jedes davon vor dem Start noch ändern. Gib dann deine Nachricht ein und klicke auf **Starten**.
@@ -121,9 +95,13 @@ Auf dem Smartphone öffnet das Menü als Bedienfeld „Projekt oder Arbeitsordne
 
 Wenn der Ordner des Projekts ein Git-Repository ist, bietet das Ende des Menüs **Neuer Worktree**, wie bei jedem Ordner in einem Repository: Die Sitzung arbeitet dann auf einem eigenen Branch in einer getrennten Kopie des Repositorys (siehe [Sitzungen](/guide/sessions)). Sitzungen, die du per Sprache im Freisprechmodus startest, beginnen an dem Ort, der zuletzt auf der Startseite ausgewählt wurde, mit seinen Auswahlen (siehe [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice)).
 
-## Die Projektseite
+## Das Detailfenster eines Projekts
 
-Klicke auf der Projektseite auf ein Projekt, um es zu öffnen. Der obere Teil seiner Seite hat die Farbe des Projekts: Auf einem Computer bleibt die Spalte neben ihr mit dem markierten Projekt, ein Klick auf eine andere Zeile öffnet also dieses Projekt. Auf dem Smartphone, in einem schmalen Fenster oder bei ausgeblendeter Spalte führt der Pfeil links zurück zu allen deinen Projekten (wie auf den anderen Seiten der App), und **Seitenleiste anzeigen** holt die Spalte zurück; dann folgen das Zeichen und der Name des Projekts und worum es geht (bei einer Gruppe die Projekte der Gruppe; ohne Beschreibung sein Ordner). Rechts startet **Neue Sitzung** eine Sitzung im Projekt (auf dem Smartphone der Stift), und **Mehr** (⋯) enthält:
+Öffne es, wie unter [Die Details eines Projekts öffnen](#open-a-projects-details) beschrieben. Die Tabs des Fensters sind **Übersicht**, **Dateien**, **Memory**, **Skills**, **Agenten** und **Einstellungen**. **Memory** und **Skills** zeigen eine Anzahl, außer auf dem Smartphone, wo die Tabs ihre Anzahl weglassen. Auf dem Smartphone (oder in einem schmalen Fenster) stehen die Tabs, die nicht passen, unter **Mehr** am Ende der Zeile: Tippe darauf, um ein Menü mit ihnen zu öffnen. Während einer davon geöffnet ist, steht dort sein Name anstelle von **Mehr**. Jeder Tab erscheint sofort.
+
+### Das Menü des Projekts
+
+**Mehr** (⋯) in der Kopfzeile des Fensters enthält:
 
 - **Ordner unter „Dateien“ öffnen**: der Ordner des Projekts auf der Seite Dateien.
 - **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**: In der Desktop-App zeigt es den Ordner des Projekts ausgewählt im Dateimanager des Systems (siehe [Mit Dateien und Ordnern arbeiten](/guide/files-git#work-with-files-and-folders)).
@@ -131,36 +109,40 @@ Klicke auf der Projektseite auf ein Projekt, um es zu öffnen. Der obere Teil se
 - **Mit anderen teilen**: Lade jemanden (eine Betreuerin, einen Studenten) ein, das Projekt zu sehen und seine Dokumente über einen eigenen Link zu kommentieren (siehe [Ein Projekt mit anderen teilen](#share-a-project-with-people)).
 - **Projekt löschen**; siehe [Ein Projekt löschen](#delete-a-project).
 
-Darunter stehen sieben Tabs: **Übersicht**, **Bibliothek**, **Dateien**, **Memory**, **Skills**, **Agenten** und **Einstellungen**. **Bibliothek**, **Memory** und **Skills** zeigen eine Anzahl, außer auf dem Smartphone, wo die Tabs ihre Anzahl weglassen. Auf dem Smartphone (oder in einem schmalen Fenster) stehen die Tabs, die nicht passen, unter **Mehr** am Ende der Zeile: Tippe darauf, um ein Menü mit ihnen zu öffnen. Während einer davon geöffnet ist, steht dort sein Name anstelle von **Mehr**. Jeder Tab erscheint sofort.
-
 ### Übersicht
 
 Karten zeigen das Projekt auf einen Blick:
 
 - **Sitzungen**: alle zugehörigen Sitzungen, ob hier oder extern im Projektordner gestartet, zuletzt aktive zuerst. Angezeigt werden Agentensymbol, Titel, am Computer Aktivität wie **In Arbeit**, **Braucht dich** oder **Bereit**, und Zeit seit letzter Aktivität. Ein Klick öffnet die Sitzung; ab mehr als sechs zeigt **Alle** den Rest. Ohne Sitzungen erklärt ein Hinweis die Arbeit mit Projektordner, Richtlinien, Dokumenten und Skills und bietet **Neue Sitzung**.
-- **In der Bibliothek**: Projektinhalte, zuletzt geänderte zuerst. Siehe [Bibliothek](#library). **In der Bibliothek öffnen** zeigt sie dort. Auf die Karte gezogene Dateien werden hinzugefügt.
+- **Dateien**: die neuesten Dateien des Projekts, bis zu sechs, als Kacheln mit ihren Bildern: was im Projekt behalten wurde (Seiten, Dokumente, Folien, Bilder …) und die Dateien oben in seinem Ordner, zuletzt geänderte zuerst. Ein Klick öffnet sie. **Alle Dateien** öffnet den Tab **Dateien**. Die Karte erscheint nur, solange das Projekt Dateien hat.
 - **Geteilt mit**, daneben oder auf dem Smartphone darunter: nach erster Freigabe die Personen mit Initialen und letzter Aktivität, etwa „‚Kapitel 3‘ kommentiert · vor 2 Std.“ oder „Noch nicht geöffnet“. Eine Person oder **Teilen** öffnet die Freigabeverwaltung. Siehe [Projektfreigaben](#share-a-project-with-people).
 - **Jede Sitzung hier** (daneben, auf dem Smartphone darunter): was jede Sitzung im Projekt bekommt. **Ordner** (sein Ordner und wie viele weitere es nutzt: Klicke darauf, um zum Tab **Dateien** zu gelangen), **Richtlinien** (der Anfang seiner Richtlinien: Klicke darauf, um zu **Einstellungen** zu gelangen), **Memory** (was es sich merkt, in einer Zeile: „12 Notizen · 8 Artikel · 5 Dokumente“, wobei die Artikel nur erscheinen, solange sein Wiki-Memory an ist; klicke darauf, um zum Tab **Memory** zu gelangen), **Skills** (wie viele eigene es hat) und **Beginnt als** (sein Agent).
 - **Die Projekte, die es zusammenbringt**, bei einer Gruppe: jedes ihrer Projekte, mit der Anzahl seiner Sitzungen. Klicke eines an, um es zu öffnen.
 
-### Bibliothek
-
-Hier liegen Seiten, Folien, Dokumente, Tabellen und LaTeX-Dokumente aus Projektsitzungen sowie selbst gespeicherte oder zugeordnete Inhalte. Siehe [Nach Projekt sortieren](/guide/library#sort-it-by-project). Karten öffnen Inhalte; **Mehr** bietet dieselben Aktionen wie in der Bibliothek. **In der Bibliothek öffnen** nutzt deren Suche und Inhaltsfilter. Ohne Inhalte gibt es **Neue Seite** und **Neue Folien**, jeweils im Projekt. Gezogene Dateien werden ihrem Typ entsprechend aufgenommen. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
-
 ### Dateien
 
-Der Projektordner und Zusatzordner erscheinen wie auf der [Dateien-Seite](/guide/files-git#browse-a-folder), mit Öffnen, Mehrfachauswahl, Ziehen, Hochladen und Zeilenmenüs. Dateien öffnen sich in einem Fenster über der Seite.
+Die Dateien des Projekts: was darin behalten wurde, sein Ordner und die weiteren Ordner, mit denen es arbeitet. Der Tab zeigt einen Ordner wie die [Dateien-Seite](/guide/files-git#browse-a-folder): öffnen, mehrere auswählen, ziehen und das Menü jeder Kachel oder Zeile. Dateien öffnen sich in einem Fenster über der Seite.
 
 - Über dem Inhalt stehen Schaltflächen je Ordner, der Stamm unter dem Projektnamen, weitere unter ihren Ordnernamen. Ein Klick wechselt den angezeigten Ordner.
 - **Ordner hinzufügen** fügt per Name oder Pfad einen weiteren Arbeitsordner unverändert hinzu, höchstens zwölf. Es wird nichts kopiert.
 - ✕ auf dem Chip eines Ordners nimmt ihn aus dem Projekt heraus; der Ordner selbst bleibt, wie er ist. Der Hinweis bietet **Rückgängig machen**.
-- **In Dateien öffnen** öffnet den Ordner auf der Dateien-Seite. In der Desktop-App zeigt **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** ihn im Dateimanager des Systems.
+- **In Dateien öffnen** öffnet den Ordner auf der Dateien-Seite. In der Desktop-App zeigt **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen** (im Menü des Projekts) ihn im Dateimanager des Systems.
 
-**Zu einem Projekt hinzufügen** auf der Dateien-Seite, im Dateifenster oder auf Agenten-Dateikarten kopiert Dateien in den Projektordner und verknüpft Ordner als zusätzliche Arbeitsorte. Siehe [Dateien zu einem Projekt hinzufügen](/guide/files-git#add-files-to-a-project). Alternativ ziehst du lokale Dateien auf Projektkarte oder Bibliothek. Unterstützte Dokumente, Tabellen und Bilder kommen in die Bibliothek, andere Dateien in den Projektordner. Siehe [Eigene Dateien hinzufügen](/guide/library#add-files-of-yours).
+**Kacheln und Liste.** Die Dateien erscheinen als Kacheln mit Bildern, es sei denn, du hast selbst **Als Liste** gewählt (der Schalter am Ende der Leiste merkt sich deine Wahl in diesem Browser). Jede Kachel hat oben ein Bild, bei Dokumenten und Ähnlichem ein kleines Kennzeichen mit ihrer Art (PDF, Word, Blatt, Folien, Notebook …), ihren Namen und wann sie geändert wurde („Geändert vor 2 Std.“); ihr ⋯ erscheint, wenn du darauf zeigst. Das Bild ist bei Bildern das Bild selbst, bei Videos ein Einzelbild, bei PDFs die erste Seite, bei Word-, PowerPoint-, Excel- und OpenDocument-Dateien die erste Seite, Folie oder die ersten Zellen, bei Webseiten und Notebooks so, wie sie sich öffnen, und bei Text-, Markdown-, Code-, CSV- und JSON-Dateien die ersten Zeilen. Alles andere zeigt das Symbol seiner Art. Die Liste zeigt Bilder als kleine Vorschaubilder statt Symbolen (siehe [Einen Ordner durchsuchen](/guide/files-git#browse-a-folder)).
+
+**Was das Projekt behält.** Oben im eigenen Ordner des Projekts (nicht in seinen Unterordnern und nicht in den Ordnern, mit denen es arbeitet) erscheint, was im Projekt behalten wurde, im selben Raster, nach den Ordnern und vor den Dateien, das Neueste zuerst: die Seiten, Designs, Folien, Dokumente, Tabellen, LaTeX-Dokumente, Notebooks, Diagramme und Boards, die Agenten erstellt und du behalten hast, gespeicherte Webseiten sowie Bilder, Videos und Audiodateien, die du behalten hast. Jedes zeigt sein Bild und darauf seine Art, und ein Klick öffnet es in seinem eigenen Editor oder Viewer. Sein ⋯-Menü enthält, was dazu passt, etwa **Bearbeiten**, **Umbenennen**, **Mit anderen teilen**, **In ein anderes Projekt verschieben**, **Duplizieren**, **Umwandeln in**, **Herunterladen** und **Löschen**. Das Feld **Suchen in** darüber filtert sie zusammen mit den Dateien. Was du in einer Sitzung ohne Projekt behältst, bleibt bei dieser Unterhaltung (siehe [Eine Seite behalten](/guide/library#keep-a-page)).
+
+**Dateien hinzufügen.**
+
+- **Hochladen** in der Leiste lädt Dateien unverändert in den angezeigten Ordner hoch; sein Pfeil (**Weitere Möglichkeiten zum Hochladen**) bietet **Dateien hochladen** und **Ordner hochladen**, was den Ordner mit seinen Dateien mitbringt. Eine Word-, Tabellen- oder LaTeX-Datei öffnet sich in den eigenen Editoren der App, wie auf der Dateien-Seite.
+- Ziehe Dateien oder Ordner von deinem Computer an eine beliebige Stelle des Tabs: Solange sie darüber sind, steht dort „Zum Hinzufügen zu „Abschlussarbeit“ ablegen“. Auf dem Smartphone bietet das runde **+** unten (**Zu diesem Ordner hinzufügen**) dasselbe.
+- **Neu** bietet **Neuer Ordner**, **Neue Datei** und **Neues Notebook**, **Dateien hochladen** und **Ordner hochladen**, darunter die Dinge, die die App erstellt: **Dokument**, **Folien**, **Tabelle**, **Seite**, **Design**, **LaTeX**, **Diagramm**, **Board** und **Bild**. Jedes öffnet den Dialog „Neu“ für diese Art, mit diesem Projekt ausgewählt (siehe [Eine Seite erstellen](/guide/library#make-a-page)).
+
+Um Dateien von anderswo in der App hinzuzufügen, nutze **Zu einem Projekt hinzufügen** auf der Dateien-Seite, im Dateifenster oder auf den Dateikarten eines Agenten: Eine Datei wird in den Projektordner kopiert, ein Ordner kommt zu denen, mit denen es arbeitet (siehe [Dateien zu einem Projekt hinzufügen](/guide/files-git#add-files-to-a-project)).
 
 ### Memory
 
-Drei Bereiche zeigen das Projektwissen, über eine Auswahl einzeln aufrufbar: **Notizen**, **Wiki** und **Dokumente**. Jeder hat eine eigene Adresse: `/projects/<id>/memory`, ergänzt um `?part=wiki` oder `?part=documents`. Auch die alten Adressen der Tabs Wissen und LLM Wiki öffnen diesen Bereich.
+Drei Bereiche zeigen das Projektwissen, über eine Auswahl einzeln aufrufbar: **Notizen**, **Wiki** und **Dokumente**. Ein Link zu einem Bereich öffnet das Fenster direkt dort, ebenso die alten Adressen der Tabs Wissen und LLM Wiki.
 
 - **Notizen**: die gespeicherten Memory-Notizen des Projekts wie unter [Einstellungen → Memory](/settings?s=memory), mit **Notiz hinzufügen** und Suchfeld. Diese kurzen Fakten erhält jede Projektsitzung zum Start; siehe [Memory](/guide/memory).
 - **Wiki**: Artikel und Quellen des Projekt-Wiki-Memory zum Lesen sowie **Letzte Aktualisierungen** durch neue und geänderte Dokumente. Agenten schreiben das Wiki, du liest es hier; siehe [Wiki-Memory](/guide/wiki-memory#a-projects-memory-tab).
@@ -228,7 +210,7 @@ Jeder eigene Skill des Projekts erscheint als Zeile: sein Name, wann er zu benut
 - Klicke ihn an, um den Skill und seinen **Verlauf** der Änderungen zu lesen. **Veränderung** unten in diesem Fenster bearbeitet seinen Namen, wann er zu benutzen ist und seinen Text: Ein neuer Name behält seine übrigen Dateien, seinen Verlauf und seinen Schalter.
 - **Entfernen** im selben Fenster fragt nach. Danach entfällt der Skill oder die gleichnamige Bibliotheksfassung gilt wieder. Entfernte Skills stehen unter der Liste als **Entfernt:** und lassen sich per Klick wiederherstellen.
 
-Gruppen zeigen anschließend die eigenen Skills ihrer Projekte unter deren Namen. Gruppen-Sitzungen erhalten sie ebenfalls; bearbeiten kannst du sie im jeweiligen Projekt. Agenteneigene Skills werden für den Projektordner aufgeführt: persönliche sowie dort vorhandene, bei Claude Code unter `.claude/skills`.
+Gruppen zeigen anschließend die eigenen Skills ihrer Projekte unter deren Namen. Gruppen-Sitzungen erhalten sie ebenfalls; bearbeiten kannst du sie in den Details des jeweiligen Projekts. Agenteneigene Skills werden für den Projektordner aufgeführt: persönliche sowie dort vorhandene, bei Claude Code unter `.claude/skills`.
 
 ### Wie Agenten die Skills erhalten
 
@@ -247,11 +229,11 @@ Der Agent schlägt einen Bereich vor; du wählst vor der Bestätigung. Verbesser
 
 ## Ein Projekt ändern
 
-Öffne das Projekt, gehe zu seinem Tab **Einstellungen**, ändere, was du möchtest, und klicke auf **Speichern**. Sitzungen, die du ab dann im Projekt startest, bekommen den neuen Namen, die neue Beschreibung und die neuen Richtlinien. Ein neuer Agent gilt, wenn du das Projekt das nächste Mal auf der Startseite auswählst oder auf seiner Seite auf **Neue Sitzung** klickst. Der Ordner des Projekts bleibt derselbe: Er lässt sich nicht in einen anderen Ordner verschieben.
+Öffne die Details des Projekts, gehe zu seinem Tab **Einstellungen**, ändere, was du möchtest, und klicke auf **Speichern**. Sitzungen, die du ab dann im Projekt startest, bekommen den neuen Namen, die neue Beschreibung und die neuen Richtlinien. Ein neuer Agent gilt, wenn du das Projekt das nächste Mal auf der Startseite auswählst oder in seinen Details auf **Neue Sitzung** klickst. Der Ordner des Projekts bleibt derselbe: Er lässt sich nicht in einen anderen Ordner verschieben.
 
 ## Ein Projekt löschen
 
-1. Öffne das Projekt und klicke oben auf **Mehr** (⋯) oder gehe zu seinem Tab **Einstellungen**.
+1. Öffne die Details des Projekts und klicke oben auf **Mehr** (⋯) oder gehe zu seinem Tab **Einstellungen**.
 2. Wähle **Projekt löschen**.
 3. Bestätige „Projekt *Name* löschen?“ mit **Löschen**. Bei automatisch erkannten Projekten erklärt die App, dass sie aus Claude-Code-, Codex- oder beiden Sitzungsbeständen stammen und nicht erneut angelegt werden.
 
@@ -260,7 +242,7 @@ Die bisherigen Inhalte bleiben erhalten:
 - **Sein Ordner** und die Dateien darin bleiben, wo sie sind, ebenso die Ordner, mit denen es gearbeitet hat.
 - **Sein Ordner kommt auf die Liste Kein Projekt**: Hydor schlägt ihn nicht wieder vor und macht ihn nicht von selbst wieder zu einem Projekt. Du kannst selbst weiterhin ein Projekt dafür erstellen (**Neues Projekt** → **In einem Ordner, den ich bereits habe**).
 - **Sitzungen** bleiben ohne Projektzuordnung erhalten.
-- **Bibliotheksinhalte** bleiben ohne Projektzuordnung erhalten.
+- **Was es behalten hat** (Seiten, Designs, Dokumente, Bilder …) bleibt erhalten, ohne Projektzuordnung: bei der Unterhaltung, die es erstellt hat, und die Suche (Strg+K) findet es weiterhin. Seine eigene Seite hat **In ein Projekt verschieben**, um es in ein anderes zu legen.
 - **Wissensdokumente** wechseln ins gemeinsame Wissen und sind damit allgemein durchsuchbar. Zur Trennung verschiebst du die Wissensdatenbank in ein anderes Projekt; siehe [Wissensdatenbanken verwalten](#rename-move-read-again-or-delete-a-knowledge-base).
 - **Seine Skills** wandern in deine Skill-Bibliothek, sodass jede Sitzung sie von da an bekommt. Trägt einer den Namen eines Skills, den die Bibliothek schon hat, hängt er den Namen des Projekts hinter seinen eigenen: Aus `research` des Projekts Thesis wird `research-thesis`.
 - **Memory** bleibt beim Ordner, da Notizen nicht an den Projekt-Datensatz gebunden sind.
@@ -280,11 +262,11 @@ Eine Gruppe ist ein Projekt, das mehrere andere für übergreifende Arbeit bünd
 
 ### Eine Gruppe erstellen
 
-1. Klicke auf der [Projektseite](/projects) auf **Projekte gruppieren**. Das erscheint ab zwei gewöhnlichen Projekten.
+1. Klicke in der Seitenleiste auf das **+** am Ende der Überschrift **Projekte** und wähle **Neue Gruppe von Projekten …**. Du brauchst mindestens ein Projekt, das du aufnehmen kannst.
 2. Gib unter **Neue Gruppe von Projekten** einen **Namen** ein, etwa „Arbeit“ oder „Alles zur Abschlussarbeit“.
 3. Tippe unter **Die Projekte, die es zusammenbringt** jedes Projekt an, das aufgenommen werden soll; tippe es noch einmal an, um es wieder herauszunehmen. Wähle mindestens eines aus.
 4. Fülle optional **Worum es geht** und die **Agentenrichtlinien** aus und wähle eine Farbe.
-5. Klicke auf **Gruppe erstellen**. Wie ein Projekt bekommt sie einen eigenen Ordner für das, was darin entsteht, und ihre Seite öffnet sich.
+5. Klicke auf **Gruppe erstellen**. Wie ein Projekt bekommt sie einen eigenen Ordner für das, was darin entsteht, und ihre Details öffnen sich.
 
 Du kannst auch ein bestehendes Projekt zu einer Gruppe machen: Wähle auf seinem Tab **Einstellungen** unter **Die Projekte, die es zusammenbringt** Projekte aus und klicke auf **Speichern**. Die Projekte einer Gruppe änderst du auf dieselbe Weise. Nimmst du alle heraus, ist es wieder ein gewöhnliches Projekt.
 
@@ -303,25 +285,25 @@ Jedes Projekt hat in der Seitenleiste eine Gruppe mit Namen, Zeichen und neueste
 So zeigst du nur ein Projekt:
 
 1. Klicke oben in der Seitenleiste auf die Filterschaltfläche (**Sitzungen filtern und gruppieren**).
-2. Unter **Alle Agenten**, **Claude Code** und **Codex** folgen **Alle Projekte**, bis zu acht Projekte und **Projekte** als Link zur Projektseite. Wähle das gewünschte Projekt.
+2. Unter **Alle Agenten**, **Claude Code** und **Codex** folgen **Alle Projekte**, bis zu acht Projekte und **Neues Projekt …**. Wähle das gewünschte Projekt.
 
 Die Sitzungsliste zeigt dann nur die Sitzungen dieses Projekts, nach Tagen, und die Filterschaltfläche ist farbig, solange ein Filter eingeschaltet ist. Wähle **Jedes Projekt**, um wieder alle Sitzungen zu sehen. Der Agentenfilter wirkt gleichzeitig, sodass du nur die Sitzungen eines Agenten in einem Projekt siehst. Wird das Projekt gelöscht, zeigt die Liste wieder alle Sitzungen.
 
-Auf der eigenen Seite des Projekts bewirkt **Mehr** (⋯) → **Nur Projektsitzungen in der Seitenleiste** dasselbe, mit einem Haken, solange es eingeschaltet ist; wähle es noch einmal, um wieder alle Sitzungen zu sehen.
+In den Details des Projekts bewirkt **Mehr** (⋯) → **Nur Projektsitzungen in der Seitenleiste** dasselbe, mit einem Haken, solange es eingeschaltet ist; wähle es noch einmal, um wieder alle Sitzungen zu sehen.
 
 Auf dem Smartphone öffnest du zuerst das Seitenleistenmenü.
 
 ## Ein Projekt mit Personen teilen
 
-Du kannst Personen in ein Projekt einladen, zum Beispiel eine Betreuerin und die Studierenden, die mit dir arbeiten, jeweils mit einem eigenen Link. Ohne dein Passwort sehen sie die Dokumente des Projekts, seine Sitzungen und, wenn es sie hat, seine Läufe und seine Leseliste. Sie kommentieren seine Dokumente unter ihrem eigenen Namen, und wenn du es erlaubst, ändern sie auch seine Dokumente. Sie erreichen nie deine Agenten, deine Dateien, deine Einstellungen oder deine anderen Projekte. Um nur eine einzelne Sache aus der Bibliothek zu teilen (ein Dokument, eine Seite, ein Bild, ein Video …), siehe [Mit Personen teilen](/guide/library#share-with-people).
+Du kannst Personen in ein Projekt einladen, zum Beispiel eine Betreuerin und die Studierenden, die mit dir arbeiten, jeweils mit einem eigenen Link. Ohne dein Passwort sehen sie die Dokumente des Projekts, seine Sitzungen und, wenn es sie hat, seine Läufe und seine Leseliste. Sie kommentieren seine Dokumente unter ihrem eigenen Namen, und wenn du es erlaubst, ändern sie auch seine Dokumente. Sie erreichen nie deine Agenten, deine Dateien, deine Einstellungen oder deine anderen Projekte. Um nur eine einzelne Sache zu teilen (ein Dokument, eine Seite, ein Bild, ein Video …), siehe [Mit Personen teilen](/guide/library#share-with-people).
 
 ### Eine Person einladen
 
-1. Öffne das Projekt und klicke oben auf **Mehr** (⋯) oder auf seiner Karte auf der [Projektseite](/projects) auf **Mehr**. Klicke auf **Mit anderen teilen**.
+1. Öffne die Details des Projekts und klicke oben auf **Mehr** (⋯), dann auf **Mit anderen teilen**.
 2. Gib unter **Person einladen** ihren **Namen** für Kommentare und Änderungen ein.
 3. Wähle die Berechtigung:
    - **Ansehen und kommentieren**: alle freigegebenen Inhalte lesen und Dokumente, LaTeX, Folien, Tabellen und Seiten kommentieren.
-   - **Dokumente bearbeiten**: zusätzlich Dokumente, Tabellen, Folien, Seiten und Designs in Bibliothekseditoren ändern. Bei Seiten gelten Text, Bilder und Layout, nie Code. LaTeX-Bearbeitung ist nur bei abgeschirmter Kompilierung möglich; siehe [Was nie geteilt wird](#what-is-never-shared).
+   - **Dokumente bearbeiten**: zusätzlich Dokumente, Tabellen, Folien, Seiten und Designs in den eigenen Editoren der App ändern. Bei Seiten gelten Text, Bilder und Layout, nie Code. LaTeX-Bearbeitung ist nur bei abgeschirmter Kompilierung möglich; siehe [Was nie geteilt wird](#what-is-never-shared).
 4. Wähle **Eine Woche**, **Einen Monat** oder **Bis zur Deaktivierung**.
 5. Klicke auf **Link für diese Person erstellen**. Kopiere ihn mit der Schaltfläche zum Kopieren und schicke ihn der Person, oder klicke auf die Schaltfläche für den QR-Code, um ihn als QR-Code für die Kamera ihres Smartphones anzuzeigen. Der Link wird nur jetzt angezeigt: Die App behält nur einen Fingerabdruck davon, deshalb kann sie ihn nicht noch einmal anzeigen. Du kannst der Person jederzeit einen neuen erstellen.
 
@@ -367,7 +349,7 @@ Ein Link, der abgelaufen ist, angehalten oder neu erstellt wurde, sagt das beim 
 ### Was nie geteilt wird
 
 - **Agenten**: Gäste können weder Sitzungen starten oder steuern noch Agenten befragen, sondern nur mitlesen und kommentieren.
-- **Dateien**: Weder Projektordner noch andere Ordner sind zugänglich. Geteilt werden nur Bibliotheksinhalte und Leselink-Ansichten der Sitzungen.
+- **Dateien**: Weder Projektordner noch andere Ordner sind zugänglich. Geteilt werden nur das, was das Projekt behält (seine Seiten, Dokumente, Bilder und Ähnliches), und Leselink-Ansichten der Sitzungen.
 - **Deine Einstellungen, deine anderen Projekte** und alles andere in der App. Der Link einer Gruppe zeigt die eigenen Dinge der Gruppe, nicht die der Projekte, die sie zusammenbringt.
 - **Etwas ausführen**: Eine HTML-Seite (eine kleine App, ein Tracker) wird mit ihren Daten so gezeigt, wie sie sind, und was sie ändert, wird nicht gespeichert; mit **Dokumente bearbeiten** ändern sie ihre Worte, Bilder und das Layout, nie ihren Code (ihre Skripte und das, was beim Anklicken läuft); ein Notebook zeigt seine Zellen und Ausgaben und läuft nie. LaTeX-Dokumente werden über einen Link nur dort geändert, wo TeX von bubblewrap abgeschottet läuft (Linux); anderswo lesen und kommentieren die Personen sie.
 
@@ -377,10 +359,10 @@ Jeder lange Zufallscode öffnet ein Projekt für eine Person. Ungültige Codes z
 
 Einmal hinzugefügte Verträge, Handbücher, Notizen, Fachartikel und Ordner lassen sich von Agenten nach Wörtern oder Bedeutung durchsuchen. Antworten zitieren Datei und Seite. **Wissensdatenbanken** sind benannte Sammlungen hochgeladener Dateien und lokaler Ordner.
 
-- **Gemeinsames Wissen** unter [Projekte → Gemeinsames Wissen](/knowledge) ist für alle Sitzungen verfügbar, auch in Projekten, sofern dort nicht ausgeschaltet.
+- **Gemeinsames Wissen** ([die Seite Gemeinsames Wissen](/knowledge)) ist für alle Sitzungen verfügbar, auch in Projekten, sofern dort nicht ausgeschaltet.
 - **Das eigene Wissen eines Projekts**, in seinem Tab **Memory** unter **Dokumente**: Nur die Sitzungen dieses Projekts durchsuchen es, und die Sitzungen einer Gruppe, die das Projekt einbindet.
 
-Um das gemeinsame Wissen zu öffnen, klicke in der Projektspalte auf **Gemeinsames Wissen** (auf dem Smartphone auf den Tab **Gemeinsames Wissen** der Projektseite) oder tippe „gemeinsames Wissen“ ins Suchfeld (Strg+K).
+Das gemeinsame Wissen ist eine eigene Seite, ohne Projektspalte daneben. Um es zu öffnen, klicke im Text oben in [Einstellungen → Memory](/settings?s=memory) auf **Gemeinsames Wissen** oder tippe „gemeinsames Wissen“ ins Suchfeld (Strg+K).
 
 ## Dokumente hinzufügen
 
@@ -440,7 +422,7 @@ Die Schaltfläche ⋯ (**Mehr**) oben rechts an einer Wissensdatenbank öffnet i
 
 ## Eigene Projektdokumente
 
-Öffne im Projekt den Tab **Memory** und wähle **Dokumente**.
+Öffne die Details des Projekts, gehe zum Tab **Memory** und wähle **Dokumente**.
 
 - **Auch das geteilte Wissen durchsuchen** ist ein Schalter, der eingeschaltet ist, solange du ihn nicht ausschaltest. Schaltest du ihn aus, durchsuchen die Sitzungen des Projekts nur die eigenen Dokumente des Projekts (und in einer Gruppe die ihrer Projekte). Die Zeile darunter sagt, wie viele gemeinsame Dokumente es gibt, mit einem Link **Gemeinsames Wissen**.
 - Ohne Dokumente legst du Dateien oder Ordner ab oder wählst sie aus. Es entsteht eine nach dem Projekt benannte Datenbank. **Stattdessen mit einem Ordner auf diesem Computer beginnen** erstellt zunächst eine leere für die Ordnerzuordnung.
@@ -487,7 +469,7 @@ Wissenstools liefern nie unzugängliche Projektdokumente, auch nicht bei direkte
 
 - „Erstelle das Projekt Steuern 2026 für Belege und Steuererklärung. Starte Sitzungen als Forscher; alle Agenten sollen wissen, dass Beträge in EUR angegeben werden.“
 - „Erstelle das Projekt Shop für meinen Code in ~/code/shop.“
-- „Was liegt für meine Abschlussarbeit in der Bibliothek? Ordne den Lesetracker diesem Projekt zu.“
+- „Was liegt für meine Abschlussarbeit in den Dateien des Projekts? Ordne den Lesetracker diesem Projekt zu.“
 - „Welche meiner Arbeitsordner haben noch kein Projekt? Erstelle Projekte für die beiden häufigsten.“
 - „Welche Projekte wurden aus Claude Code oder Codex übernommen?“
 - „Erstelle für ~/code/scratch kein automatisches Projekt.“

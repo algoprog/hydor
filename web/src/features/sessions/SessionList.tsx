@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoute } from 'wouter';
-import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Lock, Pencil, Pin, PinOff, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, Boxes, CheckCheck, ChevronRight, Ellipsis, Folder, FolderOpen, FolderPen, Info, Lock, Pencil, Pin, PinOff, Plus, RotateCcw, SquarePen, Target, Trash2 } from 'lucide-react';
 import {
   closestCenter,
   DndContext,
@@ -20,6 +20,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
+import type { Space } from '@shared/spaces';
 import { api, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { filePath, go, openSession, sessionPath } from '../../lib/nav';
@@ -33,7 +34,8 @@ import { DiffStat } from '../../components/DiffView';
 import { Button, cx, Dialog, IconButton, Throbber, MenuItem, MenuLabel, MenuSep, Popover, useConfirm, useMediaQuery } from '../../components/ui';
 import { WorkTime } from '../session/items';
 import { newSessionIn } from '../files/actions';
-import { SpaceMark, startInSpace } from '../spaces/parts';
+import { NewSpaceDialog, SpaceMark, startInSpace } from '../spaces/parts';
+import { openProject } from '../spaces/ProjectDialog';
 import { loadSpaces, useSpaces } from '../spaces/state';
 import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { deleteSession, setFlags, settle } from '../../lib/flags';
@@ -659,7 +661,8 @@ function sourceLines(from: FolderSource[], accounts?: AgentAccount[]) {
 
 /**
  * A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts
- * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A folder whose work
+ * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A project's ⓘ, its mark
+ * and the first item of its ⋯ open its details in a window; a folder's ⋯ can make it a project. A folder whose work
  * began outside Hydor shows the marks of the agents its sessions came from after its name, and its tooltip and ⋯ say
  * which apps they were started in.
  */
@@ -667,13 +670,37 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
   const unread = folded && g.items.some(unreadOf);
   const [renaming, setRenaming] = useState(false);
   const [menu, setMenu] = useState(false);
+  // A folder being made a project (its dialog).
+  const [making, setMaking] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
   // A folder you named: its own name can come back.
   const mine = useFolderNames((x) => (g.path ? x.mine[g.path] : undefined));
   const accounts = useApp((x) => x.boot?.accounts);
   const from = g.from && sourceLines(g.from, accounts);
-  const shown = (
-    <span className="flex w-[15px] shrink-0 justify-center">{g.space ? <SpaceMark s={g.space} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>
+  // A project's details, from its mark too: a button on the heading's button, which still folds and drags from anywhere else.
+  const details = (sp: Space) => {
+    useUI.getState().set({ drawerOpen: false });
+    openProject(sp.id);
+  };
+  const shown = g.space ? (
+    <span
+      role="button"
+      tabIndex={-1}
+      title="Project details"
+      aria-label="Project details"
+      onClick={(e) => {
+        e.stopPropagation();
+        // A drop ends with a click on what is under the pointer.
+        if (!lifted && Date.now() - lastDragEnd >= 300) details(g.space!);
+      }}
+      className="flex w-[15px] shrink-0 cursor-pointer justify-center rounded-[5px] transition-shadow hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--fg)_14%,transparent)]"
+    >
+      <SpaceMark s={g.space} size={14} />
+    </span>
+  ) : (
+    <span className="flex w-[15px] shrink-0 justify-center">
+      <Folder size={14} className="text-fg-3" />
+    </span>
   );
   return (
     <div data-tip="groups" className={cx('group/head flex items-center gap-0.5 py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
@@ -726,6 +753,11 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
       )}
       {!lifted && !renaming && (
         <>
+          {g.space && (
+            <IconButton size="sm" label="Project details" onClick={(e) => (e.stopPropagation(), details(g.space!))} className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100">
+              <Info size={13} />
+            </IconButton>
+          )}
           <IconButton
             ref={more}
             size="sm"
@@ -764,6 +796,11 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
                 <MenuSep />
               </>
             )}
+            {g.space && (
+              <MenuItem icon={<Info size={14} />} onClick={() => (setMenu(false), details(g.space!))}>
+                Project details
+              </MenuItem>
+            )}
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), setRenaming(true))}>
               Rename
             </MenuItem>
@@ -772,16 +809,19 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
                 Use the folder's own name
               </MenuItem>
             )}
-            {g.space ? (
-              <MenuItem icon={<Boxes size={14} />} onClick={() => (setMenu(false), go(`/projects/${enc(g.space!.id)}`))}>
-                Open the project
+            {!g.space && (
+              <MenuItem icon={<Boxes size={14} />} onClick={() => (setMenu(false), setMaking(true))}>
+                Make it a project
               </MenuItem>
-            ) : (
+            )}
+            {!g.space && (
               <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), go(filePath(g.path!)))}>
                 Open in Files
               </MenuItem>
             )}
           </Popover>
+          {/* Only while it is asked for: each folder's heading has one, and the dialog looks up suggestions as it mounts. */}
+          {!g.space && making && <NewSpaceDialog open folder={g.path} onClose={() => setMaking(false)} onMade={details} />}
         </>
       )}
     </div>
@@ -821,6 +861,10 @@ export function SessionList({ query }: { query: string }) {
   const [snoozing, setSnoozing] = useState(false);
   /** The folder whose name is being changed from a session's menu. */
   const [namingFolder, setNamingFolder] = useState<string | null>(null);
+  // The + on the Projects heading: its menu, and the dialog for a new project or a group of them.
+  const newMore = useRef<HTMLButtonElement>(null);
+  const [newMenu, setNewMenu] = useState(false);
+  const [newSpace, setNewSpace] = useState<false | 'space' | 'group'>(false);
   const menuAnchor = useRef<HTMLElement | null>(null);
   /** Opened by a row's ⋯ (it lines up with the button's end), or by a right-click on the row (under its start). */
   const [menuByButton, setMenuByButton] = useState(false);
@@ -1154,9 +1198,21 @@ export function SessionList({ query }: { query: string }) {
         {listed.map((part) =>
           part.kind === 'places' ? (
             <Fragment key={`places:${part.first}`}>
-              <button type="button" aria-expanded={!sectionFolds?.projects} onClick={() => foldSection('projects')} className={cx('flex w-full items-center gap-1 px-[18px] pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2', part.first > 0 && 'mt-2')}>
-                <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.projects && 'rotate-90')} />Projects
-              </button>
+              <div className={cx('group/sec flex items-center pr-2', part.first > 0 && 'mt-2')}>
+                <button type="button" data-tip="spaces" aria-expanded={!sectionFolds?.projects} onClick={() => foldSection('projects')} className="flex min-w-0 flex-1 items-center gap-1 px-[18px] pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
+                  <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.projects && 'rotate-90')} />Projects
+                </button>
+                {/* On hover with a mouse; always on touch screens. */}
+                <IconButton
+                  ref={newMore}
+                  size="sm"
+                  label="New project or group"
+                  onClick={(e) => (e.stopPropagation(), setNewMenu(true))}
+                  className={cx('h-6 w-6 opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100', newMenu && 'opacity-100')}
+                >
+                  <Plus size={13} />
+                </IconButton>
+              </div>
               {!sectionFolds?.projects && <SortableContext items={part.items.map((x) => PLACE + x.g.id)} strategy={verticalListSortingStrategy}>
                 {part.items.map((x) => (
                   <SortablePlace key={x.g.id} id={x.g.id} className={x.frame}>
@@ -1176,6 +1232,23 @@ export function SessionList({ query }: { query: string }) {
       </div>
       {confirmNode}
       {namingFolder && <FolderNameDialog dir={namingFolder} home={home} onClose={() => setNamingFolder(null)} />}
+      <Popover anchor={newMore} open={newMenu} onClose={() => setNewMenu(false)} width={230} align="end">
+        <MenuItem icon={<Plus size={14} />} onClick={() => (setNewMenu(false), setNewSpace('space'))}>
+          New project…
+        </MenuItem>
+        <MenuItem icon={<Boxes size={14} />} onClick={() => (setNewMenu(false), setNewSpace('group'))}>
+          New group of projects…
+        </MenuItem>
+      </Popover>
+      <NewSpaceDialog
+        open={!!newSpace}
+        group={newSpace === 'group'}
+        onClose={() => setNewSpace(false)}
+        onMade={(sp) => {
+          useUI.getState().set({ drawerOpen: false });
+          openProject(sp.id);
+        }}
+      />
       {createPortal(
         <DragOverlay dropAnimation={null} modifiers={[stayUnderPointer]}>
           {dragging ? <RowBody s={dragging} active={false} home={home} lifted /> : draggingPlace ? <PlaceHead g={draggingPlace} folded home={home} lifted /> : null}

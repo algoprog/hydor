@@ -268,7 +268,7 @@ test('--results-to: where results go, each kept as it was where it names the sam
   assert.match(out.out, /When +Spent +Shops +Went to/);
   assert.match(out.out, /2026-11-15 09:00 +42 +Lidl; Market +✓ sheet, ✗ email/);
   assert.match(out.out, /2 of 9: --limit for more\./);
-  assert.match(out.out, /Its runs go into “Household budget” in the Library\./);
+  assert.match(out.out, /Its runs go into “Household budget” in the project\./);
   const j = await run(fakeConn({ ...r0, 'GET /api/assistants/bookkeeper-3f9a/results?limit=20': history }).conn, ['agents', 'results', 'bookkeeper', '--json']);
   assert.deepEqual(j.json, [history]);
 });

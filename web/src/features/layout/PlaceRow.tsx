@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { cx } from '../../components/ui';
 
 /**
- * One place in the list of a page's column (the Library's, the Apps page's): a row with its icon, its name and how
- * many it holds, the open one marked. The same look as the Library's places.
+ * One place in the list of a page's column (the Apps page's, the Files page's): a row with its icon, its name and how
+ * many it holds, the open one marked. The same look in every column.
  */
 export function PlaceRow({ on, icon, label, count, onClick, mine }: { on: boolean; icon: ReactNode; label: string; count?: number; onClick: () => void; mine?: boolean }) {
   return (
@@ -22,7 +22,7 @@ export function PlaceRow({ on, icon, label, count, onClick, mine }: { on: boolea
   );
 }
 
-/** A small label over a group of places (the Library's Projects, the Apps page's Kinds). */
+/** A small label over a group of places (the Apps page's Kinds). */
 export function PlacesLabel({ children }: { children: ReactNode }) {
   return <div className="px-2.5 pt-4 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3 uppercase">{children}</div>;
 }

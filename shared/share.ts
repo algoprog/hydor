@@ -1,5 +1,5 @@
 // Sharing with people (server/spaces/share.ts): the owner invites someone (an advisor, a student, a client) by a
-// personal link, /p/<token>, into one project, or to one thing of the Library alone: a document, a spreadsheet, slides,
+// personal link, /p/<token>, into one project, or to one kept thing alone: a document, a spreadsheet, slides,
 // a LaTeX document, a notebook, a page, a design, a picture, a video or a sound. A project's link opens it as a portal:
 // its documents, sessions, runs and reading list; a thing's link opens that thing alone. They comment by name, and
 // with Edit change it too. Never the owner's agents, files, settings or anything else. What the server and the pages
@@ -19,7 +19,7 @@ export const SHARE_ROLES: Record<ShareRole, string> = { comment: 'View and comme
 /** What each may do, for one thing shared alone. */
 export const THING_ROLES: Record<ShareRole, string> = { comment: 'View and comment', edit: 'Edit' };
 
-/** A thing of the Library shared alone: a page of any kind (a document, slides, a design…), or a picture, video or sound. */
+/** A kept thing shared alone: a page of any kind (a document, slides, a design…), or a picture, video or sound. */
 export interface ShareThing {
   kind: 'page' | 'media';
   id: string;

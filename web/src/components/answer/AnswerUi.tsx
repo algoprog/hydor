@@ -5,7 +5,7 @@
 // shows the data laid out as it is (DataView). On hover or keyboard focus, its toolbar: the data itself, a copy of it as
 // text, Full screen, and under "…" Pin to a board and the card as a picture (CardTools.tsx). Loaded the first time a reply
 // has one (Markdown.tsx). A board (features/pages/board) draws its cards with CardView, the same views. A card whose data
-// names a source instead of holding its numbers (`from`: a Library spreadsheet or a data file, shared/answer-ui/data-ref.ts)
+// names a source instead of holding its numbers (`from`: a spreadsheet kept in a project's files, or a data file, shared/answer-ui/data-ref.ts)
 // is drawn from what the server reads there, with a line naming it (DataRef.tsx).
 import { Component, memo, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Braces, Expand, Shapes } from 'lucide-react';
@@ -147,7 +147,7 @@ export function AnswerBlock({ name, code, done, demo, session, board }: { name: 
     }
   }, [raw, code]);
   // What Pin to a board keeps: the UI and its data as the block holds it (copied now), and the reply it is in. Not at a
-  // shared link (no Library there), nor from a confidential session (what it says stays in it), nor for a UI the app
+  // shared link (nothing is kept there), nor from a confidential session (what it says stays in it), nor for a UI the app
   // does not know.
   const pin = useMemo<PinCard | undefined>(() => {
     if (!done || !spec || viaLink || md.offline) return undefined;

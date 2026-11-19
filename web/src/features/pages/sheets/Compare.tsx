@@ -3,7 +3,7 @@
 // changed tinted amber, a number format or look alone blue, formulas whose results changed with them faintly; rows and
 // columns added green, the ones removed red and struck where they were; tabs added, removed or renamed named on their
 // tabs), the changes listed beside it (tab, cell, before → after, the formula and what it shows), each a click from its
-// cell and a click from being put back, the counts on top, Put back the version (the Library's restore: it comes back
+// cell and a click from being put back, the counts on top, Put back the version (the page's restore: it comes back
 // as a new version) and the way back. How the versions are lined up is shared/sheet-diff.ts's, said under the list.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowUpDown, ChevronRight, History, RotateCcw, Undo2 } from 'lucide-react';

@@ -1,4 +1,4 @@
-// Help's column on a computer, the same kind as the Library's: Help home, then every topic of the guide as a row with
+// Help's column on a computer, the same kind as Apps and Settings have: Help home, then every topic of the guide as a row with
 // its icon, under a label for each group the home shows them in. The open one is marked.
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { GuideTopic } from '@shared/guide';

@@ -73,7 +73,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Signatures
 
-[Settings → Signatures](/settings?s=signatures): your signature and initials, drawn once and kept encrypted, for the documents you sign. More in [Library: pages, images, videos and sites](/guide/library).
+[Settings → Signatures](/settings?s=signatures): your signature and initials, drawn once and kept encrypted, for the documents you sign. More in [Pages, documents and pictures](/guide/library).
 
 - [**New signature**](/settings?s=signatures&find=New%20signature): Draw, type or upload your signature or initials.
 
@@ -271,7 +271,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Images, video and audio
 
-[Settings → Images, video and audio](/settings?s=images): pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library. More in [Documents, images, videos and voice](/guide/documents-voice).
+[Settings → Images, video and audio](/settings?s=images): pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Making images**](/settings?s=images&find=Making%20images): Let agents make images.
 - [**For most pictures (Best)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): The model that makes most pictures, and every change to one.
@@ -283,7 +283,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Making audio**](/settings?s=images&find=Making%20audio): Let agents make audio.
 - [**Music model**](/settings?s=images&find=Music%20model): The model that makes music.
 - [**Voice and sound model**](/settings?s=images&find=Voice%20and%20sound%20model): The model that makes voices and sounds.
-- [**Captions in the Library**](/settings?s=images&find=Captions%20in%20the%20Library): The model that writes the titles and descriptions of the images, videos and audio you keep.
+- [**Captions for what you keep**](/settings?s=images&find=Captions%20for%20what%20you%20keep): The model that writes the titles and descriptions of the images, videos and audio you keep.
 
 ### Voice
 

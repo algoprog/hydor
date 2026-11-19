@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { placeOf, usageQuery, type FindUsage } from '@shared/find';
 import { catalogItems } from '@shared/find-catalog';
 import { api } from '../../lib/api';
+import { useProjectWindow } from '../../lib/nav';
 
 export const useFindUsage = create<{ usage: FindUsage | null }>(() => ({ usage: null }));
 
@@ -79,15 +80,17 @@ let last: string | null = null;
 export function CountVisits() {
   const [loc] = useLocation();
   const search = useSearch();
+  // A project's details are a window over the page, not an address of their own: its staying open is a visit too.
+  const project = useProjectWindow((x) => x.at?.id);
   useEffect(() => {
-    const place = placeOf(loc, search, pages());
+    const place = project ? `space:${project}` : placeOf(loc, search, pages());
     if (!place || place === last) return;
     const t = setTimeout(() => {
       last = place;
       noteVisit(place);
     }, 1200);
     return () => clearTimeout(t);
-  }, [loc, search]);
+  }, [loc, search, project]);
   // What is waiting goes before the page is put away (a phone switching apps, a tab closed).
   useEffect(() => {
     const away = () => document.visibilityState === 'hidden' && send();

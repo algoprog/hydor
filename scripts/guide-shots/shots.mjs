@@ -7,7 +7,7 @@ import { projectsWork } from './demo.mjs';
 
 /**
  * The part of the window right of the rail and of the sessions sidebar (on the start page and in sessions), down to
- * `bottom` (CSS pixels) when given. A page's own column (the Library's places, Settings' sections) stays in: it is part of
+ * `bottom` (CSS pixels) when given. A page's own column (Settings' sections, the Apps page's places) stays in: it is part of
  * the page the guide shows.
  */
 async function main(p, bottom) {
@@ -143,19 +143,20 @@ export const SHOTS = [
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),
   {
-    // All projects, beside the column that lists them: the overview across projects. Two things only this picture has,
-    // taken out again after it: four weeks of work in the projects, and a project shared with two people.
+    // A project's details: its window over the start page, on Overview (the Thesis project, with its newest files, four
+    // weeks of work and two people it is shared with, taken out again after it).
     id: 'projects',
-    height: 980,
+    height: 860,
     async take(p, ctx) {
       const undo = await projectsExtras(ctx);
       try {
-        await ctx.go('/projects', { settle: 1800 });
-        // The Library's two pages show their pictures, which the app draws a moment after the demo made the pages.
-        await p.waitFor(`[...document.querySelectorAll('main img[src*="/thumb"]')].filter((i) => i.complete && i.naturalWidth).length >= 2`, { timeout: 30000 }).catch(() => {});
+        const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
+        await ctx.go(`/projects/${id}`, { settle: 2000 });
+        // The Files card's six tiles: five pictures (the pages' are drawn a moment after the demo made them) and a note's first lines.
+        await p.waitFor(`[...document.querySelectorAll('[role="dialog"] img')].filter((i) => i.complete && i.naturalWidth).length >= 5`, { timeout: 45000 }).catch(() => {});
         await p.park();
-        await sleep(400);
-        return await p.shot(ctx.file, { clip: await main(p, await bottomOf(p, 'js:[...document.querySelectorAll("main aside")].pop()?.parentElement', 16)) });
+        await sleep(600);
+        return await p.shot(ctx.file);
       } finally {
         await undo();
       }
@@ -173,14 +174,17 @@ export const SHOTS = [
     },
   },
   {
-    // The Library: its places beside the cards, each project's things under its name, then those in no project.
+    // A project's Files: the Thesis project's window on Files, its folders, what was kept in it and its folder's files
+    // as tiles, each with its picture.
     id: 'library',
-    height: 900,
+    height: 860,
     async take(p, ctx) {
-      await ctx.go('/library', { settle: 2500 });
+      const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
+      await ctx.go(`/projects/${id}/files`, { settle: 2500 });
+      await p.waitFor(`[...document.querySelectorAll('[role="dialog"] img')].filter((i) => i.complete && i.naturalWidth).length >= 6`, { timeout: 45000 }).catch(() => {});
       await p.park();
-      await sleep(600);
-      return p.shot(ctx.file, { clip: await main(p, 857) });
+      await sleep(800);
+      return p.shot(ctx.file);
     },
   },
   {
@@ -241,17 +245,18 @@ export const SHOTS = [
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 1101 }),
   {
-    // A project's Memory tab on its Wiki part: the articles of its wiki memory by area, an area's hub open, and what new documents did lately.
+    // A project's Memory tab on its Wiki part, in the project's details window: the articles of its wiki memory by area,
+    // an area's hub open, and what new documents did lately.
     id: 'wiki-memory',
-    height: 1240,
+    height: 860,
     async take(p, ctx) {
       const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
       await ctx.go(`/projects/${id}/memory?part=wiki`, { settle: 2000 });
       // One area folded, one area's hub open.
-      await p.click(`js:document.querySelector('button[aria-label="Research methods"]')`, { wait: 400 });
+      await p.click(`js:document.querySelector('[role="dialog"] button[aria-label="Research methods"]')`, { wait: 400 });
       await p.click(button('Library use and services'), { wait: 900 });
       await p.park();
-      return p.shot(ctx.file, { clip: await main(p) });
+      return p.shot(ctx.file);
     },
   },
   // The list's card, by the first of the demo's tasks there: those due within three hours are left out (demo.mjs).

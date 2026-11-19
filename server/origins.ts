@@ -54,7 +54,7 @@ export function addOrigin(origin: string): boolean {
 
 /**
  * The address links the app hands out start with (a session's link in a chat app's reply, the links agents are given to
- * sessions and Library pages): the first of ALLOWED_ORIGINS when it is set, which stays as it is; else the Tailscale
+ * sessions and saved pages): the first of ALLOWED_ORIGINS when it is set, which stays as it is; else the Tailscale
  * address Use on your phone serves the app at, so they open on the phone; else this computer's own.
  */
 export function linkBase(allowed: readonly string[], served: string | null, port: number): string {

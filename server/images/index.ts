@@ -7,7 +7,7 @@
 // the user a form with the settings the model takes (shape, resolution, quality, length, sound, voice…) and what it costs
 // (settings.ts), unless the agent gave them all, the user answered it earlier in the session, or nobody is there
 // to answer (a scheduled task, an app's run). What they make is saved in the session's folder (images/, videos/,
-// audio/) and shown with the reply, where the user can keep it in the Library (server/media). Pictures come in two
+// audio/) and shown with the reply, where the user can keep it in their project (server/media). Pictures come in two
 // tiers (tiers.ts): Quick for simple ones, Best for the rest; make_svg makes drawings (svg.ts), cleaned (svg-clean.ts).
 // The editors' AI tools make and change pictures and drawings without a form (their dialogs show the price first),
 // and keep them as the editors' uploads are (make.ts).
@@ -186,7 +186,7 @@ function imageTool(db: DB): RunTool {
       'With no OpenRouter key set, the user is first asked for one on a card (never ask for it yourself); if they skip it, nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (later images use the same settings unless you give others; ask: true shows it again).',
       'Set ask: false only when the user said to choose for them or to go ahead without asking.',
-      'The images are saved in the session’s folder (images/) and shown to the user with your reply, where they can keep them in their Library: do not repeat them or their paths.',
+      'The images are saved in the session’s folder (images/) and shown to the user with your reply, where they can keep them in their project: do not repeat them or their paths.',
       'Describe what you want fully: subject, setting, style (photo, illustration, watercolour…), composition, colours, light, and any text',
       'to appear, word for word. To edit or combine pictures, give their paths in images and say what to change.',
     ].join(' '),
@@ -301,7 +301,7 @@ function imageTool(db: DB): RunTool {
       return [
         `Made ${saved.length === 1 ? 'an image' : `${saved.length} images`} with ${id}${r.cost ? ` (${money(r.cost)})` : ''}${how ? `, ${how}` : ''}:`,
         ...lines,
-        'The user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.',
+        'The user sees it with your reply, a tap away from full size, download and keeping it in their project: don’t repeat it or its path. To look at it yourself, open the file.',
         ...(pick.instead && info ? [`${pick.instead} cannot make this, so ${info.label} made it.`] : []),
         ...(pick.cutout ? ['Its background was taken out on this computer.'] : []),
         ...(!asked && tier === 'quick' ? ['It was made with the Quick model, for simple pictures: for more detail, call again with detail: "complex".'] : []),
@@ -465,7 +465,7 @@ async function madeText(model: string, files: SavedVideo[], cost: number | undef
   return [
     `Made ${files.length === 1 ? 'a video' : `${files.length} videos`} with ${model}${cost ? ` (${money(cost)})` : ''}${how ? `, ${how}` : ''}:`,
     ...lines,
-    'The user sees it with your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path.',
+    'The user sees it with your reply, where they can play it, download it and keep it in their project: don’t repeat it or its path.',
   ].join('\n');
 }
 
@@ -500,7 +500,7 @@ function videoTool(db: DB): RunTool {
       'Before it makes anything, the user sees a short form in the conversation with the settings that model takes (length, shape, resolution, sound) and what it costs, filled in with what you give: they change what they like and confirm, or close it, and then nothing is made.',
       'So give only the settings the user asked for and leave the rest to the form; it comes once per model in a session (ask: true shows it again). Set ask: false only when the user said to choose for them or to go ahead without asking.',
       'It waits for the video, up to about nine minutes; if it is not ready by then, you get its job id: call again with job to wait for it (nothing more is spent).',
-      'The video is saved in the session’s folder (videos/) and shown to the user with your reply, where they can play it and keep it in their Library: do not repeat it or its path.',
+      'The video is saved in the session’s folder (videos/) and shown to the user with your reply, where they can play it and keep it in their project: do not repeat it or its path.',
       'Describe the scene, what moves and how, the camera, the style and the light, and any sound or words spoken, word for word.',
     ].join(' '),
     inputSchema: {
@@ -705,7 +705,7 @@ function audioTool(db: DB): RunTool {
       'music: in prompt, the genre, mood, instruments, tempo (BPM), key, the singer’s voice and the structure (timestamps like "[0:00 - 0:15] Intro: soft piano" place things); the lyrics in lyrics, with [Verse] and [Chorus] tags, or instrumental: true; without either the model writes its own lyrics. Write the prompt in the language the song should be sung in.',
       'speech: the exact words in prompt (or a conversation in turns), and how they are said in instructions: the voice, age, accent, tone, pace and emotion. Seed Audio reads prompt as a description, so there you may also write the whole scene with the spoken lines in quotes (‘A calm, deep male narrator: "Welcome to the museum." Soft rain in the background.’). voice: one of the model’s own voices by id, where it has them (a wrong one gets you the list). voice_samples: recordings of the voice to speak in (only a voice the user may use); with several, write who says what with @Audio1, @Audio2, @Audio3.',
       'sound: describe the sound and what happens when ("Heavy rain on a tin roof, thunder rolling in at the end, no voices"), and its duration.',
-      'It is saved in the session’s folder (audio/) and the user hears it with your reply, in a player where they can download it and keep it in their Library: do not repeat it or its path. You cannot hear it: speak of it as what you asked for.',
+      'It is saved in the session’s folder (audio/) and the user hears it with your reply, in a player where they can download it and keep it in their project: do not repeat it or its path. You cannot hear it: speak of it as what you asked for.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -910,7 +910,7 @@ function audioTool(db: DB): RunTool {
         `Made ${what} with ${id}${cost === undefined ? '' : cost ? ` (${made.cost ? '' : 'about '}${money(cost)})` : ' (free)'}${how ? `, ${how}` : ''}:`,
         `${saved.path} (${[secs ? `${Math.round(secs * 10) / 10} s` : '', size(saved.bytes)].filter(Boolean).join(', ')})`,
         ...(instead && info ? [`${instead} cannot make this, so ${info.label} made it.`] : []),
-        'The user hears it with your reply, in a player where they can download it and keep it in their Library: don’t repeat it or its path. You cannot listen to it: speak of it as what you asked for.',
+        'The user hears it with your reply, in a player where they can download it and keep it in their project: don’t repeat it or its path. You cannot listen to it: speak of it as what you asked for.',
         ...(words ? [/^[[{]/.test(words) ? `Notes from the model:\n${words.slice(0, 2000)}` : `Lyrics:\n${words.slice(0, 2000)}`] : []),
       ].join('\n');
     },

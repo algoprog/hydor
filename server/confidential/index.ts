@@ -5,7 +5,7 @@
 //   none is named), memory off, no swarm, deep research or arena. A subagent of one is confidential too.
 // - Each message (beforeSend) is refused while its model is not local, or not there; so is a switch to a model
 //   elsewhere, a hand-off to another agent, and turning it off or memory on (it stays as it started).
-// - Tools (allowTool): only those that work here (files, documents, the Library, knowledge bases, reading memory,
+// - Tools (allowTool): only those that work here (files, documents, kept pages, knowledge bases, reading memory,
 //   Hydor subagents (child sessions), the guide). Every other one is off, tools added later too, until they are named here.
 // - Custom is told so (context), and its process (HYDOR_CONFIDENTIAL) leaves out its web_fetch and every MCP server
 //   but the app's own, uses local models alone, and runs commands in the sandbox without network
@@ -47,7 +47,7 @@ export const CONFIDENTIAL_TOOLS = new Set([
   // Files and documents, read here.
   'read_document',
   'present_files',
-  // The Library, on this computer.
+  // Kept pages, on this computer.
   'show_html',
   'save_page',
   'get_page',
@@ -273,7 +273,7 @@ export function confidentialInstructions(cut: boolean): string {
     cut
       ? '- Your commands run without network: they can’t download, install from the internet, push, send or reach any service. Use what is on this computer.'
       : '- Commands can’t be cut off from the network on this computer, so the user approves each one: don’t run commands that use the network (downloads, installs from the internet, pushes, calls to services).',
-    '- Still yours: the files in the folder, documents (read here), the Library, knowledge bases, and memory notes to read (nothing new is saved).',
+    '- Still yours: the files in the folder, documents (read here), the pages kept in projects, knowledge bases, and memory notes to read (nothing new is saved).',
     '- Pages you show or save load nothing from the web here: put their scripts, styles and data inside them, with no libraries from a CDN.',
     'Don’t look for ways around this. When the task needs the internet or another service, say what and why, and leave it to the user: they can start a session without Confidential for that part, with only what may be shared.',
   ].join('\n');

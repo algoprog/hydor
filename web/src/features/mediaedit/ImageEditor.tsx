@@ -5,7 +5,7 @@
 // status bar (the zoom, the picture's size, the pointer's place and the colour under it, how it will be saved). On a
 // phone it fills the screen: the menus under one button, the tools along the bottom, the panels in a sheet.
 // The picture is a stack of layers (picture/doc.ts) edited by the engine (picture/editor.ts); Save puts them together
-// into one picture of the size and kind of file picked, and keeps it where it came from (or in the Library).
+// into one picture of the size and kind of file picked, and keeps it where it came from (or keeps it as a new one).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Layers as LayersIcon, Redo2, SplitSquareHorizontal, Undo2 } from 'lucide-react';
 import { formatOfMime, formatOfName, type ImageFormat, type Saved } from '@shared/mediaedit';
@@ -138,7 +138,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
       ed.emit(false);
       if (ans.note) toast(ans.note);
       const result: Saved = { kind: 'image', src: ans.src, media: ans.media, path: ans.path, w: ans.w, h: ans.h, mime: ans.mime, replaced: ans.replaced, ...('asset' in plan.to ? { data: made.data } : {}) };
-      if (which === 'copy') toast(ans.path ? `Saved a copy beside it: ${ans.path.split(/[\\/]/).pop()}` : 'Saved a copy in your Library', 'ok');
+      if (which === 'copy') toast(ans.path ? `Saved a copy beside it: ${ans.path.split(/[\\/]/).pop()}` : 'Saved a copy', 'ok');
       else await done(result);
     } catch (e) {
       toastError(e);
@@ -261,10 +261,10 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     [ed],
   );
 
-  /** File → New: a blank picture, opened in a tab of its own (Save keeps it in the Library). */
+  /** File → New: a blank picture, opened in a tab of its own (Save keeps it). */
   const newPicture = (w: number, h: number, bg: NewBackground, color: string) => {
     const fill = bg === 'transparent' ? null : bg === 'white' ? '#ffffff' : color.slice(0, 7);
-    openEditor({ kind: 'image', src: blankSrc(w, h, fill), title: newPictureName(w, h), from: { label: pageName() }, fresh: {}, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
+    openEditor({ kind: 'image', src: blankSrc(w, h, fill), title: newPictureName(w, h), from: { label: pageName() }, fresh: {}, save: (r) => void (r.media && toast('Saved', 'ok')) });
   };
 
   // ---- menus and keys ----

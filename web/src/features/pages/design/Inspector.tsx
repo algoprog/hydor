@@ -646,7 +646,7 @@ export function DesignInspector({
             From this device
           </Button>
           <Button size="sm" variant="ghost" icon={<LibraryBig size={14} />} onClick={() => setReplace('video')}>
-            From your Library
+            From your saved videos
           </Button>
         </div>
         <Row label="Plays">
@@ -868,7 +868,7 @@ function WordsBox({ words, focus, onChange }: { words: string; focus: number; on
   );
 }
 
-/** Replace the picture: from this device, the Library, or made with AI. */
+/** Replace the picture: from this device, one you saved, or made with AI. */
 function ReplacePicture({ empty, onDevice, onLibrary, onAi }: { empty: boolean; onDevice: (src: string) => void; onLibrary: () => void; onAi: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -883,7 +883,7 @@ function ReplacePicture({ empty, onDevice, onLibrary, onAi }: { empty: boolean; 
           From this device
         </MenuItem>
         <MenuItem icon={<LibraryBig size={14} />} onClick={() => (setOpen(false), onLibrary())}>
-          From your Library
+          From your saved pictures
         </MenuItem>
         <MenuItem
           icon={<ImageUp size={14} />}

@@ -165,7 +165,7 @@ export interface MenuCtx {
   goalSeek(): void;
   /** Tools → Print and PDF setup. */
   printSetup(): void;
-  /** Compare with the version before, or with a version picked (a spreadsheet of the Library only). */
+  /** Compare with the version before, or with a version picked (a spreadsheet kept by the app only). */
   compare?: { before(): void; pick(): void };
   trace(what: 'pre' | 'dep'): void;
   traced: boolean;

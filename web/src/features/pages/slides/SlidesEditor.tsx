@@ -281,7 +281,7 @@ export function SlidesEditor({
   live: agent,
   commentAi,
 }: ModelEditorProps<Deck> & {
-  /** Opens presenting at once (the library's Present). */
+  /** Opens presenting at once (the editor's Present). */
   startPresent?: boolean;
 }) {
   const [own, setDeck] = useState<Deck | null>(doc?.model ?? null);
@@ -794,7 +794,7 @@ export function SlidesEditor({
     const h = v.w && v.h ? Math.max(40, Math.round(v.h * k)) : 450;
     putRef.current([{ id: newId(), type: 'video', src: v.src, ...(v.poster ? { poster: v.poster } : {}), ...centred(w, h) }]);
   };
-  // The picture editors opened from this deck: once it closes, what they save goes to the Library instead.
+  // The picture editors opened from this deck: once it closes, what they save goes to their own files instead.
   const pictureEditors = useRef(new Set<EditorHandle>());
   useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
   /**
@@ -846,7 +846,7 @@ export function SlidesEditor({
       return i < 0 ? d2 : setEls(d2, i, [id], (e) => ({ ...e, src: p.src }) as El);
     });
   };
-  /** Video editors opened from this deck: told when it closes, so their Save keeps the video in the Library instead. */
+  /** Video editors opened from this deck: told when it closes, so their Save keeps the video as a file of its own instead. */
   const videoTabs = useRef<EditorHandle[]>([]);
   useEffect(() => () => videoTabs.current.forEach((t) => t.detach()), []);
   const changeRef = useRef(change);

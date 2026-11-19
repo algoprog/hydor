@@ -1,5 +1,5 @@
 // The picture editor's pieces of drawing in the browser: a picture loaded to work on (from wherever it is: kept by the
-// app, a Library item, a file, the web), made smaller only when the device cannot hold it; marks (words, shapes, lines,
+// app, a kept item, a file, the web), made smaller only when the device cannot hold it; marks (words, shapes, lines,
 // arrows, emoji, hidden areas) measured, drawn and found under a point, as the server draws them (server/mediaedit/
 // raster.ts); and a canvas as a data: address. The layers are put together in picture/compose.ts.
 import { arrowHead, fontOf, textFont, textMetrics, textReach, textWeight, type Mark } from '@shared/mediaedit';

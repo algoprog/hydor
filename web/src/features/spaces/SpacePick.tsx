@@ -1,8 +1,8 @@
-// Picking a space for something kept in the Library (a page, a picture, a video): a short menu of the spaces, with
+// Picking a space for something kept (a page, a picture, a video): a short menu of the spaces, with
 // "No space" last, the session's own space first and marked. Keep buttons show it only when there are spaces (with
-// none, they keep at once); the Library's More → Move to a space and the New dialog use it too.
+// none, they keep at once); a kept thing's Move to another project and the New dialog use it too.
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ChevronDown, LibraryBig, Search } from 'lucide-react';
+import { Ban, ChevronDown, Search } from 'lucide-react';
 import type { Space } from '@shared/spaces';
 import { cx, MenuItem, MenuLabel, MenuSep, Popover } from '../../components/ui';
 import { useSessions } from '../../lib/store';
@@ -44,7 +44,7 @@ function Choices({ value, suggest, onPick, list }: { value?: string | null; sugg
         {!shown.length && <div className="px-3 py-2 text-[12.5px] text-fg-3">No project’s name has that in it</div>}
       </div>
       <MenuSep />
-      <MenuItem icon={<LibraryBig size={15} />} checked={value === null} onClick={() => onPick(null)}>
+      <MenuItem icon={<Ban size={15} />} checked={value === null} onClick={() => onPick(null)}>
         No project
       </MenuItem>
     </>
@@ -123,7 +123,7 @@ export function SpaceSelect({ value, onChange, className }: { value: string | nu
         onClick={() => setOpen((o) => !o)}
         className={cx('flex h-9 max-w-full min-w-0 items-center gap-2 rounded-[10px] border border-line bg-bg-1 pr-2.5 pl-2.5 text-[13.5px] transition-colors hover:border-line-2', className)}
       >
-        {cur ? <SpaceMark s={cur} size={18} /> : <LibraryBig size={16} className="shrink-0 text-fg-3" />}
+        {cur ? <SpaceMark s={cur} size={18} /> : <Ban size={16} className="shrink-0 text-fg-3" />}
         <span translate={cur ? 'no' : undefined} className="min-w-0 flex-1 truncate text-left">
           {cur ? cur.name : 'No project'}
         </span>

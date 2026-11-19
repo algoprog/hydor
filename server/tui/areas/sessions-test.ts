@@ -269,7 +269,7 @@ test('list, search, show, send, stop as verbs', async () => {
   assert.match((await run(busy.conn, ['sessions', 'stop', 'fix the login'])).out, /It is not working\./);
 });
 
-test('export: the Markdown written to its title’s file, to -o, printed with -o -, or a Library document with --library', async () => {
+test('export: the Markdown written to its title’s file, to -o, printed with -o -, or a saved document with --library', async () => {
   const f = fakeConn(routes({ [path(a, '/export/doc')]: { page: { id: 'pg1', title: 'Fix the login bug' }, notes: ['A picture was left out.'] } }));
   const asked: string[] = [];
   (f.conn as Conn).raw = async (p) => {
@@ -295,7 +295,7 @@ test('export: the Markdown written to its title’s file, to -o, printed with -o
   }
   const lib = await run(f.conn, ['sessions', 'export', 'aaaa', '--library']);
   assert.deepEqual(f.calls.at(-1), { method: 'POST', path: path(a, '/export/doc'), body: {} });
-  assert.match(lib.out.trimEnd(), /^Saved “Fix the login bug” in the Library as a document: http:\/\/fake\/pages\/pg1\nA picture was left out\.$/);
+  assert.match(lib.out.trimEnd(), /^Saved “Fix the login bug” as a document: http:\/\/fake\/pages\/pg1\nA picture was left out\.$/);
   await refused(run(f.conn, ['sessions', 'export', 'aaaa', '--library', '-o', 'x.md']), /leave out -o, or --library/);
 });
 

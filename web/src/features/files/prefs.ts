@@ -1,6 +1,6 @@
-// What the Files page keeps: how folders show (a list, or big tiles with pictures) and in what order, the files
-// opened lately (in this browser, for each machine), and the folders pinned among its places (on the server,
-// so on every device).
+// What the Files page keeps: how folders show (big tiles with pictures, unless you picked the list yourself) and in
+// what order, the files opened lately (in this browser, for each machine), and the folders pinned among its places
+// (on the server, so on every device).
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { api, put } from '../../lib/api';
@@ -10,7 +10,10 @@ import { toastError } from '../../lib/store';
 export type SortBy = 'name' | 'modified' | 'size' | 'kind';
 
 interface Prefs {
+  /** Tiles unless the list was picked: see `picked`. */
   view: 'list' | 'grid';
+  /** The view was chosen by a person (from the switch or the menu): only then does a stored list stay a list. */
+  viewPicked: boolean;
   sort: SortBy;
   /** The other way round: Z to A, the oldest first, the smallest first. */
   reverse: boolean;
@@ -21,11 +24,13 @@ interface Prefs {
 const KEY = machineKey('wa.files.v1');
 
 function load(): Prefs {
-  const d: Prefs = { view: 'list', sort: 'name', reverse: false, recent: [] };
+  const d: Prefs = { view: 'grid', viewPicked: false, sort: 'name', reverse: false, recent: [] };
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}');
     return {
-      view: v.view === 'grid' ? 'grid' : 'list',
+      // Older stored prefs have no flag: they get tiles, as a person who never chose does.
+      view: v.viewPicked === true && v.view === 'list' ? 'list' : 'grid',
+      viewPicked: v.viewPicked === true,
       sort: ['name', 'modified', 'size', 'kind'].includes(v.sort) ? v.sort : 'name',
       reverse: v.reverse === true,
       recent: Array.isArray(v.recent) ? v.recent.filter((p: unknown) => typeof p === 'string').slice(0, 40) : [],
@@ -42,7 +47,8 @@ useFilesPrefs.subscribe((s) => {
   } catch {}
 });
 
-export const setPrefs = (p: Partial<Prefs>) => useFilesPrefs.setState(p);
+/** Changes what is kept; picking a view (from the switch or the menu) marks it as chosen, so a list is remembered. */
+export const setPrefs = (p: Partial<Omit<Prefs, 'viewPicked'>>) => useFilesPrefs.setState('view' in p ? { ...p, viewPicked: true } : p);
 
 /** A file was opened: it leads the recent ones. */
 export function noteOpened(path: string) {

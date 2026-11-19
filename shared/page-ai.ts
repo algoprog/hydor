@@ -50,7 +50,7 @@ export interface PageAiAsk {
   ask?: string;
   /** A follow-up: the answer given before, to change as `ask` says. */
   answer?: string;
-  /** A page of the Library: a confidential session's is written on by a helper model on this computer only. */
+  /** A kept page: a confidential session's is written on by a helper model on this computer only. */
   pageId?: string;
 }
 

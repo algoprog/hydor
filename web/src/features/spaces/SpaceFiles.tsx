@@ -1,34 +1,42 @@
-// A space's Files tab: its folder, and each folder it works with besides, in the Files page's own view (pick
-// several, drag, upload, the menus). The folders show as chips over it, with one to attach another folder of
-// yours, where it is; a chip's × leaves a folder out (the folder itself stays as it is). Files open in a window
-// over the page.
-import { useRef, useState } from 'react';
-import { useSearch } from 'wouter';
+// A project's Files tab: its folder, and each folder it works with besides, in the Files page's own view (tiles with
+// pictures, or the list; pick several, drag, upload, the menus). The folders show as chips over it, with one to attach
+// another folder of yours, where it is; a chip's × leaves a folder out (the folder itself stays as it is). Files open
+// in a window over the page. At the top of the project's own folder what was kept in the project (pages, documents,
+// slides, designs, pictures, videos, sounds: pages/kept.tsx) comes in the same view, after the folders and before the
+// files, each opening in its own editor; New there also makes those. Files and folders dropped anywhere on the tab are
+// uploaded into the folder shown.
+import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { ExternalLink, Folder, Plus, X } from 'lucide-react';
 import { MAX_FOLDERS, type Space } from '@shared/spaces';
 import { FolderFinder } from '../../components/FolderPicker';
 import { Button, cx, Popover } from '../../components/ui';
 import { enc, patch } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
-import { go, useFilePeek } from '../../lib/nav';
+import { go, openProject, useFilePeek, useProjectWindow } from '../../lib/nav';
 import { toastError, useApp, useToasts } from '../../lib/store';
-import { goFolder } from '../files/actions';
+import { dropInto, goFolder, takesDrop } from '../files/actions';
 import { FolderView } from '../files/FolderView';
+import { KeptThings, useKept } from '../pages/kept';
 import { SpaceMark } from './parts';
 import { loadSpaces } from './state';
 
 export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) => void }) {
   const home = useApp((x) => x.boot?.home);
-  const params = new URLSearchParams(useSearch());
   const roots = [s.folder, ...(s.folders ?? [])];
   const under = (p: string, r: string) => p === r || p.startsWith(`${r}/`);
-  const asked = params.get('dir');
+  // The folder the window's Files shows (its `dir`), when it is one of the project's.
+  const asked = useProjectWindow((x) => (x.at?.id === s.id ? x.at.dir : undefined));
   const dir = asked && roots.some((r) => under(asked, r)) ? asked : s.folder;
   // The folder it is in: the space's own, else the one it works with that holds it (the deepest, if nested).
   const root = under(dir, s.folder) ? s.folder : (roots.filter((r) => under(dir, r)).sort((a, b) => b.length - a.length)[0] ?? s.folder);
   const [attach, setAttach] = useState(false);
   const attachRef = useRef<HTMLButtonElement>(null);
-  const open = (d: string) => go(`/projects/${s.id}/files${d === s.folder ? '' : `?dir=${enc(d)}`}`);
+  const kept = useKept(s.id);
+  // The kept things come at the top of the project's own folder, not in its subfolders or the other folders it works with.
+  const extra = useMemo(() => (dir === s.folder && kept?.length ? { titles: kept.map((k) => k.title), render: (o: { grid: boolean; filter: string }) => <KeptThings items={kept} {...o} /> } : undefined), [dir, s.folder, kept]);
+  // Files dropped on the tab outside the view (over the chips) go into the folder shown too.
+  const [over, setOver] = useState(false);
+  const open = (d: string) => openProject(s.id, 'files', { dir: d === s.folder ? undefined : d });
 
   const save = async (folders: string[]) => {
     try {
@@ -55,7 +63,20 @@ export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) =>
 
   const chip = 'flex h-8 max-w-[16rem] min-w-0 shrink-0 items-center gap-1.5 rounded-full border pl-2.5 text-[13px] transition-colors';
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div
+      className={cx('flex h-full min-h-0 flex-col gap-3', over && 'rounded-xl outline-2 outline-offset-2 outline-accent/50 outline-dashed')}
+      onDragOver={(e: DragEvent) => {
+        if (!e.dataTransfer.types.includes('Files') || !takesDrop(e)) return;
+        if (!over) setOver(true);
+      }}
+      onDragLeave={(e: DragEvent) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(false)}
+      // A drop on the folder view below is its own (it stops there): the outline goes all the same.
+      onDropCapture={() => setOver(false)}
+      onDrop={(e: DragEvent) => {
+        setOver(false);
+        if (e.dataTransfer.types.includes('Files')) void dropInto(e, dir);
+      }}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -109,6 +130,8 @@ export function SpaceFiles({ s, onSaved }: { s: Space; onSaved: (next: Space) =>
           onFile={(p) => useFilePeek.setState({ file: { path: p } })}
           onSearch={(q) => go(`/search?q=${enc(q)}&in=${enc(dir)}`)}
           embedded
+          project={s.id}
+          extra={extra}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-// A video player of the app's own (Files, any file opened over a page, videos agents made and the Library's): a seek bar that shows what has
+// A video player of the app's own (Files, any file opened over a page, videos agents made and kept videos): a seek bar that shows what has
 // loaded and the time under the pointer, volume, speed, loop, picture in picture and full screen, with the
 // controls fading while it plays. Keys while it has focus: Space or K plays and pauses, ← → move 5 s, J L
 // 10 s, ↑ ↓ the volume, M mutes, F full screen, 0–9 a tenth of the way each, , . a frame while paused. On a

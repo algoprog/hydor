@@ -83,7 +83,7 @@ export function peopleNote(list: Comment[] | undefined): string | null {
 }
 
 /**
- * Who changes comments: you, an agent, or someone a project or a thing of the Library is shared with (their name, and
+ * Who changes comments: you, an agent, or someone a project or a kept thing is shared with (their name, and
  * the id of their share, which stays theirs when their link is made again).
  */
 export type Writer = 'user' | 'agent' | { name: string; who: string };

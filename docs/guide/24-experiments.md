@@ -119,7 +119,7 @@ Then:
 
 - **Copy LaTeX**: a `table` with booktabs' rules (add `\usepackage{booktabs}` to your preamble), the best in `\textbf`, `$\pm$` and daggers, and a caption that says how the cells read.
 - **Copy Markdown** and **Download CSV** (each metric's mean, standard deviation, number of runs and p-values).
-- **Put it in a LaTeX document**: pick a LaTeX document of the [Library](/library), then one of its files. The table goes before `\end{document}` (or at the end of a file without it), or in place of the table it made there before, keeping your own caption and label. It is saved as a new version of the document, as your own edits are.
+- **Put it in a LaTeX document**: pick one of your LaTeX documents (kept in a project's files, or with its conversation), then one of its files. The table goes before `\end{document}` (or at the end of a file without it), or in place of the table it made there before, keeping your own caption and label. It is saved as a new version of the document, as your own edits are.
 
 A table is kept when you copy it or put it in a document. Its LaTeX carries a line `% hydor:table <id>` just above its tabular: keep it there, so the check before you submit can work the numbers out again from the runs and say which changed. **Results tables**, in the menu (⋯) at the top of the page, lists the tables kept: open one to copy or place it again, or **Work it out again** from its runs as they are now.
 

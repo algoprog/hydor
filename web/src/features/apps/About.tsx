@@ -42,13 +42,13 @@ const TOOLS: Record<string, { icon: ReactNode; text: string }> = {
   read_paper: { icon: <FileSearch size={14} />, text: 'Finds and reads papers' },
   reading_list: { icon: <BookOpen size={14} />, text: 'Keeps your reading list' },
   zotero_sync: { icon: <Link2 size={14} />, text: 'Syncs with Zotero' },
-  save_sheet: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_doc: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_slides: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_latex: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_diagram: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_board: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
-  save_page: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_sheet: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_doc: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_slides: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_latex: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_diagram: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_board: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
+  save_page: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes' },
 };
 
 /** How it works, as lines: each kind of work once, the same words once. */

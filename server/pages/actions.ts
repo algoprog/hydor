@@ -1,4 +1,4 @@
-// page_action: what the Library's editors do in a click to the whole of a page (animating every slide, putting right what
+// page_action: what the editors do in a click to the whole of a page (animating every slide, putting right what
 // the accessibility check finds, PowerPoint compatible or the web format, a ready-made theme, accepting the suggested
 // changes, sorting a table, taking out its duplicate rows, renaming a LaTeX project's files…), for agents, and first of
 // all for the agent beside the page (Ask the agent). Each runs the editor's own code (shared/) on the version kept now,
@@ -317,7 +317,7 @@ const updateCharts: Act<Deck> = (d, a, x) => {
         }
       })();
       const src = p && !x.hidden(p) ? pageSource(x.ctx.deps.db, id) : null;
-      books.set(id, src?.kind === 'sheet' ? { title: src.title, book: readBook(src.text) } : `its spreadsheet (${id}) is no longer in the Library`);
+      books.set(id, src?.kind === 'sheet' ? { title: src.title, book: readBook(src.text) } : `its spreadsheet (${id}) is no longer there`);
     }
     return books.get(id)!;
   };
@@ -1170,7 +1170,7 @@ const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'do
 export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? Object.keys(HTML_ACTIONS) : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];
 
 /**
- * The Library's Turn it into (shared/content-asks.ts turnAsk): what the app asks an agent for, to make slides, a document
+ * The editors' Turn it into (shared/content-asks.ts turnAsk): what the app asks an agent for, to make slides, a document
  * or a page from it; the agent does it with its save tool, and the page itself stays as it is.
  */
 function turnInto(x: Here, a: Args): string {
@@ -1181,10 +1181,10 @@ function turnInto(x: Here, a: Args): string {
   if (!(can as string[]).includes(to)) throw new Error(`to: a ${NOUN[from]} turns into ${can.map((k) => (k === 'slides' ? 'slides' : k === 'doc' ? 'a document (doc)' : k === 'diagram' ? 'a diagram' : 'a page')).join(', ')}.`);
   const folder = page.folder ? folderPath(x.ctx.deps.db, page.folder) : '';
   const ask = turnAsk({ from, to: to as TurnTo, id: page.id, title: page.title, folder: folder || undefined });
-  return `Nothing is changed yet. What the Library’s Turn it into asks for, to do now with ${to === 'slides' ? 'save_slides' : to === 'doc' ? 'save_doc' : to === 'diagram' ? 'save_diagram' : 'save_page'} (keep it in their Library; it shows them where it is): ${ask}`;
+  return `Nothing is changed yet. What the editor’s Turn it into asks for, to do now with ${to === 'slides' ? 'save_slides' : to === 'doc' ? 'save_doc' : to === 'diagram' ? 'save_diagram' : 'save_page'} (it is kept as the save tools keep things, and shows them where it is): ${ask}`;
 }
 
-/** Duplicate in the Library: a copy beside it (its data stays with the first), made by the agent. */
+/** Duplicate: a copy beside it (its data stays with the first), made by the agent. */
 function duplicate(x: Here, a: Args): string {
   const { ctx, page } = x;
   const db = ctx.deps.db;
@@ -1197,22 +1197,22 @@ function duplicate(x: Here, a: Args): string {
   refreshThumbs(ctx.deps, [p.id]);
   // A board's copy never starts spending by itself: its cards' refreshes came paused (kinds.ts asNew).
   const paused = cur.kind === 'board' && /"paused":true/.test(pageSource(db, p.id)?.text ?? '');
-  return `Saved "${p.title}" (page ${p.id}, version 1): a copy of “${page.title}” (page ${page.id}), beside it in the Library${cur.kind === 'page' ? ', without the data the page stores' : ''}. The first is as it was.${paused ? ' Its cards’ refreshes are paused on the copy: the user turns them on (Turn all on at its top shows what they cost first), or save_board with refresh: {paused: false} when they ask.' : ''}`;
+  return `Saved "${p.title}" (page ${p.id}, version 1): a copy of “${page.title}” (page ${page.id}), beside it${cur.kind === 'page' ? ', without the data the page stores' : ''}. The first is as it was.${paused ? ' Its cards’ refreshes are paused on the copy: the user turns them on (Turn all on at its top shows what they cost first), or save_board with refresh: {paused: false} when they ask.' : ''}`;
 }
 
 const DESCRIPTION = [
-  'Do to a saved page of the user’s Library what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook, save_diagram) would have you write it all out yourself.',
+  'Do to one of the user’s saved pages what its editor does with one click to the whole of it, where a save tool (save_slides, save_doc, save_sheet, save_latex, save_notebook, save_diagram) would have you write it all out yourself.',
   'Each runs the editor’s own code on the version kept now and keeps a new version (the older ones restorable; the user’s changes and comments stay), which the editor open on it shows at once; it answers what changed.',
   'Free and instant, but describe_pictures (a model looks at each picture) and ask_ai (the helper model answers each AI cell). Give id (get_page lists them) and action, with its fields:',
   'Slide decks.',
   '- animate {style: subtle|lively|bold|none, slides?}: animate every slide (or the slides listed, by number or id) as Animate → Animate every slide does: the title first, then the words a row at a time, bullets one by one, pictures after; Morph between slides that share parts; none takes every animation and transition off.',
   '- fix_accessibility {slides?}: put right what Tools → Check accessibility can (small words, colours that stand out too little, titles and the order they are read in, videos that start with their sound, tables without a header row); it lists what is left.',
-  '- describe_pictures {slides?, parts?: [part ids]}: a description (alt) for each picture without one (or those listed), written by the model that describes the Library’s pictures (Settings → Images, video and audio; it may cost a little); up to 12 a call.',
+  '- describe_pictures {slides?, parts?: [part ids]}: a description (alt) for each picture without one (or those listed), written by the model that describes pictures (Settings → Images, video and audio; it may cost a little); up to 12 a call.',
   '- powerpoint {on: true|false}: PowerPoint compatible (what PowerPoint lacks becomes pictures or its nearest effects; it says what changed) when the user wants a file for PowerPoint, Keynote or Google Slides; false puts it back in the web format.',
   `- theme {theme: ${THEMES.map((t) => t.id).join('|')} or one of the user’s own themes by its name}: its colours and fonts on every slide, and a theme of the user’s own brings its logo (the Theme tab’s Ready-made and My themes).`,
   '- slide_shape {ratio: 16:9|4:3}: wide or standard slides, every part moved and sized down the slide in step.',
   '- reuse_slides {from: another deck’s id, slides?: its slides (all when left out), after?: a slide of this deck (0: first; left out: at the end), keep_look?: false for this deck’s theme}: copies of its slides put in (Insert → Slides from another deck), their notes along, their comments left behind.',
-  '- update_charts {slides?}: every chart made from a spreadsheet of the Library read again from its cells (Update from the spreadsheet), each series keeping its colour.',
+  '- update_charts {slides?}: every chart made from a saved spreadsheet read again from its cells (Update from the spreadsheet), each series keeping its colour.',
   'Documents.',
   '- accept_suggestions, reject_suggestions {ids?}: accept or reject the suggested changes listed (get_page lists them), or every one.',
   '- page_setup {paper?: a4|letter|legal|a3|a5, margin?: mm (every side), margins?: {top?, bottom?, left?, right?: mm} (sides of their own), font?, size?: pt, orientation?: portrait|landscape, columns?: 1|2|3, color?: the paper’s colour or none, watermark?: words (DRAFT) or null}: the paper, margins, body text, columns, colour and watermark (Page setup).',
@@ -1247,8 +1247,8 @@ const DESCRIPTION = [
   '- lock, unlock: Lock the page (it then makes no new version, by anyone, until it is unlocked; its databases still take rows): lock it when the user asks to keep it from changing by accident, unlock it before changing it when they ask.',
   '- fill_column {database?: its name (data-db) or title, the first when left out; column?: an AI column’s name, the first; rows?: "empty" (the default), "all" or row ids}: the helper model fills the AI column’s cells from each row’s other cells, as the editor’s Fill every row does (one request a row).',
   'Any of them.',
-  '- turn_into {to: slides|doc|page}: what the Library’s Turn it into asks for, to make slides, a document or a page from it (you then make it with the save tool; it stays as it is).',
-  '- duplicate {title?}: a copy beside it in the Library (“… (copy)”).',
+  '- turn_into {to: slides|doc|page}: what the editor’s Turn it into asks for, to make slides, a document or a page from it (you then make it with the save tool; it stays as it is).',
+  '- duplicate {title?}: a copy beside it (“… (copy)”).',
   'Freezing rows and columns, a filter, and what a part, a slide, a cell or a paragraph has of its own are the save tools’ (save_sheet’s freeze and filter, save_slides’ change, save_doc’s edits).',
 ].join('\n');
 

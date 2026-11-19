@@ -1,5 +1,5 @@
 // Signatures: the user draws (or types, or uploads) their signature once and keeps it, encrypted (store.ts), under a
-// name; they put it into the documents they write in the Library, and agents ask for one and place one into Word
+// name; they put it into the documents they write, and agents ask for one and place one into Word
 // files, PDFs, pictures and documents, each placement allowed by the user on a card first (tools.ts). A placed
 // signature is a picture of one, not a cryptographic digital signature.
 //
@@ -7,7 +7,7 @@
 //   GET /api/signatures                 the saved signatures (names, kinds and sizes; never their pictures)
 //   GET /api/signatures/:id/image       one's picture (PNG, see-through), for the app's own pages
 //   POST /api/signatures                keeps a new one; PATCH /api/signatures/:id changes one; DELETE removes it
-//   POST /api/signatures/:id/asset      one put into a document of the Library: kept as one of its pictures
+//   POST /api/signatures/:id/asset      one put into a document: kept as one of its pictures
 //   GET /api/signatures/previews/:token a page as an agent would sign it, for the card that asks
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
@@ -56,7 +56,7 @@ function routes(d: Deps) {
     changed();
     return { signature: s };
   });
-  // Into a document of the Library (Insert → Signature): kept as one of its pictures, which the document shows from then on.
+  // Into a document (Insert → Signature): kept as one of its pictures, which the document shows from then on.
   app.post('/api/signatures/:id/asset', async (req) => {
     const pic = await signatureImage(db, own(P(req).id).id);
     if (!pic) throw new HttpError(404, 'There is no such signature');

@@ -1,6 +1,6 @@
 // A design's dialogs: Download (PNG with a see-through background if you like, JPG, or a PDF to print, at 1×, 2× or 3×,
 // exactly its size), Resize (a copy at another size, or this one resized, its elements placed to fit), a QR code, and
-// a picture or a video picked from the Library.
+// a picture or a video picked from those you saved.
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Scaling, Search } from 'lucide-react';
 import type { MediaItem } from '@shared/media';
@@ -254,7 +254,7 @@ export function QrDialog({ open, onClose, onInsert, width, ink }: { open: boolea
   );
 }
 
-/** The Library's pictures or videos, to pick one. */
+/** The pictures or videos you saved, to pick one. */
 export function MediaPick({ kind, onClose, onPick }: { kind: 'image' | 'video' | null; onClose: () => void; onPick: (m: MediaItem) => void }) {
   const items = useMedia((s) => s.items);
   const [q, setQ] = useState('');
@@ -266,13 +266,13 @@ export function MediaPick({ kind, onClose, onPick }: { kind: 'image' | 'video' |
     return (items ?? []).filter((m) => m.kind === kind && words.every((w) => `${m.title} ${m.description}`.toLowerCase().includes(w))).slice(0, 120);
   }, [items, kind, q]);
   return (
-    <Dialog open={!!kind} onClose={onClose} title={kind === 'video' ? 'A video from your Library' : 'A picture from your Library'} width={620}>
+    <Dialog open={!!kind} onClose={onClose} title={kind === 'video' ? 'A video you saved' : 'A picture you saved'} width={620}>
       <label className="mb-2 flex h-9 items-center gap-2 rounded-lg border border-line bg-bg-1 px-2.5 focus-within:border-accent/60">
         <Search size={14} className="shrink-0 text-fg-3" />
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find by name or description" className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none" />
       </label>
       {!items && <p className="py-8 text-center text-[13px] text-fg-3">…</p>}
-      {items && !list.length && <p className="py-8 text-center text-[13px] text-fg-3">{q.trim() ? tr('None by that name.') : kind === 'video' ? tr('Your Library has no videos yet.') : tr('Your Library has no pictures yet.')}</p>}
+      {items && !list.length && <p className="py-8 text-center text-[13px] text-fg-3">{q.trim() ? tr('None by that name.') : kind === 'video' ? tr('You have not saved any videos yet.') : tr('You have not saved any pictures yet.')}</p>}
       <div className="grid max-h-[min(60dvh,460px)] grid-cols-3 gap-1.5 overflow-y-auto sm:grid-cols-4">
         {list.map((m) => (
           <button key={m.id} type="button" onClick={() => onPick(m)} title={m.title} className="group overflow-hidden rounded-lg border border-line bg-bg-1 text-left hover:border-accent/60">

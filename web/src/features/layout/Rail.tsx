@@ -1,6 +1,7 @@
 // The rail: a narrow column of icons at the left edge of every page on a computer. Sessions (which shows or hides the
-// sidebar), the sections (Browser, Library, Projects, Apps, Agents), then the inbox and the tools (Search, Usage,
-// System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or the keyboard's focus. Each group of tools keeps the order you drag it into, on every device.
+// sidebar), the sections (Browser, Apps, Agents), the inbox and Search right under them (they stay there), then, below
+// a gap, the tools (Usage, System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or
+// the keyboard's focus. The sections and the tools each keep the order you drag them into, on every device.
 // A phone has no rail: its drawer (Sidebar.tsx) holds the same.
 import { cloneElement, createContext, isValidElement, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -259,7 +260,9 @@ export const Rail = memo(function Rail() {
   const [tip, tipApi] = useRailTip();
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   const sections = tools.filter((t) => SECTION_TOOLS.includes(t.id));
-  const utilities = tools.filter((t) => !SECTION_TOOLS.includes(t.id));
+  // Search sits under the Inbox and is not dragged: the tools below the gap are the rest.
+  const search = tools.find((t) => t.id === 'search');
+  const utilities = tools.filter((t) => !SECTION_TOOLS.includes(t.id) && t.id !== 'search');
   const dragging = dragId ? tools.find((t) => t.id === dragId) : undefined;
 
   const onDrop = ({ active, over }: DragEndEvent) => {
@@ -324,8 +327,9 @@ export const Rail = memo(function Rail() {
           <span ref={bar} aria-hidden className={cx('rail-bar', glide && 'glide')} style={{ opacity: 0 }} />
           <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
           {group(sections)}
-          <div className="min-h-2 flex-1" />
           <InboxTile current={loc === '/inbox'} />
+          {search && <ToolTile t={search} />}
+          <div className="min-h-2 flex-1" />
           {group(utilities)}
         </div>
         {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <ToolTile t={dragging} floating /> : null}</DragOverlay>, document.body)}

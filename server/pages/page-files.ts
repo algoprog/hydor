@@ -3,7 +3,7 @@
 // 50 MB. Their address carries this server's signature of them and is its own permission (no sign-in), so a page shows
 // them wherever it opens: in the editor, in Use, at its own address and in a published copy.
 //   POST /api/pages/files?name=&type=  (the file's bytes, application/octet-stream) → {src, name, type, size}
-//   POST /api/pages/files/library {id} → {src, name, type, size}: a sound or a picture of the Library, for a page.
+//   POST /api/pages/files/library {id} → {src, name, type, size}: a kept sound or picture, for a page.
 //   GET  /pg/file/:sha/:sig/:name: the file (ranges for sound and video). Pictures, sounds, videos and PDFs show in
 //     the page; anything else is a download, never a page of this app (what it says runs nowhere).
 // A file no page has named for a month goes (a page's versions and its data are looked through).

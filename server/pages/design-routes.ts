@@ -1,7 +1,7 @@
 // What designs (shared/design.ts) need of the server, signed in:
 //   POST /api/pages/design-export  {html, title?, format: png|jpg|pdf, scale?: 1–3, transparent?, board?} → the file
 //   POST /api/pages/video-address  {src: "naget-video:<sha>"} → {url}: where a kept video plays in a page
-//   POST /api/pages/videos/from-media {media} → {src, url, poster?, w?, h?}: a Library video kept for pages
+//   POST /api/pages/videos/from-media {media} → {src, url, poster?, w?, h?}: a kept video for pages
 //   GET /api/brand → {brand}, PUT /api/brand {name?, colours, fonts, logos} → {brand}: the user's brand kit
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { cleanBrand, type BrandKit } from '../../shared/design-brand.ts';
@@ -69,7 +69,7 @@ export function designRoutes(app: FastifyInstance, db: DB) {
   });
   app.post('/api/pages/videos/from-media', async (req) => {
     const m = getMedia(db, String(B(req).media ?? ''));
-    if (!m || m.kind !== 'video' || !m.file) throw new HttpError(404, 'No such video in the Library');
+    if (!m || m.kind !== 'video' || !m.file) throw new HttpError(404, 'No such kept video');
     let kept;
     try {
       kept = await keepVideoFile(db, m.file, '/');

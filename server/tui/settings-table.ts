@@ -715,7 +715,7 @@ row('images', 'Use the graphics card for videos', 'choice', {
 row('images', 'Making audio', 'switch', { read: rd('/api/audio/settings', 'enabled'), write: put('/api/audio/settings', (v) => ({ enabled: v })) });
 modelRow('Music model', '/api/audio/settings', 'music', '/api/audio/models?kind=music&sort=picks', 'music');
 modelRow('Voice and sound model', '/api/audio/settings', 'speech', '/api/audio/models?kind=speech&sort=picks', 'speech');
-row('images', 'Captions in the Library', 'choice', {
+row('images', 'Captions for what you keep', 'choice', {
   choices: ['auto', 'openrouter', 'claude', 'ollama', 'vllm', 'endpoint'].map((v) => ({
     value: v,
     label: { auto: 'The app’s choice', openrouter: 'OpenRouter', claude: 'Claude', ollama: 'Ollama', vllm: 'vLLM', endpoint: 'An endpoint' }[v]!,

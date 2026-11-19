@@ -1,5 +1,5 @@
 // Comments on LaTeX files of this computer, opened from Files: a file keeps only its text, so the app keeps its
-// comments in its own data, by the file's path, each on words of that file as a Library document's are (where they
+// comments in its own data, by the file's path, each on words of that file as a saved document's are (where they
 // are, the words they quote, replies, resolved). Files opened in the editor get the comments of their project's files
 // (the document and the chapters it reads), and saving keeps them again, merged with what an agent did meanwhile
 // (an answer or a new comment comes in, what the user deleted stays deleted). Files moves them along when it renames

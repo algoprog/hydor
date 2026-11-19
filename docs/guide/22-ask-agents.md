@@ -28,7 +28,7 @@ The agent first reads how things are now, then asks you to confirm the change on
 
 ## Have an agent do what an editor does
 
-Agents change what is in your Library as you would in its editors: they write slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams, and do in one go what an editor does to the whole of one in a click:
+Agents change what you keep as you would in its editors: they write slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams, and do in one go what an editor does to the whole of one in a click:
 
 - **Slides**: animate every slide (**Subtle**, **Lively** or **Striking**, or take every animation off), put right what **Check accessibility** finds, describe the pictures that have no description, make the deck PowerPoint compatible or put it back in the web format, give it a ready-made theme or one of yours, make the slides wide or standard, bring in slides from another deck, and update the charts made from a spreadsheet.
 - **Documents**: accept or reject the suggested changes, change the page setup, and put in a header, a footer and page numbers.
@@ -36,7 +36,7 @@ Agents change what is in your Library as you would in its editors: they write sl
 - **LaTeX documents**: rename or move files, pictures and folders, the lines that name them following.
 - **Notebooks**: clear the outputs.
 - **Diagrams**: lay a page (or every page) out again, as a flowchart down or across, a tree, a mind map, rings, a circle or a grid, and give every shape one look, its words one font, or the whole diagram the look of a hand drawing.
-- **Any of them**: a copy in the Library, or another kind made from it (**Turn it into**).
+- **Any of them**: a copy kept as a new one, or another kind made from it (**Turn it into**).
 
 Each keeps a new version (the one before stays among the versions), the editor open on it shows it at once, and your own changes and comments stay. They are free and instant, but for describing pictures, which a model does. The agent beside a page ([Change it by asking an agent](/guide/library#change-it-by-asking-an-agent)) knows them all, and exactly what you picked. For example:
 

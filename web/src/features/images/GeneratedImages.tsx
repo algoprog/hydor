@@ -1,6 +1,6 @@
 // Images an agent made (generate_image), with its reply: while the model works a placeholder of the
-// shape asked for; then the pictures, a tap away from full size (the lightbox), download, and keeping them
-// in the Library. Without an OpenRouter key, or with the tool turned off, a way to Settings.
+// shape asked for; then the pictures, a tap away from full size (the lightbox), download, and keeping them.
+// Without an OpenRouter key, or with the tool turned off, a way to Settings.
 import { useEffect, useState } from 'react';
 import { Download, FolderOpen, ImageOff, KeyRound, Sparkles } from 'lucide-react';
 import type { ToolItem } from '@shared/types';

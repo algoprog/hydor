@@ -11,6 +11,8 @@ import { formatPage, formatSearch } from '../../shared/search.ts';
 
 /** Pictures and clips an agent made, for the conversation and the Library (made with OpenRouter, kept small). */
 const MEDIA = path.join(path.dirname(fileURLToPath(import.meta.url)), 'media');
+/** The repository, for the made-up files its tests keep (a study as a PDF). */
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -292,6 +294,59 @@ export async function lisbonDeck(api, s) {
   return page;
 }
 
+/** A paragraph of a document (the document editor's model): its words, and its style (a heading, the title) if any. */
+const para = (t, style) => ({ id: `p${Math.random().toString(36).slice(2, 10)}`, type: 'p', ...(style ? { style } : {}), runs: [{ t }] });
+
+/**
+ * What the Thesis project holds in its Files (the guide's pictures of a project's Files and Overview): a chapter draft
+ * and the defense slides kept in the project, and in its folder two folders, notes, the survey's numbers as a CSV, a
+ * chapter as a Word file, a study as a PDF and a picture from a visit. All made up.
+ */
+async function thesisFiles(api, home, sessionKey) {
+  const dir = path.join(home, 'Hydor/Projects/thesis');
+  for (const sub of ['chapters', 'sources']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'chapters', 'chapter-1-introduction.md'), '# Chapter 1: Introduction\n\nWhy small towns keep their libraries open, and who uses them.\n');
+  fs.writeFileSync(path.join(dir, 'chapters', 'chapter-2-literature.md'), '# Chapter 2: What others found\n\nPutnam, Klinenberg and Oldenburg on third places.\n');
+  fs.writeFileSync(path.join(dir, 'interview-notes.md'), '# Interview notes\n\n- Maple Falls: one branch, open 28 hours a week\n- Volunteers run the Saturday hours\n- Story time is the best-attended program\n- Free internet: the only public access in town\n\nNext: code the six interviews in two rounds.\n');
+  fs.writeFileSync(path.join(dir, 'survey-results.csv'), 'town,branches,hours,staff,volunteers\nMaple Falls,1,28,1.5,9\nCedar Bend,2,40,3,4\nOak Hollow,1,22,1,12\nRiverton,1,30,2,6\nPine Ridge,1,18,0.5,7\n');
+  fs.copyFileSync(path.join(MEDIA, 'viewpoint.jpg'), path.join(dir, 'field-visit.jpg'));
+  fs.writeFileSync(path.join(dir, 'sources', 'reading-list.md'), '# Reading list\n\n- Putnam, Bowling Alone (read)\n- Klinenberg, Palaces for the People (read)\n- Oldenburg, The Great Good Place\n');
+  fs.copyFileSync(path.join(REPO, 'server/pdfnotes/test-files/paper.pdf'), path.join(dir, 'related-study.pdf'));
+  // A chapter as a Word file: made as a document, saved out as .docx, and the document taken away again.
+  const chapter2 = { v: 1, blocks: [para('Chapter 2: What others found', 'title'), para('Libraries as third places', 'h1'), para('Oldenburg called the places between home and work “third places”: open to anyone, free, and kept up by their regulars. A small-town library is often the last one left.'), para('Klinenberg names them social infrastructure: the shared rooms where people who would not meet otherwise do.'), para('What the survey adds', 'h1'), para('The 214 town libraries surveyed show how thin that infrastructure has become: most keep one branch open for 28 hours a week.')] };
+  const word = (await api('POST', '/api/pages', { kind: 'doc', title: 'Chapter 2: What others found', model: chapter2 })).page;
+  const docx = await api('GET', `/api/pages/${word.id}/export?format=docx`, undefined, { raw: true }).catch(() => null);
+  if (docx) fs.writeFileSync(path.join(dir, 'chapter-2-literature.docx'), docx);
+  await api('DELETE', `/api/pages/${word.id}`).catch(() => {});
+  // Kept in the project: the chapter being written, and the defense slides.
+  await api('POST', '/api/pages', {
+    kind: 'doc',
+    title: 'Chapter 3: Method',
+    sessionKey,
+    description: 'The draft of chapter 3: how the survey of 214 town libraries and the six interviews with librarians were made and analysed.',
+    model: { v: 1, blocks: [para('Chapter 3: Method', 'title'), para('The survey', 'h1'), para('A questionnaire went to all 214 town libraries under 10,000 residents, by mail and e-mail; 88 answered (41%).'), para('The interviews', 'h1'), para('Six librarians were interviewed between January and March, and their answers coded in two rounds.')] },
+  });
+  await api('POST', '/api/pages', {
+    kind: 'slides',
+    title: 'Defense slides',
+    sessionKey,
+    description: 'The slides for the thesis defense in March: the question, the survey, what the interviews said and what it means for small towns.',
+    model: {
+      theme: 'midnight',
+      slides: [
+        { els: [
+          { type: 'text', text: 'Keeping the doors open', x: 96, y: 250, w: 1088, h: 120, size: 60, bold: true, color: '#ffffff', role: 'title' },
+          { type: 'text', text: 'How small towns use their public libraries · Thesis defense, March', x: 96, y: 380, w: 1088, h: 60, size: 26, color: '#9fb4cc', role: 'subtitle' },
+        ] },
+        { els: [
+          { type: 'text', text: 'What the survey found', x: 96, y: 80, w: 1088, h: 90, size: 44, bold: true, color: '#ffffff', role: 'title' },
+          { type: 'text', text: '• 62% of the towns have a single branch\n• The median branch is open 28 hours a week\n• Volunteers run most Saturday hours', x: 96, y: 200, w: 1088, h: 300, size: 30, color: '#d5dde8' },
+        ] },
+      ],
+    },
+  });
+}
+
 /** Every session Alex has, newest work first. Returns them by name, each with its key. */
 export function makeSessions(home, projects, now, { shop, blog }) {
   const tasks = path.join(home, 'Hydor/Tasks');
@@ -437,7 +492,7 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     out.report = { key: t.key, cwd, at: t.t };
   }
 
-  // A picture and a short clip made through OpenRouter, each with Save to Library under it.
+  // A picture and a short clip made through OpenRouter, each with Keep under it.
   {
     const cwd = path.join(tasks, '2026-11-02-lisbon-pictures');
     const pic = path.join(cwd, 'images', 'yellow-lisbon-tram.jpg');
@@ -451,15 +506,15 @@ export function makeSessions(home, projects, now, { shop, blog }) {
     const prompt = 'A yellow Lisbon tram climbing a narrow sunny street between tiled houses, two people walking beside it, bright flat illustration';
     t.tool(own('generate_image'), { prompt, aspect_ratio: '4:3' }, {
       say: "I'll make the picture first.",
-      text: `Made an image with recraft/recraft-v4.1-flash ($0.007), 4:3:\n${pic} (800×590, 96 KB)\nThe user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.`,
+      text: `Made an image with recraft/recraft-v4.1-flash ($0.007), 4:3:\n${pic} (800×590, 96 KB)\nThe user sees it with your reply, a tap away from full size, download and keeping it in their project: don’t repeat it or its path. To look at it yourself, open the file.`,
       ms: 14_000,
     });
     t.tool(own('generate_video'), { prompt: 'The yellow tram climbs the street towards the camera, warm afternoon light, gentle camera follow', first_frame: pic }, {
       say: 'Now a short clip that starts from it.',
-      text: `Made a video with x-ai/grok-imagine-video-1.5 ($0.42), 3 s, 16:9, 720p, with sound:\n${clip} (640×362, 3.1 s, 101 KB)\nThe user sees it with your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path.`,
+      text: `Made a video with x-ai/grok-imagine-video-1.5 ($0.42), 3 s, 16:9, 720p, with sound:\n${clip} (640×362, 3.1 s, 101 KB)\nThe user sees it with your reply, where they can play it, download it and keep it in their project: don’t repeat it or its path.`,
       ms: 52_000,
     });
-    t.say(['Here they are: the picture for the post, and a 3-second clip that starts from it. **Save to Library** under either one keeps it, with a title and a description written for it.'], { out: 300 });
+    t.say(['Here they are: the picture for the post, and a 3-second clip that starts from it. **Keep** under either one keeps it, with a title and a description written for it.'], { out: 300 });
     t.title('Pictures for the Lisbon trip blog').save(projects);
     out.pictures = { key: t.key, cwd, at: t.t, pic, clip };
   }
@@ -703,7 +758,7 @@ export async function seedApi(api, home, now, s) {
     icon: 'telescope',
     description: 'Finds new studies on small-town public libraries and keeps the best in the Library',
     instructions:
-      'Search for studies from the last week on how small towns use their public libraries. Keep the five closest to the thesis in the Library, two lines each: what it found, and why it matters to the thesis.',
+      'Search for studies from the last week on how small towns use their public libraries. Keep the five closest to the thesis in the project, two lines each: what it found, and why it matters to the thesis.',
     tools: ['read', 'web'],
     tier: 'quick',
     budgetUsd: 3,
@@ -806,6 +861,7 @@ export async function seedApi(api, home, now, s) {
     html: PAGE('Planting calendar, zone 5b', '<table><tr><th>Crop</th><th>Sow</th><th>Harvest</th></tr><tr><td>Garlic</td><td>Oct–Nov</td><td>July</td></tr><tr><td>Spinach</td><td>Mar–Apr</td><td>May–June</td></tr><tr><td>Tomatoes</td><td>Apr (indoors)</td><td>Aug–Sep</td></tr></table>'),
     sessionKey: s.garden.key,
   });
+  await thesisFiles(api, home, s.thesis.key);
   await api('POST', '/api/pages', {
     title: 'Thesis reading tracker',
     html: PAGE('Thesis reading tracker', '<p>23 of 31 sources read · <span class="tag">chapter 3</span></p><ul><li>☑ Putnam, Bowling Alone</li><li>☑ Klinenberg, Palaces for the People</li><li>☐ Oldenburg, The Great Good Place</li></ul>'),

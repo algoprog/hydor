@@ -1,6 +1,6 @@
 // The highlights you made on web pages in your own browsing: a table of the app's database, kept by the page they are on
 // (shared/highlights.ts `highlightKey`). Private to you: the routes are under /api/browser/browsing/, which agents are
-// refused, and nothing here is copied into the Library, memory or a session.
+// refused, and nothing here is copied into a project, memory or a session.
 import crypto from 'node:crypto';
 import { HIGHLIGHT_CONTEXT, HIGHLIGHT_MAX, HIGHLIGHT_NOTE_MAX, highlightKey, type PageHighlight } from '../../shared/highlights.ts';
 import type { DB } from '../db.ts';

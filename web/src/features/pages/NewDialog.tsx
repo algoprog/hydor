@@ -1,4 +1,4 @@
-// New in the Library: a page, a design, slides, a document, a spreadsheet, a LaTeX document, a notebook or a diagram.
+// New: a page, a design, slides, a document, a spreadsheet, a LaTeX document, a notebook or a diagram.
 // What to make is a list on the left (chips across the top on a phone, or below the width of two panes). For it, a box
 // at the top to describe it in, for an agent to make, with the kinds agents make best as chips under the words (More
 // kinds: all of them, in the gallery); then what to start from yourself, each drawn as it will look (newArt.tsx): a
@@ -60,8 +60,6 @@ import { tr } from '../../i18n/runtime';
 import { useAskRun } from '../guide/ask';
 import { SpaceSelect } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
-import { folderChain } from './folders';
-import { usePagesStore } from './state';
 import { STARTERS } from './templates';
 import { appLanguage, openTypes, preloadTypes } from './types';
 import { madeRequest } from './types/requests';
@@ -114,11 +112,11 @@ const ABOUT: Record<NewKind, string> = {
   notebook: 'A Jupyter notebook: text and code cells you run here, with their outputs, to save as an .ipynb file, a Python script or a PDF.',
   diagram: 'A diagram to draw and edit as in draw.io, and save as a picture, a PDF or a draw.io file.',
   board: 'Answer cards you pin from replies (charts, numbers, the weather, lists), kept together in a grid you size and arrange.',
-  picture: 'A blank picture to paint and edit as in Photoshop, in a size you pick, saved in your Library as a PNG, JPEG or WebP.',
+  picture: 'A blank picture to paint and edit as in Photoshop, in a size you pick, saved as a PNG, JPEG or WebP.',
 };
 const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook', diagram: 'Diagram', board: 'Board', picture: 'Picture' };
 /** What an agent is asked for a LaTeX document or a notebook, which the gallery has no kinds of: these words, then the person's. */
-const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and keep it in my Library: ', notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ', board: 'Make me a board of answer cards and keep it in my Library: ', picture: 'Make me a picture and keep it in my Library: ' };
+const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and save it: ', notebook: 'Make me a Jupyter notebook, run it, and save it: ', board: 'Make me a board of answer cards and save it: ', picture: 'Make me a picture and save it: ' };
 const EXAMPLE: Record<NewKind, string> = {
   page: 'A packing list for a week of hiking',
   design: 'A poster for our summer street party',
@@ -233,8 +231,8 @@ function KindChip({ on, icon, label, title, onClick }: { on: boolean; icon: Reac
   );
 }
 
-/** New in the Library: a page, slides, a document… made in the space it shows (`space`), in its folder open (`folder`) unless another project is picked. */
-export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, folder }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null; folder?: string }) {
+/** New: a page, slides, a document… made in a project (`space`: the one picked to start with; the dialog offers the others, and none). */
+export function NewPageDialog({ open, onClose, kind: startKind = 'page', space }: { open: boolean; onClose: () => void; kind?: NewKind; space?: string | null }) {
   const mobile = useIsMobile();
   const [kind, setKind] = useState<NewKind>(startKind);
   const [pick, setPick] = useState(STARTERS[0].id);
@@ -253,9 +251,8 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   // Who makes it: the agent and model picked last on the start page, as the editors' Ask does.
   const run = useAskRun();
   const [busy, setBusy] = useState(false);
-  // Where it goes: the space the Library shows now, or none; asked only when there are spaces.
+  // Where it goes: the project given, another one, or none; asked only when there are projects.
   const spaces = useSpaces();
-  const folders = usePagesStore((s) => s.folders);
   const [where, setWhere] = useState<string | null>(space ?? null);
   // A design: its size, the template it starts from (none: blank) and its colours.
   const brand = useBrand();
@@ -310,23 +307,21 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
 
   const starter = STARTERS.find((s) => s.id === pick)!;
   const defaultTitle = kind === 'tex' ? tplTitle(tpl) : NEW_TITLE[kind] || starter.title;
-  // In the folder the Library shows, unless another project is picked.
-  const inFolder = folder && where === (space ?? null) ? folder : undefined;
   const aiReady = !!type || !!ask.trim();
 
   const make = async () => {
     if (kind === 'picture') {
-      // Not a page: the picture editor opens on a blank picture, and its Save keeps it in the Library here.
+      // Not a page: the picture editor opens on a blank picture, and its Save keeps it in the project picked.
       const f = fitNewSize(pSize.w, pSize.h);
       const fill = pBg === 'transparent' ? null : pBg === 'white' ? '#ffffff' : pColor.slice(0, 7);
       onClose();
-      openEditor({ kind: 'image', src: blankSrc(f.w, f.h, fill), title: title.trim() || newPictureName(f.w, f.h), from: { label: pageName() }, fresh: { space: where, folder: inFolder }, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
+      openEditor({ kind: 'image', src: blankSrc(f.w, f.h, fill), title: title.trim() || newPictureName(f.w, f.h), from: { label: pageName() }, fresh: { space: where }, save: (r) => void (r.media && toast(spaces?.find((x) => x.id === where) ? tr(`Saved to ${spaces.find((x) => x.id === where)!.name}’s files`) : 'Saved', 'ok')) });
       return;
     }
     setBusy(true);
     try {
       const t = title.trim() || defaultTitle;
-      const at = { space: where, folder: inFolder };
+      const at = { space: where };
       const dt = dTpl ? (templateById(dTpl) ?? null) : null;
       const r =
         kind === 'design'
@@ -370,10 +365,10 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   };
   /** A PowerPoint deck, a Word document or a PDF, a spreadsheet or a CSV opened as a page of its kind. */
   const openFile = () =>
-    fromFile(OPENS[kind]?.accept ?? '', async (f) => post('/api/pages/import', { name: f.name, data: await base64Of(f), space: where, folder: inFolder, ...(kind === 'diagram' ? { kind } : {}) }));
+    fromFile(OPENS[kind]?.accept ?? '', async (f) => post('/api/pages/import', { name: f.name, data: await base64Of(f), space: where, ...(kind === 'diagram' ? { kind } : {}) }));
   /** A page made from a file (Markdown, a Notion export, a Word file, a web page): it opens in Edit. */
   const importPage = () =>
-    fromFile('.md,.markdown,.txt,.zip,.docx,.html,.htm,.csv', async (f) => post('/api/pages/import-page', { name: f.name, data: await base64Of(f), space: where, folder: inFolder }), '?mode=edit');
+    fromFile('.md,.markdown,.txt,.zip,.docx,.html,.htm,.csv', async (f) => post('/api/pages/import-page', { name: f.name, data: await base64Of(f), space: where }), '?mode=edit');
 
   const switchKind = (k: NewKind) => {
     if (title === defaultTitle || !title.trim()) setTitle(NEW_TITLE[k] || starter.title);
@@ -407,7 +402,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const moreKinds = () => typesFor && openTypes({ kind: typesFor, onPick: chose });
   /**
    * Make it with AI: its session starts at once, the message a short line in the person's words, the agent told the
-   * rest (the kind picked or the words, the name, a deck's theme and shape, a design's size, the folder, the app's
+   * rest (the kind picked or the words, the name, a deck's theme and shape, a design's size, the app's
    * language). A LaTeX document or a notebook, which the gallery has no kinds of, is asked for in words. In a project,
    * it starts there, so what it saves lands in it.
    */
@@ -416,15 +411,13 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     const sp = spaces?.find((x) => x.id === where) ?? null;
     const ck = TYPES_FOR[kind];
     const t = title.trim();
-    const names = inFolder ? folderChain(folders, inFolder).map((f) => f.name) : [];
     if (!ck) {
-      // In the person's words, with its name and folder said in the app's language, as the message they see.
+      // In the person's words, with its name said in the app's language, as the message they see.
       const named = t && t !== defaultTitle ? ` ${tr(`Call it “${t}”.`)}` : '';
-      const into = names.length ? ` ${tr(`Keep it in my Library folder “${names.join('/')}”.`)}` : '';
       const words = ask.trim();
-      const end = (named || into) && !/[.!?…。！？]$/.test(words) ? '.' : '';
+      const end = named && !/[.!?…。！？]$/.test(words) ? '.' : '';
       onClose();
-      return startMaking(run, { prompt: `${tr(ASK_FOR[kind] ?? '')}${words}${end}${named}${into}`, space: sp });
+      return startMaking(run, { prompt: `${tr(ASK_FOR[kind] ?? '')}${words}${end}${named}`, space: sp });
     }
     const th = kind === 'slides' ? THEMES.find((x) => x.id === theme) : undefined;
     const r = madeRequest(type, ask, {
@@ -433,7 +426,6 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
       theme: th ? { id: th.id, label: th.label } : undefined,
       ratio: kind === 'slides' ? ratio : undefined,
       size: kind === 'design' ? { label: dSize.label, w: dSize.w, h: dSize.h } : undefined,
-      folder: names.join('/') || undefined,
       lang: appLanguage(),
     });
     if (!r) return;
@@ -580,7 +572,7 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
               {pBg === 'colour' && <input type="color" value={pColor.slice(0, 7)} aria-label="Background colour" onChange={(e) => setPColor(e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-line-2 bg-transparent p-0.5" />}
             </span>
           </div>
-          <p className={cx('text-[12.5px]', fit.cut ? 'text-err' : 'text-fg-3')}>{fit.cut ? tr(`That is more than the editor holds: it will be ${fit.w} × ${fit.h} pixels.`) : tr(`${fit.w} × ${fit.h} pixels. It opens in the picture editor; Save keeps it in your Library.`)}</p>
+          <p className={cx('text-[12.5px]', fit.cut ? 'text-err' : 'text-fg-3')}>{fit.cut ? tr(`That is more than the editor holds: it will be ${fit.w} × ${fit.h} pixels.`) : tr(`${fit.w} × ${fit.h} pixels. It opens in the picture editor; Save keeps it in the project picked above.`)}</p>
         </div>
       );
     }

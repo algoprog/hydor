@@ -1,7 +1,7 @@
 // Videos an agent made (generate_video), with its reply: while the model works a placeholder of the shape
 // asked for, with the time it has taken (videos take a minute or several); then the video in the app's own
-// player (as in Files), to download, edit (the video editor, in a tab of its own: saved as a new video in the Library) and
-// keep in the Library. A call that stopped waiting says the video is still being made: the agent's next
+// player (as in Files), to download, edit (the video editor, in a tab of its own: saved as a new video, kept) and
+// keep it. A call that stopped waiting says the video is still being made: the agent's next
 // call shows it. Without an OpenRouter key, a way to Settings.
 import { useEffect, useState } from 'react';
 import { Clapperboard, Download, FolderOpen, KeyRound, SlidersHorizontal, VideoOff } from 'lucide-react';

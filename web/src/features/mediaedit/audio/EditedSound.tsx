@@ -1,5 +1,5 @@
 // What edit_audio made, with the agent's reply: while ffmpeg works, a line saying so; then the sound as generate_audio's
-// card shows it (to play, edit again, download and keep in the Library); when it could not be made, why.
+// card shows it (to play, edit again, download and keep it); when it could not be made, why.
 import type { ToolItem } from '@shared/types';
 import { Throbber } from '../../../components/ui';
 import { GeneratedAudio } from '../../images/GeneratedAudio';

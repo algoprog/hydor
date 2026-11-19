@@ -95,7 +95,7 @@ Tailscale ist eine kostenlose App, die deine eigenen Geräte in einem privaten N
 
 **Bereitstellung beenden** entfernt die App wieder aus deinem Tailnet. Dabei wird genau rückgängig gemacht, was **Auf meinen Geräten bereitstellen** eingerichtet hat: die bereitgestellte Adresse und ihre Aufnahme in die von Hydor akzeptierten Adressen. Andere Tailscale-Bereitstellungen bleiben erhalten. Hast du Hydor bereits manuell mit Tailscale bereitgestellt, zeigt die Seite „Außerhalb dieser Seite mit Tailscale eingerichtet“. **Bereitstellung beenden** schaltet auch diese Bereitstellung ab.
 
-Solange die App so bereitgestellt wird, beginnen die von ihr ausgegebenen Links mit dieser Adresse und funktionieren auch auf deinem Smartphone: **In Hydor öffnen** in einer Chat-App sowie Agentenlinks zu Sitzungen und Bibliotheksseiten. Ist in `ALLOWED_ORIGINS` eine eigene Adresse angegeben, verwenden Links weiterhin diese; siehe [Weitere Zugriffswege](/guide/devices#other-ways-to-reach-it).
+Solange die App so bereitgestellt wird, beginnen die von ihr ausgegebenen Links mit dieser Adresse und funktionieren auch auf deinem Smartphone: **In Hydor öffnen** in einer Chat-App sowie Agentenlinks zu Sitzungen und behaltenen Seiten. Ist in `ALLOWED_ORIGINS` eine eigene Adresse angegeben, verwenden Links weiterhin diese; siehe [Weitere Zugriffswege](/guide/devices#other-ways-to-reach-it).
 
 Im Terminal zeigt `hydor machines phone` denselben Status mit QR-Code. `hydor machines phone serve` und `hydor machines phone stop` übernehmen Bereitstellung und Beendigung; siehe [Das Terminal](/guide/terminal).
 
@@ -197,7 +197,7 @@ Jeder Token zeigt Erstellungszeit und letzte Verwendung. **Widerrufen** im Menü
 
 ## Eine Sitzung schreibgeschützt teilen
 
-Ein schreibgeschützter Link erlaubt anderen ohne dein Passwort, eine Sitzung live zu verfolgen. Öffne das Sitzungsmenü (⋯) → **Schreibgeschützten Link teilen**. Für ein ganzes Projekt mit Dokumenten, Sitzungen, Läufen, Leseliste und namentlichen Kommentaren siehe [Ein Projekt mit Personen teilen](/guide/projects#share-a-project-with-people). Für einzelne Bibliotheksinhalte mit Kommentar- oder Bearbeitungsrecht siehe [Mit Personen teilen](/guide/library#share-with-people).
+Ein schreibgeschützter Link erlaubt anderen ohne dein Passwort, eine Sitzung live zu verfolgen. Öffne das Sitzungsmenü (⋯) → **Schreibgeschützten Link teilen**. Für ein ganzes Projekt mit Dokumenten, Sitzungen, Läufen, Leseliste und namentlichen Kommentaren siehe [Ein Projekt mit Personen teilen](/guide/projects#share-a-project-with-people). Für eine einzelne behaltene Sache (ein Dokument, eine Seite, ein Bild, ein Video …) mit Kommentar- oder Bearbeitungsrecht siehe [Mit Personen teilen](/guide/library#share-with-people).
 
 1. Wähle unter **Gültig für** **Ein Tag**, **Eine Woche**, **Einen Monat** oder **Bis zur Deaktivierung**.
 2. Klicke auf **Link erstellen**.

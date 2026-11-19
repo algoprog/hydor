@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import { ArrowUp, ChevronRight, CircleHelp, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
 import { startTour } from '../tour/Tour';
@@ -39,6 +39,7 @@ import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } fr
 import { useTeam, useTierMap } from '../assistants/agentsState';
 import { assistantIn, useAssistants } from '../assistants/state';
 import { NewSpaceDialog } from '../spaces/parts';
+import type { NewKind } from '../pages/NewDialog';
 import { useSpaces, useSpacesStore } from '../spaces/state';
 import type { Space } from '@shared/spaces';
 import { doneStartFiles, startSessionWith, waitingStartFiles } from '../../lib/startFiles';
@@ -47,6 +48,10 @@ import { useConfidentialInfo } from '../confidential/state';
 
 /** Custom, the app's own agent (its ACP id is still "console"): the one a confidential session runs on. */
 const CUSTOM = 'console';
+
+// The New dialog (a page, slides, a document…), opened by /?new=<kind>; loaded when it is first asked for.
+const NewPageDialog = lazy(() => import('../pages/NewDialog').then((m) => ({ default: m.NewPageDialog })));
+const NEW_KINDS = ['page', 'design', 'slides', 'doc', 'sheet', 'tex', 'notebook', 'diagram', 'board', 'picture'];
 
 /** Starts a session: pick the agent and folder, type the task, press Enter. */
 /** A prompt link (/?prompt=…&agent=…&model=…&cwd=…&confidential=1) fills the box; it never starts anything by itself. */
@@ -810,6 +815,25 @@ export function HomePage() {
       (e) => (toastError(e), go('/', true)),
     );
   }, [shareId]);
+  // /?new=<kind> (a page, a design, slides, a document…; 1 is a page) opens the New dialog,
+  // in the project the address names (&space=<id>) or the box has picked (if any); the address drops it, so going back or reloading does not open it again.
+  const spaces = useSpaces();
+  const [making, setMaking] = useState<{ kind: NewKind; space: string | null } | null>(null);
+  const newParam = new URLSearchParams(search).get('new');
+  useEffect(() => {
+    if (!newParam || !booted) return;
+    const q = new URLSearchParams(search);
+    const asked = q.get('space');
+    q.delete('new');
+    q.delete('space');
+    go(`/${q.size ? `?${q}` : ''}`, true);
+    const kind = newParam === '1' ? 'page' : NEW_KINDS.includes(newParam) ? (newParam as NewKind) : null;
+    if (!kind) return;
+    const saved = startSettings();
+    const own = !saved.task && !saved.space && saved.cwd ? spaces?.find((x) => sameDir(x.folder, saved.cwd!)) : undefined;
+    const picked = asked || (saved.space ?? own?.id) || null;
+    setMaking({ kind, space: picked && (!spaces || spaces.some((x) => x.id === picked)) ? picked : null });
+  }, [newParam, booted]); // eslint-disable-line react-hooks/exhaustive-deps
   // A place picked in the box, or a project picked elsewhere while this page shows (the sidebar), opens the box again
   // there: round n of this page's box. Only the first takes a link's folder, program and model; the box carries on
   // what else the link set while it is still set.
@@ -864,6 +888,11 @@ export function HomePage() {
           {mobile && <RecentSessions />}
         </div>
       </div>
+      {making && (
+        <Suspense fallback={null}>
+          <NewPageDialog open kind={making.kind} space={making.space} onClose={() => setMaking(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -775,7 +775,7 @@ function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean):
       sidebar: true,
       icon: <LayoutGrid size={16} />,
       title: 'Everything else',
-      body: 'Library keeps what agents made for you, Apps the tasks you run again and again, Inbox everything waiting on you, Usage what your plans have left, System this computer’s files, and Help the guide to every part of the app.',
+      body: 'Apps are the tasks you run again and again, Inbox is everything waiting on you, Search finds anything in the app, Usage shows what your plans have left, System holds this computer’s files, and Help is the guide to every part of the app.',
     },
     {
       id: 'notify',

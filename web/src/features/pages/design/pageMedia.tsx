@@ -1,6 +1,6 @@
 // Pictures and videos in any page (not only designs): Edit picture and Edit video from the picked part's bar and its
 // Part tab (the editors open in a tab; Save puts the new one in its place, one step to undo), and videos from this
-// device, the Library or made with AI, kept by the app and played in the page at their signed address (a moving,
+// device, saved ones or made with AI, kept by the app and played in the page at their signed address (a moving,
 // silent background, or with controls). Pages show them at their own address and published too.
 import { useState } from 'react';
 import { Clapperboard, Film, LibraryBig, SlidersHorizontal } from 'lucide-react';
@@ -45,7 +45,7 @@ export async function editPagePicture(o: { sel: EdSel; cmd: Cmd; base?: string; 
       label: o.title || tr('The page'),
       put: async (r) => {
         if (!r.src) return;
-        if (o.pageHtml && !(await o.pageHtml().catch(() => ''))) throw new Error('The page it came from is closed: Save a copy keeps the picture in your Library.');
+        if (o.pageHtml && !(await o.pageHtml().catch(() => ''))) throw new Error('The page it came from is closed: Save a copy keeps the picture as a file of its own.');
         const data = await pageData(r.src);
         o.cmd('select', path);
         o.cmd('attr', { name: 'src', value: data });
@@ -59,7 +59,7 @@ export async function editPagePicture(o: { sel: EdSel; cmd: Cmd; base?: string; 
 /** Edit video, for a page's picked video (one the app keeps): Save puts the new one and its still in its place. */
 export function editPageVideo(o: { sel: EdSel; cmd: Cmd; title: string }) {
   const src = videoSrcOf(o.sel.attrs.src ?? '');
-  if (!src) return toast('Only a video from your device, the Library or made with AI opens in the video editor');
+  if (!src) return toast('Only a video from your device, a saved one or made with AI opens in the video editor');
   const path = o.sel.path;
   editKeptVideo(src, {
     title: tr('Video'),
@@ -85,7 +85,7 @@ export interface PageVideo {
   poster?: string;
 }
 
-/** The Video popover's other ways: a video from this device, from the Library, or made with AI. */
+/** The Video popover's other ways: a video from this device, a saved one, or made with AI. */
 export function PageVideoButtons({ onDone, onError }: { onDone: (v: PageVideo) => void; onError: (e: unknown) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [pick, setPick] = useState(false);
@@ -118,7 +118,7 @@ export function PageVideoButtons({ onDone, onError }: { onDone: (v: PageVideo) =
           {busy === 'device' ? tr('Adding it…') : tr('From this device')}
         </Button>
         <Button size="sm" variant="secondary" icon={<LibraryBig size={14} />} disabled={!!busy} onClick={() => setPick(true)}>
-          From your Library
+          From your saved videos
         </Button>
         <Button
           size="sm"

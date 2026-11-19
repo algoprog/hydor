@@ -110,8 +110,8 @@ function answer(id: string): string | { isError: true; text: string } {
     `${v.path} (${bits})`,
     ...(srt || how ? [[srt, how].filter(Boolean).join(' ')] : []),
     picture
-      ? 'The user sees it in your reply, a tap away from full size and from keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file. In a deck, a document or a page it goes as a picture: its path as an image part’s src in save_slides, a picture in save_doc, an img in save_page.'
-      : 'The user sees it in your reply, where they can play it, download it and keep it in their Library: don’t repeat it or its path. You cannot watch it: to check how it looks, take a frame of it (edit_video, frame: a moment) and open that. In a deck, give this file as a video part’s src in save_slides.',
+      ? 'The user sees it in your reply, a tap away from full size and from keeping it in their project: don’t repeat it or its path. To look at it yourself, open the file. In a deck, a document or a page it goes as a picture: its path as an image part’s src in save_slides, a picture in save_doc, an img in save_page.'
+      : 'The user sees it in your reply, where they can play it, download it and keep it in their project: don’t repeat it or its path. You cannot watch it: to check how it looks, take a frame of it (edit_video, frame: a moment) and open that. In a deck, give this file as a video part’s src in save_slides.',
   ].join('\n');
 }
 

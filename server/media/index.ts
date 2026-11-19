@@ -1,8 +1,8 @@
-// The Library's images, videos and audio: what the user keeps of what agents made (or any picture, video or sound
-// on this computer, or dropped on the Library: pages/uploads.ts moves those in), each copied in (the same bytes once)
+// The kept images, videos and audio: what the user keeps of what agents made (or any picture, video or sound
+// on this computer, or dropped on a project's Files: pages/uploads.ts moves those in), each copied in (the same bytes once)
 // with a title and a description a model writes for it (caption.ts): from the
 // picture itself, from ten of a video's frames on one picture (frames.ts), or for a sound, which the model cannot
-// hear, from what it was made from (its prompt, its words, its model). The Library page shows them beside the
+// hear, from what it was made from (its prompt, its words, its model). The project's Files show them beside the
 // pages; agents reach them through the API (app_api), and work from their files (an item's file).
 //
 // Routes, signed in:
@@ -56,10 +56,10 @@ const TYPES: Record<string, { kind: MediaKind; mime: string }> = {
 };
 
 const MAX_BYTES = 1024 * 1024 * 1024;
-/** The largest picture, video or sound the Library keeps. */
+/** The largest picture, video or sound that is kept. */
 export const MAX_MEDIA = MAX_BYTES;
 
-/** What a file is kept as in the Library, by its name: a picture, a video or a sound, or null (another kind of file). */
+/** What a file is kept as, by its name: a picture, a video or a sound, or null (another kind of file). */
 export const mediaTypeOf = (name: string): { kind: MediaKind; mime: string } | null => TYPES[path.extname(name).slice(1).toLowerCase()] ?? null;
 
 const tell =(d: Pick<Deps, 'broadcast'>, data: MediaEvent) => d.broadcast({ t: 'feature', id: 'media', data });
@@ -102,7 +102,7 @@ function caption(d: Deps, id: string) {
 // ---- keeping a file ------------------------------------------------------------------------------------------
 
 /**
- * Keeps a picture, a video or a sound in the Library: copied in, or with `move` moved in (the file leaves where it was:
+ * Keeps a picture, a video or a sound: copied in, or with `move` moved in (the file leaves where it was:
  * an upload's, a file the desktop app drops), recording `source` (the call's, or the request's `source`: the page a picture
  * came from) as what it came from when that is not its path. The
  * same file kept already (its path and size, or anywhere its bytes) comes back instead, and nothing is copied or moved.
@@ -118,7 +118,7 @@ export async function keepFile(
   if (!st?.isFile()) throw new HttpError(404, `No such file: ${file}`);
   const ext = path.extname(file).slice(1).toLowerCase();
   const type = TYPES[ext];
-  if (!type) throw new HttpError(400, 'The Library keeps pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC)');
+  if (!type) throw new HttpError(400, 'Only pictures (PNG, JPEG, WebP, GIF, AVIF), videos (MP4, WebM, MOV) and sounds (MP3, WAV, M4A, AAC, OGG, OPUS, FLAC) are kept as media');
   if (st.size > MAX_BYTES) throw new HttpError(413, 'The file is over 1 GB');
   // A file moved in leaves its path free for another, so only its bytes say it was kept before.
   const had = o.move ? null : savedFrom(d.db, file, st.size);
@@ -184,7 +184,7 @@ export async function keepFile(
 
 // ---- files -----------------------------------------------------------------------------------------------------
 
-/** A file of the Library's media, in parts for a video or sound player (Range), or to save (`download`: its name). */
+/** A file of the kept media, in parts for a video or sound player (Range), or to save (`download`: its name). */
 export async function send(req: FastifyRequest, reply: FastifyReply, file: string, mime: string, download?: string) {
   const st = await fs.promises.stat(file).catch(() => null);
   if (!st?.isFile()) throw new HttpError(404, 'Not found');
@@ -231,7 +231,7 @@ export const media: Feature = {
     app.patch('/api/media/:id', async (req) => {
       const id = (req.params as { id: string }).id;
       const b = (req.body ?? {}) as Record<string, unknown>;
-      // Moved to a space (or out of one), into a Library folder (or out of one), and/or its own title and description.
+      // Moved to a space (or out of one), into a folder (or out of one), and/or its own title and description.
       let item = b.space !== undefined ? setMediaSpace(db, id, spaceChoice(db, b.space)) : mustMedia(db, id);
       if (b.folder !== undefined) {
         putInFolder(db, 'media', id, typeof b.folder === 'string' && b.folder ? b.folder : null);

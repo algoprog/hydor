@@ -12,7 +12,7 @@
 //                                                        request it was pinned from)
 //   POST /api/boards/:id/cards/:card/refresh           → {runId, key}: refresh it now (Refresh now, Try again)
 //   POST /api/boards/:id/refresh                       → {started, skipped}: every card of it that refreshes (Refresh all)
-//   GET  /api/boards/refreshes                         → {boards, cards}: every board's cards that refresh, for `hydor library refreshes`
+//   GET  /api/boards/refreshes                         → {boards, cards}: every board's cards that refresh, for `hydor files refreshes`
 import type { FastifyRequest } from 'fastify';
 import { BOARD_LIMITS, CardError, checkCard, type BoardCard } from '../../shared/boards.ts';
 import { HttpError } from '../auth.ts';
@@ -93,7 +93,7 @@ export function boardRoutes(d: Deps, changed: (id: string) => void) {
       if (e instanceof CardError) throw new HttpError(400, e.message);
       throw e;
     }
-    // What a confidential session says stays in it: none of its cards goes to the Library, where other agents read.
+    // What a confidential session says stays in it: none of its cards goes into the kept pages, where other agents read.
     if (card.from?.session && confidentialKey(db, card.from.session)) throw new HttpError(403, 'A confidential session’s cards stay in it: they cannot be pinned to a board.');
     card.by = 'user';
     card.pinnedAt = Date.now();

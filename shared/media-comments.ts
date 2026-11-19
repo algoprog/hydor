@@ -1,4 +1,4 @@
-// Comments on the Library's pictures, videos and sounds, as the review tools for them have them: the comment itself is
+// Comments on the kept pictures, videos and sounds, as the review tools for them have them: the comment itself is
 // the editors' own (shared/comments.ts: who wrote it, when, what it says, the replies under it, resolved), and each may
 // say where it is: a spot of the picture (or of a video's picture), as a pin there, and a moment of a video or a sound,
 // as a mark on its timeline. Left out, it is about the whole of it. They are kept with the item, apart from its file

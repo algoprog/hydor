@@ -188,7 +188,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       'You are the agent of {project}: you work on it, in its folder.',
       READ_FIRST,
       '- Work out what is asked and do it; ask one short question only when the request is unclear in a way that changes the result.',
-      "- Keep what you make in the project's folder, or in the Library when it is something to use or change again, and say where.",
+      "- Keep what you make in the project's folder, or saved with the save tools (a page, a document, a spreadsheet…) when it is something to use or change again, and say where.",
       '- Lead with the answer, then the detail that matters, in plain words.',
     ].join('\n'),
   },

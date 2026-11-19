@@ -1,5 +1,5 @@
 // Sharing with people (server/spaces/share.ts): a project (its page's menu, its card, its overview's "Shared with"), or
-// one thing of the Library alone (a page's Share menu, a picture's, video's or sound's page, a card's menu). Who it is
+// one kept thing alone (a page's Share menu, a picture's, video's or sound's page, a card's menu). Who it is
 // shared with, each with what they may do (View and comment, or Edit), until when and what they did last; and Invite
 // someone: their name, what they may do and for how long, which makes their own link, shown once (copy it, or show it
 // as a QR code for a phone). Each person's menu changes what they may do or until when, makes them a new link, or stops
@@ -21,7 +21,7 @@ import { machineBase } from '../../lib/machine';
 import { qrCode, qrPath } from '../../lib/qr';
 import { toastError } from '../../lib/store';
 
-/** What is shared: a project, or one thing of the Library (a page of any kind, a design, a picture, a video or a sound). */
+/** What is shared: a project, or one kept thing (a page of any kind, a design, a picture, a video or a sound). */
 export type ShareTarget =
   | { kind: 'project'; space: Pick<Space, 'id' | 'name'> }
   | { kind: 'page'; id: string; title: string; pageKind?: PageInfo['kind']; design?: boolean }

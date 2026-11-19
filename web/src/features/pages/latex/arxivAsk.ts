@@ -5,7 +5,7 @@ import { create } from 'zustand';
 
 export const useArxivAsk = create<{ ask: { page: string; version?: number; n: number } | null }>(() => ({ ask: null }));
 
-/** Opens the arXiv package's dialog for a LaTeX document of the Library (an older version of it with `version`). */
+/** Opens the arXiv package's dialog for a LaTeX document kept by the app (an older version of it with `version`). */
 export const askArxiv = (page: string, version?: number) => useArxivAsk.setState({ ask: { page, version, n: Date.now() } });
 
 export const closeArxiv = () => useArxivAsk.setState({ ask: null });

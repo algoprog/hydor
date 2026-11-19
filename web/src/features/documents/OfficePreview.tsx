@@ -1,5 +1,5 @@
-// An Office file in the file viewer: a PowerPoint deck as its slides look (read by the Library's importer and drawn as
-// the Library's decks are), any file as LibreOffice lays out its pages (a PDF, made once per version of the file) when
+// An Office file in the file viewer: a PowerPoint deck as its slides look (read by the slides importer and drawn as
+// kept decks are), any file as LibreOffice lays out its pages (a PDF, made once per version of the file) when
 // it is installed, or as the app reads it (text, sheets, slides' words). Phones start on the read view (a deck on its
 // slides), which scrolls and zooms better there than a PDF in a frame; a switch shows the others.
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';

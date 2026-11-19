@@ -39,7 +39,7 @@ import { useAssistants, useAssistantsState } from './state';
 const saved = (r: AssistantsState) => useAssistants.getState().set(r);
 
 const EXAMPLES = [
-  'Every weekday at 8, find new papers on my research topics and keep the five best in my Library, two lines each.',
+  'Every weekday at 8, find new papers on my research topics and keep the five best in my files, two lines each.',
   'Every Friday afternoon, write my weekly progress report from my commits and notes, and let me check it before it goes.',
   'Review each change I make to this project for bugs and missing tests, and tell me what to fix first.',
   'Translate what I give it into Chinese and Greek, keeping headings, links and code as they are.',
@@ -671,7 +671,7 @@ export function AgentsPage() {
       )}
     </PageHeader>
   );
-  // The row at the top of the index, as the Library's: the place's name at the left, the find box at the right (it stays at the top while the page scrolls).
+  // The row at the top of the index, as on the other pages: the place's name at the left, the find box at the right (it stays at the top while the page scrolls).
   const project = place.startsWith('project:') ? projects.find((s) => `project:${s.id}` === place) : undefined;
   const toolbar = wide && !id && (
     <div className="sticky top-0 z-20 -mx-3 flex min-h-8.5 flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-3 py-2 sm:-mx-6 sm:px-6">

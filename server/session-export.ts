@@ -1,5 +1,5 @@
 // A conversation taken out of the chat (the session menu's Export, `hydor sessions export`): as a Markdown file, or as
-// a document in the Library to edit, print and share. What goes in: the title and date, then each of your messages and
+// a document to edit, print and share. What goes in: the title and date, then each of your messages and
 // each of the agent's replies in order, a turn's steps as one line ("Worked for 2 min · 5 steps"), the files it handed
 // over by name, pictures where the document can keep them, answer cards as readable Markdown (shared/answer-ui/text.ts:
 // tables as tables), and Mermaid diagrams and maths as they were written. A confidential session's document stays on
@@ -7,7 +7,7 @@
 //
 // The conversion (sessionMarkdown) is plain and kept apart from the routes, so tests and the `hydor` command share it:
 //   GET  /api/sessions/:key/export?format=md   the Markdown, as a file to download
-//   POST /api/sessions/:key/export/doc         a Library document of it
+//   POST /api/sessions/:key/export/doc         a saved document of it
 import path from 'node:path';
 import os from 'node:os';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -229,7 +229,7 @@ export const fileNameOf = (title: string, ext: string) =>
       .slice(0, 80) || 'Conversation'
   }.${ext}`;
 
-/** The pictures of your messages, kept as the Library's own pictures (`keep` stores one and gives its address). */
+/** The pictures of your messages, kept as the app's own pictures (`keep` stores one and gives its address). */
 async function messagePictures(items: TimelineItem[], transcript: string | null, keep: (data: Buffer) => string | null): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (!transcript) return out;
@@ -248,9 +248,9 @@ async function messagePictures(items: TimelineItem[], transcript: string | null,
 export interface ExportDeps {
   db: DB;
   sessions: SessionManager;
-  /** Makes a Library document of Markdown (pages' own way, as save_doc does), its pictures taken in. */
+  /** Makes a saved document of Markdown (pages' own way, as save_doc does), its pictures taken in. */
   saveDoc: (o: { title: string; markdown: string; cwd: string; sessionKey: string; folder?: unknown; space?: unknown }) => Promise<{ page: unknown; notes: string[] }>;
-  /** Keeps a picture as the Library's own; its address (naget-asset:…). */
+  /** Keeps a picture as the app's own; its address (naget-asset:…). */
   keepPicture: (data: Buffer) => string | null;
 }
 
@@ -280,7 +280,7 @@ export function exportRoutes(app: FastifyInstance, d: ExportDeps, K: (req: Fasti
       .header('Content-Disposition', `${q.download === '0' ? 'inline' : 'attachment'}; filename="${name.replace(/[^\x20-\x7e]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`)
       .send(markdown);
   });
-  /** The conversation as a document in the Library (in the session's project, or the folder or project asked for). */
+  /** The conversation as a saved document (in the session's project, or the folder or project asked for). */
   app.post('/api/sessions/:key/export/doc', async (req) => {
     const key = K(req);
     const b = (req.body ?? {}) as { folder?: unknown; space?: unknown; title?: unknown };

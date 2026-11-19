@@ -1,8 +1,8 @@
-// Jupyter notebooks kept in the Library: the notebook as nbformat 4 has it (its cells, with the outputs of their last
+// Jupyter notebooks kept as pages: the notebook as nbformat 4 has it (its cells, with the outputs of their last
 // run), checked as it comes in and kept as nbformat writes it (a line per line of each cell, so two versions read as
 // a diff of lines). Its own page shows the cells and outputs as a reader sees them (to print, to picture, or as a web
 // page of its own); an agent is told it cell by cell; it exports as the .ipynb itself and as a Python script with
-// # %% cells. A notebook of the Library runs in a folder of its own in the app's data folder (workFile), as one from
+// # %% cells. A kept notebook runs in a folder of its own in the app's data folder (workFile), as one from
 // Files runs in its own folder.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -106,7 +106,7 @@ const languageOf = (nb: Json): string => String(nb.metadata?.language_info?.name
 
 // ---- its own page ----------------------------------------------------------------------------------------
 
-/** Markdown as the Library's documents show it (headings, lists, tables, code, pictures, links). */
+/** Markdown as the documents show it (headings, lists, tables, code, pictures, links). */
 function markdownHtml(md: string): string {
   if (!md.trim()) return '';
   try {
@@ -262,9 +262,9 @@ export function notebookScript(text: string): string {
   return `${out.join('\n\n')}\n`;
 }
 
-// ---- where a notebook of the Library runs ----------------------------------------------------------------
+// ---- where a kept notebook runs ----------------------------------------------------------------
 
-/** The folder a notebook of the Library runs in, and the file its kernel is known by. */
+/** The folder a kept notebook runs in, and the file its kernel is known by. */
 export const workFolder = (id: string) => path.join(config.dataDir, 'notebooks', id.replace(/[^\w-]/g, ''));
 export const workFile = (id: string) => path.join(workFolder(id), 'notebook.ipynb');
 
@@ -276,7 +276,7 @@ export function writeWorkFile(id: string, text: string): string {
   return file;
 }
 
-/** A notebook deleted from the Library: its folder goes, with what its runs wrote there. */
+/** A notebook deleted: its folder goes, with what its runs wrote there. */
 export function dropWorkFolder(id: string) {
   try {
     fs.rmSync(workFolder(id), { recursive: true, force: true });
@@ -315,7 +315,7 @@ export function agentNotebook(a: Json, resolve: (p: string) => string): Json {
 }
 
 export const SAVE_NOTEBOOK_DESCRIPTION = [
-  'Keep a Jupyter notebook in the user’s Library: they read it with its outputs, edit and run its cells there (in a folder of its own, in a Python environment they pick),',
+  'Keep a Jupyter notebook for the user: they read it with its outputs, edit and run its cells there (in a folder of its own, in a Python environment they pick),',
   'ask an agent about it, and export it as an .ipynb file, a Python script, a PDF or a web page. Give one of: path, an .ipynb file you wrote and ran (its outputs come along:',
   'run it from the top first, so they match its code); notebook, the .ipynb’s object or text; or cells, a list of { type: "markdown" | "code" | "raw", source } (no outputs yet).',
   'With id, the notebook replaces that one’s content as a new version (read it with get_page first, and keep the cells, ids and outputs you do not change).',
@@ -325,8 +325,8 @@ export const SAVE_NOTEBOOK_DESCRIPTION = [
 export const SAVE_NOTEBOOK_SCHEMA = {
   type: 'object',
   properties: {
-    title: { type: 'string', description: 'Its name in the Library.' },
-    id: { type: 'string', description: 'A notebook of the Library to change (get_page lists them); leave out to make a new one.' },
+    title: { type: 'string', description: 'Its name.' },
+    id: { type: 'string', description: 'A saved notebook to change (get_page lists them); leave out to make a new one.' },
     path: { type: 'string', description: 'An .ipynb file to keep: from the session’s folder, or absolute.' },
     notebook: { description: 'The notebook: an .ipynb file’s object ({ cells, metadata, nbformat: 4, nbformat_minor }), or its text.' },
     cells: {

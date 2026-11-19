@@ -2,7 +2,7 @@
 // picture, shown as a numbered pin on it; at a moment of a video or a sound, shown as a mark along its time; or on the
 // whole of it. The stage (the picture with its pins, the player with its marks) and the list beside it share one state
 // (useMediaReview): picking one shows it on the other, a click on the picture while a comment is being written puts it
-// there, and a comment at a moment is at the moment the player is at. Your own Library page (MediaView) and the page of
+// there, and a comment at a moment is at the moment the player is at. Your own kept item's page (MediaView) and the page of
 // someone it is shared with (portal/PortalMedia) both show it, each sending the changes where its own comments are kept.
 import { useMemo, useRef, useState } from 'react';
 import { Clock, Crosshair, MessageSquarePlus, X } from 'lucide-react';

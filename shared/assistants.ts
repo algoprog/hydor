@@ -72,12 +72,12 @@ export type OutputTarget =
   /** A file in the folder it works in: "{date}", "{time}" and "{agent}" fill in; .json gets the fields as JSON, anything else Markdown. */
   | { kind: 'file'; path: string }
   /**
-   * A page in the Library, in its project when it works in one: the same page each run, as a new version of it (the
+   * A page, in its project when it works in one: the same page each run, as a new version of it (the
    * page picked, by id; none: the one its first run made), or a new page each run (`each: 'new'`).
    */
   | { kind: 'library'; each?: 'new'; page?: string }
   /**
-   * A row in a Library spreadsheet each run: when it ran, then one column per field. The spreadsheet picked, by id (none:
+   * A row in a spreadsheet each run: when it ran, then one column per field. The spreadsheet picked, by id (none:
    * the one its first run made, named after the agent), and its tab by name (none: the first; one not there is added).
    */
   | { kind: 'sheet'; page?: string; tab?: string }
@@ -105,12 +105,12 @@ export interface AgentOutput {
   to?: OutputTarget[];
 }
 
-/** Where one result went: the kind of place, whether it got there, in words, and the Library page it went to. */
+/** Where one result went: the kind of place, whether it got there, in words, and the page it went to. */
 export interface ResultSent {
   kind: OutputKind;
   ok: boolean;
   detail: string;
-  /** The Library page or spreadsheet it went to, by id. */
+  /** The page or spreadsheet it went to, by id. */
   page?: string;
 }
 
@@ -133,7 +133,7 @@ export interface AgentResult {
  */
 export const RESULTS_KEEP = { days: 366, count: 500 };
 
-/** The Library pages an agent's results go to that its first run made (a page updated each run, a spreadsheet), with their titles. */
+/** The pages an agent's results go to that its first run made (a page updated each run, a spreadsheet), with their titles. */
 export interface ResultPlaces {
   library?: { id: string; title: string };
   sheet?: { id: string; title: string };

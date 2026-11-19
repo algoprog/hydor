@@ -1,7 +1,7 @@
 // Search by meaning: a Python worker (embed_worker.py) runs the embedding model, lightonai/mDenseOn, on this
 // computer's CPU through ONNX Runtime, in its 8-bit build (algoprog/mDenseOn-ONNX: 310 MB, about 1 GB once loaded, a
 // second or two to start). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off), so
-// memory, the Library and the rest are searched by words and meaning together. It sets itself up once: a private Python
+// memory, kept pages and the rest are searched by words and meaning together. It sets itself up once: a private Python
 // environment in the data folder with ONNX Runtime, Hugging Face's tokenizer and NumPy (about 100 MB; an older one with
 // PyTorch is replaced), then the model's files, each checked against its SHA-256, into a cache beside Hugging Face's;
 // on its own a minute after the app first starts, at once when someone turns it on. The worker starts when needed, only

@@ -1,4 +1,4 @@
-// Export → arXiv package (.zip), for a LaTeX document of the Library: what it will do, ticked (comments out, only the
+// Export → arXiv package (.zip), for a LaTeX document kept by the app: what it will do, ticked (comments out, only the
 // files the paper uses, the .bbl in and the .bib out; \iffalse blocks, one file and \pdfoutput when asked), then Make
 // the package: it is made from the saved version and typeset as it is, to see it builds, and downloads. What it holds,
 // what was left out or renamed, whether it typeset, and what to know before uploading (its size against arXiv's 50 MB,

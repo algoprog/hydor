@@ -112,6 +112,6 @@ export function makeInstructions(v: unknown): string | null {
   if (m.type && !t && !m.turn) return null;
   const req = makeRequest(m, t ?? null);
   if (!req) return null;
-  const from = m.turn ? 'Turn it into, in their Library' : 'the gallery of things made with AI';
+  const from = m.turn ? 'Turn it into' : 'the gallery of things made with AI';
   return `What the user asked for, in full: they picked it in the app (${from}), and their message says it in short, in their own words. ${req}`;
 }

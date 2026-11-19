@@ -1,7 +1,7 @@
-// What your own browser keeps, as lists in the Library (its chips Bookmarks, Read later, Downloads, History and Highlights, in the desktop app):
-// never copied into the Library or counted in it or in a project, and shown only to you (agents are refused the routes);
-// Everything's All shows a few of each in a column beside its cards (BrowserColumn.tsx). Each row is a site's icon, a
-// title and a muted line, with what can be done to it at the right on hover.
+// What your own browser keeps, as lists (Bookmarks, Read later, Downloads, History and Highlights, in the desktop app):
+// never counted in a project, and shown only to you (agents are refused the routes). The Browser's Read later panel
+// (browser/Later.tsx) shows one. Each row is a site's icon, a title and a muted line, with what can be done to it at
+// the right on hover.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bookmark, Check, Clock, ExternalLink, FileDown, FolderOpen, Highlighter, History as HistoryIcon, Lock, RotateCcw, Sparkles, X } from 'lucide-react';
 import type { BookmarkNode, DownloadEntry, HistoryEntry } from '@shared/browser';
@@ -124,7 +124,7 @@ function Bookmarks({ q }: { q: string }) {
   if (!list.length) return <p className="py-8 text-center text-[13px] text-fg-3">{tr(`No bookmark matches “${q}”.`)}</p>;
   return (
     <div>
-      <Private>Only you see your bookmarks. They are not copied into the Library.</Private>
+      <Private>Only you see your bookmarks. Agents never see them.</Private>
       {list.map(({ node, root, folders }) => (
         <Row
           key={node.id}
@@ -183,7 +183,7 @@ function ReadLater({ q }: { q: string }) {
       <div className="mb-3 flex items-center gap-2 px-1">
         <p className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-fg-3">
           <Lock size={12} className="shrink-0" />
-          Only you see your Read later list. It is not copied into the Library.
+          Only you see your Read later list. Agents never see it.
         </p>
         {read > 0 && (
           <Button size="sm" variant="ghost" onClick={() => useLater.setState({ showRead: !showRead })}>
@@ -312,7 +312,7 @@ function History({ q }: { q: string }) {
     );
   return (
     <div>
-      <Private>Only you see your history. It is not copied into the Library.</Private>
+      <Private>Only you see your history. Agents never see it.</Private>
       {days.map((g) => (
         <div key={g.day}>
           <Day label={g.day} />
@@ -365,7 +365,7 @@ function Downloads({ q }: { q: string }) {
     );
   return (
     <div>
-      <Private>Only you see your downloads. They are not copied into the Library.</Private>
+      <Private>Only you see your downloads. Agents never see them.</Private>
       {days.map((g) => (
         <div key={g.day}>
           <Day label={g.day} />
@@ -479,7 +479,7 @@ function Highlights({ q }: { q: string }) {
   };
   return (
     <div>
-      <Private>Only you see your highlights. They are not copied into the Library.</Private>
+      <Private>Only you see your highlights. Agents never see them.</Private>
       {groups.map((g) => (
         <section key={g.key} className="mb-4 overflow-hidden rounded-[12px] border border-line bg-bg-1">
           <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">

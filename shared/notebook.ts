@@ -40,7 +40,7 @@ export function appendOutput(outputs: NbOutput[], o: NbOutput): NbOutput[] {
 // ---- nbformat ------------------------------------------------------------------------------------
 // A notebook as nbformat 4 keeps it, written the way nbformat itself writes it, so that a notebook read and saved
 // unchanged stays the same file: keys sorted, an indent of one space, and every multi-line string (a cell's source,
-// a stream's text, text-like output data) as a list of lines. The notebook page (web) and the Library (server) both
+// a stream's text, text-like output data) as a list of lines. The notebook page (web) and the server both
 // write notebooks with it.
 
 type Json = Record<string, any>;

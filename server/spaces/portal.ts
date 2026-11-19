@@ -1,7 +1,7 @@
-// What someone a project, or one thing of the Library, is shared with reads and sends through their link (the page
+// What someone a project, or one kept thing, is shared with reads and sends through their link (the page
 // /p/<token>, its data under /p-api/<token>/…; share.ts makes the links). The token is the permission: no sign-in, and
 // the app's cookies count for nothing here. Every route answers for what the link opens (a project's own things: its
-// Library items, its sessions, its runs, its reading list; or the one thing shared) as the person may (View and comment,
+// kept items, its sessions, its runs, its reading list; or the one thing shared) as the person may (View and comment,
 // or Edit), and nothing else: never the owner's API, files, terminal, agents, settings or other things. A token that
 // opens nothing counts as a wrong password from its address (server/auth.ts: ten in an hour pause it, for links and
 // sign-ins alike); a link that stopped, ran out or was made again says so (410), uncounted. A picture, video or sound
@@ -10,7 +10,7 @@
 // Documents show as they show at a page's own address: their own page, made here, in the sandboxed frame. Comments
 // (every kind but a notebook) come with their writers' names, the owner's under the name the owner gave. With Edit,
 // documents, spreadsheets, slides, pages and designs (and LaTeX where TeX runs shut in by bubblewrap) open in the
-// Library's own editors, which ask what they ask of /api/pages/… here instead (web/src/lib/machine.ts): the pictures and
+// editors, which ask what they ask of /api/pages/… here instead (web/src/lib/machine.ts): the pictures and
 // videos it shows, a document's files to download, a page's comments, and LaTeX typeset. Nothing they save can put words
 // in anyone else's mouth (comments keep who wrote them), nor change a page's code (its scripts) or have this computer
 // fetch something new from the web.
@@ -79,7 +79,7 @@ export function rememberUpload(shareId: string, sha: string) {
 }
 export const uploadedBy = (shareId: string, sha: string) => uploads.get(shareId)?.has(sha) ?? false;
 
-/** What a link opens: a project, a page of the Library (of any kind), or a picture, video or sound. */
+/** What a link opens: a project, a kept page (of any kind), or a picture, video or sound. */
 export type Scope = { kind: 'project'; space: Space } | { kind: 'page'; page: PageInfo } | { kind: 'media'; media: MediaItem };
 
 /** Someone a project, or a thing, is shared with, as their link opens it. */
@@ -721,7 +721,7 @@ export function portalRoutes(d: Deps) {
     const base = Number(b.base);
     if (!page.kind) {
       // A page of HTML, or a design: its words, pictures and layout change; its code (scripts, what runs) never does, and
-      // nothing new is fetched from the web by this computer (its picture in the Library is taken here).
+      // nothing new is fetched from the web by this computer (its picture is taken here).
       if (typeof b.html !== 'string') throw new HttpError(400, 'Send the page’s HTML');
       if (Number.isInteger(base) && base > 0 && base !== page.version && b.force !== true) throw new HttpError(409, `Version ${page.version} was saved after the one you changed (${base}).`);
       const stored = (await pageHtml(db, page.id))?.html ?? '';
@@ -778,7 +778,7 @@ export function portalRoutes(d: Deps) {
     return { title: s.title, agent: s.agent, acpName: s.acpName, status: s.live?.status ?? 'idle', from, total: all.length, items };
   });
 
-  // ---- what the Library's editors ask of /api/pages/… (web/src/lib/machine.ts sends it here) ----
+  // ---- what the editors ask of /api/pages/… (web/src/lib/machine.ts sends it here) ----
 
   app.get('/p-api/:token/pages/assets/:sha', async (req, reply) => {
     const p = person(req);

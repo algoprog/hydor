@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 110-second tour of Hydor: any agent and any model, sessions followed from any device, research with its sources, apps with views of their own, pictures, video and music made with AI, and the Library" /></a>
+  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 110-second tour of Hydor: any agent and any model, sessions followed from any device, research with its sources, apps with views of their own, pictures, video and music made with AI, and documents and slides you write in" /></a>
 </p>
 
 <p align="center">
@@ -91,9 +91,9 @@
       Agents of your own on schedules, watchers and webhooks, or keeping at a goal, each within a monthly budget.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/media/readme-library.webp" alt="Slides an agent made, open in the Library's editor" />
-      <p><b><a href="docs/guide/11-library.md">A Library they write in</a></b><br />
-      Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf.</p>
+      <img src="docs/media/readme-library.webp" alt="Slides an agent made, open in the app's editor" />
+      <p><b><a href="docs/guide/11-library.md">Documents they write in</a></b><br />
+      Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf, kept in the files of their project.</p>
     </td>
   </tr>
 </table>
@@ -204,7 +204,7 @@ On a Mac, the app puts the command on your PATH by itself.
   webhooks, and goals an agent keeps working on, all on one week view ([tasks](docs/guide/12-tasks.md)).
 - **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.
 
-**Research, answers and the Library**
+**Research, answers and what you keep**
 
 - Research with cited sources, deep research reports, and a browser you can watch and take over
   ([research](docs/guide/08-research.md)). In the desktop apps that browser runs inside the app, with nothing to install.
@@ -214,14 +214,17 @@ On a Mac, the app puts the command on your PATH by itself.
   too), an ad and tracker blocker that hides cookie banners, private tabs that forget their sign-ins and pages when you
   close them, a page translated into your language (by the helper model), reader view for articles, dark pages,
   screenshots and Save as PDF, a right-click menu (with video and sound controls), highlights you make on pages that are
-  marked again when you come back (and listed in the Library), zoom (and a page zoom of your choice), spell checking, print, bookmarks (searchable, and sorted into folders by topic with AI) and history (bring them in from your other
-  browsers), a Read later list, pictures kept to the Library or asked about from the right-click menu, Chrome extensions, and a page you can hand to an agent, to ask about or to work on in your sign-in, with a
+  marked again when you come back (and listed in the Browser's Highlights panel), zoom (and a page zoom of your choice), spell checking, print, bookmarks (searchable, and sorted into folders by topic with AI) and history (bring them in from your other
+  browsers), a Read later list, pictures saved to a project's files or asked about from the right-click menu, Chrome extensions, and a page you can hand to an agent, to ask about or to work on in your sign-in, with a
   stop before it sends or deletes anything ([the browser](docs/guide/07-web.md)).
-- Answer UIs open full screen and save as pictures, tables and charts can read a Library spreadsheet or a data file
-  and stay current, and a conversation exports as Markdown or a Library document.
+- Answer UIs open full screen and save as pictures, tables and charts can read a kept spreadsheet or a data file
+  and stay current, and a conversation exports as Markdown or a document.
 - **Boards** keep the cards you pin from replies together, each brought up to date by an agent on a schedule if you
-  like, within a monthly cap ([Library](docs/guide/11-library.md)).
+  like, within a monthly cap ([pages, documents and pictures](docs/guide/11-library.md)).
 - Pictures, video, music and voice-overs made with AI, and edits to your own.
+- **Everything you keep is in the files of its project**: a project's details (from the sidebar) have a **Files** tab
+  with tiles that show each file's picture, an **Upload** button, and the pages, documents, slides, spreadsheets,
+  pictures, videos and sounds that agents made for it, next to the files in its folder ([projects](docs/guide/04-projects.md)).
 
 **For researchers and engineers**
 

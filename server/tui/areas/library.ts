@@ -1,4 +1,4 @@
-// `hydor library`: the Library page. What agents made and you kept: pages, documents, slides, spreadsheets, diagrams, LaTeX
+// `hydor files` (also `hydor library`, as it was called): the things kept in the projects' Files. What agents made and you kept: pages, documents, slides, spreadsheets, diagrams, LaTeX
 // documents, notebooks, boards of answer cards (the pages of the API's /api/pages) and pictures, videos and sounds (/api/media). List and search them,
 // show one (a document as its text, a board as its cards; the rest as what it is), export one to a file in the format its menu offers, open it
 // (the editors are visual, so that prints the address), and remove it. Boards' cards that keep themselves up to date: list what
@@ -10,10 +10,10 @@ import { enc } from '../client.ts';
 import { tildify, timeAgo } from '../term.ts';
 import { choose, fields, markdown, pickOne, str, table, UsageError, type Area, type Ctx } from './kit.ts';
 
-const ITEM_HINT = 'hydor library lists them';
+const ITEM_HINT = 'hydor files lists them';
 const item = { name: 'item', kind: 'page', pick: true } as const;
 
-/** What a thing of the Library is: the kinds of pages, and the media. */
+/** What a kept thing is: the kinds of pages, and the media. */
 export type LibKind = 'page' | 'doc' | 'slides' | 'sheet' | 'diagram' | 'tex' | 'notebook' | 'board' | 'image' | 'video' | 'audio';
 const KINDS: LibKind[] = ['page', 'doc', 'slides', 'sheet', 'diagram', 'tex', 'notebook', 'board', 'image', 'video', 'audio'];
 const KIND_WORDS: Record<string, LibKind> = {
@@ -52,7 +52,7 @@ export function kindOf(word: string): LibKind {
 }
 const kindName = (k: LibKind) => (k === 'tex' ? 'latex' : k);
 
-/** One thing of the Library, a page of any kind or a picture, video or sound. */
+/** One kept thing, a page of any kind or a picture, video or sound. */
 export interface Thing {
   id: string;
   kind: LibKind;
@@ -91,7 +91,7 @@ interface Library {
   projects: Map<string, string>;
 }
 
-/** Everything of the Library, newest change first. */
+/** Everything kept, newest change first. */
 async function loadLibrary(ctx: Ctx): Promise<Library> {
   const [pages, media, projects] = await Promise.all([
     ctx.conn.api<{ pages: PageInfo[]; folders: LibFolder[] }>('GET', '/api/pages'),
@@ -163,10 +163,10 @@ function rows(ctx: Ctx, lib: Library, list: Thing[]): string[] {
 }
 
 export const library: Area = {
-  name: 'library',
-  aliases: ['lib'],
+  name: 'files',
+  aliases: ['library', 'lib'],
   summary: 'Pages, documents, slides, pictures…',
-  help: 'What agents made for you and what you kept, by kind: pages, documents (doc), slides, spreadsheets (sheet), diagrams, LaTeX documents (latex), notebooks, boards of answer cards (board), pictures (image), videos and sounds (audio). Name one by its id or its title (or the start of either); on a terminal, leave it out to pick from a list. The editors are visual: open prints the address of an item’s page.',
+  help: 'The files agents made for you and what you kept, which show in each project’s Files (a project’s details → Files), by kind: pages, documents (doc), slides, spreadsheets (sheet), diagrams, LaTeX documents (latex), notebooks, boards of answer cards (board), pictures (image), videos and sounds (audio). Name one by its id or its title (or the start of either); on a terminal, leave it out to pick from a list. The editors are visual: open prints the address of an item’s page.',
   group: 'work',
   verbs: [
     {
@@ -183,7 +183,7 @@ export const library: Area = {
       },
       summary: 'Everything kept, newest change first',
       help: '30 are shown (-n for more, or --all). --json gives the pages and the pictures, videos and sounds as the API has them.',
-      examples: ['hydor library', 'hydor library --kind doc', 'hydor library --project thesis -n 100'],
+      examples: ['hydor files', 'hydor files --kind doc', 'hydor files --project thesis -n 100'],
       async run(ctx, _a, v) {
         const lib = await loadLibrary(ctx);
         if (ctx.o.json) return ctx.json({ items: lib.things.map((t) => ({ ...t.info, kind: t.kind })), folders: lib.folders });
@@ -197,7 +197,7 @@ export const library: Area = {
           const s = pickOne(projects, str(v, 'project')!, { id: (x) => x.id, names: (x) => [x.name], what: 'project', hint: 'hydor projects lists them' });
           list = list.filter((t) => t.space === s.id);
         }
-        if (!list.length) return ctx.out(str(v, 'kind') || str(v, 'project') ? 'Nothing of that kind is kept.' : 'The Library is empty: agents save what they make for you here.');
+        if (!list.length) return ctx.out(str(v, 'kind') || str(v, 'project') ? 'Nothing of that kind is kept.' : 'Nothing is kept yet: what agents make for you shows in a project’s Files.');
         const shown = list.slice(0, ctx.o.all ? list.length : (ctx.o.limit ?? 30));
         ctx.out(rows(ctx, lib, shown));
         if (list.length > shown.length) ctx.out(ctx.look.p.dim(`… ${list.length - shown.length} more (-n <number>, or --all)`));
@@ -210,7 +210,7 @@ export const library: Area = {
       options: { kind: { type: 'string', value: '<kind>', desc: 'Only this kind', values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'board', 'image', 'video', 'audio'] } },
       summary: 'Find things by their titles and descriptions',
       help: 'Every word must be in a title or a description; with search by meaning on (Settings → Memory), what is alike in meaning follows.',
-      examples: ['hydor library search budget', 'hydor library search quarterly report --kind sheet'],
+      examples: ['hydor files search budget', 'hydor files search quarterly report --kind sheet'],
       async run(ctx, words, v) {
         if (!words.length) throw new UsageError(`Say what to look for: ${ctx.usage}`);
         const lib = await loadLibrary(ctx);
@@ -229,7 +229,7 @@ export const library: Area = {
           .filter((t): t is Thing => !!t && !ids.has(t.id) && (!kind || t.kind === kind));
         hits = [...hits, ...meaning];
         if (ctx.o.json) return ctx.json({ items: hits.map((t) => ({ ...t.info, kind: t.kind })) });
-        if (!hits.length) return ctx.out(`Nothing in the Library fits “${words.join(' ')}”.`);
+        if (!hits.length) return ctx.out(`Nothing kept fits “${words.join(' ')}”.`);
         ctx.out(rows(ctx, lib, hits.slice(0, ctx.o.all ? hits.length : (ctx.o.limit ?? 30))));
       },
     },
@@ -238,7 +238,7 @@ export const library: Area = {
       args: [item],
       summary: 'A document’s text or a board’s cards',
       help: 'A document prints as its text (Markdown; piped, as it is); a board lists its cards (their titles, kinds and sizes). Everything else says what it is: its kind, size, place, when it changed, and its address. --json gives the item as the API has it.',
-      examples: ['hydor library show "Q3 report"', 'hydor library show 3f9a1c2b7d | less'],
+      examples: ['hydor files show "Q3 report"', 'hydor files show 3f9a1c2b7d | less'],
       async run(ctx, [given]) {
         const { thing: t, lib } = await find(ctx, given);
         if (ctx.o.json) return ctx.json({ ...t.info, kind: t.kind });
@@ -270,7 +270,7 @@ export const library: Area = {
             cards.map((c, n) => [p.dim(String(n + 1)), p.bold(c.title || (typeof c.data?.title === 'string' ? c.data.title : '') || c.ui), p.dim(c.ui), p.dim(SIZE[c.size ?? ''] ?? c.size ?? ''), p.dim(c.pinnedAt ? timeAgo(c.pinnedAt) : '')]),
             { head: ['#', 'CARD', 'KIND', 'SIZE', 'PINNED'], grow: 1, fixed: [0], drop: [4, 3] },
           );
-          return ctx.out([p.bold(t.title), ...head, '', ...(cards.length ? list : [p.dim('No cards yet: pin any answer card from a reply (its … menu → Pin to a board).')]), '', p.dim(`The cards draw in the app: hydor library open ${t.id}. hydor library export ${t.id} --to md|pdf|html makes a file of their data.`)]);
+          return ctx.out([p.bold(t.title), ...head, '', ...(cards.length ? list : [p.dim('No cards yet: pin any answer card from a reply (its … menu → Pin to a board).')]), '', p.dim(`The cards draw in the app: hydor files open ${t.id}. hydor files export ${t.id} --to md|pdf|html makes a file of their data.`)]);
         }
         if (t.kind !== 'doc') {
           const f = EXPORTS[t.kind];
@@ -279,7 +279,7 @@ export const library: Area = {
             ...head,
             '',
             p.dim(
-              `Its editor is a page: hydor library open ${t.id}. ${f.formats.length ? `hydor library export ${t.id} --to ${f.formats.join('|')} makes a file.` : `hydor library export ${t.id} saves the file.`}`,
+              `Its editor is a page: hydor files open ${t.id}. ${f.formats.length ? `hydor files export ${t.id} --to ${f.formats.join('|')} makes a file.` : `hydor files export ${t.id} saves the file.`}`,
             ),
           ]);
         }
@@ -298,7 +298,7 @@ export const library: Area = {
       },
       summary: 'Save an item as a file',
       help: 'The formats are those of the editor’s Export menu: documents docx, pdf, odt, md, epub, txt, html; slides pptx, pdf, png (a zip of the slides), md; spreadsheets xlsx, csv, pdf; diagrams svg, png, jpg, drawio, pdf; LaTeX pdf, tex, zip; notebooks ipynb, py, html, pdf; boards md, pdf, html (their cards’ data as text and tables); pages pdf, html, md, txt. A picture, video or sound is saved as it is. Without --to, the kind’s usual one (docx, pptx, xlsx, ipynb, svg, md, pdf).',
-      examples: ['hydor library export "Q3 report" --to pdf -o q3.pdf', 'hydor library export deck1 --to pptx', 'hydor library export 7ac3 -o photo.png'],
+      examples: ['hydor files export "Q3 report" --to pdf -o q3.pdf', 'hydor files export deck1 --to pptx', 'hydor files export 7ac3 -o photo.png'],
       async run(ctx, [given], v) {
         const { thing: t } = await find(ctx, given);
         const f = EXPORTS[t.kind];
@@ -333,7 +333,7 @@ export const library: Area = {
       args: [{ name: 'board', kind: 'page', optional: true }],
       summary: 'What on your boards refreshes, and its cost',
       help: 'Each board card that keeps itself up to date: its board, how often it refreshes, the tier its agent thinks with, about what a refresh costs, when it was last updated, and when it refreshes next (or why it is paused, or how its last refresh failed). Then each board’s monthly cap for refreshes and what they spent this month. Name a board to see only its cards.',
-      examples: ['hydor library refreshes', 'hydor library refreshes Shop', 'hydor library refreshes --json'],
+      examples: ['hydor files refreshes', 'hydor files refreshes Shop', 'hydor files refreshes --json'],
       async run(ctx, [given]) {
         const { p } = ctx.look;
         type Row = { board: string; boardTitle: string; card: string; title: string; when: string; tier: string; perRefreshUsd?: number; refreshedAt?: number; nextAt?: number; running?: boolean; paused?: string; lastError?: string };
@@ -359,7 +359,7 @@ export const library: Area = {
           { head: ['CARD', 'BOARD', 'WHEN', 'TIER', 'A TIME', 'UPDATED', ''], grow: 0, drop: [6, 3, 5] },
         );
         const caps = boards.map((b) => `${b.title}: ${b.cap === null ? 'no cap' : `$${b.spentUsd.toFixed(2)} of its $${b.cap} cap this month${b.reached ? ' (reached: refreshes wait for next month)' : ''}`}`);
-        ctx.out([...list, '', ...caps.map((c) => p.dim(c)), '', p.dim('hydor library refresh <board> [card] refreshes now.')]);
+        ctx.out([...list, '', ...caps.map((c) => p.dim(c)), '', p.dim('hydor files refresh <board> [card] refreshes now.')]);
       },
     },
     {
@@ -369,8 +369,8 @@ export const library: Area = {
         { name: 'card', kind: 'text', optional: true },
       ],
       summary: 'Refresh a board’s card now, or all of them',
-      help: 'Asks an agent the card’s question again and replaces its data with the answer (on the card’s tier, sending nothing; it counts toward the board’s monthly cap). Name the card by its number (as hydor library show lists them), its id or the start of its title; leave it out to refresh every card of the board that keeps itself up to date. It starts the refresh and returns; the board shows the new data when it is done.',
-      examples: ['hydor library refresh Shop', 'hydor library refresh Shop 2', 'hydor library refresh Shop "Sales this week"'],
+      help: 'Asks an agent the card’s question again and replaces its data with the answer (on the card’s tier, sending nothing; it counts toward the board’s monthly cap). Name the card by its number (as hydor files show lists them), its id or the start of its title; leave it out to refresh every card of the board that keeps itself up to date. It starts the refresh and returns; the board shows the new data when it is done.',
+      examples: ['hydor files refresh Shop', 'hydor files refresh Shop 2', 'hydor files refresh Shop "Sales this week"'],
       async run(ctx, [given, which]) {
         const { thing: t } = await find(ctx, given);
         if (t.kind !== 'board') throw new UsageError(`“${t.title}” is not a board`);
@@ -385,7 +385,7 @@ export const library: Area = {
         const cards = (m.model?.cards ?? []).map((c, i) => ({ ...c, n: i + 1, name: c.title || (typeof c.data?.title === 'string' ? c.data.title : '') || c.ui }));
         const w = which.trim().toLowerCase();
         const card = /^\d+$/.test(w) ? cards.find((c) => c.n === Number(w)) : (cards.find((c) => c.id === which) ?? cards.find((c) => c.name.toLowerCase() === w) ?? cards.find((c) => c.name.toLowerCase().startsWith(w)));
-        if (!card) throw new UsageError(`“${t.title}” has no card “${which}”: hydor library show ${t.id} lists them`);
+        if (!card) throw new UsageError(`“${t.title}” has no card “${which}”: hydor files show ${t.id} lists them`);
         const r = await ctx.conn.api<{ runId?: string; key?: string }>('POST', `/api/boards/${enc(t.id)}/cards/${enc(card.id)}/refresh`, {});
         if (ctx.o.json) return ctx.json({ board: t.id, card: card.id, ...r });
         ctx.out(`Refreshing “${card.name}” on “${t.title}”: the board shows its new data when it is done.`);
@@ -396,7 +396,7 @@ export const library: Area = {
       args: [item],
       summary: 'The address of an item’s page',
       help: 'Prints it; --browser opens it in your browser too. The editors for slides, spreadsheets, documents and diagrams are visual, so this is how to get to them.',
-      examples: ['hydor library open "Q3 report"', 'hydor library open deck1 --browser'],
+      examples: ['hydor files open "Q3 report"', 'hydor files open deck1 --browser'],
       async run(ctx, [given]) {
         const { thing: t } = await find(ctx, given);
         const url = `${ctx.conn.base}${t.at}`;
@@ -411,7 +411,7 @@ export const library: Area = {
       args: [item],
       summary: 'Delete an item with its versions',
       help: 'A page goes with all its versions and the data it keeps; a picture, video or sound with its copy (the file it was saved from stays).',
-      examples: ['hydor library remove "Old draft"', 'hydor library remove 3f9a1c2b7d -y'],
+      examples: ['hydor files remove "Old draft"', 'hydor files remove 3f9a1c2b7d -y'],
       async run(ctx, [given]) {
         const { thing: t } = await find(ctx, given);
         if (!(await ctx.confirm(`Delete the ${kindName(t.kind)} “${t.title}”?`))) return ctx.out('Not removed.');

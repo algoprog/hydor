@@ -1,5 +1,5 @@
 // The media panel: the videos, pictures and sounds of this edit, each with its frame and its length. More come from
-// this device (sent to the server as a deck's would be), the Library or Files; a voice-over is recorded with the
+// this device (sent to the server as a deck's would be), what you kept or Files; a voice-over is recorded with the
 // microphone. Drag one onto a track of the timeline (V1 the clips, V2 and V3 overlays, A2 music, A3 voice), or
 // double-click it to put it at the end of the clips (a sound: at the playhead, as music). Files from the desktop can be
 // dropped on the panel (they are imported and added to it) or on the timeline (imported and placed where dropped); the
@@ -103,7 +103,7 @@ export function MediaPanel({ pool, onAdd, onUse, onRecorded, sending, onFiles }:
               ...(viaLink
                 ? []
                 : [
-                    { label: 'From the Library…', onClick: () => setDialog('library') },
+                    { label: 'From what you kept…', onClick: () => setDialog('library') },
                     { label: 'From Files…', onClick: () => setDialog('files') },
                   ]),
             ]}
@@ -205,7 +205,7 @@ function useRecorder(onDone: (it: PoolItem) => void) {
   return { on, seconds, error, start: () => void start(), stop };
 }
 
-/** The Library's videos, pictures and sounds, to pick from. */
+/** The kept videos, pictures and sounds, to pick from. */
 function LibraryPicker({ onClose, onPick }: { onClose: () => void; onPick: (it: PoolItem) => void }) {
   const items = useMedia((s) => s.items);
   useEffect(() => {
@@ -227,7 +227,7 @@ function LibraryPicker({ onClose, onPick }: { onClose: () => void; onPick: (it: 
     }
   };
   return (
-    <Dialog open onClose={onClose} title="Add from the Library" width={640}>
+    <Dialog open onClose={onClose} title="Add from what you kept" width={640}>
       <div className="flex flex-wrap items-center gap-2 pb-3">
         {(['video', 'image', 'audio'] as const).map((k) => (
           <button key={k} type="button" onClick={() => setKind(k)} className={cx('h-7 rounded-full border px-3 text-[12.5px]', kind === k ? 'border-accent bg-accent-soft text-fg' : 'border-line text-fg-2 hover:bg-bg-2')}>
@@ -248,7 +248,7 @@ function LibraryPicker({ onClose, onPick }: { onClose: () => void; onPick: (it: 
             </div>
           </button>
         ))}
-        {items && !list.length && <p className="col-span-full py-6 text-center text-[12.5px] text-fg-3">{q ? 'Nothing by that name.' : 'None in your Library yet.'}</p>}
+        {items && !list.length && <p className="col-span-full py-6 text-center text-[12.5px] text-fg-3">{q ? 'Nothing by that name.' : 'Nothing kept yet.'}</p>}
       </div>
     </Dialog>
   );

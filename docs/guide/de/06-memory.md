@@ -273,19 +273,18 @@ Der Abschnitt erscheint, solange ein Vorschlag auf dich wartet, auch wenn die le
 
 ### Nach Bedeutung suchen
 
-[Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) unter **Für Agenten bereitgestellte Informationen** findet Notizen, Bibliotheksinhalte und weitere Einträge sowohl nach Wörtern als auch nach Bedeutung. Dafür läuft LightOns Modell mDenseOn mit Unterstützung für neun Sprachen auf diesem Computer. Die Funktion ist standardmäßig aktiviert. Die hybride Suche führt Wort- und Bedeutungsranglisten zusammen. Deine Notizen werden dafür nicht an einen externen Dienst gesendet. Ohne diese Funktion zählt nur der Wortlaut. Bei aktivierter Funktion:
+[Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) unter **Für Agenten bereitgestellte Informationen** findet Notizen, Behaltenes und weitere Einträge sowohl nach Wörtern als auch nach Bedeutung. Dafür läuft LightOns Modell mDenseOn mit Unterstützung für neun Sprachen auf diesem Computer. Die Funktion ist standardmäßig aktiviert. Die hybride Suche führt Wort- und Bedeutungsranglisten zusammen. Deine Notizen werden dafür nicht an einen externen Dienst gesendet. Ohne diese Funktion zählt nur der Wortlaut. Bei aktivierter Funktion:
 
 - starten Agenten auch mit passenden Notizen, die anders formuliert sind als dein Auftrag;
 - Agenten, die Notizen nachschlagen, und das Suchfeld der Gruppe **Notizen** finden sie nach Bedeutung ebenso wie nach Wörtern.
 - Eine Notiz, die dasselbe sagt wie eine schon gespeicherte, nur mit anderen Worten, wird nicht noch einmal gespeichert, und das Aufräumen gruppiert Notizen nach Bedeutung.
-- findet die Bibliothek Seiten, Dokumente, Bilder und weitere Inhalte anhand der Bedeutung von Titel und Beschreibung. Siehe [Deine Seiten finden](/guide/library#find-your-pages);
-- findet die Suche per Strg+K Seiten, Einstellungen, Sitzungen, Apps und weitere Inhalte sinngemäß. Auch Wissensdatenbanken werden semantisch durchsucht. Siehe [Projekte und Wissen](/guide/projects).
+- findet die Suche per Strg+K Seiten, Einstellungen, Sitzungen, Apps und die Dokumente, Bilder und weiteren Inhalte, die du behalten hast (anhand ihrer Titel und Beschreibungen), sinngemäß. Auch Wissensdatenbanken werden semantisch durchsucht. Siehe [Projekte und Wissen](/guide/projects).
 
 **Einmalige Einrichtung**:
 
 1. Eine Minute nach dem ersten App-Start wird im Datenordner eine eigene Python-Umgebung mit ONNX Runtime, Hugging-Face-Tokenizer und NumPy eingerichtet, insgesamt etwa 150 MB. Bei deaktivierter Funktion geschieht das erst nach erneuter Aktivierung von **Bedeutungssuche**, sofern Memory eingeschaltet ist. Statusmeldungen nennen Schritte wie „Eigene Python-Umgebung erstellen“ und „ONNX Runtime und Tokenizer installieren“. Eine ältere PyTorch-Umgebung wird vorher entfernt, um deren Speicherplatz freizugeben, mit dem Hinweis „Umgebung einer älteren Version entfernen“.
 2. Danach wird einmalig das Modell heruntergeladen, etwa „Modell wird heruntergeladen: 120 von 340 MB“. Verwendet wird die 8-Bit-Version von mDenseOn, algoprog/mDenseOn-ONNX auf Hugging Face. Sie ist ein Viertel so groß wie das vollständige Modell und findet dieselben Notizen. Jede Datei wird vor Verwendung geprüft; unterbrochene Downloads werden beim nächsten Versuch fortgesetzt.
-3. Im Hintergrund werden Vektoren für alle Notizen und Bibliotheksinhalte erstellt. Das sind die Zahlen, die die semantische Suche vergleicht. Die Anzeige meldet etwa „Alle 120 Notizen semantisch durchsuchbar“ oder „80 von 120 Notizen semantisch durchsuchbar, Rest folgt“.
+3. Im Hintergrund werden Vektoren für alle Notizen und alles, was du behältst, erstellt. Das sind die Zahlen, die die semantische Suche vergleicht. Die Anzeige meldet etwa „Alle 120 Notizen semantisch durchsuchbar“ oder „80 von 120 Notizen semantisch durchsuchbar, Rest folgt“.
 
 **Ausschalten** über den Schalter stoppt das Modell. Inhalte werden dann nur nach Wörtern gefunden. Bei knappem Speicherplatz oder Arbeitsspeicher kannst du darauf verzichten. Ist Memory global ausgeschaltet, ist der Schalter ausgegraut.
 
@@ -342,7 +341,7 @@ Standardmäßig umfasst die Suche die Sitzungen aller Projekte. Bitte einen Agen
 
 ## Über ein Projekt hinaus suchen
 
-Manchmal wurde das, was ein Agent braucht, in einem anderen Projekt gespeichert oder erledigt: „Wie haben wir Deploys in meinem Shop-Projekt eingerichtet?“ Dafür haben Agenten eine einzige Suche, die alles durchsucht, was Memory aufbewahrt: Notizen, Wiki-Artikel, Dokumente und frühere Unterhaltungen. Sie sucht im Projekt, in dem der Agent arbeitet, in allen deinen Projekten oder in einem Projekt anhand seines Namens (sein Name auf der Seite „Projekte“, der Name seines Ordners oder der Name seines Repositorys). Sie sucht nie von selbst, sondern nur, wenn der Agent danach fragt: Nichts aus deinen anderen Projekten wird dem hinzugefügt, was ein Agent zu Beginn oder mit einer Nachricht erhält.
+Manchmal wurde das, was ein Agent braucht, in einem anderen Projekt gespeichert oder erledigt: „Wie haben wir Deploys in meinem Shop-Projekt eingerichtet?“ Dafür haben Agenten eine einzige Suche, die alles durchsucht, was Memory aufbewahrt: Notizen, Wiki-Artikel, Dokumente und frühere Unterhaltungen. Sie sucht im Projekt, in dem der Agent arbeitet, in allen deinen Projekten oder in einem Projekt anhand seines Namens (sein Name in der Seitenleiste, der Name seines Ordners oder der Name seines Repositorys). Sie sucht nie von selbst, sondern nur, wenn der Agent danach fragt: Nichts aus deinen anderen Projekten wird dem hinzugefügt, was ein Agent zu Beginn oder mit einer Nachricht erhält.
 
 Jedes Ergebnis nennt, woher es stammt und wie man es öffnet: Ein Artikel öffnet sich mit dem Wiki-Tool, ein Dokument mit dem Wissens-Tool, jeweils mit Angabe des Projekts, in dem es liegt, und eine frühere Unterhaltung mit ihrem Schlüssel. Was andere Projekte aufbewahren, wird nur gelesen: Ein Agent ändert von hier aus nie die Notizen, das Wiki, die Dokumente oder die Unterhaltungen eines anderen Projekts.
 

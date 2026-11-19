@@ -109,8 +109,13 @@ async function startServer() {
 }
 
 function apiFor(cookie) {
-  return async (method, url, body) => {
+  // `raw`: the answer's bytes as they are (a file the app made, such as an export), not JSON.
+  return async (method, url, body, { raw = false } = {}) => {
     const r = await fetch(base + url, { method, headers: { cookie: `wa_session=${cookie}`, origin: base, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    if (raw) {
+      if (!r.ok) throw new Error(`${method} ${url}: ${r.status}`);
+      return Buffer.from(await r.arrayBuffer());
+    }
     const text = await r.text();
     if (!r.ok) throw new Error(`${method} ${url}: ${r.status} ${text.slice(0, 300)}`);
     try {

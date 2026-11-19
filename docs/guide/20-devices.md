@@ -95,7 +95,7 @@ Tailscale is a free app that links your own devices in a private network of thei
 
 **Stop serving** takes the app off your tailnet again. It undoes exactly what **Serve it on my devices** did: the one address it published, and the address it added to the ones the app accepts. Anything else you serve with Tailscale stays as it was. If you had already served the app with Tailscale by hand, the section shows it ("Set up outside this page, with Tailscale itself"), and **Stop serving** turns it off too.
 
-While the app is served, the links it hands out start with this address, so they open on your phone too: a session's **Open in Hydor** in a chat app, and the links agents give you to sessions and Library pages. If `ALLOWED_ORIGINS` names an address of its own (see [Other ways to reach it](/guide/devices#other-ways-to-reach-it)), links keep using that one.
+While the app is served, the links it hands out start with this address, so they open on your phone too: a session's **Open in Hydor** in a chat app, and the links agents give you to sessions and kept pages. If `ALLOWED_ORIGINS` names an address of its own (see [Other ways to reach it](/guide/devices#other-ways-to-reach-it)), links keep using that one.
 
 In a terminal, `hydor machines phone` says the same and draws the QR code; `hydor machines phone serve` and `hydor machines phone stop` do the rest (see [The terminal](/guide/terminal)).
 
@@ -197,7 +197,7 @@ Each token shows when it was made and last used. **Revoke**, in its **⋯** menu
 
 ## Share a session with a read-only link
 
-A read-only link lets someone without your password follow one session as it happens. Open the session's menu (⋯) → **Share a read-only link**. To share a whole project with someone instead (its documents, sessions, runs and reading list, with comments under their name), see [Share a project with people](/guide/projects#share-a-project-with-people); to share one thing of the Library (a document, a page, a picture, a video…) to comment on or edit, see [Share with people](/guide/library#share-with-people).
+A read-only link lets someone without your password follow one session as it happens. Open the session's menu (⋯) → **Share a read-only link**. To share a whole project with someone instead (its documents, sessions, runs and reading list, with comments under their name), see [Share a project with people](/guide/projects#share-a-project-with-people); to share one kept thing (a document, a page, a picture, a video…) to comment on or edit, see [Share with people](/guide/library#share-with-people).
 
 1. Under **Works for**, choose **A day**, **A week**, **A month** or **Until turned off**.
 2. Click **Make a link**.

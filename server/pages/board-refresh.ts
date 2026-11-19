@@ -68,7 +68,7 @@ export interface RefreshMark {
   tier: Tier;
 }
 
-/** A board as kept, with its title; null when it is not a board of the Library (anymore). */
+/** A board as kept, with its title; null when it is not a board (anymore). */
 function boardOf(db: DB, page: string): { title: string; board: Board; locked: boolean } | null {
   const info = pageInfo(db, page);
   if (!info || info.kind !== 'board') return null;
@@ -234,7 +234,7 @@ export function refreshPrompt(o: { db: DB; board: string; card: BoardCard; quest
   const data = JSON.stringify(c.data, null, 1);
   const when = c.refresh?.schedule ? `on its schedule (${refreshText(c.refresh.schedule)})` : 'when the user asked';
   return [
-    `This is a refresh of an answer card on the board “${o.board}” in the user’s Library, started ${o.trigger === 'schedule' ? when : 'by hand'}. It is now ${localNow(o.db)}.`,
+    `This is a refresh of an answer card on the board “${o.board}”, one of the user’s, started ${o.trigger === 'schedule' ? when : 'by hand'}. It is now ${localNow(o.db)}.`,
     `The card: “${cardTitle(c)}”, a ${spec?.title ?? name} card (the ${name} answer UI). The question it answers, asked again now:\n<question>\n${o.question}\n</question>`,
     'Find the answer as it stands now: search, read, look up or run what you need. Nobody watches this refresh: change nothing (no files, no messages, no settings), ask nothing, and be brief.',
     `End your reply with exactly one \`\`\`ui ${name} block holding the card’s new data as one JSON object, in the same shape as its data now (below), with every value brought up to date. Keep its title and its fields unless what changed calls for others. The block is checked against the ${name} UI’s type and becomes the card’s data; nothing else in your reply is kept. If you cannot find what it needs, say why in one sentence and leave the block out: the card keeps what it shows.`,
@@ -361,7 +361,7 @@ export function boardRunner(d: Deps): BoardRunner {
     const o = refreshOwner(taskId);
     if (!o) throw new Error('Not a board card’s refresh');
     const b = boardOf(db, o.page);
-    if (!b) throw new Error('The board is no longer in the Library');
+    if (!b) throw new Error('The board is no longer there');
     const card = b.board.cards.find((c) => c.id === o.card);
     if (!card) throw new Error('The card is no longer on the board');
     return { ...o, ...b, card };

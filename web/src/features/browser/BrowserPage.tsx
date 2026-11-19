@@ -1,8 +1,8 @@
 // The Browser page (/browser): a browser of your own, part of the desktop app. A bar across the top (the tabs' controls on
 // the left over their column; back, forward, reload and the box, which searches, opens, asks and tells an agent what to
-// do; Save to the Library, Ask, extensions and the menu on the right), under it three columns: your tabs (with the sites
+// do; Save to a project, Ask, extensions and the menu on the right), under it three columns: your tabs (with the sites
 // you pinned and the agents at work), the page, and, when something is in it, a right column: Ask about the page, an
-// agent's conversation while you watch its browser, or history, downloads, bookmarks, extensions, site permissions and
+// agent's conversation while you watch its browser, or history, downloads, bookmarks, read later, extensions, site permissions and
 // settings. Everything lasting sits beside the page, never over it (the page is the desktop app's own native view). The
 // pages are the pages themselves (PageView draws them natively). Elsewhere the page says it is part of the desktop app
 // and starts nothing; the agents' browsers keep their live picture in sessions.
@@ -113,6 +113,7 @@ import { ExtensionButtons, ExtensionsPanel } from './Extensions';
 import { FindBar } from './FindBar';
 import { HighlightsPanel } from './Highlights';
 import { HistoryPanel } from './History';
+import { LaterPanel } from './Later';
 import { Omnibox } from './Omnibox';
 import { KeyRow } from './Dock';
 import type { LiveViewApi } from './LiveView';
@@ -129,8 +130,8 @@ import { DESKTOP_APP } from '../tour/setup';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'import' | 'bookmarks' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings' | 'shortcuts';
-const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings' || v === 'shortcuts';
+type PanelId = 'import' | 'bookmarks' | 'later' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings' | 'shortcuts';
+const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'later' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings' || v === 'shortcuts';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -345,7 +346,13 @@ function OwnBrowser() {
     };
   }, [urlParam, privateParam]);
   useEffect(() => {
-    if (isPanel(panelParam)) (setAskOpen(false), setPanel(panelParam));
+    if (!isPanel(panelParam)) return;
+    setAskOpen(false);
+    setPanel(panelParam);
+    // The address's ?panel= is used up: the same one asked again (from the search box, say) opens it again.
+    const p = new URLSearchParams(window.location.search);
+    p.delete('panel');
+    go(`/browser${p.size ? `?${p}` : ''}`, true);
   }, [panelParam]);
 
   // Closed under you (its last tab, or you closed it elsewhere): started again, a few times at most.
@@ -474,14 +481,17 @@ function OwnBrowser() {
   };
   const star = () => tab && void toggleBookmark(tab.url, tab.title, marked);
   const where = useSavePlace();
+  // The project Save uses, for the page's right-click menu (its listener is set up once).
+  const whereRef = useRef(where);
+  whereRef.current = where;
   const save = async () => {
     if (!tab || saving) return;
     setSaving(true);
     try {
       const { place, name } = where;
-      const r = await post<{ id?: string; page?: { id: string } }>(`/api/browser/browsing/tabs/${enc(tab.id)}/save-page`, { space: place.space, ...(place.folder ? { folder: place.folder } : {}) });
+      const r = await post<{ id?: string; page?: { id: string } }>(`/api/browser/browsing/tabs/${enc(tab.id)}/save-page`, { space: place.space });
       const id = r.page?.id ?? r.id;
-      useToasts.getState().push('ok', name ? tr(`Saved to ${name}`) : 'Saved to the Library', id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
+      useToasts.getState().push('ok', name ? tr(`Saved to ${name}’s files`) : tr('Saved. Pick a project beside Save to keep copies in its files.'), id ? { label: 'Open', run: () => go(`/pages/${id}`) } : undefined);
     } catch (e) {
       toastError(e);
     } finally {
@@ -579,7 +589,7 @@ function OwnBrowser() {
     };
   }, []);
 
-  // What a page's right-click menu asks: Ask an agent about the selection or a picture (Ask opens beside the page with it), Bookmark this page, Read later, and Save image to Library.
+  // What a page's right-click menu asks: Ask an agent about the selection or a picture (Ask opens beside the page with it), Bookmark this page, Read later, and Save image (to the project Save uses).
   useEffect(
     () =>
       listenTabs((c) => {
@@ -595,7 +605,7 @@ function OwnBrowser() {
         } else if (c.cmd === 'later') {
           void addLater(c.url, c.title || c.url);
         } else if (c.cmd === 'save-image') {
-          void keepPicture(c);
+          void keepPicture(c, whereRef.current);
         } else if (c.cmd === 'ask-image') {
           const t = activeTab(st.current.view);
           if (!t || t.private) return;
@@ -755,6 +765,9 @@ function OwnBrowser() {
       <MenuItem icon={<Bookmark size={14} />} checked={panel === 'bookmarks'} onClick={() => (setMenu(false), togglePanel('bookmarks'))}>
         Bookmarks
       </MenuItem>
+      <MenuItem icon={<Clock size={14} />} checked={panel === 'later'} onClick={() => (setMenu(false), togglePanel('later'))}>
+        Read later
+      </MenuItem>
       <MenuItem icon={<Import size={14} />} checked={panel === 'import'} onClick={() => (setMenu(false), togglePanel('import'))}>
         Import bookmarks and history…
       </MenuItem>
@@ -796,6 +809,8 @@ function OwnBrowser() {
         <ImportPanel onClose={close} />
       ) : panel === 'bookmarks' ? (
         <BookmarksPanel onClose={close} />
+      ) : panel === 'later' ? (
+        <LaterPanel onClose={close} />
       ) : panel === 'extensions' ? (
         <ExtensionsPanel onClose={close} />
       ) : panel === 'downloads' ? (

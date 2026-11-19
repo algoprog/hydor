@@ -70,8 +70,8 @@ const EACH_NEW = 'assistants.libraryEachNew';
 const settled = new WeakSet<DB>();
 
 /**
- * Once: agents saved before a Library target could update one page kept making a new page each run, so they keep doing
- * so (each: 'new'); a Library target saved since updates the same page unless it says otherwise.
+ * Once: agents saved before a page target could update one page kept making a new page each run, so they keep doing
+ * so (each: 'new'); a page target saved since updates the same page unless it says otherwise.
  */
 function keepNewPages(db: DB, list: Assistant[]): Assistant[] {
   if (kvGet(db, EACH_NEW) === '1') return list;
@@ -106,7 +106,7 @@ export const isMailAddress = (s: string) => {
   return MAIL.test(bare.trim()) && !/[\r\n]/.test(s);
 };
 
-/** A Library page's id as a target names it; none for anything else. */
+/** A page's id as a target names it; none for anything else. */
 const pageId = (v: unknown) => {
   const s = str(v, 80);
   return /^[\w-]+$/.test(s) ? s : undefined;

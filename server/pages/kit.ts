@@ -2,7 +2,7 @@
 // classes (options, picture cards, compare tables, pros and cons, buttons, fields) and the bridge
 // script. The bridge reports the page's height, sends the user's choices and form answers to the app
 // (and a video's still, which the app plays over the page), and gives saved pages window.hydor.storage;
-// it opens a link to another site in a tab of its own and one to another of the Library's pages in the app,
+// it opens a link to another site in a tab of its own and one to another of the kept pages in the app,
 // and fills a table of contents an agent left empty. It talks to the app only by postMessage, each message
 // carrying the number the app gave this page. Both go in right after the page's doctype, before its
 // own styles and scripts, so its CSS wins and its scripts find window.hydor (and window.naget, its name before) from their first line.
@@ -287,7 +287,7 @@ function bridge(cfg: BridgeCfg) {
     });
   // Links, once the page's own scripts had their say: one to another site opens in a tab of its own (followed in the
   // frame, it would take the page's place there, or show an error where the site may not be framed); one to another of
-  // the Library's pages (the page editor's a.n-pagelink, or /pages/<id>) opens that page in the app.
+  // the kept pages (the page editor's a.n-pagelink, or /pages/<id>) opens that page in the app.
   addEventListener('click', (e) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
@@ -301,7 +301,7 @@ function bridge(cfg: BridgeCfg) {
       return;
     }
     const here = new URL(location.href);
-    // A place of the Library (the page editor's breadcrumbs): that place, in the app.
+    // A place in the app (the page editor's breadcrumbs): that place, in the app.
     const place = a.hasAttribute('data-go') ? (a.getAttribute('href') ?? '') : '';
     if (place && /^\/(library|projects)(\/[\w-]{1,40})?(\?[\w=&%-]{0,200})?$/.test(place)) {
       e.preventDefault();

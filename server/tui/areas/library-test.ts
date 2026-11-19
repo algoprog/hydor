@@ -1,4 +1,4 @@
-// Checks for `hydor library` against a fake connection (test-kit.ts): list merges pages and media, filters by kind and project;
+// Checks for `hydor files` against a fake connection (test-kit.ts): list merges pages and media, filters by kind and project;
 // search finds by words in titles and descriptions (and by meaning when the server says); show prints a document's text or what
 // an item is; export asks the right route for the format, writes the bytes and says where; open prints the address; remove asks.
 // Build and run:
@@ -102,7 +102,7 @@ test('list merges pages and media, newest change first, with where each is', asy
   assert.match(t.out, /slides\s+Launch deck/);
   assert.match(t.out, /sheet\s+Budget/);
   assert.match(t.out, /page\s+Notes page/);
-  assert.ok(!t.out.includes('Screen of a template'), 'a template’s screen is not in the Library');
+  assert.ok(!t.out.includes('Screen of a template'), 'a template’s screen is not kept here');
   assert.match(t.out, /2\.5 MB/);
   const j = (await run(conn, ['library', '--json'])).json[0] as any;
   assert.equal(j.items.length, 5);
@@ -124,7 +124,7 @@ test('list filters by kind (with other words for it) and by project, and cuts to
   );
   assert.match((await run(conn, ['library', '-n', '2'])).out, /… 3 more/);
   assert.equal(kindOf('LaTeX'), 'tex');
-  assert.match((await run(fakeConn({ ...routes, 'GET /api/pages': { pages: [], folders: [] }, 'GET /api/media': { items: [] } }).conn, ['library'])).out, /The Library is empty/);
+  assert.match((await run(fakeConn({ ...routes, 'GET /api/pages': { pages: [], folders: [] }, 'GET /api/media': { items: [] } }).conn, ['library'])).out, /Nothing is kept yet/);
 });
 
 test('search finds by every word in a title or description, and adds what is alike in meaning', async () => {
@@ -141,7 +141,7 @@ test('search finds by every word in a title or description, and adds what is ali
   assert.match(k.out, /Budget/);
   assert.ok(!k.out.includes('Q3 report'));
   const none = fakeConn({ ...routes, 'GET /api/find?q=zebra&in=pages': new ApiError(404, 'x') });
-  assert.match((await run(none.conn, ['library', 'search', 'zebra'])).out, /Nothing in the Library fits “zebra”/);
+  assert.match((await run(none.conn, ['library', 'search', 'zebra'])).out, /Nothing kept fits “zebra”/);
   await assert.rejects(run(conn, ['library', 'search']), (e) => e instanceof UsageError);
 });
 
@@ -157,7 +157,7 @@ test('show prints a document’s text and says what anything else is', async () 
   assert.match(term.out, /Revenue grew/);
   const deck = await run(conn, ['library', 'show', 'launch']);
   assert.match(deck.out, /Kind\s+slides/);
-  assert.match(deck.out, /hydor library open d3c2222222/);
+  assert.match(deck.out, /hydor files open d3c2222222/);
   assert.match(deck.out, /--to pptx\|pdf\|png\|md/);
   const pic = await run(conn, ['library', 'show', 'sunset']);
   assert.match(pic.out, /Picture\s+1024 × 768/);

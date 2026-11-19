@@ -1,12 +1,13 @@
-// A space's own page. At the top, in the space's colour: its mark, name and what it is about, New session, and
-// one menu (open its folder in Files, show only its sessions in the sidebar, share it with people, delete it); its
-// tabs under them. Overview: its sessions, what it holds in the Library, who it is shared with (ShareDialog.tsx) and
-// what every session in it gets (its folder, guidelines, memory, skills and assistant), with a group's spaces. Then its Library, its files (SpaceFiles), its
+// What a project's details window shows (ProjectDialog.tsx holds it over the page). At the top, in the project's colour:
+// its mark, name and what it is about, New session, one menu (open its folder in Files, show only its sessions in the
+// sidebar, share it with people, delete it) and Close; its tabs under them. Overview: its sessions, who it is shared
+// with (ShareDialog.tsx) and what every session in it gets (its folder, guidelines, memory, skills and assistant), with a
+// group's projects. Then its files (SpaceFiles: its folder, and the things kept in it), its
 // memory (its notes, its wiki memory, and its documents: those only its sessions search, with the shared ones too unless it leaves them out), its skills
-// (SpaceSkills) and its settings. It shows at once from the spaces the app knows, and fills in what it fetches.
+// (SpaceSkills), its agents and its settings. The tabs change in the window, not the address. It shows at once from the
+// projects the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useSearch } from 'wouter';
-import { ArrowLeft, ArrowRight, BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, LibraryBig, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
+import { BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserPlus, UserRound, X } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type FoundIn, type Space, type SpaceView } from '@shared/spaces';
@@ -14,7 +15,7 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
-import { go, openSession } from '../../lib/nav';
+import { closeProject, go, openProject, openSession, type ProjectPart, type ProjectTab } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
@@ -24,13 +25,11 @@ import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
 import { goFolder } from '../files/actions';
 import { addFiles, BaseCard, DropFiles, MeaningHint, MeaningWait, TrySearch, useKnowledge } from '../knowledge/parts';
-import { BackButton, NavButton, PageHeader } from '../layout/PageHeader';
-import { SpaceLibrary } from '../pages/Library';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
-import { ProjectsColumn } from './ProjectsColumn';
 import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
+import { RecentFiles } from './RecentFiles';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { DEFAULT_WIKI_DOCUMENTS } from '@shared/wiki';
@@ -40,21 +39,16 @@ import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/space
 import { PlacePage } from '../memory/MemoryNotes';
 import { loadSpaces, useSpaces } from './state';
 
-export type SpaceTab = 'overview' | 'library' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
+export type SpaceTab = ProjectTab;
 
-/** The parts of the Memory tab (its address's `part`): notes first. */
-export type MemoryPart = 'notes' | 'wiki' | 'documents';
-
-/** The address of a project's Memory tab, on one of its parts. */
-export const memoryPath = (id: string, part?: MemoryPart) => `/projects/${id}/memory${part && part !== 'notes' ? `?part=${part}` : ''}`;
+/** The parts of the Memory tab: notes first. */
+export type MemoryPart = ProjectPart;
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
 
-const tabPath = (id: string, t: SpaceTab) => `/projects/${id}${t === 'overview' ? '' : `/${t}`}`;
-
 // ---- pieces ----------------------------------------------------------------------------------------------------
 
-/** A part of the page: its title (and how many it holds), what leads further, and what it holds. */
+/** A part of the tab: its title (and how many it holds), what leads further, and what it holds. */
 export function Card({ title, count, action, children, className }: { title: ReactNode; count?: number; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={cx('min-w-0 overflow-hidden rounded-2xl border border-line bg-panel', className)}>
@@ -69,7 +63,7 @@ export function Card({ title, count, action, children, className }: { title: Rea
   );
 }
 
-/** The quiet link at a card's top right: "All 12", "Open in the Library". */
+/** The quiet link at a card's top right: "All 12", "Share". */
 export function CardLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-fg-3 hover:bg-bg-2 hover:text-fg">
@@ -108,13 +102,13 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
 function deleteBody(found: FoundIn[] | undefined) {
   const claude = !!found?.includes('claude');
   const codex = !!found?.includes('codex');
-  if (claude && codex) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s and Codex’s sessions and won’t make it again.';
-  if (claude) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s sessions and won’t make it again.';
-  if (codex) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Codex’s sessions and won’t make it again.';
-  return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.';
+  if (claude && codex) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s and Codex’s sessions and won’t make it again.';
+  if (claude) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s sessions and won’t make it again.';
+  if (codex) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Codex’s sessions and won’t make it again.';
+  return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.';
 }
 
-/** Asks, then deletes the space and goes back to the list (its sessions, folder, documents and skills stay). */
+/** Asks, then deletes the space and closes its window (its sessions, folder, documents and skills stay). */
 async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) {
   const ok = await confirm({
     title: tr(`Delete the ${s.name} project?`),
@@ -130,12 +124,12 @@ async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) 
     return;
   }
   loadSpaces();
-  go('/projects');
+  closeProject();
 }
 
 // ---- the top --------------------------------------------------------------------------------------------------
 
-/** The space's one menu: its folder in Files, only its sessions in the sidebar, sharing it with people, and deleting it (on its page and its card). */
+/** The space's one menu: its folder in Files, only its sessions in the sidebar, sharing it with people, and deleting it (in the project's window). */
 export function SpaceMenu({ s }: { s: Space }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -178,22 +172,17 @@ export function SpaceMenu({ s }: { s: Space }) {
 /** How much the project remembers: notes, wiki articles and documents (what is loaded so far). */
 const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;
 
-/** Its mark, name and what it is about over a wash of its colour, New session and its menu, and its tabs. */
-function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceTab; memory: SpaceMemory }) {
+/** Its mark, name and what it is about over a wash of its colour, New session, its menu and Close, and its tabs. */
+function Top({ s, view, tab, onTab, memory }: { s: Space; view?: SpaceView; tab: SpaceTab; onTab: (t: SpaceTab) => void; memory: SpaceMemory }) {
   const spaces = useSpaces();
   const home = useApp((x) => x.boot?.home);
-  const sideOpen = useUI((x) => x.sideOpen);
   const wide = useMediaQuery('(min-width: 640px)');
-  // With the column beside it (a computer, sidebar open), All projects is a row there; the arrow is for the rest.
-  const column = useMediaQuery('(min-width: 1024px)') && sideOpen;
   const group = isGroup(s);
   const c = spaceColor(s);
   return (
-    <header className="relative shrink-0 border-b border-line pt-[var(--safe-top)]">
+    <header className="relative shrink-0 border-b border-line pt-[var(--safe-top)] sm:pt-0">
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${c} 15%, transparent), color-mix(in oklab, ${c} 3%, transparent))` }} />
-      <div className="relative mx-auto flex max-w-[1120px] items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
-        <NavButton />
-        {!column && <BackButton label="All projects" onClick={() => go('/projects')} />}
+      <div className="relative flex items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-6 sm:pt-5">
         <SpaceMark s={s} size={wide ? 46 : 34} className="rounded-[12px] max-sm:rounded-[10px]" />
         <div className="min-w-0 flex-1">
           <h1 translate="no" className="truncate text-[17px] leading-tight font-semibold tracking-tight sm:text-[21px]">
@@ -207,17 +196,19 @@ function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceT
           <span className="max-sm:hidden">New session</span>
         </Button>
         <SpaceMenu s={s} />
+        <IconButton label="Close" onClick={closeProject}>
+          <X size={18} />
+        </IconButton>
       </div>
       {/* The tabs that do not fit (on a phone) are under More at the row's end; the open one's line lies on the border. */}
-      <div className="relative mx-auto -mb-px max-w-[1120px] px-1.5 pt-1 sm:px-4 sm:pt-3">
+      <div className="relative -mb-px px-1.5 pt-1 sm:px-4 sm:pt-3">
         <Tabs
           value={tab}
           dense={!wide}
           fold
-          onChange={(t) => go(tabPath(s.id, t), true)}
+          onChange={onTab}
           options={[
             { value: 'overview', label: 'Overview', icon: <LayoutDashboard size={15} /> },
-            { value: 'library', label: 'Library', count: wide ? view?.library : undefined, icon: <LibraryBig size={15} /> },
             { value: 'files', label: 'Files', icon: <FolderOpen size={15} /> },
             { value: 'memory', label: 'Memory', count: wide ? memoryTotal(memory, view) : undefined, icon: <Brain size={15} /> },
             { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined, icon: <Sparkles size={15} /> },
@@ -235,8 +226,8 @@ function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceT
 /** How many of a space's sessions the overview lists before All. */
 const RECENT = 6;
 
-/** Its sessions, what it holds in the Library, and what every session in it gets. */
-function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; keys?: string[]; memory: SpaceMemory }) {
+/** Its sessions, who it is shared with, and what every session in it gets. */
+function OverviewTab({ s, view, keys, memory, onTab }: { s: Space; view?: SpaceView; keys?: string[]; memory: SpaceMemory; onTab: (t: SpaceTab) => void }) {
   const home = useApp((x) => x.boot?.home);
   const byKey = useSessions((x) => x.byKey);
   const spaces = useSpaces();
@@ -250,7 +241,7 @@ function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; ke
     return [...out.values()].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   }, [byKey, keys, s.id]);
   const shown = all ? sessions : sessions.slice(0, RECENT);
-  const to = (t: SpaceTab) => go(tabPath(s.id, t), true);
+  const to = onTab;
   const assistant = assistants.find((a) => a.id === s.assistant)?.name;
   const others = s.folders?.length ?? 0;
   const members = (s.members ?? []).map((id) => spaces?.find((x) => x.id === id)).filter((x): x is SpaceView => !!x);
@@ -291,19 +282,14 @@ function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; ke
             </div>
           )}
         </Card>
-        <Card
-          title="In the Library"
-          count={view?.library}
-          action={
-            !!view?.library && (
-              <CardLink onClick={() => go(`/library?project=${s.id}`)}>
-                Open in the Library <ArrowRight size={13} />
-              </CardLink>
-            )
-          }
-        >
-          <div className="px-4 pb-4">{view ? <SpaceLibrary space={view} limit={6} framed={false} /> : null}</div>
-        </Card>
+        <RecentFiles
+          s={s}
+          card={(count, body) => (
+            <Card title="Files" count={count} action={<CardLink onClick={() => to('files')}>All files</CardLink>}>
+              {body}
+            </Card>
+          )}
+        />
       </div>
       <aside className="min-w-0 space-y-5">
         <SharedWith s={s} />
@@ -340,7 +326,7 @@ function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; ke
           <Card title="The projects it brings together" count={members.length}>
             <div className="divide-y divide-line border-t border-line">
               {members.map((m) => (
-                <button key={m.id} type="button" onClick={() => go(`/projects/${m.id}`)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
+                <button key={m.id} type="button" onClick={() => openProject(m.id)} className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg-1">
                   <SpaceMark s={m} size={26} className="rounded-[8px]" />
                   <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
                     {m.name}
@@ -391,10 +377,8 @@ function SharedWith({ s }: { s: Space }) {
 
 // ---- Memory ------------------------------------------------------------------------------------------------------
 
-/** The Memory tab: the project's notes, its wiki memory and its documents, one part at a time (the address's `part`). */
-function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) => void; memory: SpaceMemory }) {
-  const asked = new URLSearchParams(useSearch()).get('part');
-  const part: MemoryPart = asked === 'wiki' || asked === 'documents' ? asked : 'notes';
+/** The Memory tab: the project's notes, its wiki memory and its documents, one part at a time. */
+function MemoryTab({ s, onSaved, memory, part, onPart }: { s: Space; onSaved: (next: Space) => void; memory: SpaceMemory; part: MemoryPart; onPart: (p: MemoryPart) => void }) {
   const home = useApp((x) => x.boot?.home);
   const articles = memory.wiki?.on ? memory.wiki.articles?.length : undefined;
   return (
@@ -402,7 +386,7 @@ function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) =>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Segmented<MemoryPart>
           value={part}
-          onChange={(p) => go(memoryPath(s.id, p), true)}
+          onChange={onPart}
           options={[
             { value: 'notes', label: <PartLabel name="Notes" n={memory.notes} /> },
             { value: 'wiki', label: <PartLabel name="Wiki" n={articles} /> },
@@ -506,7 +490,7 @@ function DocumentsPart({ s, onSaved, wikiOn, version }: { s: Space; onSaved: (ne
           <div className="text-[13.5px] font-medium">Also the documents of the projects it brings together</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
-              <button key={m.id} type="button" onClick={() => go(memoryPath(m.id, 'documents'))} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
+              <button key={m.id} type="button" onClick={() => openProject(m.id, 'memory', { part: 'documents' })} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
                 <SpaceMark s={m} size={15} />
                 <span translate="no" className="min-w-0 truncate">
                   {m.name}
@@ -772,7 +756,7 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-err/25 px-4 py-4 sm:px-6">
         <div className="min-w-[min(100%,260px)] flex-1">
           <div className="text-[14px] font-semibold">Delete the project</div>
-          <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">Its sessions, folder, documents, skills and what it holds in the Library stay.</div>
+          <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">Its sessions, folder, files, documents and skills stay.</div>
         </div>
         <Button variant="secondary" icon={<Trash2 size={14} />} onClick={() => void deleteSpace(s, confirm)} className="text-err">
           Delete the project
@@ -783,25 +767,42 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
   );
 }
 
-// ---- the page ------------------------------------------------------------------------------------------------------
+// ---- the window's content -----------------------------------------------------------------------------------------
 
-export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
+/** Only a Close, over a short message or while the project loads. */
+function Bare({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <header className="flex shrink-0 items-center justify-end border-b border-line px-2 pt-[calc(var(--safe-top)+8px)] pb-2 sm:pt-2">
+        <IconButton label="Close" onClick={closeProject}>
+          <X size={18} />
+        </IconButton>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col pb-[var(--safe-bottom)]">{children}</div>
+    </>
+  );
+}
+
+/** The project's window: its header and tabs, and the tab that is open (`tab`, `part` and `share` are how it opened). */
+export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id: string; tab: SpaceTab; part?: MemoryPart; share?: boolean; req?: number }) {
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
-  // The Projects column beside it on a computer, this project lit; a phone and a narrow window have none.
-  const wideColumn = useMediaQuery('(min-width: 1024px)');
-  const frame = (main: ReactNode) => (
-    <div className="flex h-full min-h-0">
-      {wideColumn && <ProjectsColumn project={id} />}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{main}</div>
-    </div>
-  );
-  // Its address with ?share=1 (from the search box, the guide or an agent) opens the Share dialog.
-  const share = new URLSearchParams(useSearch()).get('share') === '1';
+  const [tab, setTab] = useState<SpaceTab>(first);
+  const [part, setPart] = useState<MemoryPart>(firstPart ?? 'notes');
+  // Asked again for a tab while the window is open (its Files from a message's Show, say): that tab shows.
+  const asked = useRef(req);
   useEffect(() => {
-    if (!share || !view) return;
+    if (req === asked.current) return;
+    asked.current = req;
+    setTab(first);
+    if (firstPart) setPart(firstPart);
+  }, [req, first, firstPart]);
+  // Opened to share it (from the search box, the guide or an agent): the Share dialog opens over the window, once.
+  const shared = useRef(false);
+  useEffect(() => {
+    if (!share || !view || shared.current) return;
+    shared.current = true;
     openShareDialog(view);
-    go(tabPath(id, tab), true);
   }, [share, !!view]);
   const [data, setData] = useState<{ space: Space; sessions: string[]; memoryKey?: string } | null>(null);
   const [gone, setGone] = useState(false);
@@ -814,7 +815,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
         setData(r);
         setGone(false);
       },
-      // A space deleted (or an address that names none) says so once, in place of the page.
+      // A space deleted (or an address that names none) says so once, in place of the window's content.
       (e) => live && ((e as { status?: number }).status === 404 || /no such space/i.test((e as Error).message) ? setGone(true) : toastError(e)),
     );
     return () => {
@@ -822,68 +823,55 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
     };
   }, [id, spaces]);
   if (gone)
-    return frame(
-      <>
-        <PageHeader title="Projects" />
+    return (
+      <Bare>
         <Empty icon={<Boxes size={22} />} title="This project is gone">
           <span className="block">It was deleted, or the address is not one of your projects.</span>
-          <span className="mt-3 inline-flex">
-            <Button size="sm" variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => go('/projects')}>
-              All projects
-            </Button>
-          </span>
         </Empty>
-      </>,
+      </Bare>
     );
-  // The space as the list knows it shows at once; what the page fetches (fresher after a save) takes its place.
+  // The space as the list knows it shows at once; what the window fetches (fresher after a save) takes its place.
   const s: Space | undefined = data?.space ?? view;
   if (!s)
-    return frame(
-      <div className="flex h-full items-center justify-center text-fg-3">
-        <Throbber size={28} />
-      </div>,
+    return (
+      <Bare>
+        <div className="flex h-full items-center justify-center text-fg-3">
+          <Throbber size={28} />
+        </div>
+      </Bare>
     );
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
-  return frame(
+  const to = (t: SpaceTab) => {
+    setTab(t);
+    if (t === 'memory') setPart('notes');
+  };
+  return (
     <>
-      <Top s={s} view={view} tab={tab} memory={memory} />
+      <Top s={s} view={view} tab={tab} onTab={to} memory={memory} />
       {tab === 'files' ? (
-        // The folder scrolls in its own box, so the page keeps its height.
-        <div className="min-h-0 flex-1">
-          <div className="mx-auto h-full max-w-[1120px] px-3 pt-4 pb-3 sm:px-6">
+        // The folder scrolls in its own box, so the window keeps its height.
+        <div className="min-h-0 flex-1 pb-[var(--safe-bottom)]">
+          <div className="h-full px-3 pt-4 pb-3 sm:px-6">
             <SpaceFiles s={s} onSaved={saved} />
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto pb-[var(--safe-bottom)]">
+          <div className="px-3 py-5 sm:px-6 sm:py-6">
             {tab === 'memory' ? (
-              <MemoryTab s={s} onSaved={saved} memory={memory} />
+              <MemoryTab s={s} onSaved={saved} memory={memory} part={part} onPart={setPart} />
             ) : tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
             ) : tab === 'agents' ? (
               <AgentsBoard space={s} />
             ) : tab === 'settings' ? (
               <SettingsTab s={s} onSaved={saved} onWikiChanged={memory.reload} />
-            ) : tab === 'library' ? (
-              view ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="min-w-0 flex-1 text-[13px] text-fg-3">Pages, slides, documents, pictures and videos made in this project, or moved to it</span>
-                    <Button size="sm" variant="ghost" onClick={() => go(`/library?project=${s.id}`)}>
-                      Open in the Library
-                      <ArrowRight size={13} className="ml-1" />
-                    </Button>
-                  </div>
-                  <SpaceLibrary space={view} />
-                </div>
-              ) : null
             ) : (
-              <OverviewTab s={s} view={view} keys={data?.sessions} memory={memory} />
+              <OverviewTab s={s} view={view} keys={data?.sessions} memory={memory} onTab={to} />
             )}
           </div>
         </div>
       )}
-    </>,
+    </>
   );
 }

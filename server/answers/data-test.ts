@@ -349,7 +349,7 @@ test('a spreadsheet’s range: its first row the headings, dates as written, mon
 test('a missing spreadsheet, tab, range or column: a plain message', async () => {
   let m = await message(cardData(db, 'table', { from: { sheet: 'Shop numberz' } }, {}));
   assert.equal(m.status, 404);
-  assert.match(m.text, /no spreadsheet called “Shop numberz” in the Library/);
+  assert.match(m.text, /no spreadsheet called “Shop numberz”/);
   m = await message(cardData(db, 'table', { from: { sheet: 'Shop numbers', range: 'Costs!A1:B4' } }, {}));
   assert.match(m.text, /no tab called “Costs”\. Its tabs: Notes, Sales/);
   m = await message(cardData(db, 'table', { from: { sheet: 'Shop numbers', range: 'Sales!Z50:Z60' } }, {}));

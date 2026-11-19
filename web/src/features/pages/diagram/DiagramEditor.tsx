@@ -1,4 +1,4 @@
-// A diagram of the Library in its editor, as draw.io: the shapes on the left (drawn as they will be, a search that finds
+// A diagram in its editor, as draw.io: the shapes on the left (drawn as they will be, a search that finds
 // Lucide's icons too), the page in the middle (diagram canvas: pan, zoom, pick, move with guides, resize, turn, connect
 // with the blue arrows, words typed in place), the format panel on the right (style, text, arrange; a connector's line
 // and ends; the page and its layout), the pages as tabs at the foot. Menus hold everything (Edit, View, Insert,

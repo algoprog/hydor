@@ -306,7 +306,7 @@ test('changing a switch, a number, a choice, a text and a list calls the right e
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/images/settings', body: { model: '' } }]);
   r = await set('images.video-model', 'bytedance/seedance-2');
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/videos/settings', body: { model: 'bytedance/seedance-2' } }]);
-  r = await set('images.captions-in-the-library', 'claude');
+  r = await set('images.captions-for-what-you-keep', 'claude');
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/media/settings', body: { captions: { provider: 'claude' } } }]);
   r = await set('search.results-per-search', '30');
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/search/settings', body: { defaultK: 30 } }]);

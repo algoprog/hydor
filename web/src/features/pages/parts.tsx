@@ -1,6 +1,6 @@
-// The Library's shared parts: a page's picture (or its first letter until the picture is ready), and the dialogs
-// to rename a page and publish one (or a folder); and a published site's row. New (a page, a deck, a document…) is
-// NewDialog.tsx.
+// The shared parts of pages kept in a project: a page's picture (or its first letter until the picture is ready), and
+// the dialogs to rename a page and publish one (or a folder); and a published site's row. New (a page, a deck, a
+// document…) is NewDialog.tsx; how a kept page shows among a project's files is kept.tsx.
 import { useEffect, useState } from 'react';
 import { Globe, GlobeLock } from 'lucide-react';
 import { DESCRIPTION_WORDS, wordCount, type PageInfo, type SiteInfo, type SiteVisibility } from '@shared/pages';
@@ -20,7 +20,8 @@ export const toneOf = (id: string) => TONES[parseInt(id.slice(0, 6), 16) % TONES
 const firstLetter = (title: string) => [...title.trim()][0]?.toUpperCase() ?? 'P';
 
 /** A page's picture, or its first letter until the picture is ready. */
-export function Thumb({ page, className }: { page: PageInfo; className?: string }) {
+/** `corner`: the picture from its top-left corner (a tile narrower than the page: its title stays in). */
+export function Thumb({ page, className, corner }: { page: PageInfo; className?: string; corner?: boolean }) {
   const ready = usePagesStore((s) => s.thumbs[page.id]) ?? page.thumb;
   const [failed, setFailed] = useState<string | null>(null);
   const show = ready && failed !== ready;
@@ -29,7 +30,7 @@ export function Thumb({ page, className }: { page: PageInfo; className?: string 
   return (
     <div className={cx('relative overflow-hidden bg-gradient-to-br', toneOf(page.id), show && arrival.plate, className)}>
       {show ? (
-        <img ref={arrival.ref} src={src} alt="" loading="lazy" draggable={false} onLoad={arrival.onLoad} onError={() => setFailed(ready)} className={cx('absolute inset-0 h-full w-full object-cover object-top', arrival.className)} />
+        <img ref={arrival.ref} src={src} alt="" loading="lazy" draggable={false} onLoad={arrival.onLoad} onError={() => setFailed(ready)} className={cx('absolute inset-0 h-full w-full object-cover', corner ? 'object-left-top' : 'object-top', arrival.className)} />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center text-[34px] font-semibold opacity-80">{firstLetter(page.title)}</span>
       )}
@@ -38,7 +39,7 @@ export function Thumb({ page, className }: { page: PageInfo; className?: string 
 }
 
 /**
- * A page's title and its description (what it is, in a few sentences: the Library's search, the search box and agents
+ * A page's title and its description (what it is, in a few sentences: the search box and agents
  * find it by it). Agents write one with what they save; files added get one from the helper model.
  */
 export function RenameDialog({ page, open, onClose }: { page: PageInfo; open: boolean; onClose: () => void }) {
@@ -88,7 +89,7 @@ export function RenameDialog({ page, open, onClose }: { page: PageInfo; open: bo
           <span className="text-[12px] font-medium text-fg-2">Description</span>
           <textarea value={text} rows={4} onChange={(e) => setText(e.target.value)} className={`${inputCls} h-auto py-2 leading-snug`} />
           <span className={cx('block text-[12px] leading-snug', n > DESCRIPTION_WORDS ? 'text-warn' : 'text-fg-3')}>
-            {n > DESCRIPTION_WORDS ? tr(`${n} words: keep it under ${DESCRIPTION_WORDS}`) : 'What it is and what it is for. The Library’s search finds it by these words and what they mean.'}
+            {n > DESCRIPTION_WORDS ? tr(`${n} words: keep it under ${DESCRIPTION_WORDS}`) : 'What it is and what it is for. The search box finds it by these words and what they mean.'}
           </span>
         </label>
       </div>

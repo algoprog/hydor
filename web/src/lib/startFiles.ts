@@ -8,7 +8,7 @@ export interface StartFile {
   path: string;
   size?: number;
   dir?: boolean;
-  /** What its chip shows, when not the file's own name (a Library item's title). */
+  /** What its chip shows, when not the file's own name (a kept item's title). */
   name?: string;
 }
 

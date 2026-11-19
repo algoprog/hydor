@@ -94,7 +94,7 @@ export interface VideoMotion {
 export interface VideoClip {
   /** The editor's own name for it (to pick it, and to find its sound and frames). */
   id?: string;
-  /** Its video or picture: a deck's ("naget-video:…", "naget-asset:…"), a Library item ("media:<id>"), a sound-less file's path; none: the video being edited. */
+  /** Its video or picture: a deck's ("naget-video:…", "naget-asset:…"), a kept item ("media:<id>"), a sound-less file's path; none: the video being edited. */
   src?: string;
   /** Its name, to show. */
   name?: string;
@@ -136,7 +136,7 @@ export interface VideoClip {
   soundFadeIn?: number;
   soundFadeOut?: number;
   /**
-   * A sound in place of its own (a Library sound "media:<id>", "naget-sound:…" or a sound file), with the same timing:
+   * A sound in place of its own (a kept sound "media:<id>", "naget-sound:…" or a sound file), with the same timing:
    * its second t stands for the source's second t, so the clip's trim, speed and direction apply to it too.
    */
   sound?: string;
@@ -175,7 +175,7 @@ export interface VideoOverlay {
 /** Music (A2) or a voice-over (A3): a sound placed on the timeline. */
 export interface VideoAudio {
   id?: string;
-  /** A Library sound ("media:<id>"), a sound kept by the editor ("naget-sound:…") or a sound file's path. */
+  /** A kept sound ("media:<id>"), a sound kept by the editor ("naget-sound:…") or a sound file's path. */
   src: string;
   name?: string;
   track: 'music' | 'voice';
@@ -383,15 +383,15 @@ export const VIDEO_PRESETS = [
 
 /**
  * Where the result goes: kept as a deck's video ("naget-video:<sha>", with its first frame as a kept picture), as a
- * deck's picture ("naget-asset:<sha>": a frame, a GIF), a Library item's file replaced or a new item beside it, a new
- * item in the Library (from a session's video: that session's), or a file written over (the old one to the Trash) or a
+ * deck's picture ("naget-asset:<sha>": a frame, a GIF), a kept item's file replaced or a new item beside it, a new
+ * kept item (from a session's video: that session's), or a file written over (the old one to the Trash) or a
  * copy beside it.
  */
 export type VideoSaveTo = { video: true } | { asset: true } | { media: string; as: 'replace' | 'copy' } | { library: true; session?: string } | { file: string; as: 'replace' | 'copy' };
 
 /** POST /api/mediaedit/video. */
 export interface VideoEditAsk {
-  /** The video being edited: "naget-video:<sha>", a Library item ("media:<id>" or its /api/media/<id>/file), or a file's path. Clips without a src are of it. */
+  /** The video being edited: "naget-video:<sha>", a kept item ("media:<id>" or its /api/media/<id>/file), or a file's path. Clips without a src are of it. */
   src: string;
   recipe: VideoRecipe;
   /** What to make (mp4 when left out). */
@@ -432,7 +432,7 @@ export interface VideoEditJob {
   /** Done: a kept video or picture ("naget-video:…", "naget-asset:…"), and a video's first frame (a kept picture). */
   src?: string;
   poster?: string;
-  /** Done: the Library item it went to, by id, or the file it was written to. */
+  /** Done: the kept item it went to, by id, or the file it was written to. */
   media?: string;
   path?: string;
   w?: number;

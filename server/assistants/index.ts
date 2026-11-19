@@ -205,7 +205,7 @@ function routes(d: Deps) {
     return { key: await ensureStanding(d, a) };
   });
   // Its history: the results it handed back (hand_back), newest first, a page at a time (before: the last one's id), and
-  // the Library pages its first run made for them.
+  // the pages its first run made for them.
   app.get('/api/assistants/:id/results', async (req): Promise<AgentResults> => {
     const q = req.query as { before?: string; limit?: string };
     if (!findAssistant(db, idOf(req))) throw new HttpError(404, 'There is no such agent');

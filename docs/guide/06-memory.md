@@ -273,19 +273,18 @@ The section shows while any suggestion waits for you, even when the last tidy-up
 
 ### Search by meaning
 
-[Search by meaning](/settings?s=memory&find=Search%20by%20meaning), the first row of the group **What agents get**, "finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer": LightOn's mDenseOn, which reads nine languages. It is on unless you turn it off, so notes and the Library are found by hybrid search: by their words and by what they mean, the two lists merged by rank. The model runs here, so your notes aren't sent to a service to be searched. With it off, notes are found by their words alone. With it on:
+[Search by meaning](/settings?s=memory&find=Search%20by%20meaning), the first row of the group **What agents get**, "finds notes, what you keep and more by what they mean as well as by their words, with a model that runs on this computer": LightOn's mDenseOn, which reads nine languages. It is on unless you turn it off, so notes and what you keep are found by hybrid search: by their words and by what they mean, the two lists merged by rank. The model runs here, so your notes aren't sent to a service to be searched. With it off, notes are found by their words alone. With it on:
 
 - Agents start with the notes that bear on your request even when the notes use other words than you did.
 - Agents looking notes up, and the search field of the **Notes** group, find them by meaning as well as by words.
 - A note that says the same as one already kept, in other words, isn't saved again, and the tidy-up groups notes by meaning.
-- The Library's search finds pages, documents, pictures and the rest by what their titles and descriptions mean (see [Find your pages](/guide/library#find-your-pages)).
-- The search box (Ctrl+K) finds pages, settings, sessions, apps and more by what they mean, and knowledge bases are searched by meaning too (see [Projects and knowledge](/guide/projects)).
+- The search box (Ctrl+K) finds pages, settings, sessions, apps, and the documents, pictures and the rest you kept (by their titles and descriptions) by what they mean, and knowledge bases are searched by meaning too (see [Projects and knowledge](/guide/projects)).
 
 **How it gets ready**, once:
 
 1. A minute after the app first starts, the app sets up a private Python environment in its data folder, with ONNX Runtime, Hugging Face's tokenizer and NumPy (about 150 MB); if you turned it off, it does this as soon as you turn **Search by meaning** back on (memory itself must be on). The line under the row shows each step, such as "Making a private Python environment" and "Installing ONNX Runtime and the tokenizer". An environment an older version made with PyTorch is removed first, which frees its gigabytes: "Removing the environment an older version made".
 2. Then it downloads the model, once: "Downloading the model: 120 of 340 MB, once". It is mDenseOn in 8 bits (algoprog/mDenseOn-ONNX on Hugging Face), a quarter of the full model's size, which finds the same notes. Each file is checked before it is used, and a download cut short goes on from where it stopped the next time.
-3. Every note gets its vector (the numbers search by meaning compares) in the background, and so does everything in the Library. The line counts the notes: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
+3. Every note gets its vector (the numbers search by meaning compares) in the background, and so does everything you keep. The line counts the notes: "all 120 notes found by meaning", or "80 of 120 notes found by meaning (the rest soon)".
 
 **Turn it off** with the row's switch: the model stops, and everything is found by its words alone. A computer short of disk space or memory can do without it. While memory is off for all sessions, the switch is greyed out.
 
@@ -342,7 +341,7 @@ By default the search covers the sessions of every project. Ask an agent to keep
 
 ## Search beyond one project
 
-Sometimes what an agent needs was kept or done in another project: "How did we set up deploys in my Shop project?" For that, agents have one search that looks through everything memory keeps at once: notes, wiki articles, documents and past conversations. It looks in the project the agent works in, in all your projects, or in one project by its name (its name on the Projects page, the name of its folder, or the name of its repository). It never looks unless the agent asks: nothing from your other projects is added to what an agent is given at the start or with a message.
+Sometimes what an agent needs was kept or done in another project: "How did we set up deploys in my Shop project?" For that, agents have one search that looks through everything memory keeps at once: notes, wiki articles, documents and past conversations. It looks in the project the agent works in, in all your projects, or in one project by its name (its name in the sidebar, the name of its folder, or the name of its repository). It never looks unless the agent asks: nothing from your other projects is added to what an agent is given at the start or with a message.
 
 Each result says where it is from and how to open it: an article opens with the wiki tool, a document with the knowledge tool, each told which project it is in, and a past conversation with its key. What other projects keep is only ever read: an agent never changes another project's notes, wiki, documents or conversations from here.
 

@@ -1,6 +1,6 @@
 // Images opened large: fitted to the screen, a click (or tap) shows them at full size to pan around,
 // arrows step through several, Escape closes. A step's picture shows where the step acted on it. Edit opens the
-// picture in the picture editor, in a tab of its own (saved as a copy in the Library, or back in place when the
+// picture in the picture editor, in a tab of its own (saved as a copy, kept, or back in place when the
 // one who opened it says where).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -21,8 +21,8 @@ export interface LightboxImage {
   /** Where an agent's step acted on the picture (a computer step's screen). */
   marks?: StepMark[];
   /**
-   * Edit: where the picture editor saves it back (a Library item, a file, a deck's picture) and what to do then; with
-   * none it saves a copy in the Library. false: no Edit (a video's frames).
+   * Edit: where the picture editor saves it back (a kept picture, a file, a deck's picture) and what to do then; with
+   * none it keeps a copy. false: no Edit (a video's frames).
    */
   edit?: false | { to?: SaveTo; save?: (r: Saved) => void | Promise<void>; from?: string };
 }
@@ -45,7 +45,7 @@ function edit(img: LightboxImage) {
     from: { label: e.from || pageName() },
     to: e.to,
     copy: !!e.to,
-    save: e.save ?? ((r) => void (r.media && toast('Saved to your Library', 'ok'))),
+    save: e.save ?? ((r) => void (r.media && toast('Saved', 'ok'))),
   });
 }
 

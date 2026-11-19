@@ -68,7 +68,7 @@ export interface SoundClip {
   /** Its own id (the editor picks and moves clips by it). */
   id: string;
   /**
-   * The sound it plays: "" for the sound being edited; else a sound of the Library ("media:<id>"), one the editor keeps
+   * The sound it plays: "" for the sound being edited; else a kept sound ("media:<id>"), one the editor keeps
    * (a recording, a sound made with AI, one from this device: "naget-sound:<sha>"), or a file's path (a sound, or a
    * video's sound).
    */
@@ -1131,15 +1131,15 @@ export const fadeCurve = (x: number, smooth: boolean) => {
 // ---- asks and answers -------------------------------------------------------------------------------------------------
 
 /**
- * Where the result goes: a sound kept for a video ("naget-sound:<sha>"), a Library sound's file replaced or a new one
- * beside it, a new one in the Library (from a session's sound: that session's), a file written over (the old one to the
+ * Where the result goes: a sound kept for a video ("naget-sound:<sha>"), a kept sound's file replaced or a new one
+ * beside it, a new kept one (from a session's sound: that session's), a file written over (the old one to the
  * Trash) or a copy beside it.
  */
 export type SoundSaveTo = { sound: true } | { media: string; as: 'replace' | 'copy' } | { library: true; session?: string; title?: string } | { file: string; as: 'replace' | 'copy' };
 
 /** POST /api/mediaedit/audio. */
 export interface SoundEditAsk {
-  /** The sound being edited: a Library sound ("media:<id>" or its /api/media/<id>/file), a kept one, or a file's path (a sound, or a video whose sound it is). */
+  /** The sound being edited: a kept sound ("media:<id>" or its /api/media/<id>/file), a kept one, or a file's path (a sound, or a video whose sound it is). */
   src: string;
   recipe: SoundRecipe;
   out: SoundOutput;
@@ -1156,7 +1156,7 @@ export interface SoundEditJob {
   progress?: number;
   step?: string;
   format: SoundFormat;
-  /** Done: a kept sound ("naget-sound:…"), the Library item it went to, or the file it was written to. */
+  /** Done: a kept sound ("naget-sound:…"), the kept item it went to, or the file it was written to. */
   src?: string;
   media?: string;
   path?: string;

@@ -1,6 +1,6 @@
 // An agent's history: every result it handed back (hand_back), with where each went, kept in its own table for its
 // page's table of runs and the API. Results up to a year old are kept, at most RESULTS_KEEP.count an agent, whichever
-// comes first; each is cut to a size a list can show (a big table is whole in the places it went). Also the Library
+// comes first; each is cut to a size a list can show (a big table is whole in the places it went). Also the
 // pages an agent's first run made for its results (a page updated each run, a spreadsheet a row goes into), so later
 // runs find them again.
 import { RESULTS_KEEP, type AgentResult, type OutputKind, type ResultPlaces } from '../../shared/assistants.ts';
@@ -127,7 +127,7 @@ export const resultsOf = (db: DB, id: string, limit = 50): AgentResult[] => resu
 type Made = Partial<Record<'library' | 'sheet', string>>;
 const madeKey = (id: string) => `assistants.made.${id}`;
 
-/** The Library pages an agent's first run made for its results, by the kind of place: their ids. */
+/** The pages an agent's first run made for its results, by the kind of place: their ids. */
 export function madeOf(db: DB, id: string): Made {
   return parse<Made>(kvGet(db, madeKey(id)) ?? '{}', {});
 }
@@ -146,7 +146,7 @@ export function madePlaces(db: DB, id: string): ResultPlaces {
   return out;
 }
 
-/** An agent deleted: its history and what its runs made go from here (the pages stay in the Library). */
+/** An agent deleted: its history and what its runs made go from here (the pages stay). */
 export function forgetResults(db: DB, id: string) {
   table(db);
   db.prepare('delete from agent_results where agent = ?').run(id);
@@ -156,8 +156,8 @@ export function forgetResults(db: DB, id: string) {
 /** How each kind of place is said in a sentence (for the agent and the API's words). */
 export const PLACE: Record<OutputKind, string> = {
   file: 'a file',
-  library: 'a page in the Library',
-  sheet: 'a row in a Library spreadsheet',
+  library: 'a page',
+  sheet: 'a row in a spreadsheet',
   email: 'an email',
   webhook: 'a webhook',
   notify: 'a notification',

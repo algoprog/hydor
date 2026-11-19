@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, Folders, Inbox, ListFilter, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
+import { Folders, Inbox, ListFilter, Plus, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { go } from '../../lib/nav';
@@ -12,7 +12,8 @@ import { useApp, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Wordmark } from '../../components/Logo';
 import { cx, IconButton, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
-import { SpaceMark } from '../spaces/parts';
+import { NewSpaceDialog, SpaceMark } from '../spaces/parts';
+import { openProject } from '../spaces/ProjectDialog';
 import { useSpaces } from '../spaces/state';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
@@ -175,6 +176,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const connected = useApp((s) => s.connected);
   const filterRef = useRef<HTMLButtonElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [making, setMaking] = useState(false);
   // The rail loads the orders on a computer; the drawer has no rail.
   useEffect(() => (mobile ? loadToolOrder() : undefined), [mobile]);
   const close = () => useUI.getState().set({ drawerOpen: false });
@@ -221,22 +223,24 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
                 {sp.name}
               </MenuItem>
             ))}
-            <MenuItem
-              icon={<Boxes size={14} />}
-              onClick={() => {
-                setFilterOpen(false);
-                nav('/projects');
-              }}
-            >
-              Projects
-            </MenuItem>
           </>
         )}
         <MenuSep />
+        <MenuItem icon={<Plus size={14} />} onClick={() => (setFilterOpen(false), setMaking(true))}>
+          New project…
+        </MenuItem>
         <MenuItem icon={<Folders size={14} />} checked={byFolder} onClick={() => (useUI.getState().set({ groupByFolder: !byFolder }), setFilterOpen(false))}>
           Group by folder or project
         </MenuItem>
       </Popover>
+      <NewSpaceDialog
+        open={making}
+        onClose={() => setMaking(false)}
+        onMade={(sp) => {
+          if (mobile) close();
+          openProject(sp.id);
+        }}
+      />
     </>
   );
   // Machine, New session and the sessions: under the header of the column, or of the drawer.

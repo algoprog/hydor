@@ -11,7 +11,7 @@
 // warns of pictures over 34 megapixels), what was left out and what to pick on arXiv is said; and it is kept an hour
 // to download.
 //
-// The paper on disk: a Library document's files, pictures and last PDF written to a folder of the app's data
+// The paper on disk: a saved document's files, pictures and last PDF written to a folder of the app's data
 // (pages/papers/<id>), so an app can read it by its path; a file's document is its own folder, its PDF written there.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -338,7 +338,7 @@ function keepZip(zip: Buffer, name: string): string {
 const slug = (s: string) => (s.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'paper').slice(0, 60);
 
 /**
- * Where a paper is on this computer, for an app to read: a Library document's files, pictures and PDF written to its
+ * Where a paper is on this computer, for an app to read: a saved document's files, pictures and PDF written to its
  * own folder of the app's data (written again each time); a file's document is its own folder, its PDF beside the
  * app's copy. `pdf` is missing when it does not typeset.
  */
@@ -376,7 +376,7 @@ export async function paperOnDisk(db: DB, doc: TexDoc, o: { page?: string; folde
   return { folder, pdf };
 }
 
-/** A Library document's folder of the app's data goes with it. */
+/** A saved document's folder of the app's data goes with it. */
 export function dropPaperFolder(id: string) {
   try {
     fs.rmSync(path.join(PAPERS, id.replace(/[^\w-]/g, '')), { recursive: true, force: true });

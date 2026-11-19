@@ -1,6 +1,6 @@
-// Diagrams in the Library (shared/diagram.ts): kept as their model's text, each picture apart; their own page (a viewer
+// Diagrams kept as pages (shared/diagram.ts): kept as their model's text, each picture apart; their own page (a viewer
 // that fits the diagram to its frame, to pan and zoom, a tab for each page; every page on paper its own size; the first
-// page still, for the Library's picture); what get_page tells an agent of one; what an agent's save_diagram makes (whole
+// page still, for its picture in the Files); what get_page tells an agent of one; what an agent's save_diagram makes (whole
 // diagrams said as nodes and edges laid out here, Mermaid, the model itself, or changes by id); and the files a diagram
 // is saved as (SVG, PNG, draw.io) or opened from (draw.io files, Mermaid).
 import zlib from 'node:zlib';
@@ -259,7 +259,7 @@ const KIND_GROUPS =
   'UML and ER: class (text = name, rows = attributes, "---", methods), entity (text = table name, rows = "id int PK" …), table (rows = "cell|cell"), actor, component, lifeline, activation, initial, final, bar (fork or join). BPMN: task (rounded), event, event-end, event-mid, gateway, gateway-parallel, gateway-inclusive, data-object.';
 
 export const SAVE_DIAGRAM_DESCRIPTION = [
-  'Save a diagram in the user’s Library: a flowchart, process or swimlane diagram, org chart, mind map, network, cloud or software architecture, UML (class, sequence, state, use case), ER diagram, timeline, decision tree. They edit it there as in draw.io (shapes, connectors that follow them, styles, pages, layouts) and export it as SVG, PNG, PDF or a draw.io file.',
+  'Save a diagram for the user: a flowchart, process or swimlane diagram, org chart, mind map, network, cloud or software architecture, UML (class, sequence, state, use case), ER diagram, timeline, decision tree. They edit it there as in draw.io (shapes, connectors that follow them, styles, pages, layouts) and export it as SVG, PNG, PDF or a draw.io file.',
   'Leave out id to make a new one; give a saved diagram’s id (get_page lists them) to change it: change, add, remove and layout change only what they name; anything else replaces the whole diagram (older versions stay restorable).',
   'Say it simply, and the app lays it out and sizes each shape to its words: nodes [{id, text, shape?, color?, icon?, parent?, rows?}] and edges [{from, to, text?, arrow?, dashed?}] with layout (down: a flowchart top to bottom, the default; right, up, left; tree: an org chart; tree-right; mindmap: the first node in the middle; radial; circle; grid). Give x, y (and w, h) only to place shapes yourself (layout none). Line breaks in text: \\n.',
   `Shapes: ${KIND_GROUPS} Other names work too (process, decision, start, end, database, person, server…). Left out: a rounded box.`,
@@ -320,7 +320,7 @@ export const SAVE_DIAGRAM_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'A saved diagram’s id, to change it (a new version).' },
-    title: { type: 'string', description: 'Its name in the Library: "Checkout flow".' },
+    title: { type: 'string', description: 'Its name: "Checkout flow".' },
     nodes: { type: 'array', items: NODE_SCHEMA, description: 'The shapes of a one-page diagram.' },
     edges: { type: 'array', items: EDGE_SCHEMA, description: 'The connectors between them, by the nodes’ ids.' },
     layout: { type: 'string', enum: LAYOUTS, description: 'How the nodes are laid out (down when left out); with id and no nodes: that page laid out again.' },

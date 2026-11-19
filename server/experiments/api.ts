@@ -1,7 +1,7 @@
 // What the page's routes and the agents' tools do with experiments, beyond the queue itself: one run as the page
 // reads it (its record, events, metrics' series and the end of its log; through its machine when it is kept on
 // another), following a log, sweeps, results tables (made, kept, worked out again, put into a LaTeX document of
-// the Library), and the runs of every machine for the list.
+// the saved pages), and the runs of every machine for the list.
 import fs from 'node:fs';
 import { ACTIVE, betterOf, type MetricSeries, type ResultsColumn, type ResultsTable, type ResultsTableSpec, type RunRecord, type SweepSpec } from '../../shared/experiments.ts';
 import type { TexDoc } from '../../shared/latex.ts';
@@ -186,7 +186,7 @@ export function makeTable(d: Deps, b: Record<string, any>): ResultsTable {
 
 async function texOf(d: Deps, page: string): Promise<{ doc: TexDoc; version: number; title: string }> {
   const r = await d.app.inject({ method: 'GET', url: `/api/pages/${encodeURIComponent(page)}`, headers: internalHeaders() });
-  if (r.statusCode === 404) throw new HttpError(404, 'That document is no longer in the Library');
+  if (r.statusCode === 404) throw new HttpError(404, 'That document is no longer there');
   const j = r.json() as { page?: { kind?: string; version: number; title: string }; model?: TexDoc; error?: string };
   if (r.statusCode >= 400 || !j.page) throw new HttpError(r.statusCode, j.error ?? 'The document could not be read');
   if (j.page.kind !== 'tex' || !j.model) throw new HttpError(400, 'That is not a LaTeX document');
@@ -194,7 +194,7 @@ async function texOf(d: Deps, page: string): Promise<{ doc: TexDoc; version: num
 }
 
 /**
- * Puts a table into a file of a LaTeX document of the Library, as a new version of it (as the editor saves): in place
+ * Puts a table into a file of a saved LaTeX document, as a new version of it (as the editor saves): in place
  * of the table it made before (by its marker), else before \end{document} or at the end of the file.
  */
 export async function putInLatex(d: Deps, tableId: string, page: string, file = 'main.tex'): Promise<{ replaced: boolean; version: number; title: string }> {

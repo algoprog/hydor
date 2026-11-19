@@ -1,6 +1,6 @@
 // The LaTeX editor's files tree: the document's files in their folders, as the shared reading of what it uses gives
 // them (shared/latex-files.ts): the main file first and marked, then folders and files in a sensible order (sources in
-// the order the document reads them, the bibliography, styles and classes, pictures, data, the rest). In the Library,
+// the order the document reads them, the bibliography, styles and classes, pictures, data, the rest). In a kept document,
 // the files the document does not use show apart, greyed, under Not used (they stay in it); for a file of this computer,
 // what TeX takes from its folder as it is shows too (pictures, styles, classes, data: read-only here). A click opens a
 // file; the one in view is marked. Where the document can change: the + at the top (New file, New folder, Add pictures,

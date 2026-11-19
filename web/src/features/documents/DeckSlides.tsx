@@ -1,4 +1,4 @@
-// A PowerPoint file's slides in the file viewer, drawn by the slides runtime as the Library draws its decks (each part
+// A PowerPoint file's slides in the file viewer, drawn by the slides runtime as the app draws kept decks (each part
 // in its place: words in their fonts, sizes and colours, pictures, shapes, tables, charts, backgrounds, the footer), as
 // wide as the viewer allows, each with its speaker notes under it. A slide is drawn once it scrolls near, so a long deck
 // opens at once, and drawn again when the width changes or the deck's fonts arrive. Words a box has no room for are

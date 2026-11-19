@@ -3,7 +3,7 @@
 // server (image.ts), the same recipe the editor uses (shared/mediaedit.ts).
 //   POST /api/mediaedit/image   { data, to, format?, quality? } → { src?, media?, path?, w, h, mime, bytes, replaced?, note? }
 //     to: { asset: true }                          kept for a deck, document or page ("naget-asset:<sha>")
-//         { media?: id, as: 'replace' | 'copy' }   over a Library picture (its place, title and folder kept), or a new one
+//         { media?: id, as: 'replace' | 'copy' }   over a kept picture (its place and title kept), or a new one
 //         { file: path, as: 'replace' | 'copy' }   over a file (its old version to the Trash), or a copy beside it
 // Files are written as Files writes them, nowhere inside the app's own data folder.
 import crypto from 'node:crypto';
@@ -37,7 +37,7 @@ const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `
 /** A file's name says what kind of picture it holds. */
 const formatOfPath = (p: string): ImageFormat | null => fmtOf(path.extname(p).slice(1).toLowerCase()) ?? null;
 
-/** Within the app's own data (its database, the Library's copies, the Trash): written only through their own routes. */
+/** Within the app's own data (its database, the kept copies, the Trash): written only through their own routes. */
 function appsOwn(file: string): boolean {
   const real = (p: string) => {
     try {
@@ -61,12 +61,12 @@ function pictureOf(v: unknown): Buffer {
 }
 
 /**
- * A Library picture's file written over: its place in the Library, its title and description and folder kept; its still
+ * A kept picture's file written over: its place, its title and description kept; its still
  * made again. The file it had is kept as an earlier version (media/versions.ts). `who`: someone it is shared with saved it.
  */
 export async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: ImageFormat, who?: string): Promise<MediaItem> {
   const m = mustMedia(d.db, id);
-  if (m.kind !== 'image') throw new HttpError(400, 'Only a picture in the Library can be written over with a picture');
+  if (m.kind !== 'image') throw new HttpError(400, 'Only a kept picture can be written over with a picture');
   const name = `${m.id}.${extOf(fmt)}`;
   const dest = path.join(MEDIA_DIR, name);
   const tmp = path.join(MEDIA_DIR, `.${name}.${crypto.randomBytes(4).toString('hex')}.tmp`);
@@ -92,9 +92,9 @@ export async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: I
 }
 
 /**
- * A new Library picture: from a Library item (its project and folder kept, "(edited)" after its name), or simply named.
- * `where`: the project and Library folder it goes in when it is not from an item (a new picture made in a folder of the
- * Library, with `plain` its name left as it is, with no "(edited)").
+ * A new kept picture: from a kept item (its project kept, "(edited)" after its name), or simply named.
+ * `where`: the project and folder it goes in when it is not from an item (a new picture made in a folder of a
+ * project, with `plain` its name left as it is, with no "(edited)").
  */
 async function copyToLibrary(d: Deps, data: Buffer, fmt: ImageFormat, from: MediaItem | null, title: string, where: { space?: unknown; folder?: unknown; plain?: boolean } = {}): Promise<MediaItem> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-edited-'));
@@ -173,7 +173,7 @@ export async function saveEdited(d: Deps, b: Record<string, unknown>, who?: stri
   }
   const id = typeof to.media === 'string' && to.media ? to.media : null;
   if (as === 'replace') {
-    if (!id) throw new HttpError(400, 'to.media: the Library picture to write over');
+    if (!id) throw new HttpError(400, 'to.media: the kept picture to write over');
     const item = await replaceInLibrary(d, id, data, fmt, who);
     return { media: item.id, replaced: true, item, ...base };
   }
@@ -252,8 +252,8 @@ export function editImageTool(d: Deps): RunTool {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'The picture: a file in the session’s folder (PNG, JPEG, WebP or GIF), or one in a deck, document or page as get_page shows it (naget-asset:…).' },
-        library: { type: 'string', description: 'Instead of path: a picture of the user’s Library, by its id (app_api GET /api/media lists them).' },
-        save_to_library: { type: 'string', enum: ['replace', 'copy'], description: 'With library: put the result in the Library over that picture (replace: its title, project and folder kept, as the editor’s Save does) or beside it as a new one (copy). Left out, only the file in your folder is made.' },
+        library: { type: 'string', description: 'Instead of path: a picture the user kept, by its id (app_api GET /api/media lists them).' },
+        save_to_library: { type: 'string', enum: ['replace', 'copy'], description: 'With library: keep the result over that picture (replace: its title and project kept, as the editor’s Save does) or beside it as a new one (copy). Left out, only the file in your folder is made.' },
         crop: { ...BOX, description: 'The part to keep: its top left (x, y), width and height.' },
         rotate: { type: 'integer', enum: [90, 180, 270], description: 'Turn it clockwise by this many degrees.' },
         flip: { type: 'string', enum: ['horizontal', 'vertical', 'both'], description: 'Mirror it left to right (horizontal) or upside down (vertical).' },
@@ -341,11 +341,11 @@ export function editImageTool(d: Deps): RunTool {
       },
     },
     async run(a, ctx: RunCtx) {
-      // A Library picture by its id, or a file or a kept picture by its path.
+      // A kept picture by its id, or a file or a kept picture by its path.
       const libId = typeof a.library === 'string' && a.library.trim() ? a.library.trim() : '';
       const libItem = libId ? mustMedia(d.db, libId) : null;
-      if (libItem && libItem.kind !== 'image') return { isError: true, text: `${libId} is not a picture of the Library (it is a ${libItem.kind}).` };
-      if (!libItem && a.save_to_library) return { isError: true, text: 'save_to_library goes with library: the Library picture’s id.' };
+      if (libItem && libItem.kind !== 'image') return { isError: true, text: `${libId} is not a kept picture (it is a ${libItem.kind}).` };
+      if (!libItem && a.save_to_library) return { isError: true, text: 'save_to_library goes with library: the kept picture’s id.' };
       const pic = libItem ? { name: path.basename(libItem.file, path.extname(libItem.file)), data: fs.readFileSync(libItem.file) } : agentPicture(d.db, ctx, a.path);
       let src;
       try {
@@ -431,13 +431,13 @@ export function editImageTool(d: Deps): RunTool {
         boxes: (recipe.marks ?? []).filter((m) => m.type === 'rect' || m.type === 'ellipse').length,
         hidden: (recipe.marks ?? []).filter((m) => m.type === 'blur' || m.type === 'pixelate').length,
       });
-      // Put in the Library as the editor's Save or Save a copy does.
+      // Kept as the editor's Save or Save a copy does.
       let kept = '';
       if (libItem && (a.save_to_library === 'replace' || a.save_to_library === 'copy')) {
         const fmt = formatOfData(made.data);
-        if (!fmt) return { isError: true, text: 'The edited picture is not a PNG, JPEG or WebP: it was not put in the Library.' };
+        if (!fmt) return { isError: true, text: 'The edited picture is not a PNG, JPEG or WebP: it was not kept.' };
         const item = a.save_to_library === 'replace' ? await replaceInLibrary(d, libItem.id, made.data, fmt) : await copyToLibrary(d, made.data, fmt, libItem, '');
-        kept = a.save_to_library === 'replace' ? `It is in the Library in place of “${libItem.title}” (${item.id}).` : `It is in the Library as a new picture beside “${libItem.title}” (${item.id}).`;
+        kept = a.save_to_library === 'replace' ? `It is kept in place of “${libItem.title}” (${item.id}).` : `It is kept as a new picture beside “${libItem.title}” (${item.id}).`;
       }
       return [`Edited the picture (${src.w}×${src.h}): ${what}:`, ...savedLines(f, ...out.notes, inPlace(pic.kept)), ...(kept ? [kept] : [])].join('\n');
     },

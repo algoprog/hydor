@@ -149,7 +149,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   const d = composeAsk(pitch, 'Acme Bakery, raising $500k', { title: 'Acme seed round', theme: { id: 'midnight', label: 'Midnight' }, ratio: '16:9', folder: 'Investors/2026', lang: 'Greek' });
   ok(
     d ===
-      `${NEW_START.deck}${pitch.ask} It is about: Acme Bakery, raising $500k. Call it “Acme seed round”. Make it in the Midnight theme (the preset “midnight”), with wide 16:9 slides. Keep it in my Library folder “Investors/2026”. Write it in Greek.`,
+      `${NEW_START.deck}${pitch.ask} It is about: Acme Bakery, raising $500k. Call it “Acme seed round”. Make it in the Midnight theme (the preset “midnight”), with wide 16:9 slides. Keep it in my folder “Investors/2026”. Write it in Greek.`,
     `a new deck: as New asks, with its name, theme, shape, folder and language (${d.slice(-220)})`,
   );
   ok(/standard 4:3 slides\.$/.test(composeAsk(pitch, '', { ratio: '4:3' })), 'a standard deck says so');
@@ -181,7 +181,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   }
   ok(/speaker notes written out/.test(turnAsk({ from: 'slides', to: 'doc', id: 'x', title: 'Talk' })), 'a deck written out as a document has its notes in it');
   ok(/a dashboard of its numbers/.test(turnAsk({ from: 'sheet', to: 'page', id: 'x', title: 'Sales' })), 'a spreadsheet as a page is a dashboard');
-  ok(/Put it in my Library folder “Reports\/2026”, beside it\./.test(turnAsk({ from: 'doc', to: 'slides', id: 'x', title: 'Q3', folder: 'Reports/2026' })), 'it goes in the folder of what it was made from');
+  ok(/Put it in my folder “Reports\/2026”, beside it\./.test(turnAsk({ from: 'doc', to: 'slides', id: 'x', title: 'Q3', folder: 'Reports/2026' })), 'it goes in the folder of what it was made from');
 }
 
 // ---- finding a kind by its words ------------------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(makeInstructions({ type: 'slide.no-such-kind' }) === null && makeInstructions({ kind: 'page' }) === null && makeInstructions(undefined) === null && makeInstructions('add a slide') === null, 'nothing known: nothing told');
   ok(!!makeInstructions({ kind: 'section', words: 'a short history' })?.includes('Add a section where it fits best in the document: a short history.'), 'the words alone, where the kind was not picked');
   const turned = { turn: { from: 'doc' as const, to: 'slides' as const, id: 'c22c337e33', title: 'Bakery plan' }, folder: 'Reports' };
-  ok(!!makeInstructions(turned)?.includes('(Turn it into, in their Library)') && !!makeInstructions(turned)?.includes(turnAsk({ ...turned.turn, folder: 'Reports' })), 'Turn it into: what to make from which page, in full');
+  ok(!!makeInstructions(turned)?.includes('(Turn it into)') && !!makeInstructions(turned)?.includes(turnAsk({ ...turned.turn, folder: 'Reports' })), 'Turn it into: what to make from which page, in full');
   const spawn = async (extra: Record<string, unknown>) => (await pages.spawn!({ agent: 'claude', cwd: '/tmp', runId: 'r', resume: false, extra } as SpawnInfo, {} as Deps))?.instructions ?? [];
   const withMake = await spawn({ make: { type: 'block.faq', words: 'our cafe' } });
   ok(withMake.length === 2 && withMake[1] === makeInstructions({ type: 'block.faq', words: 'our cafe' }), 'the pages capability tells a session’s agent what it was asked to make, with Pages’ instructions from the start');
@@ -288,7 +288,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
     deck?.prompt === 'Make slides: Pitch deck — Corner Bakery' && deck.make.title === 'Seed round' && deck.make.theme?.id === 'midnight' && deck.make.folder === 'Investors' && deck.make.lang === 'Greek',
     'a new deck: a short line, its name, theme, shape, folder and language for the agent',
   );
-  ok(!!makeInstructions(deck!.make)?.includes('Make it in the Midnight theme (the preset “midnight”), with wide 16:9 slides. Keep it in my Library folder “Investors”. Write it in Greek.'), 'all of which the agent hears');
+  ok(!!makeInstructions(deck!.make)?.includes('Make it in the Midnight theme (the preset “midnight”), with wide 16:9 slides. Keep it in my folder “Investors”. Write it in Greek.'), 'all of which the agent hears');
   ok(
     ['doc.cv', 'page.kanban', 'sheet.budget'].map((id) => madeRequest(contentType(id)!, '', { kind: contentType(id)!.kind })?.prompt).join() === 'Write a document: CV or résumé,Make a page: Kanban board,Make a spreadsheet: Budget',
     'documents, pages and spreadsheets',

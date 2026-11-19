@@ -1,6 +1,6 @@
-// Files dropped on the Library, or picked with Upload files, each made what it is: a document, a spreadsheet, slides, a
+// Files dropped on a project's Files, or picked with Upload files, each made what it is: a document, a spreadsheet, slides, a
 // LaTeX document or a notebook as the import makes them (POST /api/pages/import, called in this process, so it takes
-// what that route takes, a PowerPoint file once it takes one); a picture, a video or a sound kept as the Library's media
+// what that route takes, a PowerPoint file once it takes one); a picture, a video or a sound kept as media
 // (the same bytes kept once); any other file, dropped on a project, put in the project's folder, where Files shows it.
 //
 // A browser sends a file's bytes as they are, a piece at a time and in order (no proxy's limit on a request's size stops
@@ -9,8 +9,8 @@
 // checked before its first byte, and the room on the disk.
 //
 // The desktop app moves a dropped file in by its path instead (POST /api/library/move), as a move between folders
-// does: a picture, a video or a sound into the Library's own folder, another file into the project's folder (renamed on
-// the same disk, else copied, checked whole and removed: server/filemove.ts), and a file the Library made a page of to
+// does: a picture, a video or a sound into the app's own media folder, another file into the project's folder (renamed on
+// the same disk, else copied, checked whole and removed: server/filemove.ts), and a file made a page of to
 // the app's Trash, where Put back brings it back; unless the page could not keep all of it, when the original stays and
 // the answer says why. A file of the app's own data, of the system or of a project's folder is not moved: the page sends
 // a copy instead. Nothing is written outside the app's data and the project's folder.
@@ -95,10 +95,10 @@ interface Plan {
 
 const isPptx = (name: string) => /\.pptx$/i.test(name);
 
-/** The kinds of file the Library keeps, in words (PowerPoint's once the import takes it). */
+/** The kinds of file that are kept as pages and media, in words (PowerPoint's once the import takes it). */
 function keptKinds(): string {
   const slides = kindForFile('a.pptx') === 'slides' ? ' slides (PowerPoint),' : '';
-  return `The Library keeps documents (Word, Markdown, text, web pages), spreadsheets (Excel, OpenDocument, CSV),${slides} LaTeX, Jupyter notebooks, diagrams (draw.io, Mermaid), pictures, videos and sounds`;
+  return `Kept as pages and media: documents (Word, Markdown, text, web pages), spreadsheets (Excel, OpenDocument, CSV),${slides} LaTeX, Jupyter notebooks, diagrams (draw.io, Mermaid), pictures, videos and sounds`;
 }
 
 const refused = (status: number, message: string, why: FileRefused) => new HttpError(status, message, { why });
@@ -116,8 +116,8 @@ function planFor(name: string, size: number, space: string | null): Plan {
   if (media && size <= MAX_MEDIA) return { as: media.kind };
   if (space) return { as: 'file' };
   const elsewhere = 'Drop it on a project to keep it in the project’s folder.';
-  if (kind) throw refused(413, `It is over ${importMax(kind) / MB} MB, more than the Library takes to make a ${kindOf(kind)?.noun ?? 'page'} of. ${elsewhere}`, 'size');
-  if (media) throw refused(413, `It is over ${MAX_MEDIA / MB / 1024} GB, more than the Library keeps of a picture, a video or a sound. ${elsewhere}`, 'size');
+  if (kind) throw refused(413, `It is over ${importMax(kind) / MB} MB, more than the app takes to make a ${kindOf(kind)?.noun ?? 'page'} of. ${elsewhere}`, 'size');
+  if (media) throw refused(413, `It is over ${MAX_MEDIA / MB / 1024} GB, more than the app keeps of a picture, a video or a sound. ${elsewhere}`, 'size');
   throw refused(415, `${keptKinds()}. To keep another kind of file, drop it on a project: it goes in the project’s folder.`, 'kind');
 }
 
@@ -168,7 +168,7 @@ async function importPage(d: Deps, file: string, space: string | null): Promise<
 function notPage(name: string, r: { status: number; error: string }, space: string | null): string[] {
   if (!space) {
     if (r.status === 400) throw refused(415, `${keptKinds()}. To keep another kind of file, drop it on a project: it goes in the project’s folder.`, 'kind');
-    if (/\.zip$/i.test(name)) throw refused(415, 'The Library keeps a .zip as a LaTeX project, and this one holds no LaTeX document. To keep it as it is, drop it on a project: it goes in the project’s folder.', 'kind');
+    if (/\.zip$/i.test(name)) throw refused(415, 'A .zip is kept as a LaTeX project, and this one holds no LaTeX document. To keep it as it is, drop it on a project: it goes in the project’s folder.', 'kind');
     throw new HttpError(r.status === 413 ? 413 : 422, r.error);
   }
   return r.status === 400 || /\.zip$/i.test(name) ? [] : [r.error];
@@ -264,10 +264,10 @@ function placeRefused(db: DB, p: string): MoveRefused | null {
 }
 
 const NOT_MOVED: Record<MoveRefused, string> = {
-  project: 'It is in a project’s folder, so it stays there: a copy goes into the Library instead.',
-  data: 'It is in the app’s own folders, so it stays there: a copy goes into the Library instead.',
-  system: 'It is in a folder of the system’s, so it stays there: a copy goes into the Library instead.',
-  link: 'It is a link to a file, so it stays where it is: a copy of the file goes into the Library instead.',
+  project: 'It is in a project’s folder, so it stays there: a copy is kept instead.',
+  data: 'It is in the app’s own folders, so it stays there: a copy is kept instead.',
+  system: 'It is in a folder of the system’s, so it stays there: a copy is kept instead.',
+  link: 'It is a link to a file, so it stays where it is: a copy of the file is kept instead.',
 };
 
 /** The file at an absolute path, as it may be moved in: one that is there, a file (not a folder or a link), not in a place refused. */
@@ -311,7 +311,7 @@ async function dropEmpty(from: string, root: string) {
 }
 
 /**
- * The original of a file the Library made a page of, to the app's Trash (where Put back brings it back): moved there,
+ * The original of a file that was made a page of, to the app's Trash (where Put back brings it back): moved there,
  * or from another disk copied there, checked whole, and removed. Returns where it is in the Trash.
  */
 async function toTrash(file: string): Promise<string> {
@@ -474,7 +474,7 @@ export function uploadRoutes(d: Deps) {
   sweep(true);
   setInterval(() => sweep(false), 10 * 60_000).unref();
 
-  /** A file about to be sent: what it will become, or why the Library cannot take it, before any of its bytes come. */
+  /** A file about to be sent: what it will become, or why it cannot be taken, before any of its bytes come. */
   app.post('/api/library/uploads', async (req): Promise<UploadStarted> => {
     const b = B(req);
     const name = fileName(b.name);
@@ -562,7 +562,7 @@ export function uploadRoutes(d: Deps) {
     const rel = relPath(b.rel, name);
     const st = await fs.promises.stat(file);
     const plan = planFor(name, st.size, space);
-    // Where it goes may be on another disk, which must have room for it: the Library's own folder, or the project's.
+    // Where it goes may be on another disk, which must have room for it: the app's own media folder, or the project's.
     const s = space ? spaceById(db, space) : null;
     if (plan.as !== 'page') await roomToMove(file, st.size, plan.as === 'file' ? s!.folder : config.dataDir);
     const root = await droppedFolder(db, b.root, file);

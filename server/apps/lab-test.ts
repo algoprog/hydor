@@ -466,7 +466,7 @@ test('Weekly progress report: the week’s dates (across a month and a year), it
   assert.match(d.text, /## Commits\n- retriever: Try a curriculum on long queries/);
   assert.match(d.text, /## Experiment runs\n- run e2 \(hard-negatives\): done; mrr10=0\.412/);
   assert.match(d.text, /## Papers read\n- Dense Passage Retrieval/);
-  assert.deepEqual(d.stats, [{ what: 'Sessions', count: 4 }, { what: 'Commits', count: 3 }, { what: 'Experiment runs', count: 2 }, { what: 'Made in the Library', count: 2 }, { what: 'Papers read', count: 1 }]);
+  assert.deepEqual(d.stats, [{ what: 'Sessions', count: 4 }, { what: 'Commits', count: 3 }, { what: 'Experiment runs', count: 2 }, { what: 'Made or kept', count: 2 }, { what: 'Papers read', count: 1 }]);
   assert.equal(d.empty, false);
   assert.match(d.reader, /^their team/);
   const empty = await runCode(codeOf(w, 'digest'), { log: { sessions: [] }, audience: 'Your advisor' });

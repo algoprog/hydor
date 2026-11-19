@@ -144,7 +144,7 @@ test('what changed, in sentences: names for ids, places, fields, switches', () =
     'Other agents may no longer hand it work.',
     'It keeps one conversation of its own now, with an inbox.',
     'It hands back Title now.',
-    'Its results go to a notification and a Library page, updated now.',
+    'Its results go to a notification and a page, updated now.',
   ]);
   assert.deepEqual(agentChanges({ name: 'A', examples: [] }, { name: 'A', examples: [{ id: 'x', message: 'y' }] }), []);
 });
@@ -234,7 +234,7 @@ test('the file: what it is and does, its team by name, schedules by the clock, e
   assert.deepEqual(f.leftOut, [
     'The project it works in: it works everywhere until you pick them again.',
     'The connected apps it had on (Gmail): connect them where it is installed, then turn them on in its settings.',
-    'The Library page and spreadsheet its results went to: its first run where it is installed makes new ones.',
+    'The page and spreadsheet its results went to: its first run where it is installed makes new ones.',
     'Who its results are emailed to, and from which mail account: set them again under What it hands back.',
     'The address its results are posted to, and its key: set them again under What it hands back.',
     '1 schedule that starts on a watch, a webhook or a date: it stays here.',

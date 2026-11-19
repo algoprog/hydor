@@ -76,7 +76,7 @@ export const READ_PAPER: RunTool = {
   name: 'read_paper',
   annotations: { readOnlyHint: true, openWorldHint: true },
   description: [
-    'Finds and reads a paper, for an app’s step: from a link (arXiv, a DOI’s, ACL Anthology, OpenReview, a PDF or a paper’s page), an arXiv id, a DOI, a title, or a PDF, a .tex file or a LaTeX project’s folder on this computer, or a LaTeX document of the Library (/pages/<id>); upload, a file the form took, comes first.',
+    'Finds and reads a paper, for an app’s step: from a link (arXiv, a DOI’s, ACL Anthology, OpenReview, a PDF or a paper’s page), an arXiv id, a DOI, a title, or a PDF, a .tex file or a LaTeX project’s folder on this computer, or a saved LaTeX document (/pages/<id>); upload, a file the form took, comes first.',
     'Gives JSON: found, its record (title, authors, year, venue, doi, arxiv, url, pdf, abstract, bibtex, key) and, unless text is false, its text from an open copy only (never past a paywall), in parts of at most 18,000 characters (parts, a PDF’s pages marked [Page N]; chars, pages), its sections, where the text came from (source), for LaTeX its folder, main file, figures (file, caption, label) and .bib files, and notes on what could not be read.',
     'text: false reads its record alone (quick). pages: true reads a PDF first, for citing pages. max_chars: at most this much text (90,000 unless set).',
   ].join(' '),

@@ -17,6 +17,7 @@ import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/Ht
 import { StepLine, ToolDetail } from '../session/items';
 import { PageFrame, pageStore, StreamFrame, usePreviewMax } from './frame';
 import { PageOverlay } from './overlay';
+import { useSpaces } from '../spaces/state';
 import { absolute, CANVAS_MEDIA, onScreen, requestRef, savedRef, useCanvas, useDrafts, usePagesStore } from './state';
 import { openOver, showBeside } from './Canvas';
 
@@ -128,6 +129,10 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const saving = !!before;
   const pages = usePagesStore((s) => s.pages);
   const info = ref ? pages?.find((p) => p.id === ref.id) : undefined;
+  const spaces = useSpaces();
+  // Where it is kept: in its project's files, else just saved (it stays with its conversation).
+  const project = info?.space ? spaces?.find((x) => x.id === info.space)?.name : undefined;
+  const keptIn = project ? tr(`In ${project}’s files`) : tr('Saved');
   const draft = useDrafts((x) => x.byKey[sessionKey]?.[item.id]);
   const [page, setPage] = useState<{ title: string; html: string; v: string } | 'gone' | null>(null);
   const [height, setHeight] = useState(0);
@@ -140,7 +145,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   useEffect(() => {
     if (!pages) usePagesStore.getState().loadPages().catch(() => {});
   }, []);
-  // The newest version, as far as the Library has said (it may not have heard of this one yet; while a save runs, it
+  // The newest version, as far as the app's list of pages has said (it may not have heard of this one yet; while a save runs, it
   // may have heard of the version being saved, which the card shows once the call is done).
   const current = !!ref && (saving || !info || info.version <= ref.version);
   const v = ref ? `${ref.id}:${ref.version}` : '';
@@ -161,7 +166,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const writing = !ref && item.tool.status !== 'error' && (!draft || !draft.done || running);
   const title = info?.title ?? (page && page !== 'gone' ? page.title : undefined) ?? draft?.title ?? 'Page';
 
-  // A save names its kind; page_action's is the page's own, as the Library has it.
+  // A save names its kind; page_action's is the page's own, as the list of pages has it.
   const kind = /save_slides$/.test(item.tool.name) ? 'slides' : /save_doc$/.test(item.tool.name) ? 'doc' : /save_sheet$/.test(item.tool.name) ? 'sheet' : /save_latex$/.test(item.tool.name) ? 'tex' : /save_notebook$/.test(item.tool.name) ? 'notebook' : /save_diagram$/.test(item.tool.name) ? 'diagram' : /save_board$/.test(item.tool.name) ? 'board' : /page_action$/.test(item.tool.name) ? (info?.kind ?? null) : null;
   const deck = kind !== null;
   // A deck stands whole: its slide is as tall as the card's width makes it (16:9), its buttons under it.
@@ -204,7 +209,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
               : kind === 'diagram'
                 ? `Drawing the diagram${size}`
                 : `Writing the page${size}`
-      : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
+      : `${keptIn} · version ${ref?.version ?? 1}${status}`;
     const card = (
       <SmallPageCard
         sessionKey={sessionKey}
@@ -231,7 +236,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   if (writing && deck) {
     const label = kind === 'slides' ? 'Making the slides…' : kind === 'doc' ? 'Writing the document…' : kind === 'tex' ? 'Writing and typesetting the LaTeX…' : kind === 'notebook' ? 'Keeping the notebook…' : kind === 'diagram' ? 'Drawing the diagram…' : kind === 'board' ? 'Keeping the board…' : 'Making the spreadsheet…';
     // Where there is no room beside the conversation (a phone, a narrow window): a tap opens it over everything, to
-    // watch it being written as the panel shows it. (Beside a page in the Library, that page is the one in view.)
+    // watch it being written as the panel shows it. (Beside a page opened in the app, that page is the one in view.)
     if (draft && kind !== 'notebook' && kind !== 'board' && onScreen(sessionKey))
       return (
         <button
@@ -291,7 +296,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
             <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-fg-3">
               {saving && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
               <span className="min-w-0 truncate">
-                {kind === 'slides' ? 'Slides in the Library' : kind === 'doc' ? 'A document in the Library' : kind === 'sheet' ? 'A spreadsheet in the Library' : kind === 'tex' ? 'LaTeX in the Library' : kind === 'notebook' ? 'A notebook in the Library' : kind === 'diagram' ? 'A diagram in the Library' : kind === 'board' ? 'A board in the Library' : 'Saved in the Library'} · version {ref.version}
+                {keptIn} · version {ref.version}
                 {status}
               </span>
             </span>
@@ -441,7 +446,7 @@ export function PublishCard({ item }: { item: ToolItem; sessionKey: string }) {
             <Segmented<SiteVisibility> size="sm" value={vis} onChange={setVis} options={VISIBILITY.map((v) => ({ value: v.value, label: v.label }))} />
           </div>
           <p className="text-[12.5px] leading-relaxed text-fg-3">
-            {VISIBILITY.find((v) => v.value === vis)!.hint} It opens in a sandbox, apart from this app; unpublish it any time in the Library.
+            {VISIBILITY.find((v) => v.value === vis)!.hint} It opens in a sandbox, apart from this app; unpublish it any time under Published.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="primary" icon={<Globe size={14} />} disabled={busy} onClick={() => decide(true)}>

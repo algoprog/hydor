@@ -1,4 +1,4 @@
-// What a page of the Library shows besides itself: the band of a page locked (so it doesn't change by accident), the
+// What a page shows besides itself: the band of a page locked (so it doesn't change by accident), the
 // pages that link to it (its backlinks), and how many words it has.
 import { useEffect, useState, type RefObject } from 'react';
 import { Lock } from 'lucide-react';

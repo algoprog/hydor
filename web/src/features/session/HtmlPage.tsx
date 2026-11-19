@@ -159,7 +159,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
       const r = await post<{ page: PageInfo }>('/api/pages', { title, html, sessionKey, item: item.id, data: memory.dump(), space });
       usePagesStore.getState().setKept(sessionKey, item.id, r.page.id);
       const name = space ? useSpacesStore.getState().list?.find((x) => x.id === space)?.name : undefined;
-      toast(name ? tr(`Kept in the Library, in ${name}`) : 'Kept in the Library', 'ok');
+      toast(name ? tr(`Kept in the files of ${name}`) : 'Kept', 'ok');
     } catch (e) {
       toastError(e);
     } finally {
@@ -169,7 +169,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
   const keepMenu = useKeepIn(sessionKey, (space) => void keepIn(space));
 
   if (sessionKey && wide && besideOpen) {
-    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept in the Library${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;
+    const sub = writing ? `Writing the page · ${kb(draft?.text.length ?? 0)}` : kept ? `Kept${keptInfo && keptInfo.version > 1 ? ` · version ${keptInfo.version}` : ''}` : `A page · ${kb(html.length)}`;
     return <SmallPageCard sessionKey={sessionKey} item={item} title={title} sub={sub} writing={writing} />;
   }
 
@@ -204,7 +204,7 @@ export function HtmlPage({ item, sessionKey }: { item: ToolItem; sessionKey?: st
                 type="button"
                 onClick={(e) => keep(e.currentTarget)}
                 disabled={keeping}
-                title={kept ? 'Open it in the Library' : 'Keep this page in the Library, with its own address and storage'}
+                title={kept ? 'Open it' : 'Keep this page, with its own address and storage'}
                 className={cx(
                   'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors disabled:opacity-50',
                   kept ? 'text-accent hover:bg-accent-soft' : 'text-fg-3 hover:bg-bg-2 hover:text-fg',

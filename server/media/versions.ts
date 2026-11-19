@@ -1,4 +1,4 @@
-// Earlier versions of the Library's pictures, videos and sounds. When one is saved over (in its editor, by an agent, or
+// Earlier versions of the kept pictures, videos and sounds. When one is saved over (in its editor, by an agent, or
 // by someone it is shared with through their link), the file it had is kept, with its size, length and shape and who
 // made it, in media/versions/<id>/<version>.<ext>; the newest five are kept, at most 2 GB of them an item, the oldest
 // going first. Bringing one back keeps the one shown now as a version in its turn, so nothing is lost by it.

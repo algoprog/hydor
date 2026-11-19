@@ -603,7 +603,7 @@ export interface BrowsingPrefs {
 }
 
 /** A page you visited in your own browser. */
-/** A file your own browser downloaded, as the Library's Downloads list shows it (server/browser/downloads.ts keeps them). */
+/** A file your own browser downloaded, as the Downloads list shows it (server/browser/downloads.ts keeps them). */
 export interface DownloadEntry {
   id: number;
   name: string;
@@ -626,7 +626,7 @@ export interface HistoryEntry {
   typed: number;
 }
 
-/** A few of each list your own browser keeps, for the Library's All (desktop app): how many each holds (or match the words) and its first few. */
+/** A few of each list your own browser keeps, for the Browser's All (desktop app): how many each holds (or match the words) and its first few. */
 export interface BrowsingOverview {
   /** Bookmarks (not folders), the most used first. */
   bookmarks: { count: number; items: BookmarkNode[] };

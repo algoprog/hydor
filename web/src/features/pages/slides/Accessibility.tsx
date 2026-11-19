@@ -1,7 +1,7 @@
 // Check accessibility, in the side panel, as PowerPoint's checker: what makes the deck hard for some people to see,
 // read or follow (shared/deck-check.ts), slide by slide, kept up to date as the deck changes. Each says what is wrong,
 // goes to it (its slide, the part picked), and where it can be put right for the user, Fix does it (one step to undo);
-// a picture without a description gets one written by AI (the model that describes the Library's pictures), to read
+// a picture without a description gets one written by AI (the model that describes saved pictures), to read
 // and change in its Format panel. Fix the ones it can puts every fixable one right at once.
 import { useMemo, useState } from 'react';
 import { AArrowUp, Accessibility as AccessIcon, Contrast, Heading, ImageOff, ListOrdered, Table2, VolumeX, WandSparkles } from 'lucide-react';

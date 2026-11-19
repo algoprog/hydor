@@ -32,7 +32,7 @@ import {
   Wrench,
   WandSparkles,
   BookOpen,
-  LibraryBig,
+  FileStack,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -70,7 +70,7 @@ const LOOKS: Record<string, TopicLook> = {
   web: { icon: Globe, group: 'abilities', blurb: 'Web searches, and a browser you can take over' },
   research: { icon: Telescope, group: 'abilities', blurb: 'Deep research, second opinions and teams of agents' },
   'documents-voice': { icon: FileText, group: 'abilities', blurb: 'Documents, pictures and videos in and out, and talking' },
-  library: { icon: LibraryBig, group: 'abilities', blurb: 'Pages and documents agents make, and the images and videos you keep' },
+  library: { icon: FileStack, group: 'abilities', blurb: 'Pages, documents and pictures agents make, and the ones you keep in a project’s files' },
   apps: { icon: LayoutGrid, group: 'abilities', blurb: 'Fill in a short form, and an agent does the job' },
   tasks: { icon: CalendarClock, group: 'abilities', blurb: 'Work that starts by itself, when you say' },
   researchers: { icon: GraduationCap, group: 'abilities', blurb: 'Papers to keep up with, read, check and present, and your lab’s work' },

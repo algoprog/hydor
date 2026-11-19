@@ -1,5 +1,5 @@
-// A sound player of the app's own (sounds agents made, and the Library's): play and pause, the sound's shape as its
-// seek bar, filling as it plays (drawn from its peaks: the Library's, or read from the file in the browser), the
+// A sound player of the app's own (sounds agents made, and sounds kept): play and pause, the sound's shape as its
+// seek bar, filling as it plays (drawn from its peaks: the kept sound's, or read from the file in the browser), the
 // time and the speed. Keys while it has focus: Space or K plays and pauses, ← → move 5 s, Home and End. One sound
 // plays at a time: another starting pauses it. The server answers the byte ranges it asks for, so it seeks
 // without loading the whole file.
@@ -205,8 +205,8 @@ export function PlayButton({ playing, onClick, size = 40, className, disabled }:
 
 /**
  * The player: the play button, a title (what people and agents wrote: not translated) with `actions` beside it,
- * the shape to seek along, the time and the speed. `peaks`: the shape when known (the Library's); left out, it is
- * read from the file. `large`: the Library's own page.
+ * the shape to seek along, the time and the speed. `peaks`: the shape when known (a kept sound's); left out, it is
+ * read from the file. `large`: the sound's own page.
  */
 export function AudioPlayer({
   src,

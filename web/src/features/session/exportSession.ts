@@ -1,5 +1,5 @@
 // A conversation out of the chat, from the session's menu (Export): a Markdown file to download, the same Markdown on
-// the clipboard, or a document in the Library. The server writes the Markdown (server/session-export.ts: answer cards as
+// the clipboard, or a document kept. The server writes the Markdown (server/session-export.ts: answer cards as
 // text and tables, diagrams and maths as written), so the `hydor` command gets the same.
 import { ApiError, enc, post } from '../../lib/api';
 import { mu } from '../../lib/machine';
@@ -53,11 +53,11 @@ export async function copyMarkdown(key: string) {
   }
 }
 
-/** Makes a Library document of the conversation; the toast opens it. */
+/** Makes a kept document of the conversation; the toast opens it. */
 export async function saveToLibrary(key: string) {
   try {
     const r = await post<{ page: { id: string }; notes?: string[] }>(`/api/sessions/${enc(key)}/export/doc`);
-    useToasts.getState().push('ok', 'Saved to the Library as a document', { label: 'Open', run: () => go(`/pages/${r.page.id}`) }, r.notes?.length ? r.notes.join(' ') : undefined);
+    useToasts.getState().push('ok', 'Saved as a document', { label: 'Open', run: () => go(`/pages/${r.page.id}`) }, r.notes?.length ? r.notes.join(' ') : undefined);
   } catch (e) {
     toastError(e);
   }

@@ -1,4 +1,4 @@
-// A chart from a spreadsheet of the Library (Google Slides' linked charts): Insert → Chart → From a spreadsheet picks
+// A chart from a spreadsheet of yours (Google Slides' linked charts): Insert → Chart → From a spreadsheet picks
 // the spreadsheet, a sheet of it and its cells (a table it finds there, or a range), its series down the columns or
 // along the rows, and the kind of chart, drawn as it will be before it is put on the slide. The chart keeps where it came
 // from (ChartEl.source); its Format panel says so and has Update from the spreadsheet, which reads its numbers again
@@ -21,10 +21,10 @@ import { heightOf, W } from './ops';
 
 export const CHART_NAMES: Record<ChartKind, string> = { column: 'Column chart', bar: 'Bar chart', line: 'Line chart', area: 'Area chart', pie: 'Pie chart', doughnut: 'Doughnut chart' };
 
-/** A spreadsheet of the Library as it is now: its name and its workbook. */
+/** A spreadsheet as it is now: its name and its workbook. */
 async function loadBook(page: string): Promise<{ title: string; book: Workbook }> {
   const r = await api<{ page: PageInfo; model: Workbook }>(`/api/pages/${enc(page)}`);
-  if (r.page.kind !== 'sheet' || !r.model?.sheets) throw new Error('That is not a spreadsheet of the Library any more');
+  if (r.page.kind !== 'sheet' || !r.model?.sheets) throw new Error('That is not a spreadsheet any more');
   return { title: r.page.title, book: r.model };
 }
 
@@ -140,7 +140,7 @@ export function SheetChartDialog({ open, deck, onClose, onInsert }: { open: bool
       }
     >
       <div className="space-y-3">
-        <LibraryPick kind="sheet" picked={page?.id ?? null} onPick={(p) => void pick(p)} empty="No spreadsheets in your Library yet." />
+        <LibraryPick kind="sheet" picked={page?.id ?? null} onPick={(p) => void pick(p)} empty="You have no spreadsheets yet." />
         {error && <p className="text-[12.5px] text-err">{error}</p>}
         {page && !got && !error && <p className="text-[12.5px] text-fg-3">Reading it…</p>}
         {got && (

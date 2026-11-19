@@ -1,7 +1,7 @@
 // An agent as a file (.hydor-agent), to keep or to give to someone: JSON with a format version, what the agent is and
 // does (its instructions, tools, tier, skills, fields and the kinds of place its results go), its team by name, its
 // schedules by the clock as suggestions, and its examples. Nothing of the person's own goes in it: no connected
-// accounts, projects, Library pages, email addresses, webhook addresses or keys; the file says in words what was left
+// accounts, projects, saved pages, email addresses, webhook addresses or keys; the file says in words what was left
 // out and has to be set again. Installing one shows first what it brings and needs; an agent of the same name is
 // replaced only when you choose to, else it installs beside it.
 import fs from 'node:fs';
@@ -58,7 +58,7 @@ export function exportAgent(db: DB, scheduler: Pick<Scheduler, 'list'> | null, a
   const to = a.output?.to ?? [];
   if (to.length) {
     core.output = { ...(a.output?.fields?.length ? { fields: a.output.fields } : {}), to: to.map(portablePlace) };
-    if (to.some((t) => (t.kind === 'library' && t.page) || (t.kind === 'sheet' && t.page))) leftOut.push('The Library page and spreadsheet its results went to: its first run where it is installed makes new ones.');
+    if (to.some((t) => (t.kind === 'library' && t.page) || (t.kind === 'sheet' && t.page))) leftOut.push('The page and spreadsheet its results went to: its first run where it is installed makes new ones.');
     if (to.some((t) => t.kind === 'email')) leftOut.push('Who its results are emailed to, and from which mail account: set them again under What it hands back.');
     if (to.some((t) => t.kind === 'webhook')) leftOut.push('The address its results are posted to, and its key: set them again under What it hands back.');
   }

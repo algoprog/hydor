@@ -198,7 +198,7 @@ Gemeinsame Bedienung:
 
 | Befehl | Funktion |
 | --- | --- |
-| `hydor sessions` | Neueste Sitzungen mit ● arbeitet, ● braucht dich, ✓ abgeschlossen und ✗ Fehler. Aktionen entsprechen dem Sitzungsmenü: `search`, `rename`, `archive`, `unarchive`, `pin`, `unpin`, `read`, `snooze`, `move` in ein Projekt, `fork`, `goal`, `share` als schreibgeschützter Link, `changes`, `commands`, `queue` mit `queue clear` und `queue remove`, `show`, `export` als Markdown, mit `-o -` zur Ausgabe oder `--library` als Bibliotheksdokument, sowie `send`, `stop` und `delete`. |
+| `hydor sessions` | Neueste Sitzungen mit ● arbeitet, ● braucht dich, ✓ abgeschlossen und ✗ Fehler. Aktionen entsprechen dem Sitzungsmenü: `search`, `rename`, `archive`, `unarchive`, `pin`, `unpin`, `read`, `snooze`, `move` in ein Projekt, `fork`, `goal`, `share` als schreibgeschützter Link, `changes`, `commands`, `queue` mit `queue clear` und `queue remove`, `show`, `export` als Markdown, mit `-o -` zur Ausgabe oder `--library` als Dokument im Projekt der Sitzung, sowie `send`, `stop` und `delete`. |
 | `hydor inbox` | Was auf dich wartet (Genehmigungen, Fragen, ein Key, um den ein Agent gebeten hat, ein Skill zur Prüfung): `list` und `show` für einen Eintrag, mit dem Ort, an dem du ihn beantwortest. |
 | `hydor outbox` | Zurückgehaltene Konto-Tool-Aufrufe mit Vorher fragen: `list`, `show` mit Eingaben, `send` unverändert oder mit `--set NAME=value` und `drop` zum Verwerfen. |
 | `hydor away` | Ereignisse seit dem letzten Besuch wie unter **Während du weg warst**: offene Anfragen, abgeschlossene und fehlerhafte Sitzungen, automatische Läufe mit Kosten und heutige nächste Termine. `hydor away seen` markiert alles als gesehen. |
@@ -221,7 +221,7 @@ hydor away                           # what happened while you were away
 | `hydor projects` | `list`, `show`, `new`, `rename`, `edit` für Beschreibung, Richtlinien, Standardagent und Ordner, `sessions`, `files` für gelesene Dokumente mit `files add` und `files remove` sowie `remove`. |
 | `hydor tasks` | [Geplante Aufgaben](/guide/tasks) und weitere automatische Arbeit: `list`, `show`, `new` mit `--every 2h`, `--at 09:00 --days weekdays`, `--cron`, `--once`, `--webhook`, `--watch-feed`, `--watch-page`, `--watch-folder` oder `--watch-account` mit `--tool` für neue Einträge einer verbundenen App. `--before 30m` startet vor Kalenderterminen. Außerdem `edit`, `pause`, `resume`, `run` auch bei Pause, `runs` mit `--reply` für Antworten und `remove`. Befehls- und JSON-Überwachung wird in der Oberfläche eingerichtet. Aktualisierungen einer Board-Karte erscheinen unter dem Board, etwa „Geschäft · Umsatz nach Tagen: aktualisieren“. `pause`, `resume` und `run` funktionieren auch dafür; `show` nennt den Bearbeitungsort auf dem Board. |
 | `hydor apps` | Eigene und fertige [Apps](/guide/apps): `list`, `show`, `run` mit `field=value` oder `--input` JSON und Ausgabe samt Kosten, `runs`, `run-show` und `remove`. Der Singular `hydor app …` erstellt Apps als Dateien über `new`, `folder`, `dev`, `try`, `export` und `import`. |
-| `hydor library` | [Bibliothek](/guide/library): `list` mit `--kind` und `--project`, `search`, `show` für Dokumenttext, Board-Karten oder Inhaltstyp, `export` mit `--to pdf`, `docx`, `pptx` und `-o file`, `open` für die Editoradresse, `remove`, `refreshes` für die Aktualisierungen deiner Boards samt Zeitplan und Kosten sowie `refresh`, um eine oder alle Karten eines Boards sofort zu aktualisieren. |
+| `hydor files` (auch `hydor library`) | Was Agenten für dich erstellt haben und was du behalten hast, wie es die **Dateien** der Projekte zeigen ([Seiten, Bilder, Videos und Websites](/guide/library)): `list` mit `--kind` und `--project`, `search`, `show` für Dokumenttext, Board-Karten oder Inhaltstyp, `export` mit `--to pdf`, `docx`, `pptx` und `-o file`, `open` für die Editoradresse, `remove`, `refreshes` für die Aktualisierungen deiner Boards samt Zeitplan und Kosten sowie `refresh`, um eine oder alle Karten eines Boards sofort zu aktualisieren. |
 | `hydor experiments` | Trainings- und Evaluationsläufe mit `list`, `show` und `stop`. Neue Läufe starten Agenten oder die Oberfläche. |
 
 ```bash
@@ -229,7 +229,7 @@ hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
 hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
 hydor apps run trip-planner destination=Lisbon days=5
-hydor library export "Q3 report" --to pdf -o q3.pdf
+hydor files export "Q3 report" --to pdf -o q3.pdf
 ```
 
 ### Agenten und Modelle
@@ -301,7 +301,7 @@ Browserspezifische Einstellungen wie Design, Sprache und Benachrichtigungston k�
 
 - `hydor find rate limit` durchsucht alles, was auch das Suchfeld durchsucht (**Strg+K**): Seiten, Einstellungen und ihre Optionen, Sitzungen, Memory, Skills … `--in settings` sucht nur dort, `--urls` zeigt die Adresse jedes Ergebnisses darunter, und `--open 2` öffnet das zweite in deinem Browser.
 - `hydor guide` listet die Themen der Anleitung auf; `hydor guide projects` liest eines im Terminal, und `hydor guide projects "what a project is"` einen Abschnitt davon. `--sections` listet die Abschnitte eines Themas auf.
-- `hydor open` gibt die Adresse der App aus; `hydor open library`, `hydor open settings memory`, `hydor open project thesis`, `hydor open guide projects` oder `hydor open 6f1e2a3b` (eine Sitzung) geben die der jeweiligen Seite aus. `--browser` öffnet sie zusätzlich in deinem Browser. So erreichst du, was nur eine Seite kann: die Editoren für Folien, Tabellen, Bilder und Diagramme, eine Unterschrift, die Farben eines Themes, die Anmeldung bei einem Dienst.
+- `hydor open` gibt die Adresse der App aus; `hydor open published`, `hydor open settings memory`, `hydor open project thesis`, `hydor open guide projects` oder `hydor open 6f1e2a3b` (eine Sitzung) geben die der jeweiligen Seite aus. `--browser` öffnet sie zusätzlich in deinem Browser. So erreichst du, was nur eine Seite kann: die Editoren für Folien, Tabellen, Bilder und Diagramme, eine Unterschrift, die Farben eines Themes, die Anmeldung bei einem Dienst.
 - `hydor api GET /api/projects` ruft API-Endpunkte auf und gibt JSON aus. Beispiel: `hydor api POST /api/projects -d '{"name":"Abschlussarbeit"}'`. Inhalte können aus `@file` oder `-` stammen. Siehe [API](/guide/api).
 
 ### Innerhalb des Chats

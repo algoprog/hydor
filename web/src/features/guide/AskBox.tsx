@@ -61,7 +61,7 @@ export function AskBox({
   topics: GuideTopic[] | null;
   onOpen: (topic: string, section?: string) => void;
   hero?: boolean;
-  /** The find box of a page's top row on a computer, the Library's size and look. */
+  /** The find box of a page's top row on a computer, the size and look of the find box on the other pages. */
   bar?: boolean;
   topic?: string;
   /** The text, when the page sets it too (a question picked below the box). */

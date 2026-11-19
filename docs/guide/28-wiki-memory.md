@@ -169,7 +169,7 @@ Agents can do the same when you ask them ("Rebuild this project's wiki from its 
 
 ## A project's Memory tab
 
-Open [Projects](/projects), pick a project and open its **Memory** tab. It replaces the Knowledge and LLM Wiki tabs of earlier versions, and its count adds up the notes, articles and documents. A switch at the top moves between three parts:
+Open a project's details (in the sessions sidebar, point at the project and click the (i) that appears, **Project details**) and open its **Memory** tab. It replaces the Knowledge and LLM Wiki tabs of earlier versions, and its count adds up the notes, articles and documents. A switch at the top moves between three parts:
 
 - **Notes**: the project's memory notes, as in Settings → Memory, with **Add a note** and a search field, and the folder they belong to.
 - **Wiki**: the project's articles and sources. Once the wiki has areas, the articles are grouped by area: each area's name opens its hub, a line says what belongs in it, and the arrow beside it folds it away; sub-areas sit under their area, and **Other** comes last (see [Areas and hubs](#areas-and-hubs)). Select an article to read it, follow its links, and open its listed sources. An article that was merged into another opens that one. The **⋯** menu beside the buttons has **Update now**, **Rebuild from sources…** (**Build from history…** while the wiki is new) and **Restore the previous wiki…** (see [Update, rebuild or restore the wiki](#update-rebuild-or-restore-the-wiki)). It is read-only here: agents write it. If wiki memory is off, the tab says so and has **Open its Settings**; if nothing is in it yet, "Nothing here yet. Agents add to it as they work, and new documents update it." The wiki's folder is shown under the list.

@@ -66,7 +66,7 @@ export function AgentsGetGroup() {
           <Row
             label="Search by meaning"
             hint="Find notes by what they mean, with a model on this computer (about 500 MB)"
-            info="Finds notes, what the Library holds and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 500 MB."
+            info="Finds notes, what you keep and more by what they mean as well as by their words, with a model that runs on this computer. It sets itself up once: about 500 MB."
             disabled={!st.enabled}
             control={<Switch on={st.enabled && st.meaning.on} disabled={!st.enabled} label="Search by meaning" onChange={(on) => void set({ meaning: on })} />}
           >

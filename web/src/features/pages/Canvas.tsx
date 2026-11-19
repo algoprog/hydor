@@ -17,6 +17,8 @@ import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
 import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { useSpacesStore } from '../spaces/state';
+import { tr } from '../../i18n/runtime';
 import { memoryStore, pageFile, pageStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedPageOf, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
@@ -36,6 +38,12 @@ const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_24
 // ---- which calls are pages --------------------------------------------------------------------------
 
 export type PageCall = 'show_html' | 'save_page' | 'file';
+
+/** Where a kept page is, in words: in its project's files, else just saved (it stays with its conversation). */
+function keptWhere(space?: string): string {
+  const name = space ? useSpacesStore.getState().list?.find((x) => x.id === space)?.name : undefined;
+  return name ? tr(`In ${name}’s files`) : tr('Saved');
+}
 
 /** A call that makes a page, and which kind. */
 export function pageCall(t: ToolInfo | undefined): PageCall | null {
@@ -223,7 +231,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
               },
             }
           : {}),
-        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : page.info.kind === 'diagram' ? 'A diagram in the Library' : page.info.kind === 'board' ? 'A board in the Library' : 'In the Library'} · version ${page.info.version}`,
+        sub: `${keptWhere(page.info.space)} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');
@@ -243,7 +251,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
         save: async (edited) => {
           const r = await post<{ page: PageInfo }>('/api/pages', { title: titleOf(item, kind), html, sessionKey: key, item: item.id, data: shownStore(item.id).dump(), edited });
           usePagesStore.getState().setKept(key, item.id, r.page.id);
-          toast('Kept in the Library with your changes. The agent sees them with your next message.', 'ok');
+          toast('Saved with your changes. The agent sees them with your next message.', 'ok');
           return true;
         },
       };
@@ -366,7 +374,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
       <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={250}>
         {loaded?.pageId && (
           <MenuItem icon={<ExternalLink size={14} />} onClick={() => (setMenu(null), go(`/pages/${loaded.pageId}`))}>
-            Open in the Library
+            Open on its own page
           </MenuItem>
         )}
         {loaded?.path && (

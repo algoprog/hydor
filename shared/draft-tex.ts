@@ -79,7 +79,7 @@ function withFiles(d: TexDoc, files: Map<string, string>): TexDoc {
 export function draftTex(base: TexDoc | null, p: PartialJson, memo: DraftMemo): Drafted<TexDoc> | null {
   memo.turn();
   const v = isObj(p.value) ? p.value : {};
-  // A file of this computer's comments, not a document of the Library.
+  // A file of this computer's comments, not a saved document.
   if (typeof v.path === 'string' && !(typeof v.id === 'string' && v.id)) return null;
   let doc = base;
   if (!doc && typeof v.template === 'string' && !writingIn(p.open, 'template'))

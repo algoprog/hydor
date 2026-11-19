@@ -80,7 +80,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
   terminal: '/guide/files-git#use-the-terminal',
   preview: '/guide/files-git#look-at-a-dev-server-with-preview',
   review: '/guide/files-git#review-what-a-branch-changes',
-  library: '/guide/library#find-your-pages',
+  library: '/guide/projects#files',
   apps: '/guide/apps#find-your-way-around-the-apps-page',
   spaces: '/guide/projects#what-a-project-is',
   knowledge: '/guide/projects#shared-knowledge-documents-every-session-can-search',

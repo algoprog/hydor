@@ -1,4 +1,4 @@
-// Templates for a new LaTeX document: what the Library's New → LaTeX offers, and save_latex's `template`. Each is a
+// Templates for a new LaTeX document: what New → LaTeX offers, and save_latex's `template`. Each is a
 // whole project that typesets with a standard TeX Live (an article, a report, a book or thesis, a letter, beamer
 // slides, a CV, a problem set, a two-column paper, papers in the styles IEEE, ACM and Springer's LNCS ask for, and a
 // poster), written with pdfLaTeX in mind; a title with letters pdfLaTeX's fonts lack (Greek, Chinese…) makes it a

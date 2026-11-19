@@ -317,7 +317,7 @@ test('the UIs that read from a spreadsheet or a file say how, with an example th
   assert.ok(!(typeof plain === 'string' ? plain : plain.text).includes(REF_HOW), 'and not when none can');
   assert.match(REF_HOW, /more than a few dozen rows/, 'they say when to use one');
   assert.match(REF_HOW, /50 MB/);
-  assert.match(FORMATTING, /Library spreadsheet or a data file/, 'every agent hears of them');
+  assert.match(FORMATTING, /saved spreadsheet or a data file/, 'every agent hears of them');
 });
 
 test('every agent hears of answer UIs when it starts', () => {

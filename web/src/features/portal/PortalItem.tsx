@@ -4,7 +4,7 @@
 // this browser), with its comments beside it on a wide screen (over it on a phone), every kind's but a notebook's:
 // theirs under their name, the owner's under the owner's, a new one on words they copy from it (or the whole of it), on
 // a slide, or on a spreadsheet's cell. With Edit, documents, spreadsheets, slides, pages and designs (and LaTeX where
-// the owner's computer allows) open in the Library's own editor instead, saved through the link; their comments are
+// the owner's computer allows) open in the app's own editor instead, saved through the link; their comments are
 // written there. Download makes its files (PDF, Word…). Alone (one thing shared), there is no way back to a project:
 // its top has who they are instead.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -335,7 +335,7 @@ function CommentsPanel({ it, comments, onChange, inset }: { it: PortalItemView; 
   );
 }
 
-/** With Edit: the Library's own editor (a page of HTML's or a design's: the Studio), saved through the link (a newer version meanwhile is asked about). */
+/** With Edit: the app's own editor (a page of HTML's or a design's: the Studio), saved through the link (a newer version meanwhile is asked about). */
 function EditView({ v, it, onBack, reload, onChanged, dirty }: { v: PortalView; it: PortalItemView; onBack?: () => void; reload: () => Promise<void>; onChanged: () => void; dirty: React.MutableRefObject<boolean> }) {
   const phone = useIsMobile();
   const [confirm, confirmNode] = useConfirm();

@@ -201,7 +201,7 @@ export const TOOL_VERBS: Record<string, string> = {
 
 /** A place results go, in a few words. */
 export function placeName(t: OutputTarget): string {
-  if (t.kind === 'library') return t.each === 'new' ? 'a new Library page each run' : 'a Library page, updated';
+  if (t.kind === 'library') return t.each === 'new' ? 'a new page each run' : 'a page, updated';
   if (t.kind === 'sheet') return 'a row in a spreadsheet';
   if (t.kind === 'email') return t.to?.length ? `an email to ${t.to.join(', ')}` : 'an email';
   if (t.kind === 'file') return `the file ${t.path}`;

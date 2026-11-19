@@ -159,7 +159,7 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 **Daten und Zahlen**
 
 - **data-analysis**: beantwortet Datenfragen anhand von CSV, Excel oder Exporten. Prüft und bereinigt Daten, arbeitet nachvollziehbar und nennt die Grundlage der Ergebnisse.
-- **dashboards**: wählt passende Diagramme und erstellt wiederholt nutzbare Dashboards als Bibliotheksseiten mit gespeicherten oder live geladenen Daten.
+- **dashboards**: wählt passende Diagramme und erstellt wiederholt nutzbare Dashboards als behaltene Seiten mit gespeicherten oder live geladenen Daten.
 - **notebooks**: erstellt verständliche und erneut ausführbare Jupyter-Notebooks mit erklärenden Textzellen, kleinen Codezellen und passender Laufzeitumgebung. Fehlt eine Umgebung, wird sie neben dem Notebook angelegt. Vor der Übergabe wird alles vollständig ausgeführt. Eine Karte öffnet die Notebook-Seite der App.
 - **financial-model**: bildet Umsatz, Kosten, Cashflow, Gewinnschwelle und Szenarien eines Unternehmens in einer Tabelle ab, mit Annahmen auf einem eigenen Blatt und nachvollziehbaren Formeln.
 - **sql-and-databases**: unterstützt korrektes, sicheres SQL, Schemas und Migrationen für Live-Daten, Indizes und Backups vor riskanten Änderungen.

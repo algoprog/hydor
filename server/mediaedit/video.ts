@@ -1,7 +1,7 @@
 // The video editor's work on the server: an edit (shared/mediaedit-video.ts, a timeline of clips, overlays, sounds and
 // words) made with ffmpeg as one command (video-plan.ts), as a job: in line (two are made at once, the rest wait their
 // turn), made with its progress, stopped when asked, then put where it was asked to go: kept as a deck's video (its
-// first frame a kept picture, for the slide's still), as a deck's picture (a frame, a GIF), as a Library item's file or
+// first frame a kept picture, for the slide's still), as a deck's picture (a frame, a GIF), as a kept item's file or
 // a new item, over a file (the old one to the Trash) or as a copy beside it. A video is made on the graphics card when
 // there is one that works (video-gpu.ts); when the card fails, it is made again on the processor at once. A job is kept
 // in memory for an hour after it ends. Without ffmpeg on this computer, the picture tools' portable one does it
@@ -88,7 +88,7 @@ const SOUND_EXT: Record<string, true> = { mp3: true, wav: true, m4a: true, aac: 
 
 export type SourceKind = 'video' | 'picture' | 'sound';
 
-/** A video, a picture or a sound an edit reads: its file, and what it is in the app (a deck's, a Library item, a file). */
+/** A video, a picture or a sound an edit reads: its file, and what it is in the app (a deck's, a kept item, a file). */
 export interface Source {
   file: string;
   kind: SourceKind;
@@ -141,7 +141,7 @@ function pictureFile(db: DB, sha: string): string {
   return file;
 }
 
-/** What `src` names (a deck's video or picture, a Library item, a sound kept by the editor, or a file), if it is one of `kinds`; throws what is wrong. */
+/** What `src` names (a deck's video or picture, a kept item, a sound kept by the editor, or a file), if it is one of `kinds`; throws what is wrong. */
 export async function sourceOf(db: DB, src: unknown, o: { cwd?: string; kinds?: SourceKind[] } = {}): Promise<Source> {
   const kinds = o.kinds ?? ['video'];
   const s = typeof src === 'string' ? src.trim() : '';
@@ -169,7 +169,7 @@ export async function sourceOf(db: DB, src: unknown, o: { cwd?: string; kinds?: 
   if (media) {
     const m = mustMedia(db, media[1]);
     const kind: SourceKind = m.kind === 'video' ? 'video' : m.kind === 'image' ? 'picture' : 'sound';
-    if (!kinds.includes(kind)) throw new HttpError(400, m.kind === 'video' ? 'That Library item is a video' : m.kind === 'image' ? 'That Library item is a picture, not a video' : 'That Library item is a sound, not a video');
+    if (!kinds.includes(kind)) throw new HttpError(400, m.kind === 'video' ? 'That kept item is a video' : m.kind === 'image' ? 'That kept item is a picture, not a video' : 'That kept item is a sound, not a video');
     return { file: m.file, kind, media: m, name: m.title };
   }
   const file = pathOf(s, o.cwd);
@@ -184,7 +184,7 @@ export async function sourceOf(db: DB, src: unknown, o: { cwd?: string; kinds?: 
   throw new HttpError(400, `${path.basename(file)} is not ${kinds.map((k) => KIND_WORDS[k]).join(' or ')}`);
 }
 
-/** The music `src` names: a sound of the Library's, a sound kept by the editor, or a sound file. */
+/** The music `src` names: a kept sound, a sound kept by the editor, or a sound file. */
 export async function musicOf(db: DB, src: string, o: { cwd?: string } = {}): Promise<string> {
   return (await sourceOf(db, src, { ...o, kinds: ['sound'] })).file;
 }
@@ -244,7 +244,7 @@ export function encodersOf(bin: string): Promise<Encoders> {
 
 // ---- jobs ---------------------------------------------------------------------------------------------------------
 
-/** Whether a file is the app's own (its data folder: the Library's files, a deck's videos), which is never written from here. */
+/** Whether a file is the app's own (its data folder: the kept files, a deck's videos), which is never written from here. */
 function appsOwn(file: string): boolean {
   const real = (p: string) => {
     try {
@@ -264,7 +264,7 @@ export type SaveTo = VideoSaveTo | { into: string; name: string };
 /** An edit checked and ready to make. */
 export interface Prepared {
   d: Deps;
-  /** Someone it is shared with makes it, through their link (their name): a Library video saved over says so. */
+  /** Someone it is shared with makes it, through their link (their name): a kept video saved over says so. */
   who?: string;
   /** The video being edited (where it is saved, and its clips without a src). */
   source: Source;
@@ -634,7 +634,7 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
     j.view.media = item.id;
     return;
   }
-  // A new item in the Library (a copy of an item goes in its project and folder).
+  // A new kept item (a copy of an item goes in its project and folder).
   const from = 'media' in to ? mustMedia(db, to.media) : p.source.media;
   const named = path.join(dir, madeName(p, ext));
   await fs.promises.rename(out, named);
@@ -650,14 +650,14 @@ async function deliver(j: Job, out: string, ext: string, dir: string): Promise<v
 }
 
 /**
- * A Library item's file swapped for an edited one: its size, length and hash with it, its still and frames made again,
+ * A kept item's file swapped for an edited one: its size, length and hash with it, its still and frames made again,
  * its title and description kept (Write them again makes new ones). The pages hear of it.
  */
 export async function replaceMediaFile(d: Deps, m: MediaItem, from: string, ext: string, who?: string): Promise<MediaItem> {
   initMedia(d.db);
   const mime = MIME[ext] ?? 'application/octet-stream';
   const kind = mime.startsWith('video/') ? 'video' : 'image';
-  if (kind !== m.kind) throw new Error(m.kind === 'video' ? 'A Library video is replaced by a video: save a frame or a GIF as a new item' : 'That Library item is not a video');
+  if (kind !== m.kind) throw new Error(m.kind === 'video' ? 'A kept video is replaced by a video: save a frame or a GIF as a new item' : 'That kept item is not a video');
   const name = `${m.id}.${ext}`;
   const to = path.join(MEDIA_DIR, name);
   const tmp = path.join(MEDIA_DIR, `.${m.id}.${crypto.randomBytes(4).toString('hex')}.tmp`);
@@ -766,7 +766,7 @@ export async function prepare(d: Deps, b: Partial<VideoEditAsk> & { to?: unknown
   if ('video' in to && (picture || format === 'gif')) throw new HttpError(400, 'A frame or a GIF is kept as a picture: to: { asset: true }');
   if ('video' in to && format === 'mov') format = 'mp4';
   if ('asset' in to && !(picture || format === 'gif')) throw new HttpError(400, 'A video is kept as a deck’s video: to: { video: true }');
-  if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'video') throw new HttpError(400, 'That Library item is not a video');
+  if ('media' in to && to.as === 'replace' && mustMedia(d.db, to.media).kind !== 'video') throw new HttpError(400, 'That kept item is not a video');
   const pair = Array.isArray(b.range) && b.range.length === 2 ? [Number(b.range[0]), Number(b.range[1])] : null;
   if (pair && pair.every(Number.isFinite) && Math.min(length, pair[1]) - Math.max(0, pair[0]) < 0.05) throw new HttpError(400, 'The part between In and Out is too short: mark a longer part');
   const range: [number, number] | undefined = pair && pair.every(Number.isFinite) && (pair[0] > 0.001 || pair[1] < length - 0.001) ? [Math.max(0, pair[0]), Math.min(length, pair[1])] : undefined;

@@ -1,4 +1,4 @@
-// Your own "Read later" list (the Browser page's tab column and the Library's Read later chip): pages you set aside, kept
+// Your own "Read later" list (the Browser page's tab column and its own Read later panel): pages you set aside, kept
 // in the app's key-value store. Marking one as read keeps it (Show read brings it back); removing forgets it. It is part of
 // your own browsing, so its routes are under /api/browser/browsing, which agents are refused.
 import crypto from 'node:crypto';

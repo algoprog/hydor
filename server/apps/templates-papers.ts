@@ -1,5 +1,5 @@
 // Ready-made apps for reading, writing and presenting papers: a reading list kept in step with Zotero (records and a page
-// of its own to work in), a literature matrix kept as a spreadsheet of the Library, reproducing a paper's results, a
+// of its own to work in), a literature matrix kept as a spreadsheet, reproducing a paper's results, a
 // review of your draft on a venue's own form, a rebuttal drafted point by point, a talk, a poster, a thread and a project
 // page from a paper, and figures fit for the paper. A paper comes in one way everywhere: `paper` (a link, an arXiv id or a
 // DOI, a title, or a PDF, a .tex file or a LaTeX project's folder on this computer) and, where it fits, `upload` (a file);
@@ -77,7 +77,7 @@ const PAPER_FIELDS: AnswerField[] = [
 /** Each sync with Zotero: what it did, and the library's version it left, so the next one moves only what changed. */
 const SYNC_FIELDS: AnswerField[] = [
   { id: 'service', label: 'Service', type: 'text' },
-  { id: 'library', label: 'Library', type: 'text' },
+  { id: 'library', label: 'Zotero library', type: 'text' },
   { id: 'version', label: 'Version', type: 'number' },
   { id: 'at', label: 'When', type: 'text' },
   { id: 'summary', label: 'What it did', type: 'text' },
@@ -380,7 +380,7 @@ const LITERATURE_MATRIX: Draft = {
   icon: 'list-checks',
   color: 'indigo',
   category: 'Research',
-  description: 'Papers become a spreadsheet in one go: task, data, method, metrics, results and limits for each, every cell citing its page, kept in your Library.',
+  description: 'Papers become a spreadsheet in one go: task, data, method, metrics, results and limits for each, every cell citing its page, kept in your project.',
   fields: [
     {
       id: 'papers',
@@ -639,14 +639,14 @@ The cells:
         outputs: [{ id: 'synthesis', label: 'Across the papers', type: 'markdown', required: true }],
         failed: 'skip',
       },
-      { id: 'save', title: 'Keep it in your Library', do: 'tool', tool: 'save_sheet', if: '{{matrix.count}} > 0', with: { title: '{{matrix.title}}', sheets: '{{matrix.sheets}}', project: '{{project}}' }, failed: 'skip' },
+      { id: 'save', title: 'Keep it as a spreadsheet', do: 'tool', tool: 'save_sheet', if: '{{matrix.count}} > 0', with: { title: '{{matrix.title}}', sheets: '{{matrix.sheets}}', project: '{{project}}' }, failed: 'skip' },
       {
         id: 'kept',
         title: 'Find its page',
         do: 'code',
         language: 'javascript',
         with: { saved: '{{save.text}}' },
-        code: String.raw`// The Library's page the spreadsheet was kept as (its id), from what save_sheet said.
+        code: String.raw`// The page the spreadsheet was kept as (its id), from what save_sheet said.
 const m = /\(page ([A-Za-z0-9_-]+), version/.exec(String(input.saved || ''));
 return { sheet: m ? m[1] : '', saved: !!m };`,
         outputs: [
@@ -664,7 +664,7 @@ return { sheet: m ? m[1] : '', saved: !!m };`,
     { id: 'columns', label: 'Columns', type: 'list' },
     { id: 'unread', label: 'Not read', type: 'list', description: 'The papers it could not read, and why' },
     { id: 'synthesis', label: 'Across the papers', type: 'markdown' },
-    { id: 'sheet', label: 'The spreadsheet', type: 'text', description: 'Its page in the Library' },
+    { id: 'sheet', label: 'The spreadsheet', type: 'text', description: 'Its page' },
   ],
   examples: [
     { id: 'three-rerankers', name: 'Three rerankers', inputs: { papers: '1901.04085\n2003.06713\n10.1145/3397271.3401075', project: 'Reranking' }, checks: ['{{matrix.count}} >= 2', '{{answer.cells}} is not empty'] },
@@ -1706,7 +1706,7 @@ const MADE_COLS: AnswerField['columns'] = [
   { id: 'note', label: 'Note', type: 'text' },
 ];
 
-/** What an agent that makes something for the Library hands in. */
+/** What an agent that makes something to keep hands in. */
 const MADE_OUT: AnswerField[] = [
   { id: 'page', label: 'Its page', type: 'text', required: true, description: 'The id save_slides, save_latex or save_page gave it' },
   { id: 'title', label: 'Its title', type: 'text' },
@@ -1737,7 +1737,7 @@ const PAPER_TO_TALK: Draft = {
     { id: 'poster', label: 'An A0 poster', type: 'yesno', default: 'Yes' },
     { id: 'thread', label: 'A thread (X, Bluesky, LinkedIn)', type: 'yesno', default: 'Yes' },
     { id: 'page', label: 'A project page', type: 'yesno', default: 'No' },
-    { id: 'project', label: 'Project', type: 'text', placeholder: 'e.g. ColBERT', help: 'What it makes goes in this project of yours in the Library' },
+    { id: 'project', label: 'Project', type: 'text', placeholder: 'e.g. ColBERT', help: 'What it makes goes in this project of yours' },
   ],
   prompt: '',
   flow: {
@@ -1853,7 +1853,7 @@ The plan ({{audience}}; its message: {{plan.message}}):
               title: 'Make the poster',
               do: 'agent',
               if: '{{poster}}',
-              instructions: `Make an A0 portrait poster of a paper as a LaTeX document of the Library, with save_latex: tikzposter (\\documentclass[25pt, a0paper, portrait]{tikzposter}), or another poster class this computer's TeX has. Its title, authors and their places at the top; then the problem, the idea, the method (with its key equation), the main results (the paper's own figures and its main table) and the take-away, in its own words, shortened for a poster: large type, little text, figures first. Put the paper's figures in as its pictures (save_latex takes them by path); from arXiv, download and unpack its source to get them. Fix what keeps it from typesetting until it does. {{#project}}Keep it in the project “{{project}}” (save_latex with project).{{/project}} Hand in the page id save_latex gave it, its title, and anything to check.
+              instructions: `Make an A0 portrait poster of a paper as a LaTeX document, with save_latex: tikzposter (\\documentclass[25pt, a0paper, portrait]{tikzposter}), or another poster class this computer's TeX has. Its title, authors and their places at the top; then the problem, the idea, the method (with its key equation), the main results (the paper's own figures and its main table) and the take-away, in its own words, shortened for a poster: large type, little text, figures first. Put the paper's figures in as its pictures (save_latex takes them by path); from arXiv, download and unpack its source to get them. Fix what keeps it from typesetting until it does. {{#project}}Keep it in the project “{{project}}” (save_latex with project).{{/project}} Hand in the page id save_latex gave it, its title, and anything to check.
 
 ${TALK_SOURCE}
 Its message: {{plan.message}}
@@ -1892,7 +1892,7 @@ ${paperParts('paper_read', 2)}`,
               title: 'Make the project page',
               do: 'agent',
               if: '{{page}}',
-              instructions: `Make the paper's project page with save_page, ready to publish (the user publishes it from the Library): its title, its authors and their places, links (the paper, its code and data when the paper names them), a teaser figure from the paper, the abstract, the key results (a figure and the main table, in HTML), and its BibTeX to copy, in the app's own look as save_page says. Pictures: the paper's figures, as PNG (pdftoppm -png -r 200 -singlefile figure.pdf figure), put in the page as data: addresses or as addresses on the web. {{#project}}Keep it in the project “{{project}}” (save_page with project).{{/project}} Hand in the page id save_page gave it, its title, and anything to check.
+              instructions: `Make the paper's project page with save_page, ready to publish (the user publishes it from its Share menu): its title, its authors and their places, links (the paper, its code and data when the paper names them), a teaser figure from the paper, the abstract, the key results (a figure and the main table, in HTML), and its BibTeX to copy, in the app's own look as save_page says. Pictures: the paper's figures, as PNG (pdftoppm -png -r 200 -singlefile figure.pdf figure), put in the page as data: addresses or as addresses on the web. {{#project}}Keep it in the project “{{project}}” (save_page with project).{{/project}} Hand in the page id save_page gave it, its title, and anything to check.
 
 ${TALK_SOURCE}
 {{#paper_read.data.bibtex}}Its BibTeX:
@@ -1912,7 +1912,7 @@ ${paperParts('paper_read', 2)}`,
         with: { slides: '{{slides_made}}', poster: '{{poster_made}}', page: '{{page_made}}', title: '{{check.title}}', total: '{{timing.total}}', thread: '{{thread_made.x}}' },
         code:
           LIST +
-          String.raw`// What was made, each with its page in the Library, and the talk in a line.
+          String.raw`// What was made, each with its page, and the talk in a line.
 const made = [];
 const add = (what, v) => {
   const x = obj(v);

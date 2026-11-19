@@ -1,5 +1,5 @@
-// The video editor opened from the places that have videos: a file (Files: saved over it, or a copy beside it), a Library
-// video (saved in its place, or as a new one), a video of the conversation (saved as a new one in the Library, noted as
+// The video editor opened from the places that have videos: a file (Files: saved over it, or a copy beside it), a kept
+// video (saved in its place, or as a new one), a video of the conversation (saved as a new one that is kept, noted as
 // from its session) and a slide's video (the new video and its still take the old one's place).
 import type { Saved } from '@shared/mediaedit';
 import type { MediaItem } from '@shared/media';
@@ -31,15 +31,15 @@ export function editVideoFile(path: string, o: { label?: string; after?: (r: Sav
 }
 
 /**
- * A Library video in the editor: Save puts the new one in its place, Save a copy keeps both. `src`: its file's address as
- * the Library gives it (with its version, so one written over before is not played from the browser's cache).
+ * A kept video in the editor: Save puts the new one in its place, Save a copy keeps both. `src`: its file's address as
+ * the app gives it (with its version, so one written over before is not played from the browser's cache).
  */
 export function editLibraryVideo(m: Pick<MediaItem, 'id' | 'title'> & Partial<Pick<MediaItem, 'file'>>, o: { src?: string; label?: string; after?: (r: Saved) => void } = {}): EditorHandle {
   const ext = /\.(webm|mov)$/i.exec(m.file ?? '')?.[1]?.toLowerCase();
   return openEditor({ kind: 'video', src: o.src ?? `/api/media/${m.id}/file`, title: m.title, from: { label: o.label || pageName() }, to: { media: m.id }, copy: true, fileKind: ext === 'webm' ? 'WebM' : ext === 'mov' ? 'MOV' : 'MP4', save: (r) => o.after?.(r) });
 }
 
-/** A video of the conversation in the editor: saved as a new video in the Library, noted as from its session. */
+/** A video of the conversation in the editor: saved as a new video that is kept, noted as from its session. */
 export function editSessionVideo(path: string, session: string): EditorHandle {
   return openEditor({
     kind: 'video',
@@ -47,7 +47,7 @@ export function editSessionVideo(path: string, session: string): EditorHandle {
     title: nameOf(path),
     from: { label: pageName() },
     session,
-    save: (r) => void (r.media && toast(tr('Saved to your Library; a title and a description are being written for it'), 'ok')),
+    save: (r) => void (r.media && toast(tr('Saved; a title and a description are being written for it'), 'ok')),
   });
 }
 

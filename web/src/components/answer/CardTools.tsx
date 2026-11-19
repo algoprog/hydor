@@ -99,7 +99,7 @@ export async function copyPicture(el: HTMLElement) {
 }
 
 /**
- * The "…" on a card's toolbar: Pin to a board (`pin`: what it pins; none where there is no Library to pin to), then Save
+ * The "…" on a card's toolbar: Pin to a board (`pin`: what it pins; none where there is no board to pin to), then Save
  * as picture and Copy as picture where the card can be one (`pictures`) and the browser can. `card` gives its element.
  */
 export function CardMenu({ card, title, pictures, pin }: { card: () => HTMLElement | null; title: string; pictures: boolean; pin?: PinCard }) {

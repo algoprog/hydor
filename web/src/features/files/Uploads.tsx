@@ -88,7 +88,7 @@ function Batch({ b }: { b: UploadBatch }) {
   );
 }
 
-/** Files' uploads, in the stack of trays at the bottom right (the Library's UploadTrays places it). */
+/** Files' uploads, in the stack of trays at the bottom right (UploadTrays places it). */
 export function UploadsPanel() {
   const batches = useUploads((s) => s.batches);
   if (!batches.length) return null;

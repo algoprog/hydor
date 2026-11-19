@@ -1,4 +1,4 @@
-// The Library's images and videos as the pages keep them: loaded once, kept current by the server's news
+// The kept images and videos as the pages keep them: loaded once, kept current by the server's news
 // ({ t: 'feature', id: 'media' }): one kept, its title and description written, one deleted.
 import { create } from 'zustand';
 import type { MediaEvent, MediaItem } from '@shared/media';
@@ -41,7 +41,7 @@ onFeatureEvent('media', ({ data }) => {
   if (e.what !== 'media') return;
   if (e.item) useMedia.getState().put(e.item);
   if (e.removed) useMedia.getState().drop(e.removed);
-  // Many changed at once (a Library folder deleted or moved): the list again, when it is loaded.
+  // Many changed at once (a folder of kept files deleted or moved): the list again, when it is loaded.
   if (e.reload && useMedia.getState().items) useMedia.getState().load().catch(() => {});
 });
 

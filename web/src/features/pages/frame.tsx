@@ -4,7 +4,7 @@
 // to put in the message box, and calls of window.hydor.storage, which a store answers. A template's
 // screen also gets window.hydor.app: its calls are answered here, for that template only (its runs,
 // its data), and what changes in them is passed on to it. A video's still in a page plays over it here, and a link to
-// another of the Library's pages opens that page in the app.
+// another of your pages opens that page in the app.
 // In Edit, the frame holds the visual editor (editor.ts): what it picks and changes comes back here, and
 // what it asks for (an emoji, a picture, maths…) is chosen in the app and sent back to it.
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -541,7 +541,7 @@ export function PageFrame({
         // A video's still in the page (the page editor's): its player cannot run in the sandbox, so it plays over the page.
         if (isStr(d.src, 300)) openVideo(d.src, isStr(d.title, 200) ? d.title : '');
       } else if (d.type === 'wa-open-page') {
-        // A link to another of the Library's pages (the page editor's a.n-pagelink), clicked: that page, in the app. Once a
+        // A link to another of your pages (the page editor's a.n-pagelink), clicked: that page, in the app. Once a
         // second at most, so a page cannot move the app about by itself.
         const now = Date.now();
         if (isStr(d.id, 40) && /^[\w-]+$/.test(d.id) && now - opened > 1000) {
@@ -549,9 +549,9 @@ export function PageFrame({
           go(`/pages/${d.id}`);
         }
       } else if (d.type === 'wa-go') {
-        // A place of the Library (a page's breadcrumbs), clicked: that place, in the app; once a second at most.
+        // A place (a page's breadcrumbs: its project's files), clicked: that place, in the app; once a second at most.
         const now = Date.now();
-        if (isStr(d.path, 260) && /^\/(library|projects)(\/[\w-]{1,40})?(\?[\w=&%-]{0,200})?$/.test(d.path) && now - opened > 1000) {
+        if (isStr(d.path, 260) && /^\/(library|projects)(\/[\w-]{1,40}){0,2}(\?[\w=&%-]{0,200})?$/.test(d.path) && now - opened > 1000) {
           opened = now;
           go(d.path);
         }

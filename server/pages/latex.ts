@@ -1849,7 +1849,7 @@ export async function importTex(buf: Buffer, name: string): Promise<{ doc: TexDo
 }
 
 /**
- * A document from a LaTeX project's folder of this computer (Import a folder in the Library): its main file found, its
+ * A document from a LaTeX project's folder of this computer (Import a folder): its main file found, its
  * files and pictures in their folders, those its document uses first when it is over a document's limits. What could
  * not come in is said in `notes`.
  */
@@ -1960,7 +1960,7 @@ export function texForAgent(text: string): string {
 }
 
 const LATEX_HELP = [
-  'Make or change a LaTeX document, kept in the user’s Library: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the Library as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
+  'Make or change a LaTeX document, kept for the user: a paper, a thesis, a CV, a letter, a report, math-heavy notes, a beamer talk, anything the user wants typeset with LaTeX. It shows in the conversation and in the project’s Files as its typeset pages; there the user edits the source beside its PDF (typeset again as they type) and downloads the PDF, main.tex or the whole project as a .zip. Use it rather than writing .tex files when the user asks for LaTeX, unless they want the files in a folder of theirs.',
   'source: the whole of main.tex, from \\documentclass to \\end{document}. files: the other files it reads, by the names it gives them ({"refs.bib": "…", "chapters/intro.tex": "…"}, or [{name, text}], or {name, path} for a file of this session); names are letters, digits, - _ . and / between folders. Or folder: a LaTeX project folder of this session, taken in whole.',
   'Track changes (track: true or false): while it is on, what the user types and deletes is marked, and what you change when you save is marked as yours, word by word, for the user to accept or reject; get_page lists the changes waiting (the files read as if all were accepted), and changes: [{"id", "accept": true}] or [{"id", "reject": true}], or "accept all" / "reject all", decides them.',
   'comments: the user’s comments on words of the document (get_page lists them, with their ids): answer with [{"id": "…", "reply": "…"}], resolve with {"id", "resolve": true} once you did what it asks, or add your own with {"file": "main.tex", "quote": the exact words it is on, "text": "…"}; what you leave out stays as it is. A LaTeX file of this computer (opened from Files) has comments too, which the app keeps beside it: get_page with its path lists them, and save_latex with path (instead of id and title) and comments answers them; change the file itself with your own tools.',
@@ -1979,7 +1979,7 @@ export const SAVE_LATEX_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'A saved LaTeX document’s id, to save a new version of it.' },
-    title: { type: 'string', description: 'Its name in the Library: "Thesis", "CV".' },
+    title: { type: 'string', description: 'Its name: "Thesis", "CV".' },
     source: { type: 'string', description: 'The whole of main.tex, from \\documentclass to \\end{document}.' },
     files: {
       description: 'The other files it reads, by name: {"refs.bib": "…"} or [{"name": "chapters/intro.tex", "text": "…"}] ({"name", "path"} for a file of this session).',

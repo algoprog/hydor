@@ -1,9 +1,9 @@
-// edit_audio: an agent's edits to a sound (a file of its session, a video's sound, or a Library sound), made on this
+// edit_audio: an agent's edits to a sound (a file of its session, a video's sound, or a kept sound), made on this
 // computer with ffmpeg as the sound editor makes them (audio.ts): the part kept, parts cut or made silent, long pauses
 // shortened, filler words taken out (with speech recognition on this computer), its speed and pitch, its volume, fades,
 // peak or loudness, noise reduction, tone, dynamics, echo, reverb, reverse, mono, and other sounds mixed over it at a
 // place (music under a voice, a sound effect). The file goes in the session's audio/ folder, listed as generate_audio
-// lists its sounds, so the conversation shows it in the same player; a Library sound can be put back in its place or
+// lists its sounds, so the conversation shows it in the same player; a kept sound can be put back in its place or
 // beside it. It waits up to about nine minutes, then hands back the job to wait for again.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -132,7 +132,7 @@ function answer(id: string): string | { isError: true; text: string } {
   return [
     `Edited the sound${s?.what ? ` (${s.what})` : ''}:`,
     `${v.path} (${bits})`,
-    'The user hears it in your reply, in a player where they can download it, keep it in their Library and open it in the sound editor: don’t repeat it or its path. You cannot listen to it: speak of it as what you asked for.',
+    'The user hears it in your reply, in a player where they can download it, keep it in their project and open it in the sound editor: don’t repeat it or its path. You cannot listen to it: speak of it as what you asked for.',
   ].join('\n');
 }
 
@@ -141,19 +141,19 @@ export function editAudioTool(): RunTool {
     name: 'edit_audio',
     annotations: { readOnlyHint: false, openWorldHint: false },
     description: [
-      'Edit a sound on this computer with ffmpeg: free, and nothing leaves the computer. Use it on a sound the user gave or one you made (generate_audio), a video’s sound, or a sound of the user’s Library:',
+      'Edit a sound on this computer with ffmpeg: free, and nothing leaves the computer. Use it on a sound the user gave or one you made (generate_audio), a video’s sound, or a sound the user kept:',
       'keep a part (trim), take parts out (cuts), make parts silent (silence), shorten long pauses (pauses), take out filler words such as "um" and "uh" (remove_fillers: speech recognition on this computer, Settings → Voice), play it faster or slower with its pitch kept (speed), make it higher or lower (pitch),',
       'louder or quieter (volume), fade it in and out, make its loudest peak a level (normalize) or its loudness a target (loudness: podcast −16 LUFS, streaming −14, broadcast −23), reduce steady noise (denoise), change its tone (eq: bass, middle, treble, or a preset: clearer voice, telephone, radio, warmer, brighter, less boomy, more bass), take out low rumble (highpass) or hiss (lowpass), even it out (compressor), keep its peaks down (limiter), add echo or reverb, play it backwards (reverse), make it mono,',
       'and mix other sounds over it (mix: music under a voice, a sound effect at a moment), each at a place, with its volume and fades.',
       'trim, cuts and silence are seconds of the original; pauses and fillers are found in what is left; mix’s at and effects’ from and to are seconds of the edited sound (after the trim, the cuts, the pauses and the speed).',
-      'The file is saved in the session’s folder (audio/) and shown to the user in your reply (a Library sound can also go back in its place, or beside it: save_to_library). The user can change it further in the app’s sound editor (Edit on a sound). It takes seconds for most sounds; it waits up to about nine minutes, then gives a job id to wait for it again (job).',
+      'The file is saved in the session’s folder (audio/) and shown to the user in your reply (a kept sound can also go back in its place, or beside it: save_to_library). The user can change it further in the app’s sound editor (Edit on a sound). It takes seconds for most sounds; it waits up to about nine minutes, then gives a job id to wait for it again (job).',
     ].join(' '),
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'The sound: a file of the session (MP3, WAV, M4A, AAC, OGG, Opus, FLAC or WebM), or a video (its sound).' },
-        library: { type: 'string', description: 'Instead of path: a sound of the user’s Library, by its id (app_api GET /api/media lists them).' },
-        save_to_library: { type: 'string', enum: ['replace', 'copy'], description: 'With library: put the result in the Library over that sound (replace: its title, project and folder kept) or beside it as a new one (copy). Left out, only the file in your folder is made.' },
+        library: { type: 'string', description: 'Instead of path: a sound the user kept, by its id (app_api GET /api/media lists them).' },
+        save_to_library: { type: 'string', enum: ['replace', 'copy'], description: 'With library: keep the result over that sound (replace: its title and project kept) or beside it as a new one (copy). Left out, only the file in your folder is made.' },
         trim: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'The part to keep: [start, end] in seconds of the original.' },
         cuts: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'Parts to take out (what follows moves back): [[start, end], …] in seconds of the original.' },
         silence: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, description: 'Parts to make silent, keeping its length: [[start, end], …] in seconds of the original.' },
@@ -193,7 +193,7 @@ export function editAudioTool(): RunTool {
           items: {
             type: 'object',
             properties: {
-              path: { type: 'string', description: 'The sound (a file of the session), or library: a Library sound’s id.' },
+              path: { type: 'string', description: 'The sound (a file of the session), or library: a kept sound’s id.' },
               library: { type: 'string' },
               at: { type: 'number', description: 'Where it starts, in seconds of the edited sound (default 0).' },
               volume: { type: 'number', description: 'Its volume in dB (−12 for music under a voice).' },
@@ -221,9 +221,9 @@ export function editAudioTool(): RunTool {
       }
       try {
         const lib = typeof a.library === 'string' && a.library.trim() ? mustMedia(ctx.deps.db, a.library.trim()) : null;
-        if (lib && lib.kind !== 'audio' && lib.kind !== 'video') return { isError: true, text: `${lib.id} is a picture of the Library, not a sound.` };
-        if (!lib && a.save_to_library) return { isError: true, text: 'save_to_library goes with library: the Library sound’s id.' };
-        if (!lib && (typeof a.path !== 'string' || !a.path.trim())) throw new Error('path: the sound to edit (or library: a Library sound’s id).');
+        if (lib && lib.kind !== 'audio' && lib.kind !== 'video') return { isError: true, text: `${lib.id} is a kept picture, not a sound.` };
+        if (!lib && a.save_to_library) return { isError: true, text: 'save_to_library goes with library: the kept sound’s id.' };
+        if (!lib && (typeof a.path !== 'string' || !a.path.trim())) throw new Error('path: the sound to edit (or library: a kept sound’s id).');
         const src = lib ? `media:${lib.id}` : String(a.path);
         const sound: Sound = await soundOf(ctx.deps.db, src, { cwd: ctx.cwd });
         const what: string[] = [];
@@ -292,7 +292,7 @@ export function editAudioTool(): RunTool {
         for (const [i, m] of (Array.isArray(a.mix) ? a.mix : []).slice(0, 15).entries()) {
           const mlib = typeof m?.library === 'string' && m.library.trim() ? mustMedia(ctx.deps.db, m.library.trim()) : null;
           const msrc = mlib ? `media:${mlib.id}` : typeof m?.path === 'string' ? m.path.trim() : '';
-          if (!msrc) return { isError: true, text: `mix[${i}]: path (a sound of the session) or library (a Library sound’s id).` };
+          if (!msrc) return { isError: true, text: `mix[${i}]: path (a sound of the session) or library (a kept sound’s id).` };
           const ms = await soundOf(ctx.deps.db, msrc, { cwd: ctx.cwd });
           const from = Math.max(0, Math.min(ms.duration, num(m.from) ?? 0));
           const startAt = Math.max(0, num(m.at) ?? 0);
@@ -361,7 +361,7 @@ export function editAudioTool(): RunTool {
   };
 }
 
-/** The answer, once the Library has its copy where the agent asked (as the editor's Save or Save a copy puts it). */
+/** The answer, once the kept copy is where the agent asked (as the editor's Save or Save a copy puts it). */
 async function finishLibrary(id: string, ctx: Parameters<RunTool['run']>[1]): Promise<string | { isError: true; text: string }> {
   const out = answer(id);
   const v = soundJob(id);
@@ -374,16 +374,16 @@ async function finishLibrary(id: string, ctx: Parameters<RunTool['run']>[1]): Pr
     let line: string;
     if (lib.as === 'replace') {
       const item = await replaceLibrarySound(ctx.deps, mustMedia(ctx.deps.db, lib.id), copy, path.extname(v.path).slice(1));
-      line = `It is in the Library in place of “${lib.title}” (${item.id}).`;
+      line = `It is kept in place of “${lib.title}” (${item.id}).`;
     } else {
       const from = mustMedia(ctx.deps.db, lib.id);
       const { item } = await keepFile(ctx.deps, { path: copy, ...(from.space ? { space: from.space } : {}) }, { move: true });
-      line = `It is in the Library as a new sound beside “${lib.title}” (${item.id}).`;
+      line = `It is kept as a new sound beside “${lib.title}” (${item.id}).`;
     }
     await fs.promises.rm(tmp, { recursive: true, force: true }).catch(() => {});
     said.delete(id);
     return `${out}\n${line}`;
   } catch (e) {
-    return `${out}\nIt could not be put in the Library: ${(e as Error).message}`;
+    return `${out}\nIt could not be kept: ${(e as Error).message}`;
   }
 }

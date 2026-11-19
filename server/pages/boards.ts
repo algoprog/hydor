@@ -1,7 +1,7 @@
-// Boards kept in the Library: answer cards (shared/answer-ui) in a grid, each pinned from a reply or put there by an
+// Boards kept as pages: answer cards (shared/answer-ui) in a grid, each pinned from a reply or put there by an
 // agent (save_board), kept a card a line (shared/boards.ts says the format and checks each card). The board page draws
 // the cards with the replies' own views (web/src/features/pages/board); its own page here, made without them, shows
-// each card's title and its data as text and tables in the same grid: what its picture in the Library, a PDF and a web
+// each card's title and its data as text and tables in the same grid: what its picture in the Files, a PDF and a web
 // page of it are made from. An agent is told it card by card, with each card's id, UI, size and data.
 import { blockHtml, docCss, listInfo, normalizeDoc } from '../../shared/docs.ts';
 import { answerMarkdown } from '../../shared/answer-ui/text.ts';
@@ -64,7 +64,7 @@ export const freshBoard = (): Board => newBoard();
 
 // ---- its own page ----------------------------------------------------------------------------------------
 
-/** Markdown as the Library's documents show it (headings, lists, tables, pictures, links). */
+/** Markdown as the documents show it (headings, lists, tables, pictures, links). */
 function markdownHtml(md: string): string {
   if (!md.trim()) return '';
   try {
@@ -105,7 +105,7 @@ main{max-width:1280px;margin:0 auto;padding:28px 28px 44px}
 @media print{body{background:#fff}main{max-width:none;padding:0}.bd-card{break-inside:avoid-page}}
 `;
 
-/** Its picture in the Library: each card a tile of its size in the grid, with its title and kind, large enough to read small. */
+/** Its picture in the Files: each card a tile of its size in the grid, with its title and kind, large enough to read small. */
 const STILL_CSS = `
 body{font-size:26px}
 main{max-width:none;padding:44px 48px}
@@ -122,7 +122,7 @@ main{max-width:none;padding:44px 48px}
 
 /**
  * Its own page: each card's title and its data as text and tables, in the board's grid (a phone's one column). still:
- * the first cards as tiles of their sizes with their titles and kinds, for its picture in the Library; print: every
+ * the first cards as tiles of their sizes with their titles and kinds, for its picture in the Files; print: every
  * card, to a PDF.
  */
 export function boardPage(board: Board, title: string, mode: 'viewer' | 'print' | 'still', description = ''): string {
@@ -185,7 +185,7 @@ export function boardForAgent(text: string): string {
 // ---- what save_board does ------------------------------------------------------------------------------------
 
 export const SAVE_BOARD_DESCRIPTION = [
-  'Keep answer cards on a board in the user’s Library: a page of cards in a grid (the same cards as ```ui blocks draw in replies: charts, stats, weather, tables, checklists…) that they come back to, instead of asking for the same thing again ("this week’s sales", "my reading streak").',
+  'Keep answer cards on a board for the user: a page of cards in a grid (the same cards as ```ui blocks draw in replies: charts, stats, weather, tables, checklists…) that they come back to, instead of asking for the same thing again ("this week’s sales", "my reading streak").',
   'Offer one when the user wants to keep answers together, and use it when they ask ("pin this to my Shop board", "make me a board of my GPU usage, my experiments and the weather").',
   'The user pins cards themselves from a reply (a card’s … → Pin to a board); you add them here.',
   'Make a board with title and cards; add to one with id (get_page lists boards) or board (its name: a new board of that name is made when there is none).',
@@ -196,7 +196,7 @@ export const SAVE_BOARD_DESCRIPTION = [
   'To keep a card up to date by itself ("keep this updated every morning"), give it refresh: {ask: the question an agent answers again each time (the user’s request, as it would be asked now; for a card they pinned, left out, their request it came from), every: hour, day, weekdays or week (left out: only when they press Refresh now), at: its time ("07:00", in their time zone), on: the day for week ("monday"), tier: quick (the default), standard, best or max}; refresh: null stops it. Each refresh is an agent’s session on that tier that sends nothing and answers with a new ```ui block of the same UI, which replaces the card’s data (a failed one keeps it; three in a row pause it). It costs money: the result says about what a refresh and a month come to, and each board has a monthly cap for its refreshes ($5 unless the user changes it on the board). Say so when you set one. A card that reads a spreadsheet or a file (its data has from) needs none.',
   'A board made from cards that refresh (a copy, or yours made from another board’s cards) gets them paused: it never starts spending by itself; the user turns them on (Turn all on at the top of the board, which shows what they cost, or card by card), or you with refresh: {paused: false} when they ask.',
   'get_page with a board’s id says, for each card that refreshes, when, on which tier, what it costs, when it was last updated and whether its last refresh failed, and the board’s cap and what its refreshes spent this month: answer questions about them from it.',
-  `Give each new board a description (under 100 words): the Library shows it and its search finds the board by it.`,
+  `Give each new board a description (under 100 words): the search box finds the board by it.`,
 ].join(' ');
 
 const REFRESH_SCHEMA = {

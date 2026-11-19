@@ -336,7 +336,7 @@ export async function saveForAgent(ctx: RunCtx, data: Buffer, name: string): Pro
 export function savedLines(f: Saved, ...notes: (string | false | undefined)[]): string[] {
   return [
     `${f.path} (${f.w && f.h ? `${f.w}×${f.h}, ` : ''}${size(f.bytes)})`,
-    'The user sees it with your reply, a tap away from full size, download and keeping it in their Library: don’t repeat it or its path. To look at it yourself, open the file.',
+    'The user sees it with your reply, a tap away from full size, download and keeping it in their project: don’t repeat it or its path. To look at it yourself, open the file.',
     ...notes.filter((x): x is string => !!x),
   ];
 }

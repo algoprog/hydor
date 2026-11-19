@@ -1,4 +1,4 @@
-// What "Ask an agent about these" says to an agent about the highlights you made on a page (Library → Highlights, and the
+// What "Ask an agent about these" says to an agent about the highlights you made on a page (the Browser's Highlights panel, and the
 // Browser's Highlights panel): the page's address and title, each highlighted passage in quotes with the note you put on
 // it. It goes to agents as your own message, so its words are not translated (scripts/i18n-extract.mjs leaves this file out).
 import type { PageHighlight } from './highlights.ts';

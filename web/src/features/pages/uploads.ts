@@ -1,7 +1,8 @@
-// Files added to the Library by dropping them on it (or on a project, on the Projects page) or picking them with Upload
-// files: a queue sending a few at a time, which the tray shows (UploadTray.tsx). In a browser each file's bytes go in
-// pieces (POST /api/library/uploads, then PUT a piece at a time, resumed from where the server says when one is out of
-// step, a broken piece tried again), and the server makes it what it is (server/pages/uploads.ts). In the desktop app,
+// Files kept by the app (documents, spreadsheets, slides, notebooks, pictures, videos and sounds, each in a project or
+// none) from files dropped on a project or picked with Upload files in the New dialog: a queue sending a few at a
+// time, which the tray shows (UploadTray.tsx). In a browser each file's bytes go in pieces (POST /api/library/uploads,
+// then PUT a piece at a time, resumed from where the server says when one is out of step, a broken piece tried
+// again), and the server makes it what it is (server/pages/uploads.ts). In the desktop app,
 // on its own computer's server, a dropped file goes by its path instead and is moved in (POST /api/library/move); one the
 // server will not move (in a project's folder, the app's own, the system's, a link) is uploaded as a copy, as in a browser.
 import { create } from 'zustand';
@@ -77,7 +78,7 @@ function pathOf(f: File): string | null {
   }
 }
 
-/** Files dropped in the desktop app are moved, not copied: what a drag shows over the Library. */
+/** Files dropped in the desktop app are moved, not copied: what a drag shows over where it would go. */
 export const dropMoves = () => !!(window as unknown as { hydorDesktop?: Desktop }).hydorDesktop?.pathOf && !machineId && LOOPBACK.test(location.hostname);
 
 /** The folder a file of a dropped folder came in: its path less its place in that folder. */
@@ -97,7 +98,7 @@ const LEFT_OUT = (rel: string) => {
   return rel.includes('/') && (name.startsWith('.') || name === 'Thumbs.db' || name === 'desktop.ini');
 };
 
-/** Adds files to the Library, in a project or none: each joins the queue, which sends a few at a time. */
+/** Keeps files as what they are, in a project or none: each joins the queue, which sends a few at a time. */
 export function addToLibrary(picked: PickedFile[], space: string | null) {
   const list = picked.filter((p) => !LEFT_OUT(p.rel));
   if (!list.length) return;

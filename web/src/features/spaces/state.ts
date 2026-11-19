@@ -14,7 +14,7 @@ export function loadSpaces() {
   if (!listening) {
     listening = true;
     onFeatureEvent('spaces', () => loadSpaces());
-    // What each holds in the Library changes with the pages and pictures kept: counted again a moment later.
+    // What each holds changes with the pages and pictures kept: counted again a moment later.
     const soon = () => {
       clearTimeout(later);
       later = setTimeout(loadSpaces, 800);

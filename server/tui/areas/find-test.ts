@@ -22,7 +22,7 @@ const found = {
   messages: [{ key: 'claude:s1', title: 'Fix login', cwd: '/home/u/proj', updatedAt: 1, kind: 'message', snippet: 'the \u0001rate\u0002 \u0001limit\u0002 is hit' }],
   notes: [{ id: 'n1', scope: 'project', text: 'Rate limits are 60 a minute', updatedAt: 1 }],
   alike: [
-    'go:library',
+    'go:inbox',
     'sec:memory',
     'opt:general:Appearance',
     'app:a1',
@@ -78,7 +78,7 @@ test('find: groups, one line a result (number, title, where), no addresses', asy
   assert.match(r.out, /^ {2}1 +Fix login +~\/proj · 1h ago$/m);
   assert.match(r.out, /^ {2}2 +the rate limit is hit +Fix login$/m, 'the words said, then the session');
   assert.match(r.out, /^ {2}3 +Rate limits are 60 a minute +project$/m);
-  assert.match(r.out, /^ {2}\d+ +Library$/m, 'a page of the app, from the catalog');
+  assert.match(r.out, /^ {2}\d+ +Inbox$/m, 'a page of the app, from the catalog');
   assert.match(r.out, /^ {2}\d+ +Memory +Settings › Capabilities$/m);
   assert.match(r.out, /^ {2}\d+ +Appearance +Settings › App › General$/m);
   for (const name of ['Thesis', 'Reading list', 'Quiz', 'Coder', 'Daily brief', 'Tracker', 'Notion']) assert.match(r.out, new RegExp(`^ {2}\\d+ +${name}$`, 'm'), name);
@@ -100,7 +100,7 @@ test('find --urls: each address on a dim line of its own under its result', asyn
   assert.equal(addr(/^ {2}1 +Fix login/), 'http://fake/s/claude%3As1');
   assert.equal(addr(/ the rate limit is hit/), 'http://fake/s/claude%3As1');
   assert.equal(addr(/Rate limits are 60/), 'http://fake/settings?s=memory');
-  assert.equal(addr(/ Library$/), 'http://fake/library');
+  assert.equal(addr(/ Inbox$/), 'http://fake/inbox');
   assert.equal(addr(/Appearance +Settings/), 'http://fake/settings?s=general&find=Appearance');
   assert.equal(addr(/ Thesis$/), 'http://fake/projects/sp1');
   assert.equal(addr(/ Reading list$/), 'http://fake/apps/a1');

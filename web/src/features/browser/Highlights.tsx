@@ -1,6 +1,6 @@
 // Your highlights on web pages (marked in the page from its right-click menu: Highlight). The Browser's panel lists those of
 // the page you are on, each to show on the page, copy, add a note to, or delete, and to ask an agent about together; the
-// Library's Highlights list (pages/BrowserLists.tsx) uses the same rows for all of them. Private to you: agents never see
+// Highlights list of pages/BrowserLists.tsx uses the same rows for all of them. Private to you: agents never see
 // them, except when you press Ask an agent about these, which sends that page's highlights, quoted, to a new session.
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Crosshair, ExternalLink, Highlighter, Pencil, Sparkles, Trash2 } from 'lucide-react';

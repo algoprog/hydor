@@ -1,4 +1,4 @@
-// Saved pages: the Pages library in SQLite. Each save is a new version (the oldest go past a count and
+// Saved pages: the kept pages in SQLite. Each save is a new version (the oldest go past a count and
 // a size; an agent's saves of a page in a row, in one turn, are kept as one version: the last one, which says how many
 // saves it holds); each page keeps its own small storage (window.hydor.storage), comments on its blocks (outside its HTML)
 // and its icon (for links to it from other pages), and has a link of its own,
@@ -63,17 +63,17 @@ export function initPages(db: DB) {
   if (!cols.includes('thumb')) db.exec('alter table pages add column thumb text');
   // A slide deck, a document or a spreadsheet (kinds.ts), or a page of HTML (null).
   if (!cols.includes('kind')) db.exec('alter table pages add column kind text');
-  // A template's screen belongs to the template (server/apps): its pages are its own, not the library's.
+  // A template's screen belongs to the template (server/apps): its pages are its own, not the kept pages'.
   if (!cols.includes('app')) db.exec('alter table pages add column app text');
-  // The space it belongs to (shared/spaces.ts), or none: the Library shows each space's pages together.
+  // The space it belongs to (shared/spaces.ts), or none: each project's pages show together.
   if (!cols.includes('space')) db.exec('alter table pages add column space text');
   // Who made a version, when it was someone the project is shared with (server/spaces/share.ts): their name.
   if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'who')) db.exec('alter table page_versions add column who text');
   // A name the user gave a version ("Sent to ICML"): kept past the newest 40.
   if (!(db.prepare('pragma table_info(page_versions)').all() as { name: string }[]).some((c) => c.name === 'name')) db.exec('alter table page_versions add column name text');
-  // The Library folder it is in (folders.ts), or none: at its space's top.
+  // The folder it is in (folders.ts), or none: at its space's top.
   if (!cols.includes('folder')) db.exec('alter table pages add column folder text');
-  // What it is, in a few sentences (shared/pages.ts cleanDescription): the Library's search finds it by it.
+  // What it is, in a few sentences (shared/pages.ts cleanDescription): the search box finds it by it.
   if (!cols.includes('description')) db.exec('alter table pages add column description text');
   // Locked by its owner, so it doesn't change by accident (page-tools.ts): no new version until it is unlocked.
   if (!cols.includes('locked')) db.exec('alter table pages add column locked integer');
@@ -175,7 +175,7 @@ const toInfo = (r: Row): PageInfo => ({
   ...(r.source_url ? { source: { url: r.source_url, site: r.site ?? '' } } : {}),
 });
 
-/** The library's pages: a template's screens stay with their template. */
+/** The kept pages: a template's screens stay with their template. */
 export function listPages(db: DB): PageInfo[] {
   return (db.prepare(`${SELECT} where p.app is null order by p.updated_at desc`).all() as Row[]).map(toInfo);
 }
@@ -298,7 +298,7 @@ const safeJson = (s: string) => {
 const DEFAULT_TITLE: Record<string, string> = { slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', notebook: 'Notebook', diagram: 'Diagram' };
 
 /**
- * A new page. `folder`: the Library folder it goes in, of its `space` (folders.ts placeFor makes the two agree).
+ * A new page. `folder`: the folder it goes in, of its `space` (folders.ts placeFor makes the two agree).
  * `description`: what it is, in a few sentences (cut to DESCRIPTION_WORDS words).
  */
 export function createPage(
@@ -316,7 +316,7 @@ export function createPage(
     folder?: string | null;
     turn?: string;
     description?: unknown;
-    /** A web page saved from the user's browser: the address it came from and its site's name (shown "Web page" in the Library). */
+    /** A web page saved from the user's browser: the address it came from and its site's name (shown "Web page"). */
     source?: { url: string; site: string };
     /** Keep the model as given: a board whose refreshes were set on purpose (save_board's), not copied. */
     asIs?: boolean;

@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, Clock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -77,7 +77,7 @@ const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page' | 'web', string>
 };
 
 /** Your own browser is part of the desktop app: its page, its panels and the Settings rows that open them are found only there. */
-const browserOnly = (it: CatalogItem) => it.path?.startsWith('/browser') || /^\/library\?kind=(bookmarks|downloads|history)$/.test(it.path ?? '') || (it.section === 'browser' && it.find !== undefined && BROWSING_OPTIONS.has(it.find));
+const browserOnly = (it: CatalogItem) => it.path?.startsWith('/browser') || (it.section === 'browser' && it.find !== undefined && BROWSING_OPTIONS.has(it.find));
 const BROWSING_OPTIONS = new Set(['Bookmarks', 'Extensions', 'Browser settings']);
 
 const settingsAt = (s: string, find?: string) => `/settings?s=${encodeURIComponent(s)}${find ? `&find=${encodeURIComponent(find)}` : ''}`;
@@ -93,18 +93,13 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:apps-pinned': <Pin size={15} />,
   'go:apps-recent': <History size={15} />,
   'go:apps-own': <User size={15} />,
-  'go:library': <LibraryBig size={15} />,
-  'go:media': <Images size={15} />,
-  'go:videos': <Play size={15} />,
-  'go:audio': <AudioLines size={15} />,
-  'go:web-pages': <Globe size={15} />,
-  'go:library-bookmarks': <Bookmark size={15} />,
-  'go:library-downloads': <FileDown size={15} />,
-  'go:library-history': <History size={15} />,
   'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
   'go:browser': <Globe size={15} />,
   'go:browser-history': <History size={15} />,
+  'go:browser-bookmarks': <Bookmark size={15} />,
+  'go:browser-later': <Clock size={15} />,
+  'go:browser-downloads': <FileDown size={15} />,
   'go:browser-settings': <SlidersHorizontal size={15} />,
   'go:usage': <Gauge size={15} />,
   'go:stats': <TrendingUp size={15} />,
@@ -202,7 +197,7 @@ export async function liveEntries(): Promise<Entry[]> {
         ['Sessions', String(s.sessions)],
         ['Last active', s.lastAt ? timeAgo(s.lastAt) : ''],
       ],
-      opens: 'Opens the project',
+      opens: 'Opens the project’s details',
       run: () => go(`/projects/${encodeURIComponent(s.id)}`),
     });
   for (const a of apps?.apps ?? [])
@@ -255,9 +250,9 @@ export async function liveEntries(): Promise<Entry[]> {
       icon: kind.icon(15),
       mark: kind.icon(20),
       title: p.title,
-      keywords: `${PAGE_WORDS[p.source ? 'web' : (p.kind ?? 'page')] ?? 'page'} library${p.published ? ' published' : ''}`,
+      keywords: `${PAGE_WORDS[p.source ? 'web' : (p.kind ?? 'page')] ?? 'page'} library files${p.published ? ' published' : ''}`,
       text: p.description,
-      where: ['Library', ...place].join(' › '),
+      where: ['Files', ...place].join(' › '),
       hint: timeAgo(p.updatedAt),
       meta: [kind.label],
       place,
@@ -288,9 +283,9 @@ export async function liveEntries(): Promise<Entry[]> {
       group: 'Images, videos and audio',
       icon: m.kind === 'video' ? <Play size={15} /> : m.kind === 'audio' ? <AudioLines size={15} /> : <ImageIcon size={15} />,
       title: m.title,
-      keywords: `${m.kind === 'video' ? 'video clip' : m.kind === 'audio' ? 'audio sound music song voice recording' : 'image picture'} library`,
+      keywords: `${m.kind === 'video' ? 'video clip' : m.kind === 'audio' ? 'audio sound music song voice recording' : 'image picture'} library files`,
       text: [m.description, m.prompt].filter(Boolean).join(' '),
-      where: ['Library', ...place].join(' › '),
+      where: ['Files', ...place].join(' › '),
       hint: timeAgo(m.updatedAt),
       meta: meta.filter(Boolean),
       place,

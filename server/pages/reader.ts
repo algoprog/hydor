@@ -1,7 +1,7 @@
 // A reader copy of a web page, as the Browser's Save keeps it: the article Mozilla's Readability finds in the tab (reader-script.ts),
 // its HTML cleaned down to what an article is made of (headings, text, lists, tables, quotes, code, its pictures and videos),
-// its pictures downloaded and kept with the page (kept-pictures.ts: they last when the site's go), and all of it a page of the
-// Library in the page kit's look, with readable type, set in a column. Light and dark follow the app, as every page does.
+// its pictures downloaded and kept with the page (kept-pictures.ts: they last when the site's go), and all of it a page
+// in the page kit's look, with readable type, set in a column. Light and dark follow the app, as every page does.
 //
 // The article comes from a web page: nothing in it is trusted. It is cleaned by an allowlist (parse5 reads it, what is written
 // out is built here): no script, style, form, event handler, comment or anything not named below survives.
@@ -248,7 +248,7 @@ export function cleanReaderHtml(html: string, base: string): Cleaned {
 
 /**
  * Downloads the pictures (at most PICTURE_LIMITS: how many, how large each, how much in all, how long it takes) into the
- * Library's store; each one's sha, by its address on the web. What could not be had (a site that refuses, a file too large, a
+ * the app's store; each one's sha, by its address on the web. What could not be had (a site that refuses, a file too large, a
  * time out, not a picture) is not in the map: the page shows it from the web.
  */
 export async function keepPictures(db: DB, urls: string[], page: string, o: { fetch?: typeof fetchPage } = {}): Promise<Map<string, string>> {
@@ -389,8 +389,8 @@ export const MIN_ARTICLE = 200;
 export const isArticle = (raw: ReaderRaw | null | undefined): raw is ReaderRaw & { content: string } => !!raw?.content && (raw.length ?? 0) >= MIN_ARTICLE;
 
 /**
- * Keeps the page's reader copy as a page of the Library (in a project and folder; none: not in a project), with the address
- * it came from and its site on it, so the Library shows it as a Web page and opens the original. Its pictures are
+ * Keeps the page's reader copy as a page (in a project and folder; none: not in a project), with the address
+ * it came from and its site on it, so it shows as a Web page and opens the original. Its pictures are
  * downloaded and kept with it.
  */
 export async function saveReaderPage(d: Deps, o: { raw: ReaderRaw & { content: string }; title: string; url: string; selected?: string; space?: unknown; folder?: unknown; fetch?: typeof fetchPage }): Promise<PageInfo> {

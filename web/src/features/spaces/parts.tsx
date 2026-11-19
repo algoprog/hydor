@@ -1,32 +1,17 @@
-// Pieces of spaces used on several pages: a space's coloured mark, the tabs over the spaces and the shared
-// knowledge, the dialog that makes a new space (or a group of them) with the folders it works in, the picker
+// Pieces of spaces used in several places: a space's coloured mark, the dialog that makes a new space (or a group of them) with the folders it works in, the picker
 // of a group's spaces, and the folders worth a space (used lately, in no space yet).
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Check, ChevronRight, Folder, FolderOpen, Plus, X } from 'lucide-react';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, SPACE_COLORS, spaceColor, type Space, type SpaceSuggestion } from '@shared/spaces';
 import { placeKey } from '@shared/start';
 import { FolderFinder } from '../../components/FolderPicker';
-import { Button, cx, Dialog, inputCls, Popover, Switch, Tabs } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Popover, Switch } from '../../components/ui';
 import { api, post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { placePicks, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { loadSpaces, useSpaces } from './state';
-
-/** Under the Spaces page's title: the spaces, and the documents every session searches. */
-export function SpacesTabs({ tab }: { tab: 'spaces' | 'shared' }) {
-  return (
-    <Tabs
-      value={tab}
-      onChange={(t) => go(t === 'shared' ? '/knowledge' : '/projects', true)}
-      options={[
-        { value: 'spaces', label: 'All projects' },
-        { value: 'shared', label: 'Shared knowledge' },
-      ]}
-    />
-  );
-}
 
 /** A space's mark: a rounded square in its colour, with its first letter; a group's, with another behind it. */
 export function SpaceMark({ s, size = 15, className }: { s: Pick<Space, 'name' | 'color'> & Partial<Pick<Space, 'members'>>; size?: number; className?: string }) {

@@ -27,9 +27,9 @@ const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
 const usual = [...SIDEBAR_TOOLS];
 
-test('the usual order: the sections (Browser, Library, Projects, Apps, Agents), then Search, Usage, System, Settings, Help', () => {
-  assert.deepEqual(usual, ['browser', 'pages', 'spaces', 'apps', 'agents', 'search', 'usage', 'system', 'settings', 'help']);
-  assert.deepEqual(SECTION_TOOLS, usual.slice(0, 5), 'the rail\'s upper group comes first in the usual order');
+test('the usual order: the sections (Browser, Apps, Agents), then Search, Usage, System, Settings, Help', () => {
+  assert.deepEqual(usual, ['browser', 'apps', 'agents', 'search', 'usage', 'system', 'settings', 'help']);
+  assert.deepEqual(SECTION_TOOLS, usual.slice(0, 3), 'the rail\'s upper group comes first in the usual order');
 });
 
 test('an order: the tools named first, then the rest in their usual order', () => {
@@ -39,6 +39,7 @@ test('an order: the tools named first, then the rest in their usual order', () =
   assert.deepEqual(toolOrder(['settings', 'help']), ['settings', 'help', ...usual.filter((t) => t !== 'settings' && t !== 'help')]);
   assert.deepEqual(toolOrder(['help', 'gone', 'help', 3, 'system']), ['help', 'system', ...usual.filter((t) => t !== 'help' && t !== 'system')], 'unknown names and repeats skipped');
   assert.deepEqual(toolOrder(['files', 'git', 'help']), ['help', ...usual.filter((t) => t !== 'help')], 'tools that moved into System are passed over');
+  assert.deepEqual(toolOrder(['pages', 'spaces', 'help']), ['help', ...usual.filter((t) => t !== 'help')], 'the Library and Projects are gone: passed over');
   const reversed = [...usual].reverse();
   assert.deepEqual(toolOrder(reversed), reversed);
   assert.ok(usualOrder(toolOrder([])));
@@ -47,7 +48,7 @@ test('an order: the tools named first, then the rest in their usual order', () =
 
 test('kept: every device reads the same; the usual order is kept as none', () => {
   assert.deepEqual(sidebarTools(db), usual, 'nothing kept yet');
-  const mine = ['settings', 'system', 'apps', 'spaces', ...usual.filter((t) => !['settings', 'system', 'apps', 'spaces'].includes(t))];
+  const mine = ['settings', 'system', 'apps', ...usual.filter((t) => !['settings', 'system', 'apps'].includes(t))];
   assert.deepEqual(setSidebarTools(db, mine), mine);
   assert.deepEqual(sidebarTools(db), mine);
   assert.deepEqual(setSidebarTools(db, ['help']), ['help', ...usual.filter((t) => t !== 'help')], 'an agent naming one tool puts it first');

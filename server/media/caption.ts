@@ -1,4 +1,4 @@
-// The title and description of each image, video and sound kept in the Library, written by a model that sees
+// The title and description of each image, video and sound kept as media, written by a model that sees
 // images: a picture is shown to it (a smaller copy), a video as ten of its frames on one picture (frames.ts), with
 // what it was made from as a hint; a sound, which it cannot hear, is described from what it was made from (its
 // prompt, its words, its model) alone. Settings → Images, video and audio picks the model and where it runs: the app's choice
@@ -235,14 +235,14 @@ export function readCaption(raw: string): { title: string; description: string }
 }
 
 const SYSTEM = [
-  'You write the title and description of a picture or a video someone keeps in their media library, from what you see in it.',
+  'You write the title and description of a picture or a video someone keeps in their project, from what you see in it.',
   'Say what it shows: the subject, the setting, the style and the mood, and for a video what happens and how things move.',
   'The title: at most 8 words, no quotes and no full stop at the end. The description: 1 to 3 plain sentences, at most 60 words, without starting "This image" or "This video".',
   'Answer with JSON only: {"title": "…", "description": "…"}.',
 ].join(' ');
 
 const AUDIO_SYSTEM = [
-  'You write the title and description of a sound someone keeps in their media library: a song or a piece of music, speech, or sound effects and ambience, made by an AI model.',
+  'You write the title and description of a sound someone keeps in their project: a song or a piece of music, speech, or sound effects and ambience, made by an AI model.',
   'You cannot hear it, so write from what it was made from (the words it was asked for, its lyrics or script, the model, its length): say what it is, without judging how it sounds.',
   'The title: at most 8 words, no quotes and no full stop at the end. The description: 1 to 3 plain sentences, at most 60 words, without starting "This audio", "This song" or "This recording".',
   'Answer with JSON only: {"title": "…", "description": "…"}.',

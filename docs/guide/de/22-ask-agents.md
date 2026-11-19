@@ -28,7 +28,7 @@ Der Agent liest zunächst den aktuellen Zustand und bittet dich dann auf einer K
 
 ## Inhalte mit einem Agenten bearbeiten
 
-Agenten können deine Bibliotheksinhalte mit denselben Funktionen bearbeiten wie du in den Editoren. Sie schreiben Präsentationen, Dokumente, Tabellen, LaTeX-Dokumente, Notebooks und Diagramme. Auch Aktionen für einen gesamten Inhalt lassen sich in einem Schritt ausführen:
+Agenten können das, was du behältst, mit denselben Funktionen bearbeiten wie du in den Editoren. Sie schreiben Präsentationen, Dokumente, Tabellen, LaTeX-Dokumente, Notebooks und Diagramme. Auch Aktionen für einen gesamten Inhalt lassen sich in einem Schritt ausführen:
 
 - **Folien**: Alle Folien animieren (**Dezent**, **Lebendig** oder **Markant**) oder sämtliche Animationen entfernen, Befunde der **Barrierefreiheitsprüfung** beheben, fehlende Bildbeschreibungen ergänzen, die Präsentation PowerPoint-kompatibel machen oder ins Webformat zurückwandeln, eine mitgelieferte oder eigene Designvorlage anwenden, zwischen Breitbild und Standardformat wechseln, Folien aus einer anderen Präsentation übernehmen und Diagramme aus einer Tabelle aktualisieren.
 - **Dokumente**: Änderungsvorschläge annehmen oder ablehnen, das Seitenlayout ändern sowie Kopfzeilen, Fußzeilen und Seitenzahlen einfügen.
@@ -36,7 +36,7 @@ Agenten können deine Bibliotheksinhalte mit denselben Funktionen bearbeiten wie
 - **LaTeX-Dokumente**: Dateien, Bilder und Ordner umbenennen oder verschieben und ihre Verweise entsprechend anpassen.
 - **Notebooks**: Ausgaben löschen.
 - **Diagramme**: Eine oder alle Seiten neu anordnen, etwa als Flussdiagramm von oben nach unten oder von links nach rechts, als Baum, Mindmap, konzentrische Ringe, Kreis oder Raster. Außerdem Formen einheitlich gestalten, die Schrift vereinheitlichen oder dem Diagramm einen handgezeichneten Stil geben.
-- **Alle Inhaltstypen**: Eine Kopie in der Bibliothek erstellen oder in einen anderen Typ umwandeln (**Umwandeln in**).
+- **Alle Inhaltstypen**: Eine Kopie als neues Element behalten oder in einen anderen Typ umwandeln (**Umwandeln in**).
 
 Dabei entsteht jeweils eine neue Version; die vorherige bleibt im Versionsverlauf erhalten. Ein geöffneter Editor zeigt die Änderung sofort an. Deine eigenen Änderungen und Kommentare bleiben erhalten. Diese Aktionen sind kostenlos und werden sofort ausgeführt. Bildbeschreibungen erstellt dagegen ein Modell. Der Agent neben einer Seite ([Per Auftrag an einen Agenten bearbeiten](/guide/library#change-it-by-asking-an-agent)) kennt alle diese Aktionen und deine genaue Auswahl. Zum Beispiel:
 

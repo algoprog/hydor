@@ -1,7 +1,7 @@
 // Recording a video of the slideshow, as Canva's Present and record and PowerPoint's recording: the slideshow full
 // screen, taken by the browser's capture of this tab (asked first: Chrome offers this tab), your microphone, and your
 // camera in its round bubble (drag it to a corner, or hide it); Pause and Stop; at the end the video plays back, to keep
-// in the Library or download. Where the browser can take one part of a page (Chrome's element capture) the recording's
+// as a file or download. Where the browser can take one part of a page (Chrome's element capture) the recording's
 // own controls stay out of the video; elsewhere they hide while the pointer rests. Offered where the browser can
 // capture the screen and record, and never on a phone.
 import { useEffect, useRef, useState } from 'react';
@@ -355,7 +355,7 @@ function RecordShow({ deck, from, pageId, title, took, onDone }: { deck: Deck; f
   );
 }
 
-/** The video made: it plays here, to keep in the Library or download (or record again). */
+/** The video made: it plays here, to save or download (or record again). */
 function RecordResult({ made, title, onAgain, onClose }: { made: Made; title?: string; onAgain: () => void; onClose: () => void }) {
   const [url] = useState(() => URL.createObjectURL(made.blob));
   const [saved, setSaved] = useState(false);
@@ -368,10 +368,10 @@ function RecordResult({ made, title, onAgain, onClose }: { made: Made; title?: s
   const keep = () => {
     addToLibrary([{ file: new File([made.blob], name, { type: made.blob.type }), rel: name }], null);
     setSaved(true);
-    toast(tr('The video is going into the Library'), 'ok');
+    toast(tr('The video is being saved'), 'ok');
   };
   const close = async () => {
-    if (!saved && !(await confirm({ title: tr('Close without keeping the video?'), body: tr('It is not in the Library and was not downloaded: it goes once this closes.'), confirm: tr('Close'), danger: true }))) return;
+    if (!saved && !(await confirm({ title: tr('Close without keeping the video?'), body: tr('It is not saved and was not downloaded: it goes once this closes.'), confirm: tr('Close'), danger: true }))) return;
     onClose();
   };
   return (
@@ -391,7 +391,7 @@ function RecordResult({ made, title, onAgain, onClose }: { made: Made; title?: s
             {tr('Download')}
           </a>
           <Button variant="primary" icon={<LibraryBig size={14} />} disabled={saved} onClick={keep}>
-            {tr('Keep in the Library')}
+            {tr('Save the video')}
           </Button>
         </>
       }

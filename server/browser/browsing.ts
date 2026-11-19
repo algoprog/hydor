@@ -1136,9 +1136,9 @@ export function browsingRoutes(d: Deps) {
     return { path: file, name, title: t.title, url: shownUrl(t.url) };
   });
 
-  // ---- a page kept in the Library ----
+  // ---- a page kept in a project ----
 
-  /** Save: the tab's readable text (and what is selected) kept as a document in the Library, with the address it came from. */
+  /** Save: the tab's readable text (and what is selected) kept as a document in a project, with the address it came from. */
   app.post('/api/browser/browsing/tabs/:id/save-page', async (req) => {
     const b = browserOf(BROWSING_KEY);
     const t = b?.tabs.find((x) => x.targetId === P(req).id);
@@ -1150,7 +1150,7 @@ export function browsingRoutes(d: Deps) {
     try {
       selected = (await t.evaluate<string>('String(getSelection() || "")')).slice(0, 20_000);
     } catch {}
-    // The article as Readability finds it, with its pictures, as a page of the Library; a page with no article keeps its readable text.
+    // The article as Readability finds it, with its pictures, as a kept page; a page with no article keeps its readable text.
     const raw = await t.reader().catch(() => null);
     if (isArticle(raw)) {
       try {

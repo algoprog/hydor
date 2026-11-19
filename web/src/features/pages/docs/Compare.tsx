@@ -1,7 +1,7 @@
 // A document compared with one of its versions, as Word's Compare and Google Docs' version history show it: the
 // document with what changed since that version marked in its words (words added green and underlined, words taken out
 // red and struck, a new look dotted under, paragraphs and blocks added or taken out with a bar at their side), each
-// change listed beside it (a click goes to it), Restore this version (the Library's restore: it comes back as a new
+// change listed beside it (a click goes to it), Restore this version (the page's restore: it comes back as a new
 // version) and the way back to the document. The versions to compare with are picked from a list of them. Nothing here
 // changes the document; the comparison itself is shared/doc-changes.ts's.
 import { useMemo, useRef, useState } from 'react';

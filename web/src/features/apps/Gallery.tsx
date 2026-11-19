@@ -1,4 +1,4 @@
-// The Apps page: on a computer a column of places beside the rail (as the Library's), and the open one in the page. Its
+// The Apps page: on a computer a column of places beside the rail (as on the Settings page), and the open one in the page. Its
 // places: All apps, Pinned, Recently used, Your own apps, one for each kind of app (Research, Planning…), and Connected
 // apps; the address keeps the place (/apps, /apps?place=pinned|recent|own, /apps?kind=Research, /apps/connected). On a
 // phone and a narrow window, the page header with its two tabs and the kinds as chips, as before.
@@ -310,7 +310,7 @@ function SortMenu({ value, onChange, toolbar }: { value: Sort; onChange: (s: Sor
   return (
     <>
       {toolbar ? (
-        // In the row with the place's title, as the Library's sort.
+        // In the row with the place's title, as the sort on the other pages.
         <Button ref={btn} size="sm" variant="ghost" icon={<ArrowUpDown size={13} />} title="Sort your apps" onClick={() => setOpen((o) => !o)}>
           <span className="max-sm:hidden">{SORTS.find((s) => s.value === value)!.label}</span>
         </Button>
@@ -349,7 +349,7 @@ function addressOf(p: Place): string {
 const PLACE_TITLES: Record<string, string> = { all: 'All apps', pinned: 'Pinned', recent: 'Recently used', own: 'Your own apps', connected: 'Connected apps' };
 
 /**
- * The list in the Apps page's column, as the Library's places: All apps; the parts of it that have something (Pinned,
+ * The list in the Apps page's column, as the places of the other pages: All apps; the parts of it that have something (Pinned,
  * Recently used) and Your own apps; the kinds of apps, each with its count; and, after a divider, Connected apps.
  */
 function Places({ place, onPlace, counts, kinds, connected }: { place: Place; onPlace: (p: Place) => void; counts: { all: number; pinned: number; recent: number; own: number }; kinds: [string, number][]; connected?: number }) {
@@ -382,7 +382,7 @@ const GUIDE = '/guide/apps#what-an-app-is';
 export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
   const [g, setG] = useState<Gallery | null>(null);
   const [find, setFind] = useState('');
-  // On a computer the page has its column (as the Library); narrower, the page header, its tabs and the kinds as chips.
+  // On a computer the page has its column (as on the other pages); narrower, the page header, its tabs and the kinds as chips.
   const wide = useMediaQuery('(min-width: 1024px)');
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
@@ -554,7 +554,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
       <InstallFromFile ref={installer} trigger={() => null} />
     </div>
   );
-  // The row at the top of the page, as the Library's: the place's name at the left, the find box at the right (its size and look the same), and what the place has beside it (a sort, the latest runs).
+  // The row at the top of the page, as on the other pages: the place's name at the left, the find box at the right (its size and look the same), and what the place has beside it (a sort, the latest runs).
   const title = kindOfPlace(place) ?? PLACE_TITLES[place];
   const toolbar = (withFind: boolean, controls?: ReactNode) => (
     <>
@@ -659,7 +659,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
           </div>
         ) : (
           <div className={cx('@container mx-auto max-w-[1120px] px-4 pb-10 sm:px-6', wide ? 'pt-3' : 'pt-5 sm:pt-6')}>
-            {/* As in the Library: the title at the left, the find box at the right of its row (it stays at the top while the
+            {/* As on the other pages: the title at the left, the find box at the right of its row (it stays at the top while the
                 page scrolls). On a computer the kinds are the column's; narrower, they are chips under it. */}
             <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-bg px-4 py-2 sm:-mx-6 sm:px-6">{toolbar(true, controls)}</div>
             {!wide && kinds.length > 2 && (

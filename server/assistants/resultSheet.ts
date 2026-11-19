@@ -1,4 +1,4 @@
-// A row in a Library spreadsheet for each result an agent hands back (its "A row in a spreadsheet" place): when it ran,
+// A row in a spreadsheet for each result an agent hands back (its "A row in a spreadsheet" place): when it ran,
 // then one column per field, in the fields' order. The columns are found by their headings in the table's first row,
 // so a person may move them, put columns of their own between them, restyle them and add formulas beside them; a
 // field with no heading yet gets a new column at the end, never moving the others. The row goes under the table's

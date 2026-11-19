@@ -1,6 +1,6 @@
-// Comments on the Library's pictures, videos and sounds (shared/media-comments.ts): kept with each item in its row
+// Comments on the kept pictures, videos and sounds (shared/media-comments.ts): kept with each item in its row
 // (media.comments, as JSON), apart from its file, so a new version of the picture keeps them. You change them on the
-// item's page in the Library, agents through the API (app_api), and the people it is shared with through their link
+// item's own page, agents through the API (app_api), and the people it is shared with through their link
 // (server/spaces/portal-media.ts), each by a list of changes, so two at once lose nothing.
 //
 // Routes, signed in (media/index.ts):

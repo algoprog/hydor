@@ -164,7 +164,7 @@ function PlaceCard({ p, place }: { p: CardProps; place: SignaturePlaceCard }) {
           </div>
           <div className="truncate text-[12px] text-fg-3">
             {t.page ? (
-              'A document of your Library: it gets a new version'
+              'A kept document: it gets a new version'
             ) : (
               <>
                 <span translate="no">{tildify(dirname(t.path ?? ''), home)}</span>

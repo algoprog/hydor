@@ -43,7 +43,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   page: {
     title: 'A page from the agent',
-    body: 'Agents can answer with a page: a report, a chart, a small tool. Keep puts it in your Library, where you can change it and open it on your phone.',
+    body: 'Agents can answer with a page: a report, a chart, a small tool. Keep saves it in the project’s files (or with the conversation), where you can change it and open it on your phone.',
   },
   browser: {
     title: 'The agent’s browser',
@@ -79,7 +79,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   groups: {
     title: 'Sessions by project',
-    body: 'Sessions in the same project or folder gather under its name. Click the heading to fold the group; its pen starts a new session there.',
+    body: 'Sessions in the same project or folder gather under its name. Click the heading to fold the group; its pen starts a new session there, and a project’s ⓘ opens its details.',
   },
   dictate: {
     title: 'Dictate',
@@ -114,8 +114,8 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     body: 'Everything the session’s branch changed since it left its base. Tick Viewed on each file as you go.',
   },
   library: {
-    title: 'Your Library',
-    body: 'Pages, slides, documents, pictures and videos agents made for you to keep, each project’s together, and the sites you published.',
+    title: 'Kept things',
+    body: 'Pages, slides, documents, pictures and videos agents made for you to keep show in their project’s Files; the search box finds the rest.',
   },
   apps: {
     title: 'Apps',
@@ -123,7 +123,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   spaces: {
     title: 'Projects',
-    body: 'A project keeps a project together: its sessions, folder, documents, memory and the guidelines its agents follow.',
+    body: 'A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its ⓘ in the sidebar to see them.',
   },
   knowledge: {
     title: 'Shared knowledge',

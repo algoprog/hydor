@@ -6,7 +6,7 @@
 // ExportPage.tsx). The panels' sizes are kept between visits. Everything shows in the browser as it will be made (the
 // player, video/engine.ts; WebGL, video/gl.ts); Save has the server make it exactly (ffmpeg, on the graphics card when
 // there is one: server/mediaedit/video.ts), with its progress and a way to stop, then puts it back where it came from
-// (a slide's video and its still, a Library item, a file), or keeps a copy, a GIF or one frame as a picture. Undo and
+// (a slide's video and its still, a kept item, a file), or keeps a copy, a GIF or one frame as a picture. Undo and
 // redo for every step. On a phone: the viewer, the main track, and the rest in sheets from the bottom.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AudioLines, Clapperboard, Download, Film, Palette, Plus, Redo2, Scissors, SlidersHorizontal, Undo2, X } from 'lucide-react';
@@ -100,9 +100,9 @@ const stemOf = (p: string) => nameOf(p).replace(/\.[^.]+$/, '');
 
 /** What Save does (and Save a copy, when offered), for a video opened as `o`. */
 function savePlans(o: OpenEditor, detached: boolean): { main: { label: string; to: VideoSaveTo; says: string; fixed?: string }; copy: { label: string; to: VideoSaveTo; says: string } | null; beside: VideoSaveTo } {
-  const lib = { label: 'Save to Library', to: { library: true, ...(o.session ? { session: o.session } : {}) } as VideoSaveTo, says: 'It is kept in your Library as a new video.' };
+  const lib = { label: 'Keep', to: { library: true, ...(o.session ? { session: o.session } : {}) } as VideoSaveTo, says: 'It is kept as a new video.' };
   const to = o.to;
-  if (detached || !to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept in your Library as a new video.' } : lib, copy: null, beside: lib.to };
+  if (detached || !to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept as a new video.' } : lib, copy: null, beside: lib.to };
   if ('file' in to) {
     const ext = /\.(webm|mov)$/i.exec(to.file)?.[1]?.toLowerCase() ?? 'mp4';
     return {
@@ -113,13 +113,13 @@ function savePlans(o: OpenEditor, detached: boolean): { main: { label: string; t
   }
   if ('media' in to)
     return {
-      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in the Library in place of the video it was.', fixed: o.fileKind ?? 'MP4' },
-      copy: o.copy === false ? null : { label: 'Save a copy', to: { media: to.media, as: 'copy' }, says: 'Save a copy keeps it in your Library as a new video.' },
+      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in place of the video it was.', fixed: o.fileKind ?? 'MP4' },
+      copy: o.copy === false ? null : { label: 'Save a copy', to: { media: to.media, as: 'copy' }, says: 'Save a copy keeps it as a new video.' },
       beside: { media: to.media, as: 'copy' },
     };
   return {
     main: { label: 'Save', to: { video: true }, says: `Save puts it back in ${o.from.label || 'the page'} in place of the video it was.` },
-    copy: o.copy ? { label: 'Save a copy', to: lib.to, says: 'Save a copy keeps it in your Library as a new video.' } : null,
+    copy: o.copy ? { label: 'Save a copy', to: lib.to, says: 'Save a copy keeps it as a new video.' } : null,
     beside: lib.to,
   };
 }
@@ -130,7 +130,7 @@ function wentTo(j: VideoEditJob, what: 'copy' | 'gif' | 'frame'): string {
     const name = nameOf(j.path);
     return what === 'frame' ? tr(`The frame is saved beside it: ${name}`) : what === 'gif' ? tr(`The GIF is saved beside it: ${name}`) : tr(`A copy is saved beside it: ${name}`);
   }
-  return what === 'frame' ? tr('The frame is in your Library') : what === 'gif' ? tr('The GIF is in your Library') : tr('A copy is in your Library');
+  return what === 'frame' ? tr('The frame is kept') : what === 'gif' ? tr('The GIF is kept') : tr('A copy is kept');
 }
 
 export function VideoEditor(p: EditorProps) {

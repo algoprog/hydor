@@ -884,7 +884,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     return one.length > n ? `${one.slice(0, n - 1)}…` : one;
   };
 
-  // ---- a picture of a page: for the Library, or for a question ---------------------------------------------------------
+  // ---- a picture of a page: to keep in a project, or for a question ---------------------------------------------------------
 
   /** The biggest picture kept or asked about. */
   const PICTURE_MAX = 50 * 1024 * 1024;
@@ -896,7 +896,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   /** Whether a picture can be read from this address: a web address, or a picture inside the page's own data or blobs. */
   const readable = (src) => /^(https?:|data:|blob:)/i.test(String(src || ''));
 
-  /** The kind of picture the first bytes say (the Library keeps PNG, JPEG, WebP, GIF and AVIF), or null. */
+  /** The kind of picture the first bytes say (kept pictures are PNG, JPEG, WebP, GIF and AVIF), or null. */
   function pictureKind(b) {
     const at = (i, s) => b.length >= i + s.length && b.subarray(i, i + s.length).toString('latin1') === s;
     if (b.length >= 8 && b[0] === 0x89 && at(1, 'PNG')) return 'png';
@@ -1000,7 +1000,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     const dir = pictureDir(what);
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     const name = `${pictureName(src, t.wc.getTitle())}.${kind}`;
-    // A folder of its own, so the file keeps the picture's own name (the Library names the picture after it).
+    // A folder of its own, so the file keeps the picture's own name (the kept picture is named after it).
     const own = path.join(dir, crypto.randomBytes(4).toString('hex'));
     await fs.promises.mkdir(own, { recursive: true, mode: 0o700 });
     const file = path.join(own, name);
@@ -1170,7 +1170,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       if (web(params.srcURL)) items.push({ id: 'open-image', label: 'Open image in new tab', click: () => open(params.srcURL) });
       items.push({ id: 'save-image-as', label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
       if (readable(params.srcURL)) {
-        items.push({ id: 'save-image-library', label: 'Save image to Library', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
+        items.push({ id: 'save-image-library', label: 'Save image', click: () => void sendPicture(t, params, 'library', { cmd: 'save-image' }) });
         if (!isPrivate) items.push({ id: 'ask-image', label: 'Ask about this image', click: () => void sendPicture(t, params, 'ask', { cmd: 'ask-image' }) });
       }
       items.push({ id: 'copy-image', label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });

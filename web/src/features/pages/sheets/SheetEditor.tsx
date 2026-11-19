@@ -581,7 +581,7 @@ export function SheetEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   // ---- comparing with a version ----------------------------------------------------------------------------------------
   // What changed since a version (Tools → Compare with the version before or with a version, or See what changed under
   // an agent's turn): the workbook as it is here compared with it (Compare.tsx), one change put back as a change here
-  // (Undo takes it back), or the whole version put back as a new one, as the Library's Versions does it.
+  // (Undo takes it back), or the whole version put back as a new one, as the page's Versions does it.
   const [compare, setCompare] = useState<{ version: number; at?: number; before: Workbook } | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const headRef = useRef<HTMLDivElement>(null);
@@ -589,7 +589,7 @@ export function SheetEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   // The save bar stays in view under it (a change put back is a change here, to save or discard).
   const saveBarRef = useRef<HTMLDivElement>(null);
   const [saveH, setSaveH] = useState(0);
-  // A page of the Library (not a file of the computer's), and the version open: `${id}:${version}`, or `${id}:v${n}` for an older one on view.
+  // A page kept by the app (not a file of the computer's), and the version open: `${id}:${version}`, or `${id}:v${n}` for an older one on view.
   // Not in a shared project's portal: its people reach only what its link gives them.
   const canCompare = !!pageId && !!doc && !portalToken;
   const shownVersion = Number(/:v?(\d+)$/.exec(doc?.key ?? '')?.[1]) || 0;
@@ -620,7 +620,7 @@ export function SheetEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   };
   useLayoutEffect(() => setSaveH(saveBarRef.current?.offsetHeight ?? 0), [dirty, !!compare]);
   // Opened to show what changed (a conversation's See what changed): once (a version saved or put back later does not
-  // open it again; the Library asks only once the version to compare is the one on view).
+  // open it again; the page asks only once the version to compare is the one on view).
   const compareAsked = useRef(0);
   useEffect(() => {
     if (!compareAsk || !doc || !pageId || compareAsked.current === compareAsk) return;

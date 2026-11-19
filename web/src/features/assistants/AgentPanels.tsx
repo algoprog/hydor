@@ -117,7 +117,7 @@ export function InboxPanel({ a }: { a: Assistant }) {
 
 const SENT: Record<OutputKind, string> = {
   file: 'File',
-  library: 'Library',
+  library: 'Page',
   sheet: 'Spreadsheet',
   email: 'Email',
   webhook: 'Webhook',

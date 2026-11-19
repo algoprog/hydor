@@ -1,6 +1,6 @@
-// A web page saved to the Library from the user's own browser (the Browser's Save): a document of its readable text, with
-// the address it came from and its site's name kept on the page (PageInfo.source), so the Library shows it as a Web page
-// and can open the original. It is a Library item like the rest (agents read it as they read the others); what the user's
+// A web page saved from the user's own browser (the Browser's Save): a document of its readable text, with
+// the address it came from and its site's name kept on the page (PageInfo.source), so it shows as a Web page
+// and can open the original. It is a kept page like the rest (agents read it as they read the others); what the user's
 // browsing keeps beside it (history, bookmarks, downloads) is never copied here.
 import { normalizeDoc } from '../../shared/docs.ts';
 import type { PageInfo } from '../../shared/pages.ts';
@@ -25,7 +25,7 @@ export function sourceUrl(raw: string): string {
   }
 }
 
-/** A site's name for the Library's card: its host without a leading "www." (a file: address: its file name's folder, empty). */
+/** A site's name for the page's card: its host without a leading "www." (a file: address: its file name's folder, empty). */
 export function siteOf(raw: string): string {
   try {
     const u = new URL(raw);
@@ -49,7 +49,7 @@ export function webPageMarkdown(p: { title: string; url: string; at?: number; se
   return out.join('\n');
 }
 
-/** Makes the document: in a project and folder (none: not in a project), then the Library hears of it, its picture is taken and the helper describes it. */
+/** Makes the document: in a project and folder (none: not in a project), then the app hears of it, its picture is taken and the helper describes it. */
 export function saveWebPage(d: Deps, o: { title: string; url: string; selected?: string; text: string; space?: unknown; folder?: unknown }): PageInfo {
   const title = (o.title || '').replace(/\s+/g, ' ').trim() || siteOf(o.url) || 'Web page';
   const doc = normalizeDoc({ markdown: webPageMarkdown({ ...o, title }) });

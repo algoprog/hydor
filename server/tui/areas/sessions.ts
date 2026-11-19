@@ -413,18 +413,18 @@ export const sessions: Area = {
       args: [session],
       options: {
         output: { type: 'string', short: 'o', value: '<file>', desc: 'Where to write it (default: its title, here; - prints it)', kind: 'file' },
-        library: { type: 'boolean', desc: 'Save it in the Library as a document instead' },
+        library: { type: 'boolean', desc: 'Save it as a document (in the session’s project) instead' },
       },
       summary: 'Save a session’s conversation as Markdown',
-      help: 'Writes the conversation as a Markdown file: its title and date, then each of your messages and each reply in order, a turn’s steps as one line, the files the agent handed over by name, answer cards as text and tables, diagrams and maths as they were written. --library saves it in the Library as a document instead, to edit, print and share there (a confidential session’s stays on this computer like the rest of it).',
+      help: 'Writes the conversation as a Markdown file: its title and date, then each of your messages and each reply in order, a turn’s steps as one line, the files the agent handed over by name, answer cards as text and tables, diagrams and maths as they were written. --library saves it as a document in the session’s project instead, to edit, print and share there (a confidential session’s stays on this computer like the rest of it).',
       examples: ['hydor sessions export 3f9a', 'hydor sessions export 3f9a -o notes.md', 'hydor sessions export 3f9a -o - | less', 'hydor sessions export 3f9a --library'],
       async run(ctx, [given], v) {
         const s = await findSession(ctx, given);
         if (flag(v, 'library')) {
-          if (str(v, 'output')) throw new UsageError('A document goes in the Library: leave out -o, or --library');
+          if (str(v, 'output')) throw new UsageError('A document is kept in the project: leave out -o, or --library');
           const r = await ctx.conn.api<{ page: { id: string; title: string }; notes?: string[] }>('POST', `/api/sessions/${enc(s.key)}/export/doc`, {});
           if (ctx.o.json) return ctx.json(r);
-          ctx.out(`Saved ${name(s)} in the Library as a document: ${ctx.conn.base}/pages/${r.page.id}`);
+          ctx.out(`Saved ${name(s)} as a document: ${ctx.conn.base}/pages/${r.page.id}`);
           for (const n of r.notes ?? []) ctx.out(ctx.look.p.dim(n));
           return;
         }

@@ -1,6 +1,6 @@
 // Sharing with people: the owner invites someone (an advisor, a student, a client) by a personal link, /p/<token>,
 // into one project (to see it and comment on its documents under their own name, or with Edit documents to change them
-// too), or to one thing of the Library alone: a document, spreadsheet, slides, LaTeX document, notebook, page or design,
+// too), or to one kept thing alone: a document, spreadsheet, slides, LaTeX document, notebook, page or design,
 // or a picture, video or sound (View and comment, or Edit). Each link is one person's: their name, what they may do and
 // until when. Only its hash is kept; it stops at once when the owner stops it (or the thing is deleted), and a new link
 // for the same person keeps who they are (their comments stay theirs). A link that was stopped, ran out or was made
@@ -147,7 +147,7 @@ function expiryOf(days: unknown, now: number): number | null {
   return now + Math.min(n, 365) * DAY;
 }
 
-/** What a link opens: a project, or one thing of the Library alone. */
+/** What a link opens: a project, or one kept thing alone. */
 export type ShareScope = { space: string } | { thing: ShareThing };
 
 /** The rows of a scope: a project's own (not a thing's of it), or a thing's. */
@@ -550,7 +550,7 @@ export const placeOf = (on: string) => (on.startsWith('media:') ? `/media/${on.s
 /** Whether each comment and reply of a page waits on an answer, by its id: kept for the version it was worked out for. */
 const states = new Map<string, { version: number; open: Map<string, boolean> }>();
 
-/** The comments of what `on` names, as kept now: a page's (in its model, or a page of HTML's apart from it) or an item's of the Library's media. */
+/** The comments of what `on` names, as kept now: a page's (in its model, or a page of HTML's apart from it) or a kept item's. */
 function commentsOn(db: DB, on: string): { title: string; list: Comment[]; version?: number } | null {
   if (on.startsWith('media:')) {
     const m = getMedia(db, on.slice('media:'.length));
@@ -661,7 +661,7 @@ function routes(d: Deps) {
     return { ok: true };
   });
 
-  // One thing of the Library shared alone: a page of any kind (not an app's screen), or a picture, video or sound.
+  // One kept thing shared alone: a page of any kind (not an app's screen), or a picture, video or sound.
   const things: [string, ShareThing['kind']][] = [
     ['/api/pages/:id/shares', 'page'],
     ['/api/media/:id/shares', 'media'],
@@ -670,8 +670,8 @@ function routes(d: Deps) {
     const id = String((req.params as { id: string }).id);
     if (kind === 'page') {
       const p = /^[a-f0-9]{10}$/.test(id) ? pageInfo(db, id) : null;
-      if (!p || p.app) throw new HttpError(404, 'No such page in the Library');
-    } else if (!(/^[a-f0-9]{10}$/.test(id) && getMedia(db, id))) throw new HttpError(404, 'No such image, video or sound in the Library');
+      if (!p || p.app) throw new HttpError(404, 'No such saved page');
+    } else if (!(/^[a-f0-9]{10}$/.test(id) && getMedia(db, id))) throw new HttpError(404, 'No such kept image, video or sound');
     return { thing: { kind, id } };
   };
   const told = (sc: { thing: ShareThing }) => d.broadcast({ t: 'feature', id: 'sharing', data: { thing: sc.thing } });

@@ -25,7 +25,7 @@ something else is already published at the address. **Stop serving** undoes exac
 it added (`tailscale serve --https=443 --set-path=/ off`) and the address it added to the ones the server accepts.
 It runs the `tailscale` command it finds on `PATH` or where Tailscale's installers put it; `TAILSCALE_BIN` names
 another (see [configuration](configuration.md)). Agents can turn it on only through a card you answer each time. While
-it serves, the links the app hands out (chat apps' Open in Hydor, links agents give to sessions and Library pages)
+it serves, the links the app hands out (chat apps' Open in Hydor, links agents give to sessions and kept pages)
 start with that address, unless `ALLOWED_ORIGINS` names one, which they keep using.
 
 ## Other ways

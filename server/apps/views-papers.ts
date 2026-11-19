@@ -428,7 +428,7 @@ const MATRIX: AppUi = {
   ],
   elements: {
     'mx-hero': {
-      description: 'The matrix in numbers, with the way to its spreadsheet in the Library and a copy as a table',
+      description: 'The matrix in numbers, with the way to its spreadsheet and a copy as a table',
       html: String.raw`<header class="hero">
   <p class="kicker">Literature matrix{{#inputs.project}} · {{inputs.project}}{{/inputs.project}}</p>
   <h1>{{result.papers|where:read=true|count}} papers side by side</h1>
@@ -438,8 +438,8 @@ const MATRIX: AppUi = {
     <div class="stat"><b>{{result.columns|count}}</b><span>columns</span></div>
     <div class="stat"><b>{{result.papers|where:read=false|count}}</b><span>not read</span></div>
   </div>
-  <div class="n-row acts">{{#result.sheet}}<button type="button" class="n-btn n-primary" data-event="open_sheet">Open in the Library</button>{{/result.sheet}}<button type="button" class="n-btn" data-event="copy_table">Copy as a table</button></div>
-  {{^result.sheet}}<p class="warn">It could not be kept in your Library this time: copy it as a table instead.</p>{{/result.sheet}}
+  <div class="n-row acts">{{#result.sheet}}<button type="button" class="n-btn n-primary" data-event="open_sheet">Open the spreadsheet</button>{{/result.sheet}}<button type="button" class="n-btn" data-event="copy_table">Copy as a table</button></div>
+  {{^result.sheet}}<p class="warn">It could not be kept this time: copy it as a table instead.</p>{{/result.sheet}}
 </header>`,
       css:
         HERO_CSS +
@@ -947,7 +947,7 @@ const TALK: AppUi = {
       title: 'What was made',
       blocks: [
         { element: 'tk-hero' },
-        { element: 'tk-made', data: 'result.made', each: true, layout: 'grid', empty: 'Nothing was made in your Library this time.' },
+        { element: 'tk-made', data: 'result.made', each: true, layout: 'grid', empty: 'Nothing was made this time.' },
       ],
     },
     {
@@ -981,7 +981,7 @@ const TALK: AppUi = {
   {{#result.hook}}<p class="hook">“{{result.hook}}”</p>{{/result.hook}}
   <div class="stats">
     <div class="stat"><b>{{result.talk|count}}</b><span>slides</span></div>
-    <div class="stat"><b>{{result.made|count}}</b><span>made in your Library</span></div>
+    <div class="stat"><b>{{result.made|count}}</b><span>made</span></div>
     <div class="stat"><b>{{result.x|count}}</b><span>posts in the thread</span></div>
   </div>
 </header>`,
@@ -993,7 +993,7 @@ const TALK: AppUi = {
 `,
     },
     'tk-made': {
-      description: 'A thing made in the Library (slides, a poster, a project page), with the way to it',
+      description: 'A thing made (slides, a poster, a project page), with the way to it',
       html: String.raw`<article class="made">
   <span class="ic" aria-hidden="true">{{#what|is:Slides}}▭{{/what}}{{#what|is:Poster}}▯{{/what}}{{#what|is:Project page}}◫{{/what}}</span>
   <p class="what">{{what}}</p>

@@ -1,6 +1,6 @@
 // The gallery of kinds an agent makes (shared/content-types.ts): a slide for the deck open, a section for the document
 // open, a part for the page open, or a new deck, document, page or spreadsheet. openTypes opens it from anywhere (the
-// editors' "made with AI" items, New in the Library); it shows over everything, mounted in <body> on its own the first
+// editors' "made with AI" items, New); it shows over everything, mounted in <body> on its own the first
 // time, and its code and the catalog load then, so no page carries them before. What its Make it asks (a short line,
 // and what to make, told to the agent in full: requests.ts) goes to `onDone`, the editor's host sending it on (Pages,
 // through the Ask panel at once, so the person watches it being made); through the Ask panel of the page `pageId`; or,

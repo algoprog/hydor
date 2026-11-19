@@ -84,7 +84,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
       </>
     );
   else if (at.sub === 'export')
-    // The conversation out of the chat: a confidential session's too (its document stays in the Library on this computer).
+    // The conversation out of the chat: a confidential session's too (its document stays kept on this computer).
     items = (
       <>
         <MenuBack onClick={back}>Export</MenuBack>
@@ -95,7 +95,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
           Copy as Markdown
         </MenuItem>
         <MenuItem icon={<FileText size={15} />} onClick={() => (close(), saveToLibrary(s.key))}>
-          Save to the Library as a document
+          Keep as a document
         </MenuItem>
       </>
     );

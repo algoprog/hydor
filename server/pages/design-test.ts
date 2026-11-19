@@ -123,7 +123,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   ok(/brand kit: its name "The Bakery", colours #ff0000, #00ff00 \(the main one first\), the heading font Anton, 1 logo/.test(brandForAgent(k)), 'agents are told the brand kit');
   ok(brandForAgent(cleanBrand({})) === '', 'no brand kit, nothing said');
   const ask = composeAsk(contentType('design.event-poster')!, 'our street party', { size: { label: 'Poster (A3)', w: 1123, h: 1587 } });
-  ok(ask.startsWith('Make me a design and keep it in my Library: an event poster') && ask.includes('a Poster (A3), 1123×1587 pixels') && ask.includes('how_to_make “design”'), 'a design asked for: its kind, its size, and how to write it');
+  ok(ask.startsWith('Make me a design and keep it: an event poster') && ask.includes('a Poster (A3), 1123×1587 pixels') && ask.includes('how_to_make “design”'), 'a design asked for: its kind, its size, and how to write it');
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-design-test-'));
   const db = openDb(path.join(dir, 'test.db'));

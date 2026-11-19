@@ -682,7 +682,7 @@ function lineOf(lines: number[], at: number): number {
   return lo + 1;
 }
 
-/** What a document of the Library uses, its pictures and files among `others` (files it has elsewhere: a project's folder). */
+/** What a saved document uses, its pictures and files among `others` (files it has elsewhere: a project's folder). */
 export function texDocUses(d: TexDoc, o: { others?: string[]; alias?: string; cache?: TexSources['cache']; everywhere?: boolean } = {}): TexUses {
   const texts = new Map(d.files.map((f) => [f.name, f.text]));
   const names = new Set<string>([...texts.keys(), ...d.pictures.map((x) => x.name), ...(o.others ?? [])]);

@@ -1,4 +1,4 @@
-// A slide's chart from a spreadsheet of the Library (Google Slides' linked charts): the tables a workbook holds (each
+// A slide's chart from a saved spreadsheet (Google Slides' linked charts): the tables a workbook holds (each
 // block of filled cells, with its column names), and a chart's labels and series read from a sheet's range as the
 // spreadsheet's own charts read them (sheet-chart.ts: the first column the labels, the first row the series' names when
 // they are words, hidden rows left out), worked out with the workbook's formulas. The editor reads them when a chart is

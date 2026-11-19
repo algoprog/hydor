@@ -1,4 +1,4 @@
-// The Library's images, videos and audio: a row each in SQLite (its title and description, what it was made from
+// The kept images, videos and audio: a row each in SQLite (its title and description, what it was made from
 // and with, its size and length, a sound's shape and words, the hash of its bytes), and its file copied into the app's
 // data folder (media/<id>.<ext>; moved there instead for a file the desktop app drops, or an upload), with a still to
 // show it by (<id>.still.jpg) and, for a video, its frames on one picture (<id>.frames.jpg). The copy stays when the
@@ -45,7 +45,7 @@ export function initMedia(db: DB) {
     );
     create index if not exists media_source on media(source);
   `);
-  // The space it belongs to (shared/spaces.ts), or none, as the Library's pages have; a sound's shape (JSON) and words.
+  // The space it belongs to (shared/spaces.ts), or none, as kept pages have; a sound's shape (JSON) and words.
   const cols = (db.prepare('pragma table_info(media)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('space')) db.exec('alter table media add column space text');
   if (!cols.includes('peaks')) db.exec('alter table media add column peaks text');
@@ -53,7 +53,7 @@ export function initMedia(db: DB) {
   // The SHA-256 of its bytes, to keep the same file once (items kept before have none until one of their size comes).
   if (!cols.includes('sha')) db.exec('alter table media add column sha text');
   db.exec('create index if not exists media_bytes on media(bytes)');
-  // The Library folder it is in (server/pages/folders.ts), or none.
+  // The folder it is in (server/pages/folders.ts), or none.
   if (!cols.includes('folder')) db.exec('alter table media add column folder text');
   // Its comments (shared/media-comments.ts, as JSON), and who saved this version of it through their link (a name).
   if (!cols.includes('comments')) db.exec('alter table media add column comments text');
@@ -163,7 +163,7 @@ export function getMedia(db: DB, id: string): MediaItem | null {
 
 export function mustMedia(db: DB, id: string): MediaItem {
   const m = /^[a-f0-9]{10}$/.test(id) ? getMedia(db, id) : null;
-  if (!m) throw new HttpError(404, 'No such image, video or sound in the Library');
+  if (!m) throw new HttpError(404, 'No such kept image, video or sound');
   return m;
 }
 
@@ -207,7 +207,7 @@ export interface NewMedia {
   kind: MediaKind;
   /** The file to copy in (or move in, with `move`). */
   from: string;
-  /** Moved into the Library's folder rather than copied: it leaves where it was (a file the desktop app drops, an upload). */
+  /** Moved into the app's media folder rather than copied: it leaves where it was (a file the desktop app drops, an upload). */
   move?: boolean;
   /** What it was saved from, when that is not `from`: an upload's file name, or where a moved file was. */
   source?: string;
@@ -235,7 +235,7 @@ export interface NewMedia {
 export async function addMedia(db: DB, n: NewMedia): Promise<MediaItem> {
   initMedia(db);
   const count = (db.prepare('select count(*) as n from media').get() as { n: number }).n;
-  if (count >= MAX_ITEMS) throw new HttpError(400, `The Library keeps at most ${MAX_ITEMS} images, videos and sounds: delete some first`);
+  if (count >= MAX_ITEMS) throw new HttpError(400, `At most ${MAX_ITEMS} images, videos and sounds are kept: delete some first`);
   await fs.promises.mkdir(MEDIA_DIR, { recursive: true, mode: 0o700 });
   const id = crypto.randomBytes(5).toString('hex');
   const name = `${id}.${n.ext}`;
@@ -296,7 +296,7 @@ export function editMedia(db: DB, id: string, p: { title?: unknown; description?
 export function setMediaSpace(db: DB, id: string, space: string | null): MediaItem {
   mustMedia(db, id);
   db.prepare('update media set space = ? where id = ?').run(space, id);
-  // Out of its Library folder, unless that folder is in the space too.
+  // Out of its folder, unless that folder is in the space too.
   fitFolder(db, 'media', id);
   return getMedia(db, id)!;
 }

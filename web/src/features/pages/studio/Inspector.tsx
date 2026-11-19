@@ -260,7 +260,7 @@ export function PartPanel({
         label: title || 'The page',
         put: async (r) => {
           if (!r.src) return;
-          if (pageHtml && !(await pageHtml().catch(() => ''))) throw new Error('The page it came from is closed: Save a copy keeps the picture in your Library.');
+          if (pageHtml && !(await pageHtml().catch(() => ''))) throw new Error('The page it came from is closed: Save a copy keeps the picture as a file of its own.');
           const data = await pageData(r.src);
           cmd('select', path);
           cmd('attr', { name: 'src', value: data });

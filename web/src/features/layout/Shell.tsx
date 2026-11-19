@@ -31,6 +31,7 @@ import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { EditorHost } from '../mediaedit/host';
 import { CrashGuard } from '../../components/CrashGuard';
+import { ProjectDialogHost } from '../spaces/ProjectDialog';
 import { ShareDialogHost } from '../spaces/ShareHost';
 import { Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
@@ -72,14 +73,13 @@ function useDrag(onMove: (dy: number) => void) {
 }
 
 /** Each page shows at once, with no fade. A page is built afresh when you move to another one, but not when a
- * file or folder changes inside one or you switch its tabs (a project's, Usage's), so a tab shows at once with what
+ * file or folder changes inside one or you switch its tabs (Usage's), so a tab shows at once with what
  * the page already loaded. Memoized: the shell re-rendering (a panel or the drawer toggled) never re-renders the
  * page. */
 const Routes = memo(function Routes() {
   const [loc] = useLocation();
-  const project = /^\/projects\/[^/]+/.exec(loc)?.[0];
   // A run of Experiments opens beside its list: the same page.
-  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc.startsWith('/system/experiments') ? '/system/experiments' : (project ?? loc);
+  const section = loc === '/file' || loc === '/search' ? '/files' : loc === '/stats' || loc === '/arena' ? '/usage' : loc.startsWith('/guide') ? '/guide' : loc.startsWith('/system/experiments') ? '/system/experiments' : loc;
   return (
     <div key={section} className="h-full">
       <Page />
@@ -120,7 +120,7 @@ function Page() {
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }
-  // Projects' pages were at /spaces, and the Library's filter was ?space=: older links land in their place.
+  // Projects' pages were at /spaces, and the Library's filter was ?space=: older links land in their place (a project's now opens its window).
   const moved = movedAddress(loc);
   if (moved) return <Redirect to={moved} />;
   // The capabilities' own pages (registry.tsx).
@@ -272,6 +272,7 @@ export function Shell() {
         <FilePeek />
         <ArxivHost />
         <StudioHost />
+        <ProjectDialogHost />
         <ShareDialogHost />
         <Lightbox />
         <VideoBox />
@@ -285,7 +286,7 @@ export function Shell() {
   return (
     <div data-shell className="flex h-dvh overflow-hidden bg-bg">
       <Rail />
-      {/* The sessions' column on the start page and in sessions; the Library and Settings draw theirs, and the other pages use the whole width. */}
+      {/* The sessions' column on the start page and in sessions; Settings and the other pages with one draw theirs, and the rest use the whole width. */}
       {columnOf(loc) === 'sessions' && <Sidebar />}
       <main className="flex min-w-0 flex-1 flex-col">
         <EditorHost>
@@ -311,6 +312,7 @@ export function Shell() {
       <FilePeek />
       <ArxivHost />
       <StudioHost />
+      <ProjectDialogHost />
       <ShareDialogHost />
       <Lightbox />
       <VideoBox />

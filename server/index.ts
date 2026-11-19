@@ -20,6 +20,7 @@ import { agentBaseEnv } from './env.ts';
 import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agents/control.ts';
 import * as files from './files.ts';
 import { viewRoutes } from './view.ts';
+import { fileThumbRoutes } from './file-thumbs.ts';
 import { zipPlan, zipStream } from './zip.ts';
 import { previewItem } from './history/common.ts';
 import { findSessions, Indexer } from './indexer/index.ts';
@@ -1302,6 +1303,8 @@ app.get('/api/fs/raw', async (req, reply) => {
   reply.header('Content-Length', st.size);
   return reply.send(fs.createReadStream(p));
 });
+// The small picture of a file (a picture scaled, a video's frame, a PDF's first page, a document's first page…).
+fileThumbRoutes(app, db);
 // An HTML file shown as a page, with a link that lets it load the files next to it (server/view.ts).
 viewRoutes(app);
 app.put('/api/fs/write', async (req) => {

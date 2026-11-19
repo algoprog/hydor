@@ -1,6 +1,6 @@
 // Settings, in one place: the app (theme, notifications, password) and the agents (their accounts,
 // instruction files, MCP servers, skills and plugins). On a computer the sections are the rows of the column
-// beside the rail (the same kind of column as the sessions' and the Library's), grouped, the open one on the
+// beside the rail (the same kind of column as the sessions' and the Apps page's), grouped, the open one on the
 // right under its title; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
@@ -203,7 +203,7 @@ function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
   );
 }
 
-/** A computer: every section as a row of the column, under its group's name; the rows look as the Library's places do. */
+/** A computer: every section as a row of the column, under its group's name; the rows look as the Apps page's places do. */
 function SectionRows({ current, onOpen }: { current: SettingsSection | null; onOpen: (id: SettingsSection) => void }) {
   return (
     <ColumnScroll className="px-3 pt-1 pb-4">

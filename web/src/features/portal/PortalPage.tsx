@@ -3,8 +3,8 @@
 // top, the project's mark, name and the owner's words about it, and who they are (their menu: what they may do,
 // the language and the theme); under them, tabs: Documents, Sessions, and when the project has them, Runs and Reading
 // list. A document opens to read (with its comments, where they can add theirs) or, with Edit documents, in the
-// Library's own editor (PortalItem.tsx); a session opens as a read-only link shows it (PortalSession.tsx). What is
-// open is in the address (?doc=, ?session=, ?tab=), so Back works. A link to one thing of the Library (a document, a
+// app's own editor (PortalItem.tsx); a session opens as a read-only link shows it (PortalSession.tsx). What is
+// open is in the address (?doc=, ?session=, ?tab=), so Back works. A link to one thing kept (a document, a
 // page, a design, a picture, a video, a sound) opens that thing alone (PortalItem.tsx, PortalMedia.tsx). A link that
 // was stopped or ran out shows a plain page.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';

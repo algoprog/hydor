@@ -1615,7 +1615,7 @@ How much each setting mattered (the share of the metric's spread its values acco
 /**
  * A period's log (work_log's JSON) as a writer reads it: what was done in each project (each session's title, how it
  * ended, what it was asked and how its reply ended, the files it changed), the commits by repository, the runs with
- * their numbers, what was made in the Library and the papers read; with the period in numbers, and links to each.
+ * their numbers, what was made or kept and the papers read; with the period in numbers, and links to each.
  */
 const DIGEST = String.raw`function digestOf(log, most) {
   const sessions = rows(log.sessions);
@@ -1656,7 +1656,7 @@ const DIGEST = String.raw`function digestOf(log, most) {
     }
   }
   if (library.length) {
-    out.push('## Made or changed in the Library');
+    out.push('## Made or kept');
     for (const l of library.slice(0, 30)) out.push('- ' + l.kind + ' “' + clip(l.title, 100) + '” (' + l.changed + ')');
   }
   if (read.length) {
@@ -1679,7 +1679,7 @@ const DIGEST = String.raw`function digestOf(log, most) {
     { what: 'Sessions', count: sessions.length },
     { what: 'Commits', count: commits.length },
     { what: 'Experiment runs', count: runs.length },
-    { what: 'Made in the Library', count: library.length },
+    { what: 'Made or kept', count: library.length },
     { what: 'Papers read', count: read.length },
   ].filter((x) => x.count > 0);
   return { text, links, stats, sessions: sessions.length, commits: commits.length, runs: runs.length, count: sessions.length + commits.length + runs.length + library.length + read.length, cost: Math.round(cost * 100) / 100, base, notes: list(log.notes).map(String).join(' ') };
@@ -1869,14 +1869,14 @@ return { title, summary, done, results, problems, next, questions, markdown, sub
         { id: 'markdown', label: 'The report', type: 'long', required: true },
       ],
       steps: [
-        { id: 'doc', title: 'Save it in the Library', do: 'tool', tool: 'save_doc', with: { title: '{{title}}', markdown: '{{markdown}}' } },
+        { id: 'doc', title: 'Save it as a document', do: 'tool', tool: 'save_doc', with: { title: '{{title}}', markdown: '{{markdown}}' } },
         {
           id: 'where',
           title: 'Find where it is',
           do: 'code',
           language: 'javascript',
           with: { said: '{{doc.text}}' },
-          code: String.raw`// The document's page in the Library, from what save_doc said ("… (page abc123, version 1) …").
+          code: String.raw`// The document's page, from what save_doc said ("… (page abc123, version 1) …").
 const m = /\(page ([\w-]+), version/.exec(String(input.said || ''));
 if (!m) throw new Error('The document was not saved: ' + String(input.said || '').slice(0, 200));
 return { page: '/pages/' + m[1] };`,

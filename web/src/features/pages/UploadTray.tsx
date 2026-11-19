@@ -1,4 +1,4 @@
-// The tray of files on their way into the Library (uploads.ts), at the bottom right over every page, so they carry on
+// The tray of files on their way into a project or the app (uploads.ts), at the bottom right over every page, so they carry on
 // while you open what arrived: each file with its progress, then what it became and where (a click opens it: a page,
 // a picture, or the file in its project's folder), or why it could not be added, in plain words; Cancel stops them.
 // In the desktop app it also says a file was moved, and where its original went. Files' own uploads sit under it.
@@ -28,7 +28,7 @@ const ICONS: Record<string, ReactNode> = {
   file: <FolderInput size={15} />,
 };
 
-/** What it is, as the Library's cards name their kinds. */
+/** What it is, as the cards of kept things name their kinds. */
 const KIND: Record<string, string> = { page: 'Page', doc: 'Document', sheet: 'Spreadsheet', slides: 'Slides', tex: 'LaTeX', notebook: 'Notebook', diagram: 'Diagram', image: 'Picture', video: 'Video', audio: 'Audio' };
 
 /** While the server makes it what it is. */
@@ -39,13 +39,13 @@ const MAKING: Record<string, string> = {
   tex: 'Making a LaTeX document of it',
   notebook: 'Making a notebook of it',
   diagram: 'Making a diagram of it',
-  image: 'Keeping it in the Library',
-  video: 'Keeping it in the Library',
-  audio: 'Keeping it in the Library',
+  image: 'Keeping it',
+  video: 'Keeping it',
+  audio: 'Keeping it',
   file: 'Putting it in the project’s folder',
 };
 
-/** What a page could not keep of a file, in Files' editors' words (and the Library's own: it reads others of its folder). */
+/** What a page could not keep of a file, in Files' editors' words (and a LaTeX document's own: it reads others of its folder). */
 const LOST: Record<string, string> = {
   headers: 'headers and footers',
   footnotes: 'footnotes and endnotes',
@@ -127,7 +127,7 @@ function Status({ it }: { it: UpItem }) {
     );
   return (
     <>
-      <span className="shrink-0">{d.existed ? 'Already in your Library' : tr(KIND[kind ?? 'page'] ?? 'Page')}</span>
+      <span className="shrink-0">{d.existed ? 'Already kept' : tr(KIND[kind ?? 'page'] ?? 'Page')}</span>
       <span className="shrink-0">·</span>
       <Where space={d.as === 'media' ? d.item?.space : d.space} />
     </>
@@ -137,8 +137,8 @@ function Status({ it }: { it: UpItem }) {
 /** What more there is to say: why it was not added, what did not come along, and in the desktop app where the original went. */
 function More({ it }: { it: UpItem }): ReactNode {
   if (it.status === 'error') {
-    if (it.why === 'kind') return 'The Library keeps documents, spreadsheets, slides, LaTeX, notebooks, pictures, videos and sounds. To keep another kind of file, drop it on a project: it goes in the project’s folder.';
-    if (it.why === 'size') return 'It is too large for the Library to keep. Drop it on a project to keep it in the project’s folder.';
+    if (it.why === 'kind') return 'Only documents, spreadsheets, slides, LaTeX, notebooks, pictures, videos and sounds can be kept this way. To keep another kind of file, drop it on a project’s Files: it goes in the project’s folder.';
+    if (it.why === 'size') return 'It is too large to keep this way. Drop it on a project’s Files to keep it in the project’s folder.';
     if (it.why === 'room') return 'There is not enough room for it on this computer’s disk.';
     return <span translate="no">{it.error}</span>;
   }
@@ -149,11 +149,11 @@ function More({ it }: { it: UpItem }): ReactNode {
   if (d.stayed) {
     const keys = d.lost ?? [];
     const lost = keys.filter((k) => k !== 'cut').map((k) => tr(lostWord(k, d.page?.kind)));
-    if (lost.length) lines.push(tr(`The original stays where it was: the Library’s copy lacks ${lost.join(', ')}`));
-    if (keys.includes('cut')) lines.push('The original stays where it was: not all of it fitted in the Library’s copy');
+    if (lost.length) lines.push(tr(`The original stays where it was: the copy kept lacks ${lost.join(', ')}`));
+    if (keys.includes('cut')) lines.push('The original stays where it was: not all of it fitted in the copy kept');
     if (!lost.length && !keys.includes('cut')) lines.push('The original stays where it was');
   } else if (d.trashed) lines.push('Moved: the original is in the Trash');
-  else if (d.moved) lines.push(d.as === 'file' ? 'Moved into the project’s folder' : 'Moved into the Library');
+  else if (d.moved) lines.push(d.as === 'file' ? 'Moved into the project’s folder' : 'Moved in');
   else if (it.byPath && d.existed) lines.push('The file stays where it was');
   for (const n of d.notes) lines.push(tr(n));
   return lines.length ? lines.map((l, i) => <span key={i} className="block">{l}</span>) : null;
@@ -213,7 +213,7 @@ function Row({ it }: { it: UpItem }) {
   );
 }
 
-/** The Library's tray: shown while it has files, until closed once they are all in. */
+/** The tray of files being added: shown while it has files, until closed once they are all in. */
 export function UploadTray() {
   const items = useLibraryUploads((s) => s.items);
   if (!items.length) return null;
@@ -221,9 +221,9 @@ export function UploadTray() {
   const over = items.length - going;
   const failed = items.filter((i) => i.status === 'error').length;
   return (
-    <section aria-label="Adding to the Library" className="overflow-hidden rounded-xl border border-line-2 bg-panel shadow-pop">
+    <section aria-label="Adding files" className="overflow-hidden rounded-xl border border-line-2 bg-panel shadow-pop">
       <div className="flex min-h-10 items-center gap-2 border-b border-line py-1 pr-1.5 pl-3">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{going ? 'Adding to the Library' : failed ? tr(`${failed} could not be added`) : 'Added to the Library'}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{going ? 'Adding files' : failed ? tr(`${failed} could not be added`) : 'Files added'}</span>
         <span className="tnum shrink-0 text-[12px] text-fg-3">{`${over} of ${items.length}`}</span>
         {going ? (
           <Button size="sm" variant="ghost" onClick={cancelAll} className="h-8 px-2.5">
@@ -244,7 +244,7 @@ export function UploadTray() {
   );
 }
 
-/** What a drag of files over the Library says: where they would go (a project, as people named it, or none), or in the desktop app that they move there. */
+/** What a drag of files says over a place that takes them: where they would go (a project, as people named it, or none), or in the desktop app that they move there. */
 export function DropHint({ name, className }: { name?: string; className?: string }) {
   const moves = dropMoves();
   return (
@@ -254,10 +254,10 @@ export function DropHint({ name, className }: { name?: string; className?: strin
         {moves
           ? name
             ? tr(`Drop to move them into “${name}”`)
-            : 'Drop to move them into the Library, not in a project'
+            : 'Drop to move them here'
           : name
             ? tr(`Drop to add to “${name}”`)
-            : 'Drop to add to the Library, not in a project'}
+            : 'Drop to add them here'}
       </span>
     </span>
   );
@@ -270,7 +270,7 @@ const noDrop = (e: DragEvent) => {
   if (e.type === 'dragover') e.dataTransfer.dropEffect = 'none';
 };
 
-/** The trays of files on their way, at the bottom right: the Library's over Files' own uploads. */
+/** The trays of files on their way, at the bottom right: these over Files' own uploads. */
 export function UploadTrays() {
   return (
     <div

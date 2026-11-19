@@ -358,7 +358,7 @@ const slideXml = (buf: Buffer, n: number) => new Zip(buf).text(`ppt/slides/slide
   const deck = await modelOf(idOf(saved.text));
   const c = deck.slides[0].els[0] as ChartEl;
   ok(c.labels.join() === 'North,South' && c.series.length === 2 && c.source?.title === 'Sales 2026' && !!c.source.at, `save_slides reads a chart's numbers from its source (${JSON.stringify(c).slice(0, 240)})`);
-  ok(/not a spreadsheet of the Library/.test(saved.text ?? ''), 'and says when a source is not one');
+  ok(/not a saved spreadsheet/.test(saved.text ?? ''), 'and says when a source is not one');
 }
 
 // ---- QR codes ------------------------------------------------------------------------------------------------------

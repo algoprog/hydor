@@ -1,6 +1,6 @@
 // "Edit the sound…": the video editor hands a clip's or a track's sound to the sound editor (../audio, opened here by
 // default; setSoundEditor puts another in its place), and takes back what it saves. The sound it gets is the clip's own
-// (its video file, whose sound the sound editor reads) or the sound used in its place; what comes back (a Library sound
+// (its video file, whose sound the sound editor reads) or the sound used in its place; what comes back (a kept sound
 // "media:<id>", a sound kept by the editors "naget-sound:…", or a sound file's path) is used in place of the clip's own
 // sound with the same timing (its second t stands for the source's second t: VideoClip.sound), or as the music or
 // voice-over item's sound.
@@ -9,7 +9,7 @@ import { tr } from '../../../i18n/runtime';
 import { toastError } from '../../../lib/store';
 
 export interface SoundEdit {
-  /** The sound to edit: a video (its sound), a Library sound, a kept sound or a file. */
+  /** The sound to edit: a video (its sound), a kept sound, or a file. */
   src: string;
   /** Its name, for the sound editor's tab. */
   title: string;

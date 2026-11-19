@@ -1189,7 +1189,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const openCount = model?.comments?.filter((c) => !c.resolved).length ?? 0;
 
   // ---- tracked changes ----------------------------------------------------------------------------------------------------
-  // Kept with a document of the Library (a file of this computer keeps only its text).
+  // Kept with a document kept by the app (a file of this computer keeps only its text).
   const canTrack = !onDisk;
   const tracking = !!model?.track;
   const [activeChange, setActiveChange] = useState<string | null>(null);
@@ -1805,7 +1805,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       toastError(e);
     }
   };
-  // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
+  // Documents kept by the app keep their comments; a file of this computer has its comments kept by the app.
   const canComment = true;
 
   // The source's right-click menu: the editor's own actions (from the menus above, with the same words and keys).

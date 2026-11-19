@@ -81,7 +81,7 @@ function peopleCounts(db: DB): Map<string, number> {
   return out;
 }
 
-/** How many things each space holds in the Library: pages (an app's screens aside) and the pictures and videos kept. */
+/** How many things each space holds: pages (an app's screens aside) and the pictures and videos kept. */
 function libraryCounts(db: DB): Map<string, number> {
   const out = new Map<string, number>();
   for (const sql of ['select space, count(*) as n from pages where space is not null and app is null group by space', 'select space, count(*) as n from media where space is not null group by space'])
@@ -228,7 +228,7 @@ export function deleteSpace(db: DB, id: string): string[] {
   // Its folder is not suggested again, nor made a project again when it was one found in Claude Code or Codex.
   if (s?.folder) hideSuggestion(db, s.folder);
   releaseSpace(db, id);
-  // What the Library kept in it stays there, in no space.
+  // What was kept in it stays, in no space.
   for (const table of ['pages', 'media', 'library_folders'])
     try {
       db.prepare(`update ${table} set space = null where space = ?`).run(id);

@@ -1471,12 +1471,12 @@ export const LATEX_CHECK: RunTool = {
     'anonymity for anonymous venues (names the template shows, acknowledgements, \\thanks, links naming a person or lab, “our previous work” with a citation, the PDF’s Author field);',
     'format (pages counted against the venue’s limit, Type 3 and unembedded fonts, the template’s layout changed, undefined references, TODO marks, overfull lines);',
     'the parts the venue requires (ACL’s Limitations, the NeurIPS checklist, ICML’s Impact Statement…); and numbers (bold on each column’s best value, tables Experiments made worked out again from their runs, other tables traced to finished runs).',
-    'Give doc (a LaTeX document of the Library) or path (a .tex file or a LaTeX project folder), and venue. It changes nothing: fix what it finds yourself (save_latex for a Library document). It takes up to a few minutes with many references.',
+    'Give doc (a saved LaTeX document) or path (a .tex file or a LaTeX project folder), and venue. It changes nothing: fix what it finds yourself (save_latex for a saved document). It takes up to a few minutes with many references.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
-      doc: { type: 'string', description: 'A LaTeX document of the Library: its id (get_page lists them).' },
+      doc: { type: 'string', description: 'A saved LaTeX document: its id (get_page lists them).' },
       path: { type: 'string', description: 'Or a .tex file, or a LaTeX project’s folder, on this computer (from the session’s folder, or absolute).' },
       venue: {
         type: 'string',
@@ -1513,7 +1513,7 @@ export const LATEX_CHECK: RunTool = {
       const folder = opened.tex?.folder;
       input = { folder: folder && opened.tex?.inFolder && texFolderOk(folder) ? folder : undefined };
       of = `file:${file}`;
-    } else throw new Error('Give doc (a LaTeX document of the Library) or path (a .tex file or a project folder).');
+    } else throw new Error('Give doc (a saved LaTeX document) or path (a .tex file or a project folder).');
     const venueId = typeof a.venue === 'string' && a.venue ? a.venue : (detectVenue(doc.main) ?? 'other');
     const venue = venueWith(venueId);
     const st = startCheck(db, { doc, venue, ...input }, of);

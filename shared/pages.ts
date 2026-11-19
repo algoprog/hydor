@@ -15,7 +15,7 @@ export const STORAGE_LIMITS = {
 /** Versions a page keeps (the oldest go first), and at most this many bytes of them. */
 export const VERSION_LIMITS = { count: 40, bytes: 24 * 1024 * 1024 };
 
-/** The most words a description of something in the Library may have (more are cut off). */
+/** The most words a description of something kept may have (more are cut off). */
 export const DESCRIPTION_WORDS = 100;
 
 /** Chinese, Japanese and Korean characters: written without spaces, two of them count as a word. */
@@ -70,26 +70,26 @@ export interface PageInfo {
   kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
   /** A template's screen: the template it belongs to (it is not in the library). */
   app?: string;
-  /** The space it is in (the Library shows each space's together); none when unset. */
+  /** The space it is in (each project's show together); none when unset. */
   space?: string;
-  /** The Library folder it is in (LibFolder's id, a folder of its space); none at its place's top. */
+  /** The folder it is in (LibFolder's id, a folder of its space); none at its place's top. */
   folder?: string;
   /** A page of HTML's icon: the emoji the page editor puts at its top (links to it in other pages show it). */
   icon?: string;
   /**
    * What it is, in a few sentences (at most DESCRIPTION_WORDS words): written by the agent that saved it, by the helper
-   * model for what came in without one (a file added, a page kept from a conversation), or by the user. The Library's
-   * search, the search box and agents find it by it.
+   * model for what came in without one (a file added, a page kept from a conversation), or by the user. The search box
+   * and agents find it by it.
    */
   description?: string;
   /** Locked by its owner, so it doesn't change by accident: no new version until it is unlocked. */
   locked?: boolean;
-  /** A web page saved from the user's own browser (a document): the address it came from and its site ("example.com"). The Library shows it as a Web page. */
+  /** A web page saved from the user's own browser (a document): the address it came from and its site ("example.com"). It shows as a Web page. */
   source?: { url: string; site: string };
 }
 
 /**
- * A folder of the Library: it holds things kept (pages, documents, pictures…) and other folders of its place, a
+ * A folder of kept things: it holds things kept (pages, documents, pictures…) and other folders of its place, a
  * project or none. Deleting one deletes nothing it holds: what is in it goes up a level.
  */
 export interface LibFolder {
@@ -102,14 +102,14 @@ export interface LibFolder {
   createdAt: number;
 }
 
-/** A folder's name may be this long; folders go this deep (a folder at the top is 1), and the Library holds this many. */
+/** A folder's name may be this long; folders go this deep (a folder at the top is 1), and this many are kept. */
 export const FOLDER_LIMITS = { name: 80, depth: 8, count: 2000 };
 
-/** What a folder of this computer brought into the Library gave (POST /api/pages/import-folder). */
+/** What a folder of this computer brought in gave (POST /api/pages/import-folder). */
 export interface FolderImport {
-  /** The Library folder made for it; none when it came in as one LaTeX document. */
+  /** The folder made for it; none when it came in as one LaTeX document. */
   folder?: LibFolder;
-  /** What came in, as things of the Library. */
+  /** What came in, as kept things. */
   pages: PageInfo[];
   /** Folders made for its folders (the one made for it too). */
   folders: number;
@@ -122,7 +122,7 @@ export interface FolderImport {
 /**
  * Why a file of a folder was left out: a picture, video or sound (kept from a conversation instead), a PDF or slides
  * (opened in Files), a part of a LaTeX document rather than a whole one, too large, not readable as its kind, of a kind
- * the Library does not keep, or past what one import brings in.
+ * kept as nothing, or past what one import brings in.
  */
 export type FolderSkip = 'picture' | 'video' | 'audio' | 'pdf' | 'slides' | 'part' | 'large' | 'unreadable' | 'kind' | 'limit';
 

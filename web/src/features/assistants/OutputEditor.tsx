@@ -1,5 +1,5 @@
 // What an agent hands back (the fields of each result; none: its reply) and where each result goes: a page in the
-// Library (the same one updated each run, or a new one each run), a row in a Library spreadsheet, an email to people
+// kept page (the same one updated each run, or a new one each run), a row in a spreadsheet, an email to people
 // from a connected mail account, a notification, a file in the folder it works in and a webhook (signed with a key from
 // the vault). In All settings, and from its sentence on its page. Words typed in a place's boxes count once you leave
 // the box (or press Enter), so a half-typed address is never saved.
@@ -16,7 +16,7 @@ const TYPES = ANSWER_TYPES.filter((t) => t.value !== 'media');
 
 const PLACE: Record<OutputKind, string> = {
   file: 'a file',
-  library: 'the Library',
+  library: 'a kept page',
   sheet: 'a spreadsheet',
   email: 'an email',
   webhook: 'a webhook',
@@ -185,8 +185,8 @@ export function OutputEditor({ value, onChange, agent }: { value?: AgentOutput; 
         <div className="divide-y divide-line rounded-xl border border-line">
           <div className="px-3 py-2">
             <label className="flex cursor-pointer items-center gap-3">
-              <span className="min-w-0 flex-1">A page in the Library</span>
-              <Switch on={!!lib} onChange={(on) => setTo('library', on ? { kind: 'library' } : null)} label="A page in the Library" />
+              <span className="min-w-0 flex-1">A kept page</span>
+              <Switch on={!!lib} onChange={(on) => setTo('library', on ? { kind: 'library' } : null)} label="A kept page" />
             </label>
             {lib && (
               <div className="mt-1.5 space-y-1.5">

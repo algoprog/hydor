@@ -1,5 +1,5 @@
 // The picture and video editors, each in a tab of its own inside the app, opened from anywhere with openEditor (a
-// slide's, a document's or a page's picture, the Library, Files, any picture shown full size). While one is open a
+// slide's, a document's or a page's picture, a kept picture, Files, any picture shown full size). While one is open a
 // slim strip of tabs shows at the top of the main area: first the page you were on, then a tab for each editor
 // ("Picture · boat.jpg"), each closed with its ×, which asks first when its changes are not saved. The page stays as it
 // was under its tab (hidden, not closed), so a deck's unsaved changes, its selection and its undo are all there when
@@ -17,7 +17,7 @@ import { useSessions } from '../../lib/store';
 export interface OpenEditor {
   kind: EditKind;
   /**
-   * The picture or video: one the app keeps ("naget-asset:…", "naget-video:…"), a Library item's file
+   * The picture or video: one the app keeps ("naget-asset:…", "naget-video:…"), a kept item's file
    * (/api/media/<id>/file), a file's path, or an https or data: address.
    */
   src: string;
@@ -26,22 +26,22 @@ export interface OpenEditor {
   /** Where it was opened from: the first tab's name (the deck's), and what showing that page again takes, if anything. */
   from: { label: string; back?: () => void };
   /**
-   * Where Save writes the result: a picture kept for a deck, document or page; over a Library item; over a file (or,
-   * when its kind of file changes, a copy beside it). None: Save keeps it in the Library as a new item.
+   * Where Save writes the result: a picture kept for a deck, document or page; over a kept item; over a file (or,
+   * when its kind of file changes, a copy beside it). None: Save keeps it as a new item.
    */
   to?: SaveTo;
   /** What to do with the result: put it back where it came from. Called after the editor wrote it where `to` says. */
   save: (r: Saved) => Promise<void> | void;
   /**
-   * A new picture (File → New, the Library's New): Save keeps it in the Library under the name it has, in this project
-   * (`space`, null for none) and Library folder, when it is not saved over anything.
+   * A new picture (File → New): Save keeps it under the name it has, in this project
+   * (`space`, null for none), when it is not saved over anything.
    */
   fresh?: { space?: string | null; folder?: string };
-  /** Offer "Save a copy" (to the Library; for a file, beside it). */
+  /** Offer "Save a copy" (kept; for a file, beside it). */
   copy?: boolean;
-  /** The session it is from (a video of the conversation): a copy kept in the Library is noted as from it. */
+  /** The session it is from (a video of the conversation): a copy kept is noted as from it. */
   session?: string;
-  /** A Library video's kind of file (MP4, WebM, MOV): saved over it, it stays so. */
+  /** A kept video's kind of file (MP4, WebM, MOV): saved over it, it stays so. */
   fileKind?: string;
   /** A video's sound: it keeps this length (seconds), whatever is cut or moved. */
   length?: number;
@@ -51,7 +51,7 @@ export interface EditorHandle {
   id: string;
   /** Closes its tab, whatever it holds. */
   close(): void;
-  /** The page it came from is gone (a deck closed): its Save keeps the result in the Library instead. */
+  /** The page it came from is gone (a deck closed): its Save keeps the result as a new one instead. */
   detach(): void;
 }
 
@@ -60,7 +60,7 @@ export interface EditorProps {
   o: OpenEditor;
   /** Its tab shows (the page and the other tabs are hidden): only then does it take keys. */
   active: boolean;
-  /** The page it came from is gone: Save keeps the result in the Library. */
+  /** The page it came from is gone: Save keeps the result as a new one. */
   detached: boolean;
   /** Changes not saved: closing the tab asks first. */
   setDirty(dirty: boolean): void;
@@ -168,12 +168,12 @@ export function keepKeys(e: React.KeyboardEvent) {
   e.stopPropagation();
 }
 
-/** A name for the page an editor opens from, when its opener does not know one: the session's title, the Library, Files. */
+/** A name for the page an editor opens from, when its opener does not know one: the session's title, a kept item's page, Files. */
 export function pageName(): string {
   const p = location.pathname.replace(/^\/m\/[a-z0-9-]{1,40}(?=\/)/, '');
   const s = /^\/s\/([^/]+)$/.exec(p);
   if (s) return useSessions.getState().byKey[decodeURIComponent(s[1])]?.title || tr('The session');
-  if (p.startsWith('/library') || p.startsWith('/media/')) return tr('Library');
+  if (p.startsWith('/media/')) return tr('Files');
   if (p === '/files' || p === '/file' || p === '/search') return tr('Files');
   if (p.startsWith('/apps')) return tr('Apps');
   return tr('Back');

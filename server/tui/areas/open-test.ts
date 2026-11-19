@@ -32,16 +32,13 @@ const out = async (...words: string[]) => (await run(fakeConn(routes).conn, ['op
 
 test('open: the app, and pages by name', async () => {
   assert.equal(await out(), 'http://fake');
-  assert.equal(await out('library'), 'http://fake/library');
-  assert.equal(await out('Library'), 'http://fake/library');
-  assert.equal(await out('projects'), 'http://fake/projects', 'by its title; its id in the catalog is spaces');
-  assert.equal(await out('spaces'), 'http://fake/projects');
   assert.equal(await out('inbox'), 'http://fake/inbox');
+  assert.equal(await out('Inbox'), 'http://fake/inbox');
   assert.equal(await out('experiments'), 'http://fake/system/experiments');
   assert.equal(await out('connected-apps'), 'http://fake/apps/connected');
   assert.equal(await out('experi'), 'http://fake/system/experiments', 'the start of one page’s name');
   assert.ok(pages().length > 20);
-  assert.ok(pageWords().some(([w]) => w === 'library') && pageWords().some(([w]) => w === 'settings'));
+  assert.ok(pageWords().some(([w]) => w === 'inbox') && pageWords().some(([w]) => w === 'settings'));
 });
 
 test('open: settings, guide, project', async () => {
@@ -64,13 +61,13 @@ test('open: a session by key, id start or title; the mistakes', async () => {
   assert.equal(await out('fix', 'the', 'login'.slice(0, 0)).catch(() => ''), '', 'a word per argument: more words than a name');
   assert.equal((await run(fakeConn(routes).conn, ['open', 'Fix the login bug'])).out.trim(), 'http://fake/s/claude:aaaa1111-0000');
   await assert.rejects(out('zzzz'), (e: Error) => e instanceof UsageError && /^“zzzz” is no page, and no session’s key or title/.test(e.message));
-  await assert.rejects(out('library', 'x'), /Too many words/);
+  await assert.rejects(out('inbox', 'x'), /Too many words/);
 });
 
 test('open: --browser asks the Ctx to open it, --json prints the address', async () => {
-  const r = await run(fakeConn(routes).conn, ['open', 'library', '--browser']);
-  assert.deepEqual(r.opened, ['http://fake/library']);
-  assert.equal(r.out.trim(), 'http://fake/library');
+  const r = await run(fakeConn(routes).conn, ['open', 'inbox', '--browser']);
+  assert.deepEqual(r.opened, ['http://fake/inbox']);
+  assert.equal(r.out.trim(), 'http://fake/inbox');
   const j = await run(fakeConn(routes).conn, ['open', 'inbox', '--json']);
   assert.deepEqual(j.json, [{ url: 'http://fake/inbox' }]);
   assert.deepEqual((await run(fakeConn(routes).conn, ['open', 'inbox'])).opened, [], 'not without --browser');

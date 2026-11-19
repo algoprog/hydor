@@ -1,6 +1,6 @@
 // What the desktop app's window gives its page beyond what a browser does, and nothing more: the path on this computer
-// of a file dropped on the page (Electron's webUtils.getPathForFile), so that the Library moves a file dragged in from
-// Finder, Explorer or a file manager into its place instead of uploading a copy (web/src/features/pages/uploads.ts);
+// of a file dropped on the page (Electron's webUtils.getPathForFile), so that a file dragged in from
+// Finder, Explorer or a file manager can move into its place instead of being uploaded as a copy (web/src/features/pages/uploads.ts);
 // and the notices the app shows as the system's own notifications (main.cjs): those the system did not show, for the
 // page to show inside the app, the page a click on one opens, whether the system shows them, a test one, and the
 // system's settings where you allow them (web/src/lib/notify.ts); and `reveal`, a file or folder shown in the system's file
@@ -151,7 +151,7 @@ if (own) {
       openExternal: (url) => ipcRenderer.invoke('hydor:browser-open-external', String(url)),
       /** A tab's news as it changes ({ target, audible?, muted?, zoom?, blocked?, fullscreen? }); everything of a tab comes when it is shown. */
       onTabState: (fn) => listen('hydor:browser-tab-state', fn),
-      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in the Library, or ask about it), { cmd: 'picture-failed', message }, { cmd: 'highlight', target, url, title } (mark the selection in that tab), { cmd: 'unhighlight', id, url }, { cmd: 'open-private', url } (open that link in a private tab), { cmd: 'translate', target } (translate that tab's page, or show its original), { cmd: 'translate-text', text, url } (translate the selected words). */
+      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }, { cmd: 'later', url, title } (read later), { cmd: 'save-image' | 'ask-image', path, name, url, title } (a picture read into a file of this computer: keep it in a project, or ask about it), { cmd: 'picture-failed', message }, { cmd: 'highlight', target, url, title } (mark the selection in that tab), { cmd: 'unhighlight', id, url }, { cmd: 'open-private', url } (open that link in a private tab), { cmd: 'translate', target } (translate that tab's page, or show its original), { cmd: 'translate-text', text, url } (translate the selected words). */
       onCommand: (fn) => listen('hydor:browser-command', fn),
       /**
        * The right-click menu of one of your tabs, for this page to draw in the app's own look: { target, menu, x, y (the

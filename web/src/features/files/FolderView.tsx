@@ -1,61 +1,78 @@
-// A folder's contents: the heart of the Files page, and of a space's Files tab. A list that says when each
-// thing changed and how big it is (a folder's arrow opens it in place, as a tree), or tiles with pictures;
-// sorted by name, date, size or kind, folders first. The field narrows the list as you type; Enter searches
-// everything under the folder, inside files too. Pick several (the box at a row's start, Ctrl or Shift with a
-// click, or a long press on a phone) to act on them at once. Drag rows onto a folder to move them (Alt
-// copies), or files from the computer anywhere to upload them. A right-click or ⋯ has the rest, and the
-// keyboard works too: arrows, Enter, Backspace for the folder above, F2, Delete, Ctrl+A.
+// A folder's contents: the heart of the Files page, and of a project's Files tab. Tiles by default, each with a
+// picture of the file (FileThumb.tsx: its first page, a frame, its first lines, its icon), its name and when it
+// changed; or, if you picked it, a list that says when each thing changed and how big it is (a folder's arrow opens
+// it in place, as a tree). Sorted by name, date, size or kind, folders first. The field narrows what shows as you
+// type; Enter searches everything under the folder, inside files too. Pick several (the box at a tile's or row's
+// start, Ctrl or Shift with a click, or a long press on a phone) to act on them at once. Drag tiles onto a folder
+// to move them (Alt copies); files and folders from the computer dropped anywhere on the view are uploaded into
+// the folder shown (so does Upload in the bar). A right-click or ⋯ has the rest, and the keyboard works too:
+// arrows, Enter, Backspace for the folder above, F2, Delete, Ctrl+A.
+// A project's Files gives it `project` (New then also makes what the app makes: a document, slides, a spreadsheet,
+// a page, a design, LaTeX, a diagram, a board, a picture, kept in the project) and `extra`: the project's kept
+// things, which come after the folders and before the files, as tiles or as rows.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import {
+  AppWindow,
   ArrowDownUp,
   ArrowUp,
   Boxes,
   Check,
   Copy,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
   Ellipsis,
   Eye,
   FilePlus2,
+  FileText,
   Folder,
   FolderInput,
   FolderOpen,
   FolderPlus,
   FolderUp,
+  ImageIcon,
+  LayoutDashboard,
   LayoutGrid,
   List,
   MessageSquarePlus,
   NotebookText,
+  Palette,
   Pin,
   PinOff,
   Plus,
+  Presentation,
   Search,
+  Sheet,
+  Sigma,
   SquareTerminal,
   Trash2,
   Upload,
+  Workflow,
   X,
 } from 'lucide-react';
 import { FolderFinder } from '../../components/FolderPicker';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { api, post, put } from '../../lib/api';
-import { basename, bytes, dirname, joinPath } from '../../lib/format';
-import { mu } from '../../lib/machine';
+import { ago, basename, bytes, dirname, joinPath } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { pickedFromInput, startUpload } from '../../lib/upload';
 import { FileIcon } from '../documents/fileTypes';
 import { newNotebookText } from '../notebook/model';
+import { NewPageDialog, type NewKind } from '../pages/NewDialog';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { addToSpace, copyPaths, download, dragStart, dropInto, moveInto, newSessionIn, rename, startSession, takesDrop, trash, type Item } from './actions';
+import { FileThumb, kindBadge, rowPictureUrl } from './FileThumb';
 import { ItemMenu, useFolderLead } from './ItemMenu';
 import { Crumbs, upOf } from './Places';
 import { setPinned, setPrefs, useFilesPrefs, usePinned, type SortBy } from './prefs';
 import { SpaceChoices } from './SpaceMenu';
 import { NewSpaceDialog } from '../spaces/parts';
 import { LOCALE } from '../../i18n/locale';
+import { tr } from '../../i18n/runtime';
 
 export interface FsEntry {
   name: string;
@@ -111,7 +128,6 @@ export function changedWhen(t: number, now = Date.now()): string {
 }
 
 const GIT_CLS: Record<string, string> = { M: 'text-warn', A: 'text-ok', U: 'text-ok', D: 'text-err', R: 'text-info', C: 'text-err', '•': 'text-warn' };
-const PICTURE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
 // Fingers: rows don't drag, a long press picks one instead.
 const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 /** Rows shown at first: a folder of thousands shows the rest on asking. */
@@ -143,28 +159,18 @@ function useWidth(ref: React.RefObject<HTMLElement | null>): number {
   return w;
 }
 
-/** A thing's icon: a folder, a picture's own thumbnail (tiles), or its kind's tile. */
-function Icon({ e, size, thumb }: { e: FsEntry; size: number; thumb?: boolean }) {
+/** A row's icon: a folder, a picture's own small copy, or its kind's tile. */
+function Icon({ e, size }: { e: FsEntry; size: number }) {
   const [bad, setBad] = useState(false);
   if (isDir(e))
     return (
       <span className="flex shrink-0 items-center justify-center text-accent/80" style={{ width: size, height: size }}>
-        <Folder size={Math.round(size * (thumb ? 0.62 : 0.78))} strokeWidth={thumb ? 1.4 : 1.9} fill="currentColor" fillOpacity={0.14} />
+        <Folder size={Math.round(size * 0.78)} strokeWidth={1.9} fill="currentColor" fillOpacity={0.14} />
       </span>
     );
-  if (thumb && PICTURE.test(e.name) && !bad)
-    return (
-      <img
-        src={mu(`/api/fs/raw?path=${encodeURIComponent(e.path)}&t=${e.mtime}`)}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        onError={() => setBad(true)}
-        className="h-full w-full object-cover"
-        draggable={false}
-      />
-    );
-  return <FileIcon path={e.path} size={size} className={thumb ? 'rounded-xl' : 'rounded-md'} />;
+  const pic = bad ? null : rowPictureUrl(e.name, e.path, e.mtime);
+  if (pic) return <img src={pic} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} style={{ width: size, height: size }} className="shrink-0 rounded-md object-cover" draggable={false} />;
+  return <FileIcon path={e.path} size={size} className="rounded-md" />;
 }
 
 /** "Untitled.ipynb", or "Untitled 2.ipynb" and on when the folder has one already. */
@@ -344,7 +350,7 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
   );
 });
 
-/** A tile: the picture (or the kind's icon), the name, and its size or when it changed. */
+/** A tile, shaped like a card: the file's picture on top (4:3), its kind for a document, its name, when it changed, ⋯. */
 const Tile = memo(function Tile({
   e,
   picked,
@@ -361,6 +367,8 @@ const Tile = memo(function Tile({
 }: Omit<RowProps, 'depth' | 'open' | 'narrow' | 'onToggle'>) {
   const ref = useRef<HTMLDivElement>(null);
   const press = useRef<number | null>(null);
+  const dir = isDir(e);
+  const badge = dir ? null : kindBadge(e.name);
   return (
     <div
       ref={ref}
@@ -388,21 +396,44 @@ const Tile = memo(function Tile({
       }}
       onTouchMove={() => press.current && clearTimeout(press.current)}
       className={cx(
-        'group relative flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-xl p-1.5 select-none [-webkit-touch-callout:none]',
-        picked ? 'bg-accent/12' : 'hover:bg-bg-2',
+        'press-card group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel transition-colors select-none [-webkit-touch-callout:none]',
+        picked ? 'border-accent/60 bg-accent/8' : 'border-line hover:border-line-2',
         focused && 'outline-1 -outline-offset-1 outline-accent/50',
         drop && 'bg-accent/15 outline-1 -outline-offset-1 outline-accent/70',
       )}
       title={e.path}
     >
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-bg-1">
-        <Icon e={e} size={56} thumb />
+      <div className={cx('relative aspect-[4/3] overflow-hidden border-b border-line', dir ? 'bg-accent/[0.06]' : 'bg-bg-1')}>
+        {dir ? (
+          <span className="absolute inset-0 flex items-center justify-center text-accent/80">
+            <Folder size={64} strokeWidth={1.3} fill="currentColor" fillOpacity={0.14} />
+          </span>
+        ) : (
+          <FileThumb key={`${e.path}|${e.mtime}`} path={e.path} name={e.name} size={e.size} mtime={e.mtime} />
+        )}
+        {badge && (
+          <span className="pointer-events-none absolute top-2 left-2 inline-flex items-center rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">{badge}</span>
+        )}
       </div>
-      <div className="min-w-0 px-0.5">
-        <div translate="no" className="truncate text-[13px] leading-5">
-          {e.name}
+      <div className="flex min-w-0 items-start gap-1 py-2 pr-1 pl-3">
+        <div className="min-w-0 flex-1">
+          <div translate="no" className="truncate text-[13.5px] leading-5 font-medium text-fg">
+            {e.name}
+          </div>
+          <div className="truncate text-[12px] leading-4 text-fg-3">{e.mtime ? tr(`Changed ${ago(e.mtime)}`) : dir ? '' : bytes(e.size)}</div>
         </div>
-        <div className="truncate text-[11.5px] text-fg-3">{isDir(e) ? changedWhen(e.mtime) : bytes(e.size)}</div>
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`More for “${e.name}”`}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            onMenu(ev.currentTarget);
+          }}
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 opacity-0 group-hover:opacity-100 hover:bg-bg-2 hover:text-fg focus-visible:opacity-100 max-md:opacity-100"
+        >
+          <Ellipsis size={15} />
+        </button>
       </div>
       <button
         type="button"
@@ -413,25 +444,13 @@ const Tile = memo(function Tile({
           onPick();
         }}
         className={cx(
-          'absolute top-2.5 left-2.5 flex size-6 items-center justify-center rounded-md transition-opacity',
+          'absolute top-2 right-2 flex size-6 items-center justify-center rounded-md transition-opacity',
           picked || picking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 max-md:hidden',
         )}
       >
         <span className={cx('flex size-5 items-center justify-center rounded-md border shadow-sm', picked ? 'border-accent bg-accent text-accent-fg' : 'border-line-2 bg-bg-1/90')}>
           {picked && <Check size={12} strokeWidth={3} />}
         </span>
-      </button>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={`More for “${e.name}”`}
-        onClick={(ev) => {
-          ev.stopPropagation();
-          onMenu(ev.currentTarget);
-        }}
-        className="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-md bg-bg-1/90 text-fg-3 opacity-0 shadow-sm group-hover:opacity-100 hover:text-fg max-md:opacity-100"
-      >
-        <Ellipsis size={15} />
       </button>
     </div>
   );
@@ -474,9 +493,29 @@ export interface FolderViewProps {
   onSearch?: (q: string) => void;
   /** Inside another page (a space's Files tab): no pinning, no session here. */
   embedded?: boolean;
+  /** A project's Files: the project's id. New then also makes what the app makes (a document, slides…), kept in it. */
+  project?: string;
+  /**
+   * The project's kept things, among the folder's own: `titles` (to know how many there are, and which the field leaves
+   * in) and what shows for them, tiles after the folders (a grid) or rows (a list), given what the field says.
+   */
+  extra?: { titles: string[]; render: (o: { grid: boolean; filter: string }) => ReactNode };
 }
 
-export function FolderView({ dir, onDir, base, select, onFile = openFile, onSearch, embedded }: FolderViewProps) {
+/** What New makes besides files and folders, in the project's Files: each opens the New dialog on its kind. */
+const MAKES: { kind: NewKind; label: string; icon: ReactNode }[] = [
+  { kind: 'doc', label: 'Document', icon: <FileText size={14} /> },
+  { kind: 'slides', label: 'Slides', icon: <Presentation size={14} /> },
+  { kind: 'sheet', label: 'Spreadsheet', icon: <Sheet size={14} /> },
+  { kind: 'page', label: 'Page', icon: <AppWindow size={14} /> },
+  { kind: 'design', label: 'Design', icon: <Palette size={14} /> },
+  { kind: 'tex', label: 'LaTeX', icon: <Sigma size={14} /> },
+  { kind: 'diagram', label: 'Diagram', icon: <Workflow size={14} /> },
+  { kind: 'board', label: 'Board', icon: <LayoutDashboard size={14} /> },
+  { kind: 'picture', label: 'Picture', icon: <ImageIcon size={14} /> },
+];
+
+export function FolderView({ dir, onDir, base, select, onFile = openFile, onSearch, embedded, project, extra }: FolderViewProps) {
   const mobile = useIsMobile();
   const home = useApp((s) => s.boot?.home);
   // A narrow view (a phone, or a small window beside the sidebar) keeps its bar short: the field behind a
@@ -503,6 +542,10 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   const [drop, setDrop] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ items: Item[]; el: HTMLElement | null; at?: { x: number; y: number } } | null>(null);
   const [newMenu, setNewMenu] = useState(false);
+  const [uploadMenu, setUploadMenu] = useState(false);
+  const [making, setMaking] = useState<NewKind | null>(null);
+  // Files (not tiles) are being dragged over the view: it says where they would go.
+  const [dropFiles, setDropFiles] = useState(false);
   const [more, setMore] = useState<false | 'main' | 'sort'>(false);
   const [bar, setBar] = useState<false | 'move' | 'space'>(false);
   const [newSpaceFor, setNewSpaceFor] = useState<Item[] | null>(null);
@@ -511,6 +554,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   const menuAnchor = useRef<HTMLElement | null>(null);
   const pointRef = useRef<HTMLDivElement>(null);
   const newRef = useRef<HTMLButtonElement>(null);
+  const uploadRef = useRef<HTMLButtonElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const moveRef = useRef<HTMLButtonElement>(null);
@@ -578,6 +622,8 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   const error = got && !Array.isArray(got) ? got.error : null;
   const entries = Array.isArray(got) ? got : null;
   const f = filter.trim().toLowerCase();
+  const extraTitles = extra?.titles ?? [];
+  const extraShown = f ? extraTitles.filter((t) => t.toLowerCase().includes(f)).length : extraTitles.length;
 
   const rows = useMemo(() => {
     const out: Row[] = [];
@@ -704,9 +750,23 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
       }
       listRef.current?.querySelector(`[data-path="${CSS.escape(r.e.path)}"]`)?.scrollIntoView({ block: 'nearest' });
     };
+    // The tile above or below, by where tiles are on screen (the kept things among them take places too).
+    const tileBelow = (from: number, down: boolean): number => {
+      const els = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-path]') ?? [])];
+      const at = els.find((el) => el.dataset.path === items[from]?.e.path)?.getBoundingClientRect();
+      if (!at) return from + (down ? 1 : -1);
+      const near = els
+        .map((el) => ({ path: el.dataset.path!, b: el.getBoundingClientRect() }))
+        .map((x) => ({ path: x.path, dy: down ? x.b.top - at.top : at.top - x.b.top, dx: Math.abs(x.b.left - at.left) }))
+        .filter((x) => x.dy > 4);
+      if (!near.length) return down ? items.length - 1 : 0;
+      const row = Math.min(...near.map((x) => x.dy));
+      const best = near.filter((x) => x.dy < row + 4).sort((a, b) => a.dx - b.dx)[0];
+      return items.findIndex((r) => r.e.path === best.path);
+    };
     const mod = ev.metaKey || ev.ctrlKey;
-    if (ev.key === 'ArrowDown') move(i + (grid ? Math.max(1, Math.floor((listRef.current?.clientWidth ?? 600) / 140)) : 1));
-    else if (ev.key === 'ArrowUp') move(i < 0 ? 0 : i - (grid ? Math.max(1, Math.floor((listRef.current?.clientWidth ?? 600) / 140)) : 1));
+    if (ev.key === 'ArrowDown') move(grid && i >= 0 ? tileBelow(i, true) : i + 1);
+    else if (ev.key === 'ArrowUp') move(i < 0 ? 0 : grid ? tileBelow(i, false) : i - 1);
     else if (ev.key === 'ArrowRight' && grid) move(i + 1);
     else if (ev.key === 'ArrowLeft' && grid) move(i - 1);
     else if (ev.key === 'ArrowRight' && cur && isDir(cur.e) && !expanded.has(cur.e.path)) toggle(cur.e.path);
@@ -770,8 +830,14 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   const lead = useFolderLead((p) => (setBar(false), void moveInto(picked, p, () => (clearPicks(), refresh()))), dir);
   const count = entries ? { dirs: entries.filter(isDir).length, files: entries.filter((e) => !isDir(e)).length, size: entries.reduce((n, e) => n + (isDir(e) ? 0 : e.size), 0) } : null;
   // Each part its own element, so each is translated on its own ("3 folders", "12 files").
+  // What the project kept, shown at the top of its folder (extra), counts too: the folder is not "Empty" with them on screen.
+  const keptCount = extra?.titles.length ?? 0;
   const parts = count
-    ? [count.dirs ? (count.dirs === 1 ? '1 folder' : `${count.dirs} folders`) : null, count.files ? (count.files === 1 ? '1 file' : `${count.files} files`) : null].filter((x): x is string => !!x)
+    ? [
+        count.dirs ? (count.dirs === 1 ? '1 folder' : `${count.dirs} folders`) : null,
+        keptCount ? (keptCount === 1 ? '1 kept' : `${keptCount} kept`) : null,
+        count.files ? (count.files === 1 ? '1 file' : `${count.files} files`) : null,
+      ].filter((x): x is string => !!x)
     : [];
   const summary = count ? (
     parts.length ? (
@@ -805,6 +871,16 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         <MenuItem icon={<FolderUp size={14} />} onClick={() => (close(), upload(dir, true))}>
           Upload a folder
         </MenuItem>
+      )}
+      {project && (
+        <>
+          <MenuSep />
+          {MAKES.map((k) => (
+            <MenuItem key={k.kind} icon={k.icon} onClick={() => (close(), setMaking(k.kind))}>
+              {k.label}
+            </MenuItem>
+          ))}
+        </>
       )}
     </>
   );
@@ -960,6 +1036,30 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
     </div>
   );
 
+  // Where the kept things come in: after the folders, before the files (the first row that is a file at the top level).
+  const firstFile = (() => {
+    const i = shown.findIndex((r) => r.kind === 'item' && r.depth === 0 && !isDir(r.e));
+    return i < 0 ? shown.length : i;
+  })();
+  const gridCell = (r: Row) =>
+    r.kind === 'item' ? (
+      renaming === r.e.path ? (
+        <div key={r.e.path} className="col-span-2">
+          <NameInput initial={r.e.name} dir={isDir(r.e)} onDone={(n) => (setRenaming(null), void rename(itemFor(r.e), n, refresh))} />
+        </div>
+      ) : (
+        <Tile key={r.e.path} e={r.e} {...rowProps(r.e)} />
+      )
+    ) : null;
+  const listCell = (r: Row) =>
+    r.kind === 'note' ? (
+      noteRow(r)
+    ) : renaming === r.e.path ? (
+      <NameInput key={r.e.path} initial={r.e.name} dir={isDir(r.e)} depth={r.depth} onDone={(n) => (setRenaming(null), void rename(itemFor(r.e), n, refresh))} />
+    ) : (
+      <ListRow key={r.e.path} e={r.e} depth={r.depth} open={expanded.has(r.e.path)} narrow={mobile} onToggle={() => toggle(r.e.path)} {...rowProps(r.e)} />
+    );
+
   const body = error ? (
     <Empty icon={<Folder size={20} />} title="This folder can’t be opened">
       <span className="block">{error}</span>
@@ -975,7 +1075,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
     <div className="flex justify-center py-16 text-fg-3">
       <Throbber size={30} />
     </div>
-  ) : !entries.length && !creating ? (
+  ) : !entries.length && !creating && !extraTitles.length ? (
     <Empty icon={<Folder size={20} />} title="Nothing here yet">
       {mobile ? 'Add files with the + button.' : 'Drop files or folders here, or add some.'}
       <span className="mt-3 flex justify-center gap-2">
@@ -1003,32 +1103,18 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         </button>
       )}
       {creating && <NameInput dir={creating === 'dir'} initial={creating === 'notebook' ? untitled(entries ?? [], '.ipynb') : undefined} onDone={create} />}
-      {f && !items.length && <div className="px-4 py-8 text-center text-[13px] text-fg-3">Nothing here is called “{filter.trim()}”.</div>}
+      {f && !items.length && !extraShown && <div className="px-4 py-8 text-center text-[13px] text-fg-3">Nothing here is called “{filter.trim()}”.</div>}
       {grid ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-1.5 p-2 max-md:grid-cols-[repeat(auto-fill,minmax(104px,1fr))]">
-          {shown.map((r) =>
-            r.kind === 'item' ? (
-              renaming === r.e.path ? (
-                <div key={r.e.path} className="col-span-2">
-                  <NameInput initial={r.e.name} dir={isDir(r.e)} onDone={(n) => (setRenaming(null), void rename(itemFor(r.e), n, refresh))} />
-                </div>
-              ) : (
-                <Tile key={r.e.path} e={r.e} {...rowProps(r.e)} />
-              )
-            ) : null,
-          )}
+        <div className="grid grid-cols-2 gap-2.5 p-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-3">
+          {shown.slice(0, firstFile).map(gridCell)}
+          {extra?.render({ grid: true, filter: f })}
+          {shown.slice(firstFile).map(gridCell)}
         </div>
       ) : (
         <div role="rowgroup">
-          {shown.map((r) =>
-            r.kind === 'note' ? (
-              noteRow(r)
-            ) : renaming === r.e.path ? (
-              <NameInput key={r.e.path} initial={r.e.name} dir={isDir(r.e)} depth={r.depth} onDone={(n) => (setRenaming(null), void rename(itemFor(r.e), n, refresh))} />
-            ) : (
-              <ListRow key={r.e.path} e={r.e} depth={r.depth} open={expanded.has(r.e.path)} narrow={mobile} onToggle={() => toggle(r.e.path)} {...rowProps(r.e)} />
-            ),
-          )}
+          {shown.slice(0, firstFile).map(listCell)}
+          {extra?.render({ grid: false, filter: f })}
+          {shown.slice(firstFile).map(listCell)}
         </div>
       )}
       {rows.length > limit && (
@@ -1042,7 +1128,31 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
   );
 
   return (
-    <div ref={rootRef} className="@container flex h-full min-h-0 flex-col">
+    <div
+      ref={rootRef}
+      onDragOver={(e) => {
+        // Files dropped anywhere on the view, its bar and its foot too, go into the folder shown.
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        if (drop !== dir) setDrop(dir);
+        if (!dropFiles) setDropFiles(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDrop(null);
+        setDropFiles(false);
+      }}
+      onDrop={(e) => {
+        setDropFiles(false);
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.stopPropagation();
+        setDrop(null);
+        void dropInto(e, dir, refresh);
+      }}
+      className={cx('@container relative flex h-full min-h-0 flex-col', drop === dir && dropFiles && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}
+    >
       {/* The bar: where the folder is, a field to find in it, New, how it shows and ⋯; or what is picked. */}
       <div className={cx('flex shrink-0 items-center gap-1 border-b border-line', mobile ? 'h-12 px-1.5' : 'h-11 px-2')}>
         {picked.length > 0 || picking ? (
@@ -1092,9 +1202,37 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
               findField
             )}
             {!mobile && (
+              <span className="ml-1 flex items-center">
+                <Button size="sm" variant="secondary" icon={<Upload size={14} />} onClick={() => upload(dir)} className="rounded-r-none" title="Upload files into this folder">
+                  <span className="@max-[640px]:hidden">Upload</span>
+                </Button>
+                <Button
+                  ref={uploadRef}
+                  size="sm"
+                  variant="secondary"
+                  aria-label="More ways to upload"
+                  title="More ways to upload"
+                  onClick={() => setUploadMenu((o) => !o)}
+                  className="-ml-px rounded-l-none px-1.5"
+                >
+                  <ChevronDown size={14} />
+                </Button>
+              </span>
+            )}
+            {!mobile && (
               <Button ref={newRef} size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setNewMenu((o) => !o)} className="ml-1">
                 <span className="@max-[640px]:hidden">New</span>
               </Button>
+            )}
+            {!mobile && (
+              <Popover anchor={uploadRef} open={uploadMenu} onClose={() => setUploadMenu(false)} align="end" width={200}>
+                <MenuItem icon={<Upload size={14} />} onClick={() => (setUploadMenu(false), upload(dir))}>
+                  Upload files
+                </MenuItem>
+                <MenuItem icon={<FolderUp size={14} />} onClick={() => (setUploadMenu(false), upload(dir, true))}>
+                  Upload a folder
+                </MenuItem>
+              </Popover>
             )}
             {!mobile && (
               <Popover anchor={newRef} open={newMenu} onClose={() => setNewMenu(false)} align="end" width={220}>
@@ -1142,14 +1280,24 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         aria-multiselectable
         onKeyDown={onKeyDown}
         onPointerDown={() => keys && setKeys(false)}
-        onDragOver={(e) => takesDrop(e) && drop !== dir && setDrop(dir)}
-        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDrop(null)}
+        onDragOver={(e) => {
+          if (!takesDrop(e)) return;
+          if (drop !== dir) setDrop(dir);
+          const files = e.dataTransfer.types.includes('Files');
+          if (files !== dropFiles) setDropFiles(files);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          setDrop(null);
+          setDropFiles(false);
+        }}
         onDrop={(e) => {
           setDrop(null);
+          setDropFiles(false);
           void dropInto(e, dir, refresh);
         }}
         onClick={(e) => e.target === e.currentTarget && !mobile && sel.size && clearPicks()}
-        className={cx('relative min-h-0 flex-1 overflow-y-auto pb-24 outline-none md:pb-6', drop === dir && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}
+        className={cx('relative min-h-0 flex-1 overflow-y-auto pb-24 outline-none md:pb-6', drop === dir && !dropFiles && 'bg-accent/6 outline-2 -outline-offset-4 outline-accent/50 outline-dashed')}
       >
         {body}
       </div>
@@ -1179,6 +1327,15 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
           </Popover>
         </>
       )}
+      {dropFiles && drop === dir && (
+        <div className="pointer-events-none absolute inset-x-0 top-16 z-20 flex justify-center px-4">
+          <span className="flex max-w-full items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-accent-fg shadow-pop">
+            <Upload size={15} className="shrink-0" />
+            <span className="truncate">{tr(`Drop to add to “${base && dir === base.path ? base.label : basename(dir) || dir}”`)}</span>
+          </span>
+        </div>
+      )}
+      {project && <NewPageDialog open={!!making} kind={making ?? 'page'} space={project} onClose={() => setMaking(null)} />}
       <div ref={pointRef} aria-hidden style={{ position: 'fixed', left: menu?.at?.x ?? 0, top: menu?.at?.y ?? 0, width: 1, height: 1, pointerEvents: 'none' }} />
       <ItemMenu
         items={menu?.items ?? []}

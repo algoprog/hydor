@@ -1,6 +1,6 @@
-// Which space something of the Library goes in (a page, a picture or video kept): a space's id, or none. What an
+// Which space something kept goes in (a page, a picture or video kept): a space's id, or none. What an
 // agent saves goes in its session's space; what you keep yourself goes where you pick (the pages ask when there are
-// spaces). Deleting a space leaves what it held in the Library, in no space (deleteSpace).
+// spaces). Deleting a space leaves what it held, in no space (deleteSpace).
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';

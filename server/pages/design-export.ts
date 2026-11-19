@@ -1,7 +1,7 @@
 // Designs as files: each artboard exactly its size, as a picture (PNG, a see-through background if asked, or JPG) at
 // 1×, 2× or 3× its pixels, or every artboard as a page of a PDF that is its own size on paper (an A4 poster prints on
 // A4). Made by the browser the app takes pictures with (Settings → Browser), from the design's HTML: what is saved, or
-// what the editor holds now. Also the picture of a design in the Library: its first artboard, whole.
+// what the editor holds now. Also the picture of a design in the Files: its first artboard, whole.
 import { designBoards, isDesignHtml } from '../../shared/design.ts';
 import { HttpError } from '../auth.ts';
 import { canCapture, withTab } from '../capture/index.ts';
@@ -76,7 +76,7 @@ export async function exportDesign(html: string, o: { title: string; format: Des
   return { data: zipParts(shots.map((s) => ({ name: `page-${String(s.i + 1).padStart(2, '0')}.${ext}`, data: s.data }))), type: DESIGN_TYPES.zip, name: o.name(`${o.title} pages`, 'zip'), note };
 }
 
-/** The Library's picture of a design: its first artboard whole, in the middle of a quiet ground (the size pictures are taken at). */
+/** The picture of a design in the Files: its first artboard whole, in the middle of a quiet ground (the size pictures are taken at). */
 export function designThumbHtml(html: string, box = { w: 880, h: 550 }): string | null {
   const b = designBoards(html)[0];
   if (!b) return null;

@@ -198,7 +198,7 @@ hydor completion install
 
 | 命令 | 作用 |
 | --- | --- |
-| `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话保存为 Markdown 文件，`-o -` 直接打印出来，`--library` 则在资料库中生成一份文档）、`send`、`stop` 和 `delete`。 |
+| `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话保存为 Markdown 文件，`-o -` 直接打印出来，`--library` 则在会话所属的项目中生成一份文档）、`send`、`stop` 和 `delete`。 |
 | `hydor inbox` | 等你处理的事（批准、问题、智能体要的密钥、待审的技能）：`list`，以及 `show` 查看其中一项和在哪里回答它。 |
 | `hydor outbox` | 等你确认的调用（设为先问我的已连接账户工具）：`list`，`show` 查看其中一项和它的输入，`send`（按原样发送，或用 `--set NAME=value` 修改某个字段）和 `drop`。 |
 | `hydor away` | 自你上次来过之后发生了什么，和开始页的**你不在时**一样：等你处理的事、完成或失败的会话、自动运行的事情及其花费，以及今天接下来要运行的任务。`hydor away seen` 把它们全部标为已看。 |
@@ -221,7 +221,7 @@ hydor away                           # 你不在时发生了什么
 | `hydor projects` | `list`、`show`、`new`、`rename`、`edit`（描述、准则、它以哪个智能体开始、文件夹）、`sessions`、`files`（它读取的文档：`files add` 和 `files remove`）和 `remove`。 |
 | `hydor tasks` | 你的[定时任务](/guide/tasks)，以及其他自己启动的工作：`list`、`show`、`new`（何时运行：`--every 2h`、`--at 09:00 --days weekdays`、`--cron`、`--once`；或者 `--webhook`、`--watch-feed`、`--watch-page`、`--watch-folder`，或者用 `--watch-account` 加 `--tool` 监测已连接应用里的新条目，再加 `--before 30m` 则在日历中每个日程开始前的某个时间运行）、`edit`、`pause`、`resume`、`run`（立即运行，暂停时也可以）、`runs`（最近的几次运行，`--reply` 显示最后一次的回复）和 `remove`。监视某条命令或某个 JSON 地址要在页面上做。看板卡片的刷新会作为看板的列出（“Shop · Sales by day: refresh”）：`pause`、`resume` 和 `run` 对它们有效，`show` 会说明要在看板上修改它们。 |
 | `hydor apps` | 你的[应用](/guide/apps)和现成的应用：`list`、`show`、`run`（表单的答案写成 `字段=值`，或者用 `--input` 给出 JSON；它会打印答案和花费）、`runs`、`run-show`（查看某一次运行）和 `remove`。`hydor app …`（不带 s）用来把应用做成文件：`new`、`folder`、`dev`、`try`、`export`、`import`。 |
-| `hydor library` | [资料库](/guide/library)：`list`（`--kind`、`--project`）、`search`、`show`（文档的文字、看板的卡片，或者这一项是什么）、`export`（`--to pdf`、`docx`、`pptx`……，`-o 文件`）、`open`（它的编辑器的地址）、`remove`、`refreshes`（你的看板上有哪些会刷新、什么时候刷新、要花多少钱）和 `refresh`（立即刷新看板的一张卡片，或者全部卡片）。 |
+| `hydor files`（也可以用 `hydor library`） | 智能体为你做的和你保留的东西，就像各个项目的**文件**显示的那样（[页面、图片、视频和网站](/guide/library)）：`list`（`--kind`、`--project`）、`search`、`show`（文档的文字、看板的卡片，或者这一项是什么）、`export`（`--to pdf`、`docx`、`pptx`……，`-o 文件`）、`open`（它的编辑器的地址）、`remove`、`refreshes`（你的看板上有哪些会刷新、什么时候刷新、要花多少钱）和 `refresh`（立即刷新看板的一张卡片，或者全部卡片）。 |
 | `hydor experiments` | 训练和评估运行：`list`、`show` 和 `stop`。开始一次运行是智能体和页面的事。 |
 
 ```bash
@@ -229,7 +229,7 @@ hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
 hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
 hydor apps run trip-planner destination=Lisbon days=5
-hydor library export "Q3 report" --to pdf -o q3.pdf
+hydor files export "Q3 report" --to pdf -o q3.pdf
 ```
 
 ### 智能体和模型
@@ -301,7 +301,7 @@ hydor settings run notifications.send-a-test
 
 - `hydor find rate limit` 搜索搜索框能搜到的一切（**Ctrl+K**）：页面、设置及其选项、会话、记忆、技能……`--in settings` 只在那里找，`--urls` 在每个结果下面显示它的地址，`--open 2` 在浏览器里打开第二个。
 - `hydor guide` 列出指南的主题；`hydor guide projects` 在终端里读其中一个，`hydor guide projects "what a project is"` 读其中的一节。`--sections` 列出一个主题的各节。
-- `hydor open` 打印应用的地址；`hydor open library`、`hydor open settings memory`、`hydor open project thesis`、`hydor open guide projects` 或 `hydor open 6f1e2a3b`（一个会话）打印相应页面的地址。`--browser` 也会在你的浏览器里打开它。只有页面才能做的事就这样到达：幻灯片、表格、图片和图表的编辑器、签名、主题的颜色、登录某个服务。
+- `hydor open` 打印应用的地址；`hydor open published`、`hydor open settings memory`、`hydor open project thesis`、`hydor open guide projects` 或 `hydor open 6f1e2a3b`（一个会话）打印相应页面的地址。`--browser` 也会在你的浏览器里打开它。只有页面才能做的事就这样到达：幻灯片、表格、图片和图表的编辑器、签名、主题的颜色、登录某个服务。
 - `hydor api GET /api/projects` 调用应用 API 的任何接口并打印它的 JSON（`hydor api POST /api/projects -d '{"name":"Thesis"}'`；请求体可以来自 `@文件` 或 `-`）。这些接口在 [API 主题](/guide/api)里。
 
 ### 在聊天里

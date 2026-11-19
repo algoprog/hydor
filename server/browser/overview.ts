@@ -1,4 +1,4 @@
-// A few of each list your own browser keeps, for the Library's All (desktop app): your bookmarks (the ones you use most
+// A few of each list your own browser keeps, for the Browser's All (desktop app): your bookmarks (the ones you use most
 // first), the pages waiting in Read later, your latest pages of history, your latest downloads and your newest highlights,
 // each with how many it holds. With words, only what has all of them, and the counts of what matches. It is part of your
 // own browsing, so its route is under /api/browser/browsing, which agents are refused.
@@ -17,7 +17,7 @@ export const OVERVIEW = { bookmarks: 8, later: 4, history: 6, downloads: 4, high
 /** The words of a search: lower case, split on spaces, at most 8. */
 const wordsOf = (q: string): string[] => q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
 
-/** The bookmarks in the order the Library's Bookmarks list shows them: the bar, then Other bookmarks, folder by folder (12 levels deep at most). */
+/** The bookmarks in the order the Bookmarks list shows them: the bar, then Other bookmarks, folder by folder (12 levels deep at most). */
 function inListOrder(nodes: BookmarkNode[]): BookmarkNode[] {
   const byParent = new Map<string, BookmarkNode[]>();
   for (const n of nodes) byParent.set(n.parent, [...(byParent.get(n.parent) ?? []), n]);

@@ -1,4 +1,4 @@
-// One image, video or sound in the Library (/media/<id>): the picture (a tap away from full size), the video or the
+// One kept image, video or sound (/media/<id>): the picture (a tap away from full size), the video or the
 // sound to play (a sound's shape to seek along), its title and description (written by a model, or by you: Edit),
 // its comments (on a spot of a picture, at a moment of a video or a sound: MediaComments.tsx), what it was made from
 // and with, its size, length and file, the session it came from, for a video the frames the model saw, and for a sound
@@ -120,10 +120,10 @@ function MediaView({ id }: { id: string }) {
   };
   const remove = async () => {
     setMenu(false);
-    if (!(await confirm({ title: `Delete “${m.title}”?`, body: 'It goes from your Library. The file it was saved from, if it is still there, stays.', confirm: 'Delete', danger: true }))) return;
+    if (!(await confirm({ title: `Delete “${m.title}”?`, body: 'It goes from what you kept. The file it was saved from, if it is still there, stays.', confirm: 'Delete', danger: true }))) return;
     try {
       await del(`/api/media/${enc(m.id)}`);
-      go(m.space ? `/library?project=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`);
+      go(m.space ? `/projects/${m.space}/files` : '/');
     } catch (e) {
       toastError(e);
     }
@@ -139,7 +139,7 @@ function MediaView({ id }: { id: string }) {
       to: { media: m.id },
       copy: true,
       save: (r) => {
-        // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
+        // A copy is a new item: it opens; the item written over shows itself again, as the kept list hears.
         if (r.media && r.media !== m.id) go(`/media/${r.media}`);
       },
     });
@@ -148,7 +148,7 @@ function MediaView({ id }: { id: string }) {
     editLibraryVideo(m, {
       src: mediaUrl(m),
       label: m.title,
-      // A copy is a new item: it opens; the item written over shows itself again, as the Library hears.
+      // A copy is a new item: it opens; the item written over shows itself again, as the kept list hears.
       after: (r) => void (r.media && r.media !== m.id && go(`/media/${r.media}`)),
     });
   /** The sound in the sound editor (a video's: its sound, saved as a new sound): saved over this item, or as a new one beside it. */
@@ -161,14 +161,14 @@ function MediaView({ id }: { id: string }) {
   const size = m.width && m.height ? `${m.width} × ${m.height}` : undefined;
   const ratio = m.width && m.height ? m.width / m.height : 16 / 9;
   const shape = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
-  const back = m.kind === 'video' ? 'The Library’s videos' : m.kind === 'audio' ? 'The Library’s audio' : 'The Library’s pictures';
+  const back = m.kind === 'video' ? 'Your kept videos' : m.kind === 'audio' ? 'Your kept sounds' : 'Your kept pictures';
   const what = m.kind === 'video' ? (m.duration ? `A video, ${clipLength(m.duration)}` : 'A video') : m.kind === 'audio' ? (m.duration ? `Audio, ${clipLength(m.duration)}` : 'Audio') : 'An image';
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-line bg-bg pt-[var(--safe-top)]">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-6">
           {!mobile && <NavButton />}
-          <IconButton label={back} onClick={() => go(m.space ? `/library?project=${m.space}&kind=${m.kind}` : `/library?kind=${m.kind}`)}>
+          <IconButton label={back} onClick={() => go(m.space ? `/projects/${m.space}/files` : '/')}>
             <ArrowLeft size={18} />
           </IconButton>
           <div className="min-w-0 flex-1">
@@ -328,7 +328,7 @@ function MediaView({ id }: { id: string }) {
                       <Button size="sm" variant="secondary" icon={<RefreshCw size={13} />} onClick={() => void recaption(m)}>
                         Try again
                       </Button>
-                      <Button size="sm" variant="ghost" icon={<Settings2 size={13} />} onClick={() => go('/settings?s=images&find=Captions%20in%20the%20Library')}>
+                      <Button size="sm" variant="ghost" icon={<Settings2 size={13} />} onClick={() => go('/settings?s=images&find=Captions%20for%20what%20you%20keep')}>
                         Pick the model
                       </Button>
                     </div>

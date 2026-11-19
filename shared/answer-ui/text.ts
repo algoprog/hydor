@@ -1,5 +1,5 @@
 // An answer UI's data as text, for when the card itself cannot go along: as plain text (a card's Copy as text) and as
-// Markdown (a conversation exported as a file or a Library document: server/session-export.ts). The Markdown keeps
+// Markdown (a conversation exported as a file or a saved document: server/session-export.ts). The Markdown keeps
 // what can be kept: tables as tables (a data table, a comparison, a chart's numbers, a decision matrix, a versus card,
 // any list of short records), pictures as pictures, code as code, and the rest as headed lists of label and value.
 // Shared: the pages copy a card with it and the server exports with it.

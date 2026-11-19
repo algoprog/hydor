@@ -1,6 +1,6 @@
 // The tools every session's agent has for signatures: ask_signature (a card where the user draws, types or uploads
 // their signature and keeps it under a name; the agent hears only the name) and place_signature (a saved signature put
-// into a Word file, a PDF, a picture or a document of the Library, once the user allows it on a card that shows where).
+// into a Word file, a PDF, a picture or a document, once the user allows it on a card that shows where).
 // Agents never see a signature's picture: the cards send it to the user's own routes, and the tools answer in words.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -160,7 +160,7 @@ const SIDES: Side[] = ['right', 'left', 'above', 'below'];
 const PLACE_SIGNATURE: RunTool = {
   name: 'place_signature',
   description: [
-    'Place one of the user’s saved signatures (by its name) into a Word file (.docx), a PDF, a PNG picture, or a document of their Library (page_id), as a picture of it.',
+    'Place one of the user’s saved signatures (by its name) into a Word file (.docx), a PDF, a PNG picture, or a saved document (page_id), as a picture of it.',
     'Each placement asks the user first, on a card that shows where it goes (the page as it will look, or the words around the spot): they allow it once, allow that signature for the rest of the session, or deny it. You never see the signature itself.',
     'Look first: with look: true nothing is written and nobody is asked: a PDF or a picture comes back as a picture of the page with a box where the signature would go (call it with page alone to see a page and choose a spot); a Word file or a document as the words around the spot. Adjust and look again until it is right.',
     'Where, in a Word file or a document: placeholder (words it takes the place of, like {{signature}}), after (words it goes right after, like "Signature:"; in a Word file it then floats in front of the text, so a line of underscores stays where it is), cell (a Word table’s cell), or none of them (the end). In a PDF: near (words found on the page, signed right after them or above, below, before them by side) or x and y; in a picture, x and y.',
@@ -172,7 +172,7 @@ const PLACE_SIGNATURE: RunTool = {
     properties: {
       signature: { type: 'string', description: 'The saved signature’s name (ask_signature or the error tells you the names). Left out: the only one saved.' },
       file: { type: 'string', description: 'A .docx, .pdf or .png file: in the session’s folder (relative paths start there), or absolute.' },
-      page_id: { type: 'string', description: 'Instead of file: a document of the Library (get_page lists them); it gets a new version.' },
+      page_id: { type: 'string', description: 'Instead of file: a saved document (get_page lists them); it gets a new version.' },
       placeholder: { type: 'string', description: 'Word files and documents: words it takes the place of, like "{{signature}}".' },
       after: { type: 'string', description: 'Word files and documents: words it goes right after, like "Signature:" (any case; spaces as one).' },
       cell: {
@@ -214,10 +214,10 @@ const PLACE_SIGNATURE: RunTool = {
     let plan: Plan;
     try {
       if (typeof a.page_id === 'string' && a.page_id.trim()) {
-        // A document of the Library: a picture block, in a new version.
+        // A saved document: a picture block, in a new version.
         const id = a.page_id.trim();
         const page = mustPage(db, id);
-        if (page.kind !== 'doc') throw new Error(`Page ${id} is not a document: only documents of the Library (and Word files, PDFs and PNG pictures) can be signed.`);
+        if (page.kind !== 'doc') throw new Error(`Page ${id} is not a document: only saved documents (and Word files, PDFs and PNG pictures) can be signed.`);
         const doc = normalizeDoc(pageModel(db, id));
         const spot = { placeholder: wordsOf(a.placeholder), after: wordsOf(a.after), cell: a.cell, occurrence };
         const alt = sig.kind === 'initials' ? 'Initials' : 'Signature';
@@ -230,7 +230,7 @@ const PLACE_SIGNATURE: RunTool = {
             const p = addVersion(db, id, { model: done.doc, by: 'agent' });
             ctx.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
             refreshThumbs(ctx.deps, [id]);
-            return `Placed “${sig.name}” in the document “${p.title}” (page ${id}, version ${p.version}), ${done.where}. The user sees it in the Library at once.`;
+            return `Placed “${sig.name}” in the document “${p.title}” (page ${id}, version ${p.version}), ${done.where}. The user sees it in the document at once.`;
           },
         };
       } else if (typeof a.file === 'string' && a.file.trim()) {
@@ -324,7 +324,7 @@ const PLACE_SIGNATURE: RunTool = {
             },
           };
         } else throw new Error(`${path.basename(file)} is not a kind of file this signs: Word files (.docx), PDFs and PNG pictures. Save it as one of those first (LibreOffice: soffice --convert-to docx).`);
-      } else throw new Error('Give file (a .docx, .pdf or .png file) or page_id (a document of the Library).');
+      } else throw new Error('Give file (a .docx, .pdf or .png file) or page_id (a saved document).');
     } catch (e) {
       return { isError: true, text: (e as Error).message };
     }

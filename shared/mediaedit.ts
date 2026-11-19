@@ -22,7 +22,7 @@ export * from './mediaedit-look.ts';
 export type EditKind = 'image' | 'video' | 'audio';
 
 /**
- * Where an editor's Save writes what it made: a picture kept for a deck, document or page, over a Library item, over a
+ * Where an editor's Save writes what it made: a picture kept for a deck, document or page, over a kept item, over a
  * file, or (a video's sound) a sound kept for the video ("naget-sound:…").
  */
 export type SaveTo = { asset: true } | { media: string } | { file: string } | { sound: true };
@@ -32,14 +32,14 @@ export interface Saved {
   kind: EditKind;
   /** A picture kept by the app ("naget-asset:<sha>"), or a video ("naget-video:<sha>"). */
   src?: string;
-  /** The Library item it is now (an id). */
+  /** The kept item it is now (an id). */
   media?: string;
   /** The file it was written to. */
   path?: string;
   w?: number;
   h?: number;
   mime?: string;
-  /** It was written over what it came from (a Library item, a file), not kept beside it. */
+  /** It was written over what it came from (a kept item, a file), not kept beside it. */
   replaced?: boolean;
   /** A picture: its data: address, for a page that keeps its pictures inside it. */
   data?: string;
@@ -54,7 +54,7 @@ export interface SaveImageAsk {
   /** The picture, as a data: address (PNG, JPEG or WebP). */
   data: string;
   /**
-   * Kept by the app for a deck, document or page; a Library item written over (`replace`) or a new one beside it
+   * Kept by the app for a deck, document or page; a kept item written over (`replace`) or a new one beside it
    * (`copy`: with no `media`, simply a new item, `title` its name); a file written over, or a copy beside it.
    */
   to: { asset: true } | { media?: string; as: 'replace' | 'copy'; title?: string; space?: string | null; folder?: string; plain?: boolean } | { file: string; as: 'replace' | 'copy' };

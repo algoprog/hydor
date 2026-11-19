@@ -16,7 +16,7 @@ An agent can hold:
 - **What it thinks with**: Automatic, or a tier (Quick, Standard, Best or Max) whose model you set once for each program (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **Its team**: the other agents it may hand parts of its work to, and whether other agents may hand it work (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
 - **A monthly budget**: what its sessions may spend in a month (see [A monthly budget](#a-monthly-budget)).
-- **What it hands back**: the fields of each result, checked, and where each goes: a page in the Library, a row in a spreadsheet, an email to people, a notification, a file, a webhook (see [What an agent hands back](#what-an-agent-hands-back)).
+- **What it hands back**: the fields of each result, checked, and where each goes: a kept page, a row in a spreadsheet, an email to people, a notification, a file, a webhook (see [What an agent hands back](#what-an-agent-hands-back)).
 - **A conversation of its own**: it can keep one conversation, with an inbox for messages from you and other agents, where its scheduled runs post too (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it may use**: reading files, creating and changing files, running commands, using the web, using a browser, using the computer (its screen, mouse and keyboard, in the desktop apps with Computer use on), and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills it loads before it starts when they fit the task (see [Skills](/guide/skills)).
@@ -30,7 +30,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 
 Open **Agents** on the rail, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
 
-- On a computer the page has a column beside the rail, as the Library and Settings do: the logo, **New** and **Hide sidebar** (Ctrl+B, ⌘B on a Mac) at the top, and the places under them. **New** opens a menu: **New agent** makes one (see [Make an agent](#make-an-agent)); **Install an agent from a file** installs one from a file someone gave you (see [Share an agent as a file](#share-an-agent-as-a-file)); **Import Claude Code agent files** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
+- On a computer the page has a column beside the rail, as Apps and Settings do: the logo, **New** and **Hide sidebar** (Ctrl+B, ⌘B on a Mac) at the top, and the places under them. **New** opens a menu: **New agent** makes one (see [Make an agent](#make-an-agent)); **Install an agent from a file** installs one from a file someone gave you (see [Share an agent as a file](#share-an-agent-as-a-file)); **Import Claude Code agent files** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
 - The places: **All agents** (yours as cards, and the built-in ones under them while the column is hidden, since the column lists them), **Your agents** (only yours), **Needs you** and **On a schedule** (each shows while some of yours do), and, under **Where they work**, **Everywhere** and each project that has agents of its own. Each has how many agents it holds. Under **Built in** there is a row for each agent that comes with the app, with its icon, and it opens that agent's own page. After a line, **Schedules** shows everything that runs by itself on a week: your agents' schedules with your other scheduled tasks, your apps' schedules, watchers and webhooks, each run coloured by how it went, what runs next, and a list of them all with a switch to pause each (see [See the week: what ran and what runs next](/guide/tasks#see-the-week-what-ran-and-what-runs-next)). The open place is marked, and the address keeps it (`/agents?place=mine`, `/agents/schedules`), so a link opens it.
 - At the top of the page, the name of the place is at the left and the find box at the right: **Find an agent** narrows the cards, and the built-in agents, to those whose name or line has what you type.
 - Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, how many messages wait in its inbox, and what it spent this month.
@@ -61,7 +61,7 @@ Each one leans on the [answer UIs](/guide/sessions#answer-uis-cards-charts-and-m
 - It works out what you want and does it. It asks one short question only when the request is unclear in a way that changes the result, with the likely answers as buttons to click when there are a few; otherwise it makes a sensible choice and says what it chose.
 - It leads with the answer, then the detail that matters, in plain words, and explains any technical term it can't avoid.
 - It makes each answer easy to take in and to use: what is better seen than read (options side by side, places on a map, steps to tick off, numbers as a chart, things with their pictures) comes as an answer UI, with a picture or a video where seeing helps, and its own words carry the reasoning and the advice.
-- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in your [Library](/guide/library) when it is a page you'll use again, such as a tracker or a calculator.
+- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or keeps it in the project's files (its details → **Files**) when it is a page you'll use again, such as a tracker or a calculator.
 - When an answer leaves natural next steps (go deeper, compare, plan, make something of it), it ends with two to four of them as buttons to tap; not after every answer.
 - When it made or changed files, it ends by saying which ones and where they are.
 
@@ -76,7 +76,7 @@ Each one leans on the [answer UIs](/guide/sessions#answer-uis-cards-charts-and-m
 5. It cites as it writes: a numbered marker after each claim, like [1], and the sources at the end with title, author or publisher, date and link. It never invents a source, a quote, a number or a link, and says so when it couldn't verify something.
 6. It leads with the findings: the answer in a line and the few points that matter, then the detail, then what remains uncertain.
 7. It shows what has a shape of its own instead of burying it in paragraphs: claims weighed against the evidence as a fact check, options or studies side by side, how something unfolded on a timeline, the key numbers, papers worth reading, and how people, ideas or organisations connect as a network graph.
-8. A long report is also saved in your [Library](/guide/library) as a document you can read, comment on and export, or as a Markdown file in the session's folder when you want a file.
+8. A long report is also kept in the project's files as a document you can read, comment on and export, or as a Markdown file in the session's folder when you want a file.
 
 For a big question that needs many searches, see deep research in [Deep research, second opinions and several agents](/guide/research).
 
@@ -90,7 +90,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - When it edits your text, it keeps your meaning and voice: it fixes what is wrong, tightens what is loose, leaves what works. It shows the edits so you can follow them: your text with each change marked and explained when you want feedback, or what changed between the versions for a rewrite, then the clean text.
 - It hands over short pieces ready to use: an email in versions to switch between, opened in your mail app with everything filled in; posts, each checked against its platform's length limit; a reference in the style you need.
 - When a choice matters (a subject line, a title, an opening, a name), it offers two to four options, each with a note, for you to pick.
-- Anything longer than a few paragraphs is written in your [Library](/guide/library) as a document, where you can edit, comment on and export it, and it says so; it makes a file in the session's folder (Markdown unless you want another format) when you ask for a file.
+- Anything longer than a few paragraphs is kept as a document (in the project's files), where you can edit, comment on and export it, and it says so; it makes a file in the session's folder (Markdown unless you want another format) when you ask for a file.
 
 ### Coder
 
@@ -125,7 +125,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - It makes the plan concrete: times, places, costs and who does what, room for things that slip, and what to book or decide first.
 - It shows the plan so you can follow it at a glance, in the answer UIs made for plans: a trip day by day with its places on a map, a day's schedule, dates on a calendar or a countdown, a project in phases or over weeks, what to book or pack as a checklist, the forecast, and the costs as a budget with a total.
 - Where a choice matters, it gives two or three options side by side with their trade-offs (flights and stays for a trip).
-- It keeps the plan in your [Library](/guide/library), where you can change it: a document, and a spreadsheet for budgets and schedules with totals. It offers to adjust it, with the likely changes as buttons to tap. It makes files in the session's folder instead when you ask for files.
+- It keeps the plan in the project's files, where you can change it: a document, and a spreadsheet for budgets and schedules with totals. It offers to adjust it, with the likely changes as buttons to tap. It makes files in the session's folder instead when you ask for files.
 
 ### Analyst
 
@@ -135,7 +135,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - It computes with code (a short Python or JavaScript script, or a formula), never by estimating by eye, and keeps the scripts in the session's folder so the work can be repeated.
 - It answers the question first, in plain words with the key numbers, then shows how it got them. It states assumptions and limits, and doesn't claim causes the data can't show.
 - It shows results in the answer UIs made for numbers: the key figures, a chart (the simplest that fits: bars to compare, lines over time), a table you can sort and filter, how values spread, shares of a whole, how a total changed, flows, values across two dimensions as a heatmap, numbers at places on a map, and a calculator when you'll want to try other values. A figure none of them draws goes in a live figure in the reply, or in a page when there are several; axes and units are labelled, and it is readable on a phone.
-- It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them. A table you'll look at and change goes in your [Library](/guide/library) as a spreadsheet with its formulas, and a dashboard you'll come back to as a page.
+- It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them. A table you'll look at and change is kept as a spreadsheet with its formulas, and a dashboard you'll come back to as a page.
 
 ### App builder
 
@@ -330,8 +330,8 @@ Without anything set, an agent hands back its reply in the conversation. Give it
 
 - **Fields of each result**: a name and a kind for each (text, long text, number, yes or no, date, link, list, or table with its columns), and whether it is required. The agent fills them in with its hand_back tool; a result that does not fit goes back to it with what to fix.
 - **Where each result goes**, besides the conversation:
-  - **A page in the Library**: **The same page, updated** (the one new agents get): its first run makes a page named after the agent, in its project when it works in one, and each run after puts a new version of that page, so you always open the latest and the earlier ones wait in its versions. A page you rename keeps its name. Pick **A new page each run** instead for a page of its own each time, named after the agent and the day (agents made before this choice keep doing so).
-  - **A row in a spreadsheet**: each run adds one row to the same spreadsheet in the Library: a **Date** column for when it ran, then a column for each field, in the fields' order. Numbers go in as numbers, dates as dates and links as links, so totals, formulas and charts work on them; a list or a table goes in one cell as readable text ("milk; eggs"). Leave the spreadsheet as **A new one** and the first run makes one named after the agent, or pick one of yours and the tab it goes in (a tab not there is added). See [A row in a spreadsheet](#a-row-in-a-spreadsheet).
+  - **A kept page**: **The same page, updated** (the one new agents get): its first run makes a page named after the agent, in its project when it works in one, and each run after puts a new version of that page, so you always open the latest and the earlier ones wait in its versions. A page you rename keeps its name. Pick **A new page each run** instead for a page of its own each time, named after the agent and the day (agents made before this choice keep doing so).
+  - **A row in a spreadsheet**: each run adds one row to the same spreadsheet: a **Date** column for when it ran, then a column for each field, in the fields' order. Numbers go in as numbers, dates as dates and links as links, so totals, formulas and charts work on them; a list or a table goes in one cell as readable text ("milk; eggs"). Leave the spreadsheet as **A new one** and the first run makes one named after the agent, or pick one of yours and the tab it goes in (a tab not there is added). See [A row in a spreadsheet](#a-row-in-a-spreadsheet).
   - **An email**: the result as an email to the people you name (one address or more), with a subject (`{date}`, `{time}` and `{agent}` fill in; left empty, the agent's name and the day), from one of your connected mail accounts (**From**; the first one if you pick none; see [Connected apps, keys and tools](/guide/connections#connect-your-email)). It reads well in any mail program, each field under its name, tables as tables. Since you chose the people here yourself, it goes out as soon as each result is ready, without waiting in the Outbox.
   - **A notification**, with the result's first line;
   - **A file in the folder it works in**, such as `reports/{date}.md`: `{date}`, `{time}` and `{agent}` fill in, a name ending in `.json` gets the fields as JSON and any other Markdown, and a path never leads out of the folder;
@@ -345,7 +345,7 @@ The columns are found by their headings in the table's first row, so the spreads
 
 ### Its history of results
 
-The agent's page shows **What it handed back** as a table: a row for each result, newest first, with when it came, a column for each field, and where it went (**Went to**: a mark for each place, red where it could not go; point at one for what happened, click a Library one to open the page). Click a row to see the whole result, every field in full, with **Open its session**. The table scrolls, and **Show older** brings earlier results. An agent keeps its results for a year, up to 500 of them (a daily agent keeps a whole year; one that runs every hour about three weeks); a field too long to keep there says so, and is whole in the places it went. The Library page and the spreadsheet it fills show as links above the table.
+The agent's page shows **What it handed back** as a table: a row for each result, newest first, with when it came, a column for each field, and where it went (**Went to**: a mark for each place, red where it could not go; point at one for what happened, click a kept page to open it). Click a row to see the whole result, every field in full, with **Open its session**. The table scrolls, and **Show older** brings earlier results. An agent keeps its results for a year, up to 500 of them (a daily agent keeps a whole year; one that runs every hour about three weeks); a field too long to keep there says so, and is whole in the places it went. The page and the spreadsheet it fills show as links above the table.
 
 ## An agent with a conversation of its own
 
@@ -401,7 +401,7 @@ A session started without an agent (in VS Code or a terminal, or before agents c
 On an agent's page:
 
 - **Duplicate** (on every agent): opens the editor as a new agent with everything filled in and the name "*name* (copy)". Change what you like and **Save**. This is how you make your own version of a built-in.
-- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay in your Library.
+- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay where they were kept.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.
 
@@ -409,7 +409,7 @@ The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too;
 
 One of your agents can travel as one file, to keep or to give to a colleague, who installs it on their Hydor.
 
-- **To download one**: open its page, then **More** (⋯) → **Download as a file**. Built-in agents download too, to install as someone's own. The file (`.hydor-agent`) holds its instructions, what it may use, its tier, program and model, the skills it favors, its permission mode, budget and other settings, the agents it hands work to (by name), what it hands back and the kinds of place its results go, its schedules that run by the clock (as suggestions), and its examples. Nothing of yours goes in it: the projects it works in, the connected accounts it uses, the Library page and spreadsheet its results went to, who its results are emailed to and from which account, and its webhook's address and key are left out, and its schedules that start on a watch, a webhook or a date stay here. The file lists in words what was left out, to set again.
+- **To download one**: open its page, then **More** (⋯) → **Download as a file**. Built-in agents download too, to install as someone's own. The file (`.hydor-agent`) holds its instructions, what it may use, its tier, program and model, the skills it favors, its permission mode, budget and other settings, the agents it hands work to (by name), what it hands back and the kinds of place its results go, its schedules that run by the clock (as suggestions), and its examples. Nothing of yours goes in it: the projects it works in, the connected accounts it uses, the page and spreadsheet its results went to, who its results are emailed to and from which account, and its webhook's address and key are left out, and its schedules that start on a watch, a webhook or a date stay here. The file lists in words what was left out, to set again.
 - **To install one**: on the [Agents page](/agents), open **New** and pick **Install an agent from a file** (on a phone, press **Install**), then **Choose a file** and pick a `.hydor-agent` file (or drop it there). Before anything is saved, a card shows it: its name and line, **What it brings** (its instructions, what it may use, its tier, what it hands back, its examples, its suggested schedules), **What it needs from you** (what was left out, and the agents it hands work to that you don't have), and **Its instructions** to read. An agent of yours with the same name is not touched: the new one installs beside it as "Name (2)", unless you pick **Replace mine**, which makes yours this one as a new version (the way it was stays in its **Versions**, and your examples stay, after the file's). **Add the schedules it suggests, paused** adds its schedules, turned off until you turn them on. Press **Install**, and its page opens.
 
 Some things change on the way in, and the card says which: an agent that never asked before acting (**Full access**) starts with **Accept edits**, a program not set up here gives way to the one picked on the start page, and a file from a newer Hydor brings what this one knows (update Hydor for the rest). A file that is not an agent's file, or is broken, is refused with what is wrong; an app's file installs on the [Apps page](/guide/apps#share-an-app-as-a-file) instead, and Claude Code's agent files come in with **Import** (below).
@@ -490,7 +490,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 
 ## Ask an agent
 
-- "Make me an agent called Paper scout that finds new papers on my research topics every weekday at 8 and keeps the five best in my Library, thinking with Quick."
+- "Make me an agent called Paper scout that finds new papers on my research topics every weekday at 8 and keeps the five best in a page, thinking with Quick."
 - "Make an agent called Bookkeeper that keeps my household accounts in a spreadsheet, can't run commands, and may spend at most $5 a month."
 - "Let my Release manager agent hand work to Translator and Test runner."
 - "Make my Translator agent work only in the Hydor project."
@@ -498,7 +498,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Turn off Max for hard problems, so sessions on Automatic stay on Best."
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an agent."
 - "Which agents do I have, what does each think with, and what did they spend this month?"
-- "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a page in the Library and a notification."
+- "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a kept page and a notification."
 - "Make my Bookkeeper add a row with this week's spending and its biggest items to my Household budget spreadsheet every Friday."
 - "Have my Weekly report agent email its report to maria@example.com every Monday, with the subject Weekly report {date}."
 - "What did my Bookkeeper hand back this month, and how much did it add up to?"

@@ -1,5 +1,5 @@
 // Videos and audio agents make through OpenRouter, the settings image and video models take (asked for on a form
-// before anything is made), and the images, videos and audio kept in the Library: what it keeps of each, and the
+// before anything is made), and the images, videos and audio kept: what it keeps of each, and the
 // model that writes their titles and descriptions.
 
 /** A setting an image or video model takes, as OpenRouter lists it: one of some values, a number in a range, or yes or no. */
@@ -112,7 +112,7 @@ export type MediaKind = 'image' | 'video' | 'audio';
 /** Where an item's title and description came from, or why they could not be written. */
 export type CaptionStatus = 'pending' | 'done' | 'failed' | 'edited';
 
-/** An image, video or audio kept in the Library. */
+/** A kept image, video or audio. */
 export interface MediaItem {
   id: string;
   kind: MediaKind;
@@ -133,9 +133,9 @@ export interface MediaItem {
   model?: string;
   /** The session it was saved from. */
   sessionKey?: string;
-  /** The space it is in (the Library shows each space's together); none when unset. */
+  /** The space it is in (each project's show together); none when unset. */
   space?: string;
-  /** The Library folder it is in (a folder of its space: shared/pages.ts LibFolder); none at its place's top. */
+  /** The folder it is in (a folder of its space: shared/pages.ts LibFolder); none at its place's top. */
   folder?: string;
   /** The file it was saved from, or the page it was saved from (a picture kept from the Browser). */
   source?: string;
@@ -146,7 +146,7 @@ export interface MediaItem {
   captionBy?: string;
   createdAt: number;
   updatedAt: number;
-  /** Where the Library keeps its copy: a picture an agent can work from (generate_image's images). */
+  /** Where the app keeps its copy: a picture an agent can work from (generate_image's images). */
   file: string;
   /** Someone it is shared with saved this version of it, through their link: their name. */
   who?: string;
@@ -171,7 +171,7 @@ export interface MediaVersion {
 /** Earlier versions kept of each item, and how many bytes of them at most. */
 export const MEDIA_VERSION_LIMITS = { count: 5, bytes: 2 * 1024 * 1024 * 1024 };
 
-/** What news of the Library's media the pages hear ({ t: 'feature', id: 'media' }). */
+/** What news of the kept media the pages hear ({ t: 'feature', id: 'media' }). */
 /**
  * One item kept or changed, one removed, or (`reload`) many changed at once: a folder deleted or moved, their places
  * with it. `comments`: an item's comments changed (its id).

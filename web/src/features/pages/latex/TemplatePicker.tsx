@@ -1,4 +1,4 @@
-// The templates a new LaTeX document can start from, in the Library's New dialog: an article, a report, a book or
+// The templates a new LaTeX document can start from, in the New dialog: an article, a report, a book or
 // thesis, a letter, beamer slides, a CV, a problem set, a conference paper and a poster (shared/latex-templates.ts),
 // each drawn as its first page typesets, with a line on what it has, and beside them a card that opens a file of yours;
 // a paper's style (two columns, or as IEEE, ACM or Springer's LNCS ask) is picked under the cards. Those needing a class or package this computer's TeX lacks are left out (all are offered when that

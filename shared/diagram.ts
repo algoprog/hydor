@@ -1,5 +1,5 @@
 // Diagrams: flowcharts, org charts, mind maps, network and architecture diagrams, UML, ER and sequence diagrams,
-// swimlanes, as in draw.io, Lucidchart or Visio. A diagram is a kind of page of the Library (server/pages/kinds.ts)
+// swimlanes, as in draw.io, Lucidchart or Visio. A diagram is a kind of kept page (server/pages/kinds.ts)
 // whose model is kept here: pages (the tabs at its foot), each a canvas of items drawn in their order (back to front):
 //
 //   - shapes, each of a kind of the shape library (diagram-shapes.ts says how each is drawn), placed where they are
@@ -917,7 +917,7 @@ export function mapDiagramSources(d: Diagram, f: (src: string) => string): Diagr
   return { ...d, pages: d.pages.map((p) => ({ ...p, items: p.items.map((it) => (it.type === 'shape' && it.src ? { ...it, src: f(it.src) } : it)) })) };
 }
 
-/** Every word a diagram holds, in order: for search, a description, and the Library's words. */
+/** Every word a diagram holds, in order: for search, a description, and the search's words. */
 export function diagramWords(d: Diagram): string {
   const out: string[] = [];
   for (const p of d.pages) {

@@ -1,5 +1,5 @@
 // Moving a file the way a move between folders does, for the app taking a file in by its path (the desktop app's drops
-// on the Library): renamed when it stays on its disk; onto another disk, copied, the copy checked against the original
+// on a project's Files): renamed when it stays on its disk; onto another disk, copied, the copy checked against the original
 // (its size and the hash of its bytes), and only then the original removed, so nothing is lost if the copy fails. The
 // place it goes to is claimed first (an empty file made only where nothing is), so two files given the same free name
 // at once never write over each other.

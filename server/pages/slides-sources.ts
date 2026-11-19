@@ -1,5 +1,5 @@
 // What save_slides does for a deck once its pictures are in (agentDeck): its logo takes its picture's own shape (unless
-// both its width and height were given), and each chart given a spreadsheet of the Library as its source and no numbers
+// both its width and height were given), and each chart given a saved spreadsheet as its source and no numbers
 // gets its labels and series from it, read as the slides editor reads them (shared/slides-sheet.ts). A spreadsheet that
 // is not there, or cells with no numbers, are said in `notes` and leave the chart as it was given.
 import { chartFromSheet } from '../../shared/slides-sheet.ts';
@@ -47,7 +47,7 @@ export function withSheetsAndLogo(db: DB, deck: Deck, asked: { logo?: unknown },
     if (e.type !== 'chart' || !e.source || e.series.length) return e;
     const got = bookOf(e.source.page);
     if (!got) {
-      notes.push(`The chart's source ${e.source.page} is not a spreadsheet of the Library (get_page lists them); it was left without numbers.`);
+      notes.push(`The chart's source ${e.source.page} is not a saved spreadsheet (get_page lists them); it was left without numbers.`);
       return e;
     }
     const r = chartFromSheet(got.book, e.source, e.kind);

@@ -6,7 +6,7 @@
 // in on the track they fall on, or a new one. J, K and L shuttle; the part picked's edges and splits snap to zero
 // crossings and a time grid; the other tracks and the markers follow a deletion or a paste (as Audacity's sync-lock). Nothing of the sounds changes while editing: the edit is a recipe (shared/
 // mediaedit-audio.ts) the browser plays as it will be (engine.ts) and the server makes with ffmpeg on Save, with its
-// progress and a way to stop; then it goes back where it came from (a file, a Library sound, a video), or as a copy.
+// progress and a way to stop; then it goes back where it came from (a file, a kept sound, a video), or as a copy.
 // On a phone: one track at a time, the transport at the bottom, the panels as sheets, the menus under one button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { AudioLines, ChevronDown, Ellipsis, History as HistoryIcon, Plus, Redo2, SlidersHorizontal, Sparkles, Undo2, X } from 'lucide-react';
@@ -106,10 +106,10 @@ interface Plan {
 }
 
 function soundPlans(o: OpenEditor, detached: boolean): { main: Plan; copy: Plan | null } {
-  const lib: Plan = { label: 'Save to Library', to: { library: true, ...(o.session ? { session: o.session } : {}), title: o.title }, says: 'It is kept in your Library as a new sound.' };
+  const lib: Plan = { label: 'Keep', to: { library: true, ...(o.session ? { session: o.session } : {}), title: o.title }, says: 'It is kept as a new sound.' };
   const to = o.to;
   if (to && 'sound' in to && !detached) return { main: { label: 'Save', to: { sound: true }, says: `Save puts it in ${o.from.label || 'the video'} as the video’s sound.`, fixed: 'm4a' }, copy: null };
-  if (detached || !to || 'asset' in to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept in your Library as a new sound.' } : lib, copy: null };
+  if (detached || !to || 'asset' in to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept as a new sound.' } : lib, copy: null };
   if ('file' in to) {
     const kind = /\.(mp3|wav|flac|m4a|ogg|opus|oga)$/i.test(to.file) ? soundFormatOfName(to.file) : null;
     const beside: Plan = { label: 'Save a copy', to: { file: to.file, as: 'copy' }, says: `A copy is saved beside it, “${nameOf(to.file).replace(/\.[^.]+$/, '')} (edited)”.` };
@@ -118,8 +118,8 @@ function soundPlans(o: OpenEditor, detached: boolean): { main: Plan; copy: Plan 
   }
   if ('media' in to)
     return {
-      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in the Library in place of the sound it was (its title, project and folder stay).' },
-      copy: o.copy === false ? null : { label: 'Save a copy', to: { media: to.media, as: 'copy' }, says: 'Save a copy keeps it in your Library as a new sound.' },
+      main: { label: 'Save', to: { media: to.media, as: 'replace' }, says: 'Save puts it in place of the sound it was (its title and project stay).' },
+      copy: o.copy === false ? null : { label: 'Save a copy', to: { media: to.media, as: 'copy' }, says: 'Save a copy keeps it as a new sound.' },
     };
   return { main: lib, copy: null };
 }
@@ -812,7 +812,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       if (j.status !== 'done') return toastError(new Error(j.error ?? 'The sound could not be made'));
       savedDoc.current = saving0;
       setSavedTick((n) => n + 1);
-      if (what === 'copy') return toast(j.path ? tr(`A copy is saved beside it: ${nameOf(j.path)}`) : tr('A copy is in your Library'), 'ok');
+      if (what === 'copy') return toast(j.path ? tr(`A copy is saved beside it: ${nameOf(j.path)}`) : tr('A copy is kept'), 'ok');
       await done({ kind: 'audio', src: j.src, media: j.media, path: j.path, mime: soundFormat(o2.format).mime, seconds: j.seconds, replaced: ('media' in plan.to && plan.to.as === 'replace') || ('file' in plan.to && plan.to.as === 'replace') });
     } catch (e) {
       toastError(e);
@@ -873,7 +873,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         { label: 'How it is saved…', run: () => setDialog('save') },
         '-',
         // At someone's link: only what they bring from their own device.
-        !viaLink && { label: 'Add a sound from the Library…', run: () => setLibraryOpen(true) },
+        !viaLink && { label: 'Add a kept sound…', run: () => setLibraryOpen(true) },
         { label: 'Add a sound from this device…', run: () => fileInput.current?.click() },
         { label: rec ? 'Stop recording' : 'Record', keys: 'R', run: () => void record() },
       ],
@@ -1522,7 +1522,7 @@ function Sheet({ title, onClose, aside, children }: { title: string; onClose: ()
   );
 }
 
-/** The Library's sounds, to put one on a track of its own. */
+/** The kept sounds, to put one on a track of its own. */
 function LibraryPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (m: { id: string; title: string; duration?: number }) => void }) {
   const items = useMedia((s) => s.items);
   useEffect(() => {
@@ -1530,7 +1530,7 @@ function LibraryPicker({ open, onClose, onPick }: { open: boolean; onClose: () =
   }, [open]);
   const sounds = (items ?? []).filter((m) => m.kind === 'audio');
   return (
-    <Dialog open={open} onClose={onClose} title="Add a sound from the Library" width={460}>
+    <Dialog open={open} onClose={onClose} title="Add a kept sound" width={460}>
       {sounds.length ? (
         <div className="max-h-[50dvh] space-y-0.5 overflow-y-auto">
           {sounds.map((m) => (
@@ -1544,7 +1544,7 @@ function LibraryPicker({ open, onClose, onPick }: { open: boolean; onClose: () =
           ))}
         </div>
       ) : (
-        <p className="text-[13px] text-fg-3">No sounds in your Library yet. Keep one an agent made (Save to Library, under it), or drop one on the Library.</p>
+        <p className="text-[13px] text-fg-3">No kept sounds yet. Keep one an agent made (Keep, under it), or drop one here.</p>
       )}
     </Dialog>
   );

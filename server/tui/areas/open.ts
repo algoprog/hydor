@@ -1,5 +1,5 @@
 // `hydor open [session | page]`: the address of a page of the web app, or of a session in it; --browser opens it. A page
-// is one of the app's "Go to" items by name (`library`, `projects`, `inbox`…), `settings [section]`, `guide [topic
+// is one of the app's "Go to" items by name (`inbox`, `experiments`…), `settings [section]`, `guide [topic
 // [section]]` or `project <name>`; anything else is a session, named as everywhere (the start of its id, its title).
 import { catalogItems, SECTIONS } from '../../../shared/find-catalog.ts';
 import { UsageError } from './kit.ts';
@@ -34,7 +34,7 @@ export const settingsSections = () => SECTIONS.map(([id, label, group]) => ({ id
 export const open: Area = {
   name: 'open',
   summary: 'A page’s or session’s address',
-  help: 'Without words, the address of the web app. Name a page (library, projects, inbox, experiments… Tab completes them), settings [section], guide [topic [section]], project <name>, or a session as hydor sessions shows it.',
+  help: 'Without words, the address of the web app. Name a page (inbox, experiments… Tab completes them), settings [section], guide [topic [section]], project <name>, or a session as hydor sessions shows it.',
   group: 'this',
   bare: true,
   default: 'open',
@@ -47,7 +47,7 @@ export const open: Area = {
       ],
       options: { browser: { type: 'boolean', desc: 'Open it in your browser too' }, find: { type: 'string', value: '<words>', desc: 'For settings: point at an option by its words' } },
       summary: 'Where a page or session is, in the web app',
-      examples: ['hydor open', 'hydor open library', 'hydor open settings memory --browser', 'hydor open guide projects', 'hydor open project thesis', 'hydor open 3f9a'],
+      examples: ['hydor open', 'hydor open inbox', 'hydor open settings memory --browser', 'hydor open guide projects', 'hydor open project thesis', 'hydor open 3f9a'],
       async run(ctx, [where, ...more], v) {
         const at = await address(ctx, where, more, typeof v.find === 'string' ? v.find : undefined);
         if (ctx.o.json) return ctx.json({ url: at });

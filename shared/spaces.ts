@@ -46,14 +46,14 @@ export interface Space {
 /** A program whose work made the app find a project. */
 export type FoundIn = 'claude' | 'codex';
 
-/** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, its skills, and what it holds in the Library. */
+/** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, its skills, and what it holds kept. */
 export interface SpaceView extends Space {
   sessions: number;
   lastAt?: number;
   docs: number;
   /** How many skills of its own it has (its Skills tab). */
   skills: number;
-  /** How many things it holds in the Library: pages, slides, documents, pictures and videos. */
+  /** How many things it holds kept: pages, slides, documents, pictures and videos. */
   library: number;
   /** How many people it is shared with now (links that work); absent when none. */
   people?: number;

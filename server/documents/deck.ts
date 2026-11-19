@@ -1,5 +1,5 @@
-// A PowerPoint file's slides for the file viewer, which draws them with the slides runtime as the Library draws its
-// decks: the file read by the Library's own importer (pages/pptx-import.ts) and kept as a deck is kept (keepDeck), so
+// A PowerPoint file's slides for the file viewer, which draws them with the slides runtime as the editor draws its
+// decks: the file read by the app's own importer (pages/pptx-import.ts) and kept as a deck is kept (keepDeck), so
 // its pictures are pictures the app keeps (each once, by its hash, going a day after nothing shows them) and fetched
 // one by one, its videos are videos the app keeps, and what the viewer gets stays small. Each version of a file is read
 // once: one read in the last hour, or being read, is answered from memory.
@@ -14,7 +14,7 @@ import { deckFromPptx } from '../pages/pptx-import.ts';
 import { keepDeck } from '../pages/slides.ts';
 import { soffice } from './tools.ts';
 
-/** The largest file shown as slides (the Library takes PowerPoint files as large: their videos come along). */
+/** The largest file shown as slides (the importer takes PowerPoint files as large: their videos come along). */
 const MAX_FILE = 200 * 1024 * 1024;
 /** How long a version read stays in memory (well within the day its pictures are kept without a deck), and how many do. */
 const KEEP_MS = 60 * 60_000;

@@ -1,5 +1,5 @@
 // A design's Add panel: words (a heading, a subheading, body text, pairs of fonts), elements (shapes, lines, frames to
-// drop a picture in, stickers, icons and emoji, a QR code), pictures and videos (from this device, the Library, free
+// drop a picture in, stickers, icons and emoji, a QR code), pictures and videos (from this device, those you saved, free
 // photos, made with AI, a drawing, collages), the artboard's background (a colour, a gradient, a pattern, a picture, one
 // made with AI) and the brand kit. What it adds goes in the middle of what shows of the artboard, picked. Its last tab,
 // Layers, lists the artboard's parts front to back (Layers.tsx).
@@ -217,7 +217,7 @@ export function DesignAdd({
             {tr('From this device')}
           </Wide>
           <Wide icon={<LibraryBig size={15} />} onClick={() => setMedia('image')}>
-            {tr('From your Library')}
+            {tr('From your saved pictures')}
           </Wide>
           <Wide icon={<Images size={15} />} onClick={() => run(choosePhoto({}).then((p) => p && picture(p.src, p.photo.title ?? '')))}>
             {tr('Free photos')}
@@ -259,7 +259,7 @@ export function DesignAdd({
             {tr('From this device')}
           </Wide>
           <Wide icon={<LibraryBig size={15} />} onClick={() => setMedia('video')}>
-            {tr('From your Library')}
+            {tr('From your saved videos')}
           </Wide>
           <Wide
             icon={<Clapperboard size={15} />}
@@ -432,7 +432,7 @@ export function DesignAdd({
         onClose={() => setMedia(null)}
         onPick={(m) => {
           setMedia(null);
-          if (m.kind === 'video') run(fromLibraryVideo(m.id).then(video));
+          if (m.kind === 'video') run(fromSavedVideo(m.id).then(video));
           else run(picture(`/api/media/${m.id}/file`, m.title));
         }}
       />
@@ -441,8 +441,8 @@ export function DesignAdd({
   );
 }
 
-/** A Library video copied in with the design's videos: its address for the page, its still, its size. */
-async function fromLibraryVideo(id: string) {
+/** A saved video copied in with the design's videos: its address for the page, its still, its size. */
+async function fromSavedVideo(id: string) {
   const { post } = await import('../../../lib/api');
   const r = await post<{ src: string; url: string; poster?: string; w?: number; h?: number }>('/api/pages/videos/from-media', { media: id });
   return { url: r.url, poster: r.poster, w: r.w ?? 16, h: r.h ?? 9 };

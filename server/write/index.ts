@@ -7,7 +7,7 @@
 //     Haiku through Claude Code on Automatic), shorter, longer, simpler, more formal, friendlier, spelling and grammar
 //     fixed, translated, or as the user says; facts, names and numbers kept, a paragraph a line as it came.
 //   POST /api/write/design-words, POST /api/write/palette: a design's words and colours (design.ts).
-//   POST /api/write/describe      {src, context?} → {alt, by}: by the model that writes the Library's titles and
+//   POST /api/write/describe      {src, context?} → {alt, by}: by the model that writes the titles and
 //     descriptions (Settings → Images, video and audio), in the language of the slide's words.
 // And the page editor's AI (Notion AI's) and a database's AI column: page-ai.ts (POST /api/write/page-ai, /api/write/db-ai).
 import fs from 'node:fs';

@@ -2,7 +2,7 @@
 // and the ⋯ of a file shown outside the Files page (a file's window over a session, an agent's file card,
 // a picture it made), with Start a session with it, Add to a space and Copy path.
 import { useRef, useState, type ReactNode } from 'react';
-import { Boxes, Copy, Ellipsis, FolderOpen, LibraryBig, MessageSquarePlus, Plus, Search } from 'lucide-react';
+import { Boxes, Copy, CopyPlus, Ellipsis, FolderOpen, MessageSquarePlus, Plus, Search } from 'lucide-react';
 import type { Space } from '@shared/spaces';
 import { cx, IconButton, MenuBack, MenuItem, MenuSep, Popover, Throbber } from '../../components/ui';
 import { dirname } from '../../lib/format';
@@ -116,7 +116,7 @@ export function FileMore({
   dir?: boolean;
   inFiles?: boolean;
   extra?: ReactNode;
-  /** The session it was handed over in: Save to Library puts the copy in its project. */
+  /** The session it was handed over in: Keep a copy puts the copy in its project. */
   sessionKey?: string;
   className?: string;
   iconSize?: number;
@@ -127,7 +127,7 @@ export function FileMore({
   const item = itemOf(path, dir, size);
   const close = () => setOpen(false);
   const space = useSpaceMenu(() => [item], close);
-  // Save to Library asks which project the copy goes in when there are projects (the session's first), as Keep does.
+  // Keep a copy asks which project the copy goes in when there are projects (the session's first), as Keep does.
   const lib = useKeepIn(sessionKey, (to) => void saveToLibrary(item, sessionKey, to));
   return (
     <>
@@ -153,8 +153,8 @@ export function FileMore({
             </MenuItem>
             {space.entry}
             {!dir && LIBRARY_FILE.test(path) && (
-              <MenuItem icon={<LibraryBig size={14} />} onClick={() => (close(), lib.ask(ref.current))}>
-                Save to Library
+              <MenuItem icon={<CopyPlus size={14} />} onClick={() => (close(), lib.ask(ref.current))}>
+                Keep a copy
               </MenuItem>
             )}
             <MenuSep />

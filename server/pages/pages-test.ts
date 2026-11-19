@@ -147,7 +147,7 @@ const tick = () => new Promise((r) => setTimeout(r, 10));
   ok((await run('get_page', {})).text?.includes('\n  Tomatoes, beans'), 'a short list has each one’s description');
   const found = await run('get_page', { query: 'squash beds' });
   ok(found.text?.split('\n')[1]?.includes(g), `get_page’s query finds a page by the words of its description: ${found.text}`);
-  ok(/Nothing in the Library fits/.test((await run('get_page', { query: 'zeppelin' })).text ?? ''), 'and says when nothing fits');
+  ok(/Nothing saved fits/.test((await run('get_page', { query: 'zeppelin' })).text ?? ''), 'and says when nothing fits');
   const r = (await req('GET', '/api/library/search?q=landlord%20boiler')).json();
   ok(r.hits[0]?.id === `page:${did}` && r.hits[0].by.includes('words'), `the Library’s search finds it by its description: ${JSON.stringify(r.hits.slice(0, 2))}`);
   ok((await req('GET', '/api/library/search?q=')).json().hits.length === 0, 'no words, nothing');

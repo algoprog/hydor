@@ -14,7 +14,7 @@
 // blocks are coloured as their code is written (shared/code-colours.ts), with a language picked by the chip at their
 // corner or Auto; the colours are taken off again in the page given back, which keeps its code as plain text (plain
 // <pre><code> blocks agents write are coloured too, and kept as they were written). "@" (or "/" → Link to a page) puts
-// in a link to another of the Library's pages, whose list the app tells it, as a chip. "/" → Database puts in a
+// in a link to another of the kept pages, whose list the app tells it, as a chip. "/" → Database puts in a
 // database (shared/page-db.ts), drawn in its block and kept with the page's own data through the app: a copy of one
 // (Duplicate, a paste) becomes a database of its own, with the rows the first holds.
 //
@@ -94,7 +94,7 @@ export interface Core {
   canAsk: () => boolean;
   /** The code blocks' colours (shared/code-colours.ts). */
   code: CodeColours;
-  /** Whether the app keeps comments for this page (a page of the Library). */
+  /** Whether the app keeps comments for this page (a kept page). */
   canComment: () => boolean;
   /** The databases (shared/page-db.ts), and the page's own data they are kept in, through the app. */
   db: PageDatabases;
@@ -1218,7 +1218,7 @@ export function writing(E: Core): Writing {
     alt: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15v-3.5a1.5 1.5 0 0 1 3 0V15"/><path d="M7 13.5h3"/><path d="M14 10v5"/><path d="M14 12h3"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
     comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-    // a page of the Library, by its kind (for links to it)
+    // a kept page, by its kind (for links to it)
     page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     pagelink: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5V11"/><path d="M15 21l6-6"/><path d="M17 15h4v4"/>',
     doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>',
@@ -1881,8 +1881,8 @@ export function writing(E: Core): Writing {
     for (const x of slEl.querySelectorAll('.row')) x.classList.toggle('on', (x as HTMLElement).dataset.i === b.dataset.i);
   });
 
-  // ---- "@" (or "/" → Link to a page): a link to another page of the Library ---------------------------------------------
-  /** The Library's pages, as the app tells them (their titles, kinds and icons), newest first. */
+  // ---- "@" (or "/" → Link to a page): a link to another kept page ---------------------------------------------
+  /** The kept pages, as the app tells them (their titles, kinds and icons), newest first. */
   interface PageRef {
     id: string;
     title: string;
@@ -1939,7 +1939,7 @@ export function writing(E: Core): Writing {
     mention = null;
     renderMention();
   };
-  /** "@" typed at a block's start or after a space opens the Library's pages (not in code, nor in an address). */
+  /** "@" typed at a block's start or after a space opens the kept pages (not in code, nor in an address). */
   const maybeMention = (h: HTMLElement) => {
     const r = caretIn(h);
     if (!r || r.startContainer.nodeType !== 3 || r.startOffset < 1) return;
@@ -2317,7 +2317,7 @@ export function writing(E: Core): Writing {
       return;
     }
     if (what === 'video') {
-      // A video the app keeps (from this device, the Library, or made with AI: pages/design/pageMedia.tsx), played in the page.
+      // A video the app keeps (from this device, kept, or made with AI: pages/design/pageMedia.tsx), played in the page.
       const file = typeof arg.file === 'string' && /^\/pg\/video\/[a-f0-9]{16,64}\/[\w-]{16,64}$/.test(arg.file) ? arg.file : '';
       if (file) {
         const poster = safeSrc(arg.poster);

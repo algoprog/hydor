@@ -1,4 +1,4 @@
-// Insert → Slides from another deck (PowerPoint's Reuse Slides, Google Slides' Import slides): a deck of the Library to
+// Insert → Slides from another deck (PowerPoint's Reuse Slides, Google Slides' Import slides): a deck of yours to
 // pick (a find field), its slides to tick (all, or some), put in after the slide on view: keeping their look (their
 // deck's theme as their own), or taking this deck's. Their pictures and videos come with them (shared/slides-reuse.ts).
 import { useEffect, useRef, useState } from 'react';
@@ -86,7 +86,7 @@ export function ReuseSlidesDialog({ open, deck, pageId, onClose, onInsert }: { o
     >
       {!from ? (
         <div className="space-y-2">
-          <LibraryPick kind="slides" picked={page?.id ?? null} onPick={(p) => void pick(p)} leaveOut={pageId} empty="No other decks in your Library yet." />
+          <LibraryPick kind="slides" picked={page?.id ?? null} onPick={(p) => void pick(p)} leaveOut={pageId} empty="You have no other decks yet." />
           {error && <p className="text-[12.5px] text-err">{error}</p>}
           {page && !error && <p className="text-[12.5px] text-fg-3">Opening it…</p>}
         </div>

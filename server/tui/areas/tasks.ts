@@ -283,7 +283,7 @@ async function findTask(ctx: Ctx, given: string | undefined): Promise<ScheduledT
 
 /** A board card's refreshes are changed on the board (its card's … → Keep it up to date…), not here. */
 function notBoard(ctx: Ctx, t: ScheduledTask, what: string) {
-  if (t.board) throw new UsageError(`“${t.name}” is a board card’s refresh: ${what} it on the board (${ctx.conn.base}/pages/${t.board.page}?card=${t.board.card}, the card’s … → Keep it up to date…, or Stop refreshing); hydor library refresh ${t.board.page} refreshes it now`);
+  if (t.board) throw new UsageError(`“${t.name}” is a board card’s refresh: ${what} it on the board (${ctx.conn.base}/pages/${t.board.page}?card=${t.board.card}, the card’s … → Keep it up to date…, or Stop refreshing); hydor files refresh ${t.board.page} refreshes it now`);
 }
 
 /** Pauses or turns on a task: a board card's refreshes by their switch alone, any other by saving it so. */

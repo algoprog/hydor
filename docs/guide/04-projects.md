@@ -1,8 +1,8 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers opening a project's details, making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
 
-![The Projects page: the latest sessions across your projects, what they keep in the Library, and where the work went](images/projects.webp)
+![A project's details in a window over the page: its sessions, its newest files and what every session in it gets, under its tabs](images/projects.webp)
 
 ## What a project is
 
@@ -19,48 +19,24 @@ Sessions belong to a project by where they work. Every session that works in the
 
 A project can also bring other projects together. That is a **group**: see [Bring projects together in a group](#bring-projects-together-in-a-group).
 
-## Open the Projects page
+## Open a project's details
 
-Click **Projects** on the rail. On a phone, open the sidebar first: it is a drawer, and Projects is among its tools. You can also type "projects" in the search box (Ctrl+K, or ⌘K on a Mac).
+A project has no page of its own: its details open in a window over the page you are on, which stays behind it, dimmed. There are several ways in:
 
-On a computer the page has a column beside the rail, the same kind as the Library's: the logo with **New project** and **Hide sidebar** on top, then:
+- **From the sidebar**: in the session list, point at a project's heading and click the ⓘ (**Project details**); on a touch screen it is always there. Clicking the project's mark at the start of its heading does the same, and so does its ⋯ menu: **Project details** is its first item. On a phone, open the sidebar first: it is a drawer.
+- **From the search box**: type the project's name in the search box (Ctrl+K, or ⌘K on a Mac) and pick it. A project with no sessions yet has no heading in the sidebar, so this is the way to it (a project you have just made opens its window by itself).
+- **From a link**: a link to a project in a notification or in an agent's answer opens the window over the page you are on, too.
 
-- **All projects**, with how many projects you have;
-- **Shared knowledge**: the documents every session can search (see [Shared knowledge: documents every session can search](#shared-knowledge-documents-every-session-can-search));
-- under a **Projects** label, a row for each of your projects, with its mark, its name and how many sessions it has. Click one to open its page (see [A project's own page](#a-projects-own-page)).
+The window shows what a project holds:
 
-The place you are in is lit in the column, and it stays there when you open a project, so you can move from one project to another without going back. **Hide sidebar** (Ctrl+B, or ⌘B on a Mac) hides the column; **Show sidebar** at the left of the page's top row brings it back. On a phone or in a narrow window, there is no column: the page has a header with two tabs, **All projects** and **Shared knowledge**, and **New project** at the top right.
+- **The header**, in the project's colour: its mark and name, and under them what it is about (its folder when it has no description; a group says "Brings together" and the names of its projects). On the right, **New session** starts a session in the project (on a phone, the pen); **More** (⋯) has the project's menu (see [The project's menu](#the-projects-menu)); and ✕ closes the window.
+- **Its tabs**: **Overview**, **Files**, **Memory**, **Skills**, **Agents** and **Settings** (see [A project's details window](#a-projects-details-window)).
 
-The page beside the column starts with a row: **All projects** at the left and, at the right, a box to find a project (**Find a project**). Type part of a name or of what a project is about, and the page shows the projects that match as cards; Esc or ✕ empties the box.
-
-The column already lists your projects, so the page beside it shows what goes on across them:
-
-- **Latest sessions**: the sessions last at work in any of your projects, the latest first. Each has its project's mark, its title, the project's name, what it is doing while it runs ("Working", "Needs you") and how long ago it was at work. Click one to open it. **Show more** lists up to 30 of them, and **Show fewer** goes back to 8.
-- **Lately in the Library**: the six newest things your projects hold in the Library (pages, slides, documents, pictures and videos), each with its project's name. Click one to open it; **Open the Library** shows everything.
-- **Where the work went**: the last 4 weeks, day by day. Each bar is a day, as tall as the messages your projects' sessions were sent that day, in the colours of the projects they went to; point at a bar for its date and how many. Above the bars is the total ("86 messages · 14 sessions"), and under them each project that was at work, the busiest first, with a line as long as its share and how many messages it got. Click a project to open it. **Quiet these 4 weeks** names the projects with no work in that time.
-- **Shared with people**: the projects other people have a link to, with how many people. Click one to see who, and to change it (see [Share a project with people](#share-a-project-with-people)). It shows only while you share a project.
-- **Group projects together**, once you have at least two projects that aren't groups (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
-
-A part with nothing to show is left out.
-
-The projects show as cards wherever no column lists them: on a phone or in a narrow window, while the column is hidden, while you are finding a project, and until one of your projects has a session or something in the Library. The parts above follow under the cards.
-
-Each project shows as a card:
-
-- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band). A project Hydor made by itself says where it found it on its band: **From Claude Code**, **From Codex** or **From Claude Code and Codex**, with the programs' marks (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex)). In its corner **More** (⋯), the same menu as at the top of the project's page;
-- its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its projects;
-- what it holds: how many sessions (every session in it, whether you started it here or it works in the project's folder), how many things in the Library, documents and skills;
-- how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
-
-Click a card, or its row in the column, to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
-
-Drop files from your computer on a project's card to add them to the project ("Drop to add to “Thesis”" shows while they are over it): documents, spreadsheets, slides, LaTeX and notebooks become pages of the Library, pictures, videos and sounds are kept there, and any other file goes in the project's folder (see [Add files of yours](/guide/library#add-files-of-yours)).
-
-At the end of the page (not while you are finding a project), **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
+Close it with ✕, with Esc, or with a click on the dimmed page outside it. Going to another page closes it too: opening a document from the **Files** tab, say, or following a link. On a phone the window fills the screen. Esc closes a menu or a dialog over the window first, and the window after it.
 
 ## Make a project
 
-1. On the [Projects page](/projects), click **New project**. The start page's folder menu has **New project** too (see [Start a session in a project](#start-a-session-in-a-project)).
+1. Click the **+** at the end of the sidebar's **Projects** heading (it shows when you point at the heading, and is always there on a touch screen) and pick **New project…**. The sidebar's filter button (**Filter and group sessions**) has **New project…** too, and so has the start page's folder menu, beside its **Projects** heading (see [Start a session in a project](#start-a-session-in-a-project)). A folder's heading in the sidebar has **Make it a project** (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 2. Fill in the window:
    - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in. The square beside it is the project's mark, in the colour it will get: click it to pick another of the eight colours (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, projects take the colours in turn.
    - **Where its files go**: pick one of two.
@@ -73,9 +49,9 @@ At the end of the page (not while you are finding a project), **Folders you work
 4. Leave **An agent for it** on to have an agent made for the project (see [Agents](#agents)), or turn it off.
 5. Click **Make the project**, or press Enter in the name field.
 
-A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
+A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the sidebar, the new project's details open in a window. Made from the start page, the new project is picked for the session you are about to start.
 
-Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its notes, wiki and documents are on its **Memory** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
+Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its notes, wiki and documents are on its **Memory** tab, its skills on its **Skills** tab, and more folders on its **Files** tab (see [A project's details window](#a-projects-details-window)).
 
 ### A project for a folder you already have
 
@@ -90,27 +66,25 @@ Hydor lists the sessions you had in Claude Code and Codex outside Hydor: in a te
 - **What is left out**: your home folder; hidden folders (apart from the folders of Codex's own projects); temporary folders; the folders the app makes for itself (task folders, apps' runs, worktrees and its data); folders you marked **Not a project**; and folders a project already has: its own folder, one it works with, or a folder inside them.
 - **When**: once Hydor has read your sessions after it starts, then within about a minute of new sessions there.
 - **Its name**: the name you gave the folder in the sidebar (**Rename**), else the Codex project's name, else the folder's own name. If a project already has that name, the name of the folder above goes in front ("client/app"), then a number.
-- **On the Projects page**: its card says where it was found, on its band: **From Claude Code**, **From Codex** or **From Claude Code and Codex**, with the programs' marks. Point at it to read "Hydor made this project for a folder you work in with Claude Code" (or Codex, or both). Projects found this way come after the projects you already have, the one at work most recently first.
-- **In the sidebar**: its group is the project's group, with its mark and name and, after the name, the marks of the programs. Point at the name, or open the heading's **⋯**, to see where its sessions came from (**Started outside Hydor**), as for a folder's group.
-- **A project like any other**: its own folder is the folder where those sessions ran, and nothing is moved or copied. It has documents, skills, guidelines, an agent, a Library and sharing like any project, and you can rename it, describe it or delete it. Claude Code's own skills in the folder's `.claude/skills` show on its **Skills** tab as before, and the folder's own CLAUDE.md or AGENTS.md is still read by agents as before.
+- **In the sidebar**: its group is the project's group, with its mark and name and, after the name, the marks of the programs it was found in. Point at the name, or open the heading's **⋯**, to see where its sessions came from (**Started outside Hydor**), as for a folder's group. Its details window opens like any project's (see [Open a project's details](#open-a-projects-details)); it does not say where the project was found.
+- **A project like any other**: its own folder is the folder where those sessions ran, and nothing is moved or copied. It has documents, skills, guidelines, an agent, files and sharing like any project, and you can rename it, describe it or delete it. Claude Code's own skills in the folder's `.claude/skills` show on its **Skills** tab as before, and the folder's own CLAUDE.md or AGENTS.md is still read by agents as before.
 - **If you delete it**, Hydor doesn't make it again, and you can still make a project for that folder yourself (see [Delete a project](#delete-a-project)).
 
-To see which projects came this way, look for the band on the [Projects page](/projects).
+To see which projects came this way, look for the program marks after a project's name in the sidebar, or ask an agent.
 
 ### Folders you work in, not in a project yet
 
-Under your projects on the [Projects page](/projects), the app lists up to six folders you could make projects for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no project has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each card shows the folder's name, where it is, how many sessions used it and when one last did.
+A folder that two or more of your sessions work in, and that no project has yet, has a group of its own in the sidebar, under **Projects**, with its folder's name. Point at its heading and open its **⋯** to find **Make it a project**: the **New project** window opens with that folder picked and its name filled in. The same menu has **Rename**, **Use the folder's own name** (once you have renamed it) and **Open in Files**.
 
-- **Make a project** opens the **New project** window with that folder picked and its name filled in.
-- ✕ (**Not a project**) stops suggesting that folder, and stops Hydor from making it a project by itself (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex)). The folder itself is untouched, and **New project** can still make a project for it.
+When you make a project for a folder yourself (or from the **New project** window), the folders your sessions worked in lately, over the last 90 days, or changed files in while working somewhere else, and that no project has yet, show under **Used lately, in no project yet**, so one tap picks one (see [Make a project](#make-a-project)). The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project.
 
-Folders you work in with Claude Code and Codex become projects by themselves, so this list holds mostly folders you worked in from Hydor. Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a project has a folder, as its own or as one of the folders it works with, it leaves the list. The same folders show under **Used lately, in no project yet** in the **New project** window.
+Folders you work in with Claude Code and Codex become projects by themselves, so these are mostly folders you worked in from Hydor. Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a project has a folder, as its own or as one of the folders it works with, the folder leaves them. To stop Hydor from making a project of a folder by itself, ask an agent: it keeps a list of folders that are not projects, and deleting a project adds its folder to it (see [Delete a project](#delete-a-project)).
 
 ## Start a session in a project
 
 There are two ways:
 
-- **From the project**: click **New session** on its card on the Projects page, or at the top of its own page (on a phone, the pen). The start page opens with the project picked and with what you picked in it before; if you have picked nothing there yet, with its agent when it has one.
+- **From the project**: click the pen at the end of its heading in the sidebar, or **New session** at the top of its details window (on a phone, the pen). The start page opens with the project picked and with what you picked in it before; if you have picked nothing there yet, with its agent when it has one.
 - **From the start page**: open the folder chip in the row under the message box. Its menu has two short lists: **Projects**, the five at work most recently (and the one picked, if it isn't among them), each with its mark, its name and its folder; then **Folders**, the folder in use and the ones you used last; then **New task folder**. **New**, beside the **Projects** heading, makes a project and picks it. Type part of a name in the field at the top to find any project, or any folder. A project's own folder is never listed as a folder: found by its name or path, or picked on the start page before as a folder, it is the project, and the session works in the project.
 
 When you pick a project, the chip shows its mark and name instead of a folder, and the session will work in the project's folder. In a project where you have not picked anything yet, the **Agent** chip shows the project's own agent when it has one, with any program, model and permissions that agent suggests, else **General**; in one where you have, it shows what you picked there. You can still change any of them before you start. Then type your message and click **Start**.
@@ -121,9 +95,13 @@ On a phone, the menu opens as a sheet from the bottom of the screen, titled "Pro
 
 When the project's folder is a Git repository, the end of the menu offers **New worktree**, as for any folder in a repository: the session then works on a branch of its own, in a separate copy of the repository (see [Sessions](/guide/sessions)). Sessions you start by voice in hands-free mode start in the place picked last on the start page, with its picks (see [Documents, images, videos and voice](/guide/documents-voice)).
 
-## A project's own page
+## A project's details window
 
-Click a project on the Projects page to open it. On a computer the column stays beside it with the project lit, so a click on another row opens that project. The top of its page is in the project's colour: on a phone, in a narrow window or while the column is hidden, the arrow on the left goes back to all your projects (as on the app's other pages), and **Show sidebar** brings the column back; then come the project's mark and name and what it is about (a group's projects, for a group; its folder, with no description). On the right, **New session** starts a session in the project (on a phone, the pen), and **More** (⋯) has:
+Open it as described in [Open a project's details](#open-a-projects-details). The window's tabs are **Overview**, **Files**, **Memory**, **Skills**, **Agents** and **Settings**. **Memory** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
+
+### The project's menu
+
+**More** (⋯) in the window's header has:
 
 - **Open its folder in Files**: the project's folder on the Files page.
 - **Show in Finder**, **Show in File Explorer** or **Show in folder**: in the desktop app, the project's folder selected in the system's file manager (see [Work with files and folders](/guide/files-git#work-with-files-and-folders)).
@@ -131,36 +109,40 @@ Click a project on the Projects page to open it. On a computer the column stays 
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
-Below them are seven tabs: **Overview**, **Library**, **Files**, **Memory**, **Skills**, **Agents** and **Settings**. **Library**, **Memory** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
-
 ### Overview
 
 The project at a glance, in cards:
 
 - **Sessions**: the sessions in the project (started in it, or working in its folder, in Hydor, Claude Code or Codex), the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
-- **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there. Files dropped on it are added to the project.
+- **Files**: the project's newest files, up to six, as tiles with their pictures: what was kept in the project (pages, documents, slides, pictures…) and the files at the top of its folder, the last changed first. Click one to open it. **All files** opens the **Files** tab. The card shows only while the project has files.
 - **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
 - **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Memory** (what it remembers, in a line: "12 notes · 8 articles · 5 documents", with the articles only while its wiki memory is on; click for the **Memory** tab), **Skills** (how many of its own) and **Starts as** (its agent).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
 
-### Library
-
-Everything the project holds in the Library: the pages, slides, documents, spreadsheets and LaTeX documents agents saved in its sessions, and what you kept there or moved there (see [Sort it by project](/guide/library#sort-it-by-project)). Each card opens it, and its **More** (⋯) has what it has in the Library. **Open in the Library** shows the project's things there, with the Library's search and kinds. With nothing yet, the tab says so, with **New page** and **New slides**, made in the project. Drop files on it to add them to the project, each made what it is (see [Add files of yours](/guide/library#add-files-of-yours)).
-
 ### Files
 
-The project's folder, and the other folders it works with, as the [Files page](/guide/files-git#browse-a-folder) shows a folder: open, pick several, drag, upload, and each row's menu. A file opens in a window over the page.
+The project's files: the things kept in it, its folder, and the other folders it works with. The tab shows a folder as the [Files page](/guide/files-git#browse-a-folder) does: open, pick several, drag, and each tile's or row's menu. A file opens in a window over the page.
 
 - Over the folder, a chip for each: the project's own folder, by the project's name, and each folder it works with, by its name. Click one to show it.
 - **Attach a folder** adds a folder of yours for the project to work with, where it is: find it by name or type its path. Nothing is copied. Up to 12.
 - ✕ on a folder's chip leaves it out of the project; the folder itself stays as it is. The message has **Undo**.
-- **Open in Files** opens the folder on the Files page. In the desktop app, **Show in Finder**, **Show in File Explorer** or **Show in folder** shows it in the system's file manager.
+- **Open in Files** opens the folder on the Files page. In the desktop app, **Show in Finder**, **Show in File Explorer** or **Show in folder** (in the project's menu) shows it in the system's file manager.
 
-To add files from elsewhere, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)). Or drop files from your computer on the project's card or its Library: what the Library keeps (documents, spreadsheets, pictures…) goes there, and any other file comes into this folder (see [Add files of yours](/guide/library#add-files-of-yours)).
+**Tiles and the list.** The files show as tiles with pictures, unless you picked **As a list** yourself (the switch at the end of the bar remembers your pick on this browser). Each tile has a picture on top, a small badge with its kind for documents and the like (PDF, Word, Sheet, Slides, Notebook…), its name and when it changed ("Changed 2 h ago"); its ⋯ appears when you point at it. The picture is the picture itself for pictures, a frame for videos, the first page for PDFs, the first page, slide or cells for Word, PowerPoint, Excel and OpenDocument files, how it opens for web pages and notebooks, and the first lines for text, Markdown, code, CSV and JSON files. Anything else shows its kind's icon. The list shows pictures as small thumbnails in place of icons (see [Browse a folder](/guide/files-git#browse-a-folder)).
+
+**What the project keeps.** At the top of the project's own folder (not in its subfolders, nor in the folders it works with), what was kept in the project shows in the same grid, after the folders and before the files, the newest first: the pages, designs, slides, documents, spreadsheets, LaTeX documents, notebooks, diagrams and boards that agents made and you kept, saved web pages, and pictures, videos and sounds you kept. Each shows its picture and its kind on it, and a click opens it in its own editor or viewer. Its ⋯ menu has what fits it, such as **Edit**, **Rename**, **Share with people**, **Move to another project**, **Duplicate**, **Turn it into**, **Download** and **Delete**. The **Find in** field above filters them with the files. What you keep in a session with no project stays with that conversation (see [Keep a page](/guide/library#keep-a-page)).
+
+**Add files.**
+
+- **Upload** in the bar uploads files into the folder shown, as they are; its arrow (**More ways to upload**) has **Upload files** and **Upload a folder**, which brings the folder with its files. A Word, spreadsheet or LaTeX file opens in the app's own editors, as on the Files page.
+- Drop files or folders from your computer anywhere on the tab: "Drop to add to “Thesis”" shows while they are over it. On a phone, the round **+** at the bottom (**Add to this folder**) has the same items.
+- **New** has **New folder**, **New file** and **New notebook**, **Upload files** and **Upload a folder**, and under them the things the app makes: **Document**, **Slides**, **Spreadsheet**, **Page**, **Design**, **LaTeX**, **Diagram**, **Board** and **Picture**. Each opens the New dialog for that kind, with this project picked (see [Make a page](/guide/library#make-a-page)).
+
+To add files from elsewhere in the app, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)).
 
 ### Memory
 
-What the project remembers, in three parts, one at a time under a switch: **Notes**, **Wiki** and **Documents**. Each has its own address (`/projects/<id>/memory`, with `?part=wiki` or `?part=documents`), and the old Knowledge and LLM Wiki tabs' addresses open it.
+What the project remembers, in three parts, one at a time under a switch: **Notes**, **Wiki** and **Documents**. A link to a part opens the window on it, and so do the old Knowledge and LLM Wiki tabs' addresses.
 
 - **Notes**: the memory notes agents kept about the project, as [Settings → Memory](/settings?s=memory) lists them, with **Add a note** and a search field. They are the short facts every session in the project starts with (see [Memory](/guide/memory)).
 - **Wiki**: the articles and sources of the project's wiki memory, to read, and **Recent updates** from new and changed documents. Agents write it; you read it here (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
@@ -228,7 +210,7 @@ Each of the project's own skills shows as a row: its name, when to use it, and h
 - Click it to read the skill and its **History** of changes. **Change**, at the bottom of that window, edits its name, when to use it and its text: a new name keeps its other files, its history and its switch.
 - **Remove**, in the same window, removes it after you confirm. The project's sessions stop seeing it, or go back to the library's skill of that name. Removed skills are listed under the list, after **Removed:**: click one to bring it back as it was.
 
-In a group, the own skills of each project it brings together follow, under that project's name: the group's sessions get them too. Change them on that project's page. Claude Code's and Codex's own skills are listed for the project's folder: yours, and those in that folder (Claude Code's in its `.claude/skills`).
+In a group, the own skills of each project it brings together follow, under that project's name: the group's sessions get them too. Change them in that project's details. Claude Code's and Codex's own skills are listed for the project's folder: yours, and those in that folder (Claude Code's in its `.claude/skills`).
 
 ### How agents get them
 
@@ -247,11 +229,11 @@ The agent suggests one of the two; you choose before you approve. An improvement
 
 ## Change a project
 
-Open the project, go to its **Settings** tab, change what you like and click **Save**. Sessions you start in the project from then on get the new name, description and guidelines. A new agent applies the next time you pick the project on the start page, or click **New session** on its page. The project's folder stays the same: it can't be moved to another folder.
+Open the project's details, go to its **Settings** tab, change what you like and click **Save**. Sessions you start in the project from then on get the new name, description and guidelines. A new agent applies the next time you pick the project on the start page, or click **New session** in its details. The project's folder stays the same: it can't be moved to another folder.
 
 ## Delete a project
 
-1. Open the project, and click **More** (⋯) at its top, or go to its **Settings** tab.
+1. Open the project's details, and click **More** (⋯) at its top, or go to its **Settings** tab.
 2. Click **Delete the project**.
 3. The app asks "Delete the *name* project?" Click **Delete**. For a project Hydor found, it adds "Hydor found it in Claude Code’s sessions and won’t make it again." (or Codex’s, or Claude Code’s and Codex’s).
 
@@ -260,7 +242,7 @@ Deleting a project keeps everything that was in it:
 - **Its folder** and the files in it stay where they are, and so do the folders it worked with.
 - **Its folder goes on the Not a project list**: Hydor won't suggest it again, and won't make it a project again by itself. You can still make a project for it yourself (**New project** → **In a folder I already have**).
 - **Its sessions** stay, and no longer belong to a project.
-- **What it holds in the Library** stays there, in no project.
+- **What it kept** (pages, designs, documents, pictures…) stays, in no project: with the conversation that made it, and the search box (Ctrl+K) still finds it. Its own page has **Move to a project** to put it in another.
 - **Its documents** move to the shared knowledge, so every session can search them from then on. To keep them apart, move their knowledge base into another project (see [Rename, move, read again or delete a knowledge base](#rename-move-read-again-or-delete-a-knowledge-base)).
 - **Its skills** move to your skill library, so every session gets them from then on. One with the name of a skill the library has already takes the project's name after its own: the Thesis project's `research` becomes `research-thesis`.
 - **What agents remember** about its folder stays: notes belong to the folder, not to the project.
@@ -280,11 +262,11 @@ A group is a project that brings several projects together, for work that spans 
 
 ### Make a group
 
-1. On the [Projects page](/projects), click **Group projects together**. It shows once you have at least two projects that aren't groups.
+1. In the sidebar, click the **+** at the end of the **Projects** heading and pick **New group of projects…**. You need at least one project to bring in.
 2. In **New group of projects**, give it a **Name**, such as "Work" or "Everything for the thesis".
 3. Under **The projects it brings together**, tap each project to bring in; tap one again to take it out. Pick at least one.
 4. Optionally, fill in **What it is about** and the **Agent Guidelines**, and pick a colour.
-5. Click **Make the group**. Like a project, it gets a folder of its own for what is made in it, and its page opens.
+5. Click **Make the group**. Like a project, it gets a folder of its own for what is made in it, and its details open.
 
 You can also turn an existing project into a group: on its **Settings** tab, pick projects under **The projects it brings together** and click **Save**. Change a group's projects the same way. Take all of them out and it is a plain project again.
 
@@ -303,25 +285,25 @@ The sidebar gives each project a group of its own, under its name and mark, with
 To list only one project's sessions:
 
 1. At the top of the sidebar, click the filter button (**Filter and group sessions**).
-2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every project**, up to eight of your projects, and **Projects**, which opens the Projects page. Pick a project.
+2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every project**, up to eight of your projects, and **New project…**. Pick a project.
 
 The session list then shows only the sessions in that project, by day, and the filter button is coloured while a filter is on. Pick **Every project** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a project. If the project is deleted, the list shows every session again.
 
-On the project's own page, **More** (⋯) → **Only its sessions in the sidebar** does the same, with a check while it is on; pick it again to see every session.
+In the project's details, **More** (⋯) → **Only its sessions in the sidebar** does the same, with a check while it is on; pick it again to see every session.
 
 On a phone, open the sidebar (a drawer) first.
 
 ## Share a project with people
 
-You can invite people into one project, such as an advisor and the students who work with you, each with a link of their own. Without your password, they see the project's documents, its sessions and, when it has them, its runs and its reading list. They comment on its documents under their own name, and if you let them, they change its documents too. They never reach your agents, your files, your settings or your other projects. To share one thing of the Library alone (a document, a page, a picture, a video…), see [Share with people](/guide/library#share-with-people).
+You can invite people into one project, such as an advisor and the students who work with you, each with a link of their own. Without your password, they see the project's documents, its sessions and, when it has them, its runs and its reading list. They comment on its documents under their own name, and if you let them, they change its documents too. They never reach your agents, your files, your settings or your other projects. To share one thing alone (a document, a page, a picture, a video…), see [Share with people](/guide/library#share-with-people).
 
 ### Invite someone
 
-1. Open the project and click **More** (⋯) at its top, or **More** on its card on the [Projects page](/projects). Click **Share with people**.
+1. Open the project's details and click **More** (⋯) at its top, then **Share with people**.
 2. Under **Invite someone**, type **Their name**. Their comments and changes show under it.
 3. Pick what they may do:
    - **View and comment**: they read everything the project shares, and comment on its documents, LaTeX documents, slides, spreadsheets and pages.
-   - **Edit documents**: they also change its documents, spreadsheets, slides, pages and designs, in the Library's own editors (a page's words, pictures and layout, never its code), and its LaTeX documents where this computer typesets them shut in (see [What is never shared](#what-is-never-shared)).
+   - **Edit documents**: they also change its documents, spreadsheets, slides, pages and designs, in the app's own editors (a page's words, pictures and layout, never its code), and its LaTeX documents where this computer typesets them shut in (see [What is never shared](#what-is-never-shared)).
 4. Pick how long the link works: **A week**, **A month** or **Until you stop it**.
 5. Click **Make their link**. Copy it with the copy button and send it to them, or click the QR code button to show it as a QR code for their phone's camera. The link is shown only now: the app keeps only a fingerprint of it, so it can't show it again. You can always make them a new one.
 
@@ -367,7 +349,7 @@ A link that ran out, was stopped or was made again says so when opened ("This li
 ### What is never shared
 
 - **Your agents**: people can't start or steer a session, or ask an agent anything. They read sessions and comment on documents.
-- **Your files**: not the project's folder, not any folder of yours. Only what the project holds in the Library, and its sessions as read-only links show them.
+- **Your files**: not the project's folder, not any folder of yours. Only what the project keeps (its pages, documents, pictures and the like), and its sessions as read-only links show them.
 - **Your settings, your other projects** and everything else in the app. A group's link shows the group's own things, not those of the projects it brings together.
 - **Running anything**: a page of HTML (a small app, a tracker) shows with its data as it is, and what it changes is not kept; with **Edit documents** they change its words, pictures and layout, never its code (its scripts, and what runs when something is clicked); a notebook shows its cells and outputs and never runs. LaTeX documents are changed through a link only where TeX runs shut in by bubblewrap (Linux); elsewhere people read and comment on them.
 
@@ -377,10 +359,10 @@ Each link is a long random code that opens one project for one person. A code th
 
 Agents can search documents you add once: contracts, manuals, notes, papers, a whole folder. They find passages by their words or by what they mean, and cite the file and page they read. Documents are kept in **knowledge bases**: named collections of files you dropped in and folders on this computer.
 
-- **Shared knowledge** ([Projects → Shared knowledge](/knowledge)): every session searches it, in a project too unless the project turns that off.
+- **Shared knowledge** ([the Shared knowledge page](/knowledge)): every session searches it, in a project too unless the project turns that off.
 - **A project's own knowledge**, on its **Memory** tab, under **Documents**: only that project's sessions search it, and the sessions of a group that brings the project in.
 
-To open the shared knowledge, click **Shared knowledge** in the Projects column (on a phone, the **Shared knowledge** tab on the Projects page), or type "shared knowledge" in the search box (Ctrl+K).
+Shared knowledge is a page of its own, with no column of projects beside it. To open it, click **Shared knowledge** in the text at the top of [Settings → Memory](/settings?s=memory), or type "shared knowledge" in the search box (Ctrl+K).
 
 ## Add documents
 
@@ -440,7 +422,7 @@ The ⋯ button (**More**) at the top right of a knowledge base opens its menu:
 
 ## Give a project documents of its own
 
-Open the project, go to its **Memory** tab and pick **Documents**.
+Open the project's details, go to its **Memory** tab and pick **Documents**.
 
 - **Also search the shared knowledge** is a switch, on unless you turn it off. Turn it off and the project's sessions search only the project's own documents (and, in a group, those of its projects). The line under it says how many shared documents there are, with a **Shared knowledge** link.
 - With no documents yet, drop documents or a folder in the box, or choose them: a knowledge base named after the project is made for them. **Start with a folder on this computer instead** makes an empty one, named after the project, to add a folder to.
@@ -487,7 +469,7 @@ The knowledge tools never bring up another project's documents, not even when an
 
 - "Make a project called Taxes 2026 for my receipts and tax return. Its sessions should start as the Researcher, and every agent in it should know that amounts are in EUR."
 - "Make a project called Shop for my code in ~/code/shop."
-- "What does my Thesis project hold in the Library? Move the reading tracker into it."
+- "What does my Thesis project keep in its files? Move the reading tracker into it."
 - "Which folders have I been working in that aren't in a project yet? Make projects for the two I use most."
 - "Which of my projects came from Claude Code or Codex?"
 - "Don't make a project for ~/code/scratch by itself."

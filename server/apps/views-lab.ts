@@ -552,7 +552,7 @@ const REPORT_HEAD = String.raw`<header class="hero">
   <p class="kicker">Weekly report · {{week}}{{#audience|is:Your advisor}} · for your advisor{{/audience}}{{#audience|is:Your team}} · for your team{{/audience}}{{#audience|is:A manager}} · for a manager{{/audience}}</p>
   <h1>{{title}}</h1>
   {{#summary}}<p class="lead">{{summary}}</p>{{/summary}}
-  {{#stats|count}}<p class="nums">{{#stats}}<span><b>{{count}}</b> {{#what|is:Sessions}}sessions{{/what}}{{#what|is:Commits}}commits{{/what}}{{#what|is:Experiment runs}}experiment runs{{/what}}{{#what|is:Made in the Library}}made in the Library{{/what}}{{#what|is:Papers read}}papers read{{/what}}</span>{{/stats}}</p>{{/stats}}
+  {{#stats|count}}<p class="nums">{{#stats}}<span><b>{{count}}</b> {{#what|is:Sessions}}sessions{{/what}}{{#what|is:Commits}}commits{{/what}}{{#what|is:Experiment runs}}experiment runs{{/what}}{{#what|is:Made in the Library}}made or kept{{/what}}{{#what|is:Made or kept}}made or kept{{/what}}{{#what|is:Papers read}}papers read{{/what}}</span>{{/stats}}</p>{{/stats}}
   <div class="acts">
     <button type="button" class="n-btn" data-event="copy_md">Copy as Markdown</button>
     <button type="button" class="n-btn" data-event="copy_email">Copy as an email</button>

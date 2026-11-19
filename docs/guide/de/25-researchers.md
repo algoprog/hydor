@@ -101,7 +101,7 @@ Spätere Abgleiche übertragen nur Änderungen. In Zotero gelöschte Arbeiten bl
 - **Spalten**: ein Kriterium pro Zeile; zunächst **Aufgabe**, **Daten**, **Methode**, **Metriken**, **Ergebnisse** und **Grenzen**.
 - **Projekt**: das Zielprojekt der Tabelle. Eine bloße Angabe „my reading list“ verwendet dann die Papers dieses Projekts.
 
-Die App liest drei Arbeiten gleichzeitig, als offene Vollfassung oder andernfalls Abstract. Ein schnelles Modell füllt die Zeilen und fasst gemeinsame Aussagen zusammen. Die Matrix landet als [Tabelle in der Bibliothek](/guide/library#spreadsheets), ergänzt um ein zweites Blatt mit den Papers. **Die Matrix** zeigt Anzahl, **In der Bibliothek öffnen**, **Als Tabelle kopieren**, die Tabelle selbst sowie nicht lesbare Arbeiten mit Gründen. Über **Eine weitere Spalte** und **Damit erneut erstellen** startest du eine neue Auswertung mit zusätzlichem Kriterium. **Papers** zeigt Kurzbeschreibungen und verwendete Quellen. **Über die Papers hinweg** nennt Gemeinsamkeiten, Widersprüche und offene Fragen mit **Kopieren**.
+Die App liest drei Arbeiten gleichzeitig, als offene Vollfassung oder andernfalls Abstract. Ein schnelles Modell füllt die Zeilen und fasst gemeinsame Aussagen zusammen. Die Matrix wird als [Tabelle](/guide/library#spreadsheets) in den Dateien des Projekts behalten, ergänzt um ein zweites Blatt mit den Papers. **Die Matrix** zeigt Anzahl, **Tabelle öffnen**, **Als Tabelle kopieren**, die Tabelle selbst sowie nicht lesbare Arbeiten mit Gründen. Über **Eine weitere Spalte** und **Damit erneut erstellen** startest du eine neue Auswertung mit zusätzlichem Kriterium. **Papers** zeigt Kurzbeschreibungen und verwendete Quellen. **Über die Papers hinweg** nennt Gemeinsamkeiten, Widersprüche und offene Fragen mit **Kopieren**.
 
 ### Belege für eine Aussage finden
 
@@ -125,7 +125,7 @@ Die App führt lokalen Code aus und kann Stunden benötigen. Sie hält deine Gre
 
 ## Paper vor der Einreichung prüfen
 
-Der LaTeX-Editor prüft Referenzen, Anonymität, Seiten und Schriftarten, vorgeschriebene Abschnitte und Tabellenwerte, ähnlich einer redaktionellen und wissenschaftlichen Vorprüfung. Öffne deine Arbeit in [LaTeX-Dokumente](/library?kind=tex) und wähle **Werkzeuge → Vor dem Einreichen prüfen**.
+Der LaTeX-Editor prüft Referenzen, Anonymität, Seiten und Schriftarten, vorgeschriebene Abschnitte und Tabellenwerte, ähnlich einer redaktionellen und wissenschaftlichen Vorprüfung. Öffne deine Arbeit (ein LaTeX-Dokument unter den Dateien seines Projekts: die Details des Projekts → **Dateien**) und wähle **Werkzeuge → Vor dem Einreichen prüfen**.
 
 1. Wähle das Ziel: **ACL Rolling Review** als langer oder kurzer Beitrag, auch für **EMNLP** und **NAACL**, **SIGIR** als Voll- oder Kurzbeitrag, **CIKM**, **WSDM**, **TheWebConf**, **KDD**, **NeurIPS**, **ICLR**, **ICML**, **AAAI**, **Eine IEEE-Zeitschrift**, **ACM-Zeitschrift** oder **Andere** mit eigenem Seitenlimit und Option **Anonyme Begutachtung**. Darunter stehen Seitenlimit, ausgenommene Teile, Anonymitätsregeln und Pflichtabschnitte. Da Regeln sich jährlich ändern, ist der Call for Papers verlinkt. Die Auswahl wird je Arbeit gespeichert; anfangs wird sie aus dem Dokumentstil abgeleitet.
 2. **Prüfen** setzt das Dokument, liest das PDF, recherchiert Referenzen online und zeigt Befunde laufend an. Nur Titel, DOIs und arXiv-IDs gehen an Crossref, arXiv, OpenAlex, Semantic Scholar und DBLP. Antworten werden einige Tage zwischengespeichert; nicht erreichbare Dienste stehen bei den Befunden. Eigene kostenlose Keys verbessern den Zugriff auf OpenAlex und Semantic Scholar. Hinterlege unter [Keys](/apps/connected?tab=keys) OPENALEX_API_KEY für api.openalex.org beziehungsweise SEMANTIC_SCHOLAR_API_KEY für api.semanticscholar.org.
@@ -142,7 +142,7 @@ Der Button mit Datei und Zeile öffnet die Fundstelle im Quelltext. **Beheben** 
 
 **Als Kommentare hinzufügen** verankert offene Befunde als [LaTeX-Dokumentkommentare](/guide/library#latex-documents) an ihren Textstellen. Du, mitwirkende Personen und Agenten sehen sie dort; ein zur Bearbeitung beauftragter Agent kann sie korrigieren und erledigen. Eine erneute Prüfung nennt behobene, verbleibende und neue Befunde. **Als Kommentare hinzufügen** erledigt dann Kommentare behobener Befunde.
 
-Agenten können dieselbe Prüfung für Bibliotheksdokumente oder lokale LaTeX-Projekte ausführen: „Prüfe meine Arbeit für ACL vor der Einreichung“.
+Agenten können dieselbe Prüfung für ein Paper, das du behalten hast, oder lokale LaTeX-Projekte ausführen: „Prüfe meine Arbeit für ACL vor der Einreichung“.
 
 ### Mit den Läufen übereinstimmende Werte
 
@@ -176,7 +176,7 @@ Ungespeicherte Änderungen werden vorher gespeichert, damit jede Aktion den sich
 
 ## Paper begutachten, beantworten und präsentieren
 
-Vier fertige Apps unter **Schreiben** auf [der Apps-Seite](/apps) helfen bei deinem eigenen Paper: **Begutachtung simulieren** begutachtet deinen Entwurf so, wie es die Gutachter einer Konferenz tun würden, **Rebuttal erstellen** entwirft deine Antwort auf die Gutachten, die du bekommen hast, **Vortrag, Poster und Thread aus einem Paper** erstellt das Material, mit dem du es vorstellst, und **Abbildungen optimieren** macht seine Plots druckreif. Die ersten drei lesen dein Paper aus einem PDF, einer .tex-Datei oder dem Ordner eines LaTeX-Projekts auf diesem Computer, aus einem Link oder aus einem LaTeX-Dokument deiner Bibliothek (füge dessen Adresse ein); **Oder hochladen** nimmt stattdessen ein PDF an.
+Vier fertige Apps unter **Schreiben** auf [der Apps-Seite](/apps) helfen bei deinem eigenen Paper: **Begutachtung simulieren** begutachtet deinen Entwurf so, wie es die Gutachter einer Konferenz tun würden, **Rebuttal erstellen** entwirft deine Antwort auf die Gutachten, die du bekommen hast, **Vortrag, Poster und Thread aus einem Paper** erstellt das Material, mit dem du es vorstellst, und **Abbildungen optimieren** macht seine Plots druckreif. Die ersten drei lesen dein Paper aus einem PDF, einer .tex-Datei oder dem Ordner eines LaTeX-Projekts auf diesem Computer, aus einem Link oder aus einem LaTeX-Dokument, das du behalten hast (füge dessen Adresse ein); **Oder hochladen** nimmt stattdessen ein PDF an.
 
 ### Begutachtung simulieren
 
@@ -204,7 +204,7 @@ Die App trennt Gutachten, extrahiert parallel die Punkte und führt mehrfach gen
 
 - **Dein Paper**, idealerweise der LaTeX-Projektordner mit Abbildungen; bei arXiv wird deren Quellpaket geladen. Dazu **Vortragsdauer in Minuten**, standardmäßig 15, **Publikum** mit **Forscher auf diesem Gebiet**, **Forscher in anderen Bereichen** oder **Ein allgemeines Publikum**, gewünschte Ergebnisse als **Folien**, **Ein A0-Poster**, **Ein Thread (X, Bluesky, LinkedIn)** und **Eine Projektseite** sowie das **Projekt** zum Speichern.
 
-Die App plant ungefähr eine Folie pro Minute mit je einem Kerngedanken, vom Problem bis zur Schlussfolgerung. Ein Programm verteilt die Zeit exakt auf die gewünschte Gesamtdauer. Anschließend entstehen parallel die gewählten Materialien: bearbeitbare und präsentierbare [Folien in der Bibliothek](/guide/library#slides), das Poster als [LaTeX-Dokument](/guide/library#latex-documents), die Beiträge und eine veröffentlichungsfertige Projektseite; siehe [Seite veröffentlichen](/guide/library#publish-a-page).
+Die App plant ungefähr eine Folie pro Minute mit je einem Kerngedanken, vom Problem bis zur Schlussfolgerung. Ein Programm verteilt die Zeit exakt auf die gewünschte Gesamtdauer. Anschließend entstehen parallel die gewählten Materialien: bearbeitbare und präsentierbare [Folien](/guide/library#slides) aus den Dateien des Projekts, das Poster als [LaTeX-Dokument](/guide/library#latex-documents), die Beiträge und eine veröffentlichungsfertige Projektseite; siehe [Seite veröffentlichen](/guide/library#publish-a-page).
 
 **Erstellte Inhalte** zeigt Kernaussage, Einstiegssatz und alle Ergebnisse mit **Öffnen**. **Vortrag** stellt den Ablauf als Streifen dar, dessen Folienbreiten ihrer Dauer entsprechen. Jede Folie zeigt Minuten, Titel, Punkte, Abbildung, Gleichung und Sprechtext. **Thread** wechselt zwischen **X**, **Bluesky** und **LinkedIn**: nummerierte Beiträge mit **Kopieren** und **Kopiere den Thread**, für den einzelnen LinkedIn-Beitrag **Beitrag kopieren**.
 
@@ -250,7 +250,7 @@ Jeder Datensatz gehört zu einem eigenen Lauf. Texte und deine Annotationen blei
 3. Ein Agent erstellt neben deinem unveränderten Checkout einen neuen Worktree auf einem Branch sprint/…. Dort schreibt und committet er Plan als SPRINT.md und benötigten Code. Er listet Baseline- und Hypothesenläufe mit Seeds auf. Läufe über deinem GPU-Budget werden ausgelassen und genannt.
 4. Vor dem Verbrauch von GPU-Zeit wartet er erneut. Du kannst starten oder ablehnen; bei Ablehnung endet der Sprint, Plan und Code bleiben auf dem Branch.
 5. Experimente führt die mit dem Sprint gekennzeichneten Läufe aus. Der Sprint wartet auf ihren gemeinsamen Abschluss.
-6. Eine Ergebnistabelle vergleicht alle Bedingungen mit der Baseline und weist Signifikanz aus. Ein Agent analysiert die Läufe in einem Jupyter-Notebook in deiner [Bibliothek](/library), beurteilt jede Hypothese mit Belegen als gestützt, nicht gestützt oder unklar und schreibt einen kurzen Bericht.
+6. Eine Ergebnistabelle vergleicht alle Bedingungen mit der Baseline und weist Signifikanz aus. Ein Agent analysiert die Läufe in einem Jupyter-Notebook, das in den Dateien des Projekts behalten wird, beurteilt jede Hypothese mit Belegen als gestützt, nicht gestützt oder unklar und schreibt einen kurzen Bericht.
 
 **Der Sprint** zeigt Frage, Verlauf, Branch sowie Hypothesen mit Urteil und Belegen. **Ausführungen** enthält Ergebnistabelle und einzelne Metriken. **Bericht** lässt sich lesen und kopieren und bietet **Notebook öffnen** und Vorschläge für weitere Versuche. Bei einem Start über API oder Zeitplan gibt es keine interaktiven Freigaben; der Sprint läuft direkt durch.
 
@@ -267,19 +267,19 @@ Jeder Datensatz gehört zu einem eigenen Lauf. Texte und deine Annotationen blei
 
 ## Berichte: Woche und Laborbuch
 
-Zwei fertige Apps unter **Arbeit** auf der Seite [Apps](/apps) schreiben aus dem, was Hydor über deine Arbeit weiß, auf, was du getan hast: deine Sitzungen (die hier sowie die Claude-Code- und Codex-Sitzungen in VS Code oder einem Terminal, die Hydor liest), deine Commits in den Git-Repositorys, in denen sie gearbeitet haben, deine Läufe unter Experimente, was du in der Bibliothek erstellt hast und die Papers, die du in deiner Leseliste als gelesen markiert hast. Sitzungen ohne Memory und vertrauliche Sitzungen bleiben außen vor, ebenso die Arbeit von Sitzungen, die Agenten für Teile einer Aufgabe starten (sie zählt zur übergeordneten Sitzung). Beide öffnen sich auf einer eigenen Seite und können sich von selbst aktualisieren.
+Zwei fertige Apps unter **Arbeit** auf der Seite [Apps](/apps) schreiben aus dem, was Hydor über deine Arbeit weiß, auf, was du getan hast: deine Sitzungen (die hier sowie die Claude-Code- und Codex-Sitzungen in VS Code oder einem Terminal, die Hydor liest), deine Commits in den Git-Repositorys, in denen sie gearbeitet haben, deine Läufe unter Experimente, was du erstellt oder behalten hast und die Papers, die du in deiner Leseliste als gelesen markiert hast. Sitzungen ohne Memory und vertrauliche Sitzungen bleiben außen vor, ebenso die Arbeit von Sitzungen, die Agenten für Teile einer Aufgabe starten (sie zählt zur übergeordneten Sitzung). Beide öffnen sich auf einer eigenen Seite und können sich von selbst aktualisieren.
 
 ### Wöchentlicher Fortschrittsbericht
 
 **Wöchentlicher Fortschrittsbericht** erstellt einen Wochenbericht für Betreuung, Team oder Führungskraft: Erledigtes, Ergebnisse mit Zahlen, Probleme und Blockaden, Plan für nächste Woche und offene Fragen. Die Seite zeigt den Bericht für die sieben Tage bis zu seiner Erstellung: Titel, Zusammenfassung, Zahlen sowie **Diese Woche erledigt**, **Ergebnisse**, **Probleme und Blocker**, **Nächste Woche** und **Fragen**.
 
-- **Als Markdown kopieren** und **Als E-Mail kopieren** übernehmen den Bericht in die Zwischenablage. Die E-Mail enthält Betreff und eine kurze Nachricht mit passender Anrede und Schluss. **Als Dokument speichern** legt ihn in der Bibliothek zum Bearbeiten und Exportieren als Word oder PDF ab.
+- **Als Markdown kopieren** und **Als E-Mail kopieren** übernehmen den Bericht in die Zwischenablage. Die E-Mail enthält Betreff und eine kurze Nachricht mit passender Anrede und Schluss. **Als Dokument speichern** behält ihn als Dokument zum Bearbeiten und Exportieren als Word oder PDF.
 - **Aktualisieren** schreibt jetzt den Bericht dieser Woche. **Früher** darunter listet die früheren Wochen auf, jede einen Klick entfernt.
 - Die Schieberegler oben öffnen **Einstellungen**. **Automatisch aktualisieren** ist zunächst aus und erstellt nach Aktivierung freitags um 16:00 einen Bericht. Ändere Tage über **Täglich**, **Werktags** oder **Wöchentlich am** sowie die Uhrzeit. Als [geplante Aufgabe](/guide/tasks) erscheint dies auch unter [Einstellungen → Geplante Aufgaben](/settings?s=tasks). **Zielgruppe** bestimmt Schreibweise für Betreuung, Team oder Führungskraft. **Projekte** wählt alle oder benannte Projekte, **Gewünschte Inhalte** präzisiert etwa „nur Forschung, keine Kosten“.
 
 ### Laborbuch
 
-**Laborbuch** erstellt für jeden aktiven Tag einen datierten Eintrag mit Versuchen, Erkenntnissen, Entscheidungen und offenen Fragen. Verlinkt sind zugehörige Sitzungen, Commits, Läufe, Dateien und Bibliotheksinhalte. Einträge sind App-Daten und getrennt von [Memory](/guide/memory). Die eigene Seite zeigt neueste zuerst:
+**Laborbuch** erstellt für jeden aktiven Tag einen datierten Eintrag mit Versuchen, Erkenntnissen, Entscheidungen und offenen Fragen. Verlinkt sind zugehörige Sitzungen, Commits, Läufe, Dateien und behaltene Inhalte. Einträge sind App-Daten und getrennt von [Memory](/guide/memory). Die eigene Seite zeigt neueste zuerst:
 
 - **Notebook durchsuchen** sucht Wörter und bei aktivierter [Bedeutungssuche](/settings?s=memory&find=Search%20by%20meaning) auch sinngemäß, beste Treffer zuerst. **Alle Einträge** hebt die Suche auf.
 - **Link kopieren** unter einem Eintrag kopiert dessen eigene Seite im ursprünglichen Stand, etwa als Beleg in eines Papers, einem Bericht oder einer Notiz.

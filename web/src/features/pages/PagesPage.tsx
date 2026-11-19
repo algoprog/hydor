@@ -1,8 +1,8 @@
-// The Library's pages, each at its own place (/pages/<id>): a page to use, edit (visually or as code) and save, a deck
+// A page kept by an agent or by you, each at its own place (/pages/<id>): a page to use, edit (visually or as code) and save, a deck
 // to edit and present (/pages/<id>/show is the audience's window of a presentation), with versions (view one, bring
 // it back), Export (PDF, Word, PowerPoint, a web page), the data it keeps, its own address for a phone's home screen,
-// Publish, the space it is in, and Ask: an agent changes it while you watch. The Library itself is Library.tsx;
-// /pages, its old address, opens it.
+// Publish, the project it is in, and Ask: an agent changes it while you watch. What a project keeps shows in its Files;
+// /pages and /library, the old addresses of the Library, move on (LibraryRedirect.tsx).
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppDef } from '@shared/apps';
@@ -17,7 +17,6 @@ import {
   Ellipsis,
   ExternalLink,
   FolderInput,
-  FolderTree,
   Globe,
   GlobeLock,
   History,
@@ -43,13 +42,12 @@ import { Button, cx, Dialog, Empty, IconButton, MenuItem, MenuLabel, MenuSep, Po
 import { BacklinksPopover, LockBand, lockPage, pageWords } from './PageExtras';
 import { LOCALE } from '../../i18n/locale';
 import { NavButton, PageHeader } from '../layout/PageHeader';
-import { Library } from './Library';
+import { LibraryRedirect } from './LibraryRedirect';
 import { PublishDialog, RenameDialog } from './parts';
 import { SpaceMenu } from '../spaces/SpacePick';
 import { useSpaces } from '../spaces/state';
 import { pageStore, previewStore, type AppBridge } from './frame';
 import { absolute, usePagesStore } from './state';
-import { FolderMenu, moveToFolder, placeFolders, placeTopName } from './folders';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { tr } from '../../i18n/runtime';
 import { askNow, closePageAsk, openPageAsk, PageAskPanel, PageAskPill, usePageAsk } from './AskPage';
@@ -65,16 +63,11 @@ import { openShare, useSharedThings } from '../spaces/ShareHost';
 
 export function PagesRoute() {
   const [loc] = useLocation();
-  const search = useSearch();
   const show = /^\/pages\/([a-f0-9]{10})\/show$/.exec(loc)?.[1];
-  // The Library's old address (and its tabs, "New page"…) opens the Library.
-  useEffect(() => {
-    if (loc === '/pages') go(`/library${search ? `?${search}` : ''}`, true);
-  }, [loc, search]);
   if (show) return <AudienceView id={show} />;
   const id = /^\/pages\/([a-f0-9]{10})$/.exec(loc)?.[1];
   // One view a page (key): what one page's view still does as it is left (saving it) never lands on the next one.
-  return id ? <PageView key={id} id={id} /> : <Library />;
+  return id ? <PageView key={id} id={id} /> : <LibraryRedirect />;
 }
 
 // ---- a page's own place ---------------------------------------------------------------------------
@@ -138,11 +131,9 @@ function ShareMenu({
       <MenuItem icon={page.published ? <GlobeLock size={14} /> : <Globe size={14} />} onClick={onPublish}>
         {page.published ? 'Publish it again, at another link' : 'Publish at a link others can open'}
       </MenuItem>
-      {page.published && (
-        <MenuItem icon={<Globe size={14} />} onClick={() => (onClose(), go('/library?tab=published'))}>
-          See where it is published
-        </MenuItem>
-      )}
+      <MenuItem icon={<Globe size={14} />} onClick={() => (onClose(), go('/published'))}>
+        {page.published ? 'See where it is published' : 'See all published sites'}
+      </MenuItem>
     </Popover>
   );
 }
@@ -281,13 +272,11 @@ function PageView({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   // An older version on view.
   const [old, setOld] = useState<{ version: number; title: string; html?: string; model?: unknown } | null>(null);
-  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'folder' | 'links' | null>(null);
-  // The Library's folders, for More → Move to a folder (loaded with the list, when it is not yet).
-  const folders = usePagesStore((s) => s.folders);
-  useEffect(() => {
-    if (!usePagesStore.getState().folders) usePagesStore.getState().loadPages().catch(() => {});
-  }, []);
+  const [menu, setMenu] = useState<'history' | 'more' | 'share' | 'export' | 'space' | 'links' | null>(null);
   const spaces = useSpaces();
+  // Back goes to the Files of the project it is in; with none, to the start page.
+  const backName = data?.page.space ? spaces?.find((x) => x.id === data.page.space)?.name : undefined;
+  const backTo = data?.page.space ? `/projects/${enc(data.page.space)}/files` : '/';
   const [dialog, setDialog] = useState<'rename' | 'publish' | 'data' | null>(null);
   const [scopes, setScopes] = useState<AskScope[]>([]);
   const [part, setPart] = useState<string | null>(null);
@@ -400,7 +389,7 @@ function PageView({ id }: { id: string }) {
     try {
       await del(`/api/pages/${enc(id)}`);
       closePageAsk();
-      go('/library');
+      go(backTo);
     } catch (e) {
       toastError(e);
     }
@@ -454,11 +443,11 @@ function PageView({ id }: { id: string }) {
   if (error && !data) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PageHeader title="Library" />
+        <PageHeader title="Page" />
         <Empty icon={<AppWindow size={22} />} title="This page is not here">
           {error}.{' '}
-          <button className="text-accent underline-offset-2 hover:underline" onClick={() => go('/library')}>
-            Back to the Library
+          <button className="text-accent underline-offset-2 hover:underline" onClick={() => go('/')}>
+            Back to the start
           </button>
         </Empty>
       </div>
@@ -476,7 +465,7 @@ function PageView({ id }: { id: string }) {
   const lead = (
     <>
       {!mobile && <NavButton />}
-      <IconButton label="The Library" onClick={() => (closePageAsk(), go('/library'))}>
+      <IconButton label={backName ? tr(`Back to ${backName}’s files`) : 'Back'} onClick={() => (closePageAsk(), go(backTo))}>
         <ArrowLeft size={18} />
       </IconButton>
       <button type="button" className="ml-0.5 min-w-0 text-left" onClick={() => page && setDialog('rename')} title="Edit the title and description">
@@ -705,11 +694,6 @@ function PageView({ id }: { id: string }) {
                 Move to a project
               </MenuItem>
             )}
-            {!data.page.app && placeFolders(folders, data.page.space ?? null).length > 0 && (
-              <MenuItem icon={<FolderTree size={14} />} hint={<span translate="no">{folders?.find((f) => f.id === data.page.folder)?.name ?? ''}</span>} onClick={() => setMenu('folder')}>
-                Move to a folder
-              </MenuItem>
-            )}
             <MenuItem
               icon={<ExternalLink size={14} />}
               onClick={() => {
@@ -745,15 +729,6 @@ function PageView({ id }: { id: string }) {
                 })
                 .catch(toastError);
             }}
-          />
-          <FolderMenu
-            anchor={moreRef}
-            open={menu === 'folder'}
-            onClose={() => setMenu(null)}
-            folders={placeFolders(folders, data.page.space ?? null)}
-            value={data.page.folder ?? null}
-            topName={placeTopName(data.page.space ?? null, spaces)}
-            onPick={(f) => void moveToFolder({ kind: 'page', id }, f, placeTopName(data.page.space ?? null, spaces))}
           />
           <RenameDialog page={data.page} open={dialog === 'rename'} onClose={() => setDialog(null)} />
           <PublishDialog page={data.page} open={dialog === 'publish'} onClose={() => setDialog(null)} />

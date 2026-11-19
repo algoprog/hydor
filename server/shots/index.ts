@@ -118,7 +118,7 @@ export function pathOf(url: string): string {
 }
 
 /**
- * An HTML file made with the page kit (its body is .n-page): a page for show_html or the Library, which the app
+ * An HTML file made with the page kit (its body is .n-page): a page for show_html or save_page, which the app
  * shows with the kit's stylesheet and in the app's light or dark, so its screenshot shows it so too.
  */
 export function kitPage(file: string): boolean {
@@ -153,7 +153,7 @@ const SHOT: RunTool = {
     'when you are done, take phase "after" of the same screens with the same labels. The user sees each pair side by side in the conversation. Start the dev server first if it is not running.',
     'phase "check" just looks (no pair). viewport: "desktop" (1280×800, the default), "phone" (390×844) or "both". full_page: the whole page instead of its first screen.',
     'theme: "dark" or "light", the colour scheme the page is told the device prefers (the browser’s light when not given).',
-    'An HTML file made with the page kit (<body class="n-page">, a page for show_html or the Library) is shown as the app shows it, with the kit and in its dark theme unless theme is "light": look at a page you wrote before you show it.',
+    'An HTML file made with the page kit (<body class="n-page">, a page for show_html or save_page) is shown as the app shows it, with the kit and in its dark theme unless theme is "light": look at a page you wrote before you show it.',
     'You get the picture back to check your work.',
   ].join(' '),
   annotations: { readOnlyHint: true },

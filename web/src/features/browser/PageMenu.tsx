@@ -45,6 +45,7 @@ import { BROWSING_KEY } from '@shared/browser';
 import { ContextMenu, type MenuEntry } from '../pages/common/menus';
 import type { PageMenuItem, PageMenuRequest } from './PageView';
 import { langLabel } from './languages';
+import { useSavePlace } from './SaveButton';
 import { useBrowser } from './store';
 
 /** Each item's icon and words, by its id. An item this does not know keeps the desktop app's own words. */
@@ -56,7 +57,7 @@ const KNOWN: Record<string, [ReactNode, string]> = {
   'read-link-later': [<Clock size={14} />, 'Read link later'],
   'open-image': [<Image size={14} />, 'Open image in new tab'],
   'save-image-as': [<Download size={14} />, 'Save image as…'],
-  'save-image-library': [<ImagePlus size={14} />, 'Save image to Library'],
+  'save-image-library': [<ImagePlus size={14} />, 'Save image'],
   'ask-image': [<Sparkles size={14} />, 'Ask about this image'],
   'copy-image': [<Copy size={14} />, 'Copy image'],
   'copy-image-address': [<Link size={14} />, 'Copy image address'],
@@ -93,7 +94,7 @@ const KNOWN: Record<string, [ReactNode, string]> = {
 };
 
 /** An item as the app's menus have it: its icon, its words in the app's language, and what a press does. */
-function entry(it: PageMenuItem, pick: (id: string) => void, translated: boolean): MenuEntry {
+function entry(it: PageMenuItem, pick: (id: string) => void, translated: boolean, saveTo: string | null): MenuEntry {
   if ('type' in it) return '-';
   const known = KNOWN[it.id];
   const a = it.args ?? {};
@@ -112,7 +113,11 @@ function entry(it: PageMenuItem, pick: (id: string) => void, translated: boolean
               : a.lang
                 ? `Translate to ${langLabel(a.lang)}`
                 : 'Translate page'
-            : (known?.[1] ?? it.label);
+            : it.id === 'save-image-library'
+              ? saveTo
+                ? `Save image to ${saveTo}`
+                : 'Save image'
+              : (known?.[1] ?? it.label);
   const icon = it.id === 'search' ? <Search size={14} /> : it.id === 'ask' ? <Sparkles size={14} /> : it.id === 'translate-page' || it.id === 'translate-selection' ? <Languages size={14} /> : known?.[0];
   return { label, icon, disabled: !it.enabled, ...(it.checked !== undefined ? { checked: it.checked } : {}), asIs: it.id.startsWith('spell-'), run: () => pick(it.id) };
 }
@@ -137,6 +142,8 @@ export function PageMenu({ req, onPick, onDone }: { req: PageMenuRequest; onPick
   };
   // The tab it was opened on: whether its page is translated (or being translated) decides the words of Translate.
   const translated = useBrowser((s) => !!s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation && s.views[BROWSING_KEY]?.tabs.find((t) => t.id === req.target)?.translation?.state !== 'failed');
+  // The project Save uses (SaveButton.tsx) is where the picture goes.
+  const saveTo = useSavePlace().name;
   const items = req.items.map((it) =>
     entry(
       it,
@@ -145,6 +152,7 @@ export function PageMenu({ req, onPick, onDone }: { req: PageMenuRequest; onPick
         end();
       },
       translated,
+      saveTo,
     ),
   );
   // A little wider than the app's other menus: a page's items name what they act on ("Open link in your default browser").

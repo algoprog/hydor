@@ -263,7 +263,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // Editing (changes are made) or Suggesting (changes are suggested, as Google Docs' Suggesting and Word's Track changes).
   const [mode, setMode] = useState<'edit' | 'suggest'>('edit');
   // The document compared with a version (Tools → Compare with a version, or an older version opened from the
-  // Library's Versions, compared with the latest), and the list of versions to pick one from.
+  // page's Versions, compared with the latest), and the list of versions to pick one from.
   const [compare, setCompare] = useState<{ version: number; at?: number; merged: Doc; from: 'tools' | 'versions' } | null>(null);
   const [versions, setVersions] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -286,7 +286,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   // A picture's caption or description asked for in its box (from the menu), and a comment asked to be written in (edited).
   const [pictureAsk, setPictureAsk] = useState<{ id: string; what: 'caption' | 'alt'; n: number } | null>(null);
   const [editAsk, setEditAsk] = useState<{ id: string; n: number } | null>(null);
-  // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
+  // The picture editors opened from this document: once it closes, what they save goes to their own files instead.
   const pictureEditors = useRef(new Set<EditorHandle>());
   useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
   // An agent's version being written shows in place of this one (read-only, its words arriving where its mark is),
@@ -514,7 +514,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     if (liveDoc) setDrawnLive((n) => n + 1);
   }, [liveDoc, !!engine.current]);
 
-  // An older version opened from the Library's Versions (its key ends in :v<n>): shown with what changed since it, the
+  // An older version opened from the page's Versions (its key ends in :v<n>): shown with what changed since it, the
   // latest saved version fetched to compare with (the band over the editor brings it back, or leaves it).
   const olderVersion = readOnly ? Number(/:v(\d+)$/.exec(doc?.key ?? '')?.[1]) || 0 : 0;
   useEffect(() => {
@@ -1048,7 +1048,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       toastError(err);
     }
   };
-  /** The version brought back, as the Library does it (a new version on top); changes not saved here go first. */
+  /** The version brought back, as every page does it (a new version on top); changes not saved here go first. */
   const restoreVersion = async () => {
     if (!compare) return;
     if (dirty && !(await confirm({ title: 'Restore this version?', body: 'Your changes that are not saved yet are dropped, and this version comes back as the latest.', confirm: 'Restore', danger: true }))) return;

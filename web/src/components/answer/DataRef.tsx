@@ -1,11 +1,11 @@
-// A card that reads its data from a Library spreadsheet or a data file (shared/answer-ui/data-ref.ts): the server works
+// A card that reads its data from a spreadsheet kept in a project's files or a data file (shared/answer-ui/data-ref.ts): the server works
 // its data out (POST /api/answers/data, server/answers/data.ts) and the card's view draws it as it draws numbers typed in.
 // Under it, a line says where they came from (a link that opens the spreadsheet or the file) and when they were read; a
 // source that is gone, a range or a column that is not there, shows as a plain message in the card's place (the
 // server's words, in the app's language: the card is translate="no", so they go through tr()).
 //
 // What came back is kept on this page for each card, so a card drawn again (scrolled back to, opened full screen) shows
-// at once and asks again behind it. It asks again when a page of the Library is saved (the app says so: a spreadsheet
+// at once and asks again behind it. It asks again when a kept page is saved (the app says so: a spreadsheet
 // may have changed; the server answers from what it keeps while it has not), when the app comes back into view (a file
 // may have changed meanwhile), and with Read again.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -63,7 +63,7 @@ const sourceName = (data: Data): string => {
 
 /**
  * A reference card's data: asked for once its block is whole (`on`), from the session or board it is drawn in, and again
- * when the Library changes or the app comes back into view.
+ * when kept files change or the app comes back into view.
  */
 export function useCardData(ui: string, data: Data, on: boolean, at: { session?: string; board?: string }): CardState {
   const body = on ? JSON.stringify({ ui, data, session: at.session, board: at.board }) : '';
@@ -95,7 +95,7 @@ export function useCardData(ui: string, data: Data, on: boolean, at: { session?:
     setError('');
     ask();
   }, [body, ask]);
-  // A spreadsheet saved (any page of the Library: the server knows whether this one changed); a little later, once
+  // A spreadsheet saved (any kept page: the server knows whether this one changed); a little later, once
   // for a burst of saves.
   const later = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useFeatureEvent('pages', ({ data: e }) => {
@@ -126,7 +126,7 @@ function readAtText(ms: number): string {
   }
 }
 
-/** Opens a card's source: the spreadsheet in the Library, or the file in the file viewer (not at a shared link: the source is the owner's). */
+/** Opens a card's source: the kept spreadsheet, or the file in the file viewer (not at a shared link: the source is the owner's). */
 function openSource(s: CardSource) {
   if (viaLink) return;
   if (s.kind === 'sheet' && s.id) goApp(`/pages/${s.id}`);

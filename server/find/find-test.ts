@@ -388,12 +388,9 @@ test('places: each address as the search box lists it', () => {
   assert.equal(placeOf('/apps/t/invoice', '', pages), 'app:tpl:invoice');
   assert.equal(placeOf('/apps/ab12', '', pages), 'app:ab12');
   assert.equal(placeOf('/apps/new', '', pages), 'go:new-app');
-  assert.equal(placeOf('/library', '?tab=published', pages), 'go:published');
-  assert.equal(placeOf('/library', '?kind=image', pages), 'go:media');
-  assert.equal(placeOf('/library', '?kind=video', pages), 'go:videos');
-  assert.equal(placeOf('/library', '?kind=media', pages), 'go:media', 'pictures and videos together, as the pictures');
-  assert.equal(placeOf('/library', '?tab=media', pages), 'go:media', 'the old Media tab’s address');
-  assert.equal(placeOf('/library', '', pages), 'go:library');
+  assert.equal(placeOf('/published', '', pages), 'go:published');
+  assert.equal(placeOf('/browser', '?panel=later', pages), 'go:browser-later', 'a panel of the Browser');
+  assert.equal(placeOf('/library', '?tab=published', pages), null, 'the Library’s old address is no place of its own');
   assert.equal(placeOf('/pages/p1', '', pages), 'page:p1');
   assert.equal(placeOf('/media/0a1b2c3d4e', '', pages), 'media:0a1b2c3d4e');
   assert.equal(placeOf('/projects', '', pages), 'go:spaces');

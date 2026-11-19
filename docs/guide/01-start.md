@@ -10,7 +10,7 @@ Hydor runs AI agents on your own computer, and you use them from any browser, at
 
 ## Find your way around
 
-The screen has three parts: the **rail**, a narrow strip of tools at the far left; a **column** beside it on some pages, the **sidebar** with your sessions on the start page and in a session, or the Library's or Settings' own list; and the page you are on (the start page, a session, Settings…). The rail is always there on a computer. On a phone there is no rail: the sidebar is a drawer that slides in and holds the tools too (see [Use the app on a phone](#use-the-app-on-a-phone)).
+The screen has three parts: the **rail**, a narrow strip of tools at the far left; a **column** beside it on some pages, the **sidebar** with your sessions on the start page and in a session, or the Apps', Agents', Help's or Settings' own list; and the page you are on (the start page, a session, Settings…). The rail is always there on a computer. On a phone there is no rail: the sidebar is a drawer that slides in and holds the tools too (see [Use the app on a phone](#use-the-app-on-a-phone)).
 
 On a computer you can make the column wider or narrower, from 180 to 560 pixels: drag its right edge, or click the edge and press the left and right arrow keys. The width is the same for every column and is kept in this browser.
 
@@ -20,26 +20,27 @@ The rail is a column of icons; point at one, or move to it with Tab, and a toolt
 
 - **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
 
-Then the sections of the app (the desktop app has five; the web app and a phone have four, with no **Browser**):
+Then the sections of the app (the desktop app has three; the web app and a phone have two, with no **Browser**):
 
 - **Browser**: a browser of your own, only in the desktop app, with tabs, private tabs, a smart address bar, page translation, reader view, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
-- **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
-- **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
 
-Further down, after some space:
+Right under them, always in this place:
 
 - **Inbox**: everything waiting on you, such as approvals, questions and forms, from every session, scheduled task and machine. A number on its corner says how many things wait on you right now. See [Inbox and notifications](/guide/inbox).
 - **Search**: opens the search box (the same as Ctrl+K).
+
+Then, after some space, the tools:
+
 - **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs; a thin bar under its icon shows how much is left across your paid subscriptions, or your free ones when you have no paid ones, red when nothing is left. See [Usage, limits and costs](/guide/usage).
 - **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
 
-The sections come in the order Browser, Library, Projects, Apps, Agents, and the tools below the Inbox in the order Search, Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools under the Inbox). The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
+The sections come in the order Browser, Apps, Agents, then Inbox and Search, and the tools below them in the order Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools at the bottom); Inbox and Search stay right under the sections. The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
 
-The sidebar with your sessions shows only on the start page, in a session and in its review. The **Library**, **Apps**, **Projects**, **Agents**, **Help** and **Settings** have a column of the same kind, with the logo, their own list (the places of the Library, the Apps page and the Agents page, your projects, the guide's topics, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own, and the other pages (Inbox, Usage, System…) use the whole width. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. A column that holds more than fits shows its scroll bar, and its foot fades while there is more below. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
+The sidebar with your sessions shows only on the start page, in a session and in its review. The **Apps**, **Agents**, **Help** and **Settings** have a column of the same kind, with the logo, their own list (the places of the Apps page and the Agents page, the guide's topics, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own, and the other pages (Inbox, Usage, System…) use the whole width. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. A column that holds more than fits shows its scroll bar, and its foot fades while there is more below. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
 
 ### The sidebar
 
@@ -49,7 +50,7 @@ The sidebar is the column beside the rail. It holds:
 - A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - To find a session, use the search box: **Search** on the rail (on a phone, **Search** among the tools at the bottom of the drawer), or Ctrl+K (⌘K on a Mac). It finds sessions by their title, their folder and the words said in them, archived sessions too, marked **Archived** and listed after the others (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
-- The filter button in the header (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **Projects** to open the Projects page. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/projects).
+- The filter button in the header (**Filter and group sessions**) narrows the list: **All agents**, **Claude Code** or **Codex**, and, once you have projects, **Every project** or one of your projects (up to eight are listed), with **New project…** to make one. The button takes the accent colour while a filter is on. Its last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Projects and knowledge](/guide/projects).
 
 ### The session list
 
@@ -57,15 +58,15 @@ Under **New session** is every session, in groups:
 
 - **Active**: all sessions with activity in the last five minutes, here or in VS Code or a terminal, including ones that have finished. After five minutes without activity they return to their usual group, even if their agent is still open. Sessions stopped by a usage limit stay here while scheduled to resume automatically; cancelling that resume restores the five-minute rule. Sessions whose background agents, commands or monitors are still running stay here too, however quiet, until those end. They keep their places while listed; drag one to move it.
 - **Pinned**: the sessions you pinned, in the order you drag them into. Drag a session from the groups below onto it to pin it.
-- **Projects**: a group for each of your projects, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first, until you put them in an order of your own: drag a group by its heading to another place among them (on a phone, hold the heading a moment first). That order is the same on every device, and a group you never moved (a project made since) comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
+- **Projects**: a group for each of your projects that has sessions, and for each folder of yours that two or more sessions work in, under its name; the one used last comes first, until you put them in an order of your own: drag a group by its heading to another place among them (on a phone, hold the heading a moment first). That order is the same on every device, and a group you never moved (a project made since) comes first. Each shows its five newest sessions; **Show 12 more** (or however many there are) lists the rest, and **Show fewer** goes back.
 - **Today**, **Yesterday**, **This week**, then month names and years: the rest, by when they were last active.
 - **Snoozed**: at the bottom, until their time comes.
 
 Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and any session working in a project's folder, or in a folder inside it, in the project's group, wherever it was started: in Hydor, Claude Code or Codex. A folder of a Codex project shows under the project's name. The folders the Codex app makes for your ChatGPT projects are named only by an id, so unless Codex knows the project's name they get no group either, and their sessions show **ChatGPT project** as their folder. Give one a name with **Rename folder** in one of its sessions' menus, and it gets a group under that name. Two folders of the same name show as many of the folders above them as it takes to tell them apart ("client/app", "server/app").
 
-The **Active** and **Projects** headings fold too: click one to hide everything under it, and again to show it. They stay as you left them on this computer, apart from the folding of each project or folder inside **Projects**.
+The **Active** and **Projects** headings fold too: click one to hide everything under it, and again to show it. They stay as you left them on this computer, apart from the folding of each project or folder inside **Projects**. Point at the **Projects** heading and a **+** shows (on a touch screen it is always there): **New project…** and **New group of projects…** (see [Make a project](/guide/projects#make-a-project)).
 
-Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project, and the **⋯** beside it (or a right-click on the heading) opens its menu: **Rename**, **Use the folder's own name** for a folder you renamed, and **Open the project** or **Open in Files**. To rename a group, you can also double-click its name: type the new one and press Enter (Esc leaves it as it was). A project's new name is its name everywhere; a folder's is what the app calls it, in the sidebar, under each session and in the folder menus, on every device (the folder itself keeps its name on disk). Empty the name to give a folder its own back.
+Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. A project's heading also has an ⓘ (**Project details**) that opens its details in a window (see [Open a project's details](/guide/projects#open-a-projects-details)); so does a click on the project's mark at the start of the heading. The pen at the end of a heading (on a computer, when you point at the heading; on a touch screen it is always there) starts a new session in that folder or project, and the **⋯** beside it (or a right-click on the heading) opens its menu: for a project, **Project details** and **Rename**; for a folder, **Rename**, **Use the folder's own name** (once you renamed it), **Make it a project** and **Open in Files**. To rename a group, you can also double-click its name: type the new one and press Enter (Esc leaves it as it was). A project's new name is its name everywhere; a folder's is what the app calls it, in the sidebar, under each session and in the folder menus, on every device (the folder itself keeps its name on disk). Empty the name to give a folder its own back.
 
 Sessions you had in Claude Code or Codex outside Hydor (in VS Code, a terminal, Claude's desktop app or the Codex app) are listed too. The folders you work in with them become projects by themselves (see [Projects found in Claude Code and Codex](/guide/projects#projects-found-in-claude-code-and-codex)), so their group is the project's, with the Claude Code or Codex mark after its name (or both). A folder whose sessions came from outside but is not a project (it has one session from outside, or Hydor left it out) keeps its folder group, like any other folder. A folder whose first session was started outside Hydor shows where its sessions came from: the Claude Code or Codex mark after its name, or both when it has sessions from each. Point at the name, or open the heading's **⋯**, to see the apps they were started in, such as **From Codex: VS Code, Terminal**, with the account's name when they are in one you added in [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts). The mark stays when you go on working there from Hydor: it says where the folder's work began.
 
@@ -167,23 +168,23 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 
 ### What it finds
 
-- **Go to**: Hydor's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Projects, Shared knowledge, Library, Pictures, Videos, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
+- **Go to**: Hydor's pages, such as New session, Inbox, Files, Search in files, Git, Terminal, Apps, New app, Projects, Shared knowledge, Published, Preview, Usage and limits, Model arena, Activity, System and Settings.
 - **Actions**: Take the tour, Talk hands-free, Release notes, Switch between light and dark, Show or hide the sidebar, Group sessions by folder or project, Show or hide the terminal panel.
 - **Settings**: every section of Settings and the options in it. Opening one opens its section and points at the option.
 - **Themes**: the built-in themes and your own. Opening one switches to it.
 - **Sessions**: by title, folder, branch and first message, archived ones too, marked **Archived** and after the others. Opening one opens it.
 - **In messages**: messages that hold the words you typed. Opening one opens its session at those words, with the find bar ready.
 - **Memory**: your memory notes. Opening one opens Settings → Memory at that note.
-- **Projects**: your projects, by name and description. Opening one opens the project.
+- **Projects**: your projects, by name and description. Opening one opens the project's details in a window over the page you are on.
 - **Apps**, **Scheduled tasks**, **Agents**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
 - **History**, **Bookmarks** and **Downloads**: in the desktop app, the pages you visited in your own [browser](/guide/web#your-own-browser), your bookmarks and the files it downloaded. They match by their words and, with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, by what they are about, even when the words differ. Opening a page opens it in a new tab of the **Browser** page; opening a download shows the file in its folder. They stay on this computer, agents never get them, and the box does not remember what you typed to find them.
 
 ### Choose where it looks
 
-**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Agents**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions), **Guide** and, in the desktop app only, **Browser** (your history, bookmarks and downloads).
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Kept files** (the pages, pictures, videos and sounds that agents made and you kept), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Agents**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions), **Guide** and, in the desktop app only, **Browser** (your history, bookmarks and downloads).
 
-- Tick one or more, and the box looks only there. The button names them ("Sessions, Library", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
+- Tick one or more, and the box looks only there. The button names them ("Sessions, Kept files", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
 - With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, projects and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
 - What you pick is kept on every device until you change it. When nothing is found, **Search everywhere** under the message looks in every place again.
 - On a phone, **Search in** is the filter icon beside **Cancel** (it names the places once you pick some), and its list opens from the bottom of the screen.
@@ -191,7 +192,7 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 ### How the results show
 
 - The **Best match** comes first. Then each kind has its own group of up to four rows; "3 more in Sessions" shows the rest.
-- Pictures, videos, sounds, the Library's pages and files show with a thumbnail and their details: what each one is (a picture, a video, a document, slides, a spreadsheet, a PNG image…), its size or length, the project and folder it is in, and when it last changed. A page's description follows.
+- Pictures, videos, sounds, kept pages and files show with a thumbnail and their details: what each one is (a picture, a video, a document, slides, a spreadsheet, a PNG image…), its size or length, where it is (a kept thing says "Files › the project's name", in the project's files) and when it last changed. A page's description follows.
 - On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes. A picture or a page shows larger there (click it to open it), and a video or a sound plays right there.
 - On a phone the results fill the screen, without the preview: each row says enough to tell the results apart, and is big enough to tap.
 - ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box (with the **Search in** list open, Esc closes the list first).
@@ -248,7 +249,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 | Keys | What it does | Where |
 | --- | --- | --- |
 | Ctrl+K | Opens or closes the search box | Anywhere, except while typing in a code editor or terminal |
-| Ctrl+B | Shows or hides the column beside the rail: the sidebar, the Library's or Settings' (the rail stays) | Anywhere on a computer, except in a code editor |
+| Ctrl+B | Shows or hides the column beside the rail: the sidebar, or the Apps', Agents', Help's or Settings' (the rail stays) | Anywhere on a computer, except in a code editor |
 | Ctrl+` | Shows or hides the terminal panel at the bottom | On a computer |
 | Ctrl+P | Quick open: jump to a file by part of its name, in the folder the Files page shows | Anywhere |
 | Ctrl+Z | Undoes a pin, unpin, archive, unarchive or snooze, within 8 seconds | Outside text fields |
@@ -272,7 +273,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 
 ## Get help
 
-**Help** on the rail (in the drawer on a phone) opens this guide. In a wide window it has a column of the same kind as the Library's: the logo and **Hide sidebar** in a row, then **Help home** and every topic, grouped as the first page groups them, each with its icon and the open one marked. The first page then shows just its box and a few questions people often ask. In a narrower window or on a phone the first page's cards open the topics, and **All topics** at the top of a topic goes back; in a wide window with the column hidden, the cards are on the first page too. Type a question or a few words in the box on its first page:
+**Help** on the rail (in the drawer on a phone) opens this guide. In a wide window it has a column of the same kind as the sidebar's: the logo and **Hide sidebar** in a row, then **Help home** and every topic, grouped as the first page groups them, each with its icon and the open one marked. The first page then shows just its box and a few questions people often ask. In a narrower window or on a phone the first page's cards open the topics, and **All topics** at the top of a topic goes back; in a wide window with the column hidden, the cards are on the first page too. Type a question or a few words in the box on its first page:
 
 - **Sections that match** show as you type; click one to open it. The search box (Ctrl+K) finds them too.
 - **Press Enter**, or click **Ask**, and an agent answers in a panel beside the guide, with links to the right place. It can also change a setting or set something up for you, once you confirm the change on a card. The answer is an ordinary session, with the agent and model you picked last on the start page: ask more in the panel, or open it on its own page with the arrow at the panel's top.
@@ -297,7 +298,7 @@ In a narrow window or on a phone, **Ask an agent** at the top right opens the sa
 - "What did my sessions today cost at API prices?"
 - "Make my search box look only in my sessions and pages."
 - "Can the search box find the page about Lisbon hotels I visited last month?" (in the desktop app: your history, bookmarks and downloads, by their words or what they are about; agents can't look at them)
-- "Put Settings first among the tools under the Inbox on my rail."
+- "Put Settings first among the tools at the bottom of my rail."
 - "Put my Thesis project first among the groups in my sidebar."
 - "Which of my projects did Hydor make from my Claude Code and Codex sessions?"
 - "What is in my inbox?"

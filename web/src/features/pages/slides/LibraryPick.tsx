@@ -1,4 +1,4 @@
-// A thing of the Library to pick, of one kind (a deck, a spreadsheet): a find field over their names, newest first, each
+// A thing of yours to pick, of one kind (a deck, a spreadsheet): a find field over their names, newest first, each
 // with its picture, its name and when it last changed. For Insert → Slides from another deck and Chart → From a
 // spreadsheet.
 import { useEffect, useMemo, useState } from 'react';

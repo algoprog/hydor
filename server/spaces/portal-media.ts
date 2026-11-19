@@ -1,4 +1,4 @@
-// A picture, video or sound of the Library shared alone, as its person's link reads and changes it (portal.ts does the
+// A kept picture, video or sound shared alone, as its person's link reads and changes it (portal.ts does the
 // rest of a link: its project's or its page's things, the editors' pictures). They see it, play it and download it,
 // and comment on a spot of a picture or a moment of a video or a sound, under their name. With Edit, the picture, video
 // or sound editor opens in their browser and saves over it (the file it had kept as an earlier version), as the owner's

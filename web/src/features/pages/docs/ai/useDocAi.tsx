@@ -1,7 +1,7 @@
 // The document editor's AI, in one place for the editor to use: Write with AI's box at the caret (WriteBox.tsx);
 // Proofread, Change the tone and Translate for the whole document, part by part with a bar that says how far it has
 // come (Stop ends it; what was done stays), their changes the editor's own suggestions by "AI" (or, asked for, made;
-// a translation also as a copy in the Library); suggestions as you type, grey after the caret (Tab takes them, Esc
+// a translation also as a copy); suggestions as you type, grey after the caret (Tab takes them, Esc
 // drops them); and the panel that answers questions about the document (AskPanel.tsx). What it costs is said where
 // the helper model says (one paid by the word).
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -129,7 +129,7 @@ export function useDocAi(o: {
       (n, by) => toast(n ? `${suggest ? tr('The new tone is suggested') : tr('The tone is changed')} (${by}).` : `${tr('Nothing changed')} (${by}).`, n ? 'ok' : 'info'),
     );
 
-  /** Tools → Translate the document: as suggestions here, or as a copy in the Library. */
+  /** Tools → Translate the document: as suggestions here, or as a copy. */
   const translate = (lang: string, copy: boolean) => {
     if (!e) return;
     const base = e.doc;
@@ -154,7 +154,7 @@ export function useDocAi(o: {
         const { comments: _c, suggestions: _s, ...rest } = withWords(base, items, all);
         void post<{ page: { id: string } }>('/api/pages', { title: `${o.title || tr('Document')} (${lang})`, kind: 'doc', model: rest }).then(
           (r) => {
-            toast(`${tr('The translation is a new document in the Library')} (${by}).`, 'ok');
+            toast(`${tr('The translation is a new document')} (${by}).`, 'ok');
             go(`/pages/${encodeURIComponent(r.page.id)}`);
           },
           toastError,
@@ -409,7 +409,7 @@ function TranslateDialog({ open, onClose, onRun }: { open: boolean; onClose: () 
           value={how}
           onChange={setHow}
           options={[
-            { value: 'copy', label: 'A copy in the Library' },
+            { value: 'copy', label: 'A copy as a new document' },
             { value: 'suggest', label: 'Suggestions here' },
           ]}
         />

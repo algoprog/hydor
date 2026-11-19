@@ -1,4 +1,4 @@
-// The Pages library and published sites as the app keeps them: loaded once, refreshed when the server
+// The pages and published sites as the app keeps them: loaded once, refreshed when the server
 // says they changed ({ t: 'feature', id: 'pages' }), and which pages of a conversation were kept. Also the
 // pages agents are writing right now (drafts, as their calls stream in) and what each session shows
 // beside its conversation (the canvas).
@@ -12,7 +12,7 @@ import { live as socket } from '../../lib/ws';
 
 interface PagesState {
   pages: PageInfo[] | null;
-  /** The Library's folders, loaded with the pages. */
+  /** The folders pages were put in (older ones), loaded with the pages. */
   folders: LibFolder[] | null;
   sites: SiteInfo[] | null;
   /** By session: which of its show_html calls were kept, as which page. */

@@ -28,7 +28,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `HYDOR_EMBED_MODEL_DIR` | `~/.cache/hydor/mDenseOn-ONNX-<revision>` (`~/Library/Caches/hydor/…` on a Mac, `%LOCALAPPDATA%\hydor\cache\…` on Windows, the data folder in Docker) | Where its model's files are kept (`model_q8.onnx`, `tokenizer.json`, `tokenizer_config.json`, from algoprog/mDenseOn-ONNX on Hugging Face) |
 | `HF_ENDPOINT` | `https://huggingface.co` | A Hugging Face mirror to download that model from |
 | `HYDOR_PICTURES_DEVICE` | the graphics card when there is one they can use | `cpu`: the picture tools (taking backgrounds out, erasing) run on the CPU and set up without ONNX Runtime's NVIDIA build (2.1 GB), leaving the graphics card to other work. Otherwise an NVIDIA GPU runs them through CUDA (the GPUs in `CUDA_VISIBLE_DEVICES` when it is set) and a Mac's through Core ML |
-| `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs the Library takes videos' frames and stills and sounds' lengths and shapes with, and voice samples are read with |
+| `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs that take videos' frames and stills (and the pictures of videos in a project's Files) and sounds' lengths and shapes, and voice samples are read with |
 | `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` | Where a desktop app looks for new versions |
 | `HYDOR_URL`, `HYDOR_TOKEN` | this computer's Hydor, with the command line's own token | For the `hydor` command: another computer's Hydor, by its address and an access token made there (the same as `--server` and `--token`) |
 | `NO_COLOR`, `FORCE_COLOR` | colours in a terminal, none when piped | For the `hydor` command: `NO_COLOR` turns its colours off, `FORCE_COLOR` on |
@@ -37,7 +37,7 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 
 In `DATA_DIR`: the password hash (`auth.json`), the session index and search database (`hydor.db`; `naget-agent.db` or `web-agent.db` in older installs),
 the agents' programs the app installed (`clients/`), logs of running agents (`runs/`), Claude Code's temporary files where `/tmp` can't have them (`tmp/`), attachments waiting to be sent (`uploads/`), files deleted in the file
-browser (`trash/`), the Library's images, videos and sounds with their stills and frames (`media/`), the folders the Library's
+browser (`trash/`), the pictures of files shown in a project's Files, kept for a month (`thumbs/`), the kept images, videos and sounds with their stills and frames (`media/`), the folders the kept
 notebooks run in (`notebooks/`), notebook kernels and the terminal server, the `hydor` command's token (`cli-token`)
 and its input history (`terminal-history`), and search by meaning's private Python
 environment (`memory/venv`: set up a minute after the app first starts, unless it was turned off in Settings → Memory). Its model goes to Hugging Face's cache

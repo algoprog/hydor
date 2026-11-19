@@ -62,7 +62,7 @@ export interface DocPreview {
 
 /**
  * What the file viewer gets to show a PowerPoint file as its slides (GET /api/documents/deck): the file read as the
- * Library reads one (its pictures kept by the app, as a deck's are), what the reading says of it, and whether
+ * the importer reads one (its pictures kept by the app, as a deck's are), what the reading says of it, and whether
  * LibreOffice is here to lay out its pages too.
  */
 export interface DeckPreview {

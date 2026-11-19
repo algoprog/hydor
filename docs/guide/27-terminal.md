@@ -198,7 +198,7 @@ How they all work:
 
 | Command | What it does |
 | --- | --- |
-| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the Library), `send`, `stop` and `delete`. |
+| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the session's project), `send`, `stop` and `delete`. |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
 | `hydor outbox` | Calls held for your OK (a connected account's tools on Ask first): `list`, `show` for one with its input, `send` (as it is, or with `--set NAME=value` to change a field) and `drop`. |
 | `hydor away` | What happened since your last visit, as the start page's **While you were away** shows it: what waits on you, sessions that finished or failed, what ran by itself with its cost, and what runs next today. `hydor away seen` marks it all as seen. |
@@ -221,7 +221,7 @@ hydor away                           # what happened while you were away
 | `hydor projects` | `list`, `show`, `new`, `rename`, `edit` (description, guidelines, the agent it starts as, folders), `sessions`, `files` (the documents it reads: `files add` and `files remove`) and `remove`. |
 | `hydor tasks` | Your [scheduled tasks](/guide/tasks) and the other work that starts by itself: `list`, `show`, `new` (when it runs: `--every 2h`, `--at 09:00 --days weekdays`, `--cron`, `--once`; or `--webhook`, `--watch-feed`, `--watch-page`, `--watch-folder`, or `--watch-account` with `--tool` for new items in a connected app, and `--before 30m` for a time before each event in a calendar), `edit`, `pause`, `resume`, `run` (now, even while paused), `runs` (the latest runs, `--reply` for the last reply) and `remove`. Watching a command or a JSON address is on the page. A board card's refreshes are listed as the board's ("Shop · Sales by day: refresh"): `pause`, `resume` and `run` work on them, and `show` says where to change them, on the board. |
 | `hydor apps` | Your [apps](/guide/apps) and the ready-made ones: `list`, `show`, `run` (the form's answers as `field=value`, or `--input` JSON; it prints the answer and what it cost), `runs`, `run-show` (one run) and `remove`. `hydor app …` (without the s) makes apps as files: `new`, `folder`, `dev`, `try`, `export`, `import`. |
-| `hydor library` | The [Library](/guide/library): `list` (`--kind`, `--project`), `search`, `show` (a document's text, a board's cards, or what the item is), `export` (`--to pdf`, `docx`, `pptx`…, `-o file`), `open` (the address of its editor), `remove`, `refreshes` (what on your boards refreshes, when, and what it costs) and `refresh` (a board's card, or all of them, now). |
+| `hydor files` (also `hydor library`) | What agents made for you and what you kept, as the projects' **Files** show it ([pages, images, videos and sites](/guide/library)): `list` (`--kind`, `--project`), `search`, `show` (a document's text, a board's cards, or what the item is), `export` (`--to pdf`, `docx`, `pptx`…, `-o file`), `open` (the address of its editor), `remove`, `refreshes` (what on your boards refreshes, when, and what it costs) and `refresh` (a board's card, or all of them, now). |
 | `hydor experiments` | Training and evaluation runs: `list`, `show` and `stop`. Starting a run is for the agents and the page. |
 
 ```bash
@@ -229,7 +229,7 @@ hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
 hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
 hydor apps run trip-planner destination=Lisbon days=5
-hydor library export "Q3 report" --to pdf -o q3.pdf
+hydor files export "Q3 report" --to pdf -o q3.pdf
 ```
 
 ### Agents and models
@@ -301,7 +301,7 @@ What the app keeps in each browser (the theme, the language, the notification so
 
 - `hydor find rate limit` searches everything the search box does (**Ctrl+K**): pages, settings and their options, sessions, memory, skills… `--in settings` looks only there, `--urls` shows each result's address under it, and `--open 2` opens the second in your browser.
 - `hydor guide` lists the guide's topics; `hydor guide projects` reads one in the terminal, and `hydor guide projects "what a project is"` one section of it. `--sections` lists a topic's sections.
-- `hydor open` prints the app's address; `hydor open library`, `hydor open settings memory`, `hydor open project thesis`, `hydor open guide projects` or `hydor open 6f1e2a3b` (a session) print that page's. `--browser` opens it in your browser too. It is how you reach what only a page does: the editors for slides, sheets, pictures and diagrams, a signature, a theme's colours, signing in to a service.
+- `hydor open` prints the app's address; `hydor open published`, `hydor open settings memory`, `hydor open project thesis`, `hydor open guide projects` or `hydor open 6f1e2a3b` (a session) print that page's. `--browser` opens it in your browser too. It is how you reach what only a page does: the editors for slides, sheets, pictures and diagrams, a signature, a theme's colours, signing in to a service.
 - `hydor api GET /api/projects` calls any endpoint of the app's API and prints its JSON (`hydor api POST /api/projects -d '{"name":"Thesis"}'`; the body can come from `@file` or `-`). The endpoints are in the [API topic](/guide/api).
 
 ### Inside the chat

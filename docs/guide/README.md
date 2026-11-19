@@ -15,7 +15,7 @@ The guide is also in [German (Deutsch)](de/), [Chinese (简体中文)](zh/) and 
 - [Deep research, second opinions and several agents](08-research.md)
 - [Documents, images, videos and voice](09-documents-voice.md)
 - [Apps](10-apps.md)
-- [Library: pages, images, videos and sites](11-library.md)
+- [Pages, documents and pictures](11-library.md)
 - [Scheduled tasks](12-tasks.md)
 - [Skills](13-skills.md)
 - [Plugins](23-plugins.md)

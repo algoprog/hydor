@@ -73,7 +73,7 @@
 
 ### 签名
 
-[设置 → 签名](/settings?s=signatures)：你的签名和姓名缩写：画一次，加密保存，用于你要签署的文档。详见[资料库：页面、图片、视频和网站](/guide/library)。
+[设置 → 签名](/settings?s=signatures)：你的签名和姓名缩写：画一次，加密保存，用于你要签署的文档。详见[页面、文档和图片](/guide/library)。
 
 - [**新建签名**](/settings?s=signatures&find=New%20signature)：画出、输入或上传你的签名或姓名缩写。
 
@@ -271,7 +271,7 @@
 
 ### 图片、视频和音频
 
-[设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你生成的图片、视频、音乐和语音，以及资料库中它们的标题和说明由谁撰写。详见[文档、图片、视频和语音](/guide/documents-voice)。
+[设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你做的图片、视频、音乐和语音，以及由谁来写它们的说明。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
 - [**图片生成**](/settings?s=images&find=Making%20images)：允许智能体生成图片。
 - [**用于大多数图片（最佳）**](/settings?s=images&find=For%20most%20pictures%20%28Best%29)：生成大多数图片、并负责每次修改图片的模型。
@@ -283,7 +283,7 @@
 - [**音频生成**](/settings?s=images&find=Making%20audio)：允许智能体生成音频。
 - [**音乐模型**](/settings?s=images&find=Music%20model)：生成音乐的模型。
 - [**语音和声音模型**](/settings?s=images&find=Voice%20and%20sound%20model)：生成语音和声音的模型。
-- [**资料库中的标题和说明**](/settings?s=images&find=Captions%20in%20the%20Library)：为你保存的图片、视频和音频撰写标题和说明的模型。
+- [**为保留的内容写说明**](/settings?s=images&find=Captions%20for%20what%20you%20keep)：为你保存的图片、视频和音频撰写标题和说明的模型。
 
 ### 语音
 

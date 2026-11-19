@@ -1,16 +1,17 @@
 // Pages: HTML pages agents show in the conversation (show_html) and keep (save_page), slide decks (save_slides),
-// pages saved as files (export_page), the Library (/library: pages, the images and videos kept, what was
-// published) with its sidebar entry, the cards that ask the user before publishing, and the panel beside a
-// conversation where a page shows as it is written and can be changed (Canvas).
-import { LibraryBig } from 'lucide-react';
+// pages saved as files (export_page), a page's own place (/pages/<id>), the published sites (/published), the old
+// Library addresses (they move on to where its parts live now), the cards that ask the user before publishing, and the
+// panel beside a conversation where a page shows as it is written and can be changed (Canvas).
 import { HtmlPage } from '../session/HtmlPage';
 import type { ToolView, WebFeature } from '../registry';
 import { CanvasSide, closeCanvas, PageOver, useCanvasOpen } from './Canvas';
 import { exportPageStep, pageActionStep, PublishCard, ReadPageRow, readPageStep, SavedPageCard, savedPageStep } from './cards';
 import { latexCheckStep } from './checkStep';
+import { LibraryRedirect } from './LibraryRedirect';
 import { howToMakeStep } from './types/step';
 import { PageEditNoteView } from './notes';
 import { PagesRoute } from './PagesPage';
+import { PublishedPage } from './PublishedPage';
 import { RemotePage } from './slides/Remote';
 import { savedPageOf, savedRef } from './state';
 import { nagetTool } from '../registry';
@@ -20,9 +21,10 @@ const saved = { place: 'answer', Row: SavedPageCard, same: savedPageOf, step: sa
 const actionSaved = { ...saved, step: pageActionStep } satisfies ToolView;
 const actionWork = { place: 'work', Row: ReadPageRow, step: pageActionStep } satisfies ToolView;
 
-const isPages = (p: string) => p === '/library' || p === '/pages' || p.startsWith('/pages/');
-/** The Library's own pages, a page's and an image's or video's among them. */
-const inLibrary = (p: string) => isPages(p) || p.startsWith('/media/');
+/** A page's own place (/pages/<id>, and its audience view). */
+const isPages = (p: string) => p.startsWith('/pages/');
+/** The Library's old addresses (and /pages, its other one): they move on at once. */
+const isOld = (p: string) => p === '/library' || p.startsWith('/library/') || p === '/pages';
 
 export const pagesFeature: WebFeature = {
   id: 'pages',
@@ -50,9 +52,10 @@ export const pagesFeature: WebFeature = {
   // A slideshow's phone remote (slides/Remote.tsx) too.
   routes: [
     { match: isPages, Page: PagesRoute },
+    { match: (p) => p === '/published', Page: PublishedPage },
+    { match: isOld, Page: LibraryRedirect },
     { match: (p) => p.startsWith('/remote/'), Page: RemotePage },
   ],
-  nav: [{ id: 'pages', path: '/library', label: 'Library', icon: <LibraryBig size={17} />, match: inLibrary }],
   sessionSide: { useOpen: useCanvasOpen, close: closeCanvas, Panel: CanvasSide },
   // A page opened to change over everything (a phone, a narrow window).
   SessionDock: PageOver,

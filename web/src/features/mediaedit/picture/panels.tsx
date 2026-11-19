@@ -205,7 +205,7 @@ export function LayersPanel({
           {/* At someone's link: only what they bring themselves. */}
           {!viaLink && (
             <MenuItem icon={<Layers2 size={14} />} onClick={() => (setAddOpen(false), onAddPicture('library'))}>
-              From the Library
+              From your kept pictures
             </MenuItem>
           )}
           <MenuItem icon={<Copy size={14} />} onClick={() => (setAddOpen(false), onAddPicture('clipboard'))}>

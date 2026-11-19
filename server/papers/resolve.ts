@@ -1,6 +1,6 @@
 // One way to find and read a paper from whatever someone gives for it, shared by the research apps' steps (read_paper):
 // an arXiv id or link, a DOI, a link to a paper's page or PDF (ACL Anthology and OpenReview by their own records), a PDF,
-// a .tex file or a LaTeX project's folder on this computer, a LaTeX document of the Library, or its title. Its record
+// a .tex file or a LaTeX project's folder on this computer, a saved LaTeX document, or its title. Its record
 // (title, authors, year, venue, ids, abstract and BibTeX) comes from the source of record: arXiv's API, Crossref and
 // doi.org, OpenAlex. Its text comes from an open copy only: arXiv's HTML version or its PDF, the open copy OpenAlex knows
 // of (OpenAlex carries Unpaywall's data; Unpaywall itself is asked too when HYDOR_CONTACT_EMAIL gives it an address), a
@@ -100,7 +100,7 @@ export function doiIn(s: string): string {
 }
 
 /**
- * What a paper was given as: a path on this computer (a PDF, a .tex file or a folder), a LaTeX document of the Library
+ * What a paper was given as: a path on this computer (a PDF, a .tex file or a folder), a saved LaTeX document
  * (/pages/<id>), an arXiv paper, a DOI, a link, or else its title (or words of it). `cwd`: where relative paths start.
  */
 export function paperQuery(raw: string, cwd = process.cwd()): PaperQuery {
@@ -742,7 +742,7 @@ function latexPaper(target: string): PaperRead {
   };
 }
 
-/** A LaTeX document of the Library, written out as a folder (its files and pictures) in `dir`, to read and to use. */
+/** A saved LaTeX document, written out as a folder (its files and pictures) in `dir`, to read and to use. */
 function libraryTex(db: DB, id: string, dir: string): string | null {
   const src = pageSource(db, id);
   if (!src || src.kind !== 'tex') return null;
@@ -776,7 +776,7 @@ export interface ReadOptions {
   pages?: boolean;
   /** At most this many characters of its text (90,000 unless set). */
   maxChars?: number;
-  /** Where relative paths start, and where a Library document is written out. */
+  /** Where relative paths start, and where a saved document is written out. */
   cwd?: string;
   db?: DB;
   signal?: AbortSignal;
@@ -1054,9 +1054,9 @@ export async function readPaper(given: { paper?: string; upload?: string }, o: R
       return { ...blankRead('pdf'), notes: [`${path.basename(q.path)} is not a PDF or a LaTeX file.`] };
     }
     case 'library': {
-      if (!o.db) return { ...blankRead('library'), notes: ['A Library document cannot be read here.'] };
+      if (!o.db) return { ...blankRead('library'), notes: ['A saved document cannot be read here.'] };
       const dir = libraryTex(o.db, q.id, cwd);
-      if (!dir) return { ...blankRead('library'), notes: [`${raw} is not a LaTeX document of your Library.`] };
+      if (!dir) return { ...blankRead('library'), notes: [`${raw} is not a saved LaTeX document.`] };
       return { ...latexPaper(dir), kind: 'library', url: raw };
     }
     case 'arxiv':

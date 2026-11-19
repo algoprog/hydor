@@ -1,7 +1,7 @@
-// A folder of this computer brought into the Library (New → Import a folder): a LaTeX project (a folder whose top holds
+// A folder of this computer brought in (New → Import a folder): a LaTeX project (a folder whose top holds
 // a whole document: \documentclass and \begin{document}) becomes one LaTeX document, its files and pictures in their
 // folders (latex.ts texFromFolder: the files it uses first, within a document's limits); any other folder becomes a
-// folder of the Library with its documents, spreadsheets, notebooks and LaTeX documents brought in as things in it,
+// folder of kept things with its documents, spreadsheets, notebooks and LaTeX documents brought in as things in it,
 // each as Open a file brings one in, and its folders as folders in it (a LaTeX project among them as one document). A
 // folder that brings nothing in makes no folder. What is left out is said, file by file.
 import fs from 'node:fs';
@@ -27,7 +27,7 @@ const SKIP_DIRS = new Set(['node_modules', '__MACOSX', '__pycache__']);
 
 const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
-/** Why a file of no kind the Library keeps is left out, in a word. */
+/** Why a file of no kind kept as a page or media is left out, in a word. */
 function whyNot(name: string): FolderSkip {
   if (/\.(png|jpe?g|gif|webp|svg|avif|bmp|heic|heif|tiff?|ico|eps)$/i.test(name)) return 'picture';
   if (/\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(name)) return 'video';
@@ -54,7 +54,7 @@ function texProjectAt(dir: string, files: string[]): boolean {
 }
 
 /**
- * Brings a folder of this computer into the Library, into a folder of it (`folder`) or the top of a place (`space`: a
+ * Brings a folder of this computer in, into a folder of kept things (`folder`) or the top of a place (`space`: a
  * project's id, or none). The folders it makes are named as the folders were (with a number where a folder there has
  * the name).
  */
@@ -68,7 +68,7 @@ export async function importFolder(db: DB, dirIn: string, o: { space: string | n
   let listed = 0;
   const skip = (rel: string, why: FolderSkip) => out.skipped.length < 2000 && out.skipped.push({ path: rel, why });
 
-  /** A LaTeX project's folder as one document, in the Library folder `parent` gives. */
+  /** A LaTeX project's folder as one document, in the folder `parent` gives. */
   const texDocument = async (abs: string, rel: string, parent: () => string | null) => {
     if (out.pages.length >= MAX_ITEMS) return skip(rel || path.basename(abs), 'limit');
     let got: Awaited<ReturnType<typeof texFromFolder>>;
@@ -83,7 +83,7 @@ export async function importFolder(db: DB, dirIn: string, o: { space: string | n
     for (const n of got.notes) out.notes.push(rel ? `${rel}: ${n}` : n);
   };
 
-  /** A file as a thing of the Library, in the folder `parent` gives (made when the first thing comes). */
+  /** A file as a kept thing, in the folder `parent` gives (made when the first thing comes). */
   const file = async (abs: string, rel: string, parent: () => string | null) => {
     const name = path.basename(abs);
     // A PDF is left out, as it was before a document could be opened from one (opened by itself, it becomes one).
@@ -105,7 +105,7 @@ export async function importFolder(db: DB, dirIn: string, o: { space: string | n
     for (const n of got.notes ?? []) out.notes.push(`${rel}: ${n}`);
   };
 
-  /** A folder: one LaTeX document when it is a project, else a Library folder (made when something comes in) with what is in it. */
+  /** A folder: one LaTeX document when it is a project, else a folder (made when something comes in) with what is in it. */
   const folder = async (abs: string, rel: string, depth: number, parent: () => string | null) => {
     let list: fs.Dirent[];
     try {

@@ -88,7 +88,8 @@ const PLACES: Record<FindPlace, { label: string; icon: ReactNode; groups: Group[
   sessions: { label: 'Sessions', icon: <MessagesSquare size={15} />, groups: ['Sessions'] },
   messages: { label: 'Messages', icon: <MessageSquareText size={15} />, groups: ['In messages'] },
   spaces: { label: 'Projects', icon: <Boxes size={15} />, groups: ['Projects'] },
-  pages: { label: 'Library', icon: <LibraryBig size={15} />, groups: ['Pages', 'Images, videos and audio'] },
+  // What was made and kept (pages, slides, documents, pictures…): in its project's Files, or with its conversation. It kept the id "pages", so a saved choice still works.
+  pages: { label: 'Kept files', icon: <LibraryBig size={15} />, groups: ['Pages', 'Images, videos and audio'] },
   templates: { label: 'Apps', icon: <LayoutGrid size={15} />, groups: ['Apps'] },
   files: { label: 'Files', icon: <FileText size={15} />, groups: ['Files'] },
   memory: { label: 'Memory', icon: <Brain size={15} />, groups: ['Memory'] },
@@ -810,9 +811,9 @@ function MetaLine({ e }: { e: Entry }) {
   return parts.length ? <span className="mt-0.5 block truncate text-[12px] text-fg-3">{joinParts(parts, ' · ')}</span> : null;
 }
 
-/** Where a picture, a page or a file is: the Library, then its project and folder (a file: its folder), as people named them. */
+/** Where a picture, a page or a file is: Files, then its project and folder (a file: its folder), as people named them. */
 function WhereLine({ e }: { e: Entry }) {
-  const parts: ReactNode[] = [...(e.visual?.type === 'file' ? [] : [<span>Library</span>]), ...(e.place ?? []).map((p) => <span translate="no">{p}</span>)];
+  const parts: ReactNode[] = [...(e.visual?.type === 'file' ? [] : [<span>Files</span>]), ...(e.place ?? []).map((p) => <span translate="no">{p}</span>)];
   return parts.length ? <div className="mt-0.5 text-[12px] break-words text-fg-3">{joinParts(parts, ' › ')}</div> : null;
 }
 

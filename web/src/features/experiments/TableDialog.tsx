@@ -1,6 +1,6 @@
 // Make a table: the runs picked (or an experiment's finished runs) as rows, by experiment or by one setting; the
 // metrics as columns, each with which way is better; the baseline and the test. It shows as you choose; then Copy
-// LaTeX, Copy Markdown, Download CSV, or Put it in a LaTeX document of the Library (in place of the table it made
+// LaTeX, Copy Markdown, Download CSV, or Put it in a LaTeX document you keep (in place of the table it made
 // before there, else before \end{document}). A table is kept when you copy or place it, so the pre-submission check
 // can work its numbers out again; Results tables lists them, and Work it out again takes the runs as they are now.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -83,7 +83,7 @@ function Preview({ t }: { t: ResultsTable }) {
   );
 }
 
-/** Put it in a LaTeX document: the Library's LaTeX documents, then the chosen one's files. */
+/** Put it in a LaTeX document: the kept LaTeX documents, then the chosen one's files. */
 function ToLatex({ onPick }: { onPick: (page: { id: string; title: string }, file: string) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -155,7 +155,7 @@ function ToLatex({ onPick }: { onPick: (page: { id: string; title: string }, fil
             </MenuItem>
           ))
         ) : (
-          <p className="px-2.5 py-2 text-[12.5px] leading-relaxed text-fg-3">There is no LaTeX document in the Library yet. Make one with New → LaTeX document there.</p>
+          <p className="px-2.5 py-2 text-[12.5px] leading-relaxed text-fg-3">There is no LaTeX document yet. Make one with New → LaTeX document in the project's Files.</p>
         )}
       </Popover>
     </>

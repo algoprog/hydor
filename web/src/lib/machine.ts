@@ -13,8 +13,8 @@ export const machineBase = machineId ? `/m/${machineId}` : '';
 const OWN = /^\/api\/(auth\/|machines\b|push\b|themes\b|tour\b|tips\b|sidebar\b)/;
 
 /**
- * A project, or one thing of the Library, shared with someone, opened at their link (/p/<token>,
- * server/spaces/portal.ts): the Library's editors and viewers there ask the link's own routes for what they ask of
+ * A project, or one of its files or kept things, shared with someone, opened at their link (/p/<token>,
+ * server/spaces/portal.ts): the editors and viewers there ask the link's own routes for what they ask of
  * /api/pages/… (and the picture, video and sound editors of /api/media/… and /api/mediaedit/…), which answer for what
  * the link opens alone; any other call of the app's API goes nowhere from there.
  */
@@ -22,7 +22,7 @@ export const portalToken: string | null = /^(?:\/m\/[a-z0-9-]{1,40})?\/p\/([A-Za
 
 /**
  * Opened at someone's link: the editors leave out what would spend the owner's money or reach their other things (AI
- * tools, the owner's Library and files, their graphics card's settings).
+ * tools, the owner's kept things and files, their graphics card's settings).
  */
 export const viaLink = portalToken !== null;
 

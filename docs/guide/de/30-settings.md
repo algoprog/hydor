@@ -73,7 +73,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Unterschriften
 
-[Einstellungen → Unterschriften](/settings?s=signatures): Deine einmal gezeichnete und verschlüsselt gespeicherte Unterschrift und deine Initialen für Dokumente, die du unterzeichnest. Mehr dazu unter [Bibliothek: Seiten, Bilder, Videos und Websites](/guide/library).
+[Einstellungen → Unterschriften](/settings?s=signatures): Deine einmal gezeichnete und verschlüsselt gespeicherte Unterschrift und deine Initialen für Dokumente, die du unterzeichnest. Mehr dazu unter [Seiten, Dokumente und Bilder](/guide/library).
 
 - [**Neue Unterschrift**](/settings?s=signatures&find=New%20signature): Zeichne, tippe oder lade deine Unterschrift oder Initialen hoch.
 
@@ -271,7 +271,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Bilder, Video und Audio
 
-[Einstellungen → Bilder, Video und Audio](/settings?s=images): Bilder, Videos, Musik und Stimmen, die Agenten über OpenRouter für dich erstellen, und das Modell für ihre Beschriftungen in der Bibliothek. Mehr dazu unter [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice).
+[Einstellungen → Bilder, Video und Audio](/settings?s=images): Bilder, Videos, Musik und Stimmen, die Agenten über OpenRouter für dich erstellen, und wer ihre Beschriftungen schreibt. Mehr dazu unter [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice).
 
 - [**Bilder werden erstellt**](/settings?s=images&find=Making%20images): Bilderstellung für Agenten erlauben.
 - [**Für die meisten Bilder (Beste Qualität)**](/settings?s=images&find=For%20most%20pictures%20%28Best%29): Modell für die meisten Bilder und alle Bildbearbeitungen.
@@ -283,7 +283,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Audio wird erstellt**](/settings?s=images&find=Making%20audio): Audioerstellung für Agenten erlauben.
 - [**Musikmodell**](/settings?s=images&find=Music%20model): Das Modell, das Musik macht.
 - [**Sprach- und Klangmodell**](/settings?s=images&find=Voice%20and%20sound%20model): Das Modell, das Stimmen und Geräusche erzeugt.
-- [**Untertitel in der Bibliothek**](/settings?s=images&find=Captions%20in%20the%20Library): Das Modell, das Titel und Beschreibungen für deine gespeicherten Bilder, Videos und Audiodateien erstellt.
+- [**Beschriftungen für das, was du behältst**](/settings?s=images&find=Captions%20for%20what%20you%20keep): Das Modell, das Titel und Beschreibungen für deine gespeicherten Bilder, Videos und Audiodateien erstellt.
 
 ### Spracheingabe
 

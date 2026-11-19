@@ -71,7 +71,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
-- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). The Library, Apps, Projects, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept. A column's list shows its scroll bar whenever it holds more than fits (macOS would hide it until you scroll), and its foot fades while more is below.
+- A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). Apps, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept. A column's list shows its scroll bar whenever it holds more than fits (macOS would hide it until you scroll), and its foot fades while more is below.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
@@ -79,7 +79,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run). Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable (so are the Active and Projects headings themselves,
   kept on each computer), a line per session, with a pen to
-  start a new session there, and dragged by their headings into the order you like, the same on every device;
+  start a new session there and, for a project, an ⓘ (Project details, which opens its details window), and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
   ones it makes for ChatGPT projects, show by the project's name). Any session working in a project's folder is in the
@@ -142,7 +142,7 @@ agents that speak ACP and take MCP servers.
   problems and flashcards, the Planner with itineraries and calendars, the Analyst with key figures and charts), or one
   of your own, and switch to another in the session's message box when the work
   changes. The Agents page shows each of yours as a card with how it is doing (working, needs you, budget spent), its
-  projects, tier, next run and what it spent this month. On a computer it has a column beside the rail, as the Library's
+  projects, tier, next run and what it spent this month. On a computer it has a column beside the rail, as Apps'
   (the logo, **New**, whose menu has New agent, Install an agent from a file and Import Claude Code agent files, and Hide;
   then All agents, Your agents, Needs you and On a schedule when some of yours are, Everywhere and each project that has
   agents of its own, a row for each built-in agent that opens its page (the page lists them too only while the column is hidden, or when a search finds them), and Schedules), a row with the place's name and a
@@ -160,8 +160,8 @@ agents that speak ACP and take MCP servers.
   error) runs again a tier up (its later replies, to messages, are not checked), as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
   agent turns it off; hands
   back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
-  hand_back tool, sent to a page in the Library (the same page each run as a new version of it, or a new page each
-  run), a row in a Library spreadsheet each run (when it ran, then a column per field, found by their headings: new
+  hand_back tool, sent to a kept page (the same page each run as a new version of it, or a new page each
+  run), a row in a kept spreadsheet each run (when it ran, then a column per field, found by their headings: new
   fields add columns at the end, the person's own columns, formats and formulas stay, formulas carry down and charts
   over the rows grow), an email to people from a connected mail account (HTML and plain text, a subject with {date},
   {time} and {agent}, sent at once without the Outbox), a file in its folder (Markdown or JSON, with {date}, {time} and
@@ -180,7 +180,7 @@ agents that speak ACP and take MCP servers.
   try), and shows which passed, each version with how its examples went; after a change the page offers to try them
   again; they never run by themselves. **Download as a file** saves an agent (built-in ones too) as a `.hydor-agent`
   file: its settings, instructions, team by name, fields, the kinds of place its results go, schedules by the clock as
-  suggestions and examples, with nothing of the person's own (projects, connected accounts, Library pages, email
+  suggestions and examples, with nothing of the person's own (projects, connected accounts, kept pages, email
   recipients, webhook addresses and keys are left out, and listed as what to set again); **Install** on the Agents page
   shows what a file brings and needs before saving, installs beside an agent of the same name unless you choose to
   replace it (as a new version), adds its schedules paused if you like, starts Full access as Accept edits, and says
@@ -202,7 +202,7 @@ agents that speak ACP and take MCP servers.
   once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
   the session, or not. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
   permissions, spending caps, files and commands stay yours. `page_action` does what an editor does in a click to the
-  whole of a page of the Library, with the editor's own code and a new version: animate every slide, fix what the
+  whole of a kept page, with the editor's own code and a new version: animate every slide, fix what the
   accessibility check finds, describe pictures, PowerPoint compatible or the web format, a theme, the slide shape,
   slides from another deck, charts updated from their spreadsheets; accept or reject suggestions, page setup, a
   header and footer; sort, remove duplicates, fill, clear, trim, split text, summarize, insert or delete rows and
@@ -264,9 +264,9 @@ agents that speak ACP and take MCP servers.
     **Hand a page to an agent**); an agent's conversation while you watch its tab; or **History**, **Downloads**,
     **Bookmarks**, **Import bookmarks and history**, **Highlights**, **Extensions**, **Site permissions**, **Settings**
     or **Keyboard shortcuts** (the keys the browser answers, by group), still open by `?panel=`. A sheet over the page in a narrow window.
-  - **Save** keeps a reader copy of the page in the Library as a Web page (the article as Mozilla's Readability finds it,
+  - **Save** keeps a reader copy of the page in a project's files as a Web page (the article as Mozilla's Readability finds it,
     with its pictures and videos, without the site's menus, ads and comments), whose Bookmarks, Read later, Downloads, History and
-    Highlights chips list this browser's own. A ▾ beside it picks where: Not in a project, a project, or a Library folder in one,
+    Highlights panels list this browser's own. A ▾ beside it (Choose a project to save to) picks which project, or No project,
     kept on this device.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most, a bookmark as twenty visits), what you typed as an address or a search (a **search shortcut** such as `yt` before your words, `yt lofi`, searches that
@@ -310,7 +310,7 @@ agents that speak ACP and take MCP servers.
     `/browser?private=1`): a purple **Private** section in the tab column and a **Private** chip in the address bar.
     Their sign-ins, cookies, site data and cache are kept apart, in memory, and forgotten when the last private tab
     closes or the app quits; their pages are not kept in history, in **Recently closed** or among the tabs that open
-    again at the next start; their downloads are saved but not listed in the Library's Downloads; extensions do not run
+    again at the next start; their downloads are saved but not listed in the Downloads panel; extensions do not run
     in them; a site's permission answers are asked again and forgotten; bookmarks, Read later, highlights and Save
     still keep what you ask for. They can't be grouped, and agents never get them: no **Ask**
     or Ask items in the right-click menu, and the server refuses a copy of their page.
@@ -342,8 +342,8 @@ agents that speak ACP and take MCP servers.
   - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
     **Forget**, and **Cookies and site data** → **Delete** (asks first, signs you out of the site and reloads the page).
   - **A right-click menu** on pages, in the app's own look and language: Back, Forward, Reload; for a link, open it in a new tab or your default browser
-    and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to
-    Library** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
+    and copy it, or set it aside to read later; for a picture, open, save, copy it and its address, **Save image to a
+    project** (read with the tab's own sign-ins, up to 50 MB, with the page as its source; a note with **Open**) and **Ask
     about this image** (opens Ask beside the page with the picture attached); for a link, also **Open link in private tab**;
     for a video or a sound, play or pause, mute, loop, controls, picture in picture, open, save and copy its address; for
     selected text, Copy, Search with your engine, Ask an agent about it (opens Ask beside the page, quoting up to 4,000
@@ -351,7 +351,7 @@ agents that speak ACP and take MCP servers.
     yours, Remove highlight; on the page itself, also **Translate to** your language; in a field, spelling
     suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this page, Read this page later, Print… and Inspect.
   - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
-    the Library's **Read later** chip beside Bookmarks; each page has **Mark as read** (it leaves the list; **Show read**
+    its own **Read later** panel beside Bookmarks (`/browser?panel=later`); each page has **Mark as read** (it leaves the list; **Show read**
     brings the read ones back) and **Remove**. It is yours alone: agents are refused its routes.
   - **Zoom** (Ctrl/⌘ with + − 0, Ctrl and the wheel, and a **Zoom** row in the ⋯ menu with − and + and the percent; the
     **Page zoom** setting is what a site you did not zoom shows at, and a chip in the address bar resets one you did),
@@ -522,44 +522,53 @@ agents that speak ACP and take MCP servers.
   and the time left, with **Stop** (what was written stays), **Continue** and **Try again** (`…/wiki/stop`, `…/wiki/continue`); one
   job at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`). Agents are told of a wiki only
   once it has an article.
-- **Projects** (on the rail): a project's sessions, files, documents, memory, guidelines, skills and assistant
+- **Projects**: a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
-  guidelines and its own skills and start as its assistant. On a computer the Projects page has a column of places
-  beside the rail, the same kind as the Library's (the logo, New project and Hide sidebar on top; then All projects with
-  its count, Shared knowledge, and, under a Projects label, a row for each project with its mark and its sessions); it
-  stays beside a project's own pages with that project lit, and beside Shared knowledge. All projects is under a row with
-  its name and a box to find a project by its name or what it is about. Beside the column, which lists the projects
-  already, it shows what goes on across them: the latest sessions of any project (its mark, the session's title, what a
-  running one is doing, how long ago), the newest things the projects hold in the Library, where the work went (the
-  last 4 weeks, a bar a day in the projects' colours as tall as the messages their sessions were sent, then each
-  project's share, the busiest first, and the ones that were quiet), the projects shared with people, and Group projects
-  together. Where no column lists the projects (a phone, a narrow window, the column hidden, a search, or nothing to show
-  across them yet), each is a card in its colour with what it holds (sessions, things in the Library, documents, skills)
-  and New session, with those parts under the cards. A phone and a narrow window have
-  no column: the page's header has its two tabs, All projects and Shared knowledge. A project's own page opens at
-  once under a band of its colour, with the way back on the left (when the column is not beside it), New session and one menu (its folder in Files,
-  only its sessions in the sidebar, delete it), and its tabs under them (on a phone, those that do not fit under More
-  at the row's end); its Overview has its sessions (with what each is doing), what it
-  holds in the Library and what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents,
-  skills and assistant), a group's projects too, and its Library tab everything it holds there; its Memory tab has its notes, its
+  guidelines and its own skills and start as its assistant. The sidebar groups each
+  project's sessions under its name, and a project's details open in a window over the page you are on, from the ⓘ
+  (Project details) on its heading in the sidebar, a click on its mark there, its ⋯ menu, the search box (Ctrl+K), or any
+  link to it (`/projects/<id>`, with the tab after it). The window has a band in the project's colour (its mark, its name, what
+  it is about or its folder, New session and a ⋯ menu: Open its folder in Files, Show in Finder, Only its sessions in the
+  sidebar, Share with people, Delete the project) and its tabs under it: Overview, Files, Memory, Skills, Agents and Settings
+  (on a phone the window fills the screen and the tabs that do not fit are under More at the row's end). Esc, ✕ or a
+  click outside closes it, and so does going to another page, such as opening a document from Files. Its Overview has
+  its sessions (with what each is doing), its newest files (up to six tiles, with All files to open the Files tab) and
+  what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents, skills and
+  assistant), who it is shared with, and a group's projects too; its Memory tab has its notes, its
   wiki memory and its documents, one part at a time (`?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); its Settings tab sets its name,
   colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch and the most documents its wiki reads (each saved at once) and its group, saved from a bar
-  that shows once something changed. Its Files tab shows its folders; files come in from
-  Files, a file's window or an agent's file cards with Add to a project. Its Skills tab lists every skill its
+  that shows once something changed. Its Files tab holds everything of the project that is a file or was kept in it
+  (**Files in a project** below). Its Skills tab lists every skill its
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
   skills, written there, copied from the library to change for the project alone, or proposed by an agent working
   in it and kept for the project when you approve; the library's; and Claude Code's and Codex's own for its folder,
   switched for its sessions through their settings for the session, not their own files. Turn off all skills, in the tab's
   menu, asks first and switches off every skill it lists for the project (Codex's own stay as they are when they could not be read). A group brings several projects
-  together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
-  groups each project's sessions under its name, and its filter shows one project's sessions. New project asks only for a
+  together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar's filter shows one
+  project's sessions. New project (the + on the sidebar's Projects heading, the start page's folder menu or the filter menu) asks only for a
   name (its colour on the mark beside it) and where its files go, a new folder or one you have, with the folders you
-  used lately one tap away; what it is about, its guidelines and other folders are under More options. Under your
-  projects, the Projects page suggests folders your sessions worked in, or changed files in, over the last 90 days that
-  no project has yet (a folder in a Git repository counting as the repository), each with Make a project, or ✕ to stop
-  suggesting it, and from making it a project by itself.
+  used lately one tap away; what it is about, its guidelines and other folders are under More options. A folder's
+  group in the sidebar has Make it a project in its ⋯ menu. Shared knowledge stays a page of its own, reached from
+  Settings → Memory and the search box.
+- **Files in a project**: a project's details window has a Files tab with its folder, and each other folder you
+  attached, as chips over it, with Attach a folder and Open in Files. It shows tiles by default (As a list switches; a
+  list you picked stays), each with a picture: a picture itself, a frame of a video, the first page of a PDF, the first
+  page, slide or cells of a Word, PowerPoint, Excel or OpenDocument file, how an HTML file or a notebook opens, the first
+  lines of text, Markdown, code, CSV and JSON on a paper-like tile, and the kind's icon for anything else; the pictures
+  are made on this computer (ffmpeg, poppler, the app's own browser, Quick Look on a Mac) and kept for 30 days. What was kept in the project (pages,
+  designs, slides, documents, spreadsheets, LaTeX documents, notebooks, diagrams, boards, saved web pages, and pictures,
+  videos and sounds, whether an agent made them or you did) shows in the same grid at the top of the project's own
+  folder, after the folders and before its files, the newest first, each with its kind on it, its name and when it changed,
+  and opens in its editor or viewer. Its ⋯ menu has Edit (Present for slides), Rename, Open the original page, Start a session with it
+  (pictures, videos and sounds), Share with people, Move to another project, Duplicate, Turn it into, Download as, Download,
+  Write its title and description again and Delete. The bar has Find in the folder, Upload (and from its ▾ Upload a folder),
+  New and the switch between tiles and a list: New makes a folder, a file or a notebook, and, under them, a Document, Slides,
+  Spreadsheet, Page, Design, LaTeX, Diagram, Board or Picture for this project. Files and folders dropped anywhere on the
+  tab go into the folder shown as they are, in pieces up to 1 GB with a tray of each file's progress (a Word, Excel or
+  LaTeX file in Files opens in the app's own editors). A thing kept in a session that has no project stays with its
+  conversation, whose card opens it; the search box finds it, and its own page can move it into a project.
 - **Projects found in Claude Code and Codex**: Hydor lists the sessions you had in Claude Code and Codex outside it, and
   the folders you work in with them become projects by themselves: a folder once at least two sessions you started in
   Claude Code or Codex yourself (a terminal, VS Code, Claude's desktop app, the Codex app) worked in it, a Codex
@@ -568,15 +577,14 @@ agents that speak ACP and take MCP servers.
   don't count, a session in a subfolder of a Git repository counts for the whole repository, and the home folder,
   hidden and temporary folders, the app's own, folders you marked Not a project and folders a project already has are
   left out. It happens once Hydor has read your sessions after it starts, then within about a minute of new ones. The
-  project is named after the folder (or what you renamed it to in the sidebar), and on the Projects page its card says
-  From Claude Code, From Codex or From Claude Code and Codex, with the programs' marks. It is a project like any other,
+  project is named after the folder (or what you renamed it to in the sidebar). It is a project like any other,
   with its own folder where the sessions ran (nothing moves), and deleting it keeps its folder from being made a
   project again. Every session working in a project's folder, or one inside it, is in the project, wherever it was
   started: making a project for a folder you work in brings its earlier sessions in at once, and sessions the app
   starts there start in the project.
 - **Share a project with people** (a project's ⋯ → Share with people): your advisor or students get a personal link each
   (View and comment, or Edit documents; for a week, a month, or until you stop it), shown once, as a copy or a QR code.
-  They open a portal of that project alone: its documents in the Library's own viewers and editors, its sessions
+  They open a portal of that project alone: its documents in the app's own viewers and editors, its sessions
   read-only, its experiments' runs and its reading list; they comment under their name (you get a notice and an Inbox
   line), and edit documents if you let them. Never your agents, files, settings or other projects; confidential
   sessions never show; wrong links count as wrong passwords.
@@ -585,7 +593,7 @@ agents that speak ACP and take MCP servers.
   a picture, a video or a sound, with each person by a link of their own (View and comment, or Edit; for a week, a
   month, or until you stop it), shown once, as a copy or a QR code. It opens that thing alone, without your password:
   they comment under their name on words, a slide, a spreadsheet's cell, a spot of a picture (a numbered pin) or a
-  moment of a video or a sound (a mark on its timeline), and with Edit change it in the Library's own editors (a page's
+  moment of a video or a sound (a mark on its timeline), and with Edit change it in the app's own editors (a page's
   words, pictures and layout, never its code; pictures, videos and sounds in their editors without AI tools or anything
   of yours to add, a video made on the processor), the one before kept as a version. You get a notice and an Inbox line
   for each comment until it is answered; agents read and answer them; cards show who it is shared with; a deleted
@@ -594,38 +602,33 @@ agents that speak ACP and take MCP servers.
   video or a sound, on its page (and through the API for agents); each picture, video or sound keeps the last five it
   was when saved over (in an editor, by an agent or through a link), to look at, download or bring back.
 - **Web pages saved from your browser**: in the desktop app, Save in your own browser keeps the page you are looking at in
-  the Library as a reader copy, as a browser's reader view shows it: the article's title, who wrote it, its site and day,
+  a project's files as a reader copy, as a browser's reader view shows it: the article's title, who wrote it, its site and day,
   the address and date it was saved from, what you had selected quoted above, then the article in a column of readable
   width with its headings, lists, tables, quotes, code, pictures with captions and videos (YouTube and Vimeo play over the
   page from their picture; a few other sites' players are framed with a link; video files play). The site's menus, ads,
   comments and scripts are left out. Its pictures are downloaded and kept with the page (up to 40, 8 MB each, 60 MB in
-  all), so it lasts when the site's go. A page with no article is kept as a document of its text. It is shown as a Web
-  page with its site and when it was saved, in Everything and in its project, under a Web pages chip of its own (not
-  counted among the Pages or Documents); the ▾ beside Save picks the project and folder it goes in (the last pick is kept
-  on the device); More → Open the original page opens the address it came from. A saved page is a Library item like
-  the rest, so agents can read it. In the desktop app five more chips, Bookmarks,
-  Read later, Downloads, History and Highlights, show what your own browser keeps as lists (with a search field, a row's Open, Delete,
+  all), so it lasts when the site's go. A page with no article is kept as a document of its text. It shows as a Web
+  page, with its site and when it was saved, among the project's kept things in its Files; the ▾ beside Save (Choose a
+  project to save to) picks the project, or No project (the last pick is kept on the device); More → Open the original
+  page opens the address it came from. A saved page is a kept thing like the rest, so agents can read it. The Browser's
+  ⋯ menu has panels for what your own browser keeps as lists: History, Downloads, Bookmarks, Read later (`/browser?panel=later`),
+  Import and Highlights (each with a search field, a row's Open, Delete,
   Mark as read, Show in folder and Remove from the list or history, Show read on Read later, History and Downloads by
-  day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project,
-  never copied into the Library or counted in it; agents are refused them. In Everything with All, a column beside the
-  cards shows a few of each that is not empty (the bookmarks you visit most as tiles, the latest history, the pages
-  waiting to be read, the latest downloads and highlights), each with its count and See all, filtered by the search
-  box too; it moves under the cards in a narrow window. A picture kept from a page with Save image
-  to Library is different: it is a Library picture like any other (with the page it came from as its source).
-- **Folders in the Library**: each project's things in folders (and folders in folders), shown first as tiles, with the
-  way back over them; More → Move to a folder, or drag a card onto one; a folder moved to another project takes what
-  it holds; deleting one deletes nothing in it. **New → Import a folder** brings a folder of this computer in: a LaTeX
-  project as one document with its whole tree, any other folder as Library folders with its documents, spreadsheets,
-  slides, notebooks and LaTeX. Agents save into a folder by its name or path.
+  day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project;
+  agents are refused them. A picture kept from a page with Save image to a project (in the right-click menu) is a kept
+  picture like any other (with the page it came from as its source).
+- **Folders in a project**: a project's Files are real folders: New → New folder makes one, and dragging tiles onto a
+  folder moves them into it. Kept things (pages, documents, pictures…) stay at the top of the project's own folder, and
+  Move to another project in their menu puts one in another project. Agents keep what they make in the session's project.
 - **Knowledge bases**: drop documents or a folder in once, and agents can search them: by their words (a
   full-text index ranked by BM25), by what they mean (local embeddings, with search by meaning on) or for exact
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
   kept up to date (of a text file over 4 MB, its first 4 MB). The page shows how far search by meaning has come,
-  live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
+  live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (a page of its own, from Settings → Memory or the search box) is searched by every session; a project's own
   documents (its Memory tab, under Documents) by its sessions alone, which search the shared knowledge too unless the project
   turns that off. A new or changed document also updates the project's notes and wiki memory (above), or the shared wiki for shared knowledge.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
-  app's document skills; the file viewer previews them (a PowerPoint file as its slides, drawn as the Library draws
+  app's document skills; the file viewer previews them (a PowerPoint file as its slides, drawn as the app's own viewer draws
   decks, with its pictures, shapes, tables, charts, backgrounds and speaker notes, a box's words made smaller where a
   font this computer lacks needs more room; others as LibreOffice lays out their pages, when it is installed, or as
   their text), and finished files show as cards to open or download.
@@ -634,15 +637,15 @@ agents that speak ACP and take MCP servers.
   ones before their sources, four first), and file names and paths in the reply are links that open the file in the
   window over the conversation; agents are told to hand over what they made or changed and to name each file as a link.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
-  over, an environment beside it to run it in): kept in the Library with save_notebook, or handed over as a file
-  whose card opens it in the notebook page. A card's Save to Library keeps a copy of a notebook, a document, a
-  spreadsheet or a LaTeX file in the Library, in the project you pick. Agents fill in PDF forms (every kind of field,
+  over, an environment beside it to run it in): kept in the session's project with save_notebook, or handed over as a file
+  whose card opens it in the notebook page. A file card can keep a copy of a notebook, a document, a
+  spreadsheet or a LaTeX file in a project's files, the project you pick. Agents fill in PDF forms (every kind of field,
   drawn so every viewer shows the values, Greek and Chinese too; a form already signed digitally keeps its signature
   valid), write on PDF pages beside the words printed there (text, ticks, pictures, white-out, highlights, comments)
   and rotate, reorder, merge and split their pages, saving a copy unless asked to replace the file. Signatures: draw
   yours (mouse, finger or pen), type it in a handwriting or upload a photo of it, kept encrypted (Settings →
   Signatures); agents ask for one on a card and place it, by name and never seeing it, into Word files, PDFs, pictures
-  and Library documents, each time after your OK on a card that shows where (a picture of a signature, not a
+  and kept documents, each time after your OK on a card that shows where (a picture of a signature, not a
   cryptographic digital signature).
 - **Images, videos and audio**: agents make pictures (or change yours), short videos (from words, from a picture
   to start or end on, or by changing a video) and sound with OpenRouter's image, video and audio models, the ones
@@ -672,7 +675,7 @@ agents that speak ACP and take MCP servers.
   with the voices cleaned up, the music lowered under speech and the loudness evened out (on the graphics card when
   there is one), and edit_audio trims, cuts, silences, shortens pauses, takes out filler words, cleans up (noise
   reduction, equalizer, compressor, loudness for podcasts or streaming), adds echo or reverb and mixes music or sound
-  effects into sounds (a Library sound put back in its place or beside it), all for nothing on this computer
+  effects into sounds (a kept sound put back in its place or beside it), all for nothing on this computer
   (ffmpeg). A tool that needs an
   OpenRouter key and finds none asks for it on a card in the conversation (it goes straight to Settings → Models,
   checked with OpenRouter; Skip and nothing runs or is spent, and the session is not asked again for six hours).
@@ -686,12 +689,12 @@ agents that speak ACP and take MCP servers.
   singing or not, length, voice and file) and what the result costs; it comes once per model in a session, and
   scheduled tasks and apps' runs go without it. A video is a job the app follows to its end, also after the agent
   stops waiting, and plays in the app's own player; a sound plays in the app's own audio player, its shape (read
-  from the file) the bar to seek along, with a song's lyrics under it. **Save to Library** keeps one in the
-  Library, where a model that sees images writes its title and description (a video's from ten of its frames on
+  from the file) the bar to seek along, with a song's lyrics under it. **Keep** (under each; then Kept, which opens it) keeps one in the
+  session's project (a menu, Keep it in, picks which when there are projects, or No project), where a model that sees images writes its title and description (a video's from ten of its frames on
   one picture, with ffmpeg; a sound's from its prompt, lyrics and model, since no model hears it): the app's
   choice, any of OpenRouter's vision models, Claude through Claude Code, or a model of your own (Ollama, vLLM, an
-  endpoint). The Library shows them among its other things (Pictures, Videos and Audio show each kind alone, a
-  sound's card playing it in place), and finds, plays, downloads and edits them; **Start a session with it** opens
+  endpoint; Settings → Images, video and audio → Captions for what you keep). A kept picture, video or sound shows in its project's Files
+  as a tile (with a video's length and a sound's play button), and the app finds, plays, downloads and edits them; **Start a session with it** opens
   a new session with one in the message box, and agents can work from them.
 - **Connected apps**: on the Apps page, the last place in its column after your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
@@ -763,25 +766,16 @@ agents that speak ACP and take MCP servers.
   The first time someone picks Swarm, Campaign, Deep research or Arena (on the start page, in a scheduled task's
   options or in a session's dialog), a dialog says what it does, what it is worth it for and not, and what it costs;
   it shows once per mode, on every device, whether tips are on or not.
-- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
-  Library with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
-  link (a published page with a description and a social picture where its link is shared). The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
-  ask which project when there are projects (the session's first), New makes it in the project you look at, and More →
-  Move to a project moves anything; its places (Everything, each project's things under its name, which opens it, with
-  See all only when it holds more than show, and projects too small to fill a row sharing one, each card naming its
-  project; Not in a project, Published) are a column at the left of the same kind as the sessions' sidebar and Settings' (the logo, New and Hide, then the places; Ctrl+B hides it; a row of chips on a phone),
-  beside the cards, with a search field, sorting and kind chips (Web pages, Pages, Slides, Documents,
-  Spreadsheets, LaTeX, Pictures, Videos, Audio). Everything in it has a description (at most 100 words): the agent that
+- **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), are kept with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
+  link (a published page with a description and a social picture where its link is shared; **Published**, `/published`, lists them, from a page's Share menu or the search box). Kept things go by project: what an agent saves goes in its session's project, where it shows in the project's Files (its details window, from the sidebar), and Keep
+  asks which project when there are projects (the session's first, or No project); a thing kept in a session with no project stays with its conversation, whose card opens it, and the search box finds it. New (in a project's Files, or the search box's New document, New slides…) makes it in the project you look at, and Move to
+  another project, in a kept thing's menu or its own page's ⋯, moves it. Everything kept has a description (at most 100 words): the agent that
   saves something writes one (save_page and the other save tools' description, changed alone with an id), the helper
   model writes one for files added and pages kept from a conversation, models that see images write those of
-  pictures and videos, and you can write your own (Edit the title and description). The Library's search, the search
-  box and agents (get_page's query) find things by title and description with hybrid search: by words (BM25) and by
-  meaning, joined by rank. Drop files or whole folders on the Library, on a project in its list
-  or on a project's card, and each becomes what it is (Word, Markdown, text or HTML a document; Excel, OpenDocument or
-  CSV a spreadsheet; PowerPoint slides; LaTeX a LaTeX document; a notebook a notebook; pictures, videos and sounds the
-  Library's media, kept once; anything else a file in the project's folder), sent in pieces up to 1 GB with a tray of
-  each file's progress (Upload files in New does the same on a phone); in the desktop apps a drop moves the file (an
-  original that became a page goes to the trash, unless the page could not keep all of it). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  pictures and videos, and you can write your own (Write its title and description again). The search box (its Kept files) and agents (get_page's query) find things by title and description with hybrid search: by words (BM25) and by
+  meaning, joined by rank. Files and whole folders dropped on a project's Files, or added with Upload, are put in the
+  folder shown as they are, sent in pieces up to 1 GB with a tray of
+  each file's progress (Upload files in the + of a phone's Files does the same). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,
@@ -810,7 +804,7 @@ agents that speak ACP and take MCP servers.
   and Ctrl+H find and replace words (never tags or addresses, one step to undo), a link typed as example.com goes to
   https://example.com and an address that runs code is refused,
   code blocks are coloured in about twenty languages (a language picker, or Auto; agents' plain code blocks too), "@"
-  links to another page of the Library, databases as in Notion (a table of typed columns: text, number, select,
+  links to another kept page, databases as in Notion (a table of typed columns: text, number, select,
   multi-select, date, checkbox, URL, email, phone, files and pictures, a formula over the row's other columns, created
   and last edited time, and an AI column the helper model fills from each row when asked; sorted, filtered, grouped,
   a calculation under each column (sum, average, median, count, percent checked, earliest date…), shown as a table, a
@@ -836,7 +830,7 @@ agents that speak ACP and take MCP servers.
   watch it change as it saves. Apps are small tools for one job that find things out and show them clearly, each
   with a form and a view of its answer: ready-made or your own (described to the App builder, built from scratch,
   or installed from a file, all under one New app menu). On a computer the Apps page has a column of places beside the
-  rail, the same kind as the Library's (the logo, New app and Hide sidebar, then All apps, Pinned, Recently used and
+  rail, the same kind as the sessions' (the logo, New app and Hide sidebar, then All apps, Pinned, Recently used and
   Your own apps, a Kinds label over a row for each kind of app with its count, and, after a divider, Connected apps);
   the place is in the address (/apps, /apps?place=pinned, /apps?kind=Research), and the open one fills the page under
   a row with its name and the find box. All apps has the apps you pin at its very top (big
@@ -954,13 +948,13 @@ agents that speak ACP and take MCP servers.
   it. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
   searched. An app can have a screen of its own in place of its form: a page made from its parts (its form,
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
-  edited in the Library's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
+  edited in the app's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
   flows and a conversation with its agent, who finds and changes its records and runs its flows for you (the
   latest conversation shows on return; earlier ones a click away). Apps travel as one file (.hydor-app or .json, with their records, screens, own files and the apps they
   call; the keys they need by name only), downloaded from an app's page or its card's More, the ready-made ones too (a ready-made app's file brings it
   back where it was uninstalled), and installed from New app or by dropping the file on the Apps page, after a card that says what they ask, give and do, in plain words, with the keys they need,
   then what they will use here (folded: their files, their view's scripts and libraries, models, packages), offering one of your models for any they ask for that is not set up here; uninstalling one deletes it.
-- **Slides**: decks kept in the Library, made by an agent (save_slides, from layouts or parts placed by position) or
+- **Slides**: decks kept in a project's files, made by an agent (save_slides, from layouts or parts placed by position) or
   from eight ready-made looks, and edited as in PowerPoint, Google Slides or Keynote: menus (Edit, View, Insert,
   Format, Arrange, Slide, Tools) with Search the menus, slides to reorder, copy and skip, 15 layouts, text boxes with
   rich text, bullets and numbering, 20 shapes, pictures (cropped, with brightness, contrast, saturation, blur, black
@@ -1001,7 +995,7 @@ agents that speak ACP and take MCP servers.
   text boxes, its answer in the notes) and effects as PowerPoint's nearest, with a note of what changed. Pictures go
   in shapes (fourteen) or device frames (an instant photo, a phone, a laptop, a browser window); free photos come
   from Openverse (Wikimedia Commons when it cannot answer), their credits in the notes and a caption where the
-  licence asks; QR codes; slides from another deck (their look kept or this deck's); charts from a Library
+  licence asks; QR codes; slides from another deck (their look kept or this deck's); charts from a kept
   spreadsheet that update from it; My themes (colours, fonts and a logo on every slide, also in New → Slides); a
   video's end as well as its start; and an eyedropper in the colour pickers. Design ideas lay the slide out anew
   from its own words, pictures and numbers (thirteen designs, by the helper model); Rewrite makes picked words
@@ -1012,10 +1006,10 @@ agents that speak ACP and take MCP servers.
   narration, recorded from its notes or made with AI (priced first), played by a narrated show that goes on by
   itself and kept in the PowerPoint file; Rehearse with coach times each slide, hears the pace, filler words (in six
   languages) and slides read out, and can give each slide its rehearsed time; Record a video records the slideshow
-  with your voice and a camera bubble (Keep in the Library or Download); the camera bubble (V) shows in the
+  with your voice and a camera bubble (Keep or Download); the camera bubble (V) shows in the
   slideshow, the presenter's view and the audience's window; and a phone opened from a QR code is the remote (next,
   back, any slide, a black screen, notes, a timer and the next slide).
-- **Documents, spreadsheets and LaTeX**: kept in the Library beside slides, each with versions, a picture in the list,
+- **Documents, spreadsheets and LaTeX**: kept in a project's files beside slides, each with versions, a picture in the list,
   its own address, menus with Search the menus, find and replace, a list of its keyboard shortcuts, and an agent that
   changes it on request, whose work you watch as it writes (slides too: the agent's caret where its words arrive, the
   page read-only meanwhile, your unsaved changes never overwritten), in steps (a section, some slides, some cells) as
@@ -1150,7 +1144,7 @@ agents that speak ACP and take MCP servers.
   models and the picture tools on this computer (Set up, what they are doing, Remove).
 - **The picture and video editors**: pictures and videos open in editors of their own, in tabs inside the app (the
   page you came from first, a dot on a tab with changes not saved, Open editors on a phone), from a picture shown
-  large (Edit), the Library's picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
+  large (Edit), the picture and video pages, Files (Edit, and Edit the picture or Edit the video in a
   file's menu), slides (Edit picture, Edit video), documents (Edit picture), pages (Edit picture on a picked picture's
   bar and in its Part tab, Edit video), designs (Edit picture, Edit video) and an agent's video. The picture editor is
   laid out as Photoshop is (menus with their keys, the tool's options, a rail of tools in groups, dockable panels, a
@@ -1160,7 +1154,7 @@ agents that speak ACP and take MCP servers.
   size, turn); a layer snaps to the canvas's edges and middle, the guides and the other layers while it is moved
   (thin pink lines, gaps in small pills; Shift straight, Ctrl drags a copy, Alt no snap; View → Snap) and Align puts it
   at the canvas's left, centre, right, top, middle or bottom; right-click menus on the picture and on each layer (and a
-  touch held still); File → New (and the Library's New → Picture, which saves it in the project and folder it was made in) makes a
+  touch held still); File → New (and a project's Files → New → Picture, which saves it in that project) makes a
   blank picture (Square post, Story, HD, A4 at 300 dpi or any size; white, see-through or a colour). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI,
   all, invert, feather, grow, shrink; marching ants; dragged to move, Transform selection to size and turn) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
   and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing brush, gradient, paint
@@ -1172,12 +1166,12 @@ agents that speak ACP and take MCP servers.
   histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas size,
   rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard shortcuts),
   words in seventy fonts (the app's, Google's and the computer's own where the browser allows) with bold, italic,
-  alignment, line height, an outline and a shadow, the same when an agent edits a picture; pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
+  alignment, line height, an outline and a shadow, the same when an agent edits a picture; pictures added as layers (a file, your kept pictures, the clipboard, dropped). Its AI: remove the background, erase, change
   with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject, free on this
   computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the original (the old
   file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a professional one (a
   menu bar with shortcuts, the workspaces Edit, Colour, Audio and Export, panels sized and remembered): a media panel
-  (videos, pictures and sounds from this device, the Library or Files, a voice-over recorded), a WebGL viewer
+  (videos, pictures and sounds from this device, your kept things or Files, a voice-over recorded), a WebGL viewer
   (timecode, In and Out, safe areas and a grid, J/K/L), an inspector, and a multi-track timeline (T1 words, V3 and V2
   overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3 voice; show, mute, solo, lock;
   Select, Blade, Trim and Hand tools, snapping by a part's start or end, markers with a menu, right-click menus built
@@ -1214,10 +1208,10 @@ agents that speak ACP and take MCP servers.
   crossing; J, K and L shuttle backwards and forwards at up to four times; a deletion or paste on some tracks keeps
   every track and the markers in step (as Audacity's sync-lock), or ripples all with Ripple delete. Moving an
   effect's slider while playing changes the running sound without a break. It opens MP3, WAV, M4A, AAC, OGG,
-  Opus, FLAC and WebM sounds, and the sound of a video, from the Library (Edit; a video's Edit its sound), Files
+  Opus, FLAC and WebM sounds, and the sound of a video, from your kept sounds (Edit; a video's Edit its sound), Files
   (Edit, Edit the sound or Edit its sound in a file's menu) and a sound an agent made (Edit). Edits: cut, copy,
   paste (between sound editors too), delete (closing the gap) or silence, duplicate, split, trim to the part picked,
-  insert silence, change speed with the pitch kept, shorten long pauses; tracks to mix in a Library sound, one from
+  insert silence, change speed with the pitch kept, shorten long pauses; tracks to mix in a kept sound, one from
   the device, a recording (record at the playhead, on an armed track or a new one) or music, a voice or a sound
   effect made with AI (its price first, the OpenRouter key asked for in place). Effects in a rack, each a card with
   its settings and presets, on and off, in order, on a track or the whole sound, on all of it or a part: volume,
@@ -1226,14 +1220,14 @@ agents that speak ACP and take MCP servers.
   rooms, the same in the browser and in the file) and mono, heard as you edit. Speech recognition on this computer
   shows the words under the waveform, to cut by the word and to take out filler words. Undo and History go back any
   step. Saved with ffmpeg as MP3, M4A, Ogg Opus, WAV or FLAC (quality, bits, mono or stereo, sample rate), over the
-  original (the old file to the Trash), in the Library in its place, or as a copy; a video's sound keeps the video's
+  original (the old file to the Trash), kept in its place, or as a copy; a video's sound keeps the video's
   length (a deletion leaves silence) and goes back to the video. Agents have edit_audio.
 - **Designs, as in Canva or Adobe Express**: New → Design makes a poster (A4, A3, US Letter, 18 × 24 in), a flyer, an
   Instagram post (square or portrait), a story, reel or TikTok, a Facebook post or cover, an X post, a LinkedIn
   banner, a YouTube thumbnail or banner, an invitation, a business card, a certificate, a menu, a postcard, a logo or
   any size in pixels, millimetres or inches, from 22 ready-made designs drawn for its size (with words and picture
   places to replace, in their own colours, your theme's, your brand's or a palette's), blank, or described for an
-  agent (19 design kinds). Still a page of the Library (versions, its own address fitted to the screen, publishing),
+  agent (19 design kinds). Still a kept page (versions, its own address fitted to the screen, publishing),
   of one or several fixed-size artboards. Its editor places anything anywhere: drag with smart guides that snap to
   the page's edges and middle and to every other part (those inside groups too; equal gaps and the distance to the
   nearest part on each side shown in small pink pills), resize by handles that snap to the other parts' edges and
@@ -1245,8 +1239,8 @@ agents that speak ACP and take MCP servers.
   menu with every action, a list of every key (Ctrl+/), Layers (the page's parts front to back, groups with what
   they hold: click to pick, drag to reorder, hide, lock, rename; Ctrl+Shift+H hides), pages to add, move and
   duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54 Google fonts),
-  shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
-  (from this device, the Library or made with AI, moving and silent or with controls) and backgrounds (colours,
+  shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and emoji, QR codes, collages, pictures from this device, your kept pictures, free photos or made with AI, drawings, videos
+  (from this device, your kept videos or made with AI, moving and silent or with controls) and backgrounds (colours,
   gradients, patterns, a picture, one made with AI). Words get effects (shadow, lift, hollow, outline, glow, neon,
   echo, splice, gradient), a highlight, a curve, spacing and capitals, and new words written by the helper model;
   pictures get frames, crop inside their frame, ten looks, brightness, contrast, saturation and blur, corners,
@@ -1259,7 +1253,7 @@ agents that speak ACP and take MCP servers.
   a mind map, a swimlane process, an architecture or network diagram, UML classes, an ER diagram, a sequence diagram,
   a timeline, a kanban board or a brainstorm: drawn on a blank page, opened from a draw.io file (.drawio, a draw.io
   SVG or PNG, compressed pages too) or Mermaid, or described for an agent (19 diagram kinds). A model of pages of shapes
-  and connectors, drawn by one renderer for the editor, the viewer, the Library's picture and every file. 75 kinds of
+  and connectors, drawn by one renderer for the editor, the viewer, the kept picture and every file. 75 kinds of
   shape (general, flowchart, containers, UML, ER, BPMN, block arrows, sticky notes, pictures, and icons from Lucide's
   library for network and cloud), connectors at right angles that keep clear of the shapes they join and of shapes in
   the way, straight or curved, fixed to a point of a shape or to the side that faces the other, with seventeen ends
@@ -1290,16 +1284,16 @@ agents that speak ACP and take MCP servers.
   and … (Refresh now, Keep it up to date…, Rename, Move up and down, Save as picture, Open the conversation, Remove with
   Undo); a drag by its handle moves it on a computer. Each change
   is a version (a change made over a newer one, an agent's, is made again on it); the whole board saves as a PNG as it
-  shows; Export gives its cards' titles and data as a PDF, Markdown or a web page, and its picture in the Library is a
+  shows; Export gives its cards' titles and data as a PDF, Markdown or a web page, and its picture when kept is a
   drawing of its tiles. Shared, a board is read only, its cards drawn in the person's browser (their web pictures
   through the app, only those the board holds; cards that read a spreadsheet or a data file through the link's own route,
   the owner's source read for them, only those its cards name; refreshed cards with their latest data, which guests
   cannot refresh). Agents make and change boards with save_board (cards checked against
   their UI's type as find_ui gives it, refused with a plain reason; add by id or by name, a new one for a name there is
   not; change, remove, order; set or stop a card's refresh), read them with get_page (with what refreshes when, what it
-  costs and how the last went) and export them with export_page; `hydor library show` lists a
-  board's cards, `hydor library export` makes its files, `hydor library refreshes` lists what refreshes on every board
-  and `hydor library refresh` refreshes a card or a whole board now.
+  costs and how the last went) and export them with export_page; `hydor files show` lists a
+  board's cards, `hydor files export` makes its files, `hydor files refreshes` lists what refreshes on every board
+  and `hydor files refresh` refreshes a card or a whole board now.
 - **Board cards that keep themselves up to date**: a card's … → Keep it up to date… asks an agent its question again (the
   request it was pinned from, editable, or one you write) when you ask, every hour, every day, on weekdays or every week
   at a time in your time zone (the scheduler's own schedules), on a tier (Quick unless picked), saying first about what a
@@ -1322,8 +1316,8 @@ agents that speak ACP and take MCP servers.
 - **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
-  block made with AI, the kinds under New's box and More kinds (then Make it with AI, or Make it yourself), and Turn it into in the
-  Library (slides, a document, a page or a diagram from what you have). Say what it is about, and an agent makes it from what
+  block made with AI, the kinds under New's box and More kinds (then Make it with AI, or Make it yourself), and Turn it into in a
+  kept thing's menu (slides, a document, a page or a diagram from what you have). Say what it is about, and an agent makes it from what
   is there, as you watch; web-only slides are marked Web format in a deck made for PowerPoint. Agents read the same
   instructions with how_to_make (free) before they make a known kind of thing by name.
 - **Skills**: every skill agents can use on one page (Settings → Skills), grouped by what it is for: more than
@@ -1372,9 +1366,9 @@ agents that speak ACP and take MCP servers.
   this month's, each checked for prior work and sized to your compute).
 - **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
   link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
-  to 30 papers into a Library spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
+  to 30 papers into a kept spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
   environment, sends long runs to Experiments, and compares each number with the paper's). A paper is found however
-  it is given (DOI, arXiv id, link, title, PDF, .tex, a LaTeX project or a Library document), from open copies only.
+  it is given (DOI, arXiv id, link, title, PDF, .tex, a LaTeX project or a kept document), from open copies only.
 - **Read and highlight PDFs** (Files → a PDF → Highlight): the app's own reader, the words in reading order (two columns
   too) to select; highlight passages, equations and figures in four colours, write notes beside them, copy them, and ask
   an agent about the exact part you picked. Notes are kept beside the file, follow it when it moves, and are found again
@@ -1405,8 +1399,7 @@ agents that speak ACP and take MCP servers.
   once kept as values), and how far a run has got with about how long is left. An agent on call wakes on NaN, out of memory, a stall, a crash or
   divergence, and tells you or acts within your rules. Compare runs, sweep settings (every combination or a random
   sample, losing runs stopped early), and make **results tables** (mean ± std over seeds, the best in bold, paired or
-  Welch tests with Holm's correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document of the
-  Library. Agents use it with experiment_run, experiment_sweep, experiment_list, experiment_get, experiment_stop and
+  Welch tests with Holm's correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run, experiment_sweep, experiment_list, experiment_get, experiment_stop and
   experiment_table.
 - **The lab's work** (Apps → Lab and Work): an **Annotation workbench** (you and a model label the same sample, the
   model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
@@ -1574,11 +1567,11 @@ programs shows each program's version and what is out, with Check now, Update no
   **Copy as text** and **Full screen** (the card alone over the page, as wide as the window, scrolling when tall) sit on each, and under
   its … **Save as picture** (a PNG of the card as it looks, in the current theme, at twice its size, named after its title) and **Copy as
   picture** where the browser allows it; a card with a map, a library-drawn plot, a video player or a playground's output inside has no
-  picture buttons. **Pin to a board**, first under its …, keeps a copy of the card on a board of the Library (one picked, the one
+  picture buttons. **Pin to a board**, first under its …, keeps a copy of the card on a board (one picked, the one
   changed last first, or a New board… named in place; its title changeable first), with where it came from: in replies, an app
   run's follow-ups, a task's History and the gallery. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Answer cards from a spreadsheet or a file: a table, a chart, key figures, a ranking, a histogram with box plots or values
-  on a map can take, in place of its numbers, where they are (`from`: a Library spreadsheet by name or id, with a tab and a
+  on a map can take, in place of its numbers, where they are (`from`: a kept spreadsheet by name or id, with a tab and a
   range or a named range, its first row the headings; or a CSV, TSV, JSON, JSONL or GeoJSON file in the session's folder
   or its project's) and what of them to show: columns by heading, `sum`, `avg`, `median`, `count`, `distinct`, `min`,
   `max`, `first` and `last`, `groupBy`, a filter in a small language of its own (`where: "Region = 'EU' and Revenue >
@@ -1632,7 +1625,7 @@ programs shows each program's version and what is out, with Check now, Update no
   as a button), Linux wanting you to be Tailscale's operator (the command to run once), something else published at
   that address (served on port 8443 instead, the other left alone), Funnel turned on by hand (flagged). Stop serving
   undoes exactly what was done, from a record kept for it; while it serves, the links the app hands out (chat apps'
-  Open in Hydor, links agents give to sessions and Library pages) start with that address unless ALLOWED_ORIGINS names
+  Open in Hydor, links agents give to sessions and kept pages) start with that address unless ALLOWED_ORIGINS names
   one; agents can serve it only through a card each time, Full access too. Desktop apps offer it in their welcome tour (Use it on your phone too?, skipped with one click).
 - Chat apps (Settings → Chat apps): your agents in Telegram, Discord or Slack, each through a bot or app of your own
   (a Telegram bot from @BotFather, a Discord bot from the Developer Portal, a Slack app from a manifest the app gives
@@ -1667,7 +1660,7 @@ programs shows each program's version and what is out, with Check now, Update no
 - Review what a branch changes file by file, mark files viewed, and let a guide put them in an order that is
   easy to read, with a note on each.
 - Share a session with a read-only link that ends when you want.
-- Export a conversation from the session's menu: as a Markdown file, copied as Markdown, or as a document in the Library
+- Export a conversation from the session's menu: as a Markdown file, copied as Markdown, or as a kept document
   to edit, print and share (the title and date, your messages and the replies in order, a turn's steps as one line,
   files handed over by name, answer cards as text and tables, Mermaid and maths as written; in the document, your
   pictures and the handed-over ones too). A confidential session's stays on this computer. Also `hydor sessions export`
@@ -1690,7 +1683,7 @@ programs shows each program's version and what is out, with Check now, Update no
   or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
   takes in each change as it is written (every second while an agent works), the changed lines tinted for a
   moment and your place kept. Word, Excel, CSV and LaTeX files open in the
-  Library's editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
+  app's own editors and save back to the same file: a CSV's untouched rows and cells keep their exact text, a LaTeX file
   brings the chapters and bibliography it reads and typesets among its folder's pictures (read only to TeX),
   writing only the files that changed; a Word or Excel file says first what the editor doesn't keep (headers and
   footers, comments, charts…), offers to save a copy instead, and its first save keeps the old file in the trash.
@@ -1816,7 +1809,7 @@ programs shows each program's version and what is out, with Check now, Update no
   their documents, guidelines, agents, memory (notes, forgetting and restoring, your profile), skills, plugins, MCP
   servers, the vault's keys (a value is never typed as an option or printed), the inbox and the Outbox (send a held
   call as it is or with fields changed, or drop it), what happened while you were away (`hydor away`, and `seen`), experiments, scheduled
-  tasks, apps, the Library, connections and accounts, machines, models, tiers and plan usage. Each takes ids, the
+  tasks, apps, files, connections and accounts, machines, models, tiers and plan usage. Each takes ids, the
   start of an id, or names, asks before removing, and has `--json`. `hydor settings` reads and changes every option
   of the Settings page (`list`, `get`, `set`, `run` for buttons, `open`; alone on a terminal it is a browser of the
   sections and their options). `hydor find` searches everything the search box does, `hydor guide` reads the guide,
@@ -1866,7 +1859,7 @@ programs shows each program's version and what is out, with Check now, Update no
 - In the desktop apps, a file or folder on this computer can be shown selected in the system's own file manager, from
   the menu of each place that has one (Show in Finder on a Mac, Show in File Explorer on Windows, Show in folder on
   Linux; it never opens or runs anything): a file's or folder's menu and More in Files, the file viewer and editors,
-  the cards and pictures, videos and sounds an agent hands over, the Library's pictures, videos and sounds, the
+  the cards and pictures, videos and sounds an agent hands over, the kept pictures, videos and sounds, the
   Browser's Downloads, a session's Folder and code, a project's menu, an experiment run's menu, a repository's menu
   and a changed file's, a plugin's and a skill's folder or file, an app's folder, and a notebook kernel's notebook in
   System. It is not in the web app, and not for the files of another machine (its pages, or a link someone shared).
@@ -1896,22 +1889,22 @@ programs shows each program's version and what is out, with Check now, Update no
   pulses twice amber when it needs you, its status words cross-fading; the session list's rows and the Browser's tab
   rows glide to their new places, a closed tab's row closing up and a new one opening; the Inbox count, the start page's
   numbers and usage percentages count to their new values, and the Inbox badge pops; the logo's water rises once when a
-  session finishes; Library pictures shimmer until they load, then fade in; a step in a turn's outline that finishes
+  session finishes; kept pictures shimmer until they load, then fade in; a step in a turn's outline that finishes
   draws its check. Four things bend the old rule that what you open shows at once, in Full only and never on a phone: the
   sidebar slides as you hide or show it, the Browser's right column and the Files page's Ask panel slide in and out, pages cross-fade (not to or from the Browser),
   and the theme blends when you switch between light and dark. Calm keeps all but those four; Off keeps only work in
   progress moving (the throbber's water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
-- The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Library, Projects, Apps, Agents), and below, after some space, Inbox (with a count of what waits on you) and the tools (Search, Usage, System, Settings, Help). The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device; a phone has no rail, and its drawer holds them all in one grid (hold one a moment to pick it up). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; the Library and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
+- The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Apps, Agents), right under them Inbox (with a count of what waits on you) and Search, and below, after some space, Usage, System, Settings and Help. The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device (Inbox and Search stay right under the sections); a phone has no rail, and its drawer holds them in one grid (hold one a moment to pick it up; the drawer's header has the Inbox). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; Apps, Agents, Help and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,
   every setting, sessions (archived ones too, marked Archived) and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
-  skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Pictures,
-  videos, sounds, the Library's pages and files show with a thumbnail and their details (what each is, size or
-  length, project and folder, when it changed, a page's description); on a wide screen the preview shows a picture or
+  skills, plugins, kept pages, pictures and videos, connections, themes and files, as you type. Pictures,
+  videos, sounds, kept pages and files show with a thumbnail and their details (what each is, size or
+  length, project, when it changed, a page's description); on a wide screen the preview shows a picture or
   a page larger and plays a video or a sound in place, and on a phone the rows are big enough to tap. Opening a result goes where it is: a setting opens its
-  page and points at it, a message opens its session at the words. With search by meaning on (Settings →
+  page and points at it, a project opens its details window over the page you are on, a kept thing opens in its editor or viewer, a message opens its session at the words. With search by meaning on (Settings →
   Memory; on unless you turn it off) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
-  places you pick (sessions, messages, projects, pages, files, settings…), the same on every device; with nothing
+  places you pick (sessions, messages, projects, kept files, files, settings…), the same on every device; with nothing
   typed it lists what those places hold. In the desktop app the box also finds your own browser's history, bookmarks
   and downloads (**Browser** in Search in), by words and by meaning: a page or bookmark opens in a new tab of the Browser
   page, a download shows its file in its folder; what you type to find them is not remembered, and agents never get
@@ -1930,12 +1923,12 @@ programs shows each program's version and what is out, with Check now, Update no
   what is switched on (Bookmarks, History), or **Open System Settings** on a Mac while macOS keeps Hydor from reading
   Safari (the tour comes back to this page if Hydor has to reopen); Next goes on without. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
-  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
-  Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
+  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git and Apps
+  pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
 - Help (on the rail): a guide to every part of the app, its topics grouped on one page as cards (in a wide window, in a
-  column of the same kind as the Library's instead, with Hide sidebar beside the logo, the first page keeping its box and a few questions), each with a picture of
+  column of the same kind as the sessions' instead, with Hide sidebar beside the logo, the first page keeping its box and a few questions), each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same

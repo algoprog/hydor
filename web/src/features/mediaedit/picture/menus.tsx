@@ -187,7 +187,7 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'New…', icon: <FilePlus2 size={14} />, keys: 'Ctrl+Alt+N', also: 'blank picture canvas size preset', run: ui.newPicture },
         '-',
         { label: 'Open a picture as a layer…', icon: <ImagePlus size={14} />, keys: 'Ctrl+O', run: ui.openFile },
-        { label: 'A picture from the Library as a layer…', icon: <Layers2 size={14} />, run: ui.openLibrary },
+        { label: 'A kept picture as a layer…', icon: <Layers2 size={14} />, run: ui.openLibrary },
         { label: 'A picture from the clipboard as a layer', run: ui.fromClipboard },
         '-',
         { label: ui.saveLabel, icon: <Save size={14} />, keys: 'Ctrl+S', run: () => ui.save('main') },

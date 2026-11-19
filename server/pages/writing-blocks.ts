@@ -1,9 +1,9 @@
 // The page editor's newer blocks, as Notion has them (part of the editor: writing.ts hands it what it needs), each from
 // "/" or Add: an Embed (a map, a Google Doc or Sheet, Figma, Spotify, CodePen, Loom… or any page that may be framed), a
 // Bookmark (a link as a card with its title, description and picture, which the app's server reads), a File to
-// download, a Sound (from this device or the Library), a PDF shown in the page, a Diagram written in Mermaid (drawn by
+// download, a Sound (from this device or kept in the app), a PDF shown in the page, a Diagram written in Mermaid (drawn by
 // the app as it is typed, light and dark), a Chart (from a database of the page, or a small table of its own), Breadcrumbs
-// (where the page is in the Library) and Tabs (blocks in panels, a tab at a time). What each needs is chosen in the app
+// (where the page is in the app) and Tabs (blocks in panels, a tab at a time). What each needs is chosen in the app
 // beside where it was asked, and comes back to its place; its block's menu (⋮⋮) changes it again.
 //
 // Like the writing, the function runs in the browser: its source is sent as text, so it uses only its argument and the
@@ -40,7 +40,7 @@ export function writingBlocks(X: ExtraCore): Extra {
     return svg.outerHTML;
   };
 
-  // ---- breadcrumbs: where the page is in the Library, as the app says ------------------------------------------------------
+  // ---- breadcrumbs: where the page is in the app, as the app says ------------------------------------------------------
   let crumbs: { name: string; go?: string }[] = [];
   const fillCrumbs = () => {
     for (const nav of doc.body.querySelectorAll('nav.n-crumbs')) {

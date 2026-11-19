@@ -671,9 +671,9 @@ app.whenReady().then(async () => {
       // A link that is not a web address (javascript:, mailto:) has only its copy.
       assert.deepEqual(labels(browser.menuTemplate(t, { ...base, linkURL: 'mailto:a@b.c' })).slice(0, 2), ['Copy link address', 'Back']);
       const img = labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'https://example.com/i.png' }));
-      assert.deepEqual(img.slice(0, 6), ['Open image in new tab', 'Save image as…', 'Save image to Library', 'Ask about this image', 'Copy image', 'Copy image address']);
-      // Only an address the app can read is offered for the Library or a question (not a file: or chrome: picture).
-      assert.ok(!labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'file:///tmp/a.png' })).includes('Save image to Library'));
+      assert.deepEqual(img.slice(0, 6), ['Open image in new tab', 'Save image as…', 'Save image', 'Ask about this image', 'Copy image', 'Copy image address']);
+      // Only an address the app can read is offered to keep or ask about (not a file: or chrome: picture).
+      assert.ok(!labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'file:///tmp/a.png' })).includes('Save image'));
       const sel = browser.menuTemplate(t, { ...base, selectionText: 'hello world' });
       assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Translate “hello world”', 'Highlight', 'Bookmark this page', 'Read this page later', 'Print…', 'Inspect']);
       const long = labels(browser.menuTemplate(t, { ...base, selectionText: 'x'.repeat(100) }))[1];
@@ -722,7 +722,7 @@ app.whenReady().then(async () => {
       await cdp('Target.closeTarget', { targetId: att.params.targetInfo.targetId });
     });
 
-    await check('read later, a picture for the Library and a question: the app is told, the picture is read with the page as its referrer, and what is no picture is said so', async () => {
+    await check('read later, a picture to keep and a question: the app is told, the picture is read with the page as its referrer, and what is no picture is said so', async () => {
       const t = ownT();
       const base = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
       const last = async () => (await page('__cmds')).at(-1);
@@ -734,7 +734,7 @@ app.whenReady().then(async () => {
         return last();
       };
       const pic = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `${appOrigin}/photo-of-cat.png` });
-      const kept = await next(() => pic.find((i) => i.label === 'Save image to Library').click());
+      const kept = await next(() => pic.find((i) => i.label === 'Save image').click());
       assert.equal(kept.cmd, 'save-image');
       assert.equal(kept.name, 'photo-of-cat.png');
       assert.equal(kept.url, `${appOrigin}/words`);
@@ -746,9 +746,9 @@ app.whenReady().then(async () => {
       assert.ok(fs.existsSync(asked.path) && asked.path !== kept.path);
       // A picture inside the page's own address (data:) reads too; a page that is no picture is told so.
       const inline = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `data:image/png;base64,${PNG_B64}` });
-      assert.equal((await next(() => inline.find((i) => i.label === 'Save image to Library').click())).cmd, 'save-image');
+      assert.equal((await next(() => inline.find((i) => i.label === 'Save image').click())).cmd, 'save-image');
       const html = browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: `${appOrigin}/words` });
-      const failed = await next(() => html.find((i) => i.label === 'Save image to Library').click());
+      const failed = await next(() => html.find((i) => i.label === 'Save image').click());
       assert.equal(failed.cmd, 'picture-failed');
       assert.match(failed.message, /PNG, JPEG, WebP, GIF or AVIF/);
       // Read later: a link (with its words), and the page.

@@ -258,7 +258,7 @@ export type PlaceSpot =
 /** Where an agent would place a signature, for the user to see before allowing it. */
 export interface SignaturePlaceCard {
   signature: { id: string; name: string; kind: SignatureKind };
-  /** What is signed: a file (its path) or a document of the Library. */
+  /** What is signed: a file (its path) or a saved document. */
   target: { kind: 'docx' | 'pdf' | 'png' | 'doc'; path?: string; page?: { id: string; title: string } };
   /** Where it goes; on a PDF, the page and how many there are. */
   spot: PlaceSpot;

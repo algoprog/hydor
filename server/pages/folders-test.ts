@@ -154,7 +154,8 @@ ok(!listFolders(db).find((f) => f.id === tf.id)?.space, 'a deleted project’s f
   const f = listFolders(db).find((x) => x.id === inFolder);
   ok(f?.name === 'Week 1' && folderById(db, f.parent!)?.name === 'Notes', 'an agent saves into a folder by its path, made when missing');
   const list = (await run('get_page', {})).text ?? '';
-  ok(list.includes(`${id} · Week one`) && list.includes('in the folder “Notes/Week 1”'), 'get_page’s list says each thing’s folder');
+  ok(list.includes(`${id} · Week one`) && !list.includes('folder'), 'get_page’s list names each thing and its project, not a folder');
+  ok(['save_page', 'save_slides', 'save_doc', 'save_sheet', 'save_latex', 'save_notebook', 'save_diagram', 'save_board'].every((n) => !JSON.stringify(tools[n].inputSchema).includes('libraryFolder') && !tools[n].description.includes('Library')), 'the save tools no longer offer libraryFolder or speak of the Library (older calls still work)');
   setSessionExtra(db, 'claude:s1', { space: lab.id });
   const b = await run('save_page', { title: 'Run log', html: html('log'), libraryFolder: 'results' });
   const pb = await pageOf(idOf(b.text));

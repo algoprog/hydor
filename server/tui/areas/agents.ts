@@ -82,7 +82,7 @@ async function placesOf(ctx: Ctx, v: Values, was: OutputTarget[] = []): Promise<
       let page: string | undefined;
       if (name) {
         sheets ??= (await ctx.conn.api<{ pages: { id: string; title: string; kind?: string }[] }>('GET', '/api/pages')).pages.filter((p) => p.kind === 'sheet');
-        page = pickOne(sheets, name, { id: (p) => p.id, names: (p) => [p.title], what: 'spreadsheet', hint: 'hydor library lists them' }).id;
+        page = pickOne(sheets, name, { id: (p) => p.id, names: (p) => [p.title], what: 'spreadsheet', hint: 'hydor files lists them' }).id;
       }
       out.push({ kind: 'sheet', ...(page ? { page } : {}), ...(tab ? { tab } : {}) });
     } else if (kind === 'email') {
@@ -109,7 +109,7 @@ const withPlaces = (o: Assistant['output'], to: OutputTarget[]) => (o?.fields?.l
 
 /** A place in a few words, for show. */
 function placeText(t: OutputTarget): string {
-  if (t.kind === 'library') return t.each === 'new' ? 'a new Library page each run' : t.page ? `the Library page ${t.page}, updated` : 'a Library page, updated each run';
+  if (t.kind === 'library') return t.each === 'new' ? 'a new page each run' : t.page ? `the page ${t.page}, updated` : 'a page, updated each run';
   if (t.kind === 'sheet') return `a row in ${t.page ? `the spreadsheet ${t.page}` : 'a spreadsheet of its own'}${t.tab ? ` (tab ${t.tab})` : ''}`;
   if (t.kind === 'email') return `an email to ${t.to.join(', ')}${t.account ? ` from ${t.account}` : ''}`;
   if (t.kind === 'file') return `the file ${t.path}`;
@@ -381,7 +381,7 @@ export const agents: Area = {
         );
         if (r.more) ctx.out(p.dim(`${r.results.length} of ${r.total}: --limit for more.`));
         const made = [r.made.sheet, r.made.library].filter(Boolean).map((x) => `“${x!.title}”`);
-        if (made.length) ctx.out(p.dim(`Its runs go into ${made.join(' and ')} in the Library.`));
+        if (made.length) ctx.out(p.dim(`Its runs go into ${made.join(' and ')} in the project.`));
       },
     },
     {
@@ -390,7 +390,7 @@ export const agents: Area = {
       args: [agent],
       options: { output: { type: 'string', short: 'o', value: '<file>', desc: 'Where to write it (- prints it; default: its name, here)', kind: 'file' } },
       summary: 'Save an agent as a file, to keep or to give',
-      help: 'The file (.hydor-agent, JSON) holds its instructions, tools, tier, skills, team (by name), what it hands back, its schedules by the clock as suggestions, and its examples. Nothing of yours goes in it: its projects, connected accounts, Library pages, who its results are emailed to and its webhook’s address and key are left out, and the file says so. Built-in agents export too.',
+      help: 'The file (.hydor-agent, JSON) holds its instructions, tools, tier, skills, team (by name), what it hands back, its schedules by the clock as suggestions, and its examples. Nothing of yours goes in it: its projects, connected accounts, saved pages, who its results are emailed to and its webhook’s address and key are left out, and the file says so. Built-in agents export too.',
       examples: ['hydor agents export bookkeeper', 'hydor agents export bookkeeper -o ~/Desktop/bookkeeper.hydor-agent', 'hydor agents export bookkeeper -o -'],
       async run(ctx, [given], v) {
         const found = await findAgent(ctx, given);

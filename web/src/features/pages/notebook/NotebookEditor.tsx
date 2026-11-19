@@ -1,6 +1,6 @@
-// A Jupyter notebook kept in the Library, in the notebook page's own view: its cells and outputs, edited and run here
+// A Jupyter notebook kept by the app, in the notebook page's own view: its cells and outputs, edited and run here
 // in a folder of its own in the app's data folder (GET /api/pages/:id/notebook says which file its kernel runs from;
-// POST writes the notebook there before a kernel starts), saved as the Library's versions, with the Library's bar
+// POST writes the notebook there before a kernel starts), saved as versions, with the page's bar
 // around it, and Ask about the whole notebook or the cell picked.
 import { useEffect, useState } from 'react';
 import { api, enc, post } from '../../../lib/api';

@@ -31,8 +31,8 @@ export const signaturesFeature: WebFeature = {
       step: (t) => {
         const a = args(t);
         const file = typeof a.file === 'string' && a.file.trim() ? basename(a.file.trim()) : '';
-        if (a.look === true) return { category: 'read', verb: busy(t) ? 'Looking where to sign' : 'Looked where to sign', title: file || 'A document of your Library' };
-        return { category: 'edit', verb: busy(t) ? 'Signing' : 'Signed', title: file || 'A document of your Library' };
+        if (a.look === true) return { category: 'read', verb: busy(t) ? 'Looking where to sign' : 'Looked where to sign', title: file || 'A kept document' };
+        return { category: 'edit', verb: busy(t) ? 'Signing' : 'Signed', title: file || 'A kept document' };
       },
     },
   },

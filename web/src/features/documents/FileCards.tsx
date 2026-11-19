@@ -1,6 +1,6 @@
 // The files an agent handed over (present_files), as cards with its reply: an icon by type (a
 // thumbnail for pictures), the name, what it is and its size, the agent's caption, then Open (the
-// app's file viewer, which previews documents), Download and ⋯ (a session with it, a space, the Library for a notebook,
+// app's file viewer, which previews documents), Download and ⋯ (a session with it, a project, a kept notebook,
 // a document, a spreadsheet or a LaTeX file, Files).
 import { useEffect, useState } from 'react';
 import { Download, FileQuestion } from 'lucide-react';
