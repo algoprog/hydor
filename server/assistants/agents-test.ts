@@ -520,6 +520,13 @@ test('a project’s agent from its template, in the language the app speaks', ()
   assert.match(zh.instructions!, /You are the engineer of Shop/);
   const el = fromTemplate(templateOf('paper'), { id: 'sp1', name: 'Thesis' }, 'el');
   assert.equal(el.name, 'Thesis συγγραφέας δημοσίευσης');
+  // Each language puts the project and the role in its own order.
+  const es = fromTemplate(templateOf('software'), { id: 'sp1', name: 'Shop' }, 'es');
+  assert.equal(es.name, 'Ingeniero de Shop');
+  assert.equal(es.description, 'Crea, corrige y revisa el código de Shop');
+  assert.equal(fromTemplate(templateOf('data'), { id: 'sp1', name: 'Atlas' }, 'ja').name, 'Atlasのアナリスト');
+  assert.equal(fromTemplate(templateOf('software'), { id: 'sp1', name: 'Shop' }, 'de').name, 'Entwickler für Shop');
+  assert.equal(fromTemplate(templateOf('software'), { id: 'sp1', name: 'Shop' }, 'ko').name, 'Shop engineer');
 });
 
 // ---- run ----------------------------------------------------------------------------------------------

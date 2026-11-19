@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { preferred } from '../../shared/i18n.ts';
+import { LANGS, preferred } from '../../shared/i18n.ts';
 import { noticeText } from '../../shared/notice.ts';
 import { keepsValues, translator } from '../../shared/translate.ts';
 import { APP_ROOT } from '../config.ts';
@@ -129,14 +129,18 @@ test('the browser’s language picks one the app has, else English', () => {
   assert.equal(preferred(['el-GR', 'en']), 'el');
   assert.equal(preferred(['zh-CN']), 'zh');
   assert.equal(preferred(['de-AT', 'en']), 'de');
-  assert.equal(preferred(['fr-FR', 'de']), 'de');
-  assert.equal(preferred(['fr-FR']), 'en');
+  assert.equal(preferred(['ko-KR', 'de']), 'de');
+  assert.equal(preferred(['fr-FR', 'de']), 'fr');
+  assert.equal(preferred(['es-MX', 'en']), 'es');
+  assert.equal(preferred(['pt-PT']), 'pt');
+  assert.equal(preferred(['ja-JP']), 'ja');
+  assert.equal(preferred(['ko-KR']), 'en');
 });
 
 test('every shipped translation keeps its values, and covers nearly all the app', () => {
   const strings = read('strings.json');
   const total = Object.keys(strings).length;
-  for (const lang of ['zh.json', 'el.json']) {
+  for (const lang of LANGS.filter((l) => l.id !== 'en').map((l) => `${l.id}.json`)) {
     const dict = read(lang);
     const broken = Object.entries(dict).filter(([k, v]) => !keepsValues(k, v));
     assert.deepEqual(broken, [], `${lang}: translations that lose a value`);

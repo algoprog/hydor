@@ -92,6 +92,8 @@ export const FILLERS: Record<string, string[]> = {
   es: ['eh', 'em', 'este', 'o sea', 'pues', 'bueno', 'en plan', 'digamos'],
   fr: ['euh', 'heu', 'ben', 'bah', 'genre', 'en fait', 'du coup', 'tu vois'],
   de: ['äh', 'ähm', 'öh', 'halt', 'quasi', 'sozusagen', 'eigentlich'],
+  pt: ['éé', 'ééé', 'hum', 'ahn', 'né', 'sabe', 'enfim'],
+  ja: ['えーと', 'えーっと', 'えっと', 'あのー', 'うーん', 'まあ'],
 };
 
 /** English words that count only where they fill: "kind of" not after "a" or "the", "like" between words that do not take it. */

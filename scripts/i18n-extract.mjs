@@ -448,7 +448,9 @@ if (inventoryFlag !== -1) {
   if (!target || target.startsWith('--')) throw new Error('--inventory requires an output path');
   fs.writeFileSync(target, `${JSON.stringify(Object.fromEntries([...allSources].sort(([a], [b]) => a.localeCompare(b)).map(([key, paths]) => [key, [...paths].sort()])), null, 2)}\n`);
 }
-for (const lang of ['de', 'zh', 'el']) {
+// Every language with a dictionary of its own (de.json, es.json…; supplements are named <lang>.<module>.json).
+const LANGS = fs.readdirSync(path.join(ROOT, 'web/src/i18n')).flatMap((f) => (/^([a-z]{2,3})\.json$/.exec(f)?.[1] ? [f.slice(0, -5)] : [])).sort();
+for (const lang of LANGS) {
   const file = path.join(ROOT, `web/src/i18n/${lang}.json`);
   const have = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   // Supplement catalogs contribute coverage without replacing existing base translations.

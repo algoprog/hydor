@@ -1,0 +1,99 @@
+Language: Greek (Ελληνικά).
+
+- Address the reader in the polite plural ("Κάντε κλικ", "Επιλέξτε"), as the rest of the app does.
+- Buttons and menu items are commands as nouns, the way the app's own Greek writes them ("Αποθήκευση", "Άνοιγμα φακέλου"); headings and settings are noun phrases.
+- Quotes as « »; the question mark is ";" (U+037E or a semicolon); numbers as 20.000 and 2,5.
+
+Glossary (the app's own Greek; keep these exactly):
+- Session → Συνεδρία
+- New session → Νέα συνεδρία
+- Agent → Πράκτορας
+- Subagent → Υποπράκτορας
+- Hydor subagent → Υποπράκτορας του Hydor
+- Project → Έργο
+- Projects → Έργα
+- Library → Βιβλιοθήκη
+- Pages → Σελίδες
+- Page → Σελίδα
+- Slides → Διαφάνειες
+- Document → Έγγραφο
+- Spreadsheet → Υπολογιστικό φύλλο
+- Notebook → Σημειωματάριο
+- Diagram → Διάγραμμα
+- Design → Σχεδίαση
+- Board → Ταμπλό
+- Studio → Στούντιο
+- Apps → Εφαρμογές
+- Agent apps → Εφαρμογές πρακτόρων
+- Connected apps → Συνδεδεμένες εφαρμογές
+- Answer UIs → Κάρτες απαντήσεων
+- Skills → Δεξιότητες
+- Memory → Μνήμη
+- Wiki memory → Μνήμη wiki
+- Shared knowledge → Κοινόχρηστες γνώσεις
+- Notes → Σημειώσεις
+- Tasks → Εργασίες
+- Scheduled tasks → Προγραμματισμένες εργασίες
+- Inbox → Εισερχόμενα
+- Outbox → Εξερχόμενα
+- Agent Guidelines → Οδηγίες πρακτόρων
+- Settings → Ρυθμίσεις
+- Capabilities → Δυνατότητες
+- Help → Βοήθεια
+- Swarm → Σμήνος
+- Custom → Custom
+- General → Γενικά
+- Researcher → Ερευνητής
+- Writer → Συγγραφέας
+- Coder → Προγραμματιστής
+- Tutor → Δάσκαλος
+- Planner → Σχεδιαστής
+- Analyst → Αναλυτής
+- App builder → Κατασκευαστής εφαρμογών
+- Quick → Γρήγορο
+- Standard → Τυπικό
+- Best → Καλύτερο
+- Max → Μέγιστο
+- Automatic → Αυτόματα
+- Tiers → Βαθμίδες
+- Model → Μοντέλο
+- Helper model → Βοηθητικό μοντέλο
+- Effort → Ένταση σκέψης
+- Permission mode → Λειτουργία δικαιωμάτων
+- Ask → Ερώτηση
+- Plan → Σχέδιο
+- Full access → Πλήρης πρόσβαση
+- Hands-free → Χωρίς χέρια
+- Files → Αρχεία
+- Folder → Φάκελος
+- Terminal → Τερματικό
+- Browser → Πρόγραμμα περιήγησης
+- Git → Git
+- Worktree → Worktree
+- Pull request → Pull request
+- Usage → Χρήση
+- System → Σύστημα
+- Experiments → Πειράματα
+- Machines → Μηχανήματα
+- Home → Home
+- Keys → Κλειδιά
+- Search by meaning → Αναζήτηση βάσει νοήματος
+- Sidebar → Πλευρική στήλη
+- Approve → Έγκριση
+- Deny → Απόρριψη
+- Spending cap → Όριο δαπανών
+- Budget → Προϋπολογισμός
+- Run → Εκτέλεση
+- Sign in → Σύνδεση
+- Sign out → Αποσύνδεση
+- Account → Λογαριασμός
+- Theme → Θέμα
+- Dark → Σκούρο
+- Light → Φωτεινό
+- Present → Παρουσίαση
+- Trash → Κάδος
+- Share → Κοινοποίηση
+- Pin → Καρφίτσωμα
+- Learn more → Μάθετε περισσότερα
+- Picture → Εικόνα
+- Paper → Επιστημονική εργασία

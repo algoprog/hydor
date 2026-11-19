@@ -1,6 +1,7 @@
 import { combineLanguageCatalogs, isLanguageSupplement } from '../../../shared/language-catalog.ts';
 // The pages in the user's language. The app's own words are translated as they are drawn, from a dictionary
-// per language (npm run i18n:extract lists them in strings.json; zh.json, el.json… hold the translations).
+// per language (npm run i18n:extract lists them in strings.json; de.json, es.json… hold the translations, which
+// npm run i18n:translate fills in).
 // Text nodes and a few attributes are changed in place: React keeps its nodes, and when it sets one's text
 // again that is translated again. A sentence JSX builds from text and values ("Reading {0} of {1}…") is
 // translated whole, since its words may go in another order. What people and agents wrote (conversations,
@@ -145,8 +146,12 @@ export async function startTranslating(lang: Lang) {
 /** Each language's dictionary, loaded when it is the one in use. */
 const DICTS: Partial<Record<Lang, () => Promise<Dict>>> = {
   de: () => import('./de.json').then((m) => m.default as Dict),
-  zh: () => import('./zh.json').then((m) => m.default as Dict),
+  es: () => import('./es.json').then((m) => m.default as Dict),
+  fr: () => import('./fr.json').then((m) => m.default as Dict),
+  pt: () => import('./pt.json').then((m) => m.default as Dict),
   el: () => import('./el.json').then((m) => m.default as Dict),
+  ja: () => import('./ja.json').then((m) => m.default as Dict),
+  zh: () => import('./zh.json').then((m) => m.default as Dict),
 };
 
 // Vite discovers supplement catalogs; Node-based tests do not run its transform.

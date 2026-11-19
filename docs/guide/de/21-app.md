@@ -74,10 +74,14 @@ Das Design wird deinen eigenen Designs hinzugefügt und sofort aktiviert. Ungül
 
 Unter [Einstellungen → App → Allgemein → Darstellung → Sprache](/settings?s=general&find=Language) wählst du die Oberflächensprache:
 
-- **Englisch**
-- **中文（简体）**, vereinfachtes Chinesisch
-- **Ελληνικά**, Griechisch
+- **English**, Englisch
 - **Deutsch**
+- **Español**, Spanisch
+- **Français**, Französisch
+- **Português (Brasil)**, brasilianisches Portugiesisch
+- **Ελληνικά**, Griechisch
+- **日本語**, Japanisch
+- **中文（简体）**, vereinfachtes Chinesisch
 
 Wenn du eine Sprache auswählst, wird die Seite in dieser Sprache neu geladen. Die Auswahl wird in diesem Browser gespeichert; anfangs folgt die App der Sprache deines Browsers, sofern sie sie hat, und sonst Englisch.
 

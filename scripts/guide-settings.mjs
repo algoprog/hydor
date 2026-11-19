@@ -1,5 +1,5 @@
 // npm run guide:settings: writes the guide's "Every setting" topic (docs/guide/30-settings.md, and its translations
-// in docs/guide/de/, docs/guide/zh/ and docs/guide/el/) from what the search box knows of Settings (shared/find-catalog.ts: each
+// in docs/guide/<lang>/ for every language of TEXT) from what the search box knows of Settings (shared/find-catalog.ts: each
 // section and the options in it), the app's own translations of those words (web/src/i18n), and the translated
 // topics' titles. Run it after adding, renaming or rewording a Settings section or option (AGENTS.md, "Docs").
 import fs from 'node:fs';
@@ -26,6 +26,16 @@ const TOPIC = (() => {
   const at = src.indexOf('export const SECTION_TOPIC');
   return Object.fromEntries([...src.slice(at, src.indexOf('};', at)).matchAll(/^\s+([a-z-]+): '([a-z-]+)',$/gm)].map((m) => [m[1], m[2]]));
 })();
+
+/** An on-screen label as the app shows it in a language (its dictionary): the bold words of the newer languages' texts. */
+const DICTS = {};
+function ui(lang, s) {
+  DICTS[lang] ??= JSON.parse(fs.readFileSync(path.join(ROOT, 'web', 'src', 'i18n', `${lang}.json`), 'utf8'));
+  return DICTS[lang][s] ?? s;
+}
+
+/** A button's words without the shortcut its label ends with ("Hide sidebar ({0}B)"). */
+const bare = (lang, s) => ui(lang, `${s} ({0}B)`).replace(/\s*[（(]\{0\}B[）)]\s*$/u, '');
 
 const TEXT = {
   en: {
@@ -61,6 +71,73 @@ const TEXT = {
     ask: 'Beispielaufträge',
     examples: ['Wo ändere ich die Funktion von Enter während der Agent arbeitet?', 'Aktiviere den Benachrichtigungston.', 'Zeige meine Sucheinstellungen.', 'Wähle das günstigste Hilfsmodell.', 'Deaktiviere Memory für neue Sitzungen.'],
     quote: (s) => `„${s}“`,
+  },
+  es: {
+    title: ui('es', 'Every setting'),
+    intro:
+      'Cada sección de la configuración y lo que contiene, en el orden en que la app las muestra, con un enlace a cada una y a la parte de esta guía que la explica. Úsala para encontrar dónde se ajusta algo; los temas explican cómo usarlo.',
+    layout: 'Cómo está organizada la configuración',
+    layoutText: [
+      `Abre **${ui('es', 'Settings')}** desde la barra de iconos. En una computadora, la configuración tiene una columna a la izquierda, como la de la Biblioteca, con todas las secciones en una lista bajo tres encabezados: **${ui('es', 'App')}** (la app en sí), **${ui('es', 'Agents')}** (los agentes y lo que leen) y **${ui('es', 'Capabilities')}** (lo que la app añade a cada agente: la búsqueda, el navegador, la memoria y lo demás). Haz clic en una sección y ocupa la página, bajo su título. **${bare('es', 'Hide sidebar')}** (Ctrl+B) oculta la columna, y **${bare('es', 'Show sidebar')}**, al principio del título, la vuelve a mostrar. En un teléfono, la configuración muestra todas las secciones en una lista; toca una para abrirla, y la flecha de arriba para volver.`,
+      `No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro de búsqueda (Ctrl+K, ⌘K en una Mac), por ejemplo "modo oscuro" o "notificaciones", y elígelo. La app abre la sección correcta y señala la opción. También puedes pedirle a cualquier agente que cambie un ajuste por ti ([${topicTitle('es', 'ask-agents')}](/guide/ask-agents)).`,
+    ],
+    more: 'Más en',
+    stop: '.',
+    colon: ': ',
+    gap: ' ',
+    ask: ui('es', 'Ask an agent'),
+    examples: ['¿Dónde cambio lo que hace Enter mientras un agente trabaja?', 'Activa el sonido de las notificaciones.', 'Muéstrame mis ajustes de búsqueda.', 'Pon como modelo auxiliar el más barato.', 'Desactiva la memoria para las sesiones nuevas.'],
+    quote: (s) => `"${s}"`,
+  },
+  fr: {
+    title: ui('fr', 'Every setting'),
+    intro:
+      'Chaque section des paramètres et ce qu’elle contient, dans l’ordre où l’app les affiche, avec un lien vers chacune et vers la partie de ce guide qui l’explique. Servez-vous-en pour trouver où se règle quelque chose ; les sujets expliquent comment s’en servir.',
+    layout: 'Comment les paramètres sont organisés',
+    layoutText: [
+      `Ouvrez **${ui('fr', 'Settings')}** depuis la barre d’icônes. Sur un ordinateur, les paramètres ont une colonne à gauche, comme celle de la Bibliothèque, avec toutes les sections dans une liste sous trois titres : **${ui('fr', 'App')}** (l’app elle-même), **${ui('fr', 'Agents')}** (les agents et ce qu’ils lisent) et **${ui('fr', 'Capabilities')}** (ce que l’app ajoute à chaque agent : la recherche, le navigateur, la mémoire et le reste). Cliquez sur une section et elle occupe la page, sous son titre. **${bare('fr', 'Hide sidebar')}** (Ctrl+B) masque la colonne, et **${bare('fr', 'Show sidebar')}**, au début du titre, la fait revenir. Sur un téléphone, les paramètres affichent toutes les sections dans une liste ; touchez-en une pour l’ouvrir, et la flèche en haut pour revenir.`,
+      `Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le champ de recherche (Ctrl+K, ⌘K sur un Mac), par exemple « mode sombre » ou « notifications », puis choisissez-la. L’app ouvre la bonne section et vous montre l’option. Vous pouvez aussi demander à n’importe quel agent de modifier un réglage pour vous ([${topicTitle('fr', 'ask-agents')}](/guide/ask-agents)).`,
+    ],
+    more: 'Pour en savoir plus :',
+    stop: '.',
+    colon: ' : ',
+    gap: ' ',
+    ask: ui('fr', 'Ask an agent'),
+    examples: ['Où changer ce que fait Entrée pendant qu’un agent travaille ?', 'Active le son des notifications.', 'Montre-moi mes réglages de recherche.', 'Choisis le modèle d’appoint le moins cher.', 'Désactive la mémoire pour les nouvelles sessions.'],
+    quote: (s) => `« ${s} »`,
+  },
+  pt: {
+    title: ui('pt', 'Every setting'),
+    intro:
+      'Cada seção das configurações e o que há nela, na ordem em que o app as mostra, com um link para cada uma e para a parte deste guia que a explica. Use-a para descobrir onde algo é ajustado; os tópicos explicam como usar.',
+    layout: 'Como as configurações são organizadas',
+    layoutText: [
+      `Abra **${ui('pt', 'Settings')}** na barra de ícones. No computador, as configurações têm uma coluna à esquerda, como a da Biblioteca, com todas as seções em uma lista sob três títulos: **${ui('pt', 'App')}** (o próprio app), **${ui('pt', 'Agents')}** (os agentes e o que eles leem) e **${ui('pt', 'Capabilities')}** (o que o app acrescenta a cada agente: a busca, o navegador, a memória e o resto). Clique em uma seção e ela ocupa a página, abaixo do título. **${bare('pt', 'Hide sidebar')}** (Ctrl+B) esconde a coluna, e **${bare('pt', 'Show sidebar')}**, no início do título, a traz de volta. No celular, as configurações mostram todas as seções em uma lista; toque em uma para abri-la, e na seta no alto para voltar.`,
+      `Você não precisa saber onde fica uma opção: digite o que quer na caixa de busca (Ctrl+K, ⌘K no Mac), como "modo escuro" ou "notificações", e escolha. O app abre a seção certa e aponta a opção. Você também pode pedir a qualquer agente que mude uma configuração para você ([${topicTitle('pt', 'ask-agents')}](/guide/ask-agents)).`,
+    ],
+    more: 'Mais em',
+    stop: '.',
+    colon: ': ',
+    gap: ' ',
+    ask: ui('pt', 'Ask an agent'),
+    examples: ['Onde eu mudo o que o Enter faz enquanto um agente trabalha?', 'Ative o som das notificações.', 'Mostre minhas configurações de busca.', 'Defina o modelo auxiliar como o mais barato.', 'Desative a memória para novas sessões.'],
+    quote: (s) => `"${s}"`,
+  },
+  ja: {
+    title: ui('ja', 'Every setting'),
+    intro: '設定のすべてのセクションとその内容を、アプリに表示される順に並べ、それぞれの場所と、このガイドの説明部分へのリンクを付けています。何がどこで設定できるかを探すときに使ってください。使い方は各トピックで説明しています。',
+    layout: '設定の構成',
+    layoutText: [
+      `アイコンバーから**${ui('ja', 'Settings')}**を開きます。パソコンでは、設定の左側にライブラリと同じような列があり、すべてのセクションが3つの見出しの下に1つのリストで並んでいます。**${ui('ja', 'App')}**（アプリそのもの）、**${ui('ja', 'Agents')}**（エージェントと、エージェントが読むもの）、**${ui('ja', 'Capabilities')}**（アプリがすべてのエージェントに加える機能：検索、ブラウザ、メモリなど）です。セクションをクリックすると、そのタイトルの下にページいっぱいに表示されます。**${bare('ja', 'Hide sidebar')}**（Ctrl+B）で列を隠し、タイトルの先頭にある**${bare('ja', 'Show sidebar')}**で元に戻せます。スマートフォンでは、設定のすべてのセクションが1つのリストに表示されます。タップして開き、上部の矢印で戻ります。`,
+      `オプションの場所を知らなくてもかまいません。検索ボックス（Ctrl+K、Macでは⌘K）に「ダークモード」や「通知」のように探しているものを入力して選ぶと、アプリが正しいセクションを開き、そのオプションを示します。どのエージェントにも設定の変更を頼めます（[${topicTitle('ja', 'ask-agents')}](/guide/ask-agents)）。`,
+    ],
+    more: '詳しくは',
+    stop: '。',
+    colon: '：',
+    gap: '',
+    ask: ui('ja', 'Ask an agent'),
+    examples: ['エージェントの作業中にEnterで何が起きるかは、どこで変えられますか？', '通知音をオンにして。', '検索の設定を見せて。', '補助モデルをいちばん安いものにして。', '新しいセッションではメモリをオフにして。'],
+    quote: (s) => `「${s}」`,
   },
   zh: {
     title: '所有设置',
@@ -114,9 +191,9 @@ function topicTitle(lang, id) {
 const findParam = (words) => encodeURIComponent(words).replace(/[()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
 const PROPER = /^(CLAUDE|Gemini|GitHub|Claude|Codex|OpenRouter|Ollama|MCP|ACP|Naget|Hydor)/;
-const lower = (s, lang) => (PROPER.test(s) || lang === 'zh' || lang === 'de' ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
+const lower = (s, lang) => (PROPER.test(s) || ['zh', 'ja', 'de'].includes(lang) ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
 
-for (const lang of ['en', 'de', 'zh', 'el']) {
+for (const lang of Object.keys(TEXT)) {
   const t = TEXT[lang];
   const dict = lang === 'en' ? {} : JSON.parse(fs.readFileSync(path.join(ROOT, 'web', 'src', 'i18n', `${lang}.json`), 'utf8'));
   const tr = (s) => dict[s] ?? s;
@@ -128,7 +205,7 @@ for (const lang of ['en', 'de', 'zh', 'el']) {
       const topic = TOPIC[id];
       if (!topic) throw new Error(`No guide topic for the Settings section "${id}": add it to TOPIC in scripts/guide-settings.mjs`);
       out.push(`### ${tr(label)}`, '');
-      out.push(`[${tr('Settings')} → ${tr(label)}](/settings?s=${id})${t.colon}${lower(tr(sub), lang)}${t.stop}${t.gap}${t.more}${lang === 'zh' ? '' : ' '}[${topicTitle(lang, topic)}](/guide/${topic})${t.stop}`, '');
+      out.push(`[${tr('Settings')} → ${tr(label)}](/settings?s=${id})${t.colon}${lower(tr(sub), lang)}${t.stop}${t.gap}${t.more}${t.gap}[${topicTitle(lang, topic)}](/guide/${topic})${t.stop}`, '');
       for (const [sid, words, , text] of OPTIONS) {
         if (sid !== id) continue;
         const x = tr(text).replace(/[.。]$/, '');

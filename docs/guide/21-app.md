@@ -76,8 +76,12 @@ The theme is added to your own and used at once. If the text isn't a theme, the 
 
 - **English**
 - **Deutsch** (German)
-- **中文（简体）** (Chinese, Simplified)
+- **Español** (Spanish)
+- **Français** (French)
+- **Português (Brasil)** (Portuguese, Brazil)
 - **Ελληνικά** (Greek)
+- **日本語** (Japanese)
+- **中文（简体）** (Chinese, Simplified)
 
 Picking one reloads the page in that language. The choice is kept in this browser; at first the app follows your browser's language when it has it, and English otherwise.
 

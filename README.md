@@ -38,7 +38,7 @@
 </p>
 
 <p align="center">
-  <b>140+</b> answer UIs · <b>37</b> ready-made apps · <b>70+</b> skills · <b>4</b> languages · <b>zero</b> telemetry
+  <b>140+</b> answer UIs · <b>37</b> ready-made apps · <b>70+</b> skills · <b>8</b> languages · <b>zero</b> telemetry
 </p>
 
 > [!TIP]
@@ -240,7 +240,7 @@ On a Mac, the app puts the command on your PATH by itself.
 - **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
 - **In your terminal**: the `hydor` command talks to an agent, runs one request from a script, and does everything
   the app does, with Tab completion for bash, zsh and fish ([terminal](docs/guide/27-terminal.md)).
-- In English, German, Chinese and Greek.
+- In English, German, Spanish, French, Brazilian Portuguese, Greek, Japanese and Chinese.
 
 See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.
 

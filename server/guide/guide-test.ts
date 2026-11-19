@@ -14,6 +14,7 @@ import Fastify from 'fastify';
 import { appPageLink } from '../../shared/app-pages.ts';
 import { OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import { headingId, parseTopic, topicId, translatedTopic } from '../../shared/guide.ts';
+import { LANGS } from '../../shared/i18n.ts';
 import { TIP_GUIDE } from '../../shared/tips.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
@@ -219,7 +220,7 @@ test('German native articles are loaded without fallback and retain heading posi
 });
 
 test('the translations: every topic but the API one, each with the English headings in their places and the same links', () => {
-  for (const lang of ['de', 'zh', 'el'] as const) {
+  for (const { id: lang } of LANGS.filter((l) => l.id !== 'en')) {
     const dir = path.join(APP_ROOT, 'docs', 'guide', lang);
     const files = fs.readdirSync(dir).filter((f) => /^\d+-[a-z0-9-]+\.md$/.test(f));
     const problems: string[] = [];
@@ -616,7 +617,7 @@ test('a question asked on Help: its agent answers it from the guide, knowing the
 test('the guide’s pictures: every one it shows is there; the light one when asked for, else the one there is', async () => {
   const dir = path.join(APP_ROOT, 'docs', 'guide', 'images');
   const missing: string[] = [];
-  for (const lang of ['en', 'de', 'zh', 'el'] as const)
+  for (const { id: lang } of LANGS)
     for (const t of guideTopics(lang))
       for (const m of t.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
         const name = /^images\/([a-z0-9-]+\.(?:webp|png|jpg))$/.exec(m[1])?.[1];

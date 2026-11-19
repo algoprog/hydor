@@ -1,0 +1,89 @@
+Language: Spanish (español), a neutral Spanish that reads naturally in Latin America and in Spain.
+
+- Address the reader as "tú" (informal), as Google's and Apple's Spanish interfaces do; several people are "ustedes", never "vosotros".
+- Use words every Spanish-speaking country knows: "computadora" (not "ordenador"), "teléfono", "archivo", "carpeta", "pestaña", "enlace", "descargar", "subir" (upload), "guardar".
+- Buttons and menu items are commands in the infinitive ("Guardar", "Abrir carpeta", "Eliminar sesión"); headings and settings are noun phrases ("Notificaciones", "Idioma de la app").
+- "Sign in" is "Iniciar sesión", so starting one of Hydor's sessions is "empezar una sesión" or "nueva sesión", never "iniciar sesión".
+- Punctuation: opening ¿ and ¡; quotes as “ ” around names, as in the English; numbers in the text as 20.000 and 2,5.
+- "Delete" (gone for good) is "Eliminar"; "Remove" (taken out of a list, kept elsewhere) is "Quitar".
+
+Glossary (one translation per concept; keep these exactly):
+- Session → sesión
+- New session → Nueva sesión
+- Confidential session → sesión confidencial
+- Agent → agente
+- Subagent → subagente
+- Hydor subagent → subagente de Hydor (and "Claude Code subagent" → subagente de Claude Code)
+- Project → proyecto
+- Library → Biblioteca
+- Pages → Páginas; a page → una página
+- Slides → Diapositivas; a deck → una presentación
+- Document → documento
+- Spreadsheet → hoja de cálculo
+- Notebook (Jupyter) → cuaderno
+- Diagram → diagrama
+- Design → diseño
+- Board → tablero
+- Studio → Studio
+- Apps → Apps; an app → una app
+- Agent apps → Apps de agentes
+- Connected apps → Apps conectadas
+- Answer UIs → UI de respuesta
+- Skills → Habilidades; a skill → una habilidad
+- Memory → Memoria
+- Wiki memory → Memoria wiki
+- Shared knowledge → Conocimiento compartido
+- Notes → Notas
+- Tasks → Tareas
+- Scheduled tasks → Tareas programadas
+- Inbox → Bandeja de entrada
+- Outbox → Bandeja de salida
+- Agent Guidelines → Pautas de los agentes; guidelines → pautas
+- Settings → Configuración
+- Capabilities → Capacidades
+- Help → Ayuda
+- Swarm → Enjambre
+- Custom (the app's own agent) → Custom (a name: never translated)
+- General (the default agent, and the Settings section) → General
+- Researcher → Investigador
+- Writer → Redactor
+- Coder → Programador
+- Tutor → Tutor
+- Planner → Planificador
+- Analyst → Analista
+- App builder → Creador de apps
+- Tiers → Niveles; Quick → Rápido; Standard → Estándar; Best → Mejor; Max → Máximo
+- Automatic → Automático
+- Model → modelo
+- Helper model → modelo auxiliar
+- Effort → Esfuerzo
+- Permission mode → Modo de permisos; Ask → Preguntar; Plan → Planificar; Full access → Acceso total
+- Hands-free → Manos libres
+- Files → Archivos; Folder → carpeta
+- Terminal → Terminal
+- Browser → Navegador
+- Git → Git; worktree → worktree; pull request → pull request; commit → commit; branch → rama
+- Usage → Uso
+- System → Sistema
+- Experiments → Experimentos
+- Machines → Máquinas
+- Home → Inicio
+- Keys → Claves; Vault → Bóveda
+- Search by meaning → Búsqueda por significado
+- Sidebar → Barra lateral
+- Approve → Aprobar; Deny → Rechazar
+- Spending cap → Límite de gasto
+- Budget → Presupuesto
+- Run (verb) → Ejecutar; a run → una ejecución
+- Step up (to a higher tier) → Subir de nivel
+- Sign in → Iniciar sesión; Sign out → Cerrar sesión
+- Account → cuenta
+- Theme → Tema; Dark → Oscuro; Light → Claro
+- Present (slides) → Presentar
+- Trash → Papelera
+- Share → Compartir
+- Pin → Fijar; Unpin → Dejar de fijar
+- Learn more → Más información
+- Picture → imagen
+- Paper (scientific) → artículo
+- the rail (the column of icons along the app's left edge) → la barra de iconos

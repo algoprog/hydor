@@ -191,8 +191,8 @@ agents that speak ACP and take MCP servers.
   project's Agents tab shows its agents as a team (what starts each, whom it hands work to), and a project can have an
   agent made for it as it is made, or later: drafted to fit it when it says enough about itself, else the template for
   its kind (software, a website, ML experiments, data, a LaTeX paper, research reading, writing, design and media,
-  slides) from its files or description, else a default one, named and described in the app's language (English,
-  German, Chinese or Greek). A task without a folder gets one of its own
+  slides) from its files or description, else a default one, named and described in the app's language. A task
+  without a folder gets one of its own
   (`~/Hydor/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
@@ -1345,10 +1345,11 @@ agents that speak ACP and take MCP servers.
   the background; else, or when the GPU fails, on the processor); replies can be read aloud. Hands-free mode (the
   headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
   answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
-- **Your language**: the app in English, German, Chinese (Simplified) or Greek (Settings → General → Language), with
-  dates and times written that way and notifications in it too, and agents write to you in it. Translations
+- **Your language**: the app in English, German, Spanish, French, Brazilian Portuguese, Greek, Japanese or Chinese
+  (Simplified) (Settings → General → Language), and the guide too, with dates and times written that way and
+  notifications in it too, and agents write to you in it. At first the app follows the browser's language. Translations
   live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with
-  the app (skills, connections, search providers) included.
+  the app (skills, connections, search providers) included, and `npm run i18n:translate` translates what is new.
 - **Model arena**: under Options (start page only: it sends the first message to the other models), send the same prompt to one or two more models; their answers show side by
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.

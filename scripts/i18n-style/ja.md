@@ -1,0 +1,89 @@
+Language: Japanese (日本語).
+
+- Sentences (descriptions, messages, help text) are polite です・ます form. Short labels (buttons, menu items, headings, settings) are concise, as Japanese apps write them: 「保存」「フォルダを開く」「セッションを削除」「通知」.
+- Typography: full-width 、。「」（）！？ in Japanese text; half-width letters and digits; no spaces between Japanese and Latin letters, digits or placeholders (「{0}件のセッション」「Claude Codeで開く」). Quote names with 「」 (「{0}」を削除しますか？).
+- Counts need no plural: write {0} with a counter or as a label (「{0}件」「ファイル：{0}」).
+- Katakana: ユーザー, サーバー, コンピューター, メモリ, ブラウザ, フォルダ, フィルタ, エディタ.
+- Address the reader without pronouns (no あなた unless it is needed).
+- "Delete" (gone for good) is 「削除」; "Remove" (taken out of a list, kept elsewhere) is 「外す」 or 「取り除く」.
+
+Glossary (one translation per concept; keep these exactly):
+- Session → セッション
+- New session → 新しいセッション
+- Confidential session → 機密セッション
+- Agent → エージェント
+- Subagent → サブエージェント
+- Hydor subagent → Hydorサブエージェント (and "Claude Code subagent" → Claude Codeサブエージェント)
+- Project → プロジェクト
+- Library → ライブラリ
+- Pages → ページ
+- Slides → スライド; a deck → プレゼンテーション
+- Document → ドキュメント
+- Spreadsheet → スプレッドシート
+- Notebook (Jupyter) → ノートブック
+- Diagram → 図
+- Design → デザイン
+- Board → ボード
+- Studio → スタジオ
+- Apps → アプリ
+- Agent apps → エージェントアプリ
+- Connected apps → 接続済みアプリ
+- Answer UIs → 回答UI
+- Skills → スキル
+- Memory → メモリ
+- Wiki memory → Wikiメモリ
+- Shared knowledge → 共有ナレッジ
+- Notes → メモ
+- Tasks → タスク
+- Scheduled tasks → スケジュールタスク
+- Inbox → 受信トレイ
+- Outbox → 送信トレイ
+- Agent Guidelines → エージェントガイドライン; guidelines → ガイドライン
+- Settings → 設定
+- Capabilities → 機能
+- Help → ヘルプ
+- Swarm → スウォーム
+- Custom (the app's own agent) → Custom (a name: never translated)
+- General (the default agent, and the Settings section) → 一般
+- Researcher → リサーチャー
+- Writer → ライター
+- Coder → プログラマー
+- Tutor → チューター
+- Planner → プランナー
+- Analyst → アナリスト
+- App builder → アプリビルダー
+- Tiers → ティア; Quick → 高速; Standard → 標準; Best → 最高; Max → 最大
+- Automatic → 自動
+- Model → モデル
+- Helper model → 補助モデル
+- Effort → 思考レベル
+- Permission mode → 権限モード; Ask → 確認; Plan → プラン; Full access → フルアクセス
+- Hands-free → ハンズフリー
+- Files → ファイル; Folder → フォルダ
+- Terminal → ターミナル
+- Browser → ブラウザ
+- Git → Git; worktree → ワークツリー; pull request → プルリクエスト; commit → コミット; branch → ブランチ
+- Usage → 使用量
+- System → システム
+- Experiments → 実験
+- Machines → マシン
+- Home → ホーム
+- Keys → キー; Vault → 保管庫
+- Search by meaning → 意味で検索
+- Sidebar → サイドバー
+- Approve → 承認; Deny → 拒否
+- Spending cap → 支出上限
+- Budget → 予算
+- Run (verb) → 実行; a run → 実行
+- Step up (to a higher tier) → ティアを上げる
+- Sign in → サインイン; Sign out → サインアウト
+- Account → アカウント
+- Theme → テーマ; Dark → ダーク; Light → ライト
+- Present (slides) → スライドショー
+- Trash → ゴミ箱
+- Share → 共有
+- Pin → ピン留め; Unpin → ピン留めを外す
+- Learn more → 詳細
+- Picture → 画像
+- Paper (scientific) → 論文
+- the rail (the column of icons along the app's left edge) → アイコンバー

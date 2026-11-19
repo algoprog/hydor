@@ -1,0 +1,99 @@
+Language: Simplified Chinese (简体中文).
+
+- Address the reader as 你, as the rest of the app does.
+- Full-width punctuation in Chinese text (，。：；！？“”（）); a space between Chinese and Latin words or numbers, as the app's own Chinese does ("Hydor 子智能体", "{0} 个文件").
+- Buttons and menu items are short verb phrases ("保存", "打开文件夹"); headings and settings are noun phrases.
+
+Glossary (the app's own Chinese; keep these exactly):
+- Session → 会话
+- New session → 新建会话
+- Agent → 智能体
+- Subagent → 子智能体
+- Hydor subagent → Hydor 子智能体
+- Project → 项目
+- Projects → 项目
+- Library → 资料库
+- Pages → 页面
+- Page → 网页
+- Slides → 幻灯片
+- Document → 文档
+- Spreadsheet → 电子表格
+- Notebook → 笔记本
+- Diagram → 示意图
+- Design → 设计
+- Board → 看板
+- Studio → 开间
+- Apps → 应用
+- Agent apps → 智能体应用
+- Connected apps → 已连接的应用
+- Answer UIs → 回答卡片
+- Skills → 技能
+- Memory → 记忆
+- Wiki memory → Wiki 记忆
+- Shared knowledge → 共享知识
+- Notes → 备注
+- Tasks → 任务
+- Scheduled tasks → 定时任务
+- Inbox → 收件箱
+- Outbox → 发件箱
+- Agent Guidelines → 智能体准则
+- Settings → 设置
+- Capabilities → 功能
+- Help → 帮助
+- Swarm → 集群
+- Custom → Custom
+- General → 通用
+- Researcher → 研究员
+- Writer → 撰稿人
+- Coder → 程序员
+- Tutor → 辅导老师
+- Planner → 规划师
+- Analyst → 分析师
+- App builder → 应用搭建师
+- Quick → 快速
+- Standard → 标准
+- Best → 最佳
+- Max → 最大值
+- Automatic → 自动
+- Tiers → 档位
+- Model → 模型
+- Helper model → 辅助模型
+- Effort → 思考强度
+- Permission mode → 权限模式
+- Ask → 询问
+- Plan → 计划
+- Full access → 完全访问
+- Hands-free → 免提
+- Files → 文件
+- Folder → 文件夹
+- Terminal → 终端
+- Browser → 浏览器
+- Git → Git
+- Worktree → 工作树
+- Pull request → 拉取请求
+- Usage → 用量
+- System → 系统
+- Experiments → 实验
+- Machines → 机器
+- Home → Home
+- Keys → 密钥
+- Search by meaning → 按含义搜索
+- Sidebar → 侧边栏
+- Approve → 批准
+- Deny → 拒绝
+- Spending cap → 花费上限
+- Budget → 预算
+- Run → 运行
+- Sign in → 登录
+- Sign out → 退出登录
+- Account → 账户
+- Theme → 主题
+- Dark → 深色
+- Light → 浅色
+- Present → 放映
+- Trash → 废纸篓
+- Share → 分享
+- Pin → 置顶
+- Learn more → 了解更多
+- Picture → 图片
+- Paper → 论文

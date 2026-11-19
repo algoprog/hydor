@@ -21,8 +21,13 @@ const p2 = (n: number) => String(n).padStart(2, '0');
 /** The email's own few words, in the language the app speaks (the result is in the agent's words). */
 const MAIL_WORDS: Record<string, { locale: string; foot: (name: string) => string }> = {
   en: { locale: 'en-GB', foot: (n) => `Sent by ${n}, an agent in Hydor, as its results are set to go.` },
-  zh: { locale: 'zh-CN', foot: (n) => `由 Hydor 中的智能体“${n}”按其结果去向的设置发送。` },
+  de: { locale: 'de-DE', foot: (n) => `Gesendet von ${n}, einem Agenten in Hydor, wie es für seine Ergebnisse eingestellt ist.` },
+  es: { locale: 'es', foot: (n) => `Enviado por ${n}, un agente de Hydor, según el destino configurado para sus resultados.` },
+  fr: { locale: 'fr-FR', foot: (n) => `Envoyé par ${n}, un agent de Hydor, selon la destination choisie pour ses résultats.` },
+  pt: { locale: 'pt-BR', foot: (n) => `Enviado por ${n}, um agente do Hydor, conforme o destino definido para os resultados dele.` },
   el: { locale: 'el-GR', foot: (n) => `Στάλθηκε από τον πράκτορα ${n} στο Hydor, όπως έχουν οριστεί να πηγαίνουν τα αποτελέσματά του.` },
+  ja: { locale: 'ja-JP', foot: (n) => `Hydorのエージェント「${n}」が、結果の送信先の設定に従って送信しました。` },
+  zh: { locale: 'zh-CN', foot: (n) => `由 Hydor 中的智能体“${n}”按其结果去向的设置发送。` },
 };
 
 /** A subject with its placeholders filled in: {date} (2026-11-15), {time} (09:30) and {agent} (its name). */

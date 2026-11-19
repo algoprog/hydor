@@ -11,6 +11,7 @@ import { activityOf, isWorking } from '../../lib/activity';
 import { openSession } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import { useProgramSubagentsOf } from './program';
+import { tr } from '../../i18n/runtime';
 
 /**
  * Which listed sessions sit under which: each child under its parent, when the parent is listed too. A listed session
@@ -23,6 +24,16 @@ import { useProgramSubagentsOf } from './program';
  */
 export function liveThenRecent(a: SessionSummary, b: SessionSummary): number {
   return Number(live(b)) - Number(live(a)) || (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0) || a.key.localeCompare(b.key);
+}
+
+/**
+ * How many there are, each a whole phrase so every language can say it ("4 subagents"). One is said in words:
+ * "{0} subagent" already names a program's subagent ("Claude Code subagent").
+ */
+function membersLine(n: number, team: string | null | undefined): string {
+  if (team === 'campaign') return n === 1 ? tr('One campaign member') : tr(`${n} campaign members`);
+  if (team) return n === 1 ? tr('One swarm member') : tr(`${n} swarm members`);
+  return n === 1 ? tr('One subagent') : tr(`${n} subagents`);
 }
 
 /** A subagent at work or waiting for you: the ones the sidebar shows. */
@@ -94,12 +105,9 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
         className="flex h-7 w-full items-center gap-1.5 rounded-lg px-2 text-left text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2 disabled:hover:bg-transparent max-md:h-8"
       >
         <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
-        <span className="shrink-0">
-          {total} {team === 'campaign' ? 'campaign member' : team ? 'swarm member' : 'subagent'}
-          {total === 1 ? '' : 's'}
-        </span>
+        <span className="shrink-0">{membersLine(total, team)}</span>
         {/* Every one shown is at work or waits for you: only those that wait are said. */}
-        {waiting > 0 && <span className="truncate text-warn">· {waiting} need{waiting === 1 ? 's' : ''} you</span>}
+        {waiting > 0 && <span className="truncate text-warn">· {waiting === 1 ? tr('One needs you') : tr(`${waiting} need you`)}</span>}
       </button>
       {open &&
         rows.map((c) => (

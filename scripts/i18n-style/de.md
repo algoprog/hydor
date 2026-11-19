@@ -1,0 +1,100 @@
+Language: German (Deutsch).
+
+- Address the reader as "du" (informal), as the rest of the app does.
+- Use one German word per concept, the way the app's own German (web/src/i18n/de.json) does: Paper, Subagent, Pull-Request, Unterhaltung, Computer, Tab, Key.
+- Buttons and menu items are commands in the infinitive ("Speichern", "Ordner öffnen"); headings and settings are noun phrases.
+- Quotes as „ “; numbers as 20.000 and 2,5.
+
+Glossary (the app's own German; keep these exactly):
+- Session → Sitzung
+- New session → Neue Sitzung
+- Agent → Agent
+- Subagent → Subagent
+- Hydor subagent → Hydor-Subagent
+- Project → Projekt
+- Projects → Projekte
+- Library → Bibliothek
+- Pages → Seiten
+- Page → Seite
+- Slides → Folien
+- Document → Dokument
+- Spreadsheet → Tabelle
+- Notebook → Notebook
+- Diagram → Diagramm
+- Design → Design
+- Board → Board
+- Studio → Studio
+- Apps → Apps
+- Agent apps → Agenten-Apps
+- Connected apps → Verbundene Apps
+- Answer UIs → Antwort-UIs
+- Skills → Skills
+- Memory → Memory
+- Wiki memory → Wiki-Memory
+- Shared knowledge → Gemeinsames Wissen
+- Notes → Notizen
+- Tasks → Aufgaben
+- Scheduled tasks → Geplante Aufgaben
+- Inbox → Posteingang
+- Outbox → Postausgang
+- Agent Guidelines → Agentenrichtlinien
+- Settings → Einstellungen
+- Capabilities → Funktionen
+- Help → Hilfe
+- Swarm → Schwarm
+- Custom → Custom
+- General → Allgemein
+- Researcher → Forscher
+- Writer → Schriftsteller
+- Coder → Programmierer
+- Tutor → Nachhilfelehrer
+- Planner → Planer
+- Analyst → Analyst
+- App builder → App builder
+- Quick → Schnell
+- Standard → Standard
+- Best → Am besten
+- Max → Max
+- Automatic → Automatisch
+- Tiers → Leistungsstufen
+- Model → Modell
+- Helper model → Hilfsmodell
+- Effort → Aufwand
+- Permission mode → Berechtigungsmodus
+- Ask → Fragen
+- Plan → Plan
+- Full access → Voller Zugriff
+- Hands-free → Freihändig
+- Files → Dateien
+- Folder → Ordner
+- Terminal → Terminal
+- Browser → Browser
+- Git → Git
+- Worktree → Worktree
+- Pull request → Pull-Request
+- Usage → Nutzung
+- System → System
+- Experiments → Experimente
+- Machines → Computer
+- Home → Startseite
+- Keys → Keys
+- Search by meaning → Bedeutungssuche
+- Sidebar → Seitenleiste
+- Approve → Genehmigen
+- Deny → Ablehnen
+- Spending cap → Ausgabenlimit
+- Budget → Budget
+- Run → Ausführen
+- Sign in → Anmelden
+- Sign out → Abmelden
+- Account → Konto
+- Theme → Design
+- Dark → Dunkel
+- Light → Hell
+- Present → Präsentieren
+- Trash → Papierkorb
+- Share → Teilen
+- Pin → Anheften
+- Learn more → Mehr erfahren
+- Picture → Bild
+- Paper → Paper

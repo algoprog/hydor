@@ -31,7 +31,7 @@ export function openHandsFree(focus?: string) {
 // ---- speaking -----------------------------------------------------------------------------------------
 
 /** The language spoken and heard: Settings → Voice's, else the app's own (Greek → el-GR), else the browser's. */
-const LOCALES: Record<string, string> = { zh: 'zh-CN', el: 'el-GR' };
+const LOCALES: Record<string, string> = { de: 'de-DE', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR', el: 'el-GR', ja: 'ja-JP', zh: 'zh-CN' };
 const voiceLang = () => useVoicePrefs.getState().lang || LOCALES[currentLang()] || speechLang();
 
 let speaking: { cancel: () => void } | null = null;

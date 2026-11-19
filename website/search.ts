@@ -5,9 +5,22 @@ import { queryWords } from '@shared/find';
 import type { GuideTopic } from '@shared/guide';
 import { searchGuide, type Found } from '../web/src/features/guide/search';
 
+// A page in another language has its texts and its address's prefix in a JSON data block the build writes into it
+// (website/i18n.mjs); English has none. T gives the text in the page's language: what is given to it must be a string in
+// quotes, for the build to find it (node website/build.mjs --extract).
+const i18n: { lang?: string; prefix?: string; t?: Record<string, string> } = (() => {
+  try {
+    return JSON.parse(document.getElementById('hydor-i18n')!.textContent!);
+  } catch {
+    return {};
+  }
+})();
+const prefix = i18n.prefix ?? '';
+const T = (s: string) => i18n.t?.[s] ?? s;
+
 let topics: GuideTopic[] | null = null;
 let loading: Promise<GuideTopic[]> | null = null;
-const load = () => (loading ??= fetch('/docs/search.json').then((r) => r.json()).then((t: GuideTopic[]) => (topics = t)));
+const load = () => (loading ??= fetch(`${prefix}/docs/search.json`).then((r) => r.json()).then((t: GuideTopic[]) => (topics = t)));
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -30,14 +43,14 @@ let active = 0;
 function make() {
   dlg = document.createElement('dialog');
   dlg.className = 'search';
-  dlg.setAttribute('aria-label', 'Search the docs');
+  dlg.setAttribute('aria-label', T('Search the docs'));
   dlg.innerHTML = `
     <div class="search-box">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
-      <input type="search" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" spellcheck="false" enterkeyhint="go" />
-      <button type="button" class="search-close" aria-label="Close">Esc</button>
+      <input type="search" placeholder="${esc(T('Search the docs'))}" aria-label="${esc(T('Search the docs'))}" autocomplete="off" spellcheck="false" enterkeyhint="go" />
+      <button type="button" class="search-close" aria-label="${esc(T('Close'))}">Esc</button>
     </div>
-    <ul class="search-results" role="listbox" aria-label="Pages found"></ul>
+    <ul class="search-results" role="listbox" aria-label="${esc(T('Pages found'))}"></ul>
     <p class="search-note"></p>`;
   document.body.append(dlg);
   input = dlg.querySelector('input')!;
@@ -75,12 +88,12 @@ function make() {
   });
 }
 
-const urlOf = (f: Found) => `/docs/${f.topic.id}#${f.id}`;
+const urlOf = (f: Found) => `${prefix}/docs/${f.topic.id}#${f.id}`;
 
 function go(f: Found) {
   const url = urlOf(f);
   dlg!.close();
-  if (location.pathname === `/docs/${f.topic.id}`) location.hash = f.id;
+  if (location.pathname === `${prefix}/docs/${f.topic.id}`) location.hash = f.id;
   else location.href = url;
 }
 
@@ -94,11 +107,11 @@ function run() {
   if (!q) {
     found = [];
     list.innerHTML = '';
-    note.textContent = 'Type what you are looking for: “phone”, “memory”, “schedule a task”…';
+    note.textContent = T('Type what you are looking for: “phone”, “memory”, “schedule a task”…');
     return;
   }
   if (!topics) {
-    note.textContent = 'Getting the docs…';
+    note.textContent = T('Getting the docs…');
     load().then(run);
     return;
   }
@@ -111,7 +124,7 @@ function run() {
         `<li role="option" data-i="${i}" aria-selected="${i === 0}"><a href="${urlOf(f)}"><span class="sr-where">${esc(f.topic.title)}</span><b>${mark(f.title, words)}</b><span class="sr-text">${mark(f.snippet, words)}</span></a></li>`,
     )
     .join('');
-  note.textContent = found.length ? '' : 'Nothing found. Try other words.';
+  note.textContent = found.length ? '' : T('Nothing found. Try other words.');
 }
 
 function open() {

@@ -1,0 +1,89 @@
+Language: French (français), as written in France.
+
+- Address the reader as "vous", as French software does.
+- Buttons and menu items are commands in the infinitive ("Enregistrer", "Ouvrir le dossier", "Supprimer la session"); headings and settings are noun phrases ("Notifications", "Langue de l’app").
+- "Sign in" is "Se connecter", so starting one of Hydor's sessions is "démarrer une session" or "nouvelle session", never "ouvrir une session" (which means logging in).
+- French typography: a no-break space (U+00A0) before : ; ! ? and inside guillemets; quote names with « » (« {0} »); the apostrophe is ’. Numbers in the text as 20 000 and 2,5.
+- "Delete" (gone for good) is "Supprimer"; "Remove" (taken out of a list, kept elsewhere) is "Retirer".
+- Keep English words the French tech press uses as is only when the glossary says so; otherwise write French.
+
+Glossary (one translation per concept; keep these exactly):
+- Session → session
+- New session → Nouvelle session
+- Confidential session → session confidentielle
+- Agent → agent
+- Subagent → sous-agent
+- Hydor subagent → sous-agent Hydor (and "Claude Code subagent" → sous-agent Claude Code)
+- Project → projet
+- Library → Bibliothèque
+- Pages → Pages; a page → une page
+- Slides → Diapositives; a deck → une présentation
+- Document → document
+- Spreadsheet → feuille de calcul
+- Notebook (Jupyter) → notebook
+- Diagram → diagramme
+- Design → design
+- Board → tableau de bord
+- Studio → Studio
+- Apps → Apps; an app → une app
+- Agent apps → Apps d’agents
+- Connected apps → Apps connectées
+- Answer UIs → UI de réponse
+- Skills → Compétences; a skill → une compétence
+- Memory → Mémoire
+- Wiki memory → Mémoire wiki
+- Shared knowledge → Connaissances partagées
+- Notes → Notes
+- Tasks → Tâches
+- Scheduled tasks → Tâches planifiées
+- Inbox → Boîte de réception
+- Outbox → Boîte d’envoi
+- Agent Guidelines → Consignes des agents; guidelines → consignes
+- Settings → Paramètres
+- Capabilities → Capacités
+- Help → Aide
+- Swarm → Essaim
+- Custom (the app's own agent) → Custom (a name: never translated)
+- General (the default agent, and the Settings section) → Général
+- Researcher → Chercheur
+- Writer → Rédacteur
+- Coder → Développeur
+- Tutor → Tuteur
+- Planner → Planificateur
+- Analyst → Analyste
+- App builder → Créateur d’apps
+- Tiers → Niveaux; Quick → Rapide; Standard → Standard; Best → Meilleur; Max → Max
+- Automatic → Automatique
+- Model → modèle
+- Helper model → modèle d’appoint
+- Effort → Effort
+- Permission mode → Mode d’autorisation; Ask → Demander; Plan → Planifier; Full access → Accès complet
+- Hands-free → Mains libres
+- Files → Fichiers; Folder → dossier
+- Terminal → Terminal
+- Browser → Navigateur
+- Git → Git; worktree → worktree; pull request → pull request; commit → commit; branch → branche
+- Usage → Utilisation
+- System → Système
+- Experiments → Expériences
+- Machines → Machines
+- Home → Accueil
+- Keys → Clés; Vault → Coffre
+- Search by meaning → Recherche par le sens
+- Sidebar → Barre latérale
+- Approve → Approuver; Deny → Refuser
+- Spending cap → Plafond de dépenses
+- Budget → Budget
+- Run (verb) → Exécuter; a run → une exécution
+- Step up (to a higher tier) → Monter d’un niveau
+- Sign in → Se connecter; Sign out → Se déconnecter
+- Account → compte
+- Theme → Thème; Dark → Sombre; Light → Clair
+- Present (slides) → Présenter
+- Trash → Corbeille
+- Share → Partager
+- Pin → Épingler; Unpin → Désépingler
+- Learn more → En savoir plus
+- Picture → image
+- Paper (scientific) → article
+- the rail (the column of icons along the app's left edge) → la barre d’icônes

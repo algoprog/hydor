@@ -32,13 +32,18 @@ import { CUT } from './results.ts';
 /** The heading of the column for when each result came, and the tab a spreadsheet made for an agent's results has, in the languages the app speaks. */
 export const SHEET_WORDS: Record<string, { when: string; tab: string }> = {
   en: { when: 'Date', tab: 'Results' },
-  zh: { when: '日期', tab: '结果' },
+  de: { when: 'Datum', tab: 'Ergebnisse' },
+  es: { when: 'Fecha', tab: 'Resultados' },
+  fr: { when: 'Date', tab: 'Résultats' },
+  pt: { when: 'Data', tab: 'Resultados' },
   el: { when: 'Ημερομηνία', tab: 'Αποτελέσματα' },
+  ja: { when: '日付', tab: '結果' },
+  zh: { when: '日期', tab: '结果' },
 };
 export const WHEN = SHEET_WORDS.en.when;
 export const RESULTS_TAB = SHEET_WORDS.en.tab;
 /** Headings a person may have given that column instead, in any of them. */
-const WHEN_WORDS = ['date', 'when', 'ran', 'run', 'time', 'date and time', 'ran at', '日期', '时间', 'ημερομηνία', 'πότε', 'ώρα'];
+const WHEN_WORDS = ['date', 'when', 'ran', 'run', 'time', 'date and time', 'ran at', 'datum', 'zeit', 'wann', 'fecha', 'hora', 'cuándo', 'heure', 'quand', 'data', 'quando', 'ημερομηνία', 'πότε', 'ώρα', '日付', '日時', '時刻', '日期', '时间'];
 
 const norm = (s: unknown) =>
   String(s ?? '')

@@ -2,7 +2,7 @@
 
 Every part of the app, described for the people using it. The app shows this guide under **Help** on the rail, its search box (Ctrl+K) finds its sections, and the agents in the app read it to answer questions about the app and to change things in it for you. Links that start with `/` point to places in the app.
 
-The guide is also in [German (Deutsch)](de/), [Chinese (简体中文)](zh/) and [Greek (Ελληνικά)](el/), every topic but the API: the app shows them when it is in that language.
+The guide is also in [German (Deutsch)](de/), [Spanish (Español)](es/), [French (Français)](fr/), [Brazilian Portuguese (Português)](pt/), [Greek (Ελληνικά)](el/), [Japanese (日本語)](ja/) and [Chinese (简体中文)](zh/), every topic but the API: the app shows them when it is in that language.
 
 - [Getting started](01-start.md)
 - [Sessions](02-sessions.md)

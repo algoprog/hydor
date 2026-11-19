@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ASSISTANT_ICONS, TOOL_KINDS, type Assistant, type ToolKind } from '../../shared/assistants.ts';
 import type { Space } from '../../shared/spaces.ts';
+import { isLang, type Lang } from '../../shared/i18n.ts';
 import { isTier, type Tier } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -325,7 +326,67 @@ export function kindOf(s: Scan, words: string): ProjectKind {
 const fill = (t: string, name: string) => t.replaceAll('{project}', name);
 
 /** The templates' names and lines in the languages the app speaks besides English (their instructions stay in English, for the agent). */
-const IN: Record<'zh' | 'el', Record<ProjectKind, { role: string; description: string }>> = {
+const IN: Record<Exclude<Lang, 'en'>, Record<ProjectKind, { role: string; description: string }>> = {
+  de: {
+    software: { role: 'Entwickler', description: 'Baut, repariert und prüft den Code von {project}' },
+    web: { role: 'Webentwickler', description: 'Baut und verfeinert die Website oder Web-App {project}' },
+    ml: { role: 'ML-Forscher', description: 'Führt die Machine-Learning-Experimente von {project} aus und vergleicht sie' },
+    data: { role: 'Analyst', description: 'Beantwortet Fragen aus den Daten von {project}' },
+    paper: { role: 'Paper-Autor', description: 'Schreibt, überarbeitet und prüft das Paper {project}' },
+    research: { role: 'Forscher', description: 'Liest, vergleicht und fasst die Quellen von {project} zusammen' },
+    writing: { role: 'Autor', description: 'Entwirft und bearbeitet die Texte von {project}' },
+    media: { role: 'Designer', description: 'Erstellt und bearbeitet die Bilder, Videos und Designs von {project}' },
+    slides: { role: 'Vortragender', description: 'Erstellt die Vorträge, Folien und Pläne von {project}' },
+    default: { role: 'Agent', description: 'Arbeitet an {project}, in seinem Ordner' },
+  },
+  es: {
+    software: { role: 'Ingeniero', description: 'Crea, corrige y revisa el código de {project}' },
+    web: { role: 'Desarrollador web', description: 'Crea y pule el sitio o la app web {project}' },
+    ml: { role: 'Investigador de ML', description: 'Ejecuta y compara los experimentos de aprendizaje automático de {project}' },
+    data: { role: 'Analista', description: 'Responde preguntas con los datos de {project}' },
+    paper: { role: 'Autor del artículo', description: 'Escribe, revisa y comprueba el artículo {project}' },
+    research: { role: 'Investigador', description: 'Lee, compara y resume las fuentes de {project}' },
+    writing: { role: 'Redactor', description: 'Redacta y edita los textos de {project}' },
+    media: { role: 'Diseñador', description: 'Crea y edita las imágenes, los videos y los diseños de {project}' },
+    slides: { role: 'Presentador', description: 'Prepara las charlas, las presentaciones y los planes de {project}' },
+    default: { role: 'Agente', description: 'Trabaja en {project}, en su carpeta' },
+  },
+  fr: {
+    software: { role: 'Ingénieur', description: 'Construit, corrige et relit le code du projet {project}' },
+    web: { role: 'Développeur web', description: 'Construit et peaufine le site ou l’app web {project}' },
+    ml: { role: 'Chercheur en ML', description: 'Lance et compare les expériences d’apprentissage automatique du projet {project}' },
+    data: { role: 'Analyste', description: 'Répond aux questions à partir des données du projet {project}' },
+    paper: { role: 'Auteur de l’article', description: 'Rédige, révise et vérifie l’article {project}' },
+    research: { role: 'Chercheur', description: 'Lit, compare et résume les sources du projet {project}' },
+    writing: { role: 'Rédacteur', description: 'Rédige et retravaille les textes du projet {project}' },
+    media: { role: 'Designer', description: 'Crée et retouche les images, vidéos et designs du projet {project}' },
+    slides: { role: 'Présentateur', description: 'Prépare les exposés, présentations et plans du projet {project}' },
+    default: { role: 'Agent', description: 'Travaille sur le projet {project}, dans son dossier' },
+  },
+  pt: {
+    software: { role: 'Engenheiro', description: 'Cria, corrige e revisa o código de {project}' },
+    web: { role: 'Desenvolvedor web', description: 'Cria e refina o site ou app web {project}' },
+    ml: { role: 'Pesquisador de ML', description: 'Executa e compara os experimentos de aprendizado de máquina de {project}' },
+    data: { role: 'Analista', description: 'Responde perguntas com os dados de {project}' },
+    paper: { role: 'Autor do artigo', description: 'Escreve, revisa e confere o artigo {project}' },
+    research: { role: 'Pesquisador', description: 'Lê, compara e resume as fontes de {project}' },
+    writing: { role: 'Redator', description: 'Rascunha e edita os textos de {project}' },
+    media: { role: 'Designer', description: 'Cria e edita as imagens, os vídeos e os designs de {project}' },
+    slides: { role: 'Apresentador', description: 'Prepara as palestras, as apresentações e os planos de {project}' },
+    default: { role: 'Agente', description: 'Trabalha em {project}, na pasta dele' },
+  },
+  ja: {
+    software: { role: 'エンジニア', description: '{project}のコードを作成・修正・レビューします' },
+    web: { role: 'Web開発者', description: 'WebサイトまたはWebアプリ「{project}」を作成し、仕上げます' },
+    ml: { role: 'MLリサーチャー', description: '{project}の機械学習の実験を実行し、比較します' },
+    data: { role: 'アナリスト', description: '{project}のデータから質問に答えます' },
+    paper: { role: '論文執筆者', description: '論文「{project}」を執筆・改訂・チェックします' },
+    research: { role: 'リサーチャー', description: '{project}の資料を読み、比較し、要約します' },
+    writing: { role: 'ライター', description: '{project}の文章を下書きし、編集します' },
+    media: { role: 'デザイナー', description: '{project}の画像、動画、デザインを作成・編集します' },
+    slides: { role: 'プレゼンター', description: '{project}の講演、スライド、計画を作成します' },
+    default: { role: 'エージェント', description: '{project}のフォルダで作業します' },
+  },
   zh: {
     software: { role: '工程师', description: '构建、修复和审查 {project} 的代码' },
     web: { role: 'Web 开发者', description: '构建并打磨网站或 Web 应用 {project}' },
@@ -352,11 +413,21 @@ const IN: Record<'zh' | 'el', Record<ProjectKind, { role: string; description: s
   },
 };
 
+/** An agent's name of its project and role, in the order the language puts them ("Shop engineer", "Ingeniero de Shop"). */
+const NAMED: Partial<Record<Lang, (project: string, role: string) => string>> = {
+  de: (p, r) => `${r} für ${p}`,
+  es: (p, r) => `${r} de ${p}`,
+  fr: (p, r) => `${r} du projet ${p}`,
+  pt: (p, r) => `${r} de ${p}`,
+  ja: (p, r) => `${p}の${r}`,
+};
+
 /** The template's agent for a project, as it would be saved. */
 export function fromTemplate(t: ProjectTemplate, s: Pick<Space, 'id' | 'name'>, lang: string = 'en'): Partial<Assistant> {
-  const words = lang === 'zh' || lang === 'el' ? IN[lang][t.kind] : { role: t.role, description: t.description };
+  const words = isLang(lang) && lang !== 'en' ? IN[lang][t.kind] : { role: t.role, description: t.description };
+  const named = (isLang(lang) && NAMED[lang]) || ((p: string, r: string) => `${p} ${r}`);
   return {
-    name: `${s.name} ${words.role}`.slice(0, 60),
+    name: named(s.name, words.role).slice(0, 60),
     icon: t.icon,
     description: fill(words.description, s.name).slice(0, 160),
     instructions: fill(t.instructions, s.name),

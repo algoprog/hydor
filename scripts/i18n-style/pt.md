@@ -1,0 +1,89 @@
+Language: Brazilian Portuguese (português do Brasil).
+
+- Address the reader as "você"; several people are "vocês".
+- Use Brazilian words: "arquivo", "tela", "celular", "baixar", "salvar", "planilha", "time" only for sports (a team of agents is "equipe").
+- Buttons and menu items are commands in the infinitive ("Salvar", "Abrir pasta", "Excluir sessão"); headings and settings are noun phrases ("Notificações", "Idioma do app").
+- "Sign in" is "Entrar" and "Sign out" is "Sair"; starting one of Hydor's sessions is "começar uma sessão" or "nova sessão".
+- Punctuation: quotes as “ ” around names, as in the English; numbers in the text as 20.000 and 2,5.
+- "Delete" (gone for good) is "Excluir"; "Remove" (taken out of a list, kept elsewhere) is "Remover".
+
+Glossary (one translation per concept; keep these exactly):
+- Session → sessão
+- New session → Nova sessão
+- Confidential session → sessão confidencial
+- Agent → agente
+- Subagent → subagente
+- Hydor subagent → subagente do Hydor (and "Claude Code subagent" → subagente do Claude Code)
+- Project → projeto
+- Library → Biblioteca
+- Pages → Páginas; a page → uma página
+- Slides → Slides; a deck → uma apresentação
+- Document → documento
+- Spreadsheet → planilha
+- Notebook (Jupyter) → notebook
+- Diagram → diagrama
+- Design → design
+- Board → painel
+- Studio → Estúdio
+- Apps → Apps; an app → um app
+- Agent apps → Apps de agentes
+- Connected apps → Apps conectados
+- Answer UIs → UIs de resposta
+- Skills → Habilidades; a skill → uma habilidade
+- Memory → Memória
+- Wiki memory → Memória wiki
+- Shared knowledge → Conhecimento compartilhado
+- Notes → Notas
+- Tasks → Tarefas
+- Scheduled tasks → Tarefas agendadas
+- Inbox → Caixa de entrada
+- Outbox → Caixa de saída
+- Agent Guidelines → Diretrizes dos agentes; guidelines → diretrizes
+- Settings → Configurações
+- Capabilities → Recursos
+- Help → Ajuda
+- Swarm → Enxame
+- Custom (the app's own agent) → Custom (a name: never translated)
+- General (the default agent, and the Settings section) → Geral
+- Researcher → Pesquisador
+- Writer → Redator
+- Coder → Programador
+- Tutor → Tutor
+- Planner → Planejador
+- Analyst → Analista
+- App builder → Criador de apps
+- Tiers → Níveis; Quick → Rápido; Standard → Padrão; Best → Melhor; Max → Máximo
+- Automatic → Automático
+- Model → modelo
+- Helper model → modelo auxiliar
+- Effort → Esforço
+- Permission mode → Modo de permissão; Ask → Perguntar; Plan → Planejar; Full access → Acesso total
+- Hands-free → Mãos livres
+- Files → Arquivos; Folder → pasta
+- Terminal → Terminal
+- Browser → Navegador
+- Git → Git; worktree → worktree; pull request → pull request; commit → commit; branch → branch
+- Usage → Uso
+- System → Sistema
+- Experiments → Experimentos
+- Machines → Máquinas
+- Home → Início
+- Keys → Chaves; Vault → Cofre
+- Search by meaning → Busca por significado
+- Sidebar → Barra lateral
+- Approve → Aprovar; Deny → Recusar
+- Spending cap → Limite de gastos
+- Budget → Orçamento
+- Run (verb) → Executar; a run → uma execução
+- Step up (to a higher tier) → Subir de nível
+- Sign in → Entrar; Sign out → Sair
+- Account → conta
+- Theme → Tema; Dark → Escuro; Light → Claro
+- Present (slides) → Apresentar
+- Trash → Lixeira
+- Share → Compartilhar
+- Pin → Fixar; Unpin → Desafixar
+- Learn more → Saiba mais
+- Picture → imagem
+- Paper (scientific) → artigo
+- the rail (the column of icons along the app's left edge) → a barra de ícones

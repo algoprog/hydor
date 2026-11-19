@@ -40,14 +40,18 @@ rename or remove something users can see or do (a page, a button, a setting or a
 1. **The guide**, `docs/guide/NN-<topic>.md`: the app's Help page shows it, the search box (Ctrl+K) finds its
    sections, and agents read it (`app_guide`) to answer questions about the app and to know how to change it for
    the user. Change the section that describes the feature, and its topic's "Ask an agent" examples. The guide is
-   also in German, Chinese and Greek (`docs/guide/de/`, `docs/guide/zh/`, `docs/guide/el/`: every topic but the
-   API), shown when the app is in that language: change the translations with the English, in the same commit.
+   also in German, Spanish, French, Brazilian Portuguese, Greek, Japanese and Chinese (`docs/guide/<lang>/`: every
+   topic but the API), shown when the app is in that language: change the translations with the English, in the
+   same commit (`npm run i18n:translate -- guide --lang <ids> --topics <file> --force` translates a changed topic
+   with the glossaries in `scripts/i18n-style/`; read what it wrote).
    A translation keeps the English topic's headings in the same places (they take its section ids) and the same
    link addresses in the same order, on-screen labels as the app's own dictionaries translate them
-   (`web/src/i18n/*.json`, in bold as in English); a topic out of step shows in English. German terms: one word per
-   concept as `web/src/i18n/de.json` has it (Paper, Subagent, Pull-Request, Unterhaltung, Computer, Tab…), informal "du".
-   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all four
-   languages (English, German, Chinese and Greek) from `shared/find-catalog.ts` and the dictionaries.
+   (`web/src/i18n/*.json`, in bold as in English); a topic out of step shows in English. Each language's register
+   and glossary are in `scripts/i18n-style/<lang>.md`: informal "du" in German (one word per concept as
+   `web/src/i18n/de.json` has it: Paper, Subagent, Pull-Request, Unterhaltung, Computer, Tab…), "tú" in Spanish,
+   "vous" in French, "você" in Brazilian Portuguese, です・ます in Japanese, polite plural in Greek.
+   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all eight
+   languages from `shared/find-catalog.ts` and the dictionaries.
    An `/api/` route goes in `docs/guide/90-api.md`, one bullet in its area:
    `` - `METHOD /api/path/:param` — what it does. Body: `{ field: type — meaning }`. Returns: `{ … }`. `` (routes
    agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's
@@ -63,7 +67,8 @@ rename or remove something users can see or do (a page, a button, a setting or a
    of it; keep them saying what the app does now.
 4. **The search box and translations**: `shared/find-catalog.ts` and the shipped vectors (below; the guide's sections
    are searchable too, so a changed section needs `npm run find:vectors`), and new UI text in `web/src/i18n`
-   (`npm run i18n:extract`, then translate it into German, Chinese and Greek). Where a page shows what people or agents
+   (`npm run i18n:extract`, then translate it into the seven other languages: `npm run i18n:translate -- ui --lang
+   de,es,fr,pt,el,ja,zh` fills in what is missing). Where a page shows what people or agents
    wrote (names, descriptions, notes, captions), mark it `translate="no"`; write dates and times with `LOCALE`
    (`web/src/i18n/locale.ts`).
 5. **Release notes** in `CHANGELOG.md` when you make a version (above).

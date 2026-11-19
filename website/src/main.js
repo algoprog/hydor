@@ -15,6 +15,35 @@
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const icon = (name) => `<svg class="ic"><use href="#i-${name}"/></svg>`;
+
+  /* ---------- Languages: the words this script shows come from the page (see website/i18n.mjs) ---------- */
+
+  // The build writes the translations of this page's language into it as a JSON data block; English has none, and
+  // every text then shows as it is written here. T gives a text, TH a text with elements in
+  // it (written <0>like this</0>, the elements their opening tags, and the result is HTML), {name} a value given as
+  // the second argument. What is given to them must be a string in quotes: the build finds the texts by reading this
+  // file (node website/build.mjs --extract).
+  const I18N = (() => {
+    try {
+      return JSON.parse(document.getElementById('hydor-i18n').textContent);
+    } catch {
+      return {};
+    }
+  })();
+  const DICT = I18N.t || {};
+  const LANG = document.documentElement.lang || 'en';
+  const fill = (s, vars) => (vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s);
+  const T = (s, vars) => fill(DICT[s] ?? s, vars);
+  const TH = (s, els = [], vars) =>
+    (DICT[s] ?? s)
+      .split(/(<\/?\d+\/?>)/)
+      .map((p) => {
+        const m = /^<(\/)?(\d+)(\/)?>$/.exec(p);
+        if (!m) return esc(fill(p.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), vars));
+        const el = els[Number(m[2])] || '';
+        return m[1] ? `</${/^<([a-z][\w-]*)/i.exec(el)?.[1] || 'span'}>` : el;
+      })
+      .join('');
   /** Calls back each time el comes into view (or goes), and tells whether it is on screen now. */
   const watch = (el, cb, opts) => new IntersectionObserver(([e]) => cb(e.isIntersecting), opts).observe(el);
 
@@ -220,7 +249,7 @@ void main() {
     const where = platform();
     const arch = where === 'mac' ? await macArch(gl) : 'arm';
     const linux = where === 'linux' ? await linuxBuild() : null;
-    const label = { mac: 'Download for Mac', windows: 'Download for Windows', linux: 'Download for Linux', phone: 'Get it for your computer', other: 'Get Hydor' }[where];
+    const label = { mac: T('Download for Mac'), windows: T('Download for Windows'), linux: T('Download for Linux'), phone: T('Get it for your computer'), other: T('Get Hydor') }[where];
     const href = { mac: DMG[arch], windows: EXE, linux: linux && LINUX(linux.kind, linux.arch) }[where];
     for (const a of $$('[data-get]')) {
       $('[data-get-label]', a).textContent = label;
@@ -231,14 +260,18 @@ void main() {
     if (note) {
       const other = linux && (linux.kind === 'deb' ? 'appimage' : 'deb');
       const notes = {
-        windows: 'Free and open source · Windows 10 or 11, with <a href="https://git-scm.com/download/win">Git for Windows</a> · <a href="#get-mac">Mac</a> · <a href="#get-linux">Linux</a>',
+        windows: TH('Free and open source · Windows 10 or 11, with <0>Git for Windows</0> · <1>Mac</1> · <2>Linux</2>', ['<a href="https://git-scm.com/download/win">', '<a href="#get-mac">', '<a href="#get-linux">']),
         linux:
           linux &&
-          `Free and open source · ${linux.kind === 'deb' ? 'The .deb, for Ubuntu and Debian' : 'The AppImage, for any Linux'}, ${linux.arch === 'arm64' ? 'ARM' : 'x64'} · <a href="${LINUX(other, linux.arch)}">${other === 'deb' ? '.deb' : 'AppImage'}</a> · <a href="#get-server">Linux server</a>`,
-        phone: 'Free and open source · It runs on a computer, and you use it from your phone',
+          TH(
+            'Free and open source · {build}, {arch} · <0>{other}</0> · <1>Linux server</1>',
+            [`<a href="${LINUX(other, linux.arch)}">`, '<a href="#get-server">'],
+            { build: linux.kind === 'deb' ? T('The .deb, for Ubuntu and Debian') : T('The AppImage, for any Linux'), arch: linux.arch === 'arm64' ? 'ARM' : 'x64', other: other === 'deb' ? '.deb' : 'AppImage' },
+          ),
+        phone: TH('Free and open source · It runs on a computer, and you use it from your phone'),
       };
       if (where === 'mac' && arch === 'x64')
-        note.innerHTML = `Free and open source · macOS 12 or newer, Intel · <a href="${DMG.arm}">Apple silicon</a> · <a href="#download">Windows and Linux</a>`;
+        note.innerHTML = TH('Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>', [`<a href="${DMG.arm}">`, '<a href="#download">']);
       else if (notes[where]) note.innerHTML = notes[where];
     }
     if (where === 'mac' && arch === 'x64') {
@@ -266,7 +299,7 @@ void main() {
         }
       }
       if (fine && linux.arch === 'arm64')
-        fine.innerHTML = `ARM. For x64: <a href="${LINUX('deb', 'x64')}">.deb</a> · <a href="${LINUX('appimage', 'x64')}">AppImage</a>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.`;
+        fine.innerHTML = TH('ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.', [`<a href="${LINUX('deb', 'x64')}">`, `<a href="${LINUX('appimage', 'x64')}">`]);
     }
   }
 
@@ -274,6 +307,7 @@ void main() {
 
   function header() {
     const nav = $('[data-nav]');
+    if (!nav) return;
     const onScroll = () => nav.classList.toggle('scrolled', scrollY > 8);
     addEventListener('scroll', onScroll, { passive: true });
     onScroll();
@@ -340,94 +374,95 @@ void main() {
     [' ', '}'],
   ];
 
+  // The words of each scenario: T for plain text, TH for text with elements in it (shown as HTML).
   const SCENARIOS = {
     bug: {
-      title: 'Fix the checkout tests',
+      title: T('Fix the checkout tests'),
       meta: '~/code/shop-api · main · Opus 5.5',
-      chip: 'Coder · Opus 5.5 · High',
+      chip: T('Coder · Opus 5.5 · High'),
       steps: [
-        ['user', "The checkout tests fail since yesterday's discount change. Find out why and fix it."],
-        ['say', "I'll run the checkout tests first to see what fails."],
-        ['tool', 'terminal', 'Ran 1 command, read 1 file', '2.4 s', 1300],
-        ['say', "Two problems in <code>total()</code>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end."],
+        ['user', T("The checkout tests fail since yesterday's discount change. Find out why and fix it.")],
+        ['say', TH("I'll run the checkout tests first to see what fails.")],
+        ['tool', 'terminal', TH('Ran 1 command, read 1 file'), '2.4 s', 1300],
+        ['say', TH("Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.", ['<code>'])],
         ['diff', 'src/checkout/total.ts', 2, 3, DIFF],
-        ['say', 'Running the whole suite to make sure nothing else broke.'],
-        ['approve', 'Run a command', 'Run the whole test suite', '<span class="k">npm</span> <span class="v">test</span>', 'Always allow npm test'],
-        ['tool', 'terminal', 'Ran the whole test suite <code>npm test</code>', '48 passed', 1900, 'ok'],
-        ['say', '<b>Fixed.</b> The discount now comes off before tax, and the total is rounded once. Both checkout tests pass, and so do the other 46.'],
+        ['say', TH('Running the whole suite to make sure nothing else broke.')],
+        ['approve', T('Run a command'), T('Run the whole test suite'), '<span class="k">npm</span> <span class="v">test</span>', T('Always allow npm test')],
+        ['tool', 'terminal', TH('Ran the whole test suite <0>npm test</0>', ['<code>']), T('48 passed'), 1900, 'ok'],
+        ['say', TH('<0>Fixed.</0> The discount now comes off before tax, and the total is rounded once. Both checkout tests pass, and so do the other 46.', ['<b>'])],
         ['done'],
       ],
     },
     research: {
-      title: 'Find the best e-bike for a hilly commute',
+      title: T('Find the best e-bike for a hilly commute'),
       meta: '~/Hydor/Tasks/2026-11-04-e-bikes · Opus 5.5',
-      chip: 'Researcher · Opus 5.5',
+      chip: T('Researcher · Opus 5.5'),
       steps: [
-        ['user', 'Find the best e-bike under $2,000 for my hilly commute: 9 km each way, with two steep hills.'],
-        ['say', "I'll look for recent reviews of commuter e-bikes that climb well, then compare the best few."],
-        ['search', '“best commuter e-bike under $2,000 for steep hills”', '5 results'],
-        ['tool', 'book', 'Read <span class="t-name">Velora Ridge E5 review</span>', '6.3 s', 1100],
-        ['tool', 'book', 'Read <span class="t-name">The best electric bikes for hills, tested</span>', '6.6 s', 1100],
-        ['file', 'e-bikes-compared.xlsx', 'Excel workbook · 17.6 KB', 'Five e-bikes side by side: price, motor, battery and how each did on the test climb'],
-        ['say', "<b>The Velora Ridge E5 ($1,890) is the best fit for your commute.</b> Its mid-drive motor uses the bike's gears, so it keeps its pull on steep hills, where hub-motor bikes slow down."],
+        ['user', T('Find the best e-bike under $2,000 for my hilly commute: 9 km each way, with two steep hills.')],
+        ['say', TH("I'll look for recent reviews of commuter e-bikes that climb well, then compare the best few.")],
+        ['search', T('“best commuter e-bike under $2,000 for steep hills”'), T('5 results')],
+        ['tool', 'book', TH('Read <0>Velora Ridge E5 review</0>', ['<span class="t-name">']), '6.3 s', 1100],
+        ['tool', 'book', TH('Read <0>The best electric bikes for hills, tested</0>', ['<span class="t-name">']), '6.6 s', 1100],
+        ['file', 'e-bikes-compared.xlsx', T('Excel workbook · 17.6 KB'), T('Five e-bikes side by side: price, motor, battery and how each did on the test climb')],
+        ['say', TH("<0>The Velora Ridge E5 ($1,890) is the best fit for your commute.</0> Its mid-drive motor uses the bike's gears, so it keeps its pull on steep hills, where hub-motor bikes slow down.", ['<b>'])],
         [
           'table',
-          ['', 'Price', 'Motor', 'On a 12% climb'],
+          ['', T('Price'), T('Motor'), T('On a 12% climb')],
           [
-            ['Velora Ridge E5', '$1,890', '85 Nm mid-drive', '17–18 km/h'],
-            ['Urbana Climb 2', '$1,749', '75 Nm mid-drive', '15 km/h'],
-            ['Commuter Pro 3', '$1,599', '50 Nm hub', '11 km/h'],
+            ['Velora Ridge E5', '$1,890', T('85 Nm mid-drive'), '17–18 km/h'],
+            ['Urbana Climb 2', '$1,749', T('75 Nm mid-drive'), '15 km/h'],
+            ['Commuter Pro 3', '$1,599', T('50 Nm hub'), '11 km/h'],
           ],
         ],
         [
           'sources',
           [
-            ['Velora Ridge E5 review', '#6fd39a'],
-            ['The best electric bikes for hills, tested', '#f2b468'],
-            ['Mid-drive or hub motor?', '#8aa8ff'],
+            [T('Velora Ridge E5 review'), '#6fd39a'],
+            [T('The best electric bikes for hills, tested'), '#f2b468'],
+            [T('Mid-drive or hub motor?'), '#8aa8ff'],
           ],
         ],
         ['done'],
       ],
     },
     trip: {
-      title: 'Plan 4 days in Lisbon',
+      title: T('Plan 4 days in Lisbon'),
       meta: '~/Hydor/Tasks/2026-11-04-lisbon-in-may · Opus 5.5',
-      chip: 'General · Opus 5.5 · High',
+      chip: T('General · Opus 5.5 · High'),
       steps: [
-        ['user', 'Plan 4 days in Lisbon, 11 to 14 May: two adults, mid-range hotels, lots of walking.'],
-        ['say', "Your Trip planner app does just this. I'll run it with your dates."],
-        ['app', 'Trip planner', 'Lisbon · 11–14 May · 2 adults'],
-        ['tool', 'globe', 'Checked opening hours, events and travel times', '41 s', 1300],
+        ['user', T('Plan 4 days in Lisbon, 11 to 14 May: two adults, mid-range hotels, lots of walking.')],
+        ['say', TH('Your Trip planner app does just this. I\'ll run it with your dates.')],
+        ['app', T('Trip planner'), T('Lisbon · 11–14 May · 2 adults')],
+        ['tool', 'globe', TH('Checked opening hours, events and travel times'), '41 s', 1300],
         ['trip'],
-        ['say', 'Here is your plan, checked against your dates. <b>Book the Sintra train and the Pena Palace tickets ahead</b>: May is busy.'],
+        ['say', TH('Here is your plan, checked against your dates. <0>Book the Sintra train and the Pena Palace tickets ahead</0>: May is busy.', ['<b>'])],
         ['done'],
       ],
     },
   };
 
-  const TRIP = `
-    <div class="d-trip-tabs"><span>Your trip</span><span>Day by day</span><span class="on">Map</span><span>Book ahead</span><span>Budget</span></div>
+  const TRIP = () => `
+    <div class="d-trip-tabs"><span>${esc(T('Your trip'))}</span><span>${esc(T('Day by day'))}</span><span class="on">${esc(T('Map'))}</span><span>${esc(T('Book ahead'))}</span><span>${esc(T('Budget'))}</span></div>
     <div class="d-trip-body">
-      <svg class="d-map" viewBox="0 0 320 200" role="img" aria-label="A map of Lisbon with each day's area">
+      <svg class="d-map" viewBox="0 0 320 200" role="img" aria-label="${esc(T("A map of Lisbon with each day's area"))}">
         <defs><pattern id="streets" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(8)"><path d="M22 0H0V22" fill="none" stroke="rgba(255,255,255,.05)"/></pattern></defs>
         <rect width="320" height="200" fill="url(#streets)"/>
         <ellipse cx="128" cy="42" rx="30" ry="15" fill="rgba(74,222,128,.13)"/>
         <ellipse cx="248" cy="40" rx="24" ry="11" fill="rgba(74,222,128,.13)"/>
         <ellipse cx="148" cy="112" rx="20" ry="11" fill="rgba(74,222,128,.1)"/>
         <path d="M0 168C70 156 130 176 200 160S290 150 320 154V200H0Z" fill="#0f2a40"/>
-        <text x="276" y="186" fill="rgba(255,255,255,.35)" font-size="10" font-style="italic">Tagus</text>
+        <text x="276" y="186" fill="rgba(255,255,255,.35)" font-size="10" font-style="italic">${esc(T('Tagus'))}</text>
         <path class="route" d="M232 112C190 120 140 132 92 146C64 120 50 84 46 46"/>
-        <g class="pin"><circle cx="232" cy="112" r="10" fill="#8aa8ff"/><text x="232" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">1</text><text x="248" y="116" font-size="11" fill="#e9edf5">Alfama</text></g>
-        <g class="pin"><circle cx="92" cy="146" r="10" fill="#8aa8ff"/><text x="92" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">2</text><text x="108" y="150" font-size="11" fill="#e9edf5">Belém</text></g>
-        <g class="pin"><circle cx="46" cy="46" r="10" fill="#8aa8ff"/><text x="46" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">3</text><text x="62" y="50" font-size="11" fill="#e9edf5">Sintra</text></g>
-        <g class="pin"><circle cx="214" cy="78" r="10" fill="#8aa8ff"/><text x="214" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">4</text><text x="230" y="82" font-size="11" fill="#e9edf5">Graça</text></g>
+        <g class="pin"><circle cx="232" cy="112" r="10" fill="#8aa8ff"/><text x="232" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">1</text><text x="248" y="116" font-size="11" fill="#e9edf5">${esc(T('Alfama'))}</text></g>
+        <g class="pin"><circle cx="92" cy="146" r="10" fill="#8aa8ff"/><text x="92" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">2</text><text x="108" y="150" font-size="11" fill="#e9edf5">${esc(T('Belém'))}</text></g>
+        <g class="pin"><circle cx="46" cy="46" r="10" fill="#8aa8ff"/><text x="46" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">3</text><text x="62" y="50" font-size="11" fill="#e9edf5">${esc(T('Sintra'))}</text></g>
+        <g class="pin"><circle cx="214" cy="78" r="10" fill="#8aa8ff"/><text x="214" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#0b1226">4</text><text x="230" y="82" font-size="11" fill="#e9edf5">${esc(T('Graça'))}</text></g>
       </svg>
       <ol class="d-days">
-        <li><i>1</i><span><b>Tuesday 11 May</b>Alfama and the castle</span></li>
-        <li><i>2</i><span><b>Wednesday 12 May</b>Belém by the river</span></li>
-        <li><i>3</i><span><b>Thursday 13 May</b>A day in Sintra</span></li>
-        <li><i>4</i><span><b>Friday 14 May</b>Viewpoints and fado</span></li>
+        <li><i>1</i><span><b>${esc(T('Tuesday 11 May'))}</b>${esc(T('Alfama and the castle'))}</span></li>
+        <li><i>2</i><span><b>${esc(T('Wednesday 12 May'))}</b>${esc(T('Belém by the river'))}</span></li>
+        <li><i>3</i><span><b>${esc(T('Thursday 13 May'))}</b>${esc(T('A day in Sintra'))}</span></li>
+        <li><i>4</i><span><b>${esc(T('Friday 14 May'))}</b>${esc(T('Viewpoints and fado'))}</span></li>
       </ol>
     </div>`;
 
@@ -471,7 +506,7 @@ void main() {
     };
     const setStatus = (state) => {
       status.dataset.state = state;
-      status.textContent = { working: 'Working', needs: 'Needs you', ready: 'Ready' }[state];
+      status.textContent = { working: T('Working'), needs: T('Needs you'), ready: T('Ready') }[state];
     };
     const add = (cls, html) => {
       const el = document.createElement('div');
@@ -480,6 +515,11 @@ void main() {
       feed.append(el);
       return el;
     };
+
+    // Japanese and Chinese have no spaces to stream by: their words (or, without Intl.Segmenter, pairs of characters).
+    const CJK = /^(ja|zh)/.test(LANG);
+    const segmenter = CJK && typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter(LANG, { granularity: 'word' }) : null;
+    const pieces = (part) => (segmenter ? Array.from(segmenter.segment(part), (x) => x.segment) : CJK ? part.match(/[\s\S]{1,2}/g) : [part]);
 
     /** Shows a reply word by word (a code span as one word), as it streams in the app. */
     const words = (el) => {
@@ -491,13 +531,14 @@ void main() {
             for (const part of child.textContent.split(/(\s+)/)) {
               if (!part) continue;
               if (/^\s+$/.test(part)) frag.append(part);
-              else {
-                const s = document.createElement('span');
-                s.className = 'w';
-                s.textContent = part;
-                frag.append(s);
-                out.push(s);
-              }
+              else
+                for (const piece of pieces(part)) {
+                  const s = document.createElement('span');
+                  s.className = 'w';
+                  s.textContent = piece;
+                  frag.append(s);
+                  out.push(s);
+                }
             }
             child.replaceWith(frag);
           } else if (child.nodeName === 'CODE') {
@@ -570,9 +611,9 @@ void main() {
       } else if (kind === 'tool' || kind === 'search' || kind === 'app') {
         const [ic, label, done, ms, cls] =
           kind === 'search'
-            ? ['globe', `<span>Searched the web</span><span class="t-name q">${esc(a[0])}</span>`, a[1], 1400]
+            ? ['globe', `<span>${esc(T('Searched the web'))}</span><span class="t-name q">${esc(a[0])}</span>`, a[1], 1400]
             : kind === 'app'
-              ? ['apps', `<span>Ran</span><span class="t-name">${a[0]}</span><span class="d-app-args">${a[1]}</span>`, 'Done', 1700]
+              ? ['apps', `<span>${esc(T('Ran'))}</span><span class="t-name">${esc(a[0])}</span><span class="d-app-args">${esc(a[1])}</span>`, T('Done'), 1700]
               : [a[0], `<span class="t-name">${a[1]}</span>`, a[2], a[3], a[4]];
         const el = add(kind === 'app' ? 'd-app' : 'd-tool', `${icon(ic)}${label}<span class="t-meta"><i class="spin"></i></span>`);
         await wait(id, ms || 1100);
@@ -583,7 +624,7 @@ void main() {
         const [file, plus, minus, lines] = a;
         const el = add(
           'd-diff',
-          `<div class="d-diff-head">${icon('sheet')}<span>Edited</span><span class="t-name">${file}</span><span class="t-meta"><b class="add">+${plus}</b><b class="del">−${minus}</b></span></div>` +
+          `<div class="d-diff-head">${icon('sheet')}<span>${esc(T('Edited'))}</span><span class="t-name">${file}</span><span class="t-meta"><b class="add">+${plus}</b><b class="del">−${minus}</b></span></div>` +
             `<pre>${lines.map(([k, t]) => `<span class="l pre${k === '+' ? ' a' : k === '-' ? ' d' : ''}">${esc(t)}</span>`).join('')}</pre>`,
         );
         for (const l of $$('.l', el)) {
@@ -595,13 +636,13 @@ void main() {
         setStatus('needs');
         const el = add(
           'd-approve',
-          `<div class="d-approve-head">${icon('shield')}${a[0]}<span>waiting 0 s</span></div>` +
-            `<pre><span class="c"># ${a[1]}</span>\n${a[2]}</pre>` +
-            `<div class="d-btns"><span class="d-btn allow">Allow</span><span class="d-btn">${a[3]}</span><span class="d-btn deny">Deny…</span></div>`,
+          `<div class="d-approve-head">${icon('shield')}${esc(a[0])}<span>${esc(T('waiting {n} s', { n: 0 }))}</span></div>` +
+            `<pre><span class="c"># ${esc(a[1])}</span>\n${a[2]}</pre>` +
+            `<div class="d-btns"><span class="d-btn allow">${esc(T('Allow'))}</span><span class="d-btn">${esc(a[3])}</span><span class="d-btn deny">${esc(T('Deny…'))}</span></div>`,
         );
         const clock = $('.d-approve-head span', el);
         let secs = 0;
-        const tick = setInterval(() => (clock.textContent = `waiting ${++secs} s`), 1000);
+        const tick = setInterval(() => (clock.textContent = T('waiting {n} s', { n: ++secs })), 1000);
         try {
           await wait(id, 1700);
           const allow = $('.allow', el);
@@ -617,14 +658,14 @@ void main() {
         el.remove();
         setStatus('working');
       } else if (kind === 'file') {
-        add('d-file', `<span class="d-file-ic">${icon('sheet')}</span><div><b>${a[0]}</b><span>${a[1]}</span><p>${a[2]}</p></div><span class="open">Open</span>`);
+        add('d-file', `<span class="d-file-ic">${icon('sheet')}</span><div><b>${esc(a[0])}</b><span>${esc(a[1])}</span><p>${esc(a[2])}</p></div><span class="open">${esc(T('Open'))}</span>`);
         await wait(id, 800);
       } else if (kind === 'table') {
         const [head, rows] = a;
         const el = add(
           'd-table',
-          `<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows
-            .map((r, i) => `<tr class="pre${i === 0 ? ' win' : ''}">${r.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+          `<table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows
+            .map((r, i) => `<tr class="pre${i === 0 ? ' win' : ''}">${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`)
             .join('')}</tbody></table>`,
         );
         for (const tr of $$('tbody tr', el)) {
@@ -633,10 +674,10 @@ void main() {
         }
         await wait(id, 400);
       } else if (kind === 'sources') {
-        add('d-sources', `<span>Sources</span>${a[0].map(([t, c], i) => `<span class="d-src"><i style="--c: ${c}"></i><b>${i + 1}</b>${t}</span>`).join('')}`);
+        add('d-sources', `<span>${esc(T('Sources'))}</span>${a[0].map(([t, c], i) => `<span class="d-src"><i style="--c: ${c}"></i><b>${i + 1}</b>${esc(t)}</span>`).join('')}`);
         await wait(id, 600);
       } else if (kind === 'trip') {
-        const el = add('d-trip', TRIP);
+        const el = add('d-trip', TRIP());
         await wait(id, 120);
         el.classList.add('draw');
         await wait(id, 2600);
@@ -713,10 +754,10 @@ void main() {
       const q = $('[data-mem-q]', mem);
       const notes = $$('li', mem);
       const asks = [
-        ['what should I cook tonight?', 'food'],
-        ['how do we take card payments?', 'work'],
-        ['taxi or on foot to the castle?', 'trip'],
-        ['which e-bike should I get?', 'style'],
+        [T('what should I cook tonight?'), 'food'],
+        [T('how do we take card payments?'), 'work'],
+        [T('taxi or on foot to the castle?'), 'trip'],
+        [T('which e-bike should I get?'), 'style'],
       ];
       const hit = (k) => notes.forEach((n) => n.classList.toggle('hit', n.dataset.k === k));
       if (still()) {
@@ -755,7 +796,7 @@ void main() {
     const [n1, n2] = [$('.note-1', ph), $('.note-2', ph)];
     const yes = $('.nb-yes', ph);
     const date = $('[data-lock-date]', ph);
-    date.textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    date.textContent = new Date().toLocaleDateString(LANG === 'en' ? 'en-GB' : LANG, { weekday: 'long', day: 'numeric', month: 'long' });
     if (still()) {
       n1.classList.add('show');
       n2.classList.add('show');
@@ -813,10 +854,10 @@ void main() {
         }
         const label = $('span', b);
         b.classList.add('done');
-        label.textContent = 'Copied';
+        label.textContent = T('Copied');
         setTimeout(() => {
           b.classList.remove('done');
-          label.textContent = 'Copy';
+          label.textContent = T('Copy');
         }, 1800);
       });
   }
@@ -829,7 +870,7 @@ void main() {
     if (!dlg) return;
     for (const b of $$('[data-tour]'))
       b.addEventListener('click', () => {
-        if (typeof dlg.showModal !== 'function') return void (location.href = 'media/hydor-tour.mp4');
+        if (typeof dlg.showModal !== 'function') return void (location.href = '/media/hydor-tour.mp4');
         dlg.showModal();
         vid.play().catch(() => {});
       });
@@ -838,10 +879,47 @@ void main() {
     dlg.addEventListener('close', () => vid.pause());
   }
 
+  /* ---------- The language menu: a native <details> that works without this; Escape, arrow keys, and the choice saved ---------- */
+
+  function languages() {
+    for (const a of $$('[data-lang]'))
+      a.addEventListener('click', () => {
+        try {
+          localStorage.setItem('hydor.lang', a.dataset.lang);
+        } catch {}
+        // The same place on the page, where the page has the same sections in the other language.
+        if (location.hash && !a.getAttribute('href').includes('#')) a.href += location.hash;
+      });
+    for (const menu of $$('[data-lang-menu]')) {
+      const links = $$('a', menu);
+      const summary = $('summary', menu);
+      menu.addEventListener('keydown', (e) => {
+        const i = links.indexOf(document.activeElement);
+        if (e.key === 'Escape' && menu.open) {
+          e.preventDefault();
+          menu.open = false;
+          summary.focus();
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          menu.open = true;
+          const down = e.key === 'ArrowDown';
+          links[i < 0 ? (down ? 0 : links.length - 1) : (i + (down ? 1 : -1) + links.length) % links.length].focus();
+        } else if ((e.key === 'Home' || e.key === 'End') && i >= 0) {
+          e.preventDefault();
+          links[e.key === 'Home' ? 0 : links.length - 1].focus();
+        }
+      });
+      // Tabbing out, or a click anywhere else, closes it.
+      menu.addEventListener('focusout', (e) => menu.open && e.relatedTarget && !menu.contains(e.relatedTarget) && (menu.open = false));
+      document.addEventListener('click', (e) => menu.open && !menu.contains(e.target) && (menu.open = false));
+    }
+  }
+
   const gl = (() => {
     const c = $('[data-water]');
     return c ? water(c) : null;
   })();
+  languages();
   header();
   reveals();
   stage();

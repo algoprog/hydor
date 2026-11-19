@@ -30,7 +30,7 @@ module.exports = {
     category: 'public.app-category.developer-tools',
     target: ['zip', 'dmg'],
     artifactName: 'Hydor-${version}-${arch}-mac.${ext}',
-    electronLanguages: ['en', 'zh_CN', 'el'],
+    electronLanguages: ['en', 'de', 'es', 'fr', 'pt_BR', 'pt_PT', 'el', 'ja', 'zh_CN'],
     minimumSystemVersion: '12.0',
     identity: signed ? undefined : null,
     hardenedRuntime: signed,
@@ -49,7 +49,7 @@ module.exports = {
   win: {
     icon: 'resources/icon.ico',
     target: ['nsis'],
-    electronLanguages: ['en-US', 'zh-CN', 'el'],
+    electronLanguages: ['en-US', 'de', 'es', 'es-419', 'fr', 'pt-BR', 'pt-PT', 'el', 'ja', 'zh-CN'],
   },
   nsis: {
     // One click, for your account only: it installs in your local programs folder, which the app may update by itself.
@@ -73,7 +73,7 @@ module.exports = {
     maintainer: 'Hydor <5434641+algoprog@users.noreply.github.com>',
     // The window's app id is the .desktop entry's (hydor.desktop), so the dock and the task switcher show its icon.
     syncDesktopName: true,
-    electronLanguages: ['en-US', 'zh-CN', 'el'],
+    electronLanguages: ['en-US', 'de', 'es', 'es-419', 'fr', 'pt-BR', 'pt-PT', 'el', 'ja', 'zh-CN'],
   },
   appImage: { artifactName: 'Hydor-${version}-${arch}.${ext}' },
   // git for projects and their history, python3 for computer use on X11 (with libxtst6, in electron-builder's own list

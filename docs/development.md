@@ -237,7 +237,8 @@ What users can see and do is described in several places, which change with the 
 the user guide in [docs/guide](guide/) (the app shows it under Help, the search box finds its sections, and
 agents read it to answer questions and to change things in the app), this folder's documents and the README,
 the search box's catalog (`shared/find-catalog.ts`, then `npm run find:vectors`), translations
-(`npm run i18n:extract`), and the release notes. [AGENTS.md](../AGENTS.md) says how; `server/guide/guide-test.ts`
+(`npm run i18n:extract`, then `npm run i18n:translate`, which translates what is new with the Claude Code CLI and the
+glossaries in `scripts/i18n-style/`), and the release notes. [AGENTS.md](../AGENTS.md) says how; `server/guide/guide-test.ts`
 fails when the guide no longer matches the app (a link that points nowhere, a Settings section or an API route
 it does not describe, a picture that is missing). The guide's pictures (`docs/guide/images`) come from a demo copy
 of the app with made-up data: `scripts/guide-shots` takes them again when a page they show changes.
