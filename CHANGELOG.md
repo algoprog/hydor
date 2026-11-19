@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.92.2 · 19 November 2026
+
+A copy of the app you try something out in can no longer take over your sessions, and agents a deleted copy left
+running now stop.
+
+- **A test copy keeps to itself**: a copy of Hydor started with a Claude Code or Codex folder of its own (as when
+  trying out a change) now runs its agents in that folder. They used yours before, so such a copy, given a copy of
+  your sessions, could carry on with them beside the app you use, and a subagent it started showed at the top of your
+  sidebar as **Working in another app**, outside its lead.
+- **Subagents another app runs**: when the app starts, it no longer reports or runs again the turn of a subagent that a
+  terminal, VS Code or another copy of Hydor is running. That app reports it, and a turn still going there is not
+  mistaken for a finished one.
+- **Left-behind agents stop**: an agent whose app's data folder is deleted now stops within a minute, instead of
+  working on where no app can reach it.
+
 ## 0.92.1 · 19 November 2026
 
 Activity counts the day, week, month or year you are in, so Weekly, Monthly and Yearly no longer show the same
