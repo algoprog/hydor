@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.96.2 · 19 November 2026
+
+Sessions no longer crowd into Active after Hydor updates.
+
+- **Active after an update**: when Hydor updated or restarted, every session whose agent was still open showed in
+  **Active** for a few minutes, even ones that had finished days before, because reconnecting to them counted as
+  starting them. They now stay in their usual groups: **Active** holds only sessions at work or with activity in the
+  last five minutes.
+- **Usage checks are not activity**: Hydor reads each account's plan usage every few minutes through one of its open
+  sessions, and that counted as the session being at work, so it stayed in **Active**, on top of the list, and its
+  agent was never stopped for being idle. Usage checks no longer count: the session stays where it was, and its
+  agent stops once idle for the usual time (three hours), like any other: it picks up again with your next message.
+
 ## 0.96.1 · 19 November 2026
 
 Windows open with a soft motion, Pinned folds away like Active, and projects start folded.
