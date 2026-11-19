@@ -1,4 +1,4 @@
-// The tools of the app's navigation (Agents, Apps, Browser, Search, Usage, System, Settings, Help): what
+// The tools of the app's navigation (Browser, Projects, Agents, Apps, Search, Usage, System, Settings, Help): what
 // each shows and where it goes, with the Usage bar and the Inbox count. The rail (Rail.tsx) shows them in two groups
 // down the left edge; a phone's drawer (Sidebar.tsx) in one grid.
 import { useEffect, type ReactNode } from 'react';

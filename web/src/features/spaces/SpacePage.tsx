@@ -7,26 +7,25 @@
 // (SpaceSkills), its agents and its settings. The tabs change in the window, not the address. It shows at once from the
 // projects the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserPlus, UserRound, X } from 'lucide-react';
+import { BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, MessagesSquare, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
-import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type FoundIn, type Space, type SpaceView } from '@shared/spaces';
+import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type Space, type SpaceView } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
-import { api, del, enc, patch, post } from '../../lib/api';
+import { Button, cx, Empty, IconButton, inputCls, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { api, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { closeProject, go, openProject, openSession, type ProjectPart, type ProjectTab } from '../../lib/nav';
-import { canReveal, reveal, revealLabel } from '../../lib/reveal';
-import { toastError, useApp, useSessions, useUI } from '../../lib/store';
+import { toastError, useApp, useSessions } from '../../lib/store';
 import type { PickedFile } from '../../lib/upload';
 import { tr } from '../../i18n/runtime';
 import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
-import { goFolder } from '../files/actions';
 import { addFiles, BaseCard, DropFiles, MeaningHint, MeaningWait, TrySearch, useKnowledge } from '../knowledge/parts';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
+import { deleteSpace, SpaceMenu } from './ProjectMenu';
 import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
 import { RecentFiles } from './RecentFiles';
@@ -98,76 +97,7 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
   );
 }
 
-/** The confirm's body for deleting a project: a project Hydor found says so, since it would find it again in the programs' sessions. */
-function deleteBody(found: FoundIn[] | undefined) {
-  const claude = !!found?.includes('claude');
-  const codex = !!found?.includes('codex');
-  if (claude && codex) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s and Codex’s sessions and won’t make it again.';
-  if (claude) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s sessions and won’t make it again.';
-  if (codex) return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Codex’s sessions and won’t make it again.';
-  return 'Its sessions, folder, files, documents and skills stay. The sessions, folder and the things kept in it just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.';
-}
-
-/** Asks, then deletes the space and closes its window (its sessions, folder, documents and skills stay). */
-async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) {
-  const ok = await confirm({
-    title: tr(`Delete the ${s.name} project?`),
-    body: deleteBody(s.found),
-    confirm: 'Delete',
-    danger: true,
-  });
-  if (!ok) return;
-  try {
-    await del(`/api/projects/${enc(s.id)}`);
-  } catch (e) {
-    toastError(e);
-    return;
-  }
-  loadSpaces();
-  closeProject();
-}
-
 // ---- the top --------------------------------------------------------------------------------------------------
-
-/** The space's one menu: its folder in Files, only its sessions in the sidebar, sharing it with people, and deleting it (in the project's window). */
-export function SpaceMenu({ s }: { s: Space }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLButtonElement>(null);
-  const filter = useUI((x) => x.spaceFilter);
-  const [confirm, confirmNode] = useConfirm();
-  const pick = (f: () => void) => () => {
-    setOpen(false);
-    f();
-  };
-  return (
-    <>
-      <IconButton ref={ref} label="More" active={open} onClick={() => setOpen((o) => !o)}>
-        <MoreHorizontal size={18} />
-      </IconButton>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={290} title={<span translate="no">{s.name}</span>}>
-        <MenuItem icon={<FolderOpen size={15} />} onClick={pick(() => goFolder(s.folder))}>
-          Open its folder in Files
-        </MenuItem>
-        {canReveal() && (
-          <MenuItem icon={<FolderOpen size={15} />} onClick={pick(() => reveal(s.folder))}>
-            {revealLabel()}
-          </MenuItem>
-        )}
-        <MenuItem icon={<ListFilter size={15} />} checked={filter === s.id} onClick={pick(() => useUI.getState().set({ spaceFilter: filter === s.id ? null : s.id }))}>
-          Only its sessions in the sidebar
-        </MenuItem>
-        <MenuItem icon={<UserPlus size={15} />} onClick={pick(() => openShareDialog(s))}>
-          Share with people
-        </MenuItem>
-        <MenuSep />
-        <MenuItem icon={<Trash2 size={15} />} danger onClick={pick(() => void deleteSpace(s, confirm))}>
-          Delete the project
-        </MenuItem>
-      </Popover>
-      {confirmNode}
-    </>
-  );
-}
 
 /** How much the project remembers: notes, wiki articles and documents (what is loaded so far). */
 const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;

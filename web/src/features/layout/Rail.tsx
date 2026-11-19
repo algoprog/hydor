@@ -1,5 +1,5 @@
 // The rail: a narrow column of icons at the left edge of every page on a computer. Sessions (which shows or hides the
-// sidebar), the sections (Browser, Agents, Apps), the inbox and Search right under them (they stay there), then, below
+// sidebar), the sections (Browser, Projects, Agents, Apps), the inbox and Search right under them (they stay there), then, below
 // a gap, the tools (Usage, System, Settings, Help); a tooltip beside an icon names it (and its key) under the pointer or
 // the keyboard's focus. The sections and the tools each keep the order you drag them into, on every device.
 // A phone has no rail: its drawer (Sidebar.tsx) holds the same.
@@ -19,6 +19,7 @@ import { useApp, useSessions, useUI } from '../../lib/store';
 import { Count } from '../../components/Count';
 import { cx, Kbd, MenuItem, Popover, useMediaQuery } from '../../components/ui';
 import { openPalette } from '../palette/CommandPalette';
+import { elsewhere, useMachines } from '../../lib/machines';
 import { columnOf } from './column';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
 import { useInboxCount, useTools, type Tool } from './tools';
@@ -158,6 +159,16 @@ function SortableTile({ t, onMenu }: { t: Tool; onMenu: (e: ReactMouseEvent<HTML
       }}
     />
   );
+}
+
+/** A dot on the Sessions tile while the sidebar with the machine row is hidden: another machine has finished sessions (accent), or sessions waiting on you (warn, which wins). */
+function ElsewhereDot({ hidden }: { hidden: boolean }) {
+  const list = useMachines((s) => s.list);
+  const self = useMachines((s) => s.self);
+  if (hidden) return null;
+  const { finished, waiting } = elsewhere(self, list);
+  if (!finished && !waiting) return null;
+  return <span aria-hidden className={cx('pointer-events-none absolute top-0.5 right-0.5 h-2 w-2 rounded-full border border-sidebar', waiting ? 'bg-warn' : 'bg-accent')} />;
 }
 
 function ToolTile({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void }) {
@@ -325,7 +336,7 @@ export const Rail = memo(function Rail() {
         {/* The tiles scroll in a short window (their bar hidden), so none is left out. Touches on them may pick one up (lib/dragTouch). */}
         <div ref={areaRef} onScroll={() => tipApi.hide(true)} className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <span ref={bar} aria-hidden className={cx('rail-bar', glide && 'glide')} style={{ opacity: 0 }} />
-          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} />
+          <Tile label="Sessions" keys={inSessions ? `${MOD}B` : undefined} icon={<MessagesSquare size={19} />} current={inSessions} onClick={sessions} extra={<ElsewhereDot hidden={inSessions && sideOpen} />} />
           {group(sections)}
           <InboxTile current={loc === '/inbox'} />
           {search && <ToolTile t={search} />}

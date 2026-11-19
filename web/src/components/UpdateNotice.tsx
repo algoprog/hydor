@@ -10,7 +10,7 @@ import { post } from '../lib/api';
 import { machineId } from '../lib/machine';
 import { inDesktopApp } from '../lib/notify';
 import { toastError, useApp } from '../lib/store';
-import { downloadOf, mb } from '../lib/updates';
+import { downloadOf, mb, stepWords, UPDATE_PHASE, useUpdateProgress } from '../lib/updates';
 import { DownloadBar } from './DownloadBar';
 import { Button, Throbber } from './ui';
 
@@ -81,6 +81,8 @@ export function UpdateNotice() {
   }, [deadline]);
   useEffect(() => setBusy(false), [ready?.version, deadline]);
   const away = useHeld();
+  // A copy from git updating (started with Update now): how far it has got, drawn again each second.
+  const g = useUpdateProgress(update);
 
   // A download you started (the app's own, in the background, stays quiet: Settings shows it).
   const d = downloadOf(update);
@@ -101,6 +103,26 @@ export function UpdateNotice() {
             <DownloadBar share={d.share} className="mt-2" />
             {!d.checking && <p className="tnum mt-1.5 text-[12.5px] text-fg-3">{`${mb(d.done)} of ${mb(d.total)} MB`}</p>}
             <p className="mt-1.5 text-[12.5px] leading-snug text-fg-3">Hydor restarts into it once it is downloaded. Running agents carry on.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // The same for an update of a copy from git (its steps: getting the new version, installing packages, building).
+  if (g && update?.running && !update.running.auto && !away) {
+    return (
+      <div role="status" className="pointer-events-auto w-[min(92vw,340px)] rounded-xl border border-line bg-elevated px-3.5 py-3 text-[13px] shadow-lg">
+        <div className="flex items-start gap-2.5">
+          <CircleArrowUp size={16} className="mt-0.5 shrink-0 text-accent" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 font-medium text-fg">{UPDATE_PHASE[update.running.phase]}</span>
+              <span className="tnum text-fg-3">{`${Math.round(g.share * 100)}%`}</span>
+            </div>
+            <DownloadBar share={g.share} label="Update" className="mt-2" />
+            {stepWords(g) && <p className="tnum mt-1.5 text-[12.5px] text-fg-3">{stepWords(g)}</p>}
+            <p className="mt-1.5 text-[12.5px] leading-snug text-fg-3">{update.canRestart ? 'Hydor restarts into it once it is built. Running agents carry on.' : 'Restart the server afterwards to use it.'}</p>
           </div>
         </div>
       </div>

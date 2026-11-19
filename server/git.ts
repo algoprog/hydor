@@ -33,6 +33,7 @@ import { oneShot } from './oneshot.ts';
 import { HttpError } from './auth.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { agentBaseEnv } from './env.ts';
+import { runStreamed } from './stream-run.ts';
 
 let env: Record<string, string> | null = null;
 // ssh never asks for anything (git's own prompts are off too) and gives up on a dead host.
@@ -64,7 +65,8 @@ function run(cwd: string, args: string[], timeout: number, e: Record<string, str
 /** Commands that reach a remote. */
 const NETWORK = new Set(['fetch', 'pull', 'push', 'ls-remote', 'clone', 'remote', 'submodule']);
 
-export async function git(cwd: string, args: string[], timeout = 15_000, extraEnv?: Record<string, string>): Promise<{ ok: boolean; out: string; err: string }> {
+/** The environment for a command: git's own, and an ssh command that never asks, the repository's own key included. */
+async function envFor(cwd: string, args: string[], extraEnv?: Record<string, string>): Promise<Record<string, string>> {
   let e = extraEnv ? { ...gitEnv(), ...extraEnv } : gitEnv();
   const sub = args.find((a, i) => !a.startsWith('-') && args[i - 1] !== '-c');
   if (sub && NETWORK.has(sub) && !extraEnv?.GIT_SSH_COMMAND) {
@@ -73,7 +75,20 @@ export async function git(cwd: string, args: string[], timeout = 15_000, extraEn
     const own = (await run(cwd, ['config', '--get', 'core.sshCommand'], 5000, gitEnv())).out.trim();
     if (own) e = { ...e, GIT_SSH_COMMAND: `${own} ${BATCH}` };
   }
-  return run(cwd, args, timeout, e);
+  return e;
+}
+
+export async function git(cwd: string, args: string[], timeout = 15_000, extraEnv?: Record<string, string>): Promise<{ ok: boolean; out: string; err: string }> {
+  return run(cwd, args, timeout, await envFor(cwd, args, extraEnv));
+}
+
+/**
+ * As git, with what it writes handed to `onData` as it comes (git's progress goes to stderr, its updates separated by
+ * \r: ask for it with --progress). The error text keeps only each line's last update.
+ */
+export async function gitStream(cwd: string, args: string[], timeout: number, onData: (text: string, stream: 'out' | 'err') => void): Promise<{ ok: boolean; out: string; err: string }> {
+  const r = await runStreamed('git', args, { cwd, env: await envFor(cwd, args), timeout, onData });
+  return { ok: r.ok, out: r.out, err: r.err.replace(/[^\n]*\r/g, '') };
 }
 
 /** stdout and stderr together, as a failure shows them. */

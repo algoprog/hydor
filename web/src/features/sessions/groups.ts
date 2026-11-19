@@ -95,6 +95,9 @@ export function workFolder(s: SessionSummary): string | undefined {
 
 const RANK: Record<GroupKind, number> = { active: 0, pinned: 1, space: 2, folder: 2, day: 3, snoozed: 4 };
 
+/** The project a session belongs to, by its id: the one its own record names (the sidebar groups it under that project, if the project exists). */
+export const sessionSpaceId = (s: SessionSummary): string | undefined => (typeof s.extra?.space === 'string' ? s.extra.space : undefined);
+
 /** A space's or a folder's group, which goes under Projects and keeps the place you drag it to. */
 export const isPlaceKind = (kind: GroupKind) => kind === 'space' || kind === 'folder';
 
@@ -118,7 +121,10 @@ export function groupSessions(
   },
 ): SessionGroup[] {
   const spaces = new Map((o.spaces ?? []).map((sp) => [sp.id, sp]));
-  const spaceOf = (s: SessionSummary) => (typeof s.extra?.space === 'string' ? spaces.get(s.extra.space) : undefined);
+  const spaceOf = (s: SessionSummary) => {
+    const id = sessionSpaceId(s);
+    return id ? spaces.get(id) : undefined;
+  };
   const folderOf = (s: SessionSummary) => {
     const dir = workFolder(s);
     return dir && (o.names?.[dir] || !o.unpicked(dir)) ? dir : undefined;

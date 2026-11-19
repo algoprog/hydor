@@ -11,7 +11,7 @@ import { toastError, useApp } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, MenuSep, Segmented, useConfirm } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Row, Stack } from './kit';
-import { MACHINE_DOT, machineLine } from '../machines/MachineSwitcher';
+import { machineDot, machineLine } from '../machines/MachineSwitcher';
 import { RefreshIcon } from '../../components/RefreshIcon';
 
 const CLI = 'node dist/server/cli.js access-token';
@@ -64,14 +64,14 @@ export function MachineSettings() {
             {list.map((m) => (
               <Row
                 key={m.id}
-                icon={dot(MACHINE_DOT[m.status.state])}
+                icon={dot(machineDot(m.status))}
                 label={<span translate="no">{m.name}</span>}
                 hint={
                   <>
                     <span translate="no" className="font-mono text-[11.5px]">
                       {m.via === 'ssh' ? `ssh ${m.ssh}${m.port && m.port !== 8790 ? ` · port ${m.port}` : ''}` : m.url}
                     </span>{' '}
-                    · <span className={cx(m.status.state === 'offline' ? 'text-err' : m.status.waiting ? 'text-warn' : '')}>{machineLine(m)}</span>
+                    · <span className={cx(m.status.state === 'offline' && !m.status.restarting ? 'text-err' : m.status.restarting || m.status.waiting ? 'text-warn' : '')}>{machineLine(m)}</span>
                     {m.status.state === 'online' && m.status.version && <> · {m.status.version}</>}
                   </>
                 }

@@ -25,6 +25,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { UPDATE_WORDS } from '../shared/desktop.ts';
+import { planOf } from '../shared/update-progress.ts';
 import type { UpdateReady, UpdateResult, UpdateState } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
 import { newer } from './clients.ts';
@@ -32,8 +33,10 @@ import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { desktop, onDesktop, SYSTEM_NAME, tellDesktop } from './desktop.ts';
 import { agentBaseEnv } from './env.ts';
-import { git } from './git.ts';
+import { git, gitStream } from './git.ts';
 import { appWords } from './language/index.ts';
+import { runStreamed } from './stream-run.ts';
+import { addedPackages, dueToTell, Lines, lockPackages, tookOf, UpdateTracker } from './update-progress.ts';
 import { commitsBehind, followRewrite, type Git } from './upstream.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -171,13 +174,16 @@ function lastMessageAt(db: DB): number {
 const nodeDir = path.dirname(process.execPath);
 const npm = fs.existsSync(path.join(nodeDir, 'npm')) ? path.join(nodeDir, 'npm') : 'npm';
 
-/** npm in the app's folder. Building needs the dev packages, which NODE_ENV=production would leave out. */
-function npmRun(args: string[], timeout: number): Promise<{ ok: boolean; out: string }> {
+/**
+ * npm in the app's folder, its output's lines handed to `onLine` as they come (the update's progress reads them). Building
+ * needs the dev packages, which NODE_ENV=production would leave out.
+ */
+function npmRun(args: string[], timeout: number, o: { env?: Record<string, string>; onLine?: (line: string) => void } = {}): Promise<{ ok: boolean; out: string }> {
   const env: Record<string, string> = { ...agentBaseEnv(), PATH: `${nodeDir}:${agentBaseEnv().PATH ?? ''}` };
   delete env.NODE_ENV;
-  return new Promise((resolve) =>
-    execFile(npm, args, { cwd: ROOT, env, timeout, maxBuffer: 64 << 20 }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout ?? ''}\n${stderr ?? ''}` })),
-  );
+  Object.assign(env, o.env);
+  const lines = { out: new Lines(), err: new Lines() };
+  return runStreamed(npm, args, { cwd: ROOT, env, timeout, onData: (text, stream) => lines[stream].push(text, (l) => o.onLine?.(l)) }).then((r) => ({ ok: r.ok, out: `${r.out}\n${r.err}` }));
 }
 
 /** The last few lines of a failed step's output. */
@@ -215,13 +221,48 @@ export function startUpdate(auto: boolean): UpdateState | null {
   return updateState();
 }
 
+/** Whether a list of changed files has the packages' own. */
+const packagesChanged = (changed: string) => /^(package-lock\.json|package\.json)$/m.test(changed);
+
 async function update(db: DB, auto: boolean) {
   const at = Date.now();
+  const canRestart = !!restarter();
+  // How far it has got (update-progress.ts): the steps it will take, from what each took the last time here.
+  const kept = tookOf(kvGet(db, 'update.took'));
+  const tracker = new UpdateTracker(planOf(true, canRestart), kept, at);
+  let told: { at: number; share: number; step: number; steps: number; slow: boolean } | null = null;
+  // Reading output for progress never changes how a step ends.
+  const feed = (line: string) => {
+    try {
+      tracker.line(line, Date.now());
+    } catch {}
+  };
+  const lines = new Lines();
+  const tellNow = (now: number) => {
+    const v = tracker.view(now);
+    told = { at: now, share: v.share, step: v.step, steps: v.steps, slow: !!v.slow };
+    return v;
+  };
+  if (running) running = { ...running, ...tellNow(at) };
+  // At most every 500 ms and when it moved, at least every 2 s: no write to the check's record each time, as emit() does.
+  const ticker = setInterval(() => {
+    try {
+      if (!running || running.phase === 'download') return;
+      const now = Date.now();
+      if (!dueToTell(told, tracker.view(now), now)) return;
+      running = { ...running, ...tellNow(now) };
+      ctx?.onChange(updateState());
+    } catch {}
+  }, 500);
+  ticker.unref();
   const phase = (p: NonNullable<UpdateState['running']>['phase']) => {
-    running = { phase: p, since: Date.now(), auto };
+    const now = Date.now();
+    tracker.begin(p as 'pull' | 'install' | 'build' | 'restart', now);
+    running = { phase: p, since: now, auto, ...tellNow(now) };
     emit();
   };
   const done = (r: Omit<UpdateResult, 'at' | 'auto'>) => {
+    clearInterval(ticker);
     kvSet(db, 'update.last', JSON.stringify({ ...r, at, auto }));
     running = undefined;
     emit();
@@ -229,7 +270,12 @@ async function update(db: DB, auto: boolean) {
   try {
     const head = async () => (await git(ROOT, ['rev-parse', '--short', 'HEAD'])).out.trim();
     const from = await head();
-    const pull = await git(ROOT, ['pull', '--ff-only'], 180_000);
+    // Installing is planned from what the last check fetched (assumed when that cannot be told); the pull says for sure.
+    const ahead = await git(ROOT, ['diff', '--name-only', 'HEAD', '@{u}']);
+    tracker.setPlan(planOf(!ahead.ok || packagesChanged(ahead.out), canRestart));
+    const pull = await gitStream(ROOT, ['pull', '--ff-only', '--progress'], 180_000, (text, stream) => {
+      if (stream === 'err') lines.push(text, feed);
+    });
     if (!pull.ok) {
       // Upstream's history was rewritten under this copy (Hydor's was with 0.78.0): one with nothing of its own moves to it.
       const moved = await followRewrite(rootGit);
@@ -241,14 +287,25 @@ async function update(db: DB, auto: boolean) {
       return done({ ok: true, from, to });
     }
     const changed = (await git(ROOT, ['diff', '--name-only', from, to])).out;
-    if (/^(package-lock\.json|package\.json)$/m.test(changed)) {
+    const install = packagesChanged(changed);
+    tracker.setPlan(planOf(install, canRestart));
+    let added: number | null = null;
+    if (install) {
+      try {
+        tracker.expectPackages(lockPackages(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8')));
+      } catch {}
       phase('install');
-      const r = await npmRun(['ci', '--include=dev', '--no-audit', '--no-fund'], 20 * 60_000);
+      const r = await npmRun(['ci', '--include=dev', '--no-audit', '--no-fund', '--loglevel=http'], 20 * 60_000, { onLine: feed });
       if (!r.ok) return done({ ok: false, from, to, error: tail(r.out) });
+      added = addedPackages(r.out);
     }
     phase('build');
-    const b = await npmRun(['run', 'build'], 20 * 60_000);
+    const b = await npmRun(['run', 'build'], 20 * 60_000, { env: { HYDOR_BUILD_PROGRESS: '1' }, onLine: feed });
     if (!b.ok) return done({ ok: false, from, to, error: tail(b.out) });
+    // What the steps took and counted, for the next update's estimate.
+    try {
+      kvSet(db, 'update.took', JSON.stringify({ ...kept, ...tracker.times(Date.now()), ...tracker.counts(added) }));
+    } catch {}
     if (check) check = { ...check, behind: 0, latest: undefined };
     const r = restarter();
     if (!r) return done({ ok: true, from, to, needsRestart: true });

@@ -1,6 +1,6 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers opening a project's details, making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers the Projects page, a project's details, making and using projects and groups of projects, a project's own skills, sharing a project with people, and adding, searching and managing the documents agents search.
 
 ![A project's details in a window over the page: its sessions, its newest files and what every session in it gets, under its tabs](images/projects.webp)
 
@@ -21,10 +21,11 @@ A project can also bring other projects together. That is a **group**: see [Brin
 
 ## Open a project's details
 
-A project has no page of its own: its details open in a window over the page you are on, which stays behind it, dimmed. There are several ways in:
+A project's details open in a window over the page you are on, which stays behind it, dimmed. There are several ways in:
 
+- **From the Projects page**: click a project's card (see [Find all your projects](#find-all-your-projects)).
 - **From the sidebar**: in the session list, click the project's name in its heading (on a phone, open the sidebar first, since it is a drawer, then tap the name; the drawer closes and the details fill the screen). Its ⋯ menu has **Project details** too, as its first item. The small arrow beside the name folds or unfolds the project's sessions.
-- **From the search box**: type the project's name in the search box (Ctrl+K, or ⌘K on a Mac) and pick it. A project with no sessions yet has no heading in the sidebar, so this is the way to it (a project you have just made opens its window by itself).
+- **From the search box**: type the project's name in the search box (Ctrl+K, or ⌘K on a Mac) and pick it. A project with no sessions yet has no heading in the sidebar, so this and the Projects page are the ways to it (a project you have just made opens its window by itself).
 - **From a link**: a link to a project in a notification or in an agent's answer opens the window over the page you are on, too.
 
 The window shows what a project holds:
@@ -34,9 +35,31 @@ The window shows what a project holds:
 
 Close it with ✕, with Esc, or with a click on the dimmed page outside it. Going to another page closes it too: opening a document from the **Files** tab, say, or following a link. On a phone the window fills the screen. Esc closes a menu or a dialog over the window first, and the window after it.
 
+## Find all your projects
+
+**Projects** on the rail (right before **Agents**; on a phone, in the grid of tools in the sidebar drawer) opens the Projects page, or go to [/projects](/projects). It lists every project as a card, on the whole width of the page, with no column beside the rail. The title shows how many there are.
+
+- **New project** makes one (see [Make a project](#make-a-project)). Its ▾ has **New project** and **New group of projects…**, which needs two projects to bring together (see [Make a group](#make-a-group)).
+- **Find a project** filters the cards as you type, by name, description and folder.
+- The button beside it sorts them: **Recent activity** (the project at work most recently first, the usual order), **Name** or **Most sessions**. This browser keeps your pick.
+
+Each card shows:
+
+- a band in the project's colour with its mark, and chips: **Group** for a group, and **From Claude Code** or **From Codex** for a project Hydor found (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex));
+- its name, what it is about (a group says "Brings together" and the names of its projects), and its folder;
+- what it holds: its sessions, documents, skills and kept files, and "Shared with 2 people" once you share it;
+- "2 working" while its sessions are at work, and a dot when a session finished since you last looked;
+- when it was last at work, and small bars for the messages of its last four weeks.
+
+Point at a card (on a touch screen they are always there) and **New session** starts a session in the project, and **More** (⋯) has the project's menu: **Open its folder in Files**, in the desktop app **Show in Finder**, **Show in File Explorer** or **Show in folder**, **Only its sessions in the sidebar**, **Share with people** and **Delete the project** (see [The project's menu](#the-projects-menu)). Click anywhere else on a card to open the project's details in a window over the page (see [Open a project's details](#open-a-projects-details)). Drop files from your computer on a card to put them in the project's folder.
+
+Under the cards, **Folders you work in** lists the folders your sessions worked in lately that no project has yet (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)). **Make a project** on one opens the **New project** window with that folder picked; ✕ (**Not a project: stop suggesting it**) takes it off the list for good. The list is left out while you search.
+
+With no projects yet, the page says what a project is and offers **New project**. A search that matches nothing says so.
+
 ## Make a project
 
-1. Click the **+** at the end of the sidebar's **Projects** heading (it shows when you point at the heading, and is always there on a touch screen) and pick **New project…**. The sidebar's filter button (**Filter and group sessions**) has **New project…** too, and so has the start page's folder menu, beside its **Projects** heading (see [Start a session in a project](#start-a-session-in-a-project)). A folder's heading in the sidebar has **Make it a project** (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
+1. On the Projects page, click **New project** (see [Find all your projects](#find-all-your-projects)). Or click the **+** at the end of the sidebar's **Projects** heading (it shows when you point at the heading, and is always there on a touch screen) and pick **New project…**. The sidebar's filter button (**Filter and group sessions**) has **New project…** too, and so has the start page's folder menu, beside its **Projects** heading (see [Start a session in a project](#start-a-session-in-a-project)). A folder's heading in the sidebar has **Make it a project**, and so does each folder under **Folders you work in** on the Projects page (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 2. Fill in the window:
    - **Name**: what you call the project, such as "Taxes 2026", "The garden" or "Thesis". Up to 60 characters. It is the only field you must fill in. The square beside it is the project's mark, in the colour it will get: click it to pick another of the eight colours (amber, blue, green, pink, violet, teal, orange, slate). If you pick none, projects take the colours in turn.
    - **Where its files go**: pick one of two.
@@ -49,7 +72,7 @@ Close it with ✕, with Esc, or with a click on the dimmed page outside it. Goin
 4. Leave **An agent for it** on to have an agent made for the project (see [Agents](#agents)), or turn it off.
 5. Click **Make the project**, or press Enter in the name field.
 
-A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the sidebar, the new project's details open in a window. Made from the start page, the new project is picked for the session you are about to start.
+A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the sidebar or the Projects page, the new project's details open in a window. Made from the start page, the new project is picked for the session you are about to start.
 
 Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its notes, wiki and documents are on its **Memory** tab, its skills on its **Skills** tab, and more folders on its **Files** tab (see [A project's details window](#a-projects-details-window)).
 
@@ -76,7 +99,7 @@ To see which projects came this way, look for the program marks after a project'
 
 A folder that two or more of your sessions work in, and that no project has yet, has a group of its own in the sidebar, under **Projects**, with its folder's name. Point at its heading and open its **⋯** to find **Make it a project**: the **New project** window opens with that folder picked and its name filled in. The same menu has **Rename**, **Use the folder's own name** (once you have renamed it) and **Open in Files**.
 
-When you make a project for a folder yourself (or from the **New project** window), the folders your sessions worked in lately, over the last 90 days, or changed files in while working somewhere else, and that no project has yet, show under **Used lately, in no project yet**, so one tap picks one (see [Make a project](#make-a-project)). The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project.
+When you make a project for a folder yourself (or from the **New project** window), the folders your sessions worked in lately, over the last 90 days, or changed files in while working somewhere else, and that no project has yet, show under **Used lately, in no project yet**, so one tap picks one (see [Make a project](#make-a-project)). The Projects page lists the same folders under its cards, as **Folders you work in**, each with **Make a project** (see [Find all your projects](#find-all-your-projects)). The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project.
 
 Folders you work in with Claude Code and Codex become projects by themselves, so these are mostly folders you worked in from Hydor. Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a project has a folder, as its own or as one of the folders it works with, the folder leaves them. To stop Hydor from making a project of a folder by itself, ask an agent: it keeps a list of folders that are not projects, and deleting a project adds its folder to it (see [Delete a project](#delete-a-project)).
 
@@ -262,7 +285,7 @@ A group is a project that brings several projects together, for work that spans 
 
 ### Make a group
 
-1. In the sidebar, click the **+** at the end of the **Projects** heading and pick **New group of projects…**. You need at least one project to bring in.
+1. On the Projects page, open the ▾ beside **New project** and pick **New group of projects…** (it needs two projects). Or, in the sidebar, click the **+** at the end of the **Projects** heading and pick **New group of projects…**. You need at least one project to bring in.
 2. In **New group of projects**, give it a **Name**, such as "Work" or "Everything for the thesis".
 3. Under **The projects it brings together**, tap each project to bring in; tap one again to take it out. Pick at least one.
 4. Optionally, fill in **What it is about** and the **Agent Guidelines**, and pick a colour.
@@ -472,6 +495,8 @@ The knowledge tools never bring up another project's documents, not even when an
 - "What does my Thesis project keep in its files? Move the reading tracker into it."
 - "Which folders have I been working in that aren't in a project yet? Make projects for the two I use most."
 - "Which of my projects came from Claude Code or Codex?"
+- "Open the Projects page and sort my projects by most sessions."
+- "Which of my projects has had no session for a month?"
 - "Don't make a project for ~/code/scratch by itself."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 project, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes projects into one called Everything for the thesis."

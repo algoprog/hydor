@@ -21,6 +21,7 @@ import type { MachineStatus, MachineView, NotifyEvent, SessionSummary } from '..
 import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
+import { briefOf, Looked, newsOf, type Brief } from './machine-news.ts';
 
 /** What another Hydor reports about the machine it runs on. */
 export function machineInfo() {
@@ -190,14 +191,20 @@ function killStaleTunnels() {
   }
 }
 
-const statusOf = (s: SessionSummary) => s.live?.status ?? s.external?.status;
+/** How long a machine that went away while restarting into an update is expected back. */
+const RESTART_WAIT = 2 * 60_000;
 
 /** One machine: how to reach it, and its events while connected. */
 class Machine extends EventEmitter {
   status: MachineStatus = { state: 'connecting', waiting: 0, working: 0 };
   private tunnel: Tunnel | null = null;
   private ws: WebSocket | null = null;
-  private sessions = new Map<string, string | undefined>();
+  private sessions = new Map<string, Brief>();
+  /** When you last looked at this machine (Infinity while a page shows it): see Looked. */
+  lookedAt: () => number = () => Infinity;
+  /** The step of the update it last said it was in: a socket closing in `restart` is it coming back. */
+  private phase: string | undefined;
+  private restartTimer: NodeJS.Timeout | null = null;
   private retry = 0;
   private timer: NodeJS.Timeout | null = null;
   private closed = false;
@@ -315,16 +322,18 @@ class Machine extends EventEmitter {
       return this.later();
     }
     if (this.closed) return;
-    const ws = new WebSocket(socketUrl(ep, '/ws'), { headers: { authorization: `Bearer ${this.def.token}` }, perMessageDeflate: false, handshakeTimeout: 15_000 });
+    // away: this server only listens to its news, so that is not looking at it.
+    const ws = new WebSocket(socketUrl(ep, '/ws?away=1'), { headers: { authorization: `Bearer ${this.def.token}` }, perMessageDeflate: false, handshakeTimeout: 15_000 });
     this.ws = ws;
     let error = '';
     ws.on('open', async () => {
       try {
         const info = await this.check();
         const list = await this.call<{ sessions: SessionSummary[] }>('GET', '/api/sessions?limit=500');
-        this.sessions = new Map(list.sessions.map((s) => [s.key, statusOf(s)]));
+        this.sessions = new Map(list.sessions.map((s) => [s.key, briefOf(s)]));
         this.retry = 0;
-        this.setStatus({ state: 'online', error: undefined, host: info.host, version: info.version, since: Date.now(), ...this.counts() });
+        this.clearRestart();
+        this.setStatus({ state: 'online', error: undefined, restarting: undefined, host: info.host, version: info.version, since: Date.now(), ...this.counts() });
       } catch (e) {
         error = (e as Error).message;
         ws.close();
@@ -338,9 +347,15 @@ class Machine extends EventEmitter {
         return;
       }
       if (e.t === 'sessions') {
-        for (const s of (e.upsert ?? []) as SessionSummary[]) this.sessions.set(s.key, statusOf(s));
+        for (const s of (e.upsert ?? []) as SessionSummary[]) this.sessions.set(s.key, briefOf(s));
         for (const k of (e.remove ?? []) as string[]) this.sessions.delete(k);
         this.setStatus(this.counts());
+      } else if (e.t === 'update') {
+        const run = e.update?.running;
+        this.phase = run?.phase;
+        let share = typeof run?.share === 'number' ? run.share : run?.total ? (run.done ?? 0) / run.total : undefined;
+        if (share !== undefined) share = Math.round(Math.max(0, Math.min(1, share)) * 100) / 100;
+        this.setStatus({ update: run ? { phase: String(run.phase), ...(share !== undefined ? { share } : {}) } : undefined });
       } else if (e.t === 'notify' && e.n && !e.n.machine) {
         // Its own sessions' notices (ones it passes on from its machines would point at the wrong one).
         this.emit('notify', { ...(e.n as NotifyEvent), machine: { id: this.def.id, name: this.def.name } });
@@ -350,19 +365,33 @@ class Machine extends EventEmitter {
     ws.on('close', () => {
       if (this.ws === ws) this.ws = null;
       if (this.closed) return;
-      this.setStatus({ state: 'offline', error: error || 'The connection closed', waiting: 0, working: 0 });
+      // An update restarting it: it is back soon, which is not the same as not reachable.
+      if (this.phase === 'restart') {
+        this.clearRestart();
+        this.restartTimer = setTimeout(() => {
+          this.restartTimer = null;
+          this.setStatus({ restarting: undefined });
+        }, RESTART_WAIT);
+        this.setStatus({ restarting: true });
+      }
+      this.phase = undefined;
+      this.setStatus({ state: 'offline', error: error || 'The connection closed', waiting: 0, working: 0, finished: undefined, news: undefined, update: undefined });
       this.later();
     });
   }
 
   private counts() {
-    let waiting = 0;
-    let working = 0;
-    for (const st of this.sessions.values()) {
-      if (st === 'waiting') waiting++;
-      else if (st === 'working' || st === 'starting') working++;
-    }
-    return { waiting, working };
+    return newsOf(this.sessions.values(), this.lookedAt());
+  }
+
+  /** You started or stopped looking at this machine: what is news there changes. */
+  recount() {
+    if (this.status.state === 'online') this.setStatus(this.counts());
+  }
+
+  private clearRestart() {
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.restartTimer = null;
   }
 
   /** Tries again: soon at first, then every minute. */
@@ -392,6 +421,7 @@ class Machine extends EventEmitter {
     this.closed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.clearRestart();
     this.ws?.terminate();
     this.ws = null;
     this.tunnel?.stop();
@@ -411,9 +441,21 @@ const DROP_RESPONSE = new Set(['connection', 'keep-alive', 'transfer-encoding', 
 
 export class Machines extends EventEmitter {
   private live = new Map<string, Machine>();
+  /** When you last looked at each machine, and this server ('' ): what finished since is news. */
+  readonly looked: Looked;
 
   constructor(private db: DB) {
     super();
+    let saved: Record<string, number> = {};
+    try {
+      saved = JSON.parse(kvGet(db, 'machines.looked') ?? '{}') ?? {};
+    } catch {}
+    this.looked = new Looked(saved, (kept) => kvSet(db, 'machines.looked', JSON.stringify(kept)));
+    this.looked.ensure('');
+    this.looked.on('change', (id: string) => {
+      if (id === '') this.emit('self');
+      else this.live.get(id)?.recount();
+    });
   }
 
   private defs(): MachineDef[] {
@@ -438,6 +480,8 @@ export class Machines extends EventEmitter {
 
   private track(m: Machine) {
     this.live.set(m.def.id, m);
+    this.looked.ensure(m.def.id);
+    m.lookedAt = () => this.looked.at(m.def.id);
     m.on('changed', () => this.emit('changed'));
     m.on('notify', (n: NotifyEvent) => this.emit('notify', n));
     m.start();
@@ -545,6 +589,7 @@ export class Machines extends EventEmitter {
     this.save(this.defs().filter((d) => d.id !== id));
     this.live.get(id)?.close();
     this.live.delete(id);
+    this.looked.forget(id);
     this.emit('changed');
   }
 
@@ -553,6 +598,9 @@ export class Machines extends EventEmitter {
   }
 
   shutdown() {
+    try {
+      this.looked.flush();
+    } catch {}
     for (const m of this.live.values()) m.close();
   }
 
@@ -617,9 +665,12 @@ export class Machines extends EventEmitter {
     const queued: [WebSocket.RawData, boolean][] = [];
     let up: WebSocket | null = null;
     let done = false;
+    // A page's main socket to a machine is looking at it (not a terminal's; and the page's own server socket for news is `away`).
+    const stopLooking = rest.split('?')[0] === '/ws' ? this.looked.enter(id) : null;
     const end = (code = 1011, why = '') => {
       if (done) return;
       done = true;
+      stopLooking?.();
       if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) client.close(code, why.slice(0, 60));
       up?.terminate();
     };

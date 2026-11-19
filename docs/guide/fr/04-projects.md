@@ -1,6 +1,6 @@
 # Projets et connaissances
 
-Un projet réunit un travail en un seul endroit : ses sessions, un dossier pour ses fichiers (et d’autres dossiers à vous avec lesquels il travaille), ce dont les agents se souviennent à son sujet (des notes, un wiki et des documents qui lui sont propres), les consignes que tout agent du projet suit, ses propres compétences, l’agent avec lequel ses sessions démarrent, et des agents qui lui sont propres. Les Connaissances partagées regroupent les documents et les dossiers que vous ajoutez une seule fois pour que toutes les sessions puissent les consulter et citer le fichier et la page lus. Cette rubrique explique comment ouvrir les détails d’un projet, créer et utiliser des projets et des groupes de projets, donner à un projet des compétences qui lui sont propres, partager un projet avec d’autres personnes, et ajouter, rechercher et gérer les documents que les agents consultent.
+Un projet réunit un travail en un seul endroit : ses sessions, un dossier pour ses fichiers (et d’autres dossiers à vous avec lesquels il travaille), ce dont les agents se souviennent à son sujet (des notes, un wiki et des documents qui lui sont propres), les consignes que tout agent du projet suit, ses propres compétences, l’agent avec lequel ses sessions démarrent, et des agents qui lui sont propres. Les Connaissances partagées regroupent les documents et les dossiers que vous ajoutez une seule fois pour que toutes les sessions puissent les consulter et citer le fichier et la page lus. Cette rubrique explique la page Projets, comment ouvrir les détails d’un projet, créer et utiliser des projets et des groupes de projets, donner à un projet des compétences qui lui sont propres, partager un projet avec d’autres personnes, et ajouter, rechercher et gérer les documents que les agents consultent.
 
 ![Les détails d’un projet dans une fenêtre au-dessus de la page : ses sessions, ses fichiers les plus récents et ce que reçoit chaque session, sous ses onglets](images/projects.webp)
 
@@ -21,10 +21,11 @@ Un projet peut aussi réunir d’autres projets. C’est un **groupe** : voir [R
 
 ## Ouvrir les détails d’un projet
 
-Un projet n’a pas de page à lui : ses détails s’ouvrent dans une fenêtre au-dessus de la page où vous êtes, qui reste derrière, assombrie. Il y a plusieurs façons d’y accéder :
+Les détails d’un projet s’ouvrent dans une fenêtre au-dessus de la page où vous êtes, qui reste derrière, assombrie. Il y a plusieurs façons d’y accéder :
 
+- **Depuis la page Projets** : cliquez sur la carte d’un projet (voir [Retrouver tous vos projets](#find-all-your-projects)).
 - **Depuis la barre latérale** : dans la liste des sessions, cliquez sur le nom du projet dans son en-tête (sur un téléphone, ouvrez d’abord la barre latérale, car c’est un tiroir, puis touchez le nom ; le tiroir se ferme et les détails occupent l’écran). Son menu ⋯ propose aussi **Détails du projet**, en premier élément. La petite flèche à côté du nom replie ou déplie les sessions du projet.
-- **Depuis la zone de recherche** : saisissez le nom du projet dans la zone de recherche (Ctrl+K, ou ⌘K sur Mac) et choisissez-le. Un projet sans session n’a pas encore d’en-tête dans la barre latérale ; c’est donc le chemin pour y accéder (un projet que vous venez de créer ouvre sa fenêtre de lui-même).
+- **Depuis la zone de recherche** : saisissez le nom du projet dans la zone de recherche (Ctrl+K, ou ⌘K sur Mac) et choisissez-le. Un projet sans session n’a pas encore d’en-tête dans la barre latérale ; c’est donc, avec la page Projets, le chemin pour y accéder (un projet que vous venez de créer ouvre sa fenêtre de lui-même).
 - **Depuis un lien** : un lien vers un projet dans une notification ou dans la réponse d’un agent ouvre aussi la fenêtre au-dessus de la page où vous êtes.
 
 La fenêtre présente ce que contient un projet :
@@ -34,9 +35,31 @@ La fenêtre présente ce que contient un projet :
 
 Fermez-la avec ✕, avec Échap, ou en cliquant sur la page assombrie à l’extérieur. Aller sur une autre page la ferme aussi : par exemple en ouvrant un document depuis l’onglet **Fichiers**, ou en suivant un lien. Sur un téléphone, la fenêtre occupe tout l’écran. Échap ferme d’abord un menu ou une boîte de dialogue ouverts au-dessus de la fenêtre, puis la fenêtre.
 
+## Retrouver tous vos projets
+
+**Projets** dans la barre d’icônes (juste avant **Agents** ; sur un téléphone, dans la grille d’outils du tiroir de la barre latérale) ouvre la page Projets, ou rendez-vous sur [/projects](/projects). Elle liste chaque projet sous forme de carte, sur toute la largeur de la page, sans colonne à côté de la barre d’icônes. Le titre indique combien il y en a.
+
+- **Nouveau projet** en crée un (voir [Créer un projet](#make-a-project)). Son ▾ propose **Nouveau projet** et **Nouveau groupe de projets…**, qui demande deux projets à réunir (voir [Créer un groupe](#make-a-group)).
+- **Rechercher un projet** filtre les cartes au fil de la saisie, par nom, description et dossier.
+- Le bouton à côté les trie : **Activité récente** (le projet qui a travaillé le plus récemment en premier, l’ordre habituel), **Nom** ou **Plus de sessions**. Ce navigateur garde votre choix.
+
+Chaque carte affiche :
+
+- un bandeau à la couleur du projet avec son repère, et des pastilles : **Groupe** pour un groupe, et **Depuis Claude Code** ou **Depuis Codex** pour un projet que Hydor a trouvé (voir [Projets trouvés dans Claude Code et Codex](#projects-found-in-claude-code-and-codex)) ;
+- son nom, de quoi il s’agit (un groupe indique « Réunit » suivi des noms de ses projets), et son dossier ;
+- ce qu’il contient : ses sessions, documents, compétences et fichiers conservés, et « Partagé avec 2 personnes » une fois que vous le partagez ;
+- « 2 en cours » tant que ses sessions travaillent, et un point quand une session s’est terminée depuis votre dernier passage ;
+- quand il a travaillé pour la dernière fois, et de petites barres pour les messages de ses quatre dernières semaines.
+
+Pointez une carte (sur un écran tactile, elles sont toujours là) et **Nouvelle session** démarre une session dans le projet, et **Plus** (⋯) ouvre le menu du projet : **Ouvrir son dossier dans Fichiers**, dans l’app de bureau **Afficher dans le Finder**, **Afficher dans l’Explorateur de fichiers** ou **Afficher dans le dossier**, **Seulement ses sessions dans la barre latérale**, **Partager avec des personnes** et **Supprimer le projet** (voir [Le menu du projet](#the-projects-menu)). Cliquez n’importe où ailleurs sur une carte pour ouvrir les détails du projet dans une fenêtre au-dessus de la page (voir [Ouvrir les détails d’un projet](#open-a-projects-details)). Déposez des fichiers de votre ordinateur sur une carte pour les placer dans le dossier du projet.
+
+Sous les cartes, **Dossiers dans lesquels vous travaillez** liste les dossiers dans lesquels vos sessions ont travaillé récemment et qu’aucun projet n’a encore (voir [Dossiers dans lesquels vous travaillez, pas encore dans un projet](#folders-you-work-in-not-in-a-project-yet)). **Créer un projet** sur l’un d’eux ouvre la fenêtre **Nouveau projet** avec ce dossier choisi ; ✕ (**Pas un projet : ne plus le suggérer**) le retire définitivement de la liste. La liste est omise pendant une recherche.
+
+Sans projet pour l’instant, la page explique ce qu’est un projet et propose **Nouveau projet**. Une recherche sans résultat l’indique.
+
 ## Créer un projet
 
-1. Cliquez sur le **+** à la fin de l’en-tête **Projets** de la barre latérale (il apparaît quand vous pointez l’en-tête, et il est toujours visible sur un écran tactile) et choisissez **Nouveau projet…**. Le bouton de filtre de la barre latérale (**Filtrer et regrouper les sessions**) propose aussi **Nouveau projet…**, tout comme le menu des dossiers de la page de démarrage, à côté de son en-tête **Projets** (voir [Démarrer une session dans un projet](#start-a-session-in-a-project)). L’en-tête d’un dossier dans la barre latérale propose **En faire un projet** (voir [Dossiers dans lesquels vous travaillez, pas encore dans un projet](#folders-you-work-in-not-in-a-project-yet)).
+1. Sur la page Projets, cliquez sur **Nouveau projet** (voir [Retrouver tous vos projets](#find-all-your-projects)). Ou cliquez sur le **+** à la fin de l’en-tête **Projets** de la barre latérale (il apparaît quand vous pointez l’en-tête, et il est toujours visible sur un écran tactile) et choisissez **Nouveau projet…**. Le bouton de filtre de la barre latérale (**Filtrer et regrouper les sessions**) propose aussi **Nouveau projet…**, tout comme le menu des dossiers de la page de démarrage, à côté de son en-tête **Projets** (voir [Démarrer une session dans un projet](#start-a-session-in-a-project)). L’en-tête d’un dossier dans la barre latérale propose **En faire un projet**, tout comme chaque dossier sous **Dossiers dans lesquels vous travaillez** sur la page Projets (voir [Dossiers dans lesquels vous travaillez, pas encore dans un projet](#folders-you-work-in-not-in-a-project-yet)).
 2. Remplissez la fenêtre :
    - **Nom** : le nom que vous donnez au projet, par exemple « Impôts 2026 », « Le jardin » ou « Thèse ». 60 caractères au maximum. C’est le seul champ obligatoire. Le carré à côté est le repère du projet, dans la couleur qu’il recevra : cliquez dessus pour en choisir une autre parmi les huit couleurs (ambre, bleu, vert, rose, violet, turquoise, orange, ardoise). Si vous n’en choisissez aucune, les projets prennent les couleurs à tour de rôle.
    - **Où vont ses fichiers** : choisissez l’une des deux options.
@@ -49,7 +72,7 @@ Fermez-la avec ✕, avec Échap, ou en cliquant sur la page assombrie à l’ext
 4. Laissez activé **Un agent pour lui** pour qu’un agent soit créé pour le projet (voir [Agents](#agents)), ou désactivez-le.
 5. Cliquez sur **Créer le projet**, ou appuyez sur Entrée dans le champ du nom.
 
-Un nouveau dossier est placé dans un dossier **Projets** là où vont les dossiers de tâches : « Impôts 2026 » obtient `~/Hydor/Projects/taxes-2026`, sauf si vous avez déplacé les dossiers de tâches ailleurs (voir [Déplacer les dossiers de tâches](/guide/agents#move-task-folders)). Si ce nom est déjà pris, l’app ajoute `-2`, `-3`, etc. Quand le projet est créé depuis la barre latérale, ses détails s’ouvrent dans une fenêtre. Quand il est créé depuis la page de démarrage, il est choisi pour la session que vous êtes sur le point de démarrer.
+Un nouveau dossier est placé dans un dossier **Projets** là où vont les dossiers de tâches : « Impôts 2026 » obtient `~/Hydor/Projects/taxes-2026`, sauf si vous avez déplacé les dossiers de tâches ailleurs (voir [Déplacer les dossiers de tâches](/guide/agents#move-task-folders)). Si ce nom est déjà pris, l’app ajoute `-2`, `-3`, etc. Quand le projet est créé depuis la barre latérale ou la page Projets, ses détails s’ouvrent dans une fenêtre. Quand il est créé depuis la page de démarrage, il est choisi pour la session que vous êtes sur le point de démarrer.
 
 Deux autres réglages se font ensuite dans l’onglet **Paramètres** du projet : l’agent avec lequel ses sessions démarrent, et les projets qu’il réunit. Ses notes, son wiki et ses documents se trouvent dans son onglet **Mémoire**, ses compétences dans son onglet **Compétences**, et les autres dossiers dans son onglet **Fichiers** (voir [La fenêtre des détails d’un projet](#a-projects-details-window)).
 
@@ -76,7 +99,7 @@ Pour voir quels projets sont venus ainsi, repérez les repères de programmes ap
 
 Un dossier dans lequel travaillent au moins deux de vos sessions, et qu’aucun projet n’a encore, a son propre groupe dans la barre latérale, sous **Projets**, avec le nom du dossier. Pointez son en-tête et ouvrez son **⋯** pour trouver **En faire un projet** : la fenêtre **Nouveau projet** s’ouvre avec ce dossier choisi et son nom déjà rempli. Le même menu propose **Renommer**, **Utiliser le nom du dossier** (une fois que vous l’avez renommé) et **Ouvrir dans Fichiers**.
 
-Quand vous créez vous-même un projet pour un dossier (ou depuis la fenêtre **Nouveau projet**), les dossiers dans lesquels vos sessions ont travaillé récemment, au cours des 90 derniers jours, ou dont elles ont modifié des fichiers en travaillant ailleurs, et qu’aucun projet n’a encore, apparaissent sous **Utilisés récemment, dans aucun projet**, si bien qu’une seule touche suffit à en choisir un (voir [Créer un projet](#make-a-project)). Les plus utilisés, et les plus récents, viennent en premier. Un dossier à l’intérieur d’un projet géré avec Git compte pour le projet entier.
+Quand vous créez vous-même un projet pour un dossier (ou depuis la fenêtre **Nouveau projet**), les dossiers dans lesquels vos sessions ont travaillé récemment, au cours des 90 derniers jours, ou dont elles ont modifié des fichiers en travaillant ailleurs, et qu’aucun projet n’a encore, apparaissent sous **Utilisés récemment, dans aucun projet**, si bien qu’une seule touche suffit à en choisir un (voir [Créer un projet](#make-a-project)). La page Projets liste les mêmes dossiers sous ses cartes, sous le titre **Dossiers dans lesquels vous travaillez**, chacun avec **Créer un projet** (voir [Retrouver tous vos projets](#find-all-your-projects)). Les plus utilisés, et les plus récents, viennent en premier. Un dossier à l’intérieur d’un projet géré avec Git compte pour le projet entier.
 
 Les dossiers dans lesquels vous travaillez avec Claude Code et Codex deviennent d’eux-mêmes des projets ; il s’agit donc surtout de dossiers dans lesquels vous avez travaillé depuis Hydor. Votre dossier personnel, les dossiers cachés, les dossiers temporaires et les dossiers que l’app crée pour elle-même (dossiers de tâches, exécutions des apps, worktrees) ne sont jamais suggérés. Dès qu’un projet a un dossier, comme dossier propre ou comme l’un de ceux avec lesquels il travaille, le dossier sort de cette liste. Pour empêcher Hydor de faire de lui-même un projet d’un dossier, demandez à un agent : il tient une liste de dossiers qui ne sont pas des projets, et supprimer un projet y ajoute son dossier (voir [Supprimer un projet](#delete-a-project)).
 
@@ -262,7 +285,7 @@ Un groupe est un projet qui réunit plusieurs projets, pour un travail qui les t
 
 ### Créer un groupe
 
-1. Dans la barre latérale, cliquez sur le **+** au bout du titre **Projets** et choisissez **Nouveau groupe de projets…**. Il faut au moins un projet à réunir.
+1. Sur la page Projets, ouvrez le ▾ à côté de **Nouveau projet** et choisissez **Nouveau groupe de projets…** (il faut deux projets). Ou, dans la barre latérale, cliquez sur le **+** au bout du titre **Projets** et choisissez **Nouveau groupe de projets…**. Il faut au moins un projet à réunir.
 2. Dans **Nouveau groupe de projets**, donnez-lui un **Nom**, comme « Travail » ou « Tout pour la thèse ».
 3. Sous **Les projets qu’il réunit**, touchez chaque projet à réunir ; touchez-le de nouveau pour le retirer. Choisissez-en au moins un.
 4. Si vous le souhaitez, remplissez **De quoi il s’agit** et les **Consignes des agents**, et choisissez une couleur.
@@ -472,6 +495,8 @@ Les outils de connaissances ne font jamais apparaître les documents d’un autr
 - « Que contient le dossier de mon projet Thèse dans ses fichiers ? Déplace-y le suivi de lectures. »
 - « Dans quels dossiers ai-je travaillé sans qu’ils soient encore dans un projet ? Crée des projets pour les deux que j’utilise le plus. »
 - « Lesquels de mes projets viennent de Claude Code ou de Codex ? »
+- « Ouvre la page Projets et trie mes projets par nombre de sessions. »
+- « Lequel de mes projets n’a eu aucune session depuis un mois ? »
 - « Ne crée pas de projet pour ~/code/scratch à lui seul. »
 - « Copie ~/Downloads/contract.pdf dans mon projet Impôts 2026, et fais-le travailler aussi avec ~/Documents/Receipts. »
 - « Regroupe mes projets Thèse et Notes de lecture en un seul appelé Tout pour la thèse. »

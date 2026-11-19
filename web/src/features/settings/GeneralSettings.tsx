@@ -13,7 +13,7 @@ import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
 import { holdDownloadNote, restartToUpdate, updateLater } from '../../components/UpdateNotice';
 import { DownloadBar } from '../../components/DownloadBar';
-import { beforeRewrite, cannotUpdate, downloadOf, mb, UPDATE_PHASE as PHASE } from '../../lib/updates';
+import { beforeRewrite, cannotUpdate, downloadOf, mb, stepWords, UPDATE_PHASE as PHASE, useUpdateProgress } from '../../lib/updates';
 import { machineId } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { BeforeRewrite } from '../machines/BeforeRewrite';
@@ -139,6 +139,8 @@ function VersionRow() {
   const version = useApp((s) => s.boot?.version);
   const name = useMachines((s) => s.list.find((m) => m.id === machineId)?.name);
   const update = useApp((s) => s.boot?.update);
+  // A copy from git updating: how far it has got, drawn again each second.
+  const g = useUpdateProgress(update);
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(false);
   // The corner card of a download stays away while this row shows it.
@@ -227,6 +229,20 @@ function VersionRow() {
       <span className="inline-flex items-center gap-2 text-fg-2">
         <Throbber className="text-fg-3" /> Checking the new version…
       </span>
+    );
+    control = notes;
+  } else if (update.running && g) {
+    hint = (
+      <span className="inline-flex items-center gap-2 text-fg-2">
+        <span>{PHASE[update.running.phase]}</span>
+        <span className="tnum text-fg-3">{`${Math.round(g.share * 100)}%`}</span>
+      </span>
+    );
+    progress = (
+      <div className="space-y-1.5">
+        <DownloadBar share={g.share} label="Update" className="max-w-[360px]" />
+        {stepWords(g) && <p className="tnum">{stepWords(g)}</p>}
+      </div>
     );
     control = notes;
   } else if (update.running) {

@@ -143,7 +143,7 @@ export const SHOTS = [
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),
   {
-    // A project's details: its window over the start page, on Overview (the Thesis project, with its newest files, four
+    // A project's details: its window over the Projects page, on Overview (the Thesis project, with its newest files, four
     // weeks of work and two people it is shared with, taken out again after it).
     id: 'projects',
     height: 860,

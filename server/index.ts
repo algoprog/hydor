@@ -9,7 +9,7 @@ import compress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
-import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
+import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, MachineCounts, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
 import { isSubscription } from '../shared/types.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { AuthManager, clientAddress, HttpError, SESSION_COOKIE } from './auth.ts';
@@ -41,6 +41,7 @@ import { teamOf, tiersOf } from './assistants/tiers.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
+import { briefOf, newsOf } from './machine-news.ts';
 import { createMcpToken, mcpRoutes, mcpTokens, OFFLINE_PAGE_CSP, PAGE_CSP, PAGE_FRAME_HTML, revokeMcpToken, runOf } from './mcp.ts';
 import { ModelManager } from './models/manager.ts';
 import { initPlans, planChat, planModels } from './models/subscription.ts';
@@ -1784,6 +1785,37 @@ machines.on('notify', (n: NotifyEvent) => {
   tellDesktop({ type: 'notice', n, title: p.t.title, body, path: `/m/${n.machine!.id}${n.url ?? `/s/${encodeURIComponent(n.key)}`}` });
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
+
+/**
+ * This server's own sessions as the machine switcher shows them on a page of another machine: what needs you, what works
+ * and what finished since you last looked at this server. Worked out at most every 2 s however often sessions change,
+ * and told ({ t: 'machines' }) only when it differs.
+ */
+let selfCounts = JSON.stringify(newsOf([], Infinity));
+let selfAt = 0;
+let selfTimer: NodeJS.Timeout | null = null;
+function selfStatus(): MachineCounts {
+  if (Date.now() - selfAt > 2000) {
+    selfAt = Date.now();
+    selfCounts = JSON.stringify(newsOf(sessions.list({ limit: 500 }).sessions.map(briefOf), machines.looked.at('')));
+  }
+  return JSON.parse(selfCounts);
+}
+function refreshSelf() {
+  if (selfTimer) return;
+  selfTimer = setTimeout(
+    () => {
+      selfTimer = null;
+      const before = selfCounts;
+      selfAt = 0;
+      selfStatus();
+      if (selfCounts !== before) broadcast({ t: 'machines' });
+    },
+    Math.max(0, selfAt + 2000 - Date.now()),
+  );
+}
+sessions.on('sessions', refreshSelf);
+machines.on('self', refreshSelf);
 /** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */
 const onFlow = (f: LoginFlow, account?: string) => {
   broadcast({ t: 'login', flow: publicFlow(f) });
@@ -1861,9 +1893,13 @@ indexer.on('progress', (p) => {
 });
 
 app.register(async (scope) => {
-  scope.get('/ws', { websocket: true }, (ws: WebSocket) => {
+  scope.get('/ws', { websocket: true }, (ws: WebSocket, req) => {
     const c: Client = { ws, subs: new Set() };
     clients.add(c);
+    // A page showing this server is looking at it; one that shows another machine opens this socket only to hear
+    // notices (?away=1), and so does another machine following this one (machines.ts).
+    const stopLooking = (req.query as Record<string, string> | undefined)?.away ? null : machines.looked.enter('');
+    ws.on('close', () => stopLooking?.());
     send(c, { t: 'hello', version: config.version, build: currentBuild() });
     ws.on('message', async (raw) => {
       let m: ClientEvent;
@@ -2148,7 +2184,7 @@ mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(ke
 app.get('/api/machine', async () => machineInfo());
 
 /** The other machines this one uses (Settings → Machines); their pages are /m/<id>/… */
-app.get('/api/machines', async () => ({ self: machineInfo(), machines: machines.list() }));
+app.get('/api/machines', async () => ({ self: { ...machineInfo(), status: selfStatus() }, machines: machines.list() }));
 app.post('/api/machines', async (req) => ({ machine: await machines.add(req.body) }));
 app.patch('/api/machines/:id', async (req) => ({ machine: await machines.update((req.params as { id: string }).id, req.body) }));
 app.delete('/api/machines/:id', async (req) => {

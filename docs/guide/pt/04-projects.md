@@ -1,6 +1,6 @@
 # Projetos e conhecimento
 
-Um projeto mantém junto um trabalho inteiro: suas sessões, uma pasta para os arquivos dele (e outras pastas suas com as quais ele trabalha), o que os agentes lembram sobre ele (notas, uma wiki e documentos próprios), as diretrizes que todo agente nele segue, habilidades próprias, o agente com que suas sessões começam e agentes próprios. O Conhecimento compartilhado reúne os documentos e as pastas que você adiciona uma só vez para que todas as sessões possam pesquisá-los e citar o arquivo e a página que leram. Este tópico explica como abrir os detalhes de um projeto, criar e usar projetos e grupos de projetos, dar habilidades próprias a um projeto, compartilhar um projeto com pessoas e adicionar, pesquisar e gerenciar os documentos que os agentes pesquisam.
+Um projeto mantém junto um trabalho inteiro: suas sessões, uma pasta para os arquivos dele (e outras pastas suas com as quais ele trabalha), o que os agentes lembram sobre ele (notas, uma wiki e documentos próprios), as diretrizes que todo agente nele segue, habilidades próprias, o agente com que suas sessões começam e agentes próprios. O Conhecimento compartilhado reúne os documentos e as pastas que você adiciona uma só vez para que todas as sessões possam pesquisá-los e citar o arquivo e a página que leram. Este tópico explica a página Projetos, como abrir os detalhes de um projeto, criar e usar projetos e grupos de projetos, dar habilidades próprias a um projeto, compartilhar um projeto com pessoas e adicionar, pesquisar e gerenciar os documentos que os agentes pesquisam.
 
 ![Os detalhes de um projeto em uma janela sobre a página: suas sessões, seus arquivos mais recentes e o que toda sessão nele recebe, sob as abas](images/projects.webp)
 
@@ -21,10 +21,11 @@ Um projeto também pode reunir outros projetos. Isso é um **grupo**: veja [Reú
 
 ## Abra os detalhes de um projeto
 
-Um projeto não tem uma página própria: os detalhes dele abrem em uma janela sobre a página em que você está, que fica atrás, escurecida. Há várias formas de chegar lá:
+Os detalhes de um projeto abrem em uma janela sobre a página em que você está, que fica atrás, escurecida. Há várias formas de chegar lá:
 
+- **Pela página Projetos**: clique no cartão de um projeto (veja [Encontre todos os seus projetos](#find-all-your-projects)).
 - **Pela barra lateral**: na lista de sessões, clique no nome do projeto no cabeçalho dele (no celular, abra primeiro a barra lateral, que é uma gaveta, e toque no nome; a gaveta se fecha e os detalhes ocupam a tela). O menu ⋯ dele também tem **Detalhes do projeto**, como primeiro item. A setinha ao lado do nome recolhe ou expande as sessões do projeto.
-- **Pela caixa de busca**: digite o nome do projeto na caixa de busca (Ctrl+K, ou ⌘K no Mac) e escolha-o. Um projeto que ainda não tem sessões não tem cabeçalho na barra lateral, então esse é o caminho até ele (um projeto que você acabou de criar abre a janela sozinho).
+- **Pela caixa de busca**: digite o nome do projeto na caixa de busca (Ctrl+K, ou ⌘K no Mac) e escolha-o. Um projeto que ainda não tem sessões não tem cabeçalho na barra lateral, então esse e a página Projetos são os caminhos até ele (um projeto que você acabou de criar abre a janela sozinho).
 - **De um link**: um link para um projeto em uma notificação ou na resposta de um agente também abre a janela sobre a página em que você está.
 
 A janela mostra o que um projeto guarda:
@@ -34,9 +35,31 @@ A janela mostra o que um projeto guarda:
 
 Feche-a com ✕, com Esc ou com um clique na página escurecida fora dela. Ir para outra página também a fecha: abrir um documento pela aba **Arquivos**, por exemplo, ou seguir um link. No celular, a janela ocupa a tela inteira. O Esc fecha primeiro um menu ou uma caixa de diálogo sobre a janela e, depois, a própria janela.
 
+## Encontre todos os seus projetos
+
+**Projetos** na barra de ícones (logo antes de **Agentes**; no celular, na grade de ferramentas da gaveta da barra lateral) abre a página Projetos, ou vá a [/projects](/projects). Ela lista cada projeto como um cartão, na largura toda da página, sem coluna ao lado da barra de ícones. O título mostra quantos há.
+
+- **Novo projeto** cria um (veja [Crie um projeto](#make-a-project)). O ▾ dele tem **Novo projeto** e **Novo grupo de projetos…**, que precisa de dois projetos para reunir (veja [Crie um grupo](#make-a-group)).
+- **Encontrar um projeto** filtra os cartões enquanto você digita, por nome, descrição e pasta.
+- O botão ao lado os ordena: **Atividade recente** (primeiro o projeto que trabalhou mais recentemente, a ordem padrão), **Nome** ou **Mais sessões**. Este navegador guarda a sua escolha.
+
+Cada cartão mostra:
+
+- uma faixa na cor do projeto com a marca dele, e chips: **Grupo** para um grupo, e **Do Claude Code** ou **Do Codex** para um projeto que o Hydor encontrou (veja [Projetos encontrados no Claude Code e no Codex](#projects-found-in-claude-code-and-codex));
+- o nome, do que ele trata (um grupo diz "Reúne" e os nomes dos seus projetos) e a pasta;
+- o que ele guarda: as sessões, os documentos, as habilidades e os arquivos guardados, e "Compartilhado com 2 pessoas" depois que você o compartilha;
+- "2 trabalhando" enquanto as sessões dele estão trabalhando, e um ponto quando uma sessão terminou desde a sua última visita;
+- quando ele trabalhou pela última vez, e barrinhas com as mensagens das últimas quatro semanas.
+
+Aponte para um cartão (em telas de toque eles estão sempre lá) e **Nova sessão** inicia uma sessão no projeto, e **Mais** (⋯) tem o menu do projeto: **Abrir a pasta em Arquivos**, no app para computador **Mostrar no Finder**, **Mostrar no Explorador de Arquivos** ou **Mostrar na pasta**, **Só as sessões dele na barra lateral**, **Compartilhar com pessoas** e **Excluir o projeto** (veja [O menu do projeto](#the-projects-menu)). Clique em qualquer outro lugar de um cartão para abrir os detalhes do projeto em uma janela sobre a página (veja [Abra os detalhes de um projeto](#open-a-projects-details)). Solte arquivos do seu computador em um cartão para colocá-los na pasta do projeto.
+
+Abaixo dos cartões, **Pastas em que você trabalha** lista as pastas em que suas sessões trabalharam recentemente e que nenhum projeto tem ainda (veja [Pastas em que você trabalha, ainda sem projeto](#folders-you-work-in-not-in-a-project-yet)). **Criar projeto** em uma delas abre a janela **Novo projeto** com essa pasta escolhida; ✕ (**Não é um projeto: parar de sugerir**) a tira da lista de vez. A lista fica de fora enquanto você pesquisa.
+
+Sem projetos ainda, a página diz o que é um projeto e oferece **Novo projeto**. Uma busca sem resultados avisa.
+
 ## Crie um projeto
 
-1. Clique no **+** no fim do cabeçalho **Projetos** da barra lateral (ele aparece quando você aponta para o cabeçalho, e está sempre lá em telas de toque) e escolha **Novo projeto…**. O botão de filtro da barra lateral (**Filtrar e agrupar sessões**) também tem **Novo projeto…**, e o menu de pastas da página inicial também, ao lado do cabeçalho **Projetos** dele (veja [Comece uma sessão em um projeto](#start-a-session-in-a-project)). O cabeçalho de uma pasta na barra lateral tem **Transformar em projeto** (veja [Pastas em que você trabalha, ainda sem projeto](#folders-you-work-in-not-in-a-project-yet)).
+1. Na página Projetos, clique em **Novo projeto** (veja [Encontre todos os seus projetos](#find-all-your-projects)). Ou clique no **+** no fim do cabeçalho **Projetos** da barra lateral (ele aparece quando você aponta para o cabeçalho, e está sempre lá em telas de toque) e escolha **Novo projeto…**. O botão de filtro da barra lateral (**Filtrar e agrupar sessões**) também tem **Novo projeto…**, e o menu de pastas da página inicial também, ao lado do cabeçalho **Projetos** dele (veja [Comece uma sessão em um projeto](#start-a-session-in-a-project)). O cabeçalho de uma pasta na barra lateral tem **Transformar em projeto**, e também cada pasta em **Pastas em que você trabalha** na página Projetos (veja [Pastas em que você trabalha, ainda sem projeto](#folders-you-work-in-not-in-a-project-yet)).
 2. Preencha a janela:
    - **Nome**: como você chama o projeto, como "Imposto de renda 2026", "O jardim" ou "Tese". Até 60 caracteres. É o único campo obrigatório. O quadrado ao lado é a marca do projeto, na cor que ele terá: clique nele para escolher outra das oito cores (âmbar, azul, verde, rosa, violeta, verde-azulado, laranja, ardósia). Se você não escolher nenhuma, os projetos recebem as cores em sequência.
    - **Para onde vão os arquivos dele**: escolha uma das duas opções.
@@ -49,7 +72,7 @@ Feche-a com ✕, com Esc ou com um clique na página escurecida fora dela. Ir pa
 4. Deixe **Um agente para ele** ativado para que um agente seja criado para o projeto (veja [Agentes](#agents)), ou desative-o.
 5. Clique em **Criar o projeto**, ou pressione Enter no campo do nome.
 
-Uma pasta nova vai para uma pasta **Projetos** onde ficam as pastas de tarefas: "Imposto de renda 2026" recebe `~/Hydor/Projects/taxes-2026`, a menos que você tenha movido as pastas de tarefas para outro lugar (veja [Mova as pastas de tarefas](/guide/agents#move-task-folders)). Se esse nome já existir, o app acrescenta `-2`, `-3` e assim por diante. Quando o projeto é criado pela barra lateral, os detalhes dele abrem em uma janela. Quando é criado pela página inicial, o novo projeto fica escolhido para a sessão que você está prestes a começar.
+Uma pasta nova vai para uma pasta **Projetos** onde ficam as pastas de tarefas: "Imposto de renda 2026" recebe `~/Hydor/Projects/taxes-2026`, a menos que você tenha movido as pastas de tarefas para outro lugar (veja [Mova as pastas de tarefas](/guide/agents#move-task-folders)). Se esse nome já existir, o app acrescenta `-2`, `-3` e assim por diante. Quando o projeto é criado pela barra lateral ou pela página Projetos, os detalhes dele abrem em uma janela. Quando é criado pela página inicial, o novo projeto fica escolhido para a sessão que você está prestes a começar.
 
 Mais duas coisas são definidas depois, na aba **Configurações** do projeto: o agente com que as sessões dele começam e os projetos que ele reúne. As notas, a wiki e os documentos dele ficam na aba **Memória**, as habilidades na aba **Habilidades**, e mais pastas na aba **Arquivos** (veja [A janela de detalhes de um projeto](#a-projects-details-window)).
 
@@ -76,7 +99,7 @@ Para ver quais projetos vieram assim, procure as marcas dos programas depois do 
 
 Uma pasta em que duas ou mais das suas sessões trabalham, e que nenhum projeto tem ainda, tem um grupo próprio na barra lateral, em **Projetos**, com o nome da pasta. Aponte para o cabeçalho dela e abra o **⋯** para encontrar **Transformar em projeto**: a janela **Novo projeto** abre com essa pasta escolhida e o nome dela preenchido. O mesmo menu tem **Renomear**, **Usar o nome da própria pasta** (depois que você a renomeia) e **Abrir em Arquivos**.
 
-Quando você cria um projeto para uma pasta por conta própria (ou pela janela **Novo projeto**), as pastas em que suas sessões trabalharam recentemente, nos últimos 90 dias, ou em que alteraram arquivos enquanto trabalhavam em outro lugar, e que nenhum projeto tem ainda, aparecem em **Usados recentemente, ainda em nenhum projeto**, então um toque escolhe uma (veja [Crie um projeto](#make-a-project)). As mais usadas, e as mais recentes, vêm primeiro. Uma pasta dentro de um projeto mantido no Git conta como o projeto inteiro.
+Quando você cria um projeto para uma pasta por conta própria (ou pela janela **Novo projeto**), as pastas em que suas sessões trabalharam recentemente, nos últimos 90 dias, ou em que alteraram arquivos enquanto trabalhavam em outro lugar, e que nenhum projeto tem ainda, aparecem em **Usados recentemente, ainda em nenhum projeto**, então um toque escolhe uma (veja [Crie um projeto](#make-a-project)). A página Projetos lista as mesmas pastas abaixo dos cartões, como **Pastas em que você trabalha**, cada uma com **Criar projeto** (veja [Encontre todos os seus projetos](#find-all-your-projects)). As mais usadas, e as mais recentes, vêm primeiro. Uma pasta dentro de um projeto mantido no Git conta como o projeto inteiro.
 
 As pastas em que você trabalha com o Claude Code e o Codex viram projetos sozinhas, então estas são, na maioria, pastas em que você trabalhou pelo Hydor. A sua pasta pessoal, as pastas ocultas, as temporárias e as pastas que o app cria para si mesmo (pastas de tarefas, execuções de apps, worktrees) nunca são sugeridas. Quando um projeto passa a ter uma pasta, como própria ou como uma das pastas com as quais ele trabalha, a pasta sai dessa lista. Para impedir que o Hydor crie sozinho um projeto de uma pasta, peça a um agente: ele mantém uma lista de pastas que não são projetos, e excluir um projeto adiciona a pasta dele a essa lista (veja [Exclua um projeto](#delete-a-project)).
 
@@ -262,7 +285,7 @@ Um grupo é um projeto que reúne vários projetos, para um trabalho que passa p
 
 ### Criar um grupo
 
-1. Na barra lateral, clique no **+** no fim do título **Projetos** e escolha **Novo grupo de projetos…**. Você precisa de pelo menos um projeto para reunir.
+1. Na página Projetos, abra o ▾ ao lado de **Novo projeto** e escolha **Novo grupo de projetos…** (precisa de dois projetos). Ou, na barra lateral, clique no **+** no fim do título **Projetos** e escolha **Novo grupo de projetos…**. Você precisa de pelo menos um projeto para reunir.
 2. Em **Novo grupo de projetos**, dê a ele um **Nome**, como “Trabalho” ou “Tudo para a tese”.
 3. Em **Os projetos que ele reúne**, toque em cada projeto a reunir; toque de novo para tirá-lo. Escolha pelo menos um.
 4. Se quiser, preencha **Do que se trata** e as **Diretrizes dos agentes**, e escolha uma cor.
@@ -472,6 +495,8 @@ As ferramentas de conhecimento nunca trazem os documentos de outro projeto, nem 
 - "O que o meu projeto Tese guarda nos arquivos dele? Mova a planilha de acompanhamento de leituras para dentro dele."
 - "Em quais pastas eu andei trabalhando que ainda não estão em um projeto? Crie projetos para as duas que mais uso."
 - "Quais dos meus projetos vieram do Claude Code ou do Codex?"
+- "Abra a página Projetos e ordene meus projetos por mais sessões."
+- "Qual dos meus projetos ficou um mês sem nenhuma sessão?"
 - "Não crie um projeto para ~/code/scratch por conta própria."
 - "Copie ~/Downloads/contract.pdf para o meu projeto Impostos 2026 e faça com que ele trabalhe também com ~/Documents/Receipts."
 - "Agrupe meus projetos Tese e Notas de leitura em um só chamado Tudo para a tese."

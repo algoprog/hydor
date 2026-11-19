@@ -106,5 +106,5 @@ class LiveSocket {
 /** The socket of the machine this page shows. */
 export const live = new LiveSocket(`${machineBase}/ws`);
 
-/** On another machine's pages: this server's own socket too, for notices from every machine. */
-export const ownLive = machineId ? new LiveSocket('/ws') : null;
+/** On another machine's pages: this server's own socket too, for notices from every machine (away: it only listens, so this server is not being looked at). */
+export const ownLive = machineId ? new LiveSocket('/ws?away=1') : null;

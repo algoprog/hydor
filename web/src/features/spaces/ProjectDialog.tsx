@@ -1,5 +1,5 @@
-// A project's details, in a window over the page that is open (the shell holds it once). It opens from the sessions
-// sidebar (a project's name, its ⋯ menu), the search box and every link to an old address of a project's page
+// A project's details, in a window over the page that is open (the shell holds it once). It opens from the Projects page's
+// cards, the sessions sidebar (a project's name, its ⋯ menu), the search box and every link to an old address of a project's page
 // (`/projects/<id>/<tab>`: lib/nav.ts's go() sends them here, so the page stays), and holds what the project's page
 // held (SpacePage.tsx: its header, its tabs). Escape, its Close or a click outside closes it, and so does going to
 // another page (a document opened from its Files, say). On a phone it fills the screen.

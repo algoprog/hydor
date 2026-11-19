@@ -622,7 +622,7 @@ function SearchResults({ q }: { q: string }) {
 }
 
 /** A turn finished since the session was last looked at. */
-const unreadOf = (s: SessionSummary) => !!s.doneAt && s.doneAt > (s.seenAt ?? 0);
+export const unreadOf = (s: SessionSummary) => !!s.doneAt && s.doneAt > (s.seenAt ?? 0);
 /** Space and folder groups showing all their sessions, kept while the list redraws. */
 const shownWhole = new Set<string>();
 

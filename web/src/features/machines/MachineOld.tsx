@@ -13,7 +13,7 @@ import { endBoot } from '../../lib/boot';
 import { machineId, machinePath } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { useApp } from '../../lib/store';
-import { beforeRewrite, cannotUpdate, downloadOf, UPDATE_PHASE } from '../../lib/updates';
+import { beforeRewrite, cannotUpdate, downloadOf, stepWords, UPDATE_PHASE, useUpdateProgress } from '../../lib/updates';
 import { DownloadBar } from '../../components/DownloadBar';
 import { Button, Throbber } from '../../components/ui';
 import { BeforeRewrite } from './BeforeRewrite';
@@ -117,6 +117,8 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
   const stuck = update && update.kind === 'app' && !update.canRestart ? cannotUpdate(update) : '';
   const running = update?.running;
   const d = downloadOf(update);
+  // A copy from git updating: how far it has got (an older Hydor there says nothing of it: estimated from its phase).
+  const g = useUpdateProgress(update);
   // Its last update (this one, or one before, by itself too) could not fast-forward past Hydor's rewritten history.
   const rewrite = !updating && !!update?.last && !update.last.ok && beforeRewrite(version, update.last.error);
   return (
@@ -146,7 +148,17 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
             <DownloadBar share={d.share} className="mt-2" />
           </div>
         )}
-        {updating && !(d && !d.checking) && (
+        {updating && g && running && (
+          <div className="mt-3 text-[13px] text-fg-2">
+            <p className="flex items-center gap-2">
+              <span>{UPDATE_PHASE[running.phase]}</span>
+              <span className="tnum text-fg-3">{`${Math.round(g.share * 100)}%`}</span>
+            </p>
+            <DownloadBar share={g.share} label="Update" className="mt-2" />
+            {stepWords(g) && <p className="tnum mt-1.5 text-[12.5px] text-fg-3">{stepWords(g)}</p>}
+          </div>
+        )}
+        {updating && !g && !(d && !d.checking) && (
           <p className="mt-3 flex items-center gap-2 text-[13px] text-fg-2">
             <Throbber className="shrink-0 text-fg-3" />
             {d ? 'Checking the new version' : running ? (update?.kind === 'app' && running.phase === 'restart' ? 'Opening the new version, this page reconnects by itself' : UPDATE_PHASE[running.phase]) : 'Starting the update'}…

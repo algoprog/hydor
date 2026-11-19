@@ -1,6 +1,6 @@
 # Projekte und Wissen
 
-Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt, wie du die Details eines Projekts öffnest, Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
+Ein Projekt bündelt zusammengehörige Arbeit: Sitzungen, einen eigenen Arbeitsordner und weitere verwendete Ordner, Projektwissen aus Notizen, Wiki und eigenen Dokumenten, gemeinsame Agentenrichtlinien, eigene Skills, einen Startagenten und projektspezifische Agenten. Im gemeinsamen Wissen hinterlegst du Dokumente und Ordner einmal, damit alle Sitzungen sie durchsuchen und mit Datei- und Seitenangaben zitieren können. Dieser Beitrag erklärt die Projekte-Seite, wie du die Details eines Projekts öffnest, Projekte und Projektgruppen, projektspezifische Skills, Freigaben für andere Personen sowie die Dokumentenablage und Suche der Agenten.
 
 ![Die Details eines Projekts in einem Fenster über der Seite: seine Sitzungen, seine neuesten Dateien und was jede Sitzung darin bekommt, unter seinen Tabs](images/projects.webp)
 
@@ -21,10 +21,11 @@ Ein Projekt kann andere Projekte zusammenfassen. Das ist eine **Gruppe**; siehe 
 
 ## Die Details eines Projekts öffnen
 
-Ein Projekt hat keine eigene Seite: Seine Details öffnen sich in einem Fenster über der Seite, auf der du gerade bist; sie bleibt abgedunkelt dahinter. Es gibt mehrere Wege dorthin:
+Die Details eines Projekts öffnen sich in einem Fenster über der Seite, auf der du gerade bist; sie bleibt abgedunkelt dahinter. Es gibt mehrere Wege dorthin:
 
+- **Von der Projekte-Seite**: Klicke auf die Karte eines Projekts (siehe [Alle Projekte finden](#find-all-your-projects)).
 - **Aus der Seitenleiste**: Klicke in der Sitzungsliste auf den Namen des Projekts in seiner Überschrift (öffne auf dem Smartphone zuerst die Seitenleiste, denn sie ist ein Menü, das sich einblendet, und tippe dann auf den Namen; das Menü schließt sich und die Details füllen den Bildschirm). Auch sein Menü ⋯ hat **Projektdetails**, als ersten Eintrag. Der kleine Pfeil neben dem Namen klappt die Sitzungen des Projekts ein oder aus.
-- **Aus der Suche**: Tippe den Namen des Projekts in die Suche (Strg+K, auf dem Mac ⌘K) und wähle es aus. Ein Projekt ohne Sitzungen hat noch keine Überschrift in der Seitenleiste, daher ist das der Weg dorthin (ein gerade erstelltes Projekt öffnet sein Fenster von selbst).
+- **Aus der Suche**: Tippe den Namen des Projekts in die Suche (Strg+K, auf dem Mac ⌘K) und wähle es aus. Ein Projekt ohne Sitzungen hat noch keine Überschrift in der Seitenleiste, daher sind das und die Projekte-Seite die Wege dorthin (ein gerade erstelltes Projekt öffnet sein Fenster von selbst).
 - **Über einen Link**: Auch ein Link zu einem Projekt in einer Benachrichtigung oder in der Antwort eines Agenten öffnet das Fenster über der Seite, auf der du gerade bist.
 
 Das Fenster zeigt, was ein Projekt enthält:
@@ -34,9 +35,31 @@ Das Fenster zeigt, was ein Projekt enthält:
 
 Schließe es mit ✕, mit Esc oder mit einem Klick auf die abgedunkelte Seite außerhalb. Auch der Wechsel zu einer anderen Seite schließt es: etwa wenn du ein Dokument aus dem Tab **Dateien** öffnest oder einem Link folgst. Auf dem Smartphone füllt das Fenster den Bildschirm. Esc schließt zuerst ein Menü oder einen Dialog über dem Fenster und danach das Fenster.
 
+## Alle Projekte finden
+
+**Projekte** in der Werkzeugleiste (direkt vor **Agenten**; auf dem Smartphone im Raster der Werkzeuge im Menü der Seitenleiste) öffnet die Projekte-Seite, oder gehe zu [/projects](/projects). Sie listet jedes Projekt als Karte auf, über die ganze Breite der Seite, ohne Spalte neben der Werkzeugleiste. Der Titel zeigt, wie viele es sind.
+
+- **Neues Projekt** erstellt eines (siehe [Ein Projekt erstellen](#make-a-project)). Sein ▾ bietet **Neues Projekt** und **Neue Gruppe von Projekten …**, wofür zwei Projekte zum Verbinden nötig sind (siehe [Eine Gruppe erstellen](#make-a-group)).
+- **Projekt suchen** filtert die Karten beim Tippen, nach Name, Beschreibung und Ordner.
+- Die Schaltfläche daneben sortiert sie: **Letzte Aktivität** (das zuletzt aktive Projekt zuerst, die übliche Reihenfolge), **Name** oder **Meiste Sitzungen**. Dieser Browser merkt sich deine Wahl.
+
+Jede Karte zeigt:
+
+- ein Band in der Farbe des Projekts mit seinem Zeichen und Chips: **Gruppe** für eine Gruppe sowie **Von Claude Code** oder **Von Codex** für ein Projekt, das Hydor gefunden hat (siehe [Aus Claude Code und Codex erkannte Projekte](#projects-found-in-claude-code-and-codex));
+- seinen Namen, worum es geht (eine Gruppe sagt „Bringt … zusammen“ und nennt die Namen ihrer Projekte) und seinen Ordner;
+- was es enthält: seine Sitzungen, Dokumente, Skills und Dateien, und „Mit 2 Personen geteilt“, sobald du es teilst;
+- „In Bearbeitung: 2“, solange seine Sitzungen arbeiten, und einen Punkt, wenn seit deinem letzten Blick eine Sitzung abgeschlossen wurde;
+- wann zuletzt darin gearbeitet wurde, und kleine Balken für die Nachrichten der letzten vier Wochen.
+
+Zeige auf eine Karte (auf einem Touchscreen sind sie immer da): **Neue Sitzung** startet eine Sitzung im Projekt, und **Mehr** (⋯) enthält das Menü des Projekts: **Ordner unter „Dateien“ öffnen**, in der Desktop-App **Im Finder anzeigen**, **Im Datei-Explorer anzeigen** oder **Im Ordner anzeigen**, **Nur Projektsitzungen in der Seitenleiste**, **Mit anderen teilen** und **Projekt löschen** (siehe [Das Menü des Projekts](#the-projects-menu)). Ein Klick auf eine andere Stelle der Karte öffnet die Details des Projekts in einem Fenster über der Seite (siehe [Die Details eines Projekts öffnen](#open-a-projects-details)). Ziehe Dateien von deinem Computer auf eine Karte, um sie im Ordner des Projekts abzulegen.
+
+Unter den Karten listet **Ordner, in denen du arbeitest** die Ordner auf, in denen deine Sitzungen in letzter Zeit gearbeitet haben und die noch kein Projekt hat (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)). **Projekt erstellen** bei einem Ordner öffnet das Fenster **Neues Projekt** mit diesem Ordner; ✕ (**Kein Projekt: nicht mehr vorschlagen**) nimmt ihn für immer aus der Liste. Während einer Suche entfällt die Liste.
+
+Ohne Projekte erklärt die Seite, was ein Projekt ist, und bietet **Neues Projekt** an. Eine Suche ohne Treffer sagt das auch.
+
 ## Ein Projekt erstellen
 
-1. Klicke auf das **+** am Ende der Überschrift **Projekte** der Seitenleiste (es erscheint, wenn du über die Überschrift fährst, und ist auf einem Touchscreen immer da) und wähle **Neues Projekt …**. Auch die Filterschaltfläche der Seitenleiste (**Sitzungen filtern und gruppieren**) hat **Neues Projekt …**, ebenso das Ordnermenü der Startseite neben seiner Überschrift **Projekte** (siehe [Eine Sitzung in einem Projekt starten](#start-a-session-in-a-project)). Die Überschrift eines Ordners in der Seitenleiste hat **Zum Projekt machen** (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
+1. Klicke auf der Projekte-Seite auf **Neues Projekt** (siehe [Alle Projekte finden](#find-all-your-projects)). Oder klicke auf das **+** am Ende der Überschrift **Projekte** der Seitenleiste (es erscheint, wenn du über die Überschrift fährst, und ist auf einem Touchscreen immer da) und wähle **Neues Projekt …**. Auch die Filterschaltfläche der Seitenleiste (**Sitzungen filtern und gruppieren**) hat **Neues Projekt …**, ebenso das Ordnermenü der Startseite neben seiner Überschrift **Projekte** (siehe [Eine Sitzung in einem Projekt starten](#start-a-session-in-a-project)). Die Überschrift eines Ordners in der Seitenleiste hat **Zum Projekt machen**, ebenso jeder Ordner unter **Ordner, in denen du arbeitest** auf der Projekte-Seite (siehe [Ordner, in denen du arbeitest, noch ohne Projekt](#folders-you-work-in-not-in-a-project-yet)).
 2. Fülle das Fenster aus:
    - **Name**: wie du das Projekt nennst, etwa „Steuern 2026“, „Der Garten“ oder „Abschlussarbeit“. Bis zu 60 Zeichen. Es ist das einzige Feld, das du ausfüllen musst. Das Quadrat daneben ist das Zeichen des Projekts, in der Farbe, die es bekommt: Klicke darauf, um eine andere der acht Farben auszuwählen (Bernstein, Blau, Grün, Rosa, Violett, Türkis, Orange, Schiefergrau). Wenn du keine auswählst, bekommen Projekte die Farben der Reihe nach.
    - **Dateien ablegen**: Wähle eine der beiden Möglichkeiten.
@@ -49,7 +72,7 @@ Schließe es mit ✕, mit Esc oder mit einem Klick auf die abgedunkelte Seite au
 4. Lasse **Ein Agent dafür** aktiviert, um einen Projektagenten erstellen zu lassen; siehe [Agenten](#agents). Alternativ schaltest du es aus.
 5. Klicke **Projekt erstellen** oder drücke Enter im Namensfeld.
 
-Neue Ordner entstehen unter **Projekte** am Speicherort der Aufgabenordner. „Taxes 2026“ bekommt etwa `~/Hydor/Projects/taxes-2026`, sofern du den Ort nicht geändert hast; siehe [Aufgabenordner verschieben](/guide/agents#move-task-folders). Bei vergebenem Namen folgen `-2`, `-3` und so weiter. Aus der Seitenleiste heraus öffnen sich die Details des neuen Projekts in einem Fenster, von der Startseite aus wird es für die nächste Sitzung ausgewählt.
+Neue Ordner entstehen unter **Projekte** am Speicherort der Aufgabenordner. „Taxes 2026“ bekommt etwa `~/Hydor/Projects/taxes-2026`, sofern du den Ort nicht geändert hast; siehe [Aufgabenordner verschieben](/guide/agents#move-task-folders). Bei vergebenem Namen folgen `-2`, `-3` und so weiter. Aus der Seitenleiste oder der Projekte-Seite heraus öffnen sich die Details des neuen Projekts in einem Fenster, von der Startseite aus wird es für die nächste Sitzung ausgewählt.
 
 Zwei weitere Dinge stellst du danach im Tab **Einstellungen** des Projekts ein: den Agenten, als der seine Sitzungen beginnen, und die Projekte, die es zusammenbringt. Seine Notizen, sein Wiki und seine Dokumente findest du im Tab **Memory**, seine Skills im Tab **Skills** und weitere Ordner im Tab **Dateien** (siehe [Das Detailfenster eines Projekts](#a-projects-details-window)).
 
@@ -76,7 +99,7 @@ Welche Projekte so entstanden sind, erkennst du an den Zeichen der Programme nac
 
 Ein Ordner, in dem mindestens zwei deiner Sitzungen arbeiten und den noch kein Projekt hat, bekommt in der Seitenleiste unter **Projekte** eine eigene Gruppe mit dem Namen des Ordners. Fahre über ihre Überschrift und öffne ihr **⋯**, dort steht **Zum Projekt machen**: Das Fenster **Neues Projekt** öffnet sich mit ausgewähltem Ordner und ausgefülltem Namen. Dasselbe Menü hat **Umbenennen**, **Ursprünglichen Ordnernamen verwenden** (sobald du ihn umbenannt hast) und **In Dateien öffnen**.
 
-Wenn du selbst ein Projekt für einen Ordner erstellst (oder im Fenster **Neues Projekt**), erscheinen die Ordner, in denen deine Sitzungen in letzter Zeit, in den letzten 90 Tagen, gearbeitet oder Dateien geändert haben, während sie woanders arbeiteten, und die noch kein Projekt hat, unter **Kürzlich verwendet, noch in keinem Projekt**, sodass ein Tipp genügt, um einen auszuwählen (siehe [Ein Projekt erstellen](#make-a-project)). Häufig und kürzlich verwendete stehen oben. Unterordner eines Git-Projekts zählen zum gesamten Projekt.
+Wenn du selbst ein Projekt für einen Ordner erstellst (oder im Fenster **Neues Projekt**), erscheinen die Ordner, in denen deine Sitzungen in letzter Zeit, in den letzten 90 Tagen, gearbeitet oder Dateien geändert haben, während sie woanders arbeiteten, und die noch kein Projekt hat, unter **Kürzlich verwendet, noch in keinem Projekt**, sodass ein Tipp genügt, um einen auszuwählen (siehe [Ein Projekt erstellen](#make-a-project)). Die Projekte-Seite listet dieselben Ordner unter ihren Karten auf, als **Ordner, in denen du arbeitest**, jeweils mit **Projekt erstellen** (siehe [Alle Projekte finden](#find-all-your-projects)). Häufig und kürzlich verwendete stehen oben. Unterordner eines Git-Projekts zählen zum gesamten Projekt.
 
 Ordner, in denen du mit Claude Code und Codex arbeitest, werden von selbst zu Projekten, daher sind das vor allem Ordner, in denen du aus Hydor gearbeitet hast. Dein persönlicher Ordner, versteckte Ordner, temporäre Ordner und die Ordner, die die App für sich selbst anlegt (Aufgabenordner, Läufe von Apps, Worktrees), werden nie vorgeschlagen. Sobald ein Projekt einen Ordner hat, als eigenen oder als einen der Ordner, mit denen es arbeitet, verschwindet er aus ihnen. Damit Hydor aus einem Ordner nicht von selbst ein Projekt macht, bitte einen Agenten darum: Er führt eine Liste von Ordnern, die keine Projekte sind, und das Löschen eines Projekts nimmt seinen Ordner dort auf (siehe [Ein Projekt löschen](#delete-a-project)).
 
@@ -262,7 +285,7 @@ Eine Gruppe ist ein Projekt, das mehrere andere für übergreifende Arbeit bünd
 
 ### Eine Gruppe erstellen
 
-1. Klicke in der Seitenleiste auf das **+** am Ende der Überschrift **Projekte** und wähle **Neue Gruppe von Projekten …**. Du brauchst mindestens ein Projekt, das du aufnehmen kannst.
+1. Öffne auf der Projekte-Seite das ▾ neben **Neues Projekt** und wähle **Neue Gruppe von Projekten …** (es braucht zwei Projekte). Oder klicke in der Seitenleiste auf das **+** am Ende der Überschrift **Projekte** und wähle **Neue Gruppe von Projekten …**. Du brauchst mindestens ein Projekt, das du aufnehmen kannst.
 2. Gib unter **Neue Gruppe von Projekten** einen **Namen** ein, etwa „Arbeit“ oder „Alles zur Abschlussarbeit“.
 3. Tippe unter **Die Projekte, die es zusammenbringt** jedes Projekt an, das aufgenommen werden soll; tippe es noch einmal an, um es wieder herauszunehmen. Wähle mindestens eines aus.
 4. Fülle optional **Worum es geht** und die **Agentenrichtlinien** aus und wähle eine Farbe.
@@ -472,6 +495,8 @@ Wissenstools liefern nie unzugängliche Projektdokumente, auch nicht bei direkte
 - „Was liegt für meine Abschlussarbeit in den Dateien des Projekts? Ordne den Lesetracker diesem Projekt zu.“
 - „Welche meiner Arbeitsordner haben noch kein Projekt? Erstelle Projekte für die beiden häufigsten.“
 - „Welche Projekte wurden aus Claude Code oder Codex übernommen?“
+- „Öffne die Projekte-Seite und sortiere meine Projekte nach den meisten Sitzungen.“
+- „In welchem meiner Projekte gab es einen Monat lang keine Sitzung?“
 - „Erstelle für ~/code/scratch kein automatisches Projekt.“
 - „Kopiere ~/Downloads/contract.pdf ins Projekt Steuern 2026 und verknüpfe zusätzlich ~/Documents/Receipts.“
 - „Fasse Abschlussarbeit und Lesenotizen zur Gruppe Alles zur Abschlussarbeit zusammen.“

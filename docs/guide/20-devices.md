@@ -157,13 +157,24 @@ The app checks that the machine answers before it keeps it. If it doesn't, the d
 
 Once you have added a machine, a row with the current machine's name appears at the top of the sidebar, above **New session**. Click it to see every machine with its state and a check on the one shown; pick one to move to its pages. **Add or change machines** opens Settings → Machines.
 
-On another machine's pages the row is highlighted, so you know where you are, and a dot on it means sessions on the other machines wait for you. If the machine doesn't answer, a page says "… is not reachable" with **Try again**, a button back to your own machine, and **Settings → Machines**.
+On another machine's pages the row is highlighted, so you know where you are. The row also says what happened on the machines you are not looking at, your own too when you are on another machine's pages:
+
+- A number in an accent pill counts the sessions there that finished since you last looked at those machines. Point at it and it says "3 finished on other machines".
+- An orange dot means sessions there wait for you.
+
+"Since you last looked" works per machine. While a page shows a machine, nothing there counts. When you leave it, the sessions that finish there afterwards count, until you look there again: by opening one of them, or just by switching to that machine.
+
+In the menu each machine has a line such as "2 finished · 1 needs you · 3 working" (your own machine's too, while you are on another). Under it are the sessions that finished there, up to three, each with a check, or a cross when it failed, and the time. Click one to open that session on its machine. [Settings → Machines](/settings?s=machines) shows the same lines.
+
+While a machine updates, its line says "Updating · 45%", or the step it is at. A machine restarting into the new version says "Restarting…", with a pulsing orange dot, instead of "Not reachable", and comes back by itself. If a machine doesn't answer otherwise, a page says "… is not reachable" with **Try again**, a button back to your own machine, and **Settings → Machines**.
+
+When the sidebar with the row is hidden, the **Sessions** tile on the rail carries a small dot instead: in the accent colour when something finished on another machine, orange when something waits for you there.
 
 ### When a machine has an older Hydor
 
 The app you open shows another machine's pages in its own version, whatever Hydor that machine runs. A machine with an older Hydor can lack what its pages need, and some of them can stop working. So when you pick a machine whose Hydor is older than this app's, a page comes first: "… has an older Hydor". It says both versions, that its pages open here in this app's version, and that some can stop working with an older one. It has three buttons:
 
-- **Update …** (with the machine's name) updates that machine from here, as the **Update now** button of its version row in [Settings → App → General](/settings?s=general&find=Check%20now) does (see [Keep the app up to date](/guide/app#keep-the-app-up-to-date)): a copy installed from git, or the Docker image, gets the new version, builds it and restarts; a desktop app downloads the new version and restarts into it. It takes a few minutes, and agents working there carry on. The page shows each step ("Getting the new version", "Installing packages", "Building", "Restarting, this page reconnects by itself"; for a desktop app, how much of the new version has downloaded, with a bar) and opens that machine's pages by itself once it is back. A copy from git or Docker older than 0.78.0 can't update itself past Hydor's rewritten history ("Not possible to fast-forward, aborting."): the page then says so, with the command to run on that machine once (see [Update an older copy by hand](/guide/app#update-an-older-copy-by-hand)).
+- **Update …** (with the machine's name) updates that machine from here, as the **Update now** button of its version row in [Settings → App → General](/settings?s=general&find=Check%20now) does (see [Keep the app up to date](/guide/app#keep-the-app-up-to-date)): a copy installed from git, or the Docker image, gets the new version, builds it and restarts; a desktop app downloads the new version and restarts into it. It takes a few minutes, and agents working there carry on. The page shows each step ("Getting the new version", "Installing packages", "Building", "Restarting, this page reconnects by itself"), and for a copy from git, how far it has got: a percentage, a bar filling with water, and a line such as "Step 2 of 3 · about 2 min left" (for a desktop app, how much of the new version has downloaded, with a bar). A machine still running an older Hydor can't say how far it is, so the page estimates it from the step it is on and how long that has taken, and gives a time left only when it can; the machine row shows the same "Updating · 45%" and opens that machine's pages by itself once it is back. A copy from git or Docker older than 0.78.0 can't update itself past Hydor's rewritten history ("Not possible to fast-forward, aborting."): the page then says so, with the command to run on that machine once (see [Update an older copy by hand](/guide/app#update-an-older-copy-by-hand)).
 - **Open anyway** opens its pages as they are. This browser tab doesn't ask again for that version.
 - **Open** followed by your own machine's name goes back to your own machine.
 
@@ -175,7 +186,7 @@ If a page of another machine fails to draw, you see "This page stopped working" 
 
 - **Everything on a machine's pages is that machine's**: its sessions, folders and files, Git, terminals, agents' sign-ins, models and settings.
 - **Some things always come from the machine you opened the app on**: your password and sign-in, the list of machines, notifications, the themes you made, and the welcome tour and its tips.
-- **Notices from every machine reach you.** A notice from another machine names it, push notifications come through your own machine, and the [Inbox](/guide/inbox) lists what waits on you on every machine. The count on the rail's **Inbox** includes them.
+- **Notices from every machine reach you.** A notice from another machine names it, push notifications come through your own machine, and the [Inbox](/guide/inbox) lists what waits on you on every machine. The count on the rail's **Inbox** includes them. The machine row in the sidebar also tells you which of the other machines have sessions that finished since you last looked there (see [Switch between machines](#switch-between-machines)).
 - **Read-only links** work for sessions on other machines too (see [Share a session with a read-only link](/guide/devices#share-a-session-with-a-read-only-link)).
 - **Not on other machines**: Preview, which opens dev servers on the machine you opened only, and Connect other agents, since each machine's own server is reached at its own address.
 - Your browser remembers the Files page's folder, the open files and the terminal you last used for each machine on its own.
@@ -263,6 +274,7 @@ How pull requests are opened and followed: [Open a pull request from a session](
 - "Turn off every share link on this session."
 - "Which of my machines are offline? Try reconnecting them."
 - "Rename the machine called gpu-box to Studio GPU."
+- "Which sessions finished on my other machines while I was away?"
 - "List the tokens other agents use to reach this app, and revoke the one named old laptop."
 - "Add my GitHub account using the GitHub CLI's sign-in."
 - "Send my chats in Telegram, Discord and Slack the notices of every session, not only the ones they started."

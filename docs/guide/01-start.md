@@ -18,12 +18,13 @@ On a computer you can make the column wider or narrower, from 180 to 560 pixels:
 
 The rail is a column of icons; point at one, or move to it with Tab, and a tooltip beside it gives its name and, where it has one, its shortcut. The icon for the page you are on is lit, with a bar of the accent colour at the edge of the screen beside it. From the top:
 
-- **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none.
+- **Sessions**: shows your sessions in the sidebar. While you are on the start page or in a session, it hides or shows the sidebar (the same as Ctrl+B). From any other page it shows the sidebar and takes you back to the session you had open last in this window, or to the start page when there was none. While the sidebar is hidden, a small dot on this tile says something happened on another machine (see [Switch between machines](/guide/devices#switch-between-machines)).
 
-Then the sections of the app (the desktop app has three; the web app and a phone have two, with no **Browser**):
+Then the sections of the app (the desktop app has four; the web app and a phone have three, with no **Browser**):
 
 - **Browser**: a browser of your own, only in the desktop app, with tabs, private tabs, a smart address bar, page translation, reader view, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
+- **Projects**: every project as a card, with what it holds and when it was last at work; a click on a card opens the project's details. See [Find all your projects](/guide/projects#find-all-your-projects).
 - **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
 
 Right under them, always in this place:
@@ -38,16 +39,16 @@ Then, after some space, the tools:
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).
 - **Help**: opens this guide, where you can also ask an agent about the app. The welcome tour starts from there too.
 
-The sections come in the order Browser, Agents, Apps, then Inbox and Search, and the tools below them in the order Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools at the bottom); Inbox and Search stay right under the sections. The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
+The sections come in the order Browser, Projects, Agents, Apps, then Inbox and Search, and the tools below them in the order Usage, System, Settings, Help: that is their usual order. To change it, drag a tile to another place among its own group (the sections, or the tools at the bottom); Inbox and Search stay right under the sections. A tile that a newer version brings takes its usual place in the order you set (Projects right before Agents, say), not the end of the list. The tiles keep the order you set on every device, whichever machine you look at. Once you have moved them, right-click a tile and choose **Back to the usual order** to put them all back. In a window too short for every tile, the rail scrolls.
 
-The sidebar with your sessions shows only on the start page, in a session and in its review. The **Apps**, **Agents**, **Help** and **Settings** have a column of the same kind, with the logo, their own list (the places of the Apps page and the Agents page, the guide's topics, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own, and the other pages (Inbox, Usage, System…) use the whole width. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. A column that holds more than fits shows its scroll bar, and its foot fades while there is more below. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
+The sidebar with your sessions shows only on the start page, in a session and in its review. The **Apps**, **Agents**, **Help** and **Settings** have a column of the same kind, with the logo, their own list (the places of the Apps page and the Agents page, the guide's topics, Settings' sections) and **Hide sidebar**; the **Browser** page shows its tabs in a column of its own, and the other pages (Projects, Inbox, Usage, System…) use the whole width. **Ctrl+B** hides or shows the column of the page you are on, and every column has the same width. A column that holds more than fits shows its scroll bar, and its foot fades while there is more below. While the page reconnects to the app, a crossed-out Wi-Fi icon shows beside the logo at the top of the column, or at the top of the rail when no column is showing (it is hidden, or the page has none).
 
 ### The sidebar
 
 The sidebar is the column beside the rail. It holds:
 
 - The **HYDΩR** logo, with the **Filter and group sessions** button and **Hide sidebar** (Ctrl+B) at the end. While the sidebar is hidden, the button at the top left of the page shows it again, and the rail stays. On a phone the drawer has the logo, the inbox, the filter button and **Close menu** here instead.
-- A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and shows a dot when sessions on another machine need you. See [Phones, other machines and sharing](/guide/devices).
+- A machine switcher, only once you have added other machines in [Settings → Machines](/settings?s=machines). It names the machine you are looking at, and says what happened on the others: a number on an accent pill for sessions there that finished since you last looked, and an orange dot when sessions there need you. See [Phones, other machines and sharing](/guide/devices).
 - **New session** opens the [start page](#the-start-page).
 - To find a session, use the search box: **Search** on the rail (on a phone, **Search** among the tools at the bottom of the drawer), or Ctrl+K (⌘K on a Mac). It finds sessions by their title, their folder, the agent they were started as (type Tutor to find the sessions started as Tutor; General is left out) and the words said in them, archived sessions too, marked **Archived** and listed after the others (see [Search everything with Ctrl+K](#search-everything-with-ctrlk)).
 - The filter button in the header (**Filter and group sessions**) narrows the list. Its menu has sections: **Agent** (**All agents**, then the agents your sessions were started as, the most used first, up to eight, each with how many sessions it has; it shows once some session was started as an agent), **Runs on** (a switch with **Any**, **Claude Code** and **Codex**) and, once you have projects, **Project** (**Every project**, then up to eight of your projects). **New project…** makes a project. The filters work together, such as one agent's sessions in one project. The button takes the accent colour while a filter is on, and a chip for each filter that is on shows under **New session**, with its icon and name: its × shows all sessions again for that filter. A filtered list with nothing in it says "No sessions match the filter." The last line, **Group by folder or project**, turns the groups for your projects and folders on or off (see [The session list](#the-session-list)). See [Find an agent's sessions](/guide/agents#find-an-agents-sessions) and [Projects and knowledge](/guide/projects).
@@ -223,6 +224,7 @@ On an iPhone or iPad, notifications work only in the app added to the home scree
 ### The sidebar is a drawer
 
 - The **Menu** button at the top left of each page opens it. It fills the screen.
+- The tools, **Projects** among them, are in a grid at the bottom of the drawer.
 - Tapping a session or a tool takes you there and closes the drawer. **Close menu** (the ×) closes it too.
 - Hold a session a moment to pick it up, then drag it (to reorder Active or Pinned sessions, or to pin one).
 - Hold a tool at the bottom a moment to pick it up, then drag it to another place among them.
@@ -299,6 +301,7 @@ In a narrow window or on a phone, **Ask an agent** at the top right opens the sa
 - "Make my search box look only in my sessions and pages."
 - "Can the search box find the page about Lisbon hotels I visited last month?" (in the desktop app: your history, bookmarks and downloads, by their words or what they are about; agents can't look at them)
 - "Put Settings first among the tools at the bottom of my rail."
+- "Put Projects first among the sections of my rail."
 - "Put my Thesis project first among the groups in my sidebar."
 - "Which of my projects did Hydor make from my Claude Code and Codex sessions?"
 - "What is in my inbox?"

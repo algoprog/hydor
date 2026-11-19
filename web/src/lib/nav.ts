@@ -37,7 +37,7 @@ const PROJECT_TABS = ['overview', 'files', 'memory', 'skills', 'agents', 'settin
 
 /**
  * What an address of a project's page (`/projects/<id>[/<tab>][?part=…&share=1]`, from before the details were a window)
- * means: the project and where its window opens, or no id for the list (`/projects`). Null for any other address. The
+ * means: the project and where its window opens, or no id for the Projects page (`/projects`). Null for any other address. The
  * Library tab is Files now, and the old Knowledge and LLM Wiki tabs are parts of Memory.
  */
 export function projectAddress(path: string): { id?: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string } | null {
@@ -61,18 +61,16 @@ export function projectAddress(path: string): { id?: string; tab: ProjectTab; pa
   return { id, tab, part, share: q.get('share') === '1' || undefined, dir: q.get('dir') || undefined };
 }
 
-/** Moves to a page of the machine this page shows. A project's address opens its details window over the page instead (the page stays). */
+/**
+ * Moves to a page of the machine this page shows. A project's address (`/projects/<id>…`) opens its details window over
+ * the page instead (the page stays); `/projects` alone is the Projects page.
+ */
 export function go(path: string, replace = false) {
   const project = projectAddress(path);
-  if (project) {
-    const old = /^\/(projects|spaces|library|pages)(\/|$)/.test(location.pathname.slice(machineBase.length));
-    if (!project.id) {
-      // The list of projects is gone: the sidebar has them.
-      useUI.getState().set({ sideOpen: true });
-      return go('/', replace);
-    }
-    // Typed, reloaded or followed from elsewhere, an old address of a page gives way to the start page (as it was, the window opens over it).
-    if (old) navigate(`${machineBase}/`, { replace: true });
+  if (project?.id) {
+    const here = location.pathname.slice(machineBase.length);
+    // Typed, reloaded or followed from elsewhere, an old address of a page (a project's, the Library's…) gives way to the Projects page (as it was, the window opens over it).
+    if (/^\/(projects|spaces|library|pages)(\/|$)/.test(here) && !/^\/projects\/?$/.test(here)) navigate(`${machineBase}/projects`, { replace: true });
     return openProject(project.id, project.tab, { part: project.part, share: project.share, dir: project.dir });
   }
   // Going anywhere else from the project's window (New session, a session, a document from its Files) leaves it, even

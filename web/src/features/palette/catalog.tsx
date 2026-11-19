@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, Clock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, Boxes, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, Clock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -88,6 +88,7 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:search-files': <FileSearch size={15} />,
   'go:git': <GitBranch size={15} />,
   'go:terminal': <SquareTerminal size={15} />,
+  'go:spaces': <Boxes size={15} />,
   'go:apps': <LayoutGrid size={15} />,
   'go:new-app': <LayoutGrid size={15} />,
   'go:apps-pinned': <Pin size={15} />,

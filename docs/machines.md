@@ -5,7 +5,11 @@ Using agents on other machines from one Hydor. [Back to the README](../README.md
 Run Hydor on each machine where agents should work (a desktop, a GPU box, a cloud VM), then use them
 all from one of them: Settings → Machines → Add a machine. Each machine keeps its own sessions, files,
 terminals and sign-ins. The sidebar switches between them, and notices from every machine reach you on the
-one you opened.
+one you opened. The machine row at the top of the sidebar tells you what happened on the others: a number for
+sessions that finished there since you last looked, and a dot for sessions waiting on you. Its menu lists each
+machine's recent finished sessions (one click opens one on its machine), and says when a machine is updating
+("Updating · 45%") or restarting into a new version ("Restarting…"). With the sidebar hidden, the rail's Sessions
+tile carries a dot for the same.
 
 1. On the other machine, make an access token: in its own Settings → Machines, or run
    `node dist/server/cli.js access-token "my laptop"` in its Hydor folder.
@@ -21,6 +25,8 @@ it when that machine no longer needs it. Dev-server previews work on the machine
 
 Keep the machines on the same Hydor version. The app you open shows another machine's pages in its own version, so a
 machine with an older Hydor can lack what some of its pages need. Opening one offers to update it from there (as its own
-Settings → General Update now does, with agents there carrying on), or to open it anyway. A copy from git or Docker
+Settings → General Update now does, with agents there carrying on), or to open it anyway. The page shows how far a
+copy from git has got (a percentage, a bar, the step and about how long is left); an older Hydor there can't say, so
+the page estimates it from the step it is on. A copy from git or Docker
 older than 0.78.0 can't update itself past Hydor's rewritten history ("Not possible to fast-forward, aborting."): the
 page then gives the command to run on that machine once ([install.md](install.md) has the other ways).

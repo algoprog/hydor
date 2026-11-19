@@ -123,7 +123,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   spaces: {
     title: 'Projects',
-    body: 'A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its name in the sidebar to see them.',
+    body: 'A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click one here to see them, or its name in the sidebar.',
   },
   knowledge: {
     title: 'Shared knowledge',

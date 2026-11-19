@@ -327,7 +327,8 @@ notification area, the tray) installs it whenever you like. Running agents carry
 A copy installed from git checks for a newer version once a day and installs it by itself after 5 hours without a
 message from you, at most once a day. Agents can be at work meanwhile: they carry on through the
 restart. Settings → General shows what is out, has **Update now** for updating at once, and a switch to
-turn the automatic updates off.
+turn the automatic updates off. While it updates, the version row shows the step it is on with a percentage, a bar
+and about how long is left (a note in the corner of every other page too, for one started with Update now).
 
 This works for the installer's service and for Docker, which both start the server again after it
 exits. A server started by hand (`npm start`) only checks; update it with `git pull && npm ci && npm run

@@ -1,23 +1,49 @@
 // The machine the app shows, and a switch to the others (Settings → Machines). Each machine's pages
 // are /m/<id>/…; moving to another machine loads its pages afresh.
 import { useRef, useState } from 'react';
-import { Check, ChevronsUpDown, Server, Settings2 } from 'lucide-react';
-import type { MachineView } from '@shared/types';
+import { Check, ChevronsUpDown, Server, Settings2, X } from 'lucide-react';
+import type { MachineNews, MachineStatus, MachineView } from '@shared/types';
+import { tr } from '../../i18n/runtime';
+import { timeAgo } from '../../lib/format';
 import { machineId, machinePath } from '../../lib/machine';
-import { useMachines } from '../../lib/machines';
-import { go } from '../../lib/nav';
+import { elsewhere, newsOfMachine, useMachines } from '../../lib/machines';
+import { go, sessionPath } from '../../lib/nav';
+import { UPDATE_PHASE } from '../../lib/updates';
 import { Button, cx, Popover } from '../../components/ui';
 
 export const MACHINE_DOT: Record<MachineView['status']['state'], string> = { online: 'bg-ok', connecting: 'bg-fg-3 animate-pulse', offline: 'bg-err' };
 
-/** A machine's state in a few words: whether it answers, and what needs you there. */
-export function machineLine(m: MachineView): string {
-  const s = m.status;
-  if (s.state === 'connecting') return 'Connecting…';
-  if (s.state === 'offline') return 'Not reachable';
-  const parts = [s.waiting ? `${s.waiting} need${s.waiting === 1 ? 's' : ''} you` : '', s.working ? `${s.working} working` : ''].filter(Boolean);
-  return parts.join(' · ') || 'Online';
+/** The dot of a machine's state: one restarting into an update is not down. */
+export const machineDot = (s: MachineStatus) => (s.state === 'offline' && s.restarting ? 'bg-warn animate-pulse' : MACHINE_DOT[s.state]);
+
+/** What the sessions of a machine come to, in a few words: what finished since you looked, what needs you, what works. */
+// One and many are phrases of their own ("1 finished", "{0} finished"), so that each language can say both its way.
+function countsLine(s: Pick<MachineStatus, 'waiting' | 'working' | 'finished'>): string[] {
+  const finished = s.finished ?? 0;
+  const waiting = s.waiting;
+  return [
+    finished ? (finished === 1 ? tr('1 finished') : tr(`${finished} finished`)) : '',
+    waiting ? (waiting === 1 ? tr('1 needs you') : tr(`${waiting} need you`)) : '',
+    s.working ? tr(`${s.working} working`) : '',
+  ].filter(Boolean);
 }
+
+/** What a machine's update is at: how far it is, or the step. */
+function updateLine(u: NonNullable<MachineStatus['update']>): string {
+  if (u.share !== undefined) return tr(`Updating · ${Math.round(u.share * 100)}%`);
+  if (u.phase === 'restart') return tr('Updating · restarting');
+  return (UPDATE_PHASE as Record<string, string | undefined>)[u.phase] ?? tr('Updating');
+}
+
+/** A machine's state in a few words: whether it answers, what it is doing about an update, and what needs you there. */
+export function statusLine(s: MachineStatus): string {
+  if (s.state === 'connecting') return 'Connecting…';
+  if (s.state === 'offline') return s.restarting ? tr('Restarting…') : 'Not reachable';
+  if (s.update) return updateLine(s.update);
+  return countsLine(s).join(' · ') || 'Online';
+}
+
+export const machineLine = (m: MachineView): string => statusLine(m.status);
 
 /** Moves to a machine's pages (null: this server's own). */
 function openMachine(id: string | null) {
@@ -34,8 +60,9 @@ export function MachineSwitcher({ onGo }: { onGo?: () => void }) {
   if (!machineId && (!loaded || !list.length)) return null;
   const current = list.find((m) => m.id === machineId);
   const name = machineId ? (current?.name ?? machineId) : (self?.host ?? 'This machine');
-  // Sessions needing you on the other machines: a dot here, so they are not missed from this one.
-  const elsewhere = list.filter((m) => m.id !== machineId).reduce((n, m) => n + m.status.waiting, 0);
+  // What finished or waits on the other machines (this server's own too, on another machine's pages): said here, so it is not missed from this one.
+  const { finished, waiting } = elsewhere(self, list);
+  const selfLine = machineId && self?.status ? countsLine(self.status).join(' · ') : '';
   const pick = (id: string | null) => {
     setOpen(false);
     onGo?.();
@@ -55,13 +82,22 @@ export function MachineSwitcher({ onGo }: { onGo?: () => void }) {
       >
         <Server size={14} className={machineId ? 'text-accent' : 'text-fg-3'} />
         <span className="min-w-0 flex-1 truncate text-left font-medium">{name}</span>
-        {elsewhere > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-warn" title={`${elsewhere} waiting on other machines`} />}
+        {finished > 0 && (
+          <span title={finished === 1 ? tr('1 finished on another machine') : tr(`${finished} finished on other machines`)} className="tnum min-w-4 shrink-0 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-semibold text-accent-fg">
+            {finished > 99 ? '99+' : finished}
+          </span>
+        )}
+        {waiting > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-warn" title={waiting === 1 ? tr('1 waiting on another machine') : tr(`${waiting} waiting on other machines`)} />}
         <ChevronsUpDown size={13} className="shrink-0 text-fg-3" />
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={290}>
-        <Row name={self?.host ?? 'This machine'} hint="This server" dot="bg-ok" current={!machineId} onClick={() => pick(null)} />
+        <Row name={self?.host ?? 'This machine'} hint={selfLine || 'This server'} warn={!!machineId && (self?.status?.waiting ?? 0) > 0} dot="bg-ok" current={!machineId} onClick={() => pick(null)} />
+        {machineId && <News items={newsOfMachine(self?.status)} id={null} />}
         {list.map((m) => (
-          <Row key={m.id} name={m.name} hint={machineLine(m)} warn={m.status.waiting > 0} dot={MACHINE_DOT[m.status.state]} current={m.id === machineId} onClick={() => pick(m.id)} />
+          <div key={m.id}>
+            <Row name={m.name} hint={machineLine(m)} warn={m.status.waiting > 0 && !m.status.update} dot={machineDot(m.status)} current={m.id === machineId} onClick={() => pick(m.id)} />
+            {m.id !== machineId && <News items={newsOfMachine(m.status)} id={m.id} />}
+          </div>
         ))}
         <div className="my-1 border-t border-line" />
         <button
@@ -90,6 +126,28 @@ function Row({ name, hint, dot, current, warn, onClick }: { name: string; hint: 
       </span>
       {current && <Check size={14} className="shrink-0 text-fg" strokeWidth={2.5} />}
     </button>
+  );
+}
+
+/** The sessions that finished on a machine since you looked there (up to 3), each one click from opening on that machine. */
+function News({ items, id }: { items: MachineNews[]; id: string | null }) {
+  if (!items.length) return null;
+  return (
+    <div className="mb-1 ml-[26px] flex flex-col">
+      {items.slice(0, 3).map((n) => (
+        <button
+          key={n.key}
+          onClick={() => (location.href = machinePath(id, sessionPath(n.key)))}
+          className="flex h-6.5 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg"
+        >
+          {n.failed ? <X size={12} className="shrink-0 text-err" strokeWidth={2.5} /> : <Check size={12} className="shrink-0 text-ok" strokeWidth={2.5} />}
+          <span translate="no" className="min-w-0 flex-1 truncate">
+            {n.title}
+          </span>
+          <span className="shrink-0 text-[11px] text-fg-3">{timeAgo(n.at)}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

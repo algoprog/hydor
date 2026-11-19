@@ -590,8 +590,30 @@ export interface MachineStatus {
   /** Sessions there that need you, and that are working. */
   waiting: number;
   working: number;
+  /**
+   * Sessions there that finished (or failed) since you last looked at that machine, and the newest of them (at most 5).
+   * Missing from an older server.
+   */
+  finished?: number;
+  news?: MachineNews[];
   since?: number;
+  /** An update of it is running (the step, and how far it is, 0 to 1, when it says). */
+  update?: { phase: string; share?: number };
+  /** It went away while it was restarting into an update: it is expected back within a couple of minutes. */
+  restarting?: boolean;
 }
+
+/** One session that finished on a machine since you last looked at it. */
+export interface MachineNews {
+  key: string;
+  title: string;
+  /** When it finished. */
+  at: number;
+  failed?: boolean;
+}
+
+/** What a machine's sessions come to, for the machine switcher (a machine's own status, and this server's for pages of another machine). */
+export type MachineCounts = Pick<MachineStatus, 'waiting' | 'working' | 'finished' | 'news'>;
 
 export interface SessionPrefs {
   model?: string;
@@ -1453,8 +1475,24 @@ export interface UpdateState {
    * download: the Mac app getting and checking a new version; restart: installing it (the app closes and opens again).
    * The desktop apps also say which version (`to`) and, while downloading, how many bytes have come of how many (`done`
    * reaches `total`, then it is checked and, on a Mac, unpacked).
+   * A copy from git also says how far it has got (shared/update-progress.ts), as of its latest word: `share` of the whole
+   * update (0 to 1, never going back), the `step` it is on (1-based) of `steps`, about how long is `left` (ms; absent
+   * while it is `slow`: a step with nothing to measure it by has taken over 1.5 times as long as last time). A copy
+   * from before this leaves them out, and the pages estimate them from the phase and `since`.
    */
-  running?: { phase: 'pull' | 'download' | 'install' | 'build' | 'restart'; since: number; auto: boolean; to?: string; done?: number; total?: number };
+  running?: {
+    phase: 'pull' | 'download' | 'install' | 'build' | 'restart';
+    since: number;
+    auto: boolean;
+    to?: string;
+    done?: number;
+    total?: number;
+    share?: number;
+    step?: number;
+    steps?: number;
+    left?: number;
+    slow?: boolean;
+  };
   /** The Mac app: a new version downloaded and checked, waiting to be installed. */
   ready?: UpdateReady;
   last?: UpdateResult;

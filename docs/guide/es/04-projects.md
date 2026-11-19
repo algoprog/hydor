@@ -1,6 +1,6 @@
 # Proyectos y conocimiento
 
-Un proyecto mantiene reunido un trabajo: sus sesiones, una carpeta para sus archivos (y otras carpetas tuyas con las que trabaja), lo que los agentes recuerdan sobre él (notas, una wiki y documentos propios), las pautas que sigue cada agente en él, habilidades propias, el agente con el que empiezan sus sesiones y agentes propios. El Conocimiento compartido guarda los documentos y las carpetas que añades una sola vez para que todas las sesiones puedan buscar en ellos y citar el archivo y la página que leyeron. Este tema explica cómo abrir los detalles de un proyecto, cómo crear y usar proyectos y grupos de proyectos, cómo dar a un proyecto habilidades propias, cómo compartir un proyecto con otras personas, y cómo añadir, buscar y gestionar los documentos en los que buscan los agentes.
+Un proyecto mantiene reunido un trabajo: sus sesiones, una carpeta para sus archivos (y otras carpetas tuyas con las que trabaja), lo que los agentes recuerdan sobre él (notas, una wiki y documentos propios), las pautas que sigue cada agente en él, habilidades propias, el agente con el que empiezan sus sesiones y agentes propios. El Conocimiento compartido guarda los documentos y las carpetas que añades una sola vez para que todas las sesiones puedan buscar en ellos y citar el archivo y la página que leyeron. Este tema explica la página Proyectos, cómo abrir los detalles de un proyecto, cómo crear y usar proyectos y grupos de proyectos, cómo dar a un proyecto habilidades propias, cómo compartir un proyecto con otras personas, y cómo añadir, buscar y gestionar los documentos en los que buscan los agentes.
 
 ![Los detalles de un proyecto en una ventana sobre la página: sus sesiones, sus archivos más recientes y lo que recibe cada sesión, bajo sus pestañas](images/projects.webp)
 
@@ -21,10 +21,11 @@ Un proyecto también puede reunir otros proyectos. Eso es un **grupo**: consulta
 
 ## Abrir los detalles de un proyecto
 
-Un proyecto no tiene una página propia: sus detalles se abren en una ventana sobre la página en la que estás, que queda detrás, atenuada. Hay varias formas de llegar:
+Los detalles de un proyecto se abren en una ventana sobre la página en la que estás, que queda detrás, atenuada. Hay varias formas de llegar:
 
+- **Desde la página Proyectos**: haz clic en la tarjeta de un proyecto (consulta [Encontrar todos tus proyectos](#find-all-your-projects)).
 - **Desde la barra lateral**: en la lista de sesiones, haz clic en el nombre del proyecto en su encabezado (en un teléfono, abre primero la barra lateral, que es un panel deslizante, y toca el nombre; el panel se cierra y los detalles ocupan la pantalla). Su menú ⋯ también tiene **Detalles del proyecto**, como primer elemento. La flecha pequeña junto al nombre pliega o despliega las sesiones del proyecto.
-- **Desde el cuadro de búsqueda**: escribe el nombre del proyecto en el cuadro de búsqueda (Ctrl+K, o ⌘K en Mac) y selecciónalo. Un proyecto sin sesiones todavía no tiene encabezado en la barra lateral, así que este es el camino para llegar a él (un proyecto que acabas de crear abre su ventana por sí solo).
+- **Desde el cuadro de búsqueda**: escribe el nombre del proyecto en el cuadro de búsqueda (Ctrl+K, o ⌘K en Mac) y selecciónalo. Un proyecto sin sesiones todavía no tiene encabezado en la barra lateral, así que este y la página Proyectos son los caminos para llegar a él (un proyecto que acabas de crear abre su ventana por sí solo).
 - **Desde un enlace**: un enlace a un proyecto en una notificación o en la respuesta de un agente también abre la ventana sobre la página en la que estás.
 
 La ventana muestra lo que contiene un proyecto:
@@ -34,9 +35,31 @@ La ventana muestra lo que contiene un proyecto:
 
 Ciérrala con ✕, con Esc o haciendo clic en la página atenuada fuera de ella. Ir a otra página también la cierra: por ejemplo, abrir un documento desde la pestaña **Archivos** o seguir un enlace. En un teléfono la ventana ocupa toda la pantalla. Esc cierra primero un menú o un cuadro de diálogo sobre la ventana, y después la ventana.
 
+## Encontrar todos tus proyectos
+
+**Proyectos** en la barra de iconos (justo antes de **Agentes**; en un teléfono, en la cuadrícula de herramientas del panel de la barra lateral) abre la página Proyectos, o ve a [/projects](/projects). Muestra cada proyecto como una tarjeta, en todo el ancho de la página, sin columna junto a la barra de iconos. El título indica cuántos hay.
+
+- **Nuevo proyecto** crea uno (consulta [Crear un proyecto](#make-a-project)). Su ▾ tiene **Nuevo proyecto** y **Nuevo grupo de proyectos…**, que necesita dos proyectos que reunir (consulta [Crear un grupo](#make-a-group)).
+- **Buscar un proyecto** filtra las tarjetas mientras escribes, por nombre, descripción y carpeta.
+- El botón de al lado las ordena: **Actividad reciente** (primero el proyecto que trabajó más recientemente, el orden habitual), **Nombre** o **Más sesiones**. Este navegador recuerda tu elección.
+
+Cada tarjeta muestra:
+
+- una banda del color del proyecto con su marca, y chips: **Grupo** para un grupo, y **De Claude Code** o **De Codex** para un proyecto que Hydor encontró (consulta [Proyectos encontrados en Claude Code y Codex](#projects-found-in-claude-code-and-codex));
+- su nombre, de qué trata (un grupo dice “Reúne” y los nombres de sus proyectos) y su carpeta;
+- lo que contiene: sus sesiones, documentos, habilidades y archivos guardados, y “Compartido con 2 personas” una vez que lo compartes;
+- “2 trabajando” mientras sus sesiones están en marcha, y un punto cuando una sesión terminó desde la última vez que miraste;
+- cuándo trabajó por última vez, y pequeñas barras con los mensajes de sus últimas cuatro semanas.
+
+Apunta a una tarjeta (en una pantalla táctil siempre están) y **Nueva sesión** empieza una sesión en el proyecto, y **Más** (⋯) tiene el menú del proyecto: **Abrir su carpeta en Archivos**, en la app de escritorio **Mostrar en Finder**, **Mostrar en el Explorador de archivos** o **Mostrar en la carpeta**, **Solo sus sesiones en la barra lateral**, **Compartir con otras personas** y **Eliminar el proyecto** (consulta [El menú del proyecto](#the-projects-menu)). Haz clic en cualquier otra parte de una tarjeta para abrir los detalles del proyecto en una ventana sobre la página (consulta [Abrir los detalles de un proyecto](#open-a-projects-details)). Suelta archivos de tu computadora sobre una tarjeta para ponerlos en la carpeta del proyecto.
+
+Bajo las tarjetas, **Carpetas en las que trabajas** lista las carpetas en las que tus sesiones trabajaron últimamente y que aún no tiene ningún proyecto (consulta [Carpetas en las que trabajas, aún sin proyecto](#folders-you-work-in-not-in-a-project-yet)). **Crear un proyecto** en una abre la ventana **Nuevo proyecto** con esa carpeta elegida; ✕ (**No es un proyecto: dejar de sugerirlo**) la quita de la lista para siempre. La lista se omite mientras buscas.
+
+Sin proyectos todavía, la página explica qué es un proyecto y ofrece **Nuevo proyecto**. Una búsqueda sin coincidencias lo dice.
+
 ## Crear un proyecto
 
-1. Haz clic en el **+** al final del encabezado **Proyectos** de la barra lateral (aparece cuando apuntas al encabezado, y siempre está visible en una pantalla táctil) y elige **Nuevo proyecto…**. El botón de filtro de la barra lateral (**Filtrar y agrupar sesiones**) también tiene **Nuevo proyecto…**, y también lo tiene el menú de carpetas de la página de inicio, junto a su encabezado **Proyectos** (consulta [Empezar una sesión en un proyecto](#start-a-session-in-a-project)). El encabezado de una carpeta en la barra lateral tiene **Convertir en proyecto** (consulta [Carpetas en las que trabajas, aún sin proyecto](#folders-you-work-in-not-in-a-project-yet)).
+1. En la página Proyectos, haz clic en **Nuevo proyecto** (consulta [Encontrar todos tus proyectos](#find-all-your-projects)). O haz clic en el **+** al final del encabezado **Proyectos** de la barra lateral (aparece cuando apuntas al encabezado, y siempre está visible en una pantalla táctil) y elige **Nuevo proyecto…**. El botón de filtro de la barra lateral (**Filtrar y agrupar sesiones**) también tiene **Nuevo proyecto…**, y también lo tiene el menú de carpetas de la página de inicio, junto a su encabezado **Proyectos** (consulta [Empezar una sesión en un proyecto](#start-a-session-in-a-project)). El encabezado de una carpeta en la barra lateral tiene **Convertir en proyecto**, y también cada carpeta bajo **Carpetas en las que trabajas** en la página Proyectos (consulta [Carpetas en las que trabajas, aún sin proyecto](#folders-you-work-in-not-in-a-project-yet)).
 2. Rellena la ventana:
    - **Nombre**: cómo llamas al proyecto, como “Impuestos 2026”, “El jardín” o “Tesis”. Hasta 60 caracteres. Es el único campo obligatorio. El cuadrado junto a él es la marca del proyecto, en el color que tendrá: haz clic para elegir otro de los ocho colores (ámbar, azul, verde, rosa, violeta, turquesa, naranja, pizarra). Si no eliges ninguno, los proyectos toman los colores por turnos.
    - **Dónde van sus archivos**: elige una de dos opciones.
@@ -49,7 +72,7 @@ Ciérrala con ✕, con Esc o haciendo clic en la página atenuada fuera de ella.
 4. Deja activado **Un agente para él** para que se cree un agente para el proyecto (consulta [Agentes](#agents)), o desactívalo.
 5. Haz clic en **Crear el proyecto**, o pulsa Intro en el campo del nombre.
 
-Una carpeta nueva va dentro de una carpeta **Projects** donde van las carpetas de tareas: “Impuestos 2026” obtiene `~/Hydor/Projects/taxes-2026`, a menos que hayas movido las carpetas de tareas a otro sitio (consulta [Mover las carpetas de tareas](/guide/agents#move-task-folders)). Si ese nombre ya existe, añade `-2`, `-3` y así sucesivamente. Si lo creas desde la barra lateral, los detalles del nuevo proyecto se abren en una ventana. Si lo creas desde la página de inicio, el nuevo proyecto queda elegido para la sesión que vas a empezar.
+Una carpeta nueva va dentro de una carpeta **Projects** donde van las carpetas de tareas: “Impuestos 2026” obtiene `~/Hydor/Projects/taxes-2026`, a menos que hayas movido las carpetas de tareas a otro sitio (consulta [Mover las carpetas de tareas](/guide/agents#move-task-folders)). Si ese nombre ya existe, añade `-2`, `-3` y así sucesivamente. Si lo creas desde la barra lateral o desde la página Proyectos, los detalles del nuevo proyecto se abren en una ventana. Si lo creas desde la página de inicio, el nuevo proyecto queda elegido para la sesión que vas a empezar.
 
 Dos cosas más se configuran después en la pestaña **Configuración** del proyecto: el agente con el que empiezan sus sesiones y los proyectos que reúne. Sus notas, su wiki y sus documentos están en la pestaña **Memoria**, sus habilidades en la pestaña **Habilidades** y más carpetas en la pestaña **Archivos** (consulta [La ventana de detalles de un proyecto](#a-projects-details-window)).
 
@@ -76,7 +99,7 @@ Para ver qué proyectos llegaron así, busca las marcas de programa después del
 
 Una carpeta en la que trabajan dos o más de tus sesiones, y que ningún proyecto tiene aún, tiene un grupo propio en la barra lateral, bajo **Proyectos**, con el nombre de su carpeta. Apunta a su encabezado y abre su **⋯** para encontrar **Convertir en proyecto**: se abre la ventana **Nuevo proyecto** con esa carpeta elegida y su nombre rellenado. El mismo menú tiene **Cambiar nombre**, **Usar el nombre de la carpeta** (una vez que le hayas cambiado el nombre) y **Abrir en Archivos**.
 
-Cuando creas un proyecto para una carpeta tú mismo (o desde la ventana **Nuevo proyecto**), las carpetas en las que tus sesiones trabajaron hace poco, en los últimos 90 días, o en las que cambiaron archivos mientras trabajaban en otro sitio, y que ningún proyecto tiene aún, aparecen en **Usados hace poco, en ningún proyecto aún**, de modo que un toque elige una (consulta [Crear un proyecto](#make-a-project)). Las más usadas y las más recientes van primero. Una carpeta dentro de un proyecto guardado en Git cuenta como todo el proyecto.
+Cuando creas un proyecto para una carpeta tú mismo (o desde la ventana **Nuevo proyecto**), las carpetas en las que tus sesiones trabajaron hace poco, en los últimos 90 días, o en las que cambiaron archivos mientras trabajaban en otro sitio, y que ningún proyecto tiene aún, aparecen en **Usados hace poco, en ningún proyecto aún**, de modo que un toque elige una (consulta [Crear un proyecto](#make-a-project)). La página Proyectos lista las mismas carpetas bajo sus tarjetas, como **Carpetas en las que trabajas**, cada una con **Crear un proyecto** (consulta [Encontrar todos tus proyectos](#find-all-your-projects)). Las más usadas y las más recientes van primero. Una carpeta dentro de un proyecto guardado en Git cuenta como todo el proyecto.
 
 Las carpetas en las que trabajas con Claude Code y Codex se convierten solas en proyectos, así que estas son en su mayoría carpetas en las que trabajaste desde Hydor. Tu carpeta personal, las carpetas ocultas, las temporales y las carpetas que la app crea para sí misma (carpetas de tareas, ejecuciones de apps, worktrees) nunca se sugieren. Cuando un proyecto tiene una carpeta, ya sea la suya propia o una de las carpetas con las que trabaja, la carpeta deja de aparecer aquí. Para evitar que Hydor cree por sí solo un proyecto a partir de una carpeta, pídeselo a un agente: mantiene una lista de carpetas que no son proyectos, y eliminar un proyecto añade su carpeta a ella (consulta [Eliminar un proyecto](#delete-a-project)).
 
@@ -262,7 +285,7 @@ Un grupo es un proyecto que reúne varios proyectos, para un trabajo que los aba
 
 ### Crear un grupo
 
-1. En la barra lateral, haz clic en el **+** al final del encabezado **Proyectos** y elige **Nuevo grupo de proyectos…**. Necesitas al menos un proyecto que reunir.
+1. En la página Proyectos, abre el ▾ junto a **Nuevo proyecto** y elige **Nuevo grupo de proyectos…** (necesita dos proyectos). O, en la barra lateral, haz clic en el **+** al final del encabezado **Proyectos** y elige **Nuevo grupo de proyectos…**. Necesitas al menos un proyecto que reunir.
 2. En **Nuevo grupo de proyectos**, ponle un **Nombre**, como "Trabajo" o "Todo para la tesis".
 3. En **Los proyectos que reúne**, toca cada proyecto que quieras incluir; vuelve a tocarlo para quitarlo. Elige al menos uno.
 4. Si quieres, rellena **De qué trata** y las **Pautas de los agentes**, y elige un color.
@@ -472,6 +495,8 @@ Las herramientas de conocimiento nunca muestran los documentos de otro proyecto,
 - “¿Qué guarda mi proyecto Tesis en sus archivos? Mueve a él el seguimiento de lecturas.”
 - “¿En qué carpetas he estado trabajando que todavía no están en un proyecto? Crea proyectos para las dos que más uso.”
 - “¿Cuáles de mis proyectos vienen de Claude Code o de Codex?”
+- “Abre la página Proyectos y ordena mis proyectos por más sesiones.”
+- “¿Cuál de mis proyectos lleva un mes sin ninguna sesión?”
 - “No crees un proyecto para ~/code/scratch por separado.”
 - “Copia ~/Downloads/contract.pdf en mi proyecto Impuestos 2026, y haz que trabaje también con ~/Documents/Receipts.”
 - “Agrupa mis proyectos Tesis y Notas de lectura en uno llamado Todo para la tesis.”

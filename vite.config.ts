@@ -32,9 +32,34 @@ function preloadShell(): Plugin {
   };
 }
 
+/**
+ * For the updater (server/updates.ts), which runs the build with HYDOR_BUILD_PROGRESS=1 to show how far it has got:
+ * one line on stdout for every 100 modules read ("hydor-build-progress 300"), one when all are read ("hydor-build-progress
+ * done 1250") and one when the files are written ("hydor-build-progress written"). Off otherwise.
+ */
+function buildProgress(): Plugin {
+  const seen = new Set<string>();
+  const say = (s: string) => void process.stdout.write(`hydor-build-progress ${s}\n`);
+  return {
+    name: 'hydor-build-progress',
+    apply: 'build',
+    moduleParsed(info) {
+      if (seen.has(info.id)) return;
+      seen.add(info.id);
+      if (seen.size % 100 === 0) say(String(seen.size));
+    },
+    buildEnd() {
+      say(`done ${seen.size}`);
+    },
+    closeBundle() {
+      say('written');
+    },
+  };
+}
+
 export default defineConfig({
   root: 'web',
-  plugins: [react(), tailwindcss(), preloadShell()],
+  plugins: [react(), tailwindcss(), preloadShell(), ...(process.env.HYDOR_BUILD_PROGRESS === '1' ? [buildProgress()] : [])],
   resolve: { alias: { '@shared': fileURLToPath(new URL('./shared', import.meta.url)) } },
   build: {
     outDir: '../dist/web',

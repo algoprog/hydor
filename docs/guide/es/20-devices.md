@@ -157,13 +157,24 @@ La app comprueba que la máquina responde antes de guardarla. Si no responde, el
 
 Una vez que has añadido una máquina, aparece una fila con el nombre de la máquina actual en la parte superior de la barra lateral, encima de **Nueva sesión**. Haz clic en ella para ver todas las máquinas con su estado y una marca en la que se muestra; elige una para pasar a sus páginas. **Añadir o cambiar máquinas** abre Configuración → Máquinas.
 
-En las páginas de otra máquina la fila aparece resaltada, para que sepas dónde estás, y un punto en ella significa que hay sesiones en las otras máquinas esperándote. Si la máquina no responde, una página dice "… is not reachable" con **Reintentar**, un botón para volver a tu propia máquina y **Configuración → Máquinas**.
+En las páginas de otra máquina la fila aparece resaltada, para que sepas dónde estás. La fila también dice qué ocurrió en las máquinas que no estás viendo, y en la tuya también cuando estás en las páginas de otra:
+
+- Un número en una píldora de color de acento cuenta las sesiones de allí que terminaron desde la última vez que miraste esas máquinas. Apúntalo y dice “3 terminadas en otras máquinas”.
+- Un punto naranja significa que hay sesiones allí esperándote.
+
+“Desde la última vez que miraste” funciona por máquina. Mientras una página muestra una máquina, nada de lo que ocurre allí cuenta. Cuando la dejas, cuentan las sesiones que terminan allí después, hasta que vuelves a mirar: abriendo una de ellas, o simplemente cambiando a esa máquina.
+
+En el menú cada máquina tiene una línea como “2 terminadas · 1 te necesita · 3 trabajando” (también la de tu propia máquina, mientras estás en otra). Debajo están las sesiones que terminaron allí, hasta tres, cada una con una marca de verificación, o una cruz si falló, y la hora. Haz clic en una para abrir esa sesión en su máquina. [Configuración → Máquinas](/settings?s=machines) muestra las mismas líneas.
+
+Mientras una máquina se actualiza, su línea dice “Actualizando · 45%”, o el paso en el que va. Una máquina que se reinicia con la nueva versión dice “Reiniciando…”, con un punto naranja que parpadea, en lugar de “No disponible”, y vuelve por sí sola. Si una máquina no responde por otra causa, una página dice "… is not reachable" con **Reintentar**, un botón para volver a tu propia máquina y **Configuración → Máquinas**.
+
+Cuando la barra lateral con la fila está oculta, el icono **Sesiones** de la barra de iconos lleva en su lugar un pequeño punto: de color de acento cuando algo terminó en otra máquina, naranja cuando algo te espera allí.
 
 ### Cuando una máquina tiene un Hydor más antiguo
 
 La app que abres muestra las páginas de otra máquina en su propia versión, sea cual sea el Hydor que ejecute esa máquina. Una máquina con un Hydor más antiguo puede carecer de lo que sus páginas necesitan, y algunas pueden dejar de funcionar. Por eso, cuando eliges una máquina cuyo Hydor es más antiguo que el de esta app, primero aparece una página: "… has an older Hydor". Indica ambas versiones, que sus páginas se abren aquí en la versión de esta app, y que algunas pueden dejar de funcionar con una más antigua. Tiene tres botones:
 
-- **Actualizar…** (con el nombre de la máquina) actualiza esa máquina desde aquí, igual que el botón **Actualizar ahora** de la fila de su versión en [Configuración → App → General](/settings?s=general&find=Check%20now) (consulta [Mantener la app actualizada](/guide/app#keep-the-app-up-to-date)): una copia instalada desde git, o la imagen de Docker, recibe la nueva versión, la compila y se reinicia; una app de escritorio descarga la nueva versión y se reinicia con ella. Tarda unos minutos, y los agentes que trabajan allí siguen con lo suyo. La página muestra cada paso ("Getting the new version", "Installing packages", "Building", "Restarting, this page reconnects by itself"; en una app de escritorio, cuánto de la nueva versión se ha descargado, con una barra) y abre las páginas de esa máquina por sí sola cuando vuelve a estar disponible. Una copia de git o de Docker anterior a la 0.78.0 no puede actualizarse sola más allá del historial reescrito de Hydor ("Not possible to fast-forward, aborting."): entonces la página lo indica, con el comando que hay que ejecutar una vez en esa máquina (consulta [Actualizar a mano una copia antigua](/guide/app#update-an-older-copy-by-hand)).
+- **Actualizar…** (con el nombre de la máquina) actualiza esa máquina desde aquí, igual que el botón **Actualizar ahora** de la fila de su versión en [Configuración → App → General](/settings?s=general&find=Check%20now) (consulta [Mantener la app actualizada](/guide/app#keep-the-app-up-to-date)): una copia instalada desde git, o la imagen de Docker, recibe la nueva versión, la compila y se reinicia; una app de escritorio descarga la nueva versión y se reinicia con ella. Tarda unos minutos, y los agentes que trabajan allí siguen con lo suyo. La página muestra cada paso ("Getting the new version", "Installing packages", "Building", "Restarting, this page reconnects by itself"), y, para una copia de git, cómo va: un porcentaje, una barra que se llena de agua y una línea como “Paso 2 de 3 · faltan unos 2 min” (en una app de escritorio, cuánto de la nueva versión se ha descargado, con una barra). Una máquina que aún usa un Hydor más antiguo no puede decir cómo va, así que la página lo estima a partir del paso en el que está y lo que ha tardado, y da un tiempo restante solo cuando puede; la fila de la máquina muestra el mismo “Actualizando · 45%” y abre las páginas de esa máquina por sí sola cuando vuelve a estar disponible. Una copia de git o de Docker anterior a la 0.78.0 no puede actualizarse sola más allá del historial reescrito de Hydor ("Not possible to fast-forward, aborting."): entonces la página lo indica, con el comando que hay que ejecutar una vez en esa máquina (consulta [Actualizar a mano una copia antigua](/guide/app#update-an-older-copy-by-hand)).
 - **Abrir de todos modos** abre sus páginas tal como están. Esta pestaña del navegador no vuelve a preguntar por esa versión.
 - **Abrir** seguido del nombre de tu propia máquina vuelve a tu propia máquina.
 
@@ -175,7 +186,7 @@ Si una página de otra máquina no se dibuja, ves "This page stopped working" co
 
 - **Todo lo que hay en las páginas de una máquina es de esa máquina**: sus sesiones, carpetas y archivos, Git, terminales, inicios de sesión de los agentes, modelos y configuración.
 - **Algunas cosas vienen siempre de la máquina en la que abriste la app**: tu contraseña e inicio de sesión, la lista de máquinas, las notificaciones, los temas que creaste, y el recorrido de bienvenida y sus consejos.
-- **Los avisos de todas las máquinas te llegan.** Un aviso de otra máquina la nombra, las notificaciones push llegan a través de tu propia máquina, y la [Bandeja de entrada](/guide/inbox) lista lo que te espera en todas las máquinas. El contador de la **Bandeja de entrada** de la barra de iconos las incluye.
+- **Los avisos de todas las máquinas te llegan.** Un aviso de otra máquina la nombra, las notificaciones push llegan a través de tu propia máquina, y la [Bandeja de entrada](/guide/inbox) lista lo que te espera en todas las máquinas. El contador de la **Bandeja de entrada** de la barra de iconos las incluye. La fila de máquinas de la barra lateral también te dice cuáles de las otras máquinas tienen sesiones que terminaron desde la última vez que miraste allí (consulta [Cambiar entre máquinas](#switch-between-machines)).
 - **Los enlaces de solo lectura** funcionan también para sesiones de otras máquinas (consulta [Compartir una sesión con un enlace de solo lectura](/guide/devices#share-a-session-with-a-read-only-link)).
 - **No en otras máquinas**: Preview, que abre servidores de desarrollo solo de la máquina en la que abriste la app, y Conectar otros agentes, ya que el servidor de cada máquina se alcanza en su propia dirección.
 - Tu navegador recuerda la carpeta de la página Archivos, los archivos abiertos y la terminal que usaste por última vez en cada máquina por separado.
@@ -263,6 +274,7 @@ Cómo se abren y se siguen los pull requests: [Abrir un pull request desde una s
 - “Desactiva todos los enlaces para compartir de esta sesión.”
 - “¿Cuáles de mis máquinas están sin conexión? Intenta reconectarlas.”
 - “Cambia el nombre de la máquina llamada gpu-box a Studio GPU.”
+- “¿Qué sesiones terminaron en mis otras máquinas mientras estaba fuera?”
 - “Lista los tokens que otros agentes usan para acceder a esta app y revoca el llamado old laptop.”
 - “Añade mi cuenta de GitHub usando el inicio de sesión de la CLI de GitHub.”
 - “Envía a mis chats de Telegram, Discord y Slack los avisos de todas las sesiones, no solo de las que ellos empezaron.”
