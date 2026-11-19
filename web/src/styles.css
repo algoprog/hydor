@@ -1727,6 +1727,20 @@ html:not([data-motion=off]) .update-words {
   display: inline;
   margin: 0;
 }
+@keyframes aui-flash {
+  0%,
+  35% {
+    background-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aui-flash {
+    animation: none;
+  }
+}
 @layer components {
   .aui {
     /* Its parts lay out by the room the reply gives it (@md:, @lg: …), not by the window. */
@@ -1756,6 +1770,10 @@ html:not([data-motion=off]) .update-words {
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--fg-3);
+  }
+  /* What just changed in a program's run: a tint that fades (none for people who asked for less motion). */
+  .aui-flash {
+    animation: aui-flash 0.9s ease-out;
   }
   .aui-lead {
     font-size: 16.5px;

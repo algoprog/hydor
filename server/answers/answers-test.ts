@@ -154,6 +154,10 @@ const ASKS: [string, string, 1 | 3][] = [
   ['maths exercises to answer and check', 'practice', 1],
   ['a concept map of the ideas', 'network', 1],
   ['relationships between characters', 'network', 1],
+  ['walk me through how this function works', 'walkthrough', 1],
+  ['a guided tour of the code, step by step', 'walkthrough', 1],
+  ['step through the program and watch its variables change', 'trace', 1],
+  ['trace the call stack of a recursive function', 'trace', 1],
 ];
 
 test('find_ui by words: the UI a few words ask for comes first', async () => {

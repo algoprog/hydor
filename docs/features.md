@@ -1575,7 +1575,9 @@ programs shows each program's version and what is out, with Check now, Update no
   league tables, fixtures, contact cards with a vCard, knockout brackets), writing (emails, alternatives to pick from, social posts with character counts, changes to a
   text, annotated text whose marked passages open a note and a suggested change, with the original and the corrected text
   to switch between, a reference in APA, MLA, Chicago, IEEE, Harvard and BibTeX) and code (code in tabs, commands, API endpoints, errors explained, test results, a JSON explorer, a regular
-  expression tester, shortcuts, repositories, a log viewer, cron schedules with their next runs, a code playground that runs JavaScript, Python and web pages in place). Agents find the ones that fit with `find_ui`: the names of the ones they already know together with a few words on what
+  expression tester, shortcuts, repositories, a log viewer, cron schedules with their next runs, a code playground that runs JavaScript, Python and web pages in place, code walkthroughs
+  whose steps light up the lines they explain, and a program's run stepped through line by line with its variables, call
+  stack and output, after a prediction of what it prints). Agents find the ones that fit with `find_ui`: the names of the ones they already know together with a few words on what
   the other parts of the answer show, in one lookup, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
   with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
   answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one

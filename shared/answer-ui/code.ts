@@ -1,4 +1,4 @@
-// Answer UIs for code: code in tabs, a playground to run code in, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories.
+// Answer UIs for code: code in tabs, a playground to run code in, a walkthrough of code and a program's run step by step, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories.
 import type { AnswerUiSpec } from './types.ts';
 
 export const CODE: AnswerUiSpec[] = [
@@ -660,6 +660,153 @@ Line = { time?: string, level?: "debug" | "info" | "warn" | "error" | "fatal", m
       ],
       next: 5,
       note: 'Cron reads these times on the server’s clock, set to **Chicago time**; a hosted scheduler such as GitHub Actions would read them in UTC.',
+    },
+  },
+  {
+    id: 'walkthrough',
+    title: 'Code walkthrough',
+    group: 'code',
+    use: 'Code explained as a guided tour: numbered steps beside the code, each lighting up the lines it explains; go step by step, or tap a line to open its step.',
+    keywords: 'walkthrough code tour explain how this code works annotated lines guided read understand function snippet onboarding teach',
+    shape: `{
+  title?: string
+  file?: string                  // the file's name: "retry.py"
+  lang?: string                  // "python", "ts", "go"…; from the file's extension when left out
+  code: string                   // the code, its lines numbered from 1 (or from firstLine)
+  firstLine?: number             // the first line's number, when the code is part of a longer file
+  steps: {
+    title: string                // a few words: "Back off, with jitter"
+    lines: string                // the lines it explains, numbered as shown: "13-16", "9" or "4-5, 12"
+    text: md                     // what they do and why, in a few sentences
+  }[]                            // in reading order; a line may belong to no step
+  step?: number                  // the step shown first, from 1
+}`,
+    example: {
+      title: 'How fetch_with_retry backs off',
+      file: 'retry.py',
+      lang: 'python',
+      code: 'import random, time\nimport requests\n\ndef fetch_with_retry(url, tries=5, base=0.5, cap=8.0):\n    """GET a URL, retrying on errors and 5xx answers."""\n    for attempt in range(tries):\n        try:\n            r = requests.get(url, timeout=10)\n            if r.status_code < 500:\n                return r\n        except requests.ConnectionError:\n            pass\n        if attempt == tries - 1:\n            break\n        delay = min(cap, base * 2 ** attempt)\n        time.sleep(random.uniform(0, delay))\n    raise RuntimeError(f"gave up on {url} after {tries} tries")\n',
+      steps: [
+        { title: 'The knobs', lines: '4-5', text: 'Five tries, a first wait of 0.5 s (`base`), and never more than 8 s between tries (`cap`).' },
+        { title: 'Try, and keep good answers', lines: '6-10', text: 'Each try is a GET with a 10-second timeout. Anything under 500 comes straight back: a **404** will not fix itself by waiting.' },
+        { title: 'A dropped connection is not fatal', lines: '11-12', text: 'It is swallowed, so the loop falls through to the wait and tries again.' },
+        { title: 'Back off, with jitter', lines: '13-16', text: 'The wait doubles each time (0.5, 1, 2, 4 s, up to the cap), and a random point inside it is picked, “full jitter”, so a thousand clients that failed together do not all come back at the same instant.' },
+        { title: 'Give up loudly', lines: '17', text: 'After the last try it raises an error that names the URL, so the log says what failed.' },
+      ],
+      step: 4,
+    },
+  },
+  {
+    id: 'trace',
+    title: 'Run it step by step',
+    group: 'code',
+    use: 'A program run line by line: the line it is on, its variables with what changed marked, the call stack and the output at each step, with a slider and play; predict the output first.',
+    keywords: 'trace execution step through debugger variables call stack recursion loop state visualize python tutor learn programming',
+    shape: `{
+  title?: string
+  lang?: string                  // "python", "javascript"…
+  code: string                   // the program, its lines numbered from 1
+  steps: {
+    line: number                 // the line this step runs
+    note?: md                    // what happens, in a few words: "8 is even, so s becomes 8"
+    frames?: {                   // the call stack after this step, outermost first ("Global", then each call); left out: as the step before
+      name: string
+      vars: Record<string, value>  // value: any JSON (a list is drawn as cells, an object as a small table), or { show: string } for text shown as is: "function", "→ nums"
+      returns?: value            // what the call hands back, on the step it returns
+    }[]
+    out?: string                 // what this step prints, added to the output so far
+  }[]                            // in the order they run; record a real run (Python's sys.settrace) rather than guess
+  predict?: { question?: md, answer: string }   // asked before stepping ("What will it print?" when no question); a typed answer is checked against it
+  step?: number                  // the step shown first, from 1
+}`,
+    example: {
+      title: 'Adding up the even numbers',
+      lang: 'python',
+      code: 'def total(items):\n    s = 0\n    for x in items:\n        if x % 2 == 0:\n            s += x\n    return s\n\nnums = [3, 8, 5, 6]\nprint(total(nums))\n',
+      steps: [
+        { line: 1, note: 'Python reads the function; nothing in it runs yet.', frames: [{ name: 'Global', vars: { total: { show: 'function' } } }] },
+        { line: 8, note: '`nums` is now a list of four numbers.', frames: [{ name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } }] },
+        {
+          line: 9,
+          note: '`total(nums)` is called: a new frame opens, and `items` is the same list as `nums`.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' } } },
+          ],
+        },
+        {
+          line: 2,
+          note: '`s` starts at 0.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 0 } },
+          ],
+        },
+        {
+          line: 3,
+          note: '`x` takes the first item, 3.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 0, x: 3 } },
+          ],
+        },
+        { line: 4, note: '`3 % 2 == 0` is False: 3 is odd, so it is skipped.' },
+        {
+          line: 3,
+          note: '`x` takes the next item, 8.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 0, x: 8 } },
+          ],
+        },
+        { line: 4, note: '`8 % 2 == 0` is True: 8 is even.' },
+        {
+          line: 5,
+          note: '`s += x` makes `s` 8.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 8, x: 8 } },
+          ],
+        },
+        {
+          line: 3,
+          note: '`x` takes the next item, 5.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 8, x: 5 } },
+          ],
+        },
+        { line: 4, note: '5 is odd: skipped.' },
+        {
+          line: 3,
+          note: '`x` takes the last item, 6.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 8, x: 6 } },
+          ],
+        },
+        { line: 4, note: '6 is even.' },
+        {
+          line: 5,
+          note: '`s += x` makes `s` 14.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 14, x: 6 } },
+          ],
+        },
+        { line: 3, note: 'No items left: the loop ends.' },
+        {
+          line: 6,
+          note: '`return s` hands 14 back to the caller.',
+          frames: [
+            { name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } },
+            { name: 'total', vars: { items: { show: '→ nums' }, s: 14, x: 6 }, returns: 14 },
+          ],
+        },
+        { line: 9, note: '`print` shows the 14, and the `total` frame is gone.', frames: [{ name: 'Global', vars: { total: { show: 'function' }, nums: [3, 8, 5, 6] } }], out: '14\n' },
+      ],
+      predict: { answer: '14' },
+      step: 9,
     },
   },
   {

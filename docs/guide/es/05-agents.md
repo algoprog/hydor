@@ -100,7 +100,7 @@ Para una pregunta grande que requiere muchas búsquedas, consulta la investigaci
 - Limita los cambios a lo que pediste, y menciona otros problemas que nota en lugar de corregirlos sin que se lo pidas.
 - Después de cambiar código, ejecuta las pruebas, la compilación o el linter del proyecto cuando los tiene, y corrige lo que falla.
 - Si pareces nuevo en la programación, explica lo que hizo y cómo ejecutarlo, con palabras sencillas: comandos para que ejecutes, cada uno con un botón de copiar y lo que hace, y un fragmento que puedes probar en un área de pruebas.
-- Cuando explica código en lugar de cambiarlo, muestra lo que tiene una forma propia en lugar de un muro de texto: un error con sus causas y soluciones probables, una ejecución de pruebas, los archivos de un proyecto como un árbol, un endpoint, enfoques para sopesar lado a lado, y un diagrama para un flujo o una arquitectura.
+- Cuando explica código en lugar de cambiarlo, muestra lo que tiene una forma propia en lugar de un muro de texto: un error con sus causas y soluciones probables, una ejecución de pruebas, los archivos de un proyecto como un árbol, un endpoint, código recorrido paso a paso junto a sus líneas, la ejecución de un programa línea a línea con sus variables, enfoques para sopesar lado a lado, y un diagrama para un flujo o una arquitectura.
 - Termina con un resumen breve: qué cambió, cómo lo comprobó y qué queda por hacer.
 
 ### Tutor
@@ -109,7 +109,7 @@ Para una pregunta grande que requiere muchas búsquedas, consulta la investigaci
 
 - Si tu nivel o tu objetivo no están claros, primero hace una pregunta rápida, con las respuestas probables como botones para hacer clic (soy nuevo en el tema, conozco lo básico, estoy repasando para un examen).
 - Enseña un paso a la vez, con palabras sencillas, con un ejemplo concreto para cada idea nueva, de lo simple a lo más difícil.
-- Hace que cada paso sea algo para ver o probar, no solo para leer: un diagrama, una imagen, una tarjeta de fórmula, la gráfica de una función con controles deslizantes, un mapa de cómo se conectan las ideas, una explicación en la que puedes cambiar de profundidad, un ejemplo resuelto que se revela un paso a la vez, código que puedes ejecutar y cambiar, una pequeña simulación; las matemáticas dibujadas como en un libro de texto.
+- Hace que cada paso sea algo para ver o probar, no solo para leer: un diagrama, una imagen, una tarjeta de fórmula, la gráfica de una función con controles deslizantes, un mapa de cómo se conectan las ideas, una explicación en la que puedes cambiar de profundidad, un ejemplo resuelto que se revela un paso a la vez, código que puedes ejecutar y cambiar, código recorrido línea a línea, un programa ejecutado paso a paso después de que predigas lo que imprime, una pequeña simulación; las matemáticas dibujadas como en un libro de texto.
 - Después de cada paso, comprueba con algo que respondes en el mismo lugar, y espera antes de seguir: un cuestionario breve, problemas de práctica que respondes con tus propias palabras o números (comprobados sobre la marcha, con pistas y la solución después de un intento), completar espacios en blanco, relacionar u ordenar elementos. Lee la puntuación y las respuestas que envías.
 - Cuando respondes, dice qué estuvo bien, corrige con amabilidad y precisión lo que no, y se adapta: otra explicación o ejemplo cuando te atascas, un paso más difícil cuando vas adelantado.
 - Con tareas o ejercicios, te guía con pistas y preguntas, y da la solución completa solo cuando la pides o sigues atascado después de intentarlo.

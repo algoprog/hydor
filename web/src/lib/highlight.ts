@@ -149,3 +149,16 @@ export async function highlight(code: string, lang: string | null): Promise<stri
     defaultColor: 'light',
   });
 }
+
+/**
+ * One HTML string per line of code (what Shiki wrote inside each `span.line`), for views that draw the lines
+ * themselves (a gutter, a marker, a tint). Null when the language is unknown, or when the lines Shiki gave are not the
+ * code's own: the caller shows the plain lines then, so every line still shows.
+ */
+export async function highlightLines(code: string, lang: string | null): Promise<string[] | null> {
+  const text = code.replace(/\r\n?/g, '\n').replace(/\n$/, '');
+  const html = await highlight(text, lang);
+  if (!html) return null;
+  const lines = Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.shiki .line'), (l) => l.innerHTML);
+  return lines.length === text.split('\n').length ? lines : null;
+}

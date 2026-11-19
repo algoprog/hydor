@@ -1,8 +1,9 @@
 // The answer UIs for code (code in tabs, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories): their views, by name (shared/answer-ui/code.ts has what each takes).
-import { Fragment, lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, Play, RotateCcw, Route, Scale, Search, Send, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
+import { BookMarked, Check, ChevronLeft, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, Pause, Play, RotateCcw, Route, Scale, Search, Send, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
+import { langFromPath, highlightLines } from '../../../lib/highlight';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { playgroundDoc, type PlayLang } from '../playground-doc';
@@ -2110,6 +2111,535 @@ function Playground({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- code walkthrough and a program's run, step by step ---------------------------------------------------------------
+
+/** "Step {0} of {1}": the words with their numbers in (replacing by function: a `$` in a title is not a pattern). */
+const fill = (t: string, ...v: unknown[]) => t.replace(/\{(\d+)\}/g, (_, i) => String(v[Number(i)] ?? ''));
+
+/** The lines of a piece of code as written: a trailing newline does not make a line of its own. */
+function codeLines(code: unknown): string[] {
+  const t = (Array.isArray(code) ? code.map((l) => str(l)).join('\n') : str(code)).replace(/\r\n?/g, '\n').replace(/\n$/, '');
+  return t ? t.split('\n') : [];
+}
+
+/** "13-16", "13–16", "L13-L16", "9", "4-5, 12", 9, [9, 12], ["4-5", 12], { from, to } as ranges of line numbers. */
+function parseRanges(v: unknown): [number, number][] {
+  const out: [number, number][] = [];
+  const add = (a: number, b: number) => {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+    a = Math.round(a);
+    b = Math.round(b);
+    out.push(a <= b ? [a, Math.min(b, a + 100_000)] : [b, Math.min(a, b + 100_000)]);
+  };
+  if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number' && v[1] > v[0]) {
+    add(v[0], v[1]);
+    return out;
+  }
+  for (const p of Array.isArray(v) ? v : [v]) {
+    if (typeof p === 'number') add(p, p);
+    else if (isObj(p)) {
+      const a = num(p.from ?? p.start ?? p.line);
+      if (a !== null) add(a, num(p.to ?? p.end) ?? a);
+    } else
+      for (const m of str(p).matchAll(/(\d+)(?:\s*(?:[-–—−~]|\.{2,3}|…|to\b|through\b|thru\b)\s*[Ll]?\s*(\d+))?/gi)) add(Number(m[1]), m[2] ? Number(m[2]) : Number(m[1]));
+  }
+  return out;
+}
+
+const rangeText = (rs: [number, number][]) => rs.map(([a, b]) => (a === b ? String(a) : `${a}–${b}`)).join(', ');
+
+/** Keys: ← and → move between steps, unless the focus is in a field (a slider or a text box takes them itself). */
+function stepKeys(go: (by: number) => void) {
+  return (e: KeyboardEvent<HTMLElement>) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    const el = e.target as HTMLElement;
+    if (el.closest('input, textarea, select') || el.isContentEditable) return;
+    e.preventDefault();
+    go(e.key === 'ArrowRight' ? 1 : -1);
+  };
+}
+
+/** The highlighted lines of some code, once they are ready: each with the line it was made from, so a line that did not change keeps its colours while more code arrives. */
+function useHighlighted(lines: string[], lang: string, done: boolean): (n: number) => string | undefined {
+  const [got, setGot] = useState<{ src: string[]; html: string[] } | null>(null);
+  const code = lines.join('\n');
+  useEffect(() => {
+    if (!code || !lang) return;
+    let live = true;
+    const t = setTimeout(
+      () => {
+        highlightLines(code, lang)
+          .then((html) => live && html && setGot({ src: code.split('\n'), html }))
+          .catch(() => {});
+      },
+      done ? 0 : 200,
+    );
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [code, lang, done]);
+  return (n) => (got && got.src[n] === lines[n] ? got.html[n] : undefined);
+}
+
+/** One line's code, plain or highlighted (its own `shiki` element, so the dark theme's colours apply to its tokens only). */
+function CodeText({ text, html }: { text: string; html?: string }) {
+  return html !== undefined ? <span className="shiki block min-h-5" dangerouslySetInnerHTML={{ __html: html }} /> : <span className="shiki block min-h-5">{text}</span>;
+}
+
+/** Scrolls a code pane (only the pane, never the page) so lines `from` to `to` show, when they do not already; the first time without moving smoothly. */
+function useReveal(pane: RefObject<HTMLElement | null>, from: number | null, to: number | null, dep: unknown) {
+  const first = useRef(true);
+  useEffect(() => {
+    const el = pane.current;
+    const was = first.current;
+    first.current = false;
+    if (!el || from === null) return;
+    const a = el.querySelector<HTMLElement>(`[data-n="${from}"]`);
+    const b = el.querySelector<HTMLElement>(`[data-n="${to ?? from}"]`) ?? a;
+    if (!a || !b) return;
+    const top = a.offsetTop;
+    const bottom = Math.min(b.offsetTop + b.offsetHeight, top + el.clientHeight - 16);
+    if (top >= el.scrollTop + 8 && bottom <= el.scrollTop + el.clientHeight - 8) return;
+    const calm = was || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    el.scrollTo({ top: Math.max(0, top - Math.round(el.clientHeight / 4)), behavior: calm ? 'auto' : 'smooth' });
+  }, [dep]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+const CODE_FRAME = 'relative max-h-[480px] min-w-0 overflow-auto rounded-lg border border-line bg-code-bg py-2 font-mono text-[12.5px] leading-5 text-fg';
+
+function Gutter({ n, digits }: { n: number; digits: number }) {
+  return (
+    <span aria-hidden className="shrink-0 pr-3 text-right text-fg-3 select-none" style={{ width: `${digits + 3.5}ch` }}>
+      {n}
+    </span>
+  );
+}
+
+function Walkthrough({ data, done }: { data: Data; done: boolean }) {
+  const file = str(data.file ?? data.filename ?? data.path ?? data.name);
+  const lang = str(data.lang ?? data.language) || (file ? (langFromPath(file) ?? '') : '');
+  const lines = useMemo(() => codeLines(data.code ?? data.source ?? data.content ?? data.text), [data.code, data.source, data.content, data.text]);
+  const first = Math.round(num(data.firstLine ?? data.first_line ?? data.startLine ?? data.start_line ?? data.start) ?? 1);
+  const steps = arr(data.steps ?? data.items ?? data.sections)
+    .filter(isObj)
+    .map((s) => {
+      const ranges = parseRanges(s.lines ?? s.line ?? s.range ?? s.at);
+      return { title: str(s.title ?? s.name ?? s.heading ?? s.label), ranges, range: rangeText(ranges), text: s.text ?? s.body ?? s.description ?? s.explanation ?? s.note ?? s.md };
+    });
+  const n = steps.length;
+  const [pick, setPick] = useKept<number>('step', num(data.step) ?? 1);
+  const at = Math.min(Math.max(0, Math.round(num(pick) ?? 1) - 1), Math.max(0, n - 1));
+  const cur = steps[at];
+  const html = useHighlighted(lines, lang, done);
+  const pane = useRef<HTMLDivElement>(null);
+  // The first step covering each line.
+  const owner = useMemo(() => {
+    const m = new Map<number, number>();
+    steps.forEach((s, i) => {
+      for (const [a, b] of s.ranges) for (let l = Math.max(a, first); l <= Math.min(b, first + lines.length - 1); l++) if (!m.has(l)) m.set(l, i);
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(steps.map((s) => s.ranges)), first, lines.length]);
+  const startOf = steps.map((s) => (s.ranges.length ? Math.min(...s.ranges.map((r) => r[0])) : null));
+  const covered = (l: number) => !!cur && cur.ranges.some(([a, b]) => l >= a && l <= b);
+  const lit = cur?.ranges.length ? cur.ranges : null;
+  const from = lit ? Math.max(first, Math.min(...lit.map((r) => r[0]))) : null;
+  useReveal(pane, from, lit ? Math.min(first + lines.length - 1, Math.max(...lit.map((r) => r[1]))) : null, at);
+  const go = (by: number) => setPick(Math.min(n, Math.max(1, at + 1 + by)));
+  const digits = String(first + Math.max(0, lines.length - 1)).length;
+  const oneLine = !!cur && cur.ranges.length === 1 && cur.ranges[0][0] === cur.ranges[0][1];
+  const askText = !cur
+    ? ''
+    : cur.range
+      ? file
+        ? fill(oneLine ? tr('About step {0}, “{1}” (line {2}) of {3}: ') : tr('About step {0}, “{1}” (lines {2}) of {3}: '), at + 1, cur.title, cur.range, file)
+        : fill(oneLine ? tr('About step {0}, “{1}” (line {2}): ') : tr('About step {0}, “{1}” (lines {2}): '), at + 1, cur.title, cur.range)
+      : fill(tr('About step {0}, “{1}”: '), at + 1, cur.title);
+  return (
+    <Card>
+      <div tabIndex={-1} onKeyDown={stepKeys(go)} className="outline-none">
+        <Head title={data.title} aside={(file || lang) && <Chip className="max-w-[12rem] font-mono">{file || lang}</Chip>} />
+        {n > 0 && (
+          <>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[13px] text-fg-3 tabular-nums" aria-live="polite">
+                {fill(tr('Step {0} of {1}'), at + 1, n)}
+              </span>
+              <div className="ml-auto flex gap-1.5">
+                <Btn icon={<ChevronLeft size={16} />} title={tr('Previous step')} disabled={at <= 0} onClick={() => go(-1)} />
+                <Btn icon={<ChevronRight size={16} />} title={tr('Next step')} disabled={at >= n - 1} onClick={() => go(1)} />
+              </div>
+            </div>
+            {n > 20 ? (
+              <div aria-hidden className="mb-3 h-1 overflow-hidden rounded-full bg-line">
+                <div className="h-full rounded-full bg-accent transition-[width] duration-150" style={{ width: `${((at + 1) / n) * 100}%` }} />
+              </div>
+            ) : (
+              <div aria-hidden className="mb-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+                {steps.map((_, i) => (
+                  <i key={i} className="h-1 rounded-full transition-colors duration-150" style={{ background: i === at ? 'var(--accent)' : i < at ? 'color-mix(in srgb, var(--accent) 45%, transparent)' : 'var(--line)' }} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] @2xl:items-start">
+          <div ref={pane} className={CODE_FRAME}>
+            <div className="w-max min-w-full">
+              {lines.map((text, i) => {
+                const l = first + i;
+                const o = owner.get(l);
+                const on = covered(l);
+                const row = cx(
+                  'flex w-full items-start pr-4 text-left whitespace-pre transition-[opacity,background-color] duration-150',
+                  lit && !on && 'opacity-[.45]',
+                  on && 'bg-[var(--accent-soft)] shadow-[inset_3px_0_0_var(--accent)]',
+                );
+                const inner = (
+                  <>
+                    <Gutter n={l} digits={digits} />
+                    <CodeText text={text} html={html(i)} />
+                  </>
+                );
+                return o === undefined ? (
+                  <div key={i} data-n={l} className={row}>
+                    {inner}
+                  </div>
+                ) : (
+                  <button
+                    key={i}
+                    type="button"
+                    data-n={l}
+                    tabIndex={startOf[o] === l ? 0 : -1}
+                    title={fill(tr('Go to step {0}'), o + 1)}
+                    aria-current={on ? 'step' : undefined}
+                    onClick={() => setPick(o + 1)}
+                    className={cx(row, 'cursor-pointer hover:opacity-100 focus-visible:opacity-100')}
+                  >
+                    {inner}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {n > 0 && (
+            <div className="min-w-0 overflow-hidden rounded-lg border border-line">
+              <ol className="m-0 list-none divide-y divide-line p-0">
+                {steps.map((s, i) => (
+                  <li key={i}>
+                    <button type="button" aria-current={i === at ? 'step' : undefined} aria-expanded={i === at} onClick={() => setPick(i + 1)} className="flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-bg-2">
+                      <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[12px] font-semibold tabular-nums transition-colors duration-150', i === at ? 'border-accent bg-accent text-accent-fg' : 'border-line text-fg-3')}>{i + 1}</span>
+                      <span className={cx('min-w-0 flex-1 text-[13.5px] leading-snug', i === at ? 'font-semibold text-fg' : 'font-medium text-fg-2')}>{s.title || fill(tr('Step {0}'), i + 1)}</span>
+                      {s.range && <span className="shrink-0 font-mono text-[12px] text-fg-3">{s.range}</span>}
+                    </button>
+                    {i === at && str(s.text).trim() && <Md text={s.text} className="px-3 pb-3 pl-[46px] text-[13px] text-fg-2" />}
+                  </li>
+                ))}
+              </ol>
+              <div className="border-t border-line p-3">
+                <Ask text={askText} className="w-full">
+                  {tr('Ask about this step')}
+                </Ask>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {str(data.note) && <Md text={data.note} className="mt-3 text-[13px] text-fg-2" />}
+    </Card>
+  );
+}
+
+// ---- a program's run, step by step ------------------------------------------------------------------------------------
+
+type Frame = { name: string; vars: [string, unknown][]; returns?: unknown; hasReturns: boolean };
+
+function readFrames(v: unknown): Frame[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return v.filter(isObj).map((f) => {
+    const vars = f.vars ?? f.variables ?? f.locals ?? f.env ?? f.values;
+    const ret = f.returns ?? f.return ?? f.ret;
+    return {
+      name: str(f.name ?? f.fn ?? f.function ?? f.title) || tr('Global'),
+      vars: Array.isArray(vars) ? vars.filter(isObj).map((x) => [str(x.name ?? x.key), x.value] as [string, unknown]) : isObj(vars) ? Object.entries(vars) : [],
+      returns: ret,
+      hasReturns: ret !== undefined,
+    };
+  });
+}
+
+const isSimple = (v: unknown) => v === null || ['number', 'boolean', 'string'].includes(typeof v);
+const isShown = (v: unknown): v is { show: unknown } => isObj(v) && 'show' in v && (typeof v.show === 'string' || typeof v.show === 'number');
+const same = (a: unknown, b: unknown) => {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return a === b;
+  }
+};
+
+/** Short JSON text for what is too big to draw (cut with …). */
+function brief(v: unknown, max = 64): string {
+  let s: string;
+  try {
+    s = JSON.stringify(v) ?? String(v);
+  } catch {
+    s = String(v);
+  }
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function Simple({ v }: { v: unknown }) {
+  if (v === null || v === undefined) return <span className="text-fg-3">null</span>;
+  if (typeof v === 'string') return <span className="break-all text-ok">{JSON.stringify(v)}</span>;
+  return <span className="text-fg">{String(v)}</span>;
+}
+
+/** A value of a variable: simple ones as text, a short list as a row of cells, an object as a small list, `{ show }` as its text. */
+function Val({ v, deep }: { v: unknown; deep?: boolean }) {
+  if (isShown(v)) return <span className="break-words text-fg-2">{String(v.show)}</span>;
+  if (isSimple(v) || v === undefined) return <Simple v={v} />;
+  if (Array.isArray(v) && !deep && v.length > 0 && v.length <= 12 && v.every(isSimple))
+    return (
+      <span className="inline-flex max-w-full flex-wrap gap-1 align-middle">
+        {v.map((x, i) => (
+          <span key={i} className="grid h-6 min-w-7 place-items-center rounded-md border border-line bg-panel px-1.5 leading-none">
+            <Simple v={x} />
+          </span>
+        ))}
+      </span>
+    );
+  if (isObj(v) && !deep && Object.keys(v).length > 0) {
+    const e = Object.entries(v);
+    return (
+      <span className="grid min-w-0 gap-0.5 border-l border-line pl-2">
+        {e.slice(0, 12).map(([k, x]) => (
+          <span key={k} className="flex min-w-0 items-baseline gap-1.5">
+            <span className="shrink-0 text-fg-2">{k}</span>
+            <span className="text-fg-3">:</span>
+            <span className="min-w-0 break-words">
+              <Val v={x} deep />
+            </span>
+          </span>
+        ))}
+        {e.length > 12 && <span className="text-fg-3">…</span>}
+      </span>
+    );
+  }
+  return <span className="break-all text-fg-2">{brief(v)}</span>;
+}
+
+/** The room a stack of frames needs, in pixels (an estimate: the most any step needs is kept free, so the controls below do not move). */
+function framesHeight(f: Frame[]): number {
+  return f.reduce((h, fr) => h + 8 + 34 + fr.vars.reduce((r, [, v]) => r + 28 + (isObj(v) && !isShown(v) ? Math.min(12, Object.keys(v).length) * 20 : 0), 0), 24);
+}
+
+function Trace({ data, done }: { data: Data; done: boolean }) {
+  const lang = str(data.lang ?? data.language);
+  const lines = useMemo(() => codeLines(data.code ?? data.source ?? data.program ?? data.text), [data.code, data.source, data.program, data.text]);
+  const html = useHighlighted(lines, lang, done);
+  const raw = arr(data.steps ?? data.trace ?? data.states).filter(isObj);
+  const predict = isObj(data.predict) && str(data.predict.answer ?? data.predict.expected) ? data.predict : null;
+  // What each step shows: its own frames, or the step before's; the output so far.
+  const steps = useMemo(() => {
+    let frames: Frame[] = [];
+    let out = '';
+    return raw.map((s) => {
+      frames = readFrames(s.frames ?? s.stack) ?? frames;
+      out += str(s.out ?? s.output ?? s.stdout);
+      return { line: num(s.line ?? s.lineno ?? s.ln), note: s.note ?? s.text ?? s.explain ?? s.description, frames, out };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.steps, data.trace, data.states]);
+  const n = steps.length;
+  const [pick, setPick] = useKept<number>('step', num(data.step) ?? 1);
+  const at = Math.min(Math.max(0, Math.round(num(pick) ?? 1) - 1), Math.max(0, n - 1));
+  const cur = steps[at];
+  const before = at > 0 ? steps[at - 1] : null;
+  const [playing, setPlaying] = useState(false);
+  const stop = () => setPlaying(false);
+  const go = (by: number) => {
+    stop();
+    setPick(Math.min(n, Math.max(1, at + 1 + by)));
+  };
+  useEffect(() => {
+    if (!playing) return;
+    if (at >= n - 1) return setPlaying(false);
+    const t = setTimeout(() => setPick(at + 2), 800);
+    return () => clearTimeout(t);
+  }, [playing, at, n, setPick]);
+  const play = () => {
+    if (playing) return stop();
+    if (at >= n - 1) setPick(1);
+    setPlaying(true);
+  };
+  const pane = useRef<HTMLDivElement>(null);
+  useReveal(pane, cur?.line ?? null, cur?.line ?? null, at);
+  const reserve = Math.min(340, Math.max(96, ...steps.map((s) => framesHeight(s.frames))));
+  const outRows = Math.min(8, Math.max(1, (steps[n - 1]?.out.replace(/\n$/, '').split('\n').length ?? 1)));
+  const digits = String(lines.length).length;
+  const text = cur?.line ? (lines[cur.line - 1] ?? '').trim() : '';
+  const askText = cur ? (text ? fill(tr('About step {0} of the run (line {1}: {2}): '), at + 1, cur.line, text) : fill(tr('About step {0} of the run (line {1}): '), at + 1, cur.line ?? '')) : '';
+  // Predicting the output
+  const [guess, setGuess] = useState('');
+  const [verdict, setVerdict] = useState<boolean | null>(null);
+  const norm = (s: string) =>
+    s
+      .replace(/\r/g, '')
+      .replace(/[ \t]+/g, ' ')
+      .split('\n')
+      .map((l) => l.trim())
+      .join('\n')
+      .trim();
+  const check = () => guess.trim() && setVerdict(predict ? norm(guess) === norm(str(predict.answer ?? predict.expected)) : null);
+  const frames = cur?.frames ?? [];
+  return (
+    <Card>
+      <div tabIndex={-1} onKeyDown={stepKeys(go)} className="outline-none">
+        <Head title={data.title} aside={lang && <Chip className="font-mono">{lang}</Chip>} />
+        <div className="grid gap-3 @2xl:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+          <div ref={pane} className={CODE_FRAME}>
+            <div className="w-max min-w-full">
+              {lines.map((t, i) => {
+                const l = i + 1;
+                const on = cur?.line === l;
+                return (
+                  <div key={i} data-n={l} aria-current={on ? 'step' : undefined} className={cx('flex w-full items-start pr-4 whitespace-pre', on && 'bg-[var(--accent-soft)] shadow-[inset_3px_0_0_var(--accent)]')}>
+                    <span aria-hidden className={cx('ml-2 w-3 shrink-0 pt-[5px] text-[10px] leading-[10px] select-none', on ? 'text-accent' : 'text-transparent')}>
+                      ▶
+                    </span>
+                    <Gutter n={l} digits={digits} />
+                    <CodeText text={t} html={html(i)} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid min-w-0 content-start gap-3">
+            <div className="rounded-lg border border-line p-3">
+              <Section title={tr('Frames')}>
+                <div className="max-h-[340px] overflow-auto font-mono text-[12.5px]" style={{ minHeight: reserve }}>
+                  {frames.length === 0 && <div className="py-1 font-sans text-[13px] text-fg-3">{tr('Nothing yet')}</div>}
+                  <div className="grid gap-2">
+                    {frames
+                      .map((f, fi) => ({ f, fi }))
+                      .reverse()
+                      .map(({ f, fi }) => {
+                        const was = before?.frames[fi];
+                        const opened = !!before && was?.name !== f.name;
+                        return (
+                          <div key={`${fi}:${f.name}`} className="rounded-lg border border-line bg-bg-2 p-1.5 pb-2">
+                            <div key={opened ? `new${at}` : 'old'} className={cx('flex items-baseline justify-between gap-2 rounded-md border-l-2 px-1.5 pb-1 font-semibold', opened ? 'aui-flash border-[var(--accent)]' : 'border-transparent')}>
+                              <span className={cx('min-w-0 break-all', opened && 'text-accent')}>{f.name}</span>
+                              {f.hasReturns && (
+                                <span className="min-w-0 text-right font-normal">
+                                  <span className="mr-1.5 font-sans text-[12px] text-fg-3">{tr('returns')}</span>
+                                  <Val v={f.returns} deep />
+                                </span>
+                              )}
+                            </div>
+                            {f.vars.length === 0 && <div className="px-2 py-1 font-sans text-[12px] text-fg-3">{tr('No variables')}</div>}
+                            {f.vars.map(([name, v]) => {
+                              const changed = !!before && !(was?.name === f.name && was.vars.some(([k, x]) => k === name && same(x, v)));
+                              return (
+                                <div key={changed ? `${name}@${at}` : name} className={cx('flex min-h-7 items-start gap-2 rounded-r-md border-l-2 px-1.5 py-0.5 leading-6', changed ? 'aui-flash border-[var(--accent)]' : 'border-transparent')}>
+                                  <span className="max-w-[50%] shrink-0 break-all text-fg-2">{name}</span>
+                                  {/* A reference drawn as an arrow (items → nums) needs no equals sign before it. */}
+                                  {!(isShown(v) && /^\s*(→|->)/.test(String(v.show))) && <span className="shrink-0 text-fg-3">=</span>}
+                                  <span className="min-w-0 flex-1 break-words">
+                                    <Val v={v} />
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </Section>
+            </div>
+            <div className="rounded-lg border border-line p-3">
+              <Section title={tr('Output')}>
+                {cur?.out ? (
+                  <pre className="m-0 max-h-[168px] overflow-auto font-mono text-[12.5px] leading-[20px] break-words whitespace-pre-wrap text-fg" style={{ minHeight: outRows * 20 }}>
+                    {cur.out}
+                  </pre>
+                ) : (
+                  <div className="text-[13px] text-fg-3 italic" style={{ minHeight: outRows * 20 }}>
+                    {tr('Nothing printed yet')}
+                  </div>
+                )}
+              </Section>
+            </div>
+          </div>
+        </div>
+        {n > 0 && (
+          <div className="mt-3 divide-y divide-line rounded-lg border border-line">
+            <div className="flex min-h-[3.75rem] items-start gap-2.5 px-3.5 py-2.5">
+              <span className="shrink-0 rounded-full border border-line px-2 font-mono text-[12px] leading-5 text-fg-3">{fill(tr('Line {0}'), cur.line ?? '–')}</span>
+              {str(cur.note).trim() ? <Md text={cur.note} className="min-w-0 flex-1 text-[13.5px] text-fg" /> : <span className="flex-1" />}
+            </div>
+            {predict && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 px-3.5 py-2.5">
+                <b className="text-[13px] font-semibold">{tr('Predict first:')}</b>
+                <Md text={str(predict.question) || tr('What will it print?')} inline className="text-[13px] text-fg-2" />
+                <input
+                  value={guess}
+                  onChange={(e) => {
+                    setGuess(e.target.value);
+                    setVerdict(null);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && check()}
+                  aria-label={tr('Your prediction')}
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="h-9 w-28 min-w-0 rounded-lg border border-line bg-code-bg px-2.5 font-mono text-[16px] text-fg outline-none placeholder:text-fg-3 focus:border-line-2"
+                />
+                <Btn onClick={check} disabled={!guess.trim()} className="h-9">
+                  {tr('Check')}
+                </Btn>
+                <span role="status" className={cx('min-h-5 basis-full text-[13px] leading-5', verdict ? 'text-ok' : 'text-warn')}>
+                  {verdict === null ? '' : verdict ? tr('Right. Step through to see why.') : tr('Not quite. Step through and watch how it gets there.')}
+                </span>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2.5">
+              <div className="flex gap-1">
+                <Btn icon={<ChevronsLeft size={16} />} title={tr('First step')} disabled={at <= 0} onClick={() => (stop(), setPick(1))} />
+                <Btn icon={<ChevronLeft size={16} />} title={tr('Previous step')} disabled={at <= 0} onClick={() => go(-1)} />
+                <Btn primary icon={playing ? <Pause size={15} /> : <Play size={15} />} title={playing ? tr('Pause') : tr('Play')} onClick={play} />
+                <Btn icon={<ChevronRight size={16} />} title={tr('Next step')} disabled={at >= n - 1} onClick={() => go(1)} />
+                <Btn icon={<ChevronsRight size={16} />} title={tr('Last step')} disabled={at >= n - 1} onClick={() => (stop(), setPick(n))} />
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={n}
+                value={at + 1}
+                onChange={(e) => (stop(), setPick(Number(e.target.value)))}
+                aria-label={tr('Step')}
+                className="h-8 min-w-28 flex-[1_1_9rem] accent-[var(--accent)]"
+              />
+              <span className="text-[13px] text-fg-3 tabular-nums" aria-live="polite">
+                {fill(tr('Step {0} of {1}'), at + 1, n)}
+              </span>
+            </div>
+            <div className="px-3.5 py-2.5">
+              <Ask text={askText}>{tr('Ask about this step')}</Ask>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export const CODE_UIS: Record<string, AnswerUiView> = {
   code: CodeTabs,
   commands: Commands,
@@ -2123,4 +2653,6 @@ export const CODE_UIS: Record<string, AnswerUiView> = {
   logs: Logs,
   cron: CronUi,
   playground: Playground,
+  walkthrough: Walkthrough,
+  trace: Trace,
 };

@@ -100,7 +100,7 @@ For a big question that needs many searches, see deep research in [Deep research
 - It keeps changes to what you asked, and mentions other problems it notices instead of fixing them unasked.
 - After changing code, it runs the project's tests, build or linter when the project has them, and fixes what fails.
 - If you seem new to programming, it explains what it did and how to run it, in plain words: commands for you to run, each with a copy button and what it does, and a snippet you can try in a playground.
-- When it explains code instead of changing it, it shows what has a shape of its own instead of a wall of text: an error with its likely causes and fixes, a test run, a project's files as a tree, an endpoint, approaches to weigh side by side, and a diagram for a flow or an architecture.
+- When it explains code instead of changing it, it shows what has a shape of its own instead of a wall of text: an error with its likely causes and fixes, a test run, a project's files as a tree, an endpoint, code walked through step by step beside its lines, a program's run line by line with its variables, approaches to weigh side by side, and a diagram for a flow or an architecture.
 - It finishes with a short summary: what changed, how it checked it, and anything left to do.
 
 ### Tutor
@@ -109,7 +109,7 @@ For a big question that needs many searches, see deep research in [Deep research
 
 - If your level or goal is unclear, it asks one quick question first, with the likely answers as buttons to click (new to it, know the basics, revising for an exam).
 - It teaches one step at a time, in plain words, with a concrete example for each new idea, from simple to harder.
-- It makes each step something to see or try, not only to read: a diagram, a picture, a formula card, a function graph with sliders, a map of how ideas connect, an explanation you can switch between depths, a worked example revealed one step at a time, code you can run and change, a small simulation; maths drawn as in a textbook.
+- It makes each step something to see or try, not only to read: a diagram, a picture, a formula card, a function graph with sliders, a map of how ideas connect, an explanation you can switch between depths, a worked example revealed one step at a time, code you can run and change, code walked through line by line, a program run step by step after you predict what it prints, a small simulation; maths drawn as in a textbook.
 - After each step, it checks with something you answer in place, and waits before going on: a short quiz, practice problems you answer in your own words or numbers (checked as you go, with hints and the solution after a try), fill-in-the-blanks, matching or putting things in order. It reads the score and the answers you send back.
 - When you answer, it says what was right, corrects what was not kindly and specifically, and adapts: another explanation or example when you're stuck, a harder step when you're ahead.
 - With homework or exercises, it guides you with hints and questions, and gives the full solution only when you ask for it or are still stuck after trying.

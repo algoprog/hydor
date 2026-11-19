@@ -20,7 +20,7 @@ const LINES = [
   '  - numbers: stats, chart, table, breakdown, distribution, calculator (a what-if with sliders); numbers in a saved spreadsheet or a data file (more than a few dozen rows, or a card to keep) the card reads itself, from a reference in place of the values (find_ui says how)',
   '  - time and plans: timeline, itinerary, agenda, calendar, roadmap, gantt, countdown, weather',
   '  - things to do: steps, checklist, recipe, workout, commands, timers',
-  '  - learning: key-points, explainer (at several depths), definition, formula, graph (curves with sliders), solution (step by step), quiz, practice (problems answered in place), flashcards, fill-blanks, matching, network (how things connect), playground (code to run)',
+  '  - learning: key-points, explainer (at several depths), definition, formula, graph (curves with sliders), solution (step by step), quiz, practice (problems answered in place), flashcards, fill-blanks, matching, network (how things connect), playground (code to run), walkthrough (code explained step by step, each step lighting up its lines), trace (a program run line by line, with its variables, call stack and output)',
   '  - writing: email, variants, annotated-text (a text with each change or comment marked), diff, social-post',
   '  - checking facts: fact-check (each claim with its verdict and evidence)',
   '  - next steps the user may well want: follow-ups at the end, two to four, asked with a tap, instead of ending on an offer (not after every answer)',

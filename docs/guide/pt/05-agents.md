@@ -100,7 +100,7 @@ Para uma pergunta grande que exige muitas buscas, veja a pesquisa aprofundada em
 - Ele limita as mudanças ao que você pediu e menciona outros problemas que perceber em vez de corrigi-los sem ser solicitado.
 - Depois de alterar o código, ele executa os testes, a build ou o linter do projeto quando existem, e corrige o que falhar.
 - Se você parece novo na programação, ele explica o que fez e como executar, em palavras simples: comandos para você executar, cada um com um botão de copiar e o que ele faz, e um trecho que você pode testar em um playground.
-- Quando explica código em vez de alterá-lo, ele mostra o que tem forma própria em vez de um muro de texto: um erro com suas causas e correções prováveis, uma execução de testes, os arquivos de um projeto como uma árvore, um endpoint, abordagens para pesar lado a lado e um diagrama para um fluxo ou uma arquitetura.
+- Quando explica código em vez de alterá-lo, ele mostra o que tem forma própria em vez de um muro de texto: um erro com suas causas e correções prováveis, uma execução de testes, os arquivos de um projeto como uma árvore, um endpoint, código percorrido passo a passo ao lado de suas linhas, a execução de um programa linha a linha com suas variáveis, abordagens para pesar lado a lado e um diagrama para um fluxo ou uma arquitetura.
 - Ele termina com um resumo curto: o que mudou, como verificou e o que ainda falta fazer.
 
 ### Tutor
@@ -109,7 +109,7 @@ Para uma pergunta grande que exige muitas buscas, veja a pesquisa aprofundada em
 
 - Se seu nível ou objetivo não está claro, ele faz primeiro uma pergunta rápida, com as respostas prováveis como botões para clicar (iniciante, sei o básico, revisando para uma prova).
 - Ele ensina um passo de cada vez, em palavras simples, com um exemplo concreto para cada ideia nova, do mais simples ao mais difícil.
-- Ele faz de cada passo algo para ver ou experimentar, não só para ler: um diagrama, uma imagem, um cartão de fórmula, o gráfico de uma função com controles deslizantes, um mapa de como as ideias se conectam, uma explicação que você alterna entre níveis de profundidade, um exemplo resolvido revelado um passo de cada vez, código que você pode executar e alterar, uma pequena simulação; matemática desenhada como em um livro didático.
+- Ele faz de cada passo algo para ver ou experimentar, não só para ler: um diagrama, uma imagem, um cartão de fórmula, o gráfico de uma função com controles deslizantes, um mapa de como as ideias se conectam, uma explicação que você alterna entre níveis de profundidade, um exemplo resolvido revelado um passo de cada vez, código que você pode executar e alterar, código percorrido linha a linha, um programa executado passo a passo depois que você prevê o que ele imprime, uma pequena simulação; matemática desenhada como em um livro didático.
 - Depois de cada passo, ele confere com algo que você responde ali mesmo e espera antes de seguir: um quiz curto, exercícios que você responde com suas próprias palavras ou números (conferidos conforme você avança, com dicas e a solução depois de uma tentativa), preencher lacunas, associar ou colocar em ordem. Ele lê a pontuação e as respostas que você envia.
 - Quando você responde, ele diz o que estava certo, corrige com gentileza e de forma específica o que não estava e se adapta: outra explicação ou exemplo quando você trava, um passo mais difícil quando você está adiantado.
 - Com lição de casa ou exercícios, ele guia você com dicas e perguntas, e dá a solução completa só quando você pede ou ainda está travado depois de tentar.

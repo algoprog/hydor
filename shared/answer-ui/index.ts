@@ -225,6 +225,17 @@ export const ANSWER_UI_ALIASES: Record<string, string> = {
   'dependency-graph': 'network',
   'network-diagram': 'network',
   connections: 'network',
+  'code-walkthrough': 'walkthrough',
+  'code-tour': 'walkthrough',
+  'explain-code': 'walkthrough',
+  'annotated-code': 'walkthrough',
+  'code-explainer': 'walkthrough',
+  'execution-trace': 'trace',
+  'program-trace': 'trace',
+  'run-trace': 'trace',
+  'step-through': 'trace',
+  debugger: 'trace',
+  'python-tutor': 'trace',
 };
 
 /** A UI by its name, or by another name agents write for it (ANSWER_UI_ALIASES); undefined when there is none. */
