@@ -79,11 +79,11 @@ export function ScheduleChoice({ value, onChange }: { value?: TaskSchedule; onCh
               </button>
             ))}
           </div>
-          <input type="time" value={time} onChange={(e) => e.target.value && daily({ time: e.target.value })} className={cx(inputCls, 'w-32')} aria-label="At" />
+          <input type="time" value={time} onChange={(e) => e.target.value && daily({ time: e.target.value })} className={cx(inputCls, 'w-36!')} aria-label="At" />
         </div>
       )}
       {kind === 'every' && (
-        <select value={minutes} onChange={(e) => onChange({ kind: 'every', minutes: Number(e.target.value) })} className={cx(inputCls, 'w-44')} aria-label="How often">
+        <select value={minutes} onChange={(e) => onChange({ kind: 'every', minutes: Number(e.target.value) })} className={cx(inputCls, 'w-44!')} aria-label="How often">
           {[15, 30, 60, 120, 240, 360, 720].map((m) => (
             <option key={m} value={m}>
               {whenText({ kind: 'every', minutes: m })}

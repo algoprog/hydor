@@ -20,7 +20,7 @@ An agent can hold:
 - **A conversation of its own**: it can keep one conversation, with an inbox for messages from you and other agents, where its scheduled runs post too (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it may use**: reading files, creating and changing files, running commands, using the web, using a browser, using the computer (its screen, mouse and keyboard, in the desktop apps with Computer use on), and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills it loads before it starts when they fit the task (see [Skills](/guide/skills)).
-- **Connections**: connected accounts to turn on in its sessions (see [Connected apps, keys and tools](/guide/connections)).
+- **Connected apps**: connected accounts to turn on in its sessions (see [Connected apps, keys and tools](/guide/connections)).
 - **A program, model and permission mode** to suggest: picked with it on the start page, and still yours to change before you start.
 - **Where its sessions start** when you pick no folder: a new task folder of their own, or the folder shown on the start page.
 
@@ -40,7 +40,7 @@ Click a card for the agent's own page, which keeps the column beside it with tha
 
 - Its settings in a few sentences, such as "It works everywhere, every weekday at 09:00, and thinks with Quick." Click any underlined words to change them there (see [Change an agent](#change-an-agent)).
 - **Start a session** opens the start page with the agent picked (and its project, when it works in one).
-- **All settings** opens every setting in the editor (see [All settings](#all-settings)). **Duplicate** makes a copy to change; **Delete** removes one of yours.
+- **All settings** opens every setting of the agent in a window (see [All settings](#all-settings)). **Duplicate** makes a copy to change; **Delete** removes one of yours.
 - **More** (⋯): **Versions**, for one of yours, lists what it was before each change, to compare and bring back (see [Versions: go back to an earlier one](#versions-go-back-to-an-earlier-one)); **Download as a file** saves it as a file to keep or give (see [Share an agent as a file](#share-an-agent-as-a-file)).
 - **Examples**, for one of yours: messages to try it with and what its answer must do, with **Try the examples** (see [Examples that check it](#examples-that-check-it)).
 - **Schedules** lists the scheduled tasks that run as it, with **Add a schedule**.
@@ -151,50 +151,56 @@ For a big question that needs many searches, see deep research in [Deep research
 
 ### Say what it should do
 
-1. On the [Agents page](/agents), click **New** at the top of the column, then **New agent** (on a phone, **New agent** at the top of the page).
-2. Under "What should it do?", say it in a few sentences, and when it should work by itself if it should: "Every Friday afternoon, write my weekly progress report from my commits and notes, and let me check it before it goes." The examples under the box fill it in when you click one.
-3. Click **Draft it**. The helper model (Settings → Models → Helper model) drafts the agent: its name, icon, line, instructions, what it may use, the tier it thinks with, and a schedule when you asked for one.
-4. Read the draft as sentences, and click any underlined words to change them (see [Change an agent](#change-an-agent)). With a schedule, "Each scheduled run starts with" holds the message each run begins with; **Its instructions** opens what it reads.
+1. On the [Agents page](/agents), click **New** at the top of the column, then **New agent** (on a phone, **New agent** at the top of the page). The **New agent** window opens in two steps, shown at its top as **1 Describe** and **2 Set up**.
+2. Under "What should your agent do?", say it in your own words, and when it should work by itself if it should: "Every Friday afternoon, write my weekly progress report from my commits and notes, and let me check it before it goes." Under **Or start from an idea**, **Paper digest**, **Weekly report**, **Change reviewer** and **Translator** put a sentence in the box when you click one, for you to change.
+3. Click **Draft my agent** (or press Ctrl+Enter, ⌘+Enter on a Mac). The helper model (Settings → Models → Helper model) drafts the agent: its name, icon, line, instructions, what it may use, the tier it thinks with, and a schedule when you asked for one. The window moves on to **Set up**.
+4. Read through the draft and change what you like (see [All settings](#all-settings)). **Back** returns to **Describe**: what you wrote stays, and drafting again replaces the draft.
 5. Click **Create agent**. The app says "*name* is ready" and opens its page; its schedule, if it has one, is a scheduled task that runs as it.
 
-**All settings** opens the draft in the editor instead, and **Describe it again** goes back to the box. A project's **Agents** tab has **New agent here**, which makes one that works in that project, and, while it has none, **Make one for this project**, which makes one from what the project says about itself or from the template for its kind; a new project can get one as it is made (see [Projects](/guide/projects)).
+If you close the window (✕, Esc or a click outside it) after you typed or changed something, it asks **Discard this agent?** first. A project's **Agents** tab has **New agent here**, which makes one that works in that project, and, while it has none, **Make one for this project**, which makes one from what the project says about itself or from the template for its kind; a new project can get one as it is made (see [Projects](/guide/projects)).
 
-### Start empty
+### Set it up yourself
 
-**Start empty**, under the box, opens the editor with nothing filled in but the icon (see [All settings](#all-settings)). You can keep up to 200 agents of your own.
+**Set it up myself**, under the box, skips the draft and opens **Set up** with nothing filled in but the icon (see [All settings](#all-settings)). You can keep up to 200 agents of your own.
 
 ### All settings
 
-The editor that **All settings** opens has every setting of an agent; on a phone it opens as a sheet from the bottom of the screen. Only the name is required. **Save** keeps it ("*name* is saved", or "*name* is ready" for a new one); **Cancel** closes the editor without saving. The fields, from the top:
+**Set up** is the second step of **New agent**, and what **All settings** on an agent's page opens for that agent, with no **Describe** step. On a phone the window fills the screen. At the top are the icon (click it to pick one of 30: a telescope, a pen, a chef's hat, a plane, a wallet and so on) and the name, up to 60 characters, such as "Bookkeeper" or "Travel agent". Only the name is required.
 
-- **Icon**: the icon left of the name. Click it to pick one of 30 (a telescope, a pen, a chef's hat, a plane, a wallet and so on).
-- **Name**: up to 60 characters, such as "Bookkeeper" or "Travel agent".
-- **One line about it**: up to 160 characters, shown on its card and in the start page's menu, such as "Keeps the household accounts in order".
-- **Instructions**: who it is and how it works, up to 20,000 characters. It reads this at the start of every session. Write it the way the built-ins do: "You are the user's bookkeeper for this session", then a few lines on how it works ("Ask for the statements you need", "Keep totals in a spreadsheet in the working folder").
-- **Where it works**: **Everywhere**, or **In projects** with a switch for each project (see [Where an agent works](#where-an-agent-works)).
-- **Where its sessions start**, when no folder is picked on the start page:
-  - **A new task folder** (the default): each session gets a fresh folder of its own (see [Task folders](#task-folders-where-a-task-without-a-folder-works)).
-  - **The folder on the start page**: sessions work in the folder shown there, as Coder does. Pick this for agents that work in a project.
-- **Runs on**: the program it suggests, picked with it on the start page.
-  - **Any agent** (the default) keeps the program picked on the start page.
-  - **Claude Code**, **Codex**, **Custom** ("Any model"), or any agent you added in [Settings → Agents → More agents](/settings?s=agents).
-  - Once you pick a program, a model menu appears next to it with that program's models (for programs that offer a choice); left alone, it is the program's default model. A tier below picks the model instead.
-- **Permission mode**: when it asks you first.
-  - **As picked** (the default): keeps the mode picked on the start page.
-  - **Ask**: asks before changing files and running commands.
-  - **Accept edits**: changes files freely, asks before commands.
-  - **Full access**: never asks.
-  - **Plan**: reads and plans only, until you approve.
+On a computer a column at the left lists seven sections, each with what it is set to now under its name, so the whole agent shows at a glance; click one to see its settings beside it. When a section is longer than the window, a **More below** button shows there is more. On a phone, **Set up** lists the sections with what each is set to; tap one to open it, and **‹ All settings** goes back.
 
-  Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
-- **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**; under it **Subagents it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
-- **What it may use**: seven switches, all on for a new agent (see below).
-- **Skills to favor**: skill names, one at a time (see below).
-- **Connections**: shown when you have connected accounts (see below).
-- **Team**: a switch for each other agent it may hand work to, and **Other agents may hand it work** (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
-- **Monthly budget**: dollars a month, or empty for no limit (see [A monthly budget](#a-monthly-budget)).
-- **Its own conversation**: **Keeps one conversation, with an inbox** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
-- **Hands back**: the fields of each result and where each goes (see [What an agent hands back](#what-an-agent-hands-back)).
+- **About**:
+  - **One line about it**: up to 160 characters, shown on its card and in the start page's menu, such as "Keeps the household accounts in order".
+  - **Instructions**: who it is and how it works, up to 20,000 characters. It reads this at the start of every session. Write it the way the built-ins do: "You are the user's bookkeeper for this session", then a few lines on how it works ("Ask for the statements you need", "Keep totals in a spreadsheet in the working folder").
+- **Where and when**:
+  - **Where it works**: **Everywhere**, or **Only in some projects** with a switch for each project (see [Where an agent works](#where-an-agent-works)).
+  - **When it works**: for a new agent, **When asked**, **At a time** (days and a time) or **Every…** (an interval), and **Each run starts with**, the message each scheduled run begins with. For an agent you already have, its schedules are listed here; you add and change them on its page, under **Schedules** (see [When an agent works: schedules](#when-an-agent-works-schedules)).
+  - **Keeps one conversation, with an inbox** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
+  - **Where its sessions start**, when no folder is picked on the start page:
+    - **A new task folder** (the default): each session gets a fresh folder of its own (see [Task folders](#task-folders-where-a-task-without-a-folder-works)).
+    - **The folder on the start page**: sessions work in the folder shown there, as Coder does. Pick this for agents that work in a project.
+- **Model**:
+  - **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**, each with a line on what it is for (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
+  - **Runs on**: the program it suggests, picked with it on the start page.
+    - **Any agent** (the default) keeps the program picked on the start page.
+    - **Claude Code**, **Codex**, **Custom** ("Any model"), or any agent you added in [Settings → Agents → More agents](/settings?s=agents).
+    - Once you pick a program, a model menu appears next to it with that program's models (for programs that offer a choice); left alone, it is the program's default model. A tier above picks the model instead.
+  - **Permission mode**: when it asks you first.
+    - **As picked** (the default): keeps the mode picked on the start page.
+    - **Ask**: asks before changing files and running commands.
+    - **Accept edits**: changes files freely, asks before commands.
+    - **Full access**: never asks.
+    - **Plan**: reads and plans only, until you approve.
+
+    Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
+  - **Subagents it starts**: **Any**, or never above a tier.
+  - **Step up when a check fails**: on unless you turn it off.
+- **Tools**: **What it may use** (seven switches, all on for a new agent, with **Turn all on** when some are off; see below), **Skills to favor** (see below) and **Connected apps**, shown when you have connected accounts (see below).
+- **Team**: **Other agents may hand it work**, and **It may hand work to** with a switch for each other agent (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
+- **Results**: what it hands back: the fields of each result and where each goes (see [What an agent hands back](#what-an-agent-hands-back)).
+- **Budget**: **No limit**, or **A monthly limit** in dollars; for an agent you have, it says what it spent this month (see [A monthly budget](#a-monthly-budget)).
+
+**Create agent** makes a new agent. For one you have, **Save** keeps your changes ("*name* is saved") and **Cancel** closes the window without saving; closing it after a change asks **Discard your changes?**.
 
 ### What it may use
 
@@ -215,15 +221,15 @@ What happens to the ones you switch off depends on the program:
 - **Claude Code, Codex and Custom** also have the browser and the computer's tools switched off when **Use a browser** or **Use the computer** is off.
 - **Other agents** are told not to use them.
 
-The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search and page reading go too; with **Use a browser** off, its browser goes; with **Use the computer** off, its screen, mouse and keyboard tools go; with **Read files** off, its document reader. Connected accounts are not "other tools": the **Connections** below decide those. When a task needs something the agent can't use, it is told to say so instead of working around it.
+The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search and page reading go too; with **Use a browser** off, its browser goes; with **Use the computer** off, its screen, mouse and keyboard tools go; with **Read files** off, its document reader. Connected accounts are not "other tools": the **Connected apps** below decide those. When a task needs something the agent can't use, it is told to say so instead of working around it.
 
 ### Skills to favor
 
-Type a skill's name and press Enter (or a comma) to add it. The field suggests Claude Code's and Codex's own skills, as [Settings → Agents → Skills](/settings?s=skills) lists them for the folder open in Files; you can also type the name of a skill in the skill library, such as research. Click the bin next to a name to take it off. Up to 30. When one of these skills fits the task, the agent loads it before it starts and follows it. See [Skills](/guide/skills) for the skills that come with the app and how to add more.
+In **Tools**, type a skill's name and press Enter (or a comma) to add it. The field suggests Claude Code's and Codex's own skills, as [Settings → Agents → Skills](/settings?s=skills) lists them for the folder open in Files; you can also type the name of a skill in the skill library, such as research. Click the bin next to a name to take it off. Up to 30. When one of these skills fits the task, the agent loads it before it starts and follows it. See [Skills](/guide/skills) for the skills that come with the app and how to add more.
 
 ### Connections
 
-This part shows only when you have connected accounts (set up in [Apps → Connected apps](/apps/connected)). Each one has a switch: on means it is on in this agent's sessions. One that is already on for every session says "On for every session" instead. If an account the agent names is no longer connected, it shows as "(not connected)" with a button to remove it. See [Connected apps, keys and tools](/guide/connections).
+**Connected apps**, in **Tools**, shows only when you have connected accounts (set up in [Apps → Connected apps](/apps/connected)). Each one has a switch: on means it is on in this agent's sessions. One that is already on for every session says "On for every session" instead. If an account the agent names is no longer connected, it shows with "Not connected" under its name and a button to remove it. See [Connected apps, keys and tools](/guide/connections).
 
 ## Change an agent
 
@@ -316,17 +322,17 @@ An agent that keeps a conversation of its own takes the work in its inbox instea
 
 ## A monthly budget
 
-An agent's **Monthly budget** caps what its sessions spend in a month (from the first of the month, in this computer's time):
+An agent's monthly limit (**Budget** in **All settings**, or its sentence on its page) caps what its sessions spend in a month (from the first of the month, in this computer's time):
 
 - Each session started as it gets a spending cap of what is left of the budget (the lower one, when the session has a cap of its own).
 - What its plain subagents spend counts towards it; a named agent's work counts towards that agent's own budget.
 - Once the budget is spent, no session starts as it until the next month: a scheduled run says why it could not start, and its card says **Budget spent**.
 
-What each session spends is worked out as in [Usage and costs](/guide/usage). Leave the field empty for no limit.
+What each session spends is worked out as in [Usage and costs](/guide/usage). Leave it at **No limit** for none.
 
 ## What an agent hands back
 
-Without anything set, an agent hands back its reply in the conversation. Give it fields and places in **Hands back** (in All settings, or from its sentence "It hands back *its reply*"), and at the end of each task it hands back a result with those fields, checked before it goes anywhere:
+Without anything set, an agent hands back its reply in the conversation. Give it fields and places in **Results** (in **All settings**, or from its sentence "It hands back *its reply*"), and at the end of each task it hands back a result with those fields, checked before it goes anywhere:
 
 - **Fields of each result**: a name and a kind for each (text, long text, number, yes or no, date, link, list, or table with its columns), and whether it is required. The agent fills them in with its hand_back tool; a result that does not fit goes back to it with what to fix.
 - **Where each result goes**, besides the conversation:
@@ -349,7 +355,7 @@ The agent's page shows **What it handed back** as a table: a row for each result
 
 ## An agent with a conversation of its own
 
-Most agents start a new session each time. Turn on **Keeps one conversation, with an inbox** (in All settings, or in the "when" part of its sentence), and the agent keeps one conversation of its own instead, made the first time it is needed, in its project's folder when it works in one project:
+Most agents start a new session each time. Turn on **Keeps one conversation, with an inbox** (in **All settings** under **Where and when**, or in the "when" part of its sentence), and the agent keeps one conversation of its own instead, made the first time it is needed, in its project's folder when it works in one project:
 
 - Messages for it wait in its **Inbox** and go into its conversation one at a time, each when the one before has its answer: what you send from its page and what other agents hand it.
 - Its scheduled runs post into the same conversation, waiting for a turn under way to end; each shows in its schedule's history, as any run does.
@@ -400,7 +406,7 @@ A session started without an agent (in VS Code or a terminal, or before agents c
 
 On an agent's page:
 
-- **Duplicate** (on every agent): opens the editor as a new agent with everything filled in and the name "*name* (copy)". Change what you like and **Save**. This is how you make your own version of a built-in.
+- **Duplicate** (on every agent): opens the window at **Set up** as a new agent with everything filled in and the name "*name* (copy)". Change what you like and click **Create agent**; its page opens. This is how you make your own version of a built-in.
 - **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay where they were kept.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.

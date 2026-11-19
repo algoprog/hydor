@@ -20,7 +20,7 @@ Ein Agent kann Folgendes festlegen:
 - **Eine eigene Unterhaltung**: Er kann eine Unterhaltung führen, mit einem Posteingang für Nachrichten von dir und von anderen Agenten, in dem auch seine geplanten Läufe etwas hinterlassen (siehe [Ein Agent mit einer eigenen Unterhaltung](#an-agent-with-a-conversation-of-its-own)).
 - **Erlaubte Werkzeuge**: Dateien lesen, Dateien erstellen und ändern, Befehle ausführen, das Web benutzen, einen Browser benutzen, den Computer benutzen (seinen Bildschirm, seine Maus und seine Tastatur, in den Desktop-Apps mit eingeschaltetem Computer Use) und andere Tools. Lass alle eingeschaltet oder schalte einige aus.
 - **Bevorzugte Skills**, die bei passenden Aufgaben vor Arbeitsbeginn geladen werden. Siehe [Skills](/guide/skills).
-- **Verbindungen** für in seinen Sitzungen aktivierte Konten. Siehe [Verbundene Apps, Keys und Tools](/guide/connections).
+- **Verbundene Apps** für in seinen Sitzungen aktivierte Konten. Siehe [Verbundene Apps, Keys und Tools](/guide/connections).
 - **Empfehlungen für Programm, Modell und Berechtigungsmodus**, die auf der Startseite übernommen werden, aber vor dem Start änderbar bleiben.
 - **Standard-Arbeitsordner**, wenn du keinen wählst: ein neuer Aufgabenordner oder der auf der Startseite angezeigte Ordner.
 
@@ -40,7 +40,7 @@ Klicke auf eine Karte für die eigene Seite des Agenten. Die Spalte bleibt daneb
 
 - Einstellungen erscheinen als Sätze, etwa „Arbeitet überall, werktags um 09:00 Uhr und verwendet Quick“. Unterstrichene Teile lassen sich direkt ändern; siehe [Agenten bearbeiten](#change-an-agent).
 - **Sitzung starten** öffnet die Startseite mit diesem Agenten und gegebenenfalls seinem Projekt.
-- **Alle Einstellungen** öffnet den vollständigen Editor; siehe [Alle Einstellungen](#all-settings). **Duplizieren** erstellt eine bearbeitbare Kopie, **Löschen** entfernt einen eigenen Agenten.
+- **Alle Einstellungen** öffnet alle Einstellungen des Agenten in einem Fenster; siehe [Alle Einstellungen](#all-settings). **Duplizieren** erstellt eine bearbeitbare Kopie, **Löschen** entfernt einen eigenen Agenten.
 - **Mehr** (⋯): **Versionen** listet bei einem deiner Agenten auf, wie er vor jeder Änderung war, zum Vergleichen und Zurückholen (siehe [Versionen: zu einer früheren zurückgehen](#versions-go-back-to-an-earlier-one)); **Als Datei herunterladen** speichert ihn als Datei zum Aufbewahren oder Weitergeben (siehe [Einen Agenten als Datei teilen](#share-an-agent-as-a-file)).
 - **Beispiele** enthält bei eigenen Agenten Testnachrichten und Prüfkriterien samt **Beispiele testen**. Siehe [Prüfbeispiele](#examples-that-check-it).
 - **Zeitpläne** listet als dieser Agent laufende Aufgaben und bietet **Zeitplan hinzufügen**.
@@ -151,50 +151,56 @@ Für eine große Frage, die viele Suchen braucht, siehe tiefgehende Recherche un
 
 ### Beschreiben, was er tun soll
 
-1. Klicke auf der [Agentenseite](/agents) oben in der Spalte auf **Neu**, dann auf **Neuer Agent** (auf dem Smartphone auf **Neuer Agent** oben auf der Seite).
-2. Sag unter „Was soll es tun?“ in ein paar Sätzen, was es tun soll und, falls es selbstständig arbeiten soll, wann: „Schreibe jeden Freitagnachmittag meinen wöchentlichen Fortschrittsbericht anhand meiner Commits und Notizen und lass mich ihn vor der Veröffentlichung prüfen.“ Die Beispiele unter dem Feld füllen es aus, wenn du eines anklickst.
-3. **Entwurf erstellen** lässt das Hilfsmodell unter Einstellungen → Modelle einen Namen, Symbol, Kurzbeschreibung, Anweisungen, Werkzeuge, Modellstufe und gegebenenfalls Zeitplan entwerfen.
-4. Lies die Beschreibung und ändere unterstrichene Teile direkt; siehe [Agenten bearbeiten](#change-an-agent). Bei Zeitplänen steht unter „Jeder geplante Lauf beginnt mit“ die Startnachricht. **Seine Anweisungen** zeigt den vollständigen Text.
-5. **Agent erstellen** meldet „*Name* ist bereit“ und öffnet die Agentenseite. Ein Zeitplan wird als geplante Aufgabe mit diesem Agenten angelegt.
+1. Klicke auf der [Agentenseite](/agents) oben in der Spalte auf **Neu**, dann auf **Neuer Agent** (auf dem Smartphone auf **Neuer Agent** oben auf der Seite). Das Fenster **Neuer Agent** öffnet sich in zwei Schritten, die oben als **1 Beschreiben** und **2 Einrichten** angezeigt werden.
+2. Sag unter „Was soll dein Agent tun?“ in deinen eigenen Worten, was er tun soll und, falls er selbstständig arbeiten soll, wann: „Schreibe jeden Freitagnachmittag meinen wöchentlichen Fortschrittsbericht anhand meiner Commits und Notizen und lass mich ihn vor der Veröffentlichung prüfen.“ Unter **Oder starte mit einer Idee** setzen **Paper-Zusammenfassung**, **Wochenbericht**, **Änderungsprüfer** und **Übersetzer** beim Anklicken einen Satz in das Feld, den du ändern kannst.
+3. Klicke auf **Meinen Agenten entwerfen** (oder drücke Strg+Enter, auf dem Mac ⌘+Enter). Das Hilfsmodell unter Einstellungen → Modelle → Hilfsmodell entwirft Name, Symbol, Kurzbeschreibung, Anweisungen, Werkzeuge, Modellstufe und gegebenenfalls einen Zeitplan. Das Fenster wechselt zu **Einrichten**.
+4. Sieh dir den Entwurf an und ändere, was du willst (siehe [Alle Einstellungen](#all-settings)). **Zurück** führt zu **Beschreiben** zurück: Was du geschrieben hast, bleibt erhalten, und ein neuer Entwurf ersetzt den bisherigen.
+5. Klicke auf **Agent erstellen**. Die App meldet „*Name* ist bereit“ und öffnet die Agentenseite. Ein Zeitplan wird als geplante Aufgabe mit diesem Agenten angelegt.
 
-**Alle Einstellungen** öffnet den vollständigen Editor, **Erneut beschreiben** kehrt zum Auftrag zurück. Im Projekt bietet der Tab **Agenten** die Option **Neuer Agent hier** sowie ohne Projektagenten **Einen für dieses Projekt erstellen** anhand von Beschreibung oder passender Vorlage. Auch neue Projekte können direkt einen erhalten; siehe [Projekte](/guide/projects).
+Schließt du das Fenster (✕, Esc oder ein Klick daneben), nachdem du etwas eingegeben oder geändert hast, fragt es zuerst **Diesen Agenten verwerfen?**. Im Projekt bietet der Tab **Agenten** die Option **Neuer Agent hier** sowie ohne Projektagenten **Einen für dieses Projekt erstellen** anhand von Beschreibung oder passender Vorlage. Auch neue Projekte können direkt einen erhalten; siehe [Projekte](/guide/projects).
 
-### Leer beginnen
+### Selbst einrichten
 
-**Leer beginnen** unter dem Feld öffnet den Editor nur mit vorausgewähltem Symbol. Siehe [Alle Einstellungen](#all-settings). Du kannst bis zu 200 eigene Agenten behalten.
+**Selbst einrichten** unter dem Feld überspringt den Entwurf und öffnet **Einrichten** nur mit vorausgewähltem Symbol. Siehe [Alle Einstellungen](#all-settings). Du kannst bis zu 200 eigene Agenten behalten.
 
 ### Alle Einstellungen
 
-Der Editor, den **Alle Einstellungen** öffnet, enthält jede Einstellung eines Agenten; auf dem Smartphone öffnet er sich als Fenster vom unteren Bildschirmrand. Nur der Name ist Pflicht. **Speichern** übernimmt die Änderungen („*Name* ist gespeichert“ oder bei einem neuen Agenten „*Name* ist bereit“); **Abbrechen** schließt den Editor ohne Speichern. Die Felder, von oben:
+**Einrichten** ist der zweite Schritt von **Neuer Agent** und das, was **Alle Einstellungen** auf der Seite eines Agenten für diesen Agenten öffnet, ohne den Schritt **Beschreiben**. Auf dem Smartphone füllt das Fenster den Bildschirm. Oben stehen das Symbol (klicke darauf, um eines von 30 auszuwählen: ein Teleskop, ein Stift, eine Kochmütze, ein Flugzeug, eine Geldbörse und so weiter) und der Name, höchstens 60 Zeichen, etwa „Buchhaltung“ oder „Reiseberatung“. Nur der Name ist Pflicht.
 
-- **Symbol**: das Symbol links neben dem Namen. Klicke darauf, um eines von 30 auszuwählen (ein Teleskop, ein Stift, eine Kochmütze, ein Flugzeug, eine Geldbörse und so weiter).
-- **Name**: höchstens 60 Zeichen, etwa „Buchhaltung“ oder „Reiseberatung“.
-- **Eine Zeile dazu**: höchstens 160 Zeichen, angezeigt auf seiner Karte und im Menü der Startseite, etwa „Hält die Haushaltskonten in Ordnung“.
-- **Anweisungen**: Rolle und Arbeitsweise, höchstens 20.000 Zeichen, zu Sitzungsbeginn gelesen. Beginne etwa mit „Du übernimmst in dieser Sitzung die Buchhaltung des Nutzers“ und ergänze „Frage nach benötigten Abrechnungen“ oder „Halte Summen in einer Tabelle im Arbeitsordner fest“.
-- **Arbeitsbereich**: **Überall** oder **In Projekten** mit einem Schalter für jedes Projekt (siehe [Wo ein Agent arbeitet](#where-an-agent-works)).
-- **Wo seine Sitzungen beginnen**, wenn auf der Startseite kein Ordner ausgewählt ist:
-  - **Neuer Aufgabenordner** als Standard für eine eigene frische Ablage. Siehe [Aufgabenordner](#task-folders-where-a-task-without-a-folder-works).
-  - **Der Ordner auf der Startseite**: Sitzungen arbeiten in dem Ordner, der dort angezeigt wird, wie bei Programmierer. Wähle das für Agenten, die in einem Projekt arbeiten.
-- **Ausführungsumgebung**: das Programm, das er vorschlägt und mit dem er auf der Startseite ausgewählt wird.
-  - **Beliebiger Agent** behält standardmäßig deine Startseitenauswahl;
-  - **Claude Code**, **Codex**, **Custom** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
-  - Sobald du ein Programm auswählst, erscheint daneben ein Modellmenü mit den Modellen dieses Programms (bei Programmen, die eine Auswahl bieten); lässt du es unberührt, gilt das Standardmodell des Programms. Eine Leistungsstufe darunter bestimmt stattdessen das Modell.
-- **Berechtigungsmodus**:
-  - **Wie ausgewählt** (die Standardeinstellung): behält den auf der Startseite gewählten Modus.
-  - **Fragen** vor Dateiänderungen und Befehlen;
-  - **Änderungen akzeptieren** für freie Dateibearbeitung, Rückfragen vor Befehlen;
-  - **Voller Zugriff** ohne Rückfragen;
-  - **Plan** nur zum Lesen und Planen bis zur Freigabe.
+Auf dem Computer listet eine Spalte links sieben Bereiche auf, jeweils mit dem, worauf er gerade eingestellt ist, unter seinem Namen, sodass du den ganzen Agenten auf einen Blick siehst. Klicke auf einen, um daneben seine Einstellungen zu sehen. Ist ein Bereich länger als das Fenster, zeigt die Schaltfläche **Weiter unten mehr**, dass es weitergeht. Auf dem Smartphone listet **Einrichten** die Bereiche mit ihrer jeweiligen Einstellung auf; tippe auf einen, um ihn zu öffnen, und **‹ Alle Einstellungen** führt zurück.
 
-  Claude Code, Codex und Custom verwenden jeweils passende Modi. Andere Programme wie Gemini CLI oder OpenCode behalten ihre eigenen.
-- **Modellstufe**: **Automatisch**, **Schnell**, **Standard**, **Am besten** oder **Max**. Darunter **Höchste Modellstufe für die von ihm gestarteten Subagenten** mit **Beliebig** oder einer Stufe und standardmäßig **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln**. Siehe [Modellstufen](#what-an-agent-thinks-with-tiers).
-- **Erlaubte Werkzeuge**: sieben Schalter, bei einem neuen Agenten alle eingeschaltet (siehe unten).
-- **Bevorzugte Skills** mit einzeln eingegebenen Namen; siehe unten.
-- **Verbindungen**, sobald Konten verbunden sind; siehe unten.
-- **Team**: ein Schalter für jeden anderen Agenten, an den er Arbeit übergeben darf, und **Andere Agenten dürfen ihm Arbeit übergeben** (siehe [Agenten, die Arbeit an andere Agenten übergeben](#agents-that-hand-work-to-other-agents)).
-- **Monatsbudget** in Dollar, leer für unbegrenzt. Siehe [Monatsbudget](#a-monthly-budget).
-- **Eine eigene Unterhaltung**: **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang**. Siehe [Eigene Unterhaltungen](#an-agent-with-a-conversation-of-its-own).
-- **Ergebnisübergabe**: die Felder jedes Ergebnisses und wohin jedes geht (siehe [Was ein Agent übergibt](#what-an-agent-hands-back)).
+- **Über**:
+  - **Eine Zeile dazu**: höchstens 160 Zeichen, angezeigt auf seiner Karte und im Menü der Startseite, etwa „Hält die Haushaltskonten in Ordnung“.
+  - **Anweisungen**: Rolle und Arbeitsweise, höchstens 20.000 Zeichen, zu Sitzungsbeginn gelesen. Beginne etwa mit „Du übernimmst in dieser Sitzung die Buchhaltung des Nutzers“ und ergänze „Frage nach benötigten Abrechnungen“ oder „Halte Summen in einer Tabelle im Arbeitsordner fest“.
+- **Wo und wann**:
+  - **Arbeitsbereich**: **Überall** oder **Nur in einigen Projekten** mit einem Schalter für jedes Projekt (siehe [Wo ein Agent arbeitet](#where-an-agent-works)).
+  - **Ausführungszeitpunkt**: bei einem neuen Agenten **Auf Anfrage**, **Zu einer Uhrzeit** (Tage und Uhrzeit) oder **Jeden…** (ein Intervall) sowie **Jeder Lauf beginnt mit**, der Nachricht, mit der jeder geplante Lauf beginnt. Bei einem vorhandenen Agenten stehen hier seine Zeitpläne; du fügst sie auf seiner Seite unter **Zeitpläne** hinzu und änderst sie dort (siehe [Wann ein Agent arbeitet: Zeitpläne](#when-an-agent-works-schedules)).
+  - **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang** (siehe [Eigene Unterhaltungen](#an-agent-with-a-conversation-of-its-own)).
+  - **Wo seine Sitzungen beginnen**, wenn auf der Startseite kein Ordner ausgewählt ist:
+    - **Neuer Aufgabenordner** als Standard für eine eigene frische Ablage. Siehe [Aufgabenordner](#task-folders-where-a-task-without-a-folder-works).
+    - **Der Ordner auf der Startseite**: Sitzungen arbeiten in dem Ordner, der dort angezeigt wird, wie bei Programmierer. Wähle das für Agenten, die in einem Projekt arbeiten.
+- **Modell**:
+  - **Denkt mit**: **Automatisch**, **Schnell**, **Standard**, **Am besten** oder **Max**, jeweils mit einer Zeile dazu, wofür es gedacht ist (siehe [Modellstufen](#what-an-agent-thinks-with-tiers)).
+  - **Ausführungsumgebung**: das Programm, das er vorschlägt und mit dem er auf der Startseite ausgewählt wird.
+    - **Beliebiger Agent** behält standardmäßig deine Startseitenauswahl;
+    - **Claude Code**, **Codex**, **Custom** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
+    - Sobald du ein Programm auswählst, erscheint daneben ein Modellmenü mit den Modellen dieses Programms (bei Programmen, die eine Auswahl bieten); lässt du es unberührt, gilt das Standardmodell des Programms. Eine Leistungsstufe darüber bestimmt stattdessen das Modell.
+  - **Berechtigungsmodus**:
+    - **Wie ausgewählt** (die Standardeinstellung): behält den auf der Startseite gewählten Modus.
+    - **Fragen** vor Dateiänderungen und Befehlen;
+    - **Änderungen akzeptieren** für freie Dateibearbeitung, Rückfragen vor Befehlen;
+    - **Voller Zugriff** ohne Rückfragen;
+    - **Plan** nur zum Lesen und Planen bis zur Freigabe.
+
+    Claude Code, Codex und Custom verwenden jeweils passende Modi. Andere Programme wie Gemini CLI oder OpenCode behalten ihre eigenen.
+  - **Subagenten, die er startet**: **Beliebig** oder nie über einer Stufe.
+  - **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln**: eingeschaltet, solange du es nicht ausschaltest.
+- **Werkzeuge**: **Erlaubte Werkzeuge** (sieben Schalter, bei einem neuen Agenten alle eingeschaltet, mit **Alle aktivieren**, wenn einige ausgeschaltet sind; siehe unten), **Bevorzugte Skills** (siehe unten) und **Verbundene Apps**, sobald Konten verbunden sind (siehe unten).
+- **Team**: **Andere Agenten dürfen ihm Arbeit übergeben** und **Er darf Arbeit übergeben an** mit einem Schalter für jeden anderen Agenten (siehe [Agenten, die Arbeit an andere Agenten übergeben](#agents-that-hand-work-to-other-agents)).
+- **Ergebnisse**: was er zurückgibt: die Felder jedes Ergebnisses und wohin jedes geht (siehe [Was ein Agent übergibt](#what-an-agent-hands-back)).
+- **Budget**: **Keine Begrenzung** oder **Ein Monatslimit** in Dollar; bei einem vorhandenen Agenten steht dort, was er diesen Monat ausgegeben hat (siehe [Monatsbudget](#a-monthly-budget)).
+
+**Agent erstellen** legt einen neuen Agenten an. Bei einem vorhandenen Agenten übernimmt **Speichern** deine Änderungen („*Name* ist gespeichert“), **Abbrechen** schließt das Fenster ohne Speichern; schließt du es nach einer Änderung, fragt es zuerst **Deine Änderungen verwerfen?**.
 
 ### Verfügbare Werkzeuge
 
@@ -215,15 +221,15 @@ Die Wirkung ausgeschalteter Gruppen hängt vom Programm ab:
 - **Claude Code, Codex und Custom** haben außerdem die Werkzeuge für Browser und Computer ausgeschaltet, wenn **Nutze einen Browser** oder **Nutze den Computer** aus ist.
 - **Andere Agenten** erhalten entsprechende Nutzungsverbote als Anweisung.
 
-Die eigenen Werkzeuge der App (Seiten, Memory und dergleichen) bleiben an, außer denen, die unter einen Schalter fallen, den du ausgeschaltet hast: Ist **Web verwenden** aus, entfallen auch die Websuche und das Lesen von Seiten der App; ist **Nutze einen Browser** aus, entfällt ihr Browser; ist **Nutze den Computer** aus, entfallen ihre Werkzeuge für Bildschirm, Maus und Tastatur; ist **Dateien lesen** aus, entfällt ihr Dokumentenleser. Verbundene Konten sind keine „anderen Werkzeuge“: Darüber entscheiden die **Verbindungen** weiter unten. Braucht eine Aufgabe etwas, das der Agent nicht verwenden kann, soll er das sagen, statt sich anders zu behelfen.
+Die eigenen Werkzeuge der App (Seiten, Memory und dergleichen) bleiben an, außer denen, die unter einen Schalter fallen, den du ausgeschaltet hast: Ist **Web verwenden** aus, entfallen auch die Websuche und das Lesen von Seiten der App; ist **Nutze einen Browser** aus, entfällt ihr Browser; ist **Nutze den Computer** aus, entfallen ihre Werkzeuge für Bildschirm, Maus und Tastatur; ist **Dateien lesen** aus, entfällt ihr Dokumentenleser. Verbundene Konten sind keine „anderen Werkzeuge“: Darüber entscheiden die **Verbundenen Apps** weiter unten. Braucht eine Aufgabe etwas, das der Agent nicht verwenden kann, soll er das sagen, statt sich anders zu behelfen.
 
 ### Bevorzugte Skills
 
-Gib einen Skill-Namen ein und drücke Enter oder Komma. Vorschläge stammen aus den eigenen Claude-Code- und Codex-Skills, wie [Einstellungen → Agenten → Skills](/settings?s=skills) sie für den in Dateien geöffneten Ordner zeigt. Auch Bibliotheksnamen wie research sind erlaubt. Der Papierkorb entfernt Einträge. Höchstens 30 sind möglich. Passt einer zur Aufgabe, lädt und befolgt der Agent ihn vor Arbeitsbeginn. Siehe [Skills](/guide/skills) für mitgelieferte und zusätzliche Skills.
+Gib unter **Werkzeuge** einen Skill-Namen ein und drücke Enter oder Komma. Vorschläge stammen aus den eigenen Claude-Code- und Codex-Skills, wie [Einstellungen → Agenten → Skills](/settings?s=skills) sie für den in Dateien geöffneten Ordner zeigt. Auch Bibliotheksnamen wie research sind erlaubt. Der Papierkorb entfernt Einträge. Höchstens 30 sind möglich. Passt einer zur Aufgabe, lädt und befolgt der Agent ihn vor Arbeitsbeginn. Siehe [Skills](/guide/skills) für mitgelieferte und zusätzliche Skills.
 
 ### Verbindungen
 
-Dieser Bereich erscheint bei unter [Apps → Verbundene Apps](/apps/connected) eingerichteten Konten. Ihr Schalter aktiviert sie in Agentensitzungen. Global aktivierte Konten zeigen stattdessen „Für jede Sitzung aktiviert“. Nicht mehr verbundene Konten stehen mit „Nicht verbunden“ und Entfernen-Schaltfläche dort. Siehe [Verbundene Apps, Keys und Tools](/guide/connections).
+**Verbundene Apps** unter **Werkzeuge** erscheint nur bei unter [Apps → Verbundene Apps](/apps/connected) eingerichteten Konten. Ihr Schalter aktiviert sie in Agentensitzungen. Global aktivierte Konten zeigen stattdessen „Für jede Sitzung aktiviert“. Nicht mehr verbundene Konten stehen mit „Nicht verbunden“ unter ihrem Namen und einer Entfernen-Schaltfläche dort. Siehe [Verbundene Apps, Keys und Tools](/guide/connections).
 
 ## Einen Agenten bearbeiten
 
@@ -316,17 +322,17 @@ Ein Agent, der eine eigene Unterhaltung führt, nimmt die Arbeit in seinem Poste
 
 ## Monatsbudget
 
-**Monatsbudget** begrenzt die Kosten der Agentensitzungen seit dem Monatsersten in der Zeitzone dieses Computers:
+Das Monatslimit eines Agenten (**Budget** unter **Alle Einstellungen** oder sein Satz auf seiner Seite) begrenzt die Kosten der Agentensitzungen seit dem Monatsersten in der Zeitzone dieses Computers:
 
 - Jede Sitzung, die als er gestartet wird, bekommt als Ausgabenlimit das, was vom Budget übrig ist (das niedrigere, wenn die Sitzung ein eigenes Limit hat).
 - Was seine einfachen Subagenten ausgeben, wird darauf angerechnet; die Arbeit eines benannten Agenten wird auf dessen eigenes Budget angerechnet.
 - Bei aufgebrauchtem Budget starten bis zum nächsten Monat keine neuen Sitzungen als dieser Agent. Geplante Aufgaben nennen den Grund; die Karte zeigt **Budget aufgebraucht**.
 
-Kosten werden wie unter [Nutzung und Kosten](/guide/usage) ermittelt. Ein leeres Feld bedeutet unbegrenzt.
+Kosten werden wie unter [Nutzung und Kosten](/guide/usage) ermittelt. Bei **Keine Begrenzung** gibt es keines.
 
 ## Ergebnisse eines Agenten
 
-Ohne Konfiguration liefert der Agent seine Unterhaltungsantwort. Unter **Ergebnisse** im vollständigen Editor oder über den entsprechenden Satz kannst du Felder und Ziele festlegen. Nach jeder Aufgabe liefert er dann vor der Zustellung geprüfte Daten:
+Ohne Konfiguration liefert der Agent seine Unterhaltungsantwort. Unter **Ergebnisse** (in **Alle Einstellungen**) oder über den entsprechenden Satz kannst du Felder und Ziele festlegen. Nach jeder Aufgabe liefert er dann vor der Zustellung geprüfte Daten:
 
 - **Ergebnisfelder**: je Name und Typ wie Text, Langtext, Zahl, Ja/Nein, Datum, Link, Liste oder Tabelle mit Spalten sowie Pflichtstatus. Der Agent füllt sie über `hand_back`. Unpassende Ergebnisse werden mit Korrekturhinweisen zurückgegeben.
 - **Ergebnisziele** zusätzlich zur Unterhaltung:
@@ -349,7 +355,7 @@ Die Spalten werden an ihren Überschriften in der ersten Zeile der Tabelle erkan
 
 ## Ein Agent mit eigener Unterhaltung
 
-Üblicherweise starten Agenten pro Auftrag eine Sitzung. **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang** im vollständigen Editor oder unter Auslösern erstellt stattdessen bei Bedarf einmalig eine dauerhafte Unterhaltung, bei genau einem zugeordneten Projekt in dessen Ordner:
+Üblicherweise starten Agenten pro Auftrag eine Sitzung. **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang** unter **Alle Einstellungen** bei **Wo und wann** oder unter Auslösern erstellt stattdessen bei Bedarf einmalig eine dauerhafte Unterhaltung, bei genau einem zugeordneten Projekt in dessen Ordner:
 
 - Nachrichten an ihn warten in seinem **Posteingang** und kommen nacheinander in seine Unterhaltung, jede erst, wenn die vorherige ihre Antwort hat: was du von seiner Seite sendest und was andere Agenten ihm übergeben.
 - Seine geplanten Läufe schreiben in dieselbe Unterhaltung und warten, bis ein laufender Durchgang zu Ende ist; jeder erscheint im Verlauf seines Zeitplans, wie jeder Lauf.
@@ -400,7 +406,7 @@ Eine Sitzung, die ohne Agent gestartet wurde (in VS Code oder einem Terminal ode
 
 Auf der Agentenseite:
 
-- **Duplizieren** (bei jedem Agenten): öffnet den Editor als neuen Agenten mit allem ausgefüllt und dem Namen „*Name* (Kopie)“. Ändere, was du willst, und **Speichern**. So machst du deine eigene Version eines integrierten Agenten.
+- **Duplizieren** (bei jedem Agenten): öffnet das Fenster bei **Einrichten** als neuen Agenten mit allem ausgefüllt und dem Namen „*Name* (Kopie)“. Ändere, was du willst, und klicke auf **Agent erstellen**; seine Seite öffnet sich. So machst du deine eigene Version eines integrierten Agenten.
 - **Löschen** (nur deine eigenen): fragt zuerst „*Name* löschen?“. Sitzungen, die als dieser Agent gestartet wurden, laufen ohne seine Anweisungen weiter; seine Zeitpläne bleiben als gewöhnliche geplante Aufgaben; Agenten, die ihm Arbeit übergeben könnten, führen ihn nicht mehr auf. Projekte, die ihre Sitzungen als er gestartet haben, werden davon befreit: Ihre Sitzungen starten wieder als Allgemein (oder als der Agent, den du wählst). Sein Ergebnisverlauf geht mit ihm; die Seiten und Tabellen, die er gefüllt hat, bleiben dort, wo sie behalten wurden.
 
 Auch die Suche per Strg+K beziehungsweise ⌘K findet Agenten nach Name und Beschreibung und öffnet ihre Seite.

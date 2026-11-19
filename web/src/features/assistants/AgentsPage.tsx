@@ -1,21 +1,20 @@
 // The Agents page (/agents): your agents, each in a few sentences (what it does, where and when it works, what it
-// thinks with, whom it asks, what it may spend) with how it is doing; New agent drafts one from what you say it
-// should do; an agent's own page (/agents/<id>) changes it in place, lists its schedules, examples and recent sessions,
-// opens All settings (every setting, in the editor), and in its menu its Versions and Download as a file; Install
-// installs one from a file.
+// thinks with, whom it asks, what it may spend) with how it is doing; New agent opens a window (AgentEditor.tsx) that
+// drafts one from what you say it should do, then lets you set it up; an agent's own page (/agents/<id>) changes it
+// in place, lists its schedules, examples and recent sessions, opens All settings (every setting, in the same window),
+// and in its menu its Versions and Download as a file; Install installs one from a file.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { BellRing, CalendarClock, CalendarDays, ChevronDown, Copy, Download, FileDown, FileUp, Globe, History, LayoutGrid, MessageSquarePlus, MoreHorizontal, Plus, Search, Settings2, Sparkles, Trash2, User, X } from 'lucide-react';
 import { agentFileName } from '@shared/agent-files';
-import { agentMode, DEFAULT_ASSISTANT, hasOutput, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
-import type { ScheduledTask, TaskDraft, TaskSchedule } from '@shared/automations';
+import { DEFAULT_ASSISTANT, hasOutput, type Assistant, type AssistantsState } from '@shared/assistants';
+import type { ScheduledTask, TaskDraft } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
-import { api, del, enc, post, put } from '../../lib/api';
+import { api, del, enc, put } from '../../lib/api';
 import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
-import { lastAgent } from '../../lib/start';
-import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
-import { Badge, Button, cx, IconButton, inputCls, MenuItem, Popover, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { toastError, useApp, useSessions, useUI } from '../../lib/store';
+import { Badge, Button, cx, IconButton, MenuItem, Popover, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
@@ -25,8 +24,9 @@ import { SchedulesView } from '../automations/SchedulesView';
 import { TaskEditor } from '../settings/TasksSettings';
 import { SpaceMark } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
-import { EditAssistant, ImportDialog } from './AssistantsSettings';
-import { loadActivity, nextRunOf, statusOf, useAgentActivity } from './agentsState';
+import { AgentDialog } from './AgentEditor';
+import { ImportDialog } from './AssistantsSettings';
+import { loadActivity, nextRunOf, scheduleDraft, statusOf, useAgentActivity } from './agentsState';
 import { AssistantIcon } from './icons';
 import { assistantTranslate } from './language';
 import { AgentSentences } from './Sentences';
@@ -37,13 +37,6 @@ import { InstallAgentDialog } from './InstallAgent';
 import { useAssistants, useAssistantsState } from './state';
 
 const saved = (r: AssistantsState) => useAssistants.getState().set(r);
-
-const EXAMPLES = [
-  'Every weekday at 8, find new papers on my research topics and keep the five best in my files, two lines each.',
-  'Every Friday afternoon, write my weekly progress report from my commits and notes, and let me check it before it goes.',
-  'Review each change I make to this project for bugs and missing tests, and tell me what to fix first.',
-  'Translate what I give it into Chinese and Greek, keeping headings, links and code as they are.',
-];
 
 /** The dot and words of how an agent is doing. */
 function Status({ s }: { s: ReturnType<typeof statusOf> }) {
@@ -105,174 +98,6 @@ function AgentCard({ a, spaces }: { a: Assistant; spaces: SpaceView[] | null }) 
         )}
       </div>
     </button>
-  );
-}
-
-// ---- a new agent, from what it should do ---------------------------------------------------------------------
-
-interface Draft {
-  a: Partial<Assistant>;
-  schedule?: TaskSchedule;
-  task?: string;
-}
-
-/** The task that runs an agent on its schedule: its agent program and mode, in the project's folder or the task folders' root. */
-export function scheduleDraft(a: Pick<Assistant, 'id' | 'name' | 'agent' | 'acpAgent' | 'mode' | 'projects'>, schedule: TaskSchedule, prompt: string, folder: string): TaskDraft {
-  const w = lastAgent();
-  const agent = a.agent ?? w.agent;
-  const acpAgent = a.agent ? a.acpAgent : (w.acp ?? undefined);
-  return {
-    name: a.name,
-    schedule,
-    prompt,
-    agent,
-    acpAgent,
-    cwd: folder,
-    mode: agentMode(a.mode, agent, acpAgent) ?? (agent === 'claude' ? 'default' : agent === 'codex' ? 'auto' : undefined),
-    extra: { assistant: a.id },
-  };
-}
-
-/** `project`: made from a project's Agents tab, so it works there. */
-function NewAgent({ onClose, onAll, project }: { onClose: () => void; onAll: (d: Partial<Assistant>) => void; project?: string }) {
-  const st = useAssistantsState();
-  const spaces = useSpaces();
-  const home = useApp((s) => s.boot?.home) ?? '';
-  const defaultCwd = useApp((s) => s.boot?.defaultCwd) ?? '';
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState<'draft' | 'make' | null>(null);
-  const [d, setD] = useState<Draft | null>(null);
-  const draft = async () => {
-    setBusy('draft');
-    try {
-      const r = await post<AgentDraft>('/api/assistants/draft', { text });
-      setD({ a: project ? { ...r.agent, projects: [project] } : r.agent, schedule: r.schedule, task: r.task });
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(null);
-    }
-  };
-  const make = async () => {
-    if (!d) return;
-    setBusy('make');
-    try {
-      const r = await post<AssistantsState & { assistant: Assistant }>('/api/assistants', { ...d.a, drafted: true });
-      saved(r);
-      const a = r.assistant;
-      if (d.schedule) {
-        const only = a.projects?.length === 1 ? spaces?.find((s) => s.id === a.projects![0]) : undefined;
-        await post('/api/tasks', { ...scheduleDraft(a, d.schedule, d.task || `Do your work as ${a.name}.`, only?.folder ?? (defaultCwd || home)), enabled: true });
-      }
-      loadActivity();
-      toast(`${a.name} is ready`, 'ok');
-      go(`/agents/${enc(a.id)}`);
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setBusy(null);
-    }
-  };
-  return (
-    <section className="rounded-2xl border border-line bg-panel p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="flex-1 text-[15px] font-semibold tracking-tight">New agent</h2>
-        <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-fg-3 hover:bg-bg-3 hover:text-fg">
-          <X size={15} />
-        </button>
-      </div>
-      {!d ? (
-        <>
-          <label className="mb-1.5 block text-[13px] text-fg-3" htmlFor="agent-want">
-            What should it do? Say when it should work by itself, too, if it should.
-          </label>
-          <textarea
-            id="agent-want"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={3}
-            autoFocus
-            maxLength={4000}
-            placeholder={EXAMPLES[1]}
-            onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim() && draft()}
-            className={cx(inputCls, 'h-auto resize-y py-2 leading-relaxed')}
-          />
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" icon={busy === 'draft' ? <Throbber size={13} /> : <Sparkles size={14} />} disabled={!text.trim() || !!busy} onClick={draft}>
-              {busy === 'draft' ? 'Drafting…' : 'Draft it'}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onAll({ icon: 'bot', folder: 'task', ...(project ? { projects: [project] } : {}) })}>
-              Start empty
-            </Button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {EXAMPLES.map((x) => (
-              <button
-                key={x}
-                type="button"
-                onClick={() => setText(x)}
-                className="max-w-full truncate rounded-full border border-line px-2.5 py-1 text-left text-[12px] text-fg-3 hover:border-line-2 hover:text-fg"
-              >
-                {x}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex items-start gap-3">
-            <AssistantIcon icon={d.a.icon ?? 'bot'} size={16} />
-            <div className="min-w-0 flex-1">
-              <input
-                value={d.a.name ?? ''}
-                onChange={(e) => setD({ ...d, a: { ...d.a, name: e.target.value } })}
-                maxLength={60}
-                aria-label="Name"
-                className="w-full bg-transparent text-[15px] font-semibold outline-none"
-              />
-              <div className="text-[12.5px] text-fg-3">Drafted from what you wrote. Click any underlined words to change them.</div>
-            </div>
-          </div>
-          <div className="mt-2">
-            <AgentSentences
-              a={d.a}
-              editable
-              onChange={(p) => setD({ ...d, a: { ...d.a, ...p } })}
-              all={st?.assistants ?? []}
-              spaces={spaces}
-              when={{ draft: true, schedule: d.schedule, onSchedule: (schedule) => setD({ ...d, schedule, task: schedule ? d.task || `Do your work as ${d.a.name ?? 'the agent'}.` : d.task }) }}
-            />
-          </div>
-          {d.schedule && (
-            <label className="mt-2 block">
-              <span className="mb-1 block text-[12.5px] text-fg-3">Each scheduled run starts with</span>
-              <input value={d.task ?? ''} onChange={(e) => setD({ ...d, task: e.target.value })} maxLength={2000} className={inputCls} />
-            </label>
-          )}
-          <details className="mt-2 text-[13px]">
-            <summary className="cursor-pointer text-fg-3 hover:text-fg">Its instructions</summary>
-            <textarea
-              value={d.a.instructions ?? ''}
-              onChange={(e) => setD({ ...d, a: { ...d.a, instructions: e.target.value } })}
-              rows={6}
-              maxLength={20000}
-              className={cx(inputCls, 'mt-1.5 h-auto resize-y py-2 leading-relaxed')}
-            />
-          </details>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" disabled={!d.a.name?.trim() || !!busy} onClick={make}>
-              {busy === 'make' ? 'Making it…' : 'Create agent'}
-            </Button>
-            <Button size="sm" variant="ghost" icon={<Settings2 size={14} />} onClick={() => onAll(d.a)}>
-              All settings
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setD(null)}>
-              Describe it again
-            </Button>
-          </div>
-        </>
-      )}
-    </section>
   );
 }
 
@@ -719,8 +544,7 @@ export function AgentsPage() {
                 </div>
               ) : (
                 <>
-                  {making && <NewAgent project={forProject} onClose={() => go('/agents', true)} onAll={(d) => setEdit(d)} />}
-                  {!mine.length && !making ? (
+                  {!mine.length ? (
                     place !== 'all' && place !== 'mine' && wide ? (
                       <div className="py-6 text-center text-[13px] text-fg-3">None here.</div>
                     ) : (
@@ -784,7 +608,8 @@ export function AgentsPage() {
             </div>
           </div>
         </div>
-        <EditAssistant value={edit} onClose={() => setEdit(null)} onSaved={(a) => (loadActivity(), !id && go(`/agents/${enc(a.id)}`, true))} />
+        <AgentDialog open={making} project={forProject} onClose={() => go('/agents', true)} onSaved={(a) => go(`/agents/${enc(a.id)}`)} />
+        <AgentDialog open={!!edit} value={edit} onClose={() => setEdit(null)} onSaved={(a) => (loadActivity(), a.id !== id && go(`/agents/${enc(a.id)}`))} />
         <ImportDialog open={importing} onClose={() => setImporting(false)} />
         <InstallAgentDialog open={installing} onClose={() => setInstalling(false)} />
       </div>

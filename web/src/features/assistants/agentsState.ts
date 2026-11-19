@@ -3,12 +3,13 @@
 // Tiers); and the words that describe an agent in sentences.
 import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
-import type { AgentActivity, Assistant, ToolKind } from '@shared/assistants';
-import type { TaskSchedule } from '@shared/automations';
+import { agentMode, type AgentActivity, type Assistant, type ToolKind } from '@shared/assistants';
+import type { TaskDraft, TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
 import { tierLabel, TIER_PROGRAMS, TIERS, type TeamSettings, type Tier, type TierMap } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import { lastAgent } from '../../lib/start';
 import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 
@@ -116,6 +117,13 @@ const DOES: Record<ToolKind, string> = {
   mcp: 'use other tools',
 };
 
+/** What it may do, a phrase per kind ("read files"), or one for everything or nothing: the pieces of toolsText, to show each translated. */
+export function toolPhrases(a: Pick<Assistant, 'tools'>): string[] {
+  if (!a.tools) return ['use anything it needs'];
+  if (!a.tools.length) return ['only answer, with no tools'];
+  return a.tools.map((t) => DOES[t]);
+}
+
 /** "read files and use the web"; "do anything" when it may use everything. */
 export function toolsText(a: Pick<Assistant, 'tools'>): string {
   if (!a.tools) return 'use anything it needs';
@@ -147,3 +155,20 @@ export const nextRunOf = (act?: AgentActivity): number | undefined =>
     .filter((s) => s.enabled && s.nextAt)
     .map((s) => s.nextAt!)
     .sort((x, y) => x - y)[0];
+
+/** The task that runs an agent on its schedule: its agent program and mode, in the project's folder or the task folders' root. */
+export function scheduleDraft(a: Pick<Assistant, 'id' | 'name' | 'agent' | 'acpAgent' | 'mode' | 'projects'>, schedule: TaskSchedule, prompt: string, folder: string): TaskDraft {
+  const w = lastAgent();
+  const agent = a.agent ?? w.agent;
+  const acpAgent = a.agent ? a.acpAgent : (w.acp ?? undefined);
+  return {
+    name: a.name,
+    schedule,
+    prompt,
+    agent,
+    acpAgent,
+    cwd: folder,
+    mode: agentMode(a.mode, agent, acpAgent) ?? (agent === 'claude' ? 'default' : agent === 'codex' ? 'auto' : undefined),
+    extra: { assistant: a.id },
+  };
+}

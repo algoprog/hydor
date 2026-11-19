@@ -147,10 +147,13 @@ agents that speak ACP and take MCP servers.
   then All agents, Your agents, Needs you and On a schedule when some of yours are, Everywhere and each project that has
   agents of its own, a row for each built-in agent that opens its page (the page lists them too only while the column is hidden, or when a search finds them), and Schedules), a row with the place's name and a
   find box (by name and line), and an agent's own page keeps the column beside it; a phone keeps its header, tabs and
-  chips. **New agent** drafts one from what you say it should do, with
-  the helper model: its instructions, tools (switches for reading, editing, commands, the web, a browser, the computer
-  and other tools), tier and a schedule, read as sentences whose underlined words change it in
-  place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
+  chips. **New agent** opens a window in two steps: you say what it should
+  do (or pick an idea: Paper digest, Weekly report, Change reviewer, Translator) and the helper model drafts its instructions,
+  tools (switches for reading, editing, commands, the web, a browser, the computer and other tools), tier and a schedule,
+  or you set it up yourself; then Set up shows the whole agent in seven sections (About, Where and when, Model, Tools,
+  Team, Results, Budget), each with what it is set to, to change before Create agent. An agent's page reads its settings
+  as sentences whose underlined words change it in place, and All settings opens the same window for it; Claude Code's
+  agent files import. An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
   listed on its page, and on a week with every other task in the page's Schedules place); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
