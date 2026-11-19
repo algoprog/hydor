@@ -3,6 +3,16 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.93.2 · 19 November 2026
+
+A project's details open with a click or a tap on its name in the sidebar, the same on a phone as on a computer.
+
+- **Tap a project's name**: in the sessions sidebar, a project's name opens its details window (on a phone the sidebar
+  closes and the window fills the screen). The small arrow beside the name folds its sessions away, and its ⋯ still
+  has **Project details** and **Rename**. The ⓘ that showed when you pointed at a heading is gone, so nothing depends
+  on hovering.
+- A folder's heading still folds when you click its name, and a double-click still renames it.
+
 ## 0.93.1 · 19 November 2026
 
 Agents now come before Apps on the rail, and a project's folders show as slim tiles, so its documents and pictures
