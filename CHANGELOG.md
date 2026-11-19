@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.98.0 · 19 November 2026
+
+Agents can now walk you through code step by step, and show a program running line by line.
+
+- **Code walkthroughs**: when an agent explains code, it can show it as a guided tour, with numbered steps beside the
+  code. Each step lights up the lines it explains while the rest fades. Go through them with the arrows or the ← and
+  → keys, or tap a line to open the step that explains it; **Ask about this step** puts a question about it in your
+  message box.
+- **Run it step by step**: an agent can show a program as it runs, one line at a time: the line it is on, its
+  variables with what just changed marked, the calls under way and what it has printed. Step back and forth, drag the
+  slider or press play. It may ask you to predict the output first, and checks your guess.
+- **Who uses them**: the Tutor walks you through code and runs programs with you to teach loops and recursion, and the
+  Coder uses them when it explains how a piece of code works. Both are in the **Answer UIs** gallery, with an example
+  of each.
+- **Fixes**: on a Mac, windows no longer flash for a moment while something scrolls in them; the page behind a window
+  is now dimmed instead of blurred.
+
 ## 0.97.1 · 19 November 2026
 
 Updating the desktop app now shows how far the download has got, and the app restarts into the new version behind its
