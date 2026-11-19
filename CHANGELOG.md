@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.94.1 · 19 November 2026
+
+A shorter hint in the home page's message box.
+
+- **The message box on the home page** now says "Describe a task or ask a question" until you start typing, in
+  English, German, Chinese and Greek.
+
 ## 0.94.0 · 19 November 2026
 
 A new window for making agents: say what it should do, then see the whole agent at a glance in seven short sections
