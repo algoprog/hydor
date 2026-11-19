@@ -45,6 +45,30 @@ export async function runView(d: Deps, id: string, lines = 300): Promise<RunView
   return { run: r, series: seriesNow(d, r.id), log: t.text, logSize: t.size };
 }
 
+/**
+ * The metrics' series of runs by id, for the page's charts and sparklines: this computer's runs as they are (live while
+ * they run), a copy of another machine's run as that machine has it (one that cannot be read is left out), unknown ids left out.
+ */
+export async function seriesFor(d: Deps, ids: string[]): Promise<Record<string, MetricSeries>> {
+  const out: Record<string, MetricSeries> = {};
+  await Promise.all(
+    ids.map(async (id) => {
+      const r = getRun(d.db, id);
+      if (!r) return;
+      if (!r.remote) {
+        out[id] = seriesNow(d, id);
+        return;
+      }
+      try {
+        out[id] = (await runView(d, id, 0)).series ?? {};
+      } catch {
+        /* the machine did not answer: left out */
+      }
+    }),
+  );
+  return out;
+}
+
 /** The log after `from` (bytes), for following it while it runs. */
 export async function logAfter(d: Deps, id: string, from: number): Promise<{ text: string; next: number; size: number }> {
   const r = mustRun(d, id);

@@ -4,13 +4,14 @@
 // significance for the paper. The queue is queue.ts; records.ts keeps the records (and is what the rest of the app
 // reads); tables.ts the tables, clusters.ts the clusters, remote.ts the other machines, tools.ts the agents' tools.
 import type { FastifyRequest } from 'fastify';
-import { ACTIVE, type RunStatus } from '../../shared/experiments.ts';
+import { ACTIVE, type ExperimentGroup, type RunStatus } from '../../shared/experiments.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { logAfter, makeTable, patchOf, putInLatex, runsList, runView, startSweep, cleanTableSpec } from './api.ts';
+import { logAfter, makeTable, patchOf, putInLatex, runsList, runView, seriesFor, startSweep, cleanTableSpec } from './api.ts';
 import { checkCluster, getCluster, listClusters, noteCheck, removeCluster, saveCluster } from './clusters.ts';
 import { cleanJob, queueNow, resume, runAgain, setSettings, settingsOf, stopRun, submit, tellRuns, useDeps } from './queue.ts';
-import { deleteRun, deleteTable, getRun, getSweep, getTable, listRuns, listTables, okId, recomputeTable, saveTable, workOut } from './records.ts';
+import { describeBackfill, describeGroup, enableExperimentDescriptions } from './describe.ts';
+import { deleteInfo, deleteRun, deleteTable, getRun, getSweep, getTable, listInfo, listRuns, listTables, okId, recomputeTable, saveInfo, saveTable, workOut } from './records.ts';
 import { experimentTools, SPAWN_NOTE } from './tools.ts';
 
 const P = (req: FastifyRequest) => req.params as Record<string, string>;
@@ -51,13 +52,22 @@ function routes(d: Deps) {
     if (!r) throw new HttpError(404, 'There is no such run');
     if (ACTIVE.includes(r.status)) throw new HttpError(409, 'It has not ended: stop it first');
     deleteRun(d.db, id);
+    // The last run of an experiment goes: what was written of it goes too.
+    if (r.group && !listRuns(d.db, { group: r.group, limit: 1 }).length) deleteInfo(d.db, r.group);
     tellRuns(d, [id]);
     return { ok: true };
   });
   app.get('/api/experiments/queue', async () => queueNow(d));
   app.get('/api/experiments/settings', async () => settingsOf(d.db));
   app.put('/api/experiments/settings', async (req) => setSettings(d.db, B(req)));
-  /** The experiments (groups) runs belong to, the latest first, with how many runs each has. */
+  /** The metric series of many runs at once (the page's charts and sparklines), by run id; unknown ids are left out. */
+  app.get('/api/experiments/series', async (req) => {
+    // ?runs=a,b, or ?runs=a&runs=b (an array).
+    const asked: string | string[] | undefined = (req.query as Record<string, string | string[] | undefined>).runs;
+    const ids = [...new Set((Array.isArray(asked) ? asked.join(',') : (asked ?? '')).split(',').map((x) => x.trim()).filter(okId))].slice(0, 100);
+    return { series: await seriesFor(d, ids) };
+  });
+  /** The experiments (groups) runs belong to, the latest first, with how many runs each has and what each is (title, description, category). */
   app.get('/api/experiments/groups', async () => {
     const seen = new Map<string, { name: string; runs: number; done: number; lastAt: number }>();
     for (const r of listRuns(d.db, { limit: 5000 })) {
@@ -68,7 +78,36 @@ function routes(d: Deps) {
       g.lastAt = Math.max(g.lastAt, r.createdAt);
       seen.set(r.group, g);
     }
-    return { groups: [...seen.values()].sort((a, b) => b.lastAt - a.lastAt) };
+    const info = listInfo(d.db);
+    const groups: ExperimentGroup[] = [...seen.values()].sort((a, b) => b.lastAt - a.lastAt).map((g) => {
+      const i = info.get(g.name);
+      return { ...g, ...(i?.title ? { title: i.title } : {}), ...(i?.description ? { description: i.description } : {}), ...(i?.category ? { category: i.category } : {}), ...(i?.by ? { by: i.by } : {}), ...(i?.at ? { at: i.at } : {}) };
+    });
+    return { groups };
+  });
+  /** Changes an experiment's title, description or category (the fields given replace the old ones, '' clears one); kept as the user's. */
+  app.put('/api/experiments/groups', async (req) => {
+    const b = B(req);
+    const name = typeof b.name === 'string' ? b.name.trim().slice(0, 120) : '';
+    if (!name) throw new HttpError(400, 'Which experiment: name (its group)');
+    const p: { title?: string; description?: string; category?: string } = {};
+    for (const k of ['title', 'description', 'category'] as const) {
+      if (b[k] === undefined || b[k] === null) continue;
+      if (typeof b[k] !== 'string') throw new HttpError(400, `${k} is text`);
+      p[k] = b[k];
+    }
+    const { runs: _runs, ...group } = saveInfo(d.db, name, p, 'user');
+    d.broadcast({ t: 'feature', id: 'experiments', data: { groups: [name] } });
+    return { group };
+  });
+  /** Has the helper model write an experiment's title, description and category now, over what is there (the user asked). */
+  app.post('/api/experiments/groups/describe', async (req) => {
+    const name = typeof B(req).name === 'string' ? B(req).name.trim() : '';
+    if (!name) throw new HttpError(400, 'Which experiment: name (its group)');
+    const got = await describeGroup(d, name, { force: true });
+    if (!got) throw new HttpError(502, 'The helper model gave no title and description to use. Try again, or write them yourself.');
+    const { runs: _runs, ...group } = got;
+    return { group };
   });
 
   // ---- sweeps --------------------------------------------------------------------------------------------
@@ -142,5 +181,8 @@ export const experiments: Feature = {
   },
   start(d) {
     resume(d);
+    // Experiments without a title and description get them from the helper model, in the background.
+    enableExperimentDescriptions();
+    describeBackfill(d);
   },
 };

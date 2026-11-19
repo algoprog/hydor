@@ -2,15 +2,28 @@
 // queue now, a run's status in words (what a waiting run waits for, how long an ended one took, how far a running
 // one is), which metrics matter most and so come first, durations, metrics in a line, and the run's address. Changes
 // come through the app's socket ({ t: 'feature', id: 'experiments' }): the page reloads what changed.
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ExperimentsSettings, QueueNow, RunRecord, RunStatus } from '@shared/experiments';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ExperimentGroup, ExperimentsSettings, MetricSeries, QueueNow, RunRecord, RunStatus } from '@shared/experiments';
 import { api, enc } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 
 export type { RunRecord };
 
-/** A run's page: /system/experiments/<id>, with ?m=<machine> for a run kept on another machine. */
-export const runPath = (r: Pick<RunRecord, 'id' | 'machine'>) => `/system/experiments/${enc(r.id)}${r.machine ? `?m=${enc(r.machine.id)}` : ''}`;
+/** A run's page's tabs, and an experiment's. */
+export type RunTab = 'overview' | 'charts' | 'log';
+export type ExperimentTab = 'runs' | 'charts' | 'params';
+
+/** A run's page: /system/experiments/<id>, with ?m=<machine> for a run kept on another machine, and &tab= for a tab other than Overview. */
+export const runPath = (r: Pick<RunRecord, 'id' | 'machine'>, tab?: RunTab) => {
+  const q = new URLSearchParams();
+  if (r.machine) q.set('m', r.machine.id);
+  if (tab && tab !== 'overview') q.set('tab', tab);
+  const s = q.toString();
+  return `/system/experiments/${enc(r.id)}${s ? `?${s}` : ''}`;
+};
+
+/** An experiment's page: /system/experiments?e=<group> ('' for the runs without one), with &tab= for a tab other than Runs. */
+export const experimentPath = (group: string, tab?: ExperimentTab) => `/system/experiments?e=${enc(group)}${tab && tab !== 'runs' ? `&tab=${tab}` : ''}`;
 
 /** Where a run's own calls go: this machine, or the machine it is kept on. */
 export const baseOf = (machine?: string | null) => (machine ? `/m/${machine}` : undefined);
@@ -267,3 +280,157 @@ export function download(name: string, text: string, type = 'text/plain') {
 
 /** The colours of series on a chart, in order: the app's own, as the page kit's --n-c1…6 are. */
 export const VIZ = ['var(--viz-1)', 'var(--viz-2)', 'var(--ok)', 'var(--codex)', 'var(--warn)', 'var(--claude)'];
+
+/** How long a failed read of a run's series waits before it is tried again. */
+const RETRY_MS = 15_000;
+
+/** A run's key, unique across this computer's runs and other machines' (the same id can come from two). */
+const keyOf = (r: Pick<RunRecord, 'id' | 'machine'>) => `${r.machine?.id ?? ''}:${r.id}`;
+
+/**
+ * The metrics over steps of these runs, by runKey: this computer's in one call (GET /api/experiments/series), each
+ * other machine's run through its machine; undefined while a run's load. What was read is kept across renders, and
+ * only what is missing is asked for (a read that failed is not kept: it is tried again after 15 seconds). Runs still
+ * going are read again every 10 seconds, a change to one (the app's socket) reads it again, and a run that has just
+ * ended is read once more for its last points.
+ */
+export function useSeries(runs: RunRecord[]): Record<string, MetricSeries | undefined> {
+  const cache = useRef(new Map<string, MetricSeries>());
+  const inFlight = useRef(new Set<string>());
+  // When a read of a run failed (it is not asked for again within 15 seconds), and the runs to read again once the read now going ends.
+  const failedAt = useRef(new Map<string, number>());
+  const again = useRef(new Map<string, RunRecord>());
+  const [version, setVersion] = useState(0);
+  const latest = useRef(runs);
+  latest.current = runs;
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const read = useCallback((rs: RunRecord[], last = false) => {
+    // `last`: the run has ended; one read still going may have missed its last points, so it is read again after.
+    if (last) for (const r of rs) if (inFlight.current.has(keyOf(r))) again.current.set(keyOf(r), r);
+    const todo = rs.filter((r) => !inFlight.current.has(keyOf(r)));
+    if (!todo.length) return;
+    for (const r of todo) inFlight.current.add(keyOf(r));
+    const done = (r: RunRecord, s: MetricSeries | undefined) => {
+      inFlight.current.delete(keyOf(r));
+      if (!alive.current) return;
+      // A read that failed is not kept: the run stays unread (or keeps what it had) and is tried again after 15 seconds.
+      if (s) {
+        cache.current.set(keyOf(r), s);
+        failedAt.current.delete(keyOf(r));
+      } else failedAt.current.set(keyOf(r), Date.now());
+      setVersion((v) => v + 1);
+      const next = again.current.get(keyOf(r));
+      if (next) {
+        again.current.delete(keyOf(r));
+        read([next]);
+      }
+    };
+    const own = todo.filter((r) => !r.machine);
+    for (let i = 0; i < own.length; i += 100) {
+      const chunk = own.slice(i, i + 100);
+      api<{ series: Record<string, MetricSeries> }>(`/api/experiments/series?runs=${chunk.map((r) => enc(r.id)).join(',')}`)
+        .then((x) => chunk.forEach((r) => done(r, x.series?.[r.id] ?? {})))
+        .catch(() => chunk.forEach((r) => done(r, undefined)));
+    }
+    for (const r of todo.filter((x) => x.machine)) {
+      api<{ series?: MetricSeries }>(`/api/experiments/runs/${enc(r.id)}?lines=0`, { base: baseOf(r.machine!.id) })
+        .then((x) => done(r, x.series ?? {}))
+        .catch(() => done(r, undefined));
+    }
+  }, []);
+
+  const sig = runs.map(keyOf).join('|');
+  const unread = () => latest.current.filter((r) => !cache.current.has(keyOf(r)) && Date.now() - (failedAt.current.get(keyOf(r)) ?? 0) >= RETRY_MS);
+  useEffect(() => {
+    read(unread());
+  }, [sig, read]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reads that failed: again after 15 seconds (looked at every 5).
+  useEffect(() => {
+    const t = window.setInterval(() => read(unread()), 5000);
+    return () => window.clearInterval(t);
+  }, [read]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A run that was going and has ended: its last points, once.
+  const wasActive = useRef(new Map<string, boolean>());
+  const activeSig = runs.map((r) => keyOf(r) + (isActive(r) ? '+' : '-')).join('|');
+  useEffect(() => {
+    const ended = latest.current.filter((r) => wasActive.current.get(keyOf(r)) === true && !isActive(r));
+    wasActive.current = new Map(latest.current.map((r) => [keyOf(r), isActive(r)]));
+    if (ended.length) read(ended, true);
+  }, [activeSig, read]);
+  // Runs going: again every 10 seconds.
+  useEffect(() => {
+    const t = window.setInterval(() => read(latest.current.filter(isActive)), 10_000);
+    return () => window.clearInterval(t);
+  }, [read]);
+  // The server says which runs changed: those that are shown are read again, once in a second.
+  const changed = useRef(new Set<string>());
+  const timer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+  useFeatureEvent('experiments', (e) => {
+    const ids = (e.data as { runs?: unknown } | null)?.runs;
+    if (!Array.isArray(ids)) return;
+    for (const id of ids) if (typeof id === 'string') changed.current.add(id);
+    if (timer.current) return;
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      const set = changed.current;
+      changed.current = new Set();
+      read(latest.current.filter((r) => set.has(r.id) && !r.machine));
+    }, 1000);
+  });
+
+  return useMemo(() => {
+    const o: Record<string, MetricSeries | undefined> = {};
+    for (const r of runs) {
+      const s = cache.current.get(keyOf(r));
+      if (s) o[keyOf(r)] = s;
+    }
+    return o;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, version]);
+}
+
+/** The experiments' titles, descriptions and categories, by group (GET /api/experiments/groups), read again when they change. */
+export function useGroups(): { groups: Map<string, ExperimentGroup>; reload: () => void } {
+  const [groups, setGroups] = useState<Map<string, ExperimentGroup>>(() => new Map());
+  const alive = useRef(true);
+  const load = useCallback(() => {
+    api<{ groups: ExperimentGroup[] }>('/api/experiments/groups')
+      .then((r) => alive.current && setGroups(new Map(r.groups.map((g) => [g.name, g]))))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    alive.current = true;
+    load();
+    return () => {
+      alive.current = false;
+    };
+  }, [load]);
+  const timer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+  useFeatureEvent('experiments', () => {
+    if (timer.current) return;
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      load();
+    }, 2000);
+  });
+  return { groups, reload: load };
+}

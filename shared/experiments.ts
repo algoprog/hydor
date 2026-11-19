@@ -261,6 +261,29 @@ export interface SweepSpec {
   createdAt: number;
 }
 
+/**
+ * What an experiment (the group its runs share) is, in words: a title, a description of a few sentences and a
+ * category, so people see at a glance what it tests and find it by searching. The helper model writes them when an
+ * experiment has none, an agent may write them as it starts runs (experiment_describe), and you can change them.
+ */
+export interface ExperimentInfo {
+  /** The group's name, as the runs carry it. */
+  name: string;
+  title?: string;
+  description?: string;
+  category?: string;
+  /** Who wrote them last. */
+  by?: 'helper' | 'agent' | 'user';
+  at?: number;
+}
+
+/** An experiment as the page lists it: what it is, and its runs counted (this computer's). */
+export interface ExperimentGroup extends ExperimentInfo {
+  runs: number;
+  done: number;
+  lastAt: number;
+}
+
 /** The page's own settings for the queue. */
 export interface ExperimentsSettings {
   /** Jobs without a GPU running at once on this computer. */

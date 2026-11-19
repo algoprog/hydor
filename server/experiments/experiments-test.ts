@@ -8,7 +8,8 @@
 // Markdown, CSV, per-example scores, recompute after a run changes, putting one in a LaTeX file); sweeps
 // (expansion, placeholders, the early stop); SLURM (the batch script, sbatch, squeue and sacct with canned output,
 // a whole run through a stand-in ssh); another machine's runs; the tools (in a step, in Plan mode, asking the user)
-// and experiment_wait; the routes.
+// and experiment_wait; the routes; the batch series route; experiments' titles, descriptions and categories (the
+// routes, the helper's writing with a stand-in model, when it happens by itself) and experiment_describe.
 // Build and run with a scratch data folder (no GPU is used):
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/experiments/experiments-test.ts
 //   DATA_DIR=/tmp/hydor-test-experiments CUDA_VISIBLE_DEVICES= node dist/dev/experiments-test.js
@@ -23,20 +24,23 @@ import { betterOf, tableMarks, type RunRecord } from '../../shared/experiments.t
 import type { NotifyEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { openDb } from '../db.ts';
+import { CONFIDENTIAL_EXTRA } from '../../shared/confidential.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { captureGit, localShell, pythonOf } from './capture.ts';
 import { endOfSlurm, parseSacct, parseSbatch, parseSqueue, reasonWords, saveCluster, sbatchScript, setSsh, type Ssh } from './clusters.ts';
 import { chooseGpus, parseGpus, setGpuReader } from './gpus.ts';
+import { describeGroup, enableExperimentDescriptions, firstObject, redactCommand, redactSetting, timing as describeTiming } from './describe.ts';
 import { experiments } from './index.ts';
 import { stopTmuxServer } from './local.ts';
 import { MAX_METRICS, nanText, oomText, parseLine, Tracker } from './metrics.ts';
 import { cleanJob, forgetLive, forgetNotices, onCallBrief, repairEnded, submit, tick, timing, useDeps, waitRuns } from './queue.ts';
-import { addEvent, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
+import { addEvent, getInfo, getRun, getRunWithEvents, getTable, insertRun, listRuns, recomputeTable, runFolder, saveSeries, saveTable, seriesOf, updateRun, waitStarted, workOut } from './records.ts';
 import { useMachines } from './remote.ts';
 import { holm, lgamma, pairedBootstrap, pairedT, tTwoSided, welch } from './stats.ts';
 import { earlyStop, expandSweep, fillCommand, paramsOf, placeholders, shellWords } from './sweeps.ts';
 import { insertTable, makeTable, parseScores } from './tables.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 import { experimentTools } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -918,7 +922,7 @@ test('the tools: JSON answers; a step runs without asking, Plan mode refuses, a 
   const step = ctxOf({ step: true, runId: 'flow-app1', key: 'acp:flow-app1', agent: 'acp' });
   assert.deepEqual(
     experimentTools(step).map((t) => t.name),
-    ['experiment_run', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_wait'],
+    ['experiment_run', 'experiment_sweep', 'experiment_list', 'experiment_get', 'experiment_stop', 'experiment_table', 'experiment_describe', 'experiment_wait'],
   );
   assert.ok(!experimentTools(ctxOf()).some((t) => t.name === 'experiment_wait'), 'waiting hours is for steps');
   const run = await call('experiment_run', { command: 'echo "f1=0.5"', gpus: 0, group: 'tools', report: true }, step);
@@ -1010,6 +1014,257 @@ test('the routes: a job’s mistakes in words, clusters added and refused, recor
     told.some((e: any) => e.t === 'feature' && e.id === 'experiments'),
     'open pages hear of changes',
   );
+});
+
+// ---- the batch series, and what an experiment is -----------------------------------------------------------------------
+
+test('the series of many runs in one call: local runs, bad ids ignored, unknown ones left out', async () => {
+  saveSeries(db, 'rbat0001', { loss: [[1, 2], [2, 1]] });
+  insertRun(db, { id: 'rbat0001', spec: { command: 'true', cwd: tmp }, status: 'done' });
+  insertRun(db, { id: 'rbat0002', spec: { command: 'true', cwd: tmp }, status: 'done' });
+  saveSeries(db, 'rbat0002', { acc: [[10, 0.5]] });
+  // A copy of a run of a machine that is not connected: nothing to read there, so its series is empty.
+  insertRun(db, { id: 'rbat0003', spec: { command: 'true', cwd: tmp }, status: 'done', info: { remote: { machine: 'gone', id: 'x1234' } } });
+  const r = await http.inject({ method: 'GET', url: '/api/experiments/series?runs=rbat0001,rbat0002,,BAD!id,nosuchrun,rbat0001,rbat0003' });
+  assert.equal(r.statusCode, 200);
+  const { series } = r.json();
+  assert.deepEqual(Object.keys(series).sort(), ['rbat0001', 'rbat0002', 'rbat0003']);
+  assert.deepEqual(series.rbat0001.loss, [[1, 2], [2, 1]]);
+  assert.deepEqual(series.rbat0002.acc, [[10, 0.5]]);
+  assert.deepEqual(series.rbat0003, {});
+  assert.deepEqual((await http.inject({ method: 'GET', url: '/api/experiments/series' })).json(), { series: {} });
+  // ?runs=a&runs=b (an array) reads as ?runs=a,b.
+  const arr = await http.inject({ method: 'GET', url: '/api/experiments/series?runs=rbat0001&runs=rbat0002' });
+  assert.equal(arr.statusCode, 200);
+  assert.deepEqual(Object.keys(arr.json().series).sort(), ['rbat0001', 'rbat0002']);
+  // At most 100 ids are read.
+  const many = Array.from({ length: 130 }, (_, i) => `rm${String(i).padStart(4, '0')}`);
+  for (const id of many) insertRun(db, { id, spec: { command: 'true', cwd: tmp }, status: 'done' });
+  const big = (await http.inject({ method: 'GET', url: `/api/experiments/series?runs=${many.join(',')}` })).json().series;
+  assert.equal(Object.keys(big).length, 100);
+  for (const id of many) deleteRunRow(id);
+});
+const deleteRunRow = (id: string) => db.prepare('delete from exp_runs where id = ?').run(id);
+
+test('an experiment’s title, description and category: PUT keeps them as the user’s, GET lists them with the runs', async () => {
+  const put = (payload: unknown) => http.inject({ method: 'PUT', url: '/api/experiments/groups', payload: payload as any });
+  assert.equal((await put({ title: 'No name' })).statusCode, 400);
+  assert.equal((await put({ name: 'base', title: 5 })).statusCode, 400);
+  told.length = 0;
+  const a = await put({ name: 'base', title: '  “Baseline\n  runs”  ', description: 'The reference.\n\n\n\nNo changes.', category: 'Retrieval' });
+  assert.equal(a.statusCode, 200);
+  assert.equal(a.json().group.title, 'Baseline runs', 'quotes gone, one line');
+  assert.equal(a.json().group.description, 'The reference.\n\nNo changes.');
+  assert.equal(a.json().group.by, 'user');
+  assert.ok(told.some((e: any) => e.t === 'feature' && e.id === 'experiments' && e.data?.groups?.[0] === 'base'), 'pages hear of it');
+  // Caps: 80, 500 and 40 characters.
+  const b = (await put({ name: 'other', title: 'T'.repeat(200), description: 'd '.repeat(400), category: 'C'.repeat(90) })).json().group;
+  assert.equal(b.title.length, 80);
+  assert.ok(b.description.length <= 500 && b.description.length > 400);
+  assert.equal(b.category.length, 40);
+  // The name is cut to 120 characters; a user who clears all three leaves nothing kept.
+  assert.equal((await put({ name: 'n'.repeat(200), title: 'Long' })).json().group.name.length, 120);
+  db.prepare('delete from exp_groups where name = ?').run('n'.repeat(120));
+  assert.ok(getInfo(db, 'other'));
+  assert.ok(!('title' in (await put({ name: 'other', title: '', description: '', category: '' })).json().group));
+  assert.equal(getInfo(db, 'other'), null, 'all three cleared: the row is gone, so the helper may write them');
+  // The fields given replace; '' clears one; the rest stay.
+  const c = (await put({ name: 'base', title: '', category: 'Ranking' })).json().group;
+  assert.ok(!('title' in c));
+  assert.equal(c.category, 'Ranking');
+  assert.equal(c.description, 'The reference.\n\nNo changes.');
+  assert.equal((await put({ name: 'base', category: 'Retrieval', title: 'Baseline runs' })).statusCode, 200);
+  const groups = (await http.inject({ method: 'GET', url: '/api/experiments/groups' })).json().groups;
+  const base = groups.find((g: { name: string }) => g.name === 'base');
+  assert.deepEqual({ runs: base.runs, title: base.title, category: base.category, by: base.by }, { runs: 3, title: 'Baseline runs', category: 'Retrieval', by: 'user' });
+  assert.ok(!('title' in groups.find((g: { name: string }) => g.name === 'ours')), 'one without info is listed as before');
+});
+
+test('the helper writes an experiment now: its runs and the categories in use are in the prompt, the answer is parsed and capped, a non-answer saves nothing', async () => {
+  assert.deepEqual(firstObject('Sure: ```json\n{"a": "x}y", "b": {"c": 1}}\n``` bye'), { a: 'x}y', b: { c: 1 } });
+  assert.equal(firstObject('no object here'), null);
+  const prompts: { system: string; prompt: string; task?: string; model?: string }[] = [];
+  let answer = '';
+  enableExperimentDescriptions(async (_db, q) => {
+    prompts.push(q);
+    return answer;
+  });
+  describeTiming.soon = 30;
+  describeTiming.retry = 60_000;
+  const post = (name: string) => http.inject({ method: 'POST', url: '/api/experiments/groups/describe', payload: { name } });
+  assert.equal((await post('no-such-group')).statusCode, 404);
+  assert.equal((await http.inject({ method: 'POST', url: '/api/experiments/groups/describe', payload: {} })).statusCode, 400);
+  // A group of runs with settings and metrics.
+  for (let i = 0; i < 3; i++) doneRun(`tz${i}zzzz`, 'zeta-e7', i, { dev_nll: 3 - i, step_time: 1, acc: 0.5 }, { params: { lr: 0.001 * (i + 1) } });
+  updateRun(db, 'tz0zzzz', { spec: { name: 'zeta-lr1', command: 'python train.py --lr 0.001 --data wiki ' + 'q'.repeat(400) } });
+  answer = 'Here it is:\n```json\n{"title": "“Zeta pretraining (E7)”", "description": "' + 'It compares learning rates. '.repeat(40) + '", "category": "Language modelling"}\n```';
+  const ok = await post('zeta-e7');
+  assert.equal(ok.statusCode, 200, ok.body);
+  const g = ok.json().group;
+  assert.equal(g.title, 'Zeta pretraining (E7)');
+  assert.equal(g.description.length <= 500, true);
+  assert.equal(g.category, 'Language modelling');
+  assert.equal(g.by, 'helper');
+  assert.ok(!('runs' in g));
+  assert.equal(getInfo(db, 'zeta-e7')!.runs, 3, 'its runs then are kept, for growth');
+  const q = prompts.at(-1)!;
+  assert.equal(q.task, 'describing an experiment');
+  assert.match(q.system, /JSON/);
+  assert.match(q.prompt, /The experiment: zeta-e7/);
+  assert.match(q.prompt, /zeta-lr1 \(done\)/, 'a run’s name and status');
+  assert.match(q.prompt, /settings: seed=0, lr=0\.001/);
+  assert.match(q.prompt, /metrics: dev_nll, acc, step_time/, 'quality names first');
+  assert.ok(q.prompt.includes('--data wiki ' + 'q'.repeat(150)) && !q.prompt.includes('q'.repeat(241)), 'a command is cut to 240 characters');
+  assert.match(q.prompt, /Categories already in use: .*Retrieval/, 'the categories in use are given to reuse');
+  assert.ok(q.prompt.includes(tmp), 'the runs’ folder');
+  // Not JSON: nothing is saved (and the route says so); an answer of empty fields neither.
+  doneRun('tn0nnnn', 'nojson', 1, { acc: 1 });
+  answer = 'I am sorry, I cannot do that.';
+  assert.equal((await post('nojson')).statusCode, 502);
+  answer = '{"title": " ", "description": "", "category": 3}';
+  assert.equal((await post('nojson')).statusCode, 502);
+  assert.equal(getInfo(db, 'nojson'), null);
+  // Without any run there is nothing to read; nothing is asked.
+  const n = prompts.length;
+  assert.equal(await describeGroup(deps, 'empty-group', {}), null);
+  assert.equal(prompts.length, n);
+  // Its own words are what the user asked for: the page's Write them again goes over a user's text, the helper by itself never does.
+  assert.equal(getInfo(db, 'base')!.by, 'user');
+  answer = '{"title": "Machine title"}';
+  assert.equal(await describeGroup(deps, 'base', {}), null, 'never over the user’s text by itself');
+  assert.equal(prompts.length, n);
+  assert.equal(getInfo(db, 'base')!.title, 'Baseline runs');
+  const again = (await post('base')).json().group;
+  assert.equal(again.title, 'Machine title');
+  assert.equal(again.description, 'The reference.\n\nNo changes.', 'what the answer left out stays');
+  assert.equal(again.by, 'helper');
+});
+
+test('what the helper is shown has no secrets: tokens, keys, passwords in a command and among the settings are left out', () => {
+  assert.equal(redactCommand('HF_TOKEN=hf_abc123 python train.py --lr 0.1'), 'HF_TOKEN=… python train.py --lr 0.1');
+  assert.equal(redactCommand('CUDA_VISIBLE_DEVICES=0 API_KEY="a b c" MY_Secret=\'x y\' python t.py'), 'CUDA_VISIBLE_DEVICES=0 API_KEY=… MY_Secret=… python t.py');
+  assert.equal(redactCommand('python t.py --api-key sk-123 --hf-token=hf_9 --password hunter2 --data wiki --epochs 3'), 'python t.py --api-key … --hf-token=… --password … --data wiki --epochs 3');
+  assert.equal(redactCommand('python t.py --use-auth --lr 1 --Passwd "p q" -k abc'), 'python t.py --use-auth --lr 1 --Passwd … -k abc');
+  assert.equal(redactCommand('export WANDB_API_KEY=abc && python t.py --lr=1e-3'), 'export WANDB_API_KEY=… && python t.py --lr=1e-3');
+  assert.equal(redactSetting('lr', 0.1), '0.1');
+  assert.equal(redactSetting('hf_token', 'hf_abc'), '…');
+  assert.equal(redactSetting('Auth', 'x'), '…');
+  assert.equal(redactSetting('pwd', 'x'), '…');
+});
+
+test('the helper’s prompt carries the redacted command and settings', async () => {
+  let seen = '';
+  enableExperimentDescriptions(async (_db, q) => {
+    seen = q.prompt;
+    return '{"title": "Secrets test"}';
+  });
+  doneRun('tsec0sec', 'redact-g', 1, { acc: 1 }, { params: { hf_token: 'hf_topsecret', lr: 0.5 } });
+  updateRun(db, 'tsec0sec', { spec: { name: 'sec', command: 'API_KEY=sk-topsecret python t.py --password hunter2 --lr 0.5' } });
+  const r = await http.inject({ method: 'POST', url: '/api/experiments/groups/describe', payload: { name: 'redact-g' } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.ok(!/topsecret|hunter2/.test(seen), seen);
+  assert.match(seen, /command: API_KEY=… python t\.py --password … --lr 0\.5/);
+  assert.match(seen, /hf_token=…, lr=0\.5|lr=0\.5, hf_token=…/);
+});
+
+test('deleting the last run of an experiment deletes its title and description too', async () => {
+  doneRun('tdel0del', 'gone-g', 1, { acc: 1 });
+  doneRun('tdel1del', 'gone-g', 2, { acc: 1 });
+  await http.inject({ method: 'PUT', url: '/api/experiments/groups', payload: { name: 'gone-g', title: 'Soon gone' } });
+  assert.equal((await http.inject({ method: 'DELETE', url: '/api/experiments/runs/tdel0del' })).statusCode, 200);
+  assert.ok(getInfo(db, 'gone-g'), 'a run is left: it stays');
+  assert.equal((await http.inject({ method: 'DELETE', url: '/api/experiments/runs/tdel1del' })).statusCode, 200);
+  assert.equal(getInfo(db, 'gone-g'), null);
+});
+
+test('an experiment’s info is written by itself: once for a new group, again only when it has doubled, never over an agent’s or a user’s; a confidential one only by a local helper', async () => {
+  const asked: string[] = [];
+  let answer = '{"title": "Auto title", "description": "Auto.", "category": "Vision"}';
+  enableExperimentDescriptions(async (_db, q) => {
+    asked.push(/The experiment: (.*)/.exec(q.prompt)![1]);
+    return answer;
+  });
+  const count = (g: string) => asked.filter((x) => x === g).length;
+  const job = (group: string) => cleanJob(db, { command: 'true', cwd: tmp, gpus: 0, group });
+  // Two runs submitted to a new group: it is written once, after the wait.
+  const r1 = await submit(deps, await job('auto1'));
+  const r2 = await submit(deps, await job('auto1'));
+  assert.equal(count('auto1'), 0, 'not at once');
+  await until(() => !!getInfo(db, 'auto1'), 20_000, 'the helper’s writing');
+  assert.equal(count('auto1'), 1, 'once, not once per run');
+  assert.deepEqual({ title: getInfo(db, 'auto1')!.title, by: getInfo(db, 'auto1')!.by, runs: getInfo(db, 'auto1')!.runs }, { title: 'Auto title', by: 'helper', runs: 2 });
+  assert.ok(told.some((e: any) => e.t === 'feature' && e.data?.groups?.[0] === 'auto1'));
+  // Another run: it has not doubled (and has under 4): nothing.
+  const r3 = await submit(deps, await job('auto1'));
+  await sleep(150);
+  assert.equal(count('auto1'), 1);
+  // Doubled and 4+ runs, but written under 6 hours ago: nothing; after that: again, once.
+  doneRun('tg0gggg', 'auto1', 1, { acc: 1 });
+  const r4 = await submit(deps, await job('auto1'));
+  await sleep(150);
+  assert.equal(count('auto1'), 1, 'not within 6 hours');
+  db.prepare('update exp_groups set at = ? where name = ?').run(Date.now() - 7 * 3_600_000, 'auto1');
+  const r5 = await submit(deps, await job('auto1'));
+  await until(() => count('auto1') === 2, 20_000, 'the second writing');
+  await sleep(150);
+  assert.equal(count('auto1'), 2);
+  assert.equal(getInfo(db, 'auto1')!.runs, listRuns(db, { group: 'auto1', limit: 100 }).length, 'what it has grown from is now');
+  // An agent’s or a user’s text stays, even when the group has grown a lot.
+  const own = await submit(deps, await job('auto2'));
+  await until(() => !!getInfo(db, 'auto2'), 20_000, 'the first writing');
+  db.prepare('update exp_groups set by = ?, at = ? where name = ?').run('agent', Date.now() - 7 * 3_600_000, 'auto2');
+  for (let i = 0; i < 6; i++) doneRun(`th${i}hhhh`, 'auto2', i, { acc: 1 });
+  const own2 = await submit(deps, await job('auto2'));
+  await sleep(200);
+  assert.equal(count('auto2'), 1);
+  // One the agent describes before the helper does: the helper leaves it.
+  const early = await submit(deps, await job('auto3'));
+  const said = await call('experiment_describe', { group: 'auto3', title: 'By the agent' }, ctxOf());
+  assert.ok(!said.isError, said.text);
+  await sleep(200);
+  assert.equal(count('auto3'), 0);
+  assert.equal(getInfo(db, 'auto3')!.title, 'By the agent');
+  // A helper that gives nothing usable: asked once, then left alone for a while.
+  answer = 'no json';
+  const bad1 = await submit(deps, await job('auto4'));
+  await until(() => count('auto4') === 1, 20_000, 'the asking');
+  await sleep(100);
+  const bad2 = await submit(deps, await job('auto4'));
+  await sleep(200);
+  assert.equal(count('auto4'), 1);
+  assert.equal(getInfo(db, 'auto4'), null);
+  // A confidential session’s runs are read only by a helper on this computer: none here, so nothing is asked.
+  answer = '{"title": "Secret"}';
+  db.prepare("insert into app_sessions (key, agent, cwd) values ('claude:secret1', 'claude', ?)").run(tmp);
+  setSessionExtra(db, 'claude:secret1', { ...CONFIDENTIAL_EXTRA });
+  const sec = await submit(deps, { ...(await job('secret-g')), name: 'secret-run' }, { startedBy: { session: 'claude:secret1' } });
+  await sleep(200);
+  assert.equal(count('secret-g'), 0);
+  assert.equal(await describeGroup(deps, 'secret-g', {}), null);
+  await assert.rejects(describeGroup(deps, 'secret-g', { force: true }), /only a helper model on this computer/);
+  assert.equal(getInfo(db, 'secret-g'), null);
+  const forced = await http.inject({ method: 'POST', url: '/api/experiments/groups/describe', payload: { name: 'secret-g' } });
+  assert.equal(forced.statusCode, 409);
+  await until(() => [r1, r2, r3, r4, r5, own, own2, early, bad1, bad2, sec].every((r) => ended(r.id)()), 30_000, 'the runs');
+});
+
+test('experiment_describe: an agent’s title, description and category are kept as the agent’s; experiment_list tells each run’s experiment title', async () => {
+  const none = await call('experiment_describe', { group: 'tools' }, ctxOf());
+  assert.ok(none.isError && /at least one/.test(none.text));
+  assert.ok((await call('experiment_describe', { title: 'x' }, ctxOf())).isError, 'the group is required');
+  const first = JSON.parse((await call('experiment_describe', { group: 'tools', title: 'Tool runs', description: 'Runs the tools test starts.', category: 'Testing' }, ctxOf())).text);
+  assert.deepEqual(first, { name: 'tools', title: 'Tool runs', description: 'Runs the tools test starts.', category: 'Testing', by: 'agent', at: first.at });
+  const second = JSON.parse((await call('experiment_describe', { group: 'tools', description: 'Changed.', category: '' }, ctxOf())).text);
+  assert.equal(second.title, 'Tool runs', 'the fields left out stay');
+  assert.equal(second.description, 'Changed.');
+  assert.ok(!('category' in second), 'an empty one clears');
+  const list = JSON.parse((await call('experiment_list', { group: 'tools' }, ctxOf())).text);
+  assert.ok(list.runs.length && list.runs.every((r: { experiment_title?: string }) => r.experiment_title === 'Tool runs'));
+  const other = JSON.parse((await call('experiment_list', { group: 'base' }, ctxOf())).text);
+  assert.ok(other.runs.every((r: { experiment_title?: string }) => r.experiment_title === 'Baseline runs' || r.experiment_title === 'Machine title'));
+  const plain = JSON.parse((await call('experiment_list', { group: 'ours' }, ctxOf())).text);
+  assert.ok(plain.runs.length && plain.runs.every((r: object) => !('experiment_title' in r)), 'no title, no field');
+  assert.ok(experimentTools(ctxOf()).find((t) => t.name === 'experiment_describe')!.description.includes('title'));
 });
 
 // Last: it fixes the metrics of every ended run of the others above.

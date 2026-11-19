@@ -11,7 +11,7 @@ import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { modeOf } from '../guide/api.ts';
 import { makeTable, runView, startSweep } from './api.ts';
 import { cleanJob, onCallSession, placesLine, runAgain, stopRun, submit, waitRuns, whereWords } from './queue.ts';
-import { getRun, getRunWithEvents, listRuns } from './records.ts';
+import { getRun, getRunWithEvents, listInfo, listRuns, saveInfo } from './records.ts';
 import { connectedMachines } from './remote.ts';
 
 const json = (v: unknown): string => JSON.stringify(v, null, 1);
@@ -54,11 +54,12 @@ const startedBy = (ctx: RunCtx): RunRecord['startedBy'] => (ctx.step ? { app: ct
 /** The agent of this session, as the agent on call's default ("claude", "codex", "acp:<id>"). */
 const agentOf = (ctx: RunCtx) => (ctx.agent === 'acp' ? `acp:${ctx.acpAgent ?? 'console'}` : ctx.agent);
 
-/** A run as the list gives it. */
-const brief = (db: RunCtx['deps']['db'], r: RunRecord) => ({
+/** A run as the list gives it (`titles`: the experiments' titles by group, for experiment_title). */
+const brief = (db: RunCtx['deps']['db'], r: RunRecord, titles?: Map<string, string>) => ({
   id: r.id,
   name: r.name,
   group: r.group,
+  ...(r.group && titles?.get(r.group) ? { experiment_title: titles.get(r.group) } : {}),
   status: r.status,
   ...(r.why ? { why: r.why } : {}),
   where: whereWords(db, r),
@@ -196,7 +197,7 @@ function sweepTool(ctx: RunCtx): RunTool {
 const LIST: RunTool = {
   name: 'experiment_list',
   annotations: { readOnlyHint: true },
-  description: 'List runs of Experiments, newest first: their id, name, experiment (group), status (and why it waits or failed), where, settings, seed, metrics ({ last, best, step, repeated: the metrics printed more than once, which have curves (the others it printed once: settings, results), progress?: { done, total } while a phase is under way }) and when they started and ended.',
+  description: 'List runs of Experiments, newest first: their id, name, experiment (group) and its title when it has one (experiment_title), status (and why it waits or failed), where, settings, seed, metrics ({ last, best, step, repeated: the metrics printed more than once, which have curves (the others it printed once: settings, results), progress?: { done, total } while a phase is under way }) and when they started and ended.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -211,7 +212,42 @@ const LIST: RunTool = {
     const st = String(a.status ?? '').trim();
     const status = st === 'active' ? ACTIVE : st ? (st.split(/[\s,]+/).filter(Boolean) as RunStatus[]) : undefined;
     const runs = listRuns(ctx.deps.db, { group: a.group ? String(a.group) : undefined, tag: a.tag ? String(a.tag) : undefined, status, cwd: a.cwd ? String(a.cwd) : undefined, limit: Math.min(Math.max(Number(a.limit) || 30, 1), 500) });
-    return json({ runs: runs.map((r) => brief(ctx.deps.db, r)) });
+    const titles = new Map([...listInfo(ctx.deps.db)].flatMap(([name, i]) => (i.title ? [[name, i.title] as const] : [])));
+    return json({ runs: runs.map((r) => brief(ctx.deps.db, r, titles)) });
+  },
+};
+
+const DESCRIBE: RunTool = {
+  name: 'experiment_describe',
+  description:
+    'Give an experiment (the group its runs share) a clear title, a short description (what it tests or compares, the model and data, the metrics that matter) and a category (one to three words naming the area or task, reusing one already in use when it fits), so people see at a glance what it is and find it by searching. Use it when you start the first runs of a new experiment, and again when what it tests changes. The fields you give replace the old ones (an empty string clears one); the ones you leave out stay. Returns the experiment’s info as JSON.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      group: { type: 'string', description: 'The experiment’s name: the group its runs carry.' },
+      title: { type: 'string', description: 'At most 8 words or so (80 characters at most), plain and specific: what is trained or evaluated, on what, and what is varied. Keep a short code the runs use (E7, v2) in parentheses at the end.' },
+      description: { type: 'string', description: 'One to three sentences (500 characters at most).' },
+      category: { type: 'string', description: 'One to three words (40 characters at most): the area or task, like “Language modelling”.' },
+    },
+    required: ['group'],
+  },
+  async run(a, ctx) {
+    const name = typeof a.group === 'string' ? a.group.trim().slice(0, 120) : '';
+    if (!name) return failed('Which experiment: group (the name its runs carry).');
+    const p: { title?: string; description?: string; category?: string } = {};
+    for (const k of ['title', 'description', 'category'] as const) {
+      if (a[k] === undefined || a[k] === null) continue;
+      if (typeof a[k] !== 'string') return failed(`${k} is text.`);
+      p[k] = a[k] as string;
+    }
+    if (!Object.keys(p).length) return failed('Give at least one of title, description and category.');
+    try {
+      const { runs: _runs, ...info } = saveInfo(ctx.deps.db, name, p, 'agent');
+      ctx.deps.broadcast({ t: 'feature', id: 'experiments', data: { groups: [name] } });
+      return json(info);
+    } catch (e) {
+      return failed(e);
+    }
   },
 };
 
@@ -312,8 +348,8 @@ const WAIT: RunTool = {
 };
 
 export function experimentTools(ctx: RunCtx): RunTool[] {
-  return [runTool(ctx), sweepTool(ctx), LIST, GET, STOP, TABLE, ...(ctx.step ? [WAIT] : [])];
+  return [runTool(ctx), sweepTool(ctx), LIST, GET, STOP, TABLE, DESCRIBE, ...(ctx.step ? [WAIT] : [])];
 }
 
 export const SPAWN_NOTE =
-  'Experiments (System → Experiments in the app): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. Never start runs on the user’s GPUs unless they asked you to.';
+  'Experiments (System → Experiments in the app): long training or evaluation goes to experiment_run (many settings: experiment_sweep) instead of running in the foreground: it waits for free GPUs, runs on its own and is recorded. Read runs with experiment_list and experiment_get; make results tables (mean ± std over seeds, significance, LaTeX) with experiment_table. When you start the first runs of an experiment (its group), or what it tests changes, give it a title, a short description and a category with experiment_describe, so people see what it is and find it by searching. Never start runs on the user’s GPUs unless they asked you to.';

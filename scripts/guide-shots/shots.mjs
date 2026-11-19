@@ -264,12 +264,19 @@ export const SHOTS = [
   settingsShot('skills', 'skills', { height: 979 }),
   settingsShot('plugins', 'plugins', { height: 979 }),
   {
-    // System → Experiments: the queue's line, the GPUs (made up: demo.mjs) and the demo's runs, by experiment.
+    // System → Experiments: the column of experiments by category, the queue and the GPUs (made up: run.mjs), and an
+    // experiment's Charts tab: the demo's learning rate and batch size sweep, its six runs' curves (demo.mjs makes the
+    // runs, on the CPU, and their titles). Its runs end within seconds of the demo's start; the shot waits for them.
     id: 'experiments',
     height: 860,
     async take(p, ctx) {
-      await ctx.go('/system/experiments', { settle: 2500 });
-      await p.waitFor(`[...document.querySelectorAll('main *')].some((e) => /hard negatives/.test(e.textContent))`, { timeout: 15000 }).catch(() => {});
+      for (let i = 0; i < 90; i++) {
+        const r = await ctx.api('GET', '/api/experiments/runs?status=active&limit=50').catch(() => null);
+        if (r && !r.runs?.length) break;
+        await sleep(1000);
+      }
+      await ctx.go('/system/experiments?e=dense-retriever-lr-sweep&tab=charts', { settle: 2500 });
+      await p.waitFor(`document.querySelectorAll('main svg path.viz-line').length >= 12`, { timeout: 20000 }).catch(() => {});
       await sleep(1500);
       await p.park();
       return p.shot(ctx.file, { clip: await main(p) });

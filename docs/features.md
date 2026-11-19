@@ -1397,13 +1397,27 @@ agents that speak ACP and take MCP servers.
   posts for X, Bluesky and LinkedIn, a project page) and a **Figure doctor** (column width, the paper's font,
   colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in.
 - **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
-  SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, settings, seed,
-  environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it prints
-  once kept as values), and how far a run has got with about how long is left. An agent on call wakes on NaN, out of memory, a stall, a crash or
-  divergence, and tells you or acts within your rules. Compare runs, sweep settings (every combination or a random
-  sample, losing runs stopped early), and make **results tables** (mean ± std over seeds, the best in bold, paired or
-  Welch tests with Holm's correction as daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run, experiment_sweep, experiment_list, experiment_get, experiment_stop and
-  experiment_table.
+  SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, hyperparameters,
+  seed, environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it
+  prints once kept as values), and how far a run has got with about how long is left. The page has a column at the left
+  (the queue, this computer's GPUs, **Find an experiment**, and the experiments by category) and an **Overview**:
+  **Running now**, **Experiments** as cards and the **Latest runs**. Every experiment has a **title, a short
+  description and a category**, written by the helper model soon after its first run (and again when it has twice
+  the runs), by an agent that starts runs (experiment_describe) or by you (**Edit the title and description**), and
+  found by the search box and **Find an experiment**. An experiment's page has three tabs: **Runs**, a table with a
+  column per metric and per hyperparameter you choose (sortable, with the best of each column in bold, **Find a run**,
+  **Filter**, **Columns**); **Charts**, a chart per metric over steps in sections (dev, train, Metrics, Other), up
+  to 8 runs at once each keeping its colour, with **Smoothing**, a choice of X axis, a log scale, **Ignore
+  outliers**, a drag to zoom and a bigger view with the numbers; and **Hyperparameters**, the best run, parallel
+  coordinates, **Which hyperparameters matter** (ρ and η, a correlation, not proof) and each hyperparameter against a
+  metric. A run's page has **Overview** (key metrics with their curves, hyperparameters, values, details, code,
+  command, environment and what happened), **Charts** and **Log**. **Compare** puts the picked runs' metrics,
+  hyperparameters (**Only what differs**) and charts side by side. An agent on call wakes on NaN, out of memory, a
+  stall, a crash or divergence, and tells you or acts within your rules. Sweep hyperparameters (every combination or a
+  random sample, losing runs stopped early; a sweep is one experiment, and its notice opens its Hyperparameters tab),
+  and make **results tables** (mean ± std over seeds, the best in bold, paired or Welch tests with Holm's correction as
+  daggers) as LaTeX, Markdown or CSV, or straight into a LaTeX document you kept. Agents use it with experiment_run,
+  experiment_sweep, experiment_list, experiment_get, experiment_stop, experiment_table and experiment_describe.
 - **The lab's work** (Apps → Lab and Work): an **Annotation workbench** (you and a model label the same sample, the
   model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
   with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis

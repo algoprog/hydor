@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { JobSpec, MetricSeries, ResultsTable, ResultsTableSpec, RunEvent, RunRecord, RunStatus, SweepSpec } from '../../shared/experiments.ts';
+import type { ExperimentInfo, JobSpec, MetricSeries, ResultsTable, ResultsTableSpec, RunEvent, RunRecord, RunStatus, SweepSpec } from '../../shared/experiments.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { makeTable, readScores } from './tables.ts';
@@ -57,6 +57,7 @@ function tables(db: DB) {
     create table if not exists exp_tables (id text primary key, spec text not null, data text not null, made_at integer not null);
     create table if not exists exp_sweeps (id text primary key, grp text not null, spec text not null, created_at integer not null);
     create table if not exists exp_waits (key text primary key, started_at integer not null);
+    create table if not exists exp_groups (name text primary key, title text, description text, category text, by text, runs integer, at integer);
   `);
   made.add(db);
 }
@@ -382,4 +383,87 @@ export function waitStarted(db: DB, key: string): number {
 export function waitDone(db: DB, key: string) {
   tables(db);
   db.prepare('delete from exp_waits where key = ?').run(key);
+}
+
+// ---- what an experiment is: its title, description and category ---------------------------------------------------
+
+/** The longest each part of an experiment's info may be, in characters. */
+export const INFO_MAX = { title: 80, description: 500, category: 40 } as const;
+
+/** An experiment's info as kept: also how many runs it had when the helper wrote it (what growth is measured from). */
+export interface StoredInfo extends ExperimentInfo {
+  runs: number;
+}
+
+interface InfoRow {
+  name: string;
+  title: string | null;
+  description: string | null;
+  category: string | null;
+  by: string | null;
+  runs: number | null;
+  at: number | null;
+}
+
+const toInfo = (r: InfoRow): StoredInfo => ({
+  name: r.name,
+  ...(r.title ? { title: r.title } : {}),
+  ...(r.description ? { description: r.description } : {}),
+  ...(r.category ? { category: r.category } : {}),
+  ...(r.by === 'helper' || r.by === 'agent' || r.by === 'user' ? { by: r.by } : {}),
+  ...(r.at ? { at: r.at } : {}),
+  runs: r.runs ?? 0,
+});
+
+/** Text for one of the three fields: tidy (quotes and markdown marks around it gone, spaces and a one-line title and category) and cut to its limit. */
+export function cleanInfoField(field: keyof typeof INFO_MAX, v: unknown): string {
+  let t = typeof v === 'string' ? v.replace(/\r/g, '') : '';
+  t = field === 'description' ? t.replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n') : t.replace(/\s+/g, ' ');
+  t = t.trim().replace(/^["“”'`*_#\s]+|["“”'`*_\s]+$/g, '').trim();
+  return t.slice(0, INFO_MAX[field]).trim();
+}
+
+/** What is kept of an experiment (its group's name), or null when nothing is. */
+export function getInfo(db: DB, name: string): StoredInfo | null {
+  tables(db);
+  const r = db.prepare('select * from exp_groups where name = ?').get(name) as InfoRow | undefined;
+  return r ? toInfo(r) : null;
+}
+
+/** Every experiment that has info, by name. */
+export function listInfo(db: DB): Map<string, StoredInfo> {
+  tables(db);
+  return new Map((db.prepare('select * from exp_groups').all() as InfoRow[]).map((r) => [r.name, toInfo(r)]));
+}
+
+/**
+ * Keeps what `by` wrote of an experiment: the fields given replace the old ones ('' clears one, undefined leaves it);
+ * `runs` is how many runs it has now when the helper wrote it. The info as kept.
+ */
+export function saveInfo(db: DB, name: string, p: { title?: string; description?: string; category?: string }, by: 'helper' | 'agent' | 'user', o: { runs?: number; at?: number } = {}): StoredInfo {
+  tables(db);
+  const old = getInfo(db, name);
+  const pick = (k: keyof typeof INFO_MAX) => (p[k] === undefined ? old?.[k] ?? null : cleanInfoField(k, p[k]) || null);
+  // A person who cleared all three: nothing is kept (an empty row would keep the helper from writing them again).
+  if (by === 'user' && !pick('title') && !pick('description') && !pick('category')) {
+    deleteInfo(db, name);
+    return { name, runs: old?.runs ?? 0 };
+  }
+  db.prepare(
+    'insert into exp_groups (name, title, description, category, by, runs, at) values (?, ?, ?, ?, ?, ?, ?) on conflict(name) do update set title = excluded.title, description = excluded.description, category = excluded.category, by = excluded.by, runs = excluded.runs, at = excluded.at',
+  ).run(name, pick('title'), pick('description'), pick('category'), by, o.runs ?? old?.runs ?? 0, o.at ?? Date.now());
+  return getInfo(db, name)!;
+}
+
+/** Forgets what is kept of an experiment (its group's name). */
+export function deleteInfo(db: DB, name: string) {
+  tables(db);
+  db.prepare('delete from exp_groups where name = ?').run(name);
+}
+
+/** The categories experiments have, the most used first. */
+export function categoriesInUse(db: DB): string[] {
+  const n = new Map<string, number>();
+  for (const i of listInfo(db).values()) if (i.category) n.set(i.category, (n.get(i.category) ?? 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1]).map(([c]) => c);
 }

@@ -1,7 +1,7 @@
 // New run: the command, its folder, the GPUs it needs and the free memory each, where it runs, a name and an
-// experiment; More options folds the rest (settings, seed, priority, a metrics file, what to tell you, the agent on
+// experiment; More options folds the rest (hyperparameters, seed, priority, a metrics file, what to tell you, the agent on
 // call and its rules, a cluster's needs). As a sweep: the command with {name} placeholders and values for each
-// setting, every combination or a random sample, and an early stop. Run again opens it filled in.
+// hyperparameter, every combination or a random sample, and an early stop. Run again opens it filled in.
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ClusterSpec, RunRecord, WatchKind } from '@shared/experiments';
@@ -67,10 +67,12 @@ export interface NewRunProps {
   from?: RunRecord | null;
   /** Start as a sweep. */
   sweep?: boolean;
+  /** The experiment the run goes in (fills the Experiment field when it opens without `from`). */
+  group?: string;
   onStarted: (r: { run?: RunRecord; group?: string }) => void;
 }
 
-export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRunProps) {
+export function NewRun({ open, onClose, from, sweep: asSweep, group: inGroup, onStarted }: NewRunProps) {
   const home = useApp((s) => s.boot?.home) ?? '';
   const defaultCwd = useApp((s) => s.boot?.defaultCwd) ?? home;
   const [mode, setMode] = useState<'one' | 'sweep'>('one');
@@ -140,7 +142,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
     if (f) setGpus(String(f.gpus ?? 0));
     setMem(f?.gpuMemGb ? String(f.gpuMemGb) : '');
     setName(f?.name ?? '');
-    setGroup(f?.group ?? '');
+    setGroup(f ? (f.group ?? '') : (inGroup ?? ''));
     setSettings(settingsText(f?.params));
     setSeed(f?.seed !== undefined ? String(f.seed) : '');
     setPriority(f?.priority ? String(f.priority) : '');
@@ -163,7 +165,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
     setStopMetric('');
     // The options worth seeing again are open when the run had them.
     setMore(!!f && !!(f.seed !== undefined || f.onCall?.on || f.metricsFile || f.notify?.when || f.hours));
-  }, [open, from, asSweep, defaultCwd]);
+  }, [open, from, asSweep, inGroup, defaultCwd]);
 
   const place = where.startsWith('c:') ? clusters.find((c) => `c:${c.id}` === where) : null;
   const local = where === 'local';
@@ -262,7 +264,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
           hint={
             mode === 'sweep' ? (
               // Keep technical placeholders in one complete translatable sentence.
-              'Put {name} where each setting’s value goes: python train.py --lr {lr}'
+              'Put {name} where each hyperparameter’s value goes: python train.py --lr {lr}'
             ) : (
               'As you would type it in its folder. Metrics are read from what it prints: loss=0.42, or a JSON object on a line.'
             )
@@ -329,7 +331,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
 
         {mode === 'sweep' && (
           <div className="space-y-2.5 rounded-xl border border-line p-3">
-            <div className="text-fg-2">Settings and their values</div>
+            <div className="text-fg-2">Hyperparameters and their values</div>
             {params.map((p, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input
@@ -346,13 +348,13 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
                   spellCheck={false}
                   className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')}
                 />
-                <IconButton label="Remove this setting" size="sm" onClick={() => setParams(params.length > 1 ? params.filter((_, k) => k !== i) : [{ name: '', values: '' }])}>
+                <IconButton label="Remove this hyperparameter" size="sm" onClick={() => setParams(params.length > 1 ? params.filter((_, k) => k !== i) : [{ name: '', values: '' }])}>
                   <X size={14} />
                 </IconButton>
               </div>
             ))}
             <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setParams([...params, { name: '', values: '' }])}>
-              Add a setting
+              Add a hyperparameter
             </Button>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Segmented
@@ -397,7 +399,7 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
         {more && (
           <div className="space-y-3.5">
             {mode === 'one' && (
-              <Field label="Settings" hint="One per line, name=value. --name value in the command are read by themselves; {name} in the command takes the value.">
+              <Field label="Hyperparameters" hint="One per line, name=value. --name value in the command are read by themselves; {name} in the command takes the value.">
                 <textarea value={settings} onChange={(e) => setSettings(e.target.value)} rows={2} spellCheck={false} placeholder="lr=3e-4" className={cx(inputCls, 'h-auto py-2 font-mono text-[12.5px]')} />
               </Field>
             )}

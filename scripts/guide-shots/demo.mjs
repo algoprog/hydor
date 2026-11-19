@@ -821,18 +821,30 @@ export async function seedApi(api, home, now, s) {
     { name: 'New library studies', time: '08:00', h: 8, days: [1, 2, 3, 4, 5], prompt: 'Find this week’s new studies and keep the best five.', extra: { assistant: scout } },
     { name: 'Nightly shop tests', time: '02:00', h: 2, prompt: 'Run the tests on main and say what broke.', cwd: path.join(home, 'code/shop-api'), extra: { assistant: tester } },
   ];
-  // Experiments: a few short runs on the CPU (no GPU is ever used), two experiments of a dense retriever, three seeds
-  // each, their metrics printed as training logs do; the GPUs the page shows are made up (overrides, run.mjs).
+  // Experiments: three made-up experiments of a dense retriever, all on the CPU (no GPU is ever used). Two of them run
+  // three seeds each (in-batch negatives, then BM25 hard negatives) and print training curves as a training log does,
+  // a line every 0.1 s; a sweep of learning rate and batch size makes six runs. The three are described (titles, notes,
+  // categories) once their runs are submitted. The GPUs the page shows are made up (overrides, run.mjs).
   const retriever = path.join(home, 'code/retriever');
   fs.mkdirSync(retriever, { recursive: true });
-  const train = (base, seed) =>
-    `for s in 1 2 3 4 5 6 7 8; do l=$(( 900 - s * ${base} - ${seed} * 7 )); n=$(( 300 + s * ${Math.round(base / 3)} + ${seed} * 3 )); echo "step=$((s * 500)) loss=0.$l ndcg@10=0.$n"; sleep 0.15; done`;
-  for (const [group, base] of [
-    ['BM25 + dense, in-batch negatives', 60],
-    ['BM25 + dense, hard negatives', 75],
+  // One run's command, for `sh -c`: awk prints a header line, then 40 steps of training curves (deterministic for a
+  // seed), then the test scores. `base`, `seed` and `lr` are shell words; a sweep passes `{lr}` and `{batch}` instead.
+  const train = (base, seed, lr) =>
+    `awk -v base=${base} -v seed=${seed} -v lr=${lr} 'BEGIN { srand(seed); print "params=109482240 train_examples=502939"; fflush(); f = sqrt(lr / 2e-5); g = log(lr / 2e-5) / log(2); if (g < 0) g = -g; for (i = 1; i <= 40; i++) { tl = 0.22 + (seed - 2) * 0.012 + 0.95 * exp(-i * f / (7 + base)) + 0.03 * rand(); dv = 0.31 + (0.20 + base / 100 - 0.035 * g + (seed - 2) * 0.007) * (1 - exp(-i * f / (6 + base))) + 0.01 * rand(); printf "step=%d train_loss=%.4f dev_ndcg@10=%.4f lr=%.2e\\n", i * 250, tl, dv, lr * (1 - i / 45); fflush(); system("sleep 0.1"); } printf "test_ndcg@10=%.4f test_mrr@10=%.4f\\n", dv - 0.004, dv - 0.004 + 0.05; }'`;
+  for (const [group, negatives, base, label] of [
+    ['dense-retriever-inbatch', 'in-batch', 2, 'in-batch negatives'],
+    ['dense-retriever-hardneg', 'hard', 4, 'hard negatives'],
   ])
     for (const seed of [1, 2, 3])
-      await api('POST', '/api/experiments/jobs', { name: `${group.split(', ')[1]} · seed ${seed}`, group, command: train(base, seed), cwd: retriever, gpus: 0, seed, params: { negatives: group.split(', ')[1], lr: '2e-5', seed }, notify: { done: false, failed: false } }).catch((e) => console.warn(`  experiments: ${e.message}`));
+      await api('POST', '/api/experiments/jobs', { name: `${label} · seed ${seed}`, group, command: train(base, seed, 2e-5), cwd: retriever, gpus: 0, seed, params: { negatives, lr: 2e-5, batch: 64, seed }, notify: { done: false, failed: false } }).catch((e) => console.warn(`  experiments: ${e.message}`));
+  // The sweep: the batch size sets the base of the curves in the shell (3 + (batch == 64)), so the two sizes differ.
+  await api('POST', '/api/experiments/sweeps', { group: 'dense-retriever-lr-sweep', command: train('$((3 + ({batch} == 64)))', 1, '{lr}'), cwd: retriever, gpus: 0, params: { lr: [1e-5, 2e-5, 5e-5], batch: [32, 64] }, mode: 'grid', notify: { done: false, failed: false } }).catch((e) => console.warn(`  experiments: ${e.message}`));
+  for (const g of [
+    { name: 'dense-retriever-inbatch', title: 'Dense retriever with in-batch negatives', description: 'Fine-tunes a BERT-base bi-encoder on MS MARCO passages with in-batch negatives only, three seeds. Measures nDCG@10 on the dev queries; the baseline for the hard-negatives runs.', category: 'Retrieval' },
+    { name: 'dense-retriever-hardneg', title: 'Dense retriever with BM25 hard negatives', description: 'The same bi-encoder trained with hard negatives mined by BM25 alongside the in-batch ones, three seeds. Tests whether harder negatives raise nDCG@10 over the in-batch baseline.', category: 'Retrieval' },
+    { name: 'dense-retriever-lr-sweep', title: 'Learning rate and batch size sweep', description: 'Every combination of three learning rates and two batch sizes for the hard-negatives retriever, to pick the settings for the final runs by dev nDCG@10.', category: 'Retrieval' },
+  ])
+    await api('PUT', '/api/experiments/groups', g).catch((e) => console.warn(`  experiments: ${e.message}`));
   for (const t of tasks) {
     if (!away(t.h)) continue;
     await api('POST', '/api/tasks', {

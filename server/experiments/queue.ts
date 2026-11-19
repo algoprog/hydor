@@ -20,6 +20,7 @@ import { pathDirs } from '../platform.ts';
 import { startSettings } from '../startSettings.ts';
 import { captureEnvironment, captureGit, localShell, q, type Shell } from './capture.ts';
 import { endOfSlurm, getCluster, listClusters, parseSacct, parseSbatch, parseSqueue, reasonWords, remoteDir, rq, runSsh, sbatchScript, slurmEnded, sshWhy } from './clusters.ts';
+import { describeAfterSubmit } from './describe.ts';
 import { chooseGpus, gpuList, gpusVia, readGpus, type GpuReading } from './gpus.ts';
 import { aliveLocal, exitOf, files, startLocal, stopLocal, wrapperScript } from './local.ts';
 import { nanText, oomText, parseLine, readFrom, tailLines, Tracker } from './metrics.ts';
@@ -244,6 +245,8 @@ export async function submit(d: Deps, spec: JobSpec, o: { startedBy?: RunInfo['s
   }
   tellRuns(d, [id]);
   wake();
+  // A new experiment (or one that has grown) gets its title and description written soon.
+  describeAfterSubmit(d, spec.group);
   return getRun(d.db, id)!;
 }
 

@@ -136,6 +136,7 @@ export const experimentsFeature: WebFeature = {
     experiment_list: { Row: StepRow, step: (t) => ({ category: 'read', verb: going(t) ? 'Looking at' : 'Looked at', title: arg(t, 'group') ? `the runs of ${arg(t, 'group')}` : 'the runs' }) },
     experiment_get: { Row: StepRow, step: (t) => ({ category: 'read', verb: going(t) ? 'Reading' : 'Read', title: `the run ${arg(t, 'id') ?? ''}`.trim() }) },
     experiment_stop: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Stopping' : 'Stopped', title: `the run ${arg(t, 'id') ?? ''}`.trim() }) },
+    experiment_describe: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Describing' : 'Described', title: arg(t, 'group') ? `the experiment ${arg(t, 'group')}` : 'an experiment' }) },
     experiment_wait: { Row: StepRow, step: (t) => ({ verb: going(t) ? 'Waiting for' : 'Waited for', title: 'runs to end' }) },
   },
 };
