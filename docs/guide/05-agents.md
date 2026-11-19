@@ -46,7 +46,7 @@ Click a card for the agent's own page, which keeps the column beside it with tha
 - **Schedules** lists the scheduled tasks that run as it, with **Add a schedule**.
 - **Inbox**, for an agent that keeps a conversation of its own: its messages and their answers, a box to send it one, and **Its conversation** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it handed back**, for an agent with fields or places for its results: a table of its results, one row for each, with where each went (see [What an agent hands back](#what-an-agent-hands-back)).
-- **This month**: how many sessions started as it and what they spent, against its budget when it has one; and its **Recent sessions**, each opening its conversation.
+- **This month**: how many sessions started as it and what they spent, against its budget when it has one; and its **Recent sessions**, each opening its conversation, with **Show all 23 in the sidebar** beside them (see [Find an agent's sessions](#find-an-agents-sessions)).
 
 ## The built-in agents
 
@@ -401,6 +401,16 @@ From your next message on, the session works as the new agent, and the conversat
 - The connected accounts the new agent turns on are on in the session, in place of the previous one's; what you turned on or off for the session yourself stays. If it has a permission mode, the session switches to the matching mode, and to its model when it suggests the session's own program. The program itself stays the same: to move the conversation to another one, see [Continue in another agent](/guide/sessions#continue-in-another-agent).
 
 A session started without an agent (in VS Code or a terminal, or before agents came to the app) shows **No agent** there: pick one to give it one. The session's menu (⋯) → **Session settings** → **Agent** names it too; clicking it opens the agent's page.
+
+## Find an agent's sessions
+
+A session started as an agent other than the usual one says so in the sidebar: the second line of its row begins with the agent's icon and name ("Planner · web-agent · 5d", or "Researcher · Working · 2m 10s" while it works). The usual one is the project's own agent for a session in a project that has one (**Its sessions start as**, in the project's details), and General for every other session. Sessions started outside Hydor and an agent you have deleted since are not named either. The filter and the search go by the agent each session really started as, the usual one included. To see only one agent's sessions:
+
+- Click the filter button at the top of the sidebar (**Filter and group sessions**) and pick the agent under **Agent**. It lists the agents your sessions were started as, the most used first (up to eight), each with how many sessions it has; **All agents** shows every session again. The section shows once some session was started as an agent.
+- Or open the agent's page and click **Show all 23 in the sidebar** beside **Recent sessions** (it says **Show them in the sidebar** when the agent has eight sessions or fewer). It opens the start page with the sidebar showing only that agent's sessions, other filters cleared; on a phone the menu opens.
+- Or type the agent's name in the search box (Ctrl+K): "Tutor" finds the sessions started as Tutor. General is left out of this, since most sessions are. A session's preview there lists its **Agent**.
+
+While a filter is on, a chip under **New session** names it, with its icon: click its × to show all sessions again. The agent filter works with the others (**Runs on** and **Project**), such as one agent's sessions in one project. If the agent is deleted, the list shows every session again. See [The sidebar](/guide/start#the-sidebar).
 
 ## Duplicate or delete an agent
 

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -6,15 +6,19 @@ import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { Folders, Inbox, ListFilter, Plus, RotateCcw, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
+import type { Assistant } from '@shared/assistants';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { go } from '../../lib/nav';
-import { useApp, useUI } from '../../lib/store';
+import { useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Wordmark } from '../../components/Logo';
-import { cx, IconButton, MenuItem, MenuSep, Popover, useMediaQuery } from '../../components/ui';
+import { cx, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Segmented, useMediaQuery } from '../../components/ui';
 import { NewSpaceDialog, SpaceMark } from '../spaces/parts';
 import { openProject } from '../spaces/ProjectDialog';
 import { useSpaces } from '../spaces/state';
+import { useAssistantsState } from '../assistants/state';
+import { AssistantIcon } from '../assistants/icons';
+import { assistantTranslate } from '../assistants/language';
 import { SessionList } from '../sessions/SessionList';
 import { openPalette } from '../palette/CommandPalette';
 import { MachineSwitcher } from '../machines/MachineSwitcher';
@@ -146,6 +150,73 @@ function ToolGrid({ nav, close }: { nav: (path: string) => void; close: () => vo
   );
 }
 
+/**
+ * The filter menu's agents: those the list has sessions of, the most used first (eight at most, and the one picked),
+ * each with how many. Counted only while the menu is open; nothing at all while no session was started as an agent.
+ */
+function AgentChoices({ picked, onPick }: { picked: string | null; onPick: (id: string | null) => void }) {
+  const st = useAssistantsState();
+  const byKey = useSessions((s) => s.byKey);
+  const counts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const s of Object.values(byKey)) {
+      const id = s.extra?.assistant;
+      if (typeof id === 'string' && !s.archived && !s.subagentOf) n.set(id, (n.get(id) ?? 0) + 1);
+    }
+    return n;
+  }, [byKey]);
+  const all = st?.assistants ?? [];
+  const shown = all.filter((a) => counts.has(a.id)).sort((a, b) => counts.get(b.id)! - counts.get(a.id)! || a.name.localeCompare(b.name)).slice(0, 8);
+  const cur = picked ? all.find((a) => a.id === picked) : undefined;
+  if (cur && !shown.includes(cur)) shown.push(cur);
+  if (!shown.length) return null;
+  return (
+    <>
+      <MenuLabel>Agent</MenuLabel>
+      <MenuItem checked={!picked} onClick={() => onPick(null)}>
+        All agents
+      </MenuItem>
+      {shown.map((a) => (
+        <MenuItem key={a.id} icon={<AssistantIcon icon={a.icon} size={14} plain />} hint={<span className="tnum">{counts.get(a.id) ?? 0}</span>} checked={picked === a.id} onClick={() => onPick(a.id)}>
+          <span translate={assistantTranslate(a)}>{a.name}</span>
+        </MenuItem>
+      ))}
+      <MenuSep />
+    </>
+  );
+}
+
+/** A filter that is on, under New session: what it shows, and its × to show everything again. */
+function FilterChip({ icon, label, clear, translate }: { icon: ReactNode; label: string; clear: () => void; translate?: 'no' }) {
+  return (
+    <span className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full bg-accent/10 pr-0.5 pl-2 text-[12px] text-fg ring-1 ring-accent/30 ring-inset">
+      <span className="flex shrink-0 items-center text-accent">{icon}</span>
+      <span className="truncate" translate={translate}>
+        {label}
+      </span>
+      <button type="button" aria-label={`Stop filtering: ${label}`} title="Show all sessions again" onClick={clear} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-fg-3 hover:bg-accent/15 hover:text-fg">
+        <X size={12} />
+      </button>
+    </span>
+  );
+}
+
+/** The filters that are on, as chips: the list's narrowing shows, and goes with a click. Nothing while none is on. */
+function FilterChips({ agent }: { agent?: Assistant }) {
+  const program = useUI((s) => s.agentFilter);
+  const spaceFilter = useUI((s) => s.spaceFilter);
+  const space = useSpaces()?.find((sp) => sp.id === spaceFilter);
+  if (!agent && program === 'all' && !space) return null;
+  const set = useUI.getState().set;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {agent && <FilterChip icon={<AssistantIcon icon={agent.icon} size={12} plain />} label={agent.name} translate={assistantTranslate(agent)} clear={() => set({ assistantFilter: null })} />}
+      {program !== 'all' && <FilterChip icon={<AgentIcon agent={program} size={12} />} label={program === 'claude' ? 'Claude Code' : 'Codex'} clear={() => set({ agentFilter: 'all' })} />}
+      {space && <FilterChip icon={<SpaceMark s={space} size={12} />} label={space.name} translate="no" clear={() => set({ spaceFilter: null })} />}
+    </div>
+  );
+}
+
 /** The inbox, by the drawer's title: how many sessions wait on you, here and on the other machines, on its corner. */
 function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
   const n = useInboxCount();
@@ -166,13 +237,20 @@ function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) =
 export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const [loc] = useLocation();
   const filter = useUI((s) => s.agentFilter);
+  const agentFilter = useUI((s) => s.assistantFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
   const byFolder = useUI((s) => s.groupByFolder);
   const spaces = useSpaces();
-  // A space deleted while the list showed only its sessions: all of them again.
+  const agents = useAssistantsState()?.assistants;
+  const agent = agentFilter ? agents?.find((a) => a.id === agentFilter) : undefined;
+  // A space deleted while the list showed only its sessions: all of them again. The same for an agent.
   useEffect(() => {
     if (spaces && spaceFilter && !spaces.some((s) => s.id === spaceFilter)) useUI.getState().set({ spaceFilter: null });
   }, [spaces, spaceFilter]);
+  useEffect(() => {
+    if (agents && agentFilter && !agents.some((a) => a.id === agentFilter)) useUI.getState().set({ assistantFilter: null });
+  }, [agents, agentFilter]);
+  const filtered = filter !== 'all' || !!agentFilter || !!spaceFilter;
   const connected = useApp((s) => s.connected);
   const filterRef = useRef<HTMLButtonElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -189,32 +267,29 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
   const filterButton = (
     <>
       {/* Search is the rail's (and Ctrl+K's): it finds sessions with the rest. What stays here narrows the list itself. */}
-      <IconButton ref={filterRef} label="Filter and group sessions" active={filter !== 'all' || !!spaceFilter} onClick={() => setFilterOpen((o) => !o)}>
-        <ListFilter size={16} className={cx((filter !== 'all' || spaceFilter) && 'text-accent')} />
+      <IconButton ref={filterRef} label="Filter and group sessions" active={filtered} onClick={() => setFilterOpen((o) => !o)}>
+        <ListFilter size={16} className={cx(filtered && 'text-accent')} />
       </IconButton>
-      <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={272}>
-        {(
-          [
-            ['all', 'All agents', null],
-            ['claude', 'Claude Code', <AgentIcon key="c" agent="claude" size={14} />],
-            ['codex', 'Codex', <AgentIcon key="x" agent="codex" size={14} />],
-          ] as const
-        ).map(([v, label, icon]) => (
-          <MenuItem
-            key={v}
-            icon={icon}
-            checked={filter === v}
-            onClick={() => {
-              useUI.getState().set({ agentFilter: v });
-              setFilterOpen(false);
-            }}
-          >
-            {label}
-          </MenuItem>
-        ))}
+      <Popover anchor={filterRef} open={filterOpen} onClose={() => setFilterOpen(false)} align="end" width={284}>
+        {/* The agent each session started as (General, Researcher, yours), then the program it runs on, then the project. */}
+        <AgentChoices picked={agentFilter} onPick={(id) => (useUI.getState().set({ assistantFilter: id }), setFilterOpen(false))} />
+        <MenuLabel>Runs on</MenuLabel>
+        <div className="px-1.5 pb-1">
+          <Segmented
+            size="sm"
+            value={filter}
+            onChange={(v) => (useUI.getState().set({ agentFilter: v }), setFilterOpen(false))}
+            options={[
+              { value: 'all', label: 'Any' },
+              { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={13} /> },
+              { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={13} /> },
+            ]}
+          />
+        </div>
         {!!spaces?.length && (
           <>
             <MenuSep />
+            <MenuLabel>Project</MenuLabel>
             <MenuItem checked={!spaceFilter} onClick={() => (useUI.getState().set({ spaceFilter: null }), setFilterOpen(false))}>
               Every project
             </MenuItem>
@@ -255,6 +330,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
           <SquarePen size={16} className="shrink-0" />
           New session
         </button>
+        <FilterChips agent={agent} />
       </div>
 
       <ColumnScroll

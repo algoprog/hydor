@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.95.0 · 19 November 2026
+
+The sidebar names the agent each session was started as, and its filter shows one agent's sessions.
+
+- **Each session names its agent**: a session started as Researcher, Planner, Tutor or one of your own agents shows the
+  agent's icon and name at the start of its second line in the sidebar ("Planner · web-agent · 5d"), also inside a
+  project's group. Sessions started as the usual agent (General, or a project's own agent in that project) look as
+  before, so the ones that are different stand out.
+- **Filter by agent**: the sidebar's filter button now has an **Agent** section that lists the agents your sessions were
+  started as, with how many each has. Pick one to see only its sessions; it works together with the program
+  (**Runs on**: **Any**, **Claude Code** or **Codex**) and the project.
+- **See what is filtered**: while a filter is on, a chip for it shows under **New session**; its × shows every session
+  again.
+- **Find by agent**: type an agent's name in the search box (Ctrl+K) to find the sessions started as it, and on an
+  agent's page **Show them in the sidebar** lists all of them there.
+
+## 0.94.2 · 19 November 2026
+
+Folders in a file's path now open in the same window.
+
+- **A folder in the path above a file in the file window** (where a file opens from a conversation or a project's
+  Files) now shows in that window, with the file picked, instead of closing it and going to the Files page.
+- **‹** at the window's top goes back to what it showed before: from a folder to the file, from a file to its folder.
+  **Open in Files** still takes you to the Files page.
+
 ## 0.94.1 · 19 November 2026
 
 A shorter hint in the home page's message box.

@@ -285,9 +285,9 @@ The sidebar gives each project a group of its own, under its name and mark, with
 To list only one project's sessions:
 
 1. At the top of the sidebar, click the filter button (**Filter and group sessions**).
-2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every project**, up to eight of your projects, and **New project…**. Pick a project.
+2. Under **Project**, the menu lists **Every project** and up to eight of your projects (above it are **Agent** and **Runs on**; **New project…** and **Group by folder or project** are below). Pick a project.
 
-The session list then shows only the sessions in that project, by day, and the filter button is coloured while a filter is on. Pick **Every project** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a project. If the project is deleted, the list shows every session again.
+The session list then shows only the sessions in that project, by day, the filter button is coloured while a filter is on, and a chip with the project's name shows under **New session**: click its × to see every session again. You can also pick **Every project**. The other filters work at the same time: pick an agent under **Agent** (or a program under **Runs on**) to show only its sessions in the project. If the project is deleted, the list shows every session again.
 
 In the project's details, **More** (⋯) → **Only its sessions in the sidebar** does the same, with a check while it is on; pick it again to see every session.
 

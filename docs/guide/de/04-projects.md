@@ -285,9 +285,9 @@ Jedes Projekt hat in der Seitenleiste eine Gruppe mit Namen, Zeichen und neueste
 So zeigst du nur ein Projekt:
 
 1. Klicke oben in der Seitenleiste auf die Filterschaltfläche (**Sitzungen filtern und gruppieren**).
-2. Unter **Alle Agenten**, **Claude Code** und **Codex** folgen **Alle Projekte**, bis zu acht Projekte und **Neues Projekt …**. Wähle das gewünschte Projekt.
+2. Unter **Projekt** listet das Menü **Jedes Projekt** und bis zu acht deiner Projekte (darüber stehen **Agent** und **Ausführungsumgebung**, darunter **Neues Projekt …** und **Nach Ordner oder Projekt gruppieren**). Wähle das gewünschte Projekt.
 
-Die Sitzungsliste zeigt dann nur die Sitzungen dieses Projekts, nach Tagen, und die Filterschaltfläche ist farbig, solange ein Filter eingeschaltet ist. Wähle **Jedes Projekt**, um wieder alle Sitzungen zu sehen. Der Agentenfilter wirkt gleichzeitig, sodass du nur die Sitzungen eines Agenten in einem Projekt siehst. Wird das Projekt gelöscht, zeigt die Liste wieder alle Sitzungen.
+Die Sitzungsliste zeigt dann nur die Sitzungen dieses Projekts, nach Tagen, die Filterschaltfläche ist farbig, solange ein Filter eingeschaltet ist, und unter **Neue Sitzung** erscheint ein Chip mit dem Namen des Projekts: Klicke auf sein ×, um wieder alle Sitzungen zu sehen. Du kannst auch **Jedes Projekt** wählen. Die anderen Filter wirken gleichzeitig: Wähle unter **Agent** einen Agenten (oder unter **Ausführungsumgebung** ein Programm), um nur dessen Sitzungen im Projekt zu sehen. Wird das Projekt gelöscht, zeigt die Liste wieder alle Sitzungen.
 
 In den Details des Projekts bewirkt **Mehr** (⋯) → **Nur Projektsitzungen in der Seitenleiste** dasselbe, mit einem Haken, solange es eingeschaltet ist; wähle es noch einmal, um wieder alle Sitzungen zu sehen.
 

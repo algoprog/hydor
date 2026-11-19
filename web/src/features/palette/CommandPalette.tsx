@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Clock, Compass, CornerDownLeft, Download, FileText, Globe, LayoutGrid, Layers, Library, LibraryBig, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, Star, X } from 'lucide-react';
 import { kindLabel } from '@shared/documents';
 import { FIND_PLACES, matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindPlace, type FindResponse, type FindUsage, type FoundBrowsing } from '@shared/find';
+import { DEFAULT_ASSISTANT } from '@shared/assistants';
 import type { SessionSummary } from '@shared/types';
 import { api } from '../../lib/api';
 import { MOD, basename, bytes, dirname, markRuns, tildify, timeAgo } from '../../lib/format';
@@ -24,6 +25,7 @@ import { Button, cx, Kbd, MenuLabel, MenuSep, Popover, SheetsOnPhone, Throbber, 
 import { ownBrowserHere, showDownload } from '../browser/browsing';
 import { FileIcon } from '../documents/fileTypes';
 import { folderName } from '../sessions/SessionList';
+import { useAssistants, useAssistantsState } from '../assistants/state';
 import { liveEntries, staticEntries, type Entry, type Group } from './catalog';
 import { loadScope, setScope, useFindScope } from './scope';
 import { loadUsage, notePick, useFindUsage } from './usage';
@@ -144,7 +146,18 @@ function snippet(s: string): ReactNode {
   );
 }
 
-function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?: string; title: string; cwd?: string; updatedAt?: number; firstPrompt?: string; archived?: boolean }, home?: string, find?: string): Entry {
+/**
+ * The agent a session started as (General, Researcher, one of yours), by name, while the app still has it; `usual`
+ * for General, which most sessions are, so its name finds nothing by itself (Researcher's finds Researcher's sessions).
+ */
+function agentOf(s: { key: string; extra?: SessionSummary['extra'] }): { name: string; usual: boolean } | undefined {
+  const id = (s.extra ?? useSessions.getState().byKey[s.key]?.extra)?.assistant;
+  const a = typeof id === 'string' ? useAssistants.getState().state?.assistants.find((x) => x.id === id) : undefined;
+  return a ? { name: a.name, usual: a.id === DEFAULT_ASSISTANT } : undefined;
+}
+
+function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?: string; title: string; cwd?: string; updatedAt?: number; firstPrompt?: string; archived?: boolean; extra?: SessionSummary['extra'] }, home?: string, find?: string): Entry {
+  const agent = agentOf(s);
   return {
     id: `s:${s.key}${find ? `:${find}` : ''}`,
     group: 'Sessions',
@@ -155,6 +168,7 @@ function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?
     hint: s.archived ? 'Archived' : s.updatedAt ? timeAgo(s.updatedAt) : undefined,
     body: s.firstPrompt && s.firstPrompt !== s.title ? s.firstPrompt : undefined,
     facts: [
+      ...(agent ? [['Agent', agent.name] as [string, string]] : []),
       ['Folder', s.cwd ?? ''],
       ['Last active', s.updatedAt ? timeAgo(s.updatedAt) : ''],
     ],
@@ -257,8 +271,13 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
   });
   // Sessions: their titles and folders here, and what the server finds by title or meaning. Archived ones too (the
   // sidebar's list leaves them out, and this is where they are found), a little after the others.
+  // The agent it started as counts as a word of its own (Tutor finds the sessions started as Tutor); General, which most are, does not.
+  const agentWord = (s: SessionSummary) => {
+    const a = agentOf(s);
+    return a && !a.usual ? ` ${a.name}` : '';
+  };
   sessions
-    .map((s) => ({ s, m: matchItem({ title: s.title ?? '', keywords: `${folderName(s.cwd, home)} ${s.gitBranch ?? ''}`, text: s.firstPrompt }, words, q) }))
+    .map((s) => ({ s, m: matchItem({ title: s.title ?? '', keywords: `${folderName(s.cwd, home)} ${s.gitBranch ?? ''}${agentWord(s)}`, text: s.firstPrompt }, words, q) }))
     .filter((x) => x.m.score > 0)
     .sort((a, b) => Number(!!a.s.archived) - Number(!!b.s.archived) || b.m.score - a.m.score)
     .slice(0, 30)
@@ -393,6 +412,8 @@ export function CommandPalette() {
   const open = usePalette((s) => s.open);
   const mobile = useIsMobile();
   const sessions = useSessions((s) => s.byKey);
+  // The agents, which sessions are found by and named with (loaded once, kept current).
+  const agents = useAssistantsState();
   const home = useApp((s) => s.boot?.home);
   const root = useUI((s) => s.explorerRoot);
   const defaultCwd = useApp((s) => s.boot?.defaultCwd);
@@ -490,7 +511,7 @@ export function CommandPalette() {
     // A program's own subagents show in their lead, not on their own.
     const list = Object.values(sessions).filter((s) => !s.subagentOf);
     return q.trim() ? rank(q, entries, list, server, files, fileInfo, usage, places, home) : start(list, entries, usage, places, home);
-  }, [open, q, entries, sessions, server, files, fileInfo, usage, places, home]);
+  }, [open, q, entries, sessions, agents, server, files, fileInfo, usage, places, home]);
 
   // The rows, in order, for the keys: the best match, then each group's (and its "more"). With nothing typed a
   // group lists everything, or with several places picked, a few of each.

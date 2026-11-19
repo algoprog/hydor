@@ -1,7 +1,7 @@
 // The path above an open file: each folder in it goes to that folder on the Files page (with the next step of the path
 // picked there), and the file's name shows it in its folder. A long path folds its middle into a "…" that lists the
 // folders between; on a phone the folder's path is one button that lists the folders to go to. Over a file in the
-// file pop-up (FilePeek), going anywhere closes it first, asking about changes not saved.
+// file pop-up (FilePeek), the folder shows in the pop-up itself, which asks first about changes not saved.
 import { useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Folder, FolderOpen, House } from 'lucide-react';
 import { cx, MenuItem, MenuSep, Popover } from '../../components/ui';
@@ -11,11 +11,11 @@ import { useApp } from '../../lib/store';
 import { goFolder } from './actions';
 import { Step } from './Places';
 
-/** Opens a folder on the Files page with `select` picked, once a file pop-up over the page (if any) has closed; stays if its changes are kept. */
-async function visit(dir: string, select: string) {
-  const leave = useFilePeek.getState().leave;
-  if (leave && !(await leave())) return;
-  goFolder(dir, select);
+/** Opens a folder with `select` picked: in the file pop-up over the page when the file is in one (with Back to it), else on the Files page. */
+function visit(dir: string, select: string) {
+  const show = useFilePeek.getState().show;
+  if (show) void show({ path: dir, dir: true, sel: select });
+  else goFolder(dir, select);
 }
 
 export function PathCrumbs({ path, className, after, compact }: { path: string; className?: string; after?: ReactNode; compact?: boolean }) {
@@ -35,11 +35,11 @@ export function PathCrumbs({ path, className, after, compact }: { path: string; 
   const steps = [{ dir: top.path, label: top.label }, ...folders].map((s, i, all) => ({ ...s, next: all[i + 1]?.dir ?? path }));
   const go = (s: { dir: string; next: string }) => {
     setFold(false);
-    void visit(s.dir, s.next);
+    visit(s.dir, s.next);
   };
   const showInFolder = () => {
     setFold(false);
-    void visit(dir, path);
+    visit(dir, path);
   };
 
   if (compact) {
