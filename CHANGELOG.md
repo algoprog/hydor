@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.92.1 · 19 November 2026
+
+Activity counts the day, week, month or year you are in, so Weekly, Monthly and Yearly no longer show the same
+numbers.
+
+- **The period so far**: on the Usage page's **Activity** tab, the tiles and the **By agent**, **Top projects** and
+  **By model** tables now count **Today**, **This week**, **This month** or **This year** so far, named with its dates
+  above the tiles. They used to add up the whole range of the charts (the last 30 days, 26 weeks, 12 months or every
+  year), and with a few months of history the last three ranges held the same days, so they showed the same totals.
+- **Fair arrows**: each tile's arrow compares with the period before up to the same point (on a Wednesday at 15:00,
+  last week from Monday until Wednesday 15:00), so a new week or month no longer looks like a drop. **Yearly** now
+  compares with last year too.
+- **The trend stays**: the charts and **Table** still show every day, week, month or year of the range, the table's
+  total is the whole range's, and the agent buttons still offer every agent that worked in it.
+- **For agents**: an agent can now ask for one period's numbers, such as last month's costs by model.
+
 ## 0.92.0 · 18 November 2026
 
 Ask beside a page can now do things on it too, its column is as wide as you drag it, and your own browser gets search
