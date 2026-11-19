@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.92.3 · 19 November 2026
+
+The Send buttons on cards in replies now send: your pick, your quiz score or your results reach the agent with one
+click.
+
+- **Send means send**: a button on an answer card that says Send (**Send my choice**, **Send my score**, **Send my
+  result**, **Send it**, **Send my results**, **Send for checking**, **Send my code**) used to put its words in your
+  message box, where you still had to send them yourself. It now sends them at once as your next message, as if you
+  had typed them and pressed Enter, and the card says **Sent**. Whatever you were writing stays in the box. When the
+  session cannot take a message just then (another one is still on its way), the words go into the box as before.
+- **One click, one message**: a double click on such a button sends once.
+
 ## 0.92.2 · 19 November 2026
 
 A copy of the app you try something out in can no longer take over your sessions, and agents a deleted copy left
