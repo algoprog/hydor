@@ -3,6 +3,26 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.97.0 · 19 November 2026
+
+Hydor now speaks Spanish, French, Brazilian Portuguese and Japanese, and its website comes in all eight of its languages.
+
+- **Four more languages**: the whole app, its guide and its notifications in **Español**, **Français**,
+  **Português (Brasil)** and **日本語**, picked in **Settings → General → Language**, and agents write to you in the one
+  you pick. At first the app follows your browser's language, so most people see their own right away.
+- **Dates and times your way**: in any language but English, dates and times follow your browser's region too, so
+  Spanish shows 2:28 p.m. in Mexico and 14:28 in Spain.
+- **Your project's agent in your language**: the agent made for a new project is named and described in German, Spanish,
+  French, Portuguese and Japanese too, and an agent's results sent by email or kept in a spreadsheet use the app's
+  language.
+- **The desktop apps** now pick up German, Spanish, French, Portuguese and Japanese from your computer's settings.
+- **hydor.app in eight languages**: the website and its docs open in your browser's language, with a switcher at the
+  top to change it.
+- **For contributors**: `npm run i18n:translate` translates new words and changed guide topics into every language,
+  with a glossary per language in `scripts/i18n-style/`.
+- **Fixes**: in every language but English, the sidebar's count of a session's subagents reads right (it ended in an
+  English "s"), and German, Greek and Chinese get the few words of the editors they were still missing.
+
 ## 0.96.2 · 19 November 2026
 
 Sessions no longer crowd into Active after Hydor updates.
