@@ -3,6 +3,32 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.96.0 · 19 November 2026
+
+Experiments, redesigned: every experiment has a page with its runs as a table, their curves on shared charts and which
+hyperparameters matter, and a title, description and category written for it.
+
+- **Your experiments in a column**: on a computer, System → Experiments keeps a column at the left with the queue, the
+  GPUs, **Find an experiment** and your experiments grouped by category. The **Overview** shows what runs now (how far
+  it has got, and its main metric with a small curve), a card for each experiment with its description and best
+  result, and the latest runs.
+- **Titles, descriptions and categories**: soon after an experiment's first run, the helper model gives it a plain
+  title, a sentence or two on what it tests and a category, so you see at a glance what each one is; agents write them
+  as they start runs, and you can edit them or have them written again from the experiment's ⋯ menu. They never
+  replace what you or an agent wrote, and passwords or keys in a command are left out of what the helper reads.
+- **The runs table**: an experiment's **Runs** tab lists its runs with a column for each metric (the best in bold) and
+  each hyperparameter that differs. Sort by any column, choose the columns, find and filter runs.
+- **Charts, as Weights & Biases draws them**: the **Charts** tab puts up to 8 runs' curves on shared charts, each run
+  keeping its colour, in sections (dev, train…), with **Smoothing**, an x axis of steps or another metric (tokens,
+  time), a log scale, **Ignore outliers**, drag to zoom, and **Bigger** with each run's last, best, min and max.
+- **Which hyperparameters matter**: the **Hyperparameters** tab shows the best run, parallel coordinates across the
+  hyperparameters, how strongly each goes with a metric, and each one against it. A sweep's notice opens it.
+- **A run's page in tabs**: **Overview** (its key metrics with small curves, hyperparameters, values, details, code,
+  command and environment; a failed run starts with how it ended), **Charts** and **Log** (with **Find in the log**).
+- **Compare** shows the picked runs' metrics side by side, their hyperparameters with **Only what differs**, and their
+  charts.
+- **New run** calls a run's name=value lines **Hyperparameters**.
+
 ## 0.95.0 · 19 November 2026
 
 The sidebar names the agent each session was started as, and its filter shows one agent's sessions.
