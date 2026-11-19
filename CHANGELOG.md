@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.94.0 · 19 November 2026
+
+A new window for making agents: say what it should do, then see the whole agent at a glance in seven short sections
+instead of one long form.
+
+- **Two clear steps**: **New agent** now opens a window. First say what the agent should do, or start from one of four
+  ideas, and **Draft my agent** fills everything in; or pick **Set it up myself**. Then **Set up** shows the agent
+  before you press **Create agent**.
+- **Everything in view**: the settings are split into seven sections (About, Where and when, Model, Tools, Team,
+  Results, Budget) in a column on the left, each showing what it is set to now, so nothing hides at the bottom of a
+  long scroll. When a section is longer than the window, a **More below** button says so.
+- **Clearer choices**: the tier it thinks with and its budget are picked from short lists that say what each choice is
+  for, and where it works is two cards: **Everywhere**, or **Only in some projects**.
+- **All settings** and **Duplicate** on an agent's page open the same window. Closing it after a change asks before
+  your changes are thrown away.
+- On a phone the window fills the screen and lists the sections with what each is set to; tap one to change it.
+
 ## 0.93.2 · 19 November 2026
 
 A project's details open with a click or a tap on its name in the sidebar, the same on a phone as on a computer.
