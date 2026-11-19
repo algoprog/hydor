@@ -6650,7 +6650,7 @@
 "Depth":"server/apps/templates.ts",
 "Descent":"web/src/components/answer/uis/travel.tsx",
 "Describe":"web/src/features/assistants/AgentEditor.tsx",
-"Describe a task, ask a question, or paste an error…":"web/src/features/home/HomePage.tsx",
+"Describe a task or ask a question":"web/src/features/home/HomePage.tsx",
 "Describe an app, and an agent makes it":"web/src/features/apps/Builder.tsx",
 "Describe it":"web/src/features/pages/slides/Inspector.tsx",
 "Describe it to an agent":"web/src/features/apps/Gallery.tsx",

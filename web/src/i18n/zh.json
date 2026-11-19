@@ -3445,7 +3445,7 @@
 "Deploy and manage services, environments, variables and logs on Railway.":"在 Railway 上部署和管理服务、环境、变量和日志。",
 "Depth":"深度",
 "Describe a task, ask a question or paste an error. Drop in screenshots and files, type @ to point at a file, or / for the agent’s commands. Enter starts the session.":"描述一个任务、提个问题或粘贴报错信息。可以拖入截图和文件，输入 @ 指向某个文件，或输入 / 调用智能体的命令。按 Enter 开始会话。",
-"Describe a task, ask a question, or paste an error…":"描述一个任务、提个问题，或粘贴报错信息…",
+"Describe a task or ask a question":"描述一个任务或提个问题",
 "Describe an app, and an agent makes it":"描述一个应用，让智能体来做",
 "Describe it":"描述",
 "Describe what the command should do":"描述这条命令要做什么",

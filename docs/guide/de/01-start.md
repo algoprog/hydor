@@ -155,7 +155,7 @@ Im Terminal listet `hydor away` dieselben Ereignisse auf; `hydor away seen` mark
    - **Neuer Aufgabenordner** für einen nach deinem Auftrag benannten Ordner in `~/Hydor`, sofern du den Ort nicht unter [Einstellungen → Funktionen → Deine Agenten](/settings?s=assistants&find=Task%20folders) änderst.
 
    Die meisten Agenten starten ohne eigene Ordnerauswahl in einem neuen Aufgabenordner. Programmierer arbeitet im gewählten Ordner.
-5. Beschreibe deinen Auftrag, stelle eine Frage oder füge eine Fehlermeldung in das Nachrichtenfeld ein. Hänge Dateien über die Büroklammer an oder ziehe sie auf das Feld. Bereits lokal vorhandene Dateien übernimmst du auf der Dateien-Seite über **Sitzung damit starten** im Dateimenü. Siehe [Eine Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files).
+5. Beschreibe im Nachrichtenfeld deinen Auftrag oder stelle eine Frage. Hänge Dateien über die Büroklammer an oder ziehe sie auf das Feld. Bereits lokal vorhandene Dateien übernimmst du auf der Dateien-Seite über **Sitzung damit starten** im Dateimenü. Siehe [Eine Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files).
 6. Drücke Enter oder **Starten**, auf dem Smartphone den runden Pfeil.
 
 Die Sitzung öffnet sich. Du siehst die einzelnen Schritte in verständlicher Form und am Ende die Antwort. Braucht ein Befehl oder eine Dateiänderung eine Freigabe, erscheint eine Karte mit **Erlauben** und **Ablehnen**. Im Nachrichtenfeld unten setzt du die Unterhaltung fort. Deine Startseitenauswahl bleibt geräteübergreifend für die nächste Sitzung gespeichert.

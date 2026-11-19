@@ -3451,7 +3451,7 @@
 "Deploy and manage services, environments, variables and logs on Railway.":"Ανάπτυξη και διαχείριση υπηρεσιών, περιβαλλόντων, μεταβλητών και αρχείων καταγραφής στο Railway.",
 "Depth":"Βάθος",
 "Describe a task, ask a question or paste an error. Drop in screenshots and files, type @ to point at a file, or / for the agent’s commands. Enter starts the session.":"Περιγράψτε μια εργασία, κάντε μια ερώτηση ή επικολλήστε ένα σφάλμα. Σύρετε εδώ στιγμιότυπα οθόνης και αρχεία, πληκτρολογήστε @ για να υποδείξετε ένα αρχείο ή / για τις εντολές του πράκτορα. Το Enter ξεκινά τη συνεδρία.",
-"Describe a task, ask a question, or paste an error…":"Περιγράψτε μια εργασία, κάντε μια ερώτηση ή επικολλήστε ένα σφάλμα…",
+"Describe a task or ask a question":"Περιγράψτε μια εργασία ή κάντε μια ερώτηση",
 "Describe an app, and an agent makes it":"Περιγράψτε μια εφαρμογή και θα τη φτιάξει ένας πράκτορας",
 "Describe it":"Περιγραφή",
 "Describe what the command should do":"Περιγράψτε τι πρέπει να κάνει η εντολή",

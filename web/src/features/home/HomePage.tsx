@@ -639,7 +639,7 @@ function StartComposer({
             e.preventDefault();
             attach(files);
           }}
-          placeholder="Describe a task, ask a question, or paste an error…"
+          placeholder="Describe a task or ask a question"
           className="block w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15.5px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none"
         />
         <div className="flex items-center gap-0.5 px-2.5 pb-2.5">
