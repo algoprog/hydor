@@ -3,6 +3,34 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.93.0 · 19 November 2026
+
+No more Library: everything you keep is now a file of its project, and a project's details open in a window from the
+sidebar, with its files as tiles with real pictures.
+
+- **Projects with their files**: the pages, slides, documents, spreadsheets, pictures and videos agents make for you
+  now show in their project's **Files**, beside the files of its folder. There is no separate Library to look in, and
+  no Library folders: organise with the project's own folders. Something kept outside a project stays with its
+  conversation, and the search box finds it.
+- **Pictures for every file**: **Files** shows tiles by default, each with a real picture: photos, a frame of a video,
+  the first page of a PDF, Word, PowerPoint or Excel file, an HTML page, or the first lines of a text, Markdown or CSV
+  file. You can still switch to the list.
+- **Upload into a project**: an **Upload** button sits at the top of **Files**, and files or whole folders dropped
+  anywhere on it go into the folder you see. **New** also makes documents, slides, spreadsheets, pages and the rest
+  right in the project.
+- **Project details in a window**: the ⓘ beside a project's name in the sidebar (or a click on its mark) opens its
+  details over the page you are on: **Overview** (with its newest files), **Files**, **Memory**, **Skills**,
+  **Agents** and **Settings**. Esc or ✕ closes it. There is no Projects page any more; **New project** is the + on the
+  sidebar's **Projects** heading, and a folder's ⋯ has **Make it a project**.
+- **A shorter rail**: Library and Projects are gone from it, and **Inbox** and **Search** now sit right under
+  **Agents**.
+- **Keep**: the button under a picture, video or sound an agent made is now **Keep** (it was Save to Library), and a
+  file's ⋯ has **Keep a copy**.
+- **Your own browser**: **Save** keeps a readable copy of a page in the project you pick, and **Read later** has a
+  panel of its own in the Browser's ⋯ menu. Published pages are listed on a page of their own, **Published**.
+- **For agents**: what they keep goes into the session's project and shows in its **Files**; the guide, in English,
+  German, Chinese and Greek, says the same.
+
 ## 0.92.3 · 19 November 2026
 
 The Send buttons on cards in replies now send: your pick, your quiz score or your results reach the agent with one
