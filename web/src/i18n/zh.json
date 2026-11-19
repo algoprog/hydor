@@ -26173,5 +26173,14 @@
   "Your kept videos": "你保留的视频",
   "Zotero library": "Zotero 文献库",
   "1 kept": "1 个保留的内容",
-  "{0} kept": "{0} 个保留的内容"
+  "{0} kept": "{0} 个保留的内容",
+  "{0}: its details, sessions, files and memory, in {1}": "{0}：它的详情、会话、文件和记忆，位于 {1}",
+  "A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its name in the sidebar to see them.": "项目把它的会话、文件夹、文件、文档、记忆，以及其中智能体遵循的准则放在一起。点击侧边栏中它的名字就能看到它们。",
+  "Each project’s sessions, files, memory (notes, wiki and documents) and kept things, together: click its name in the sessions sidebar to open its details": "每个项目的会话、文件、记忆（笔记、wiki 和文档）以及保留的内容放在一起：在会话侧边栏中点它的名字即可打开详情",
+  "Hide its sessions": "隐藏它的会话",
+  "Hide the sessions of {0}": "隐藏 {0} 的会话",
+  "projects spaces project workspace group sessions sidebar project details name files project files kept documents knowledge memory notes wiki memory tab guidelines instructions skills folder overview settings tab most documents to read into its wiki limit": "项目 空间 项目工作区 分组 会话 侧边栏 项目详情 名字 文件 项目文件 保留的文档 知识 记忆 笔记 wiki 记忆标签页 准则 指令 技能 文件夹 概览 设置标签页 最多 读入其 wiki 的文档数 上限",
+  "Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow beside it folds the group; a folder’s name folds it. The pen starts a new session there.": "同一个项目或文件夹里的会话会归到它的名字下。点项目的名字会打开它的详情，名字旁的箭头可以折叠这一组；点文件夹的名字会折叠它。笔会在那里开始一个新会话。",
+  "Show its sessions": "显示它的会话",
+  "Show the sessions of {0}": "显示 {0} 的会话"
 }

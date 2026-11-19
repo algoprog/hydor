@@ -243,7 +243,7 @@ Agents can also change a page you kept: ask "add a notes column to my habit trac
 
 What you keep belongs to one project, or to none (see [Sort it by project](#sort-it-by-project)).
 
-**In a project**, open its details from the sidebar (the **Project details** button on its heading, shown when you point at it, or a click on the project's mark) and pick **Files** (see [Open a project's details](/guide/projects#open-a-projects-details)). What was kept in the project shows there, at the top of the project's own folder, in the same grid as its files: after the folders and before the files, the newest first (rows when you picked **As a list**). The **Overview** tab shows the newest in its **Files** card, with **All files** to go on (see [The Files tab of a project](/guide/projects#files)).
+**In a project**, open its details from the sidebar (click the project's name in the sidebar) and pick **Files** (see [Open a project's details](/guide/projects#open-a-projects-details)). What was kept in the project shows there, at the top of the project's own folder, in the same grid as its files: after the folders and before the files, the newest first (rows when you picked **As a list**). The **Overview** tab shows the newest in its **Files** card, with **All files** to go on (see [The Files tab of a project](/guide/projects#files)).
 
 **Outside a project**, what a conversation made or you kept there stays with that conversation: its card opens it. You can also find a page, a picture or a video by its title or its description in the search box (Ctrl+K, ⌘K on a Mac): results of kept things say "Files › Thesis", and the **Search in** list there has **Kept files** to look at them alone. Open it, and its own page has **Move to a project** when you want it in one.
 

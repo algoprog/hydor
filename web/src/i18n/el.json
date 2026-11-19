@@ -26154,5 +26154,14 @@
   "Your kept videos": "Τα κρατημένα βίντεό σας",
   "Zotero library": "Βιβλιοθήκη Zotero",
   "1 kept": "1 κρατημένο",
-  "{0} kept": "{0} κρατημένα"
+  "{0} kept": "{0} κρατημένα",
+  "{0}: its details, sessions, files and memory, in {1}": "{0}: οι λεπτομέρειες, οι συνεδρίες, τα αρχεία και η μνήμη του, στο {1}",
+  "A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its name in the sidebar to see them.": "Ένα έργο κρατά μαζί τις συνεδρίες, τον φάκελο, τα αρχεία, τα έγγραφα, τη μνήμη του και τις οδηγίες που ακολουθούν οι πράκτορές του. Κάντε κλικ στο όνομά του στην πλευρική στήλη για να τα δείτε.",
+  "Each project’s sessions, files, memory (notes, wiki and documents) and kept things, together: click its name in the sessions sidebar to open its details": "Οι συνεδρίες, τα αρχεία, η μνήμη (σημειώσεις, wiki και έγγραφα) και τα κρατημένα κάθε έργου, μαζί: κάντε κλικ στο όνομά του στην πλευρική στήλη των συνεδριών για να ανοίξετε τις λεπτομέρειές του",
+  "Hide its sessions": "Απόκρυψη των συνεδριών του",
+  "Hide the sessions of {0}": "Απόκρυψη των συνεδριών του {0}",
+  "projects spaces project workspace group sessions sidebar project details name files project files kept documents knowledge memory notes wiki memory tab guidelines instructions skills folder overview settings tab most documents to read into its wiki limit": "έργα χώροι έργο χώρος εργασίας ομάδα συνεδρίες πλευρική στήλη λεπτομέρειες έργου όνομα αρχεία αρχεία έργου κρατημένα έγγραφα γνώση μνήμη σημειώσεις wiki καρτέλα μνήμης οδηγίες δεξιότητες φάκελος επισκόπηση καρτέλα ρυθμίσεων όριο εγγράφων για ανάγνωση στο wiki του",
+  "Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow beside it folds the group; a folder’s name folds it. The pen starts a new session there.": "Οι συνεδρίες στο ίδιο έργο ή φάκελο συγκεντρώνονται κάτω από το όνομά του. Το όνομα ενός έργου ανοίγει τις λεπτομέρειές του και το βέλος δίπλα του διπλώνει την ομάδα· το όνομα ενός φακέλου τον διπλώνει. Η πένα ξεκινά νέα συνεδρία εκεί.",
+  "Show its sessions": "Εμφάνιση των συνεδριών του",
+  "Show the sessions of {0}": "Εμφάνιση των συνεδριών του {0}"
 }

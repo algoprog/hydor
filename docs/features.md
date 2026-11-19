@@ -79,7 +79,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run). Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable (so are the Active and Projects headings themselves,
   kept on each computer), a line per session, with a pen to
-  start a new session there and, for a project, an ⓘ (Project details, which opens its details window), and dragged by their headings into the order you like, the same on every device;
+  start a new session there; a project's name opens its details window and the arrow beside it folds its sessions; and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
   ones it makes for ChatGPT projects, show by the project's name). Any session working in a project's folder is in the
@@ -527,8 +527,8 @@ agents that speak ACP and take MCP servers.
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
   guidelines and its own skills and start as its assistant. The sidebar groups each
-  project's sessions under its name, and a project's details open in a window over the page you are on, from the ⓘ
-  (Project details) on its heading in the sidebar, a click on its mark there, its ⋯ menu, the search box (Ctrl+K), or any
+  project's sessions under its name, and a project's details open in a window over the page you are on, from a click on
+  its name in the sidebar (a tap on a phone; the arrow beside it folds its sessions), its ⋯ menu, the search box (Ctrl+K), or any
   link to it (`/projects/<id>`, with the tab after it). The window has a band in the project's colour (its mark, its name, what
   it is about or its folder, New session and a ⋯ menu: Open its folder in Files, Show in Finder, Only its sessions in the
   sidebar, Share with people, Delete the project) and its tabs under it: Overview, Files, Memory, Skills, Agents and Settings

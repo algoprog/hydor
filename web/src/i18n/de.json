@@ -24902,5 +24902,14 @@
   "Your kept videos": "Deine behaltenen Videos",
   "Zotero library": "Zotero-Bibliothek",
   "1 kept": "1 behaltener Inhalt",
-  "{0} kept": "{0} behaltene Inhalte"
+  "{0} kept": "{0} behaltene Inhalte",
+  "{0}: its details, sessions, files and memory, in {1}": "{0}: Details, Sitzungen, Dateien und Memory, in {1}",
+  "A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its name in the sidebar to see them.": "Ein Projekt hält seine Sitzungen, seinen Ordner, seine Dateien, Dokumente, sein Memory und die Richtlinien, denen seine Agenten folgen, zusammen. Klicke in der Seitenleiste auf seinen Namen, um sie zu sehen.",
+  "Each project’s sessions, files, memory (notes, wiki and documents) and kept things, together: click its name in the sessions sidebar to open its details": "Sitzungen, Dateien, Memory (Notizen, Wiki und Dokumente) und behaltene Inhalte jedes Projekts zusammen: Klicke in der Seitenleiste der Sitzungen auf seinen Namen, um seine Details zu öffnen",
+  "Hide its sessions": "Sitzungen ausblenden",
+  "Hide the sessions of {0}": "Sitzungen von {0} ausblenden",
+  "projects spaces project workspace group sessions sidebar project details name files project files kept documents knowledge memory notes wiki memory tab guidelines instructions skills folder overview settings tab most documents to read into its wiki limit": "projekte spaces projekt arbeitsbereich gruppe sitzungen seitenleiste projektdetails name dateien projektdateien behaltene dokumente wissen memory notizen wiki tab memory richtlinien anweisungen skills ordner übersicht tab einstellungen maximale dokumente zum einlesen in sein wiki limit",
+  "Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow beside it folds the group; a folder’s name folds it. The pen starts a new session there.": "Sitzungen im selben Projekt oder Ordner stehen unter seinem Namen beisammen. Der Name eines Projekts öffnet seine Details, der Pfeil daneben klappt die Gruppe ein; der Name eines Ordners klappt ihn ein. Der Stift startet dort eine neue Sitzung.",
+  "Show its sessions": "Sitzungen einblenden",
+  "Show the sessions of {0}": "Sitzungen von {0} einblenden"
 }

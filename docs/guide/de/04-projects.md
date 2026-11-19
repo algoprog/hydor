@@ -23,7 +23,7 @@ Ein Projekt kann andere Projekte zusammenfassen. Das ist eine **Gruppe**; siehe 
 
 Ein Projekt hat keine eigene Seite: Seine Details öffnen sich in einem Fenster über der Seite, auf der du gerade bist; sie bleibt abgedunkelt dahinter. Es gibt mehrere Wege dorthin:
 
-- **Aus der Seitenleiste**: Fahre in der Sitzungsliste über die Überschrift eines Projekts und klicke auf das ⓘ (**Projektdetails**); auf einem Touchscreen ist es immer da. Dasselbe bewirkt ein Klick auf das Zeichen des Projekts am Anfang seiner Überschrift, ebenso sein Menü ⋯: **Projektdetails** ist sein erster Eintrag. Öffne auf dem Smartphone zuerst die Seitenleiste: Sie ist ein Menü, das sich einblendet.
+- **Aus der Seitenleiste**: Klicke in der Sitzungsliste auf den Namen des Projekts in seiner Überschrift (öffne auf dem Smartphone zuerst die Seitenleiste, denn sie ist ein Menü, das sich einblendet, und tippe dann auf den Namen; das Menü schließt sich und die Details füllen den Bildschirm). Auch sein Menü ⋯ hat **Projektdetails**, als ersten Eintrag. Der kleine Pfeil neben dem Namen klappt die Sitzungen des Projekts ein oder aus.
 - **Aus der Suche**: Tippe den Namen des Projekts in die Suche (Strg+K, auf dem Mac ⌘K) und wähle es aus. Ein Projekt ohne Sitzungen hat noch keine Überschrift in der Seitenleiste, daher ist das der Weg dorthin (ein gerade erstelltes Projekt öffnet sein Fenster von selbst).
 - **Über einen Link**: Auch ein Link zu einem Projekt in einer Benachrichtigung oder in der Antwort eines Agenten öffnet das Fenster über der Seite, auf der du gerade bist.
 

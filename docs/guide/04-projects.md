@@ -23,7 +23,7 @@ A project can also bring other projects together. That is a **group**: see [Brin
 
 A project has no page of its own: its details open in a window over the page you are on, which stays behind it, dimmed. There are several ways in:
 
-- **From the sidebar**: in the session list, point at a project's heading and click the ⓘ (**Project details**); on a touch screen it is always there. Clicking the project's mark at the start of its heading does the same, and so does its ⋯ menu: **Project details** is its first item. On a phone, open the sidebar first: it is a drawer.
+- **From the sidebar**: in the session list, click the project's name in its heading (on a phone, open the sidebar first, since it is a drawer, then tap the name; the drawer closes and the details fill the screen). Its ⋯ menu has **Project details** too, as its first item. The small arrow beside the name folds or unfolds the project's sessions.
 - **From the search box**: type the project's name in the search box (Ctrl+K, or ⌘K on a Mac) and pick it. A project with no sessions yet has no heading in the sidebar, so this is the way to it (a project you have just made opens its window by itself).
 - **From a link**: a link to a project in a notification or in an agent's answer opens the window over the page you are on, too.
 

@@ -46,6 +46,7 @@ import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../li
 import { setPlaceOrder, useToolOrder } from '../layout/toolOrder';
 import { Swap } from '../../components/Swap';
 import { useFlip } from '../../lib/flip';
+import { tr } from '../../i18n/runtime';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -660,11 +661,11 @@ function sourceLines(from: FolderSource[], accounts?: AgentAccount[]) {
 }
 
 /**
- * A space's or a folder's heading: it folds the group away, and drags it to another place among them; its pen starts
- * a new session there, and its ⋯ (or a right-click, or a double-click on the name) renames it. A project's ⓘ, its mark
- * and the first item of its ⋯ open its details in a window; a folder's ⋯ can make it a project. A folder whose work
- * began outside Hydor shows the marks of the agents its sessions came from after its name, and its tooltip and ⋯ say
- * which apps they were started in.
+ * A space's or a folder's heading, which drags it to another place among them; its pen starts a new session there, and
+ * its ⋯ (or a right-click) renames it. A project's name (with its mark) opens its details in a window, on a phone as on
+ * a computer, and the arrow beside it folds its sessions away; a folder's name folds it (a double-click renames it),
+ * and its ⋯ can make it a project. A folder whose work began outside Hydor shows the marks of the agents its sessions
+ * came from after its name, and its tooltip and ⋯ say which apps they were started in.
  */
 function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGroup; folded: boolean; home?: string; onFold?: () => void; handle?: PlaceHandle; lifted?: boolean }) {
   const unread = folded && g.items.some(unreadOf);
@@ -677,31 +678,14 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
   const mine = useFolderNames((x) => (g.path ? x.mine[g.path] : undefined));
   const accounts = useApp((x) => x.boot?.accounts);
   const from = g.from && sourceLines(g.from, accounts);
-  // A project's details, from its mark too: a button on the heading's button, which still folds and drags from anywhere else.
+  // A project's details: its name opens them (the drawer closes on a phone, the window takes the screen).
   const details = (sp: Space) => {
     useUI.getState().set({ drawerOpen: false });
     openProject(sp.id);
   };
-  const shown = g.space ? (
-    <span
-      role="button"
-      tabIndex={-1}
-      title="Project details"
-      aria-label="Project details"
-      onClick={(e) => {
-        e.stopPropagation();
-        // A drop ends with a click on what is under the pointer.
-        if (!lifted && Date.now() - lastDragEnd >= 300) details(g.space!);
-      }}
-      className="flex w-[15px] shrink-0 cursor-pointer justify-center rounded-[5px] transition-shadow hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--fg)_14%,transparent)]"
-    >
-      <SpaceMark s={g.space} size={14} />
-    </span>
-  ) : (
-    <span className="flex w-[15px] shrink-0 justify-center">
-      <Folder size={14} className="text-fg-3" />
-    </span>
-  );
+  const project = g.space;
+  const shown = <span className="flex w-[15px] shrink-0 justify-center">{project ? <SpaceMark s={project} size={14} /> : <Folder size={14} className="text-fg-3" />}</span>;
+  const chevron = <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />;
   return (
     <div data-tip="groups" className={cx('group/head flex items-center gap-0.5 py-0.5', lifted ? 'rounded-lg bg-bg-2 shadow-lg ring-1 ring-line-2' : 'sticky top-0 z-[1] bg-sidebar')}>
       {renaming ? (
@@ -711,13 +695,14 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
           type="button"
           ref={handle?.ref}
           {...handle?.attrs}
-          aria-expanded={!folded}
-          title={g.space ? `The ${g.space.name} project: its sessions, files and memory, in ${tildify(g.space.folder, home)}` : from ? `${tildify(g.path, home)}\n${from}` : tildify(g.path, home)}
+          {...(project ? { 'aria-haspopup': 'dialog' as const } : { 'aria-expanded': !folded })}
+          title={project ? tr(`${project.name}: its details, sessions, files and memory, in ${tildify(project.folder, home)}`) : from ? `${tildify(g.path, home)}\n${from}` : tildify(g.path, home)}
           onClick={(e) => {
-            // On a phone a tap on a button in the list closes the drawer (it opened a session); this one stays.
+            // On a phone a tap on a button in the list closes the drawer (it opened a session); a folder's stays.
             e.stopPropagation();
             // A drop ends with a click on the heading under the pointer.
             if (Date.now() - lastDragEnd < 300) return;
+            if (project) return details(project);
             // The second click of a double-click renames instead (the first one folded it: it opens again).
             if (e.detail === 2) {
               onFold?.();
@@ -731,7 +716,10 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
             e.preventDefault();
             setMenu(true);
           }}
-          className="flex h-7 min-w-0 flex-1 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8"
+          className={cx(
+            'flex h-7 min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium text-fg-2 transition-colors select-none [-webkit-touch-callout:none] hover:bg-bg-2 hover:text-fg max-md:h-8',
+            project ? 'cursor-pointer' : 'flex-1 cursor-default',
+          )}
         >
           {shown}
           <span className="flex min-w-0 items-center gap-1.5">
@@ -747,17 +735,28 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
             )}
             {folded && <span className="tnum shrink-0 text-[11.5px] font-normal text-fg-3">{g.items.length}</span>}
             {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
-            <ChevronRight size={12} className={cx('shrink-0 text-fg-3 transition-transform duration-200', !folded && 'rotate-90')} />
+            {!project && chevron}
           </span>
         </button>
       )}
+      {/* A project's arrow folds its sessions away (its name opens its details); the rest of the row is room. */}
+      {project && !renaming && (
+        <>
+          <button
+            type="button"
+            aria-expanded={!folded}
+            aria-label={folded ? tr(`Show the sessions of ${project.name}`) : tr(`Hide the sessions of ${project.name}`)}
+            title={folded ? 'Show its sessions' : 'Hide its sessions'}
+            onClick={(e) => (e.stopPropagation(), onFold?.())}
+            className="-ml-1.5 flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-bg-2 max-md:h-8 max-md:w-8"
+          >
+            {chevron}
+          </button>
+          <span className="min-w-0 flex-1" />
+        </>
+      )}
       {!lifted && !renaming && (
         <>
-          {g.space && (
-            <IconButton size="sm" label="Project details" onClick={(e) => (e.stopPropagation(), details(g.space!))} className="opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100">
-              <Info size={13} />
-            </IconButton>
-          )}
           <IconButton
             ref={more}
             size="sm"

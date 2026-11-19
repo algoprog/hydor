@@ -79,7 +79,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   groups: {
     title: 'Sessions by project',
-    body: 'Sessions in the same project or folder gather under its name. Click the heading to fold the group; its pen starts a new session there, and a project’s ⓘ opens its details.',
+    body: 'Sessions in the same project or folder gather under its name. A project’s name opens its details and the arrow beside it folds the group; a folder’s name folds it. The pen starts a new session there.',
   },
   dictate: {
     title: 'Dictate',
@@ -123,7 +123,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   spaces: {
     title: 'Projects',
-    body: 'A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its ⓘ in the sidebar to see them.',
+    body: 'A project keeps its sessions, folder, files, documents, memory and the guidelines its agents follow together. Click its name in the sidebar to see them.',
   },
   knowledge: {
     title: 'Shared knowledge',

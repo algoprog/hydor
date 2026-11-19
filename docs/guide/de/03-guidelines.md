@@ -36,7 +36,7 @@ Jede Ebene umfasst höchstens 20.000 Zeichen. Halte die Richtlinien möglichst k
 
 Jedes Projekt kann eigene Richtlinien erhalten: für wen die Arbeit gedacht ist, welcher Schreibstil passt und welche Projektregeln gelten.
 
-1. Fahre in der Seitenleiste der Sitzungen über das Projekt und klicke auf das (i), das erscheint (**Projektdetails**), oder klicke auf das Zeichen des Projekts; öffne dann den Tab **Einstellungen**.
+1. Klicke in der Seitenleiste der Sitzungen auf den Namen des Projekts (**Projektdetails** öffnet sich); öffne dann den Tab **Einstellungen**.
 2. Fülle das Feld **Agentenrichtlinien: Vorgaben für alle Agenten im Projekt** aus.
 3. Speichere das Projekt.
 
