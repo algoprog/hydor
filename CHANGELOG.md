@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.93.1 · 19 November 2026
+
+Agents now come before Apps on the rail, and a project's folders show as slim tiles, so its documents and pictures
+stay in view.
+
+- **The rail's order**: Sessions, Browser (in the desktop app), **Agents**, **Apps**, then **Inbox** and **Search**
+  right under them. If you dragged the tiles into an order of your own, it stays as you set it.
+- **Slim folders**: in a project's **Files** (and System → Files) shown as tiles, folders are now slim cards with
+  their icon and name above the pictures, so a project with many folders no longer pushes its documents, slides and
+  pictures off the screen.
+
 ## 0.93.0 · 19 November 2026
 
 No more Library: everything you keep is now a file of its project, and a project's details open in a window from the
