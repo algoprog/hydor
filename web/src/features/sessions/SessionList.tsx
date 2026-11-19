@@ -534,6 +534,26 @@ const DraggableRow = memo(function DraggableRow(p: RowProps) {
   return <RowShell {...p} drag={{ ref: setNodeRef, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLDivElement>) }, lifted: isDragging }} />;
 });
 
+/**
+ * The Active and Pinned headings: a click (a tap) folds the section away and opens it again, as each computer keeps it.
+ * Folded, it says how many sessions it holds, with a dot when one finished since you last looked.
+ */
+function SectionHead({ label, folded, count, unread, onFold }: { label: string; folded: boolean; count: number; unread: boolean; onFold: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={!folded}
+      onClick={onFold}
+      className="sticky top-0 z-[1] flex w-full items-center gap-1 bg-sidebar px-2.5 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2"
+    >
+      <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !folded && 'rotate-90')} />
+      {label}
+      {folded && <span className="tnum ml-0.5 font-normal">{count}</span>}
+      {folded && unread && <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
+    </button>
+  );
+}
+
 function PinZone({ hot }: { hot: boolean }) {
   const { setNodeRef } = useDroppable({ id: PIN_ZONE });
   return (
@@ -952,7 +972,7 @@ export function SessionList({ query }: { query: string }) {
   const folds = useUI((s) => s.groupFolds);
   const sectionFolds = useUI((s) => s.sidebarSectionFolds);
   // Top-level sections are independent of the project and folder folds inside them.
-  const foldSection = (section: 'active' | 'projects') => {
+  const foldSection = (section: 'active' | 'pinned' | 'projects') => {
     const current = useUI.getState().sidebarSectionFolds;
     useUI.getState().set({ sidebarSectionFolds: { ...current, [section]: !current?.[section] } });
   };
@@ -1008,7 +1028,7 @@ export function SessionList({ query }: { query: string }) {
   /** Folds a group or opens it; the 200 changed last are kept. */
   const fold = (g: SessionGroup) => {
     const all = useUI.getState().groupFolds;
-    const shut = isFolded(g, all, Date.now());
+    const shut = isFolded(g, all);
     const { [g.id]: _, ...rest } = all;
     useUI.getState().set({ groupFolds: { ...Object.fromEntries(Object.entries(rest).slice(-199)), [g.id]: !shut } });
   };
@@ -1120,14 +1140,19 @@ export function SessionList({ query }: { query: string }) {
   const dragging = dragKey ? byKey[dragKey] : null;
   const draggingPlace = dragPlace ? groups.find((g) => g.id === dragPlace) : undefined;
   const datedDrag = !!dragKey && groupOf.get(dragKey) === 'dated';
-  // No Pinned group yet: dragging a dated session shows where to drop it to pin it.
-  const zoneAt = datedDrag && !groups.some((g) => g.kind === 'pinned') ? (groups[0]?.kind === 'active' ? 1 : 0) : -1;
+  // Dragging a dated session shows where to drop it to pin it while there are no Pinned rows to drop it among: no
+  // Pinned group yet (under Active, or first), or Pinned folded (under its heading).
+  const pinAt = groups.findIndex((g) => g.kind === 'pinned');
+  const zoneAt = !datedDrag ? -1 : pinAt < 0 ? (groups[0]?.kind === 'active' ? 1 : 0) : sectionFolds?.pinned ? pinAt + 1 : -1;
   // What each group shows: a space's or a folder's newest few (all once asked, none while folded), and the session open.
-  // While one of those groups is dragged, they all show as their headings alone.
-  const now = Date.now();
-  const shut = new Set(groups.filter((g) => isPlace(g) && (!!dragPlace || isFolded(g, folds, now))).map((g) => g.id));
+  // While one of those groups is dragged, they all show as their headings alone. Active or Pinned folded keeps only the
+  // session open in sight.
+  const shut = new Set(groups.filter((g) => isPlace(g) && (!!dragPlace || isFolded(g, folds))).map((g) => g.id));
   const shownRows = groups.map((g) => {
-    if (g.kind === 'active' && sectionFolds?.active) return [];
+    if ((g.kind === 'active' || g.kind === 'pinned') && sectionFolds?.[g.kind]) {
+      const open = activeKey ? g.items.find((s) => s.key === activeKey) : undefined;
+      return open ? [open] : [];
+    }
     if (!isPlace(g)) return g.items;
     if (dragPlace) return [];
     const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
@@ -1189,10 +1214,8 @@ export function SessionList({ query }: { query: string }) {
       <>
         {place ? (
           <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} handle={handle} />
-        ) : g.kind === 'active' ? (
-          <button type="button" aria-expanded={!sectionFolds?.active} onClick={() => foldSection('active')} className="sticky top-0 z-[1] flex w-full items-center gap-1 bg-sidebar px-2.5 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
-            <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.active && 'rotate-90')} />{g.label}
-          </button>
+        ) : g.kind === 'active' || g.kind === 'pinned' ? (
+          <SectionHead label={g.label} folded={!!sectionFolds?.[g.kind]} count={g.items.length} unread={g.items.some(unreadOf)} onFold={() => foldSection(g.kind as 'active' | 'pinned')} />
         ) : (
           <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
         )}
@@ -1261,6 +1284,7 @@ export function SessionList({ query }: { query: string }) {
         {listed.map((part) =>
           part.kind === 'places' ? (
             <Fragment key={`places:${part.first}`}>
+              {part.first === zoneAt && <PinZone hot={overGroup === 'pinned'} />}
               <div className={cx('group/sec flex items-center pr-2', part.first > 0 && 'mt-2')}>
                 <button type="button" data-tip="spaces" aria-expanded={!sectionFolds?.projects} onClick={() => foldSection('projects')} className="flex min-w-0 flex-1 items-center gap-1 px-[18px] pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
                   <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.projects && 'rotate-90')} />Projects

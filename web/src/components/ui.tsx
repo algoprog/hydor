@@ -289,10 +289,10 @@ export function Popover({
     const kb = !!room && room.bottom > 0;
     return createPortal(
       <div ref={ref} role="dialog" aria-modal data-i18n={part} className="fixed inset-0 z-50" style={z ? { zIndex: z } : undefined}>
-        <div className="absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
+        <div className="anim-overlay absolute inset-0 touch-none bg-black/40" onClick={onClose} aria-hidden />
         <div
           style={{ bottom: room?.bottom ?? 0, maxHeight: room ? `calc(${room.height}px - var(--safe-top) - 12px)` : undefined }}
-          className="absolute inset-x-0 flex max-h-[calc(100dvh-var(--safe-top)-12px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated shadow-lg"
+          className="anim-modal absolute inset-x-0 flex max-h-[calc(100dvh-var(--safe-top)-12px)] flex-col rounded-t-[20px] border border-b-0 border-line bg-elevated shadow-lg"
         >
           <div className="flex shrink-0 items-center gap-2 pt-2.5 pr-2.5 pb-1 pl-4">
             <div className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">{title}</div>
@@ -578,7 +578,7 @@ export function Dialog({
         aria-modal
         aria-label={label}
         style={{ maxWidth: width }}
-        className={cx('flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]', bare && 'overflow-hidden')}
+        className={cx('anim-modal flex max-h-[92dvh] w-full flex-col rounded-t-[20px] border border-line bg-elevated shadow-lg sm:rounded-[20px]', bare && 'overflow-hidden')}
       >
         {bare ? children : title && (
           <div className="flex items-center gap-2 px-5 pt-4 pb-1">
@@ -620,7 +620,7 @@ export function Sheet({ open, onClose, children, label, width = 560 }: { open: b
       onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
       onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
     >
-      <div role="dialog" aria-modal aria-label={label} style={{ '--sheet-w': `${width}px` } as CSSProperties} className="flex h-full w-full flex-col overflow-hidden border-l border-line bg-bg shadow-lg sm:max-w-[var(--sheet-w)] max-sm:border-l-0">
+      <div role="dialog" aria-modal aria-label={label} style={{ '--sheet-w': `${width}px` } as CSSProperties} className="anim-modal-side flex h-full w-full flex-col overflow-hidden border-l border-line bg-bg shadow-lg sm:max-w-[var(--sheet-w)] max-sm:border-l-0">
         {children}
       </div>
     </div>,

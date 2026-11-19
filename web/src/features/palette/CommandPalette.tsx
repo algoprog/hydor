@@ -557,7 +557,7 @@ export function CommandPalette() {
         // Escape from inside the preview (its video player) closes the box too; the field handles its own.
         onKeyDown={(e) => e.key === 'Escape' && !e.defaultPrevented && !picking && close()}
         className={cx(
-          'flex flex-col overflow-hidden bg-elevated shadow-lg',
+          'anim-modal-soft flex flex-col overflow-hidden bg-elevated shadow-lg',
           mobile ? 'h-full w-full pt-[var(--safe-top)]' : cx('h-fit max-h-[72vh] w-full rounded-2xl border border-line', wide ? 'max-w-[860px]' : 'max-w-[640px]'),
         )}
       >

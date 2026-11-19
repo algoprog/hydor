@@ -103,7 +103,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'New theme', 'custom colours colors make create theme editor', 'Make a theme of your own from any of them'],
   ['general', 'Import', 'import share theme', 'Add a theme someone shared', 'Import a theme'],
   ['general', 'Language', 'language translate translation chinese greek 中文 简体 ελληνικά english', 'The language the app is shown in, and agents write in'],
-  ['general', 'Motion', 'animation animations reduce motion calm full off transitions movement fade slide', 'How much of the app moves: full, calm (nothing slides or fades as you open a page), or none'],
+  ['general', 'Motion', 'animation animations reduce motion calm full off transitions movement fade slide', 'How much of the app moves: full, calm (nothing slides or fades as you open a page or a window), or none'],
   ['general', 'Sending while an agent works', 'enter join turn queue wait steer message', 'Enter joins the running turn, or waits for it to end'],
   ['general', 'Terminal suggestions', 'autocomplete completion shell commands', 'Grey completions after the cursor in terminals'],
   ['general', 'Resume after usage limits', 'limit reset continue automatically plan', 'Continues a session a minute after a plan’s limit resets'],

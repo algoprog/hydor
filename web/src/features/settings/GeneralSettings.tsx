@@ -91,13 +91,13 @@ export function GeneralSettings() {
   );
 }
 
-/** How much moves on this device: Full, Calm (nothing slides or fades as you open a page), or Off. */
+/** How much moves on this device: Full, Calm (nothing slides or fades as you open a page or a window), or Off. */
 function MotionSetting() {
   const motion = useUI((s) => s.motion);
   return (
     <Row
       label="Motion"
-      hint="Full, Calm (nothing slides or fades as you open a page) or Off. Your device's Reduce motion setting always wins"
+      hint="Full, Calm (nothing slides or fades as you open a page or a window) or Off. Your device's Reduce motion setting always wins"
       control={
         // "Full" here is how much moves (its own entry in the dictionaries: "motion::Full").
         <span data-i18n="motion">

@@ -99,7 +99,7 @@ export function Lightbox() {
         </button>
       </div>
       <div
-        className={cx('relative min-h-0 flex-1', zoom ? 'overflow-auto' : 'flex items-center justify-center overflow-hidden px-3 pb-3')}
+        className={cx('anim-modal-soft relative min-h-0 flex-1', zoom ? 'overflow-auto' : 'flex items-center justify-center overflow-hidden px-3 pb-3')}
         onPointerDown={(e) => e.target === e.currentTarget && close()}
       >
         <img
@@ -159,7 +159,7 @@ export function VideoBox() {
           <X size={18} />
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-6" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
+      <div className="anim-modal-soft flex min-h-0 flex-1 items-center justify-center px-3 pb-6" onPointerDown={(e) => e.target === e.currentTarget && closeVideo()}>
         <iframe
           src={`${src}${src.includes('?') ? '&' : '?'}autoplay=1`}
           title={title || 'Video'}

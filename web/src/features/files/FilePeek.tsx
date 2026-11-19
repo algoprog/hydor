@@ -114,7 +114,7 @@ export function FilePeek() {
               role="dialog"
               aria-modal
               aria-label={basename(file.path) || file.path}
-              className="flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
+              className="anim-modal flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
             >
               <div className={file.back ? 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-2' : 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-5'}>
                 {file.back && (

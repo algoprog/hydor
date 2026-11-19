@@ -77,8 +77,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
   agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run). Pinned comes next, then Projects: a group for each project and each folder you picked
-  (task folders, the home folder and temporary ones go by day), foldable (so are the Active and Projects headings themselves,
-  kept on each computer), a line per session, with a pen to
+  (task folders, the home folder and temporary ones go by day), foldable, and each starting folded (the Active, Pinned and Projects headings fold too,
+  kept on each computer; folded, Active and Pinned show their count and a dot for a finished session), a line per session, with a pen to
   start a new session there; a project's name opens its details window and the arrow beside it folds its sessions; and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
@@ -1907,9 +1907,9 @@ programs shows each program's version and what is out, with Check now, Update no
   rows glide to their new places, a closed tab's row closing up and a new one opening; the Inbox count, the start page's
   numbers and usage percentages count to their new values, and the Inbox badge pops; the logo's water rises once when a
   session finishes; kept pictures shimmer until they load, then fade in; a step in a turn's outline that finishes
-  draws its check. Four things bend the old rule that what you open shows at once, in Full only and never on a phone: the
+  draws its check. Five things bend the old rule that what you open shows at once, in Full only: the
   sidebar slides as you hide or show it, the Browser's right column and the Files page's Ask panel slide in and out, pages cross-fade (not to or from the Browser),
-  and the theme blends when you switch between light and dark. Calm keeps all but those four; Off keeps only work in
+  the theme blends when you switch between light and dark, and windows come in over a page that dims behind them (a dialog or window rises a little as it grows to its size, and on a phone rises from the bottom edge like a sheet; a side panel slides in from the right; the search box and the picture and video viewer fade in quickly; all close at once). On a phone, the slides of the sidebar and columns and the page cross-fades don't play, but windows still rise from the bottom. Calm keeps all but those five; Off keeps only work in
   progress moving (the throbber's water, the dots of sessions at work). Nothing delays content, and nothing repeats but work in progress.
 - The rail's icons (a tooltip names each, with its shortcut): Sessions (shows or hides the sidebar, or goes back to the session you had open), then the sections (Browser, which is in the desktop app only, Agents, Apps), right under them Inbox (with a count of what waits on you) and Search, and below, after some space, Usage, System, Settings and Help. The current page's icon is lit, with a bar of the accent colour beside it. Each group stays in the order you drag it into, as sessions do, the same on every device (Inbox and Search stay right under the sections); a phone has no rail, and its drawer holds them in one grid (hold one a moment to pick it up; the drawer's header has the Inbox). On a computer, right-click an icon for Back to the usual order. The sessions' sidebar shows on the start page and in a session only; Apps, Agents, Help and Settings have a column of the same kind (logo, their list, Hide), and the Browser draws one of its own. The rail shows the offline mark when no column does. Sessions are found with the search box, not a field in the sidebar.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search on the rail finds pages,

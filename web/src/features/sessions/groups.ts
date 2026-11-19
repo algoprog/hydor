@@ -34,8 +34,6 @@ export interface SessionGroup {
 export const FOLDER_MIN = 2;
 /** Rows a space or folder group shows before "Show N more". */
 export const GROUP_ROWS = 5;
-/** A space or folder group with no session this recent starts folded. */
-export const STALE_MS = 7 * 86400_000;
 /** Active means recent activity, background tasks (agents, commands, monitors) still running, or a session scheduled to resume after a usage limit. */
 export const ACTIVE_MS = 5 * 60_000;
 /**
@@ -46,8 +44,8 @@ export const hasBackgroundWork = (s: SessionSummary) =>
   !!(s.live && s.live.status !== 'exited' && s.live.status !== 'error' && s.live.backgroundTasks?.length) || !!s.external?.backgroundTasks?.length || !!s.helpers;
 export const lastActivityAt = (s: SessionSummary) => Math.max(s.updatedAt ?? s.createdAt ?? 0, s.doneAt ?? 0, s.live?.startedAt ?? 0, s.live?.turnStartedAt ?? 0, s.external?.since ?? 0);
 
-/** Whether a space or folder group shows folded: as you left it, else when none of its sessions was at work this week. */
-export const isFolded = (g: SessionGroup, folds: Record<string, boolean>, now: number) => folds[g.id] ?? now - (g.items[0]?.updatedAt ?? 0) > STALE_MS;
+/** Whether a space or folder group shows folded: as you left it, else folded (each starts as its heading, and opens when you open it). */
+export const isFolded = (g: SessionGroup, folds: Record<string, boolean>) => folds[g.id] ?? true;
 
 const trim = (p: string) => (p.length > 1 && !/^[A-Za-z]:[\\/]$/.test(p) ? p.replace(isWinPath(p) ? /[\\/]+$/ : /\/+$/, '') : p);
 

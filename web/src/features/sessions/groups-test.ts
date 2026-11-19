@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import type { FolderOrigin } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
-import { ACTIVE_MS, groupSessions, isFolded, STALE_MS, unpickedFolders, type SessionGroup } from './groups';
+import { ACTIVE_MS, groupSessions, isFolded, unpickedFolders, type SessionGroup } from './groups';
 
 const HOME = '/home/alex';
 const now = new Date(2026, 10, 2, 15, 0);
@@ -328,14 +328,14 @@ test('with grouping off, everything but active, pinned and snoozed goes by day, 
   assert.deepEqual(shape(gs), ['Today: Session 1, Session 2']);
 });
 
-test('a group shows folded as you left it, else once none of its sessions was at work this week', () => {
+test('a group shows folded as you left it, else folded: each starts as its heading', () => {
   n = 0;
   const fresh = group([ses(`${HOME}/code/a`, H), ses(`${HOME}/code/a`, 2 * H)])[0];
-  const stale = group([ses(`${HOME}/code/b`, STALE_MS + H), ses(`${HOME}/code/b`, STALE_MS + 2 * H)])[0];
-  assert.equal(isFolded(fresh, {}, now.getTime()), false);
-  assert.equal(isFolded(stale, {}, now.getTime()), true);
-  assert.equal(isFolded(fresh, { [fresh.id]: true }, now.getTime()), true);
-  assert.equal(isFolded(stale, { [stale.id]: false }, now.getTime()), false);
+  const old = group([ses(`${HOME}/code/b`, 30 * 24 * H), ses(`${HOME}/code/b`, 31 * 24 * H)])[0];
+  assert.equal(isFolded(fresh, {}), true, 'a group with a session from an hour ago starts folded too');
+  assert.equal(isFolded(old, {}), true);
+  assert.equal(isFolded(fresh, { [fresh.id]: false }), false, 'one you opened stays open');
+  assert.equal(isFolded(old, { [old.id]: true }), true);
 });
 
 for (const [name, fn] of tests) {

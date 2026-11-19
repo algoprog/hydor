@@ -51,7 +51,7 @@ export function ProjectDialogHost() {
         role="dialog"
         aria-modal
         aria-label="Project details"
-        className="flex h-dvh w-full flex-col overflow-hidden bg-bg shadow-lg sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(1120px,calc(100vw-48px))] sm:rounded-[20px] sm:border sm:border-line"
+        className="anim-modal flex h-dvh w-full flex-col overflow-hidden bg-bg shadow-lg sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(1120px,calc(100vw-48px))] sm:rounded-[20px] sm:border sm:border-line"
       >
         <Suspense
           fallback={

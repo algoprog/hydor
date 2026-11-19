@@ -276,15 +276,16 @@ html {
    something changed: a pressed button dips, a rail icon leans to the pointer, a copy turns into a check, a switch
    springs, the rail's bar glides to the page you opened, a session's dot changes with its status, lists glide to their
    new places, numbers count, a badge pops, the logo's water rises once when a session finishes, pictures shimmer
-   until they arrive, a finished step draws its check. Four things bend the old rule that what you open shows at once,
+   until they arrive, a finished step draws its check. Five things bend the old rule that what you open shows at once,
    with no fade, because they make a change easier to follow than a cut does: the column beside a page slides, pages
-   and themes cross-fade (and the sidebar slides, in Shell.tsx). The rest of the rule stands: pages, tabs, dialogs, menus,
-   popovers, sheets and the parts you unfold show at once, and only what arrives by itself comes in softly: a message,
-   a toast, a card asking you something.
+   and themes cross-fade (and the sidebar slides, in Shell.tsx), and windows come in over a page that dims in behind
+   them (.anim-modal and its kin, below the scrims). The rest of the rule stands: pages, tabs, menus, popovers and the
+   parts you unfold show at once, and only what arrives by itself comes in softly: a message, a toast, a card asking
+   you something.
 
-   Settings → General → Appearance → Motion is on <html> as data-motion: full (all of it), calm (all but the four that
+   Settings → General → Appearance → Motion is on <html> as data-motion: full (all of it), calm (all but the five that
    move as you open things) or off (none of it). The system's Reduce motion always means off (lib/motion.ts). So each
-   new motion here is gated by `html:not([data-motion=off])`, the four by `html[data-motion=full]`; a motion made in
+   new motion here is gated by `html:not([data-motion=off])`, the five by `html[data-motion=full]`; a motion made in
    script asks lib/motion.ts (motionOn, motionFull). The two curves are --ease-app and --spring. */
 :root {
   --ease-app: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -957,6 +958,68 @@ html[data-vt='theme']::view-transition-group(root) {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background-color: rgb(0 0 0 / 0.55);
+  }
+}
+
+/* Windows you open come in, one of the five motions that play as you open things (Full only): the page behind dims in,
+   a dialog or a window (a project's, a file's, a page over the app) rises a little as it grows to its size, or on a
+   phone, where it stands at the bottom, rises from the screen's edge as a sheet does; a panel at the side slides in
+   from the right; the search box and a picture fade in, quickly, so typing and looking are never held back. Only as
+   they open: they close at once. */
+@keyframes modal-zoom {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes modal-rise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes modal-side {
+  from {
+    opacity: 0.4;
+    transform: translateX(56px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes modal-soft {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+html[data-motion='full'] .scrim.holds::before,
+html[data-motion='full'] .anim-overlay {
+  animation: overlay-in 200ms ease-out both;
+}
+html[data-motion='full'] .anim-modal {
+  animation: modal-zoom 240ms var(--ease-app) both;
+}
+html[data-motion='full'] .anim-modal-side {
+  animation: modal-side 260ms var(--ease-app) both;
+}
+html[data-motion='full'] .anim-modal-soft {
+  animation: modal-soft 160ms var(--ease-app) both;
+}
+@media (max-width: 639px) {
+  html[data-motion='full'] .anim-modal {
+    animation: modal-rise 280ms var(--ease-app) both;
   }
 }
 

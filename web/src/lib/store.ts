@@ -509,7 +509,7 @@ interface UIState {
   /** The sidebar's space and folder groups you folded (true) or opened (false), by their ids; the others follow sessions/groups.ts. */
   groupFolds: Record<string, boolean>;
   /** Collapsed top-level session sections on this machine. */
-  sidebarSectionFolds: { active?: boolean; projects?: boolean };
+  sidebarSectionFolds: { active?: boolean; pinned?: boolean; projects?: boolean };
   /** The start page's While you were away opened (it starts folded). */
   awayOpen: boolean;
   set: (p: Partial<Omit<UIState, 'set' | 'openTab' | 'closeTab'>>) => void;
