@@ -19,6 +19,7 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
+import { DEFAULT_ASSISTANT, type Assistant } from '@shared/assistants';
 import { isConfidential } from '@shared/confidential';
 import type { Space } from '@shared/spaces';
 import { api, enc, patch, post } from '../../lib/api';
@@ -36,7 +37,7 @@ import { WorkTime } from '../session/items';
 import { newSessionIn } from '../files/actions';
 import { NewSpaceDialog, SpaceMark, startInSpace } from '../spaces/parts';
 import { openProject } from '../spaces/ProjectDialog';
-import { loadSpaces, useSpaces } from '../spaces/state';
+import { loadSpaces, useSpaces, useSpacesStore } from '../spaces/state';
 import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
 import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
@@ -44,6 +45,9 @@ import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
 import { setPlaceOrder, useToolOrder } from '../layout/toolOrder';
+import { useAssistants, useAssistantsState } from '../assistants/state';
+import { AssistantIcon } from '../assistants/icons';
+import { assistantTranslate } from '../assistants/language';
 import { Swap } from '../../components/Swap';
 import { useFlip } from '../../lib/flip';
 import { tr } from '../../i18n/runtime';
@@ -222,13 +226,48 @@ function TitleText({ title }: { title: string }) {
   );
 }
 
+/**
+ * The agent a session started as, named in its row when it is not the usual one: for a session in a project, the
+ * project's own agent (while there is one), otherwise General. Most rows then name none: the sessions that started as
+ * something else stand out. None either for a session started outside Hydor, or for an agent since deleted.
+ */
+function useRowAgent(s: SessionSummary): Assistant | undefined {
+  const id = s.extra?.assistant;
+  const sp = s.extra?.space;
+  const own = useSpacesStore((x) => (typeof sp === 'string' ? x.list?.find((v) => v.id === sp)?.assistant : undefined));
+  return useAssistants((x) => {
+    const list = x.state?.assistants;
+    if (typeof id !== 'string' || !list) return undefined;
+    const usual = own && list.some((a) => a.id === own) ? own : DEFAULT_ASSISTANT;
+    return id === usual ? undefined : list.find((a) => a.id === id);
+  });
+}
+
+/** A row's agent, at the start of its second line: its mark and its name ("Researcher · web-agent · 2h"). */
+function AgentTag({ a }: { a: Assistant }) {
+  return (
+    <>
+      <span title={`Agent: ${a.name}`} className="flex max-w-[45%] min-w-0 shrink-0 items-center gap-1 text-fg-2">
+        <AssistantIcon icon={a.icon} size={11} plain className="text-fg-3" />
+        <span className="truncate" translate={assistantTranslate(a)}>
+          {a.name}
+        </span>
+      </span>
+      <span className="shrink-0" aria-hidden>
+        ·
+      </span>
+    </>
+  );
+}
+
 const FADE = '[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
 const HOVER_FADE = 'group-hover:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)] group-focus-within:[mask-image:linear-gradient(to_left,transparent_26px,black_54px)]';
 
 /**
- * What a row shows; also the floating copy while it is dragged. Two lines: the title, then what the agent is doing,
- * or the folder and when it was last active. In a space's or a folder's group, which names the folder, one line:
- * the title, then the time, or what the agent is doing.
+ * What a row shows; also the floating copy while it is dragged. Two lines: the title, then the agent it started as
+ * (unless the usual one: useRowAgent), and what it is doing, or the folder and when it was last active. In a space's
+ * or a folder's group, which names the folder, one line: the title, then the time, or what it is doing; a session
+ * that names its agent keeps a second line there for it.
  */
 const RowBody = memo(function RowBody({
   s,
@@ -252,6 +291,8 @@ const RowBody = memo(function RowBody({
 }) {
   const a = activityOf(s);
   const running = !!a;
+  const agent = useRowAgent(s);
+  const oneLine = place && !agent;
   // A turn finished since the session was last looked at.
   const unread = !active && !!s.doneAt && s.doneAt > (s.seenAt ?? 0) && !(a && (isWorking(a) || a.status === 'waiting'));
   // A folder renamed anywhere shows its new name at once.
@@ -320,7 +361,7 @@ const RowBody = memo(function RowBody({
     </button>
   );
   const icon = (
-    <span className={cx('relative shrink-0', !place && 'mt-[3px]')}>
+    <span className={cx('relative shrink-0', !oneLine && 'mt-[3px]')}>
       <AgentIcon agent={s.agent} name={s.acpName} size={15} />
       <StatusDot s={s} className={cx('absolute -right-0.5 -bottom-0.5 ring-2', active ? 'ring-bg-3' : menuOpen ? 'ring-bg-2' : 'ring-sidebar group-hover:ring-bg-2')} />
     </span>
@@ -330,7 +371,7 @@ const RowBody = memo(function RowBody({
     lifted ? 'bg-bg-2 shadow-lg ring-1 ring-line-2' : active ? 'bg-bg-3' : menuOpen ? 'bg-bg-2' : 'hover:bg-bg-2',
   );
 
-  if (place) {
+  if (oneLine) {
     // A turn running or waiting says so; ready, or stopped, the time (its dot says it is ready).
     const doing = a && (isBusy(a) || inBackground(a) || a.status === 'waiting' || a.status === 'stopping');
     return (
@@ -371,7 +412,8 @@ const RowBody = memo(function RowBody({
           {marks}
         </span>
         <span className="mt-0.5 flex items-center gap-1 text-[12px] leading-4 text-fg-3">
-          {/* The words cross-fade when the status changes: working, waiting, done, or the folder and time. */}
+          {/* The agent it works as stays put; the words after it cross-fade when the status changes: working, waiting, done, or the folder and time. */}
+          {agent && <AgentTag a={agent} />}
           <Swap id={unread && a && !isWorking(a) && !inBackground(a) ? 'done' : running ? (isWorking(a) ? 'working' : (a?.status ?? 'running')) : 'idle'}>
             {unread && a && !isWorking(a) && !inBackground(a) ? (
               <span className="min-w-0 truncate text-ok">Done · {timeAgo(s.doneAt)}</span>
@@ -379,12 +421,28 @@ const RowBody = memo(function RowBody({
               <ActivityText s={s} className="min-w-0" />
             ) : (
               <>
-                <span className="min-w-0 truncate" translate={translatable(where) ? undefined : 'no'}>
-                  {where || '—'}
-                </span>
-                <span className="shrink-0" aria-hidden>
-                  ·
-                </span>
+                {/* In a project's or a folder's group, which names the folder: a worktree's branch, if any, in its place. */}
+                {!place ? (
+                  <>
+                    <span className="min-w-0 truncate" translate={translatable(where) ? undefined : 'no'}>
+                      {where || '—'}
+                    </span>
+                    <span className="shrink-0" aria-hidden>
+                      ·
+                    </span>
+                  </>
+                ) : (
+                  s.worktree && (
+                    <>
+                      <span className="min-w-0 truncate" translate="no">
+                        {s.worktree.branch}
+                      </span>
+                      <span className="shrink-0" aria-hidden>
+                        ·
+                      </span>
+                    </>
+                  )
+                )}
                 <span className="shrink-0">{timeAgo(s.updatedAt)}</span>
               </>
             )}
@@ -406,6 +464,8 @@ interface DragBits {
 }
 
 function RowShell({ s, active, home, renaming, onRename, onMenu, onMore, menuOpen, touch, eager, place, inPinned, drag }: RowProps & { drag: DragBits }) {
+  // One line in a project's or a folder's group, unless it names its agent (RowBody).
+  const oneLine = place && !useRowAgent(s);
   return (
     <div
       ref={drag.ref}
@@ -433,7 +493,7 @@ function RowShell({ s, active, home, renaming, onRename, onMenu, onMore, menuOpe
         // Their stand-in is a row's exact height, so drawing one never changes the list's height (Safari
         // keeps no scroll anchor: rows above that grew as they were drawn moved what was on screen).
         'press cursor-default rounded-[10px] outline-none select-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-accent/50',
-        !eager && (place ? '[contain-intrinsic-size:auto_36.25px] [content-visibility:auto]' : '[contain-intrinsic-size:auto_52.25px] [content-visibility:auto]'),
+        !eager && (oneLine ? '[contain-intrinsic-size:auto_36.25px] [content-visibility:auto]' : '[contain-intrinsic-size:auto_52.25px] [content-visibility:auto]'),
         drag.lifted && 'opacity-40',
       )}
     >
@@ -850,7 +910,10 @@ export function SessionList({ query }: { query: string }) {
   const startingById = useStarting((x) => x.byId);
   const standIns = useMemo(() => startingRows(startingById, byKey), [startingById, byKey]);
   const filter = useUI((s) => s.agentFilter);
+  const agentFilter = useUI((s) => s.assistantFilter);
   const spaceFilter = useUI((s) => s.spaceFilter);
+  // The agents, which the rows name (loaded once, kept current).
+  useAssistantsState();
   const home = useApp((s) => s.boot?.home);
   const [, params] = useRoute('/s/:key');
   const activeKey = params?.key ? decodeURIComponent(params.key) : null;
@@ -882,8 +945,8 @@ export function SessionList({ query }: { query: string }) {
 
   // Child sessions sit under their parent (folded), when it is listed too, and so do a program's own subagents (they
   // are never listed on their own).
-  const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!spaceFilter || s.extra?.space === spaceFilter);
-  const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && shown(s)), [byKey, filter, spaceFilter]);
+  const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!agentFilter || s.extra?.assistant === agentFilter) && (!spaceFilter || s.extra?.space === spaceFilter);
+  const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && shown(s)), [byKey, filter, agentFilter, spaceFilter]);
   // Spaces and the folders you picked have groups of their own; how you fold them is kept for this machine.
   const byFolder = useUI((s) => s.groupByFolder);
   const folds = useUI((s) => s.groupFolds);
@@ -922,7 +985,7 @@ export function SessionList({ query }: { query: string }) {
     // A session still starting cannot be dragged: it is in no group's order.
     for (const g of out) g.keys = g.items.filter((s) => !isStartingKey(s.key)).map((s) => s.key);
     return out;
-  }, [standIns, byKey, order, filter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
+  }, [standIns, byKey, order, filter, agentFilter, spaceFilter, nest, byFolder, spaces, unpicked, places, groupTime, folderNames, origins]);
 
   // Move sessions out of Active even when no new session events arrive.
   useEffect(() => {
@@ -1051,7 +1114,8 @@ export function SessionList({ query }: { query: string }) {
       </div>
     );
   }
-  if (!groups.length) return <div className="px-4 py-10 text-center text-[13px] text-fg-3">No sessions yet.</div>;
+  if (!groups.length)
+    return <div className="px-4 py-10 text-center text-[13px] text-fg-3">{filter !== 'all' || agentFilter || spaceFilter ? 'No sessions match the filter.' : 'No sessions yet.'}</div>;
 
   const dragging = dragKey ? byKey[dragKey] : null;
   const draggingPlace = dragPlace ? groups.find((g) => g.id === dragPlace) : undefined;

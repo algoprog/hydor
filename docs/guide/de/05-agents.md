@@ -46,7 +46,7 @@ Klicke auf eine Karte für die eigene Seite des Agenten. Die Spalte bleibt daneb
 - **Zeitpläne** listet als dieser Agent laufende Aufgaben und bietet **Zeitplan hinzufügen**.
 - **Posteingang**, für einen Agenten, der eine eigene Unterhaltung führt: seine Nachrichten und ihre Antworten, ein Feld, um ihm eine zu schicken, und **Seine Unterhaltung** (siehe [Ein Agent mit einer eigenen Unterhaltung](#an-agent-with-a-conversation-of-its-own)).
 - **Ergebnisse** bei konfigurierten Ergebnisfeldern oder Zielen zeigt eine Tabelle mit einer Zeile pro Ergebnis und Zustellorten. Siehe [Ergebnisse eines Agenten](#what-an-agent-hands-back).
-- **Diesen Monat**: wie viele Sitzungen als er gestartet wurden und was sie ausgegeben haben, im Vergleich zu seinem Budget, wenn er eines hat; und unter **Letzte Sitzungen** die Sitzungen selbst, die jeweils ihre Unterhaltung öffnen.
+- **Diesen Monat**: wie viele Sitzungen als er gestartet wurden und was sie ausgegeben haben, im Vergleich zu seinem Budget, wenn er eines hat; und unter **Letzte Sitzungen** die Sitzungen selbst, die jeweils ihre Unterhaltung öffnen, mit **Alle 23 in der Seitenleiste anzeigen** daneben (siehe [Die Sitzungen eines Agenten finden](#find-an-agents-sessions)).
 
 ## Die integrierten Agenten
 
@@ -401,6 +401,16 @@ Ab deiner nächsten Nachricht arbeitet die Sitzung als der neue Agent, und die U
 - Die verbundenen Konten, die der neue Agent einschaltet, sind in der Sitzung eingeschaltet, anstelle derer des vorherigen; was du selbst für die Sitzung ein- oder ausgeschaltet hast, bleibt. Hat er einen Berechtigungsmodus, wechselt die Sitzung auf den passenden Modus, und auf sein Modell, wenn er das eigene Programm der Sitzung vorschlägt. Das Programm selbst bleibt gleich: Wie du die Unterhaltung in ein anderes verlegst, steht unter [Mit einem anderen Agenten fortsetzen](/guide/sessions#continue-in-another-agent).
 
 Eine Sitzung, die ohne Agent gestartet wurde (in VS Code oder einem Terminal oder bevor es Agenten in der App gab), zeigt dort **Kein Agent**: Wähle einen, um ihr einen zu geben. Auch das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Agent** nennt ihn; ein Klick darauf öffnet die Seite des Agenten.
+
+## Die Sitzungen eines Agenten finden
+
+Eine Sitzung, die als anderer Agent als der übliche gestartet wurde, sagt das in der Seitenleiste: Die zweite Zeile ihres Eintrags beginnt mit dem Symbol und dem Namen des Agenten („Planner · web-agent · 5 T.“ oder „Researcher · Arbeitet · 2 Min. 10 Sek.“, solange sie arbeitet). Der übliche Agent ist bei einer Sitzung in einem Projekt mit eigenem Agenten dieser Agent (**Neue Sitzungen starten mit** in den Details des Projekts), bei jeder anderen Sitzung General. Außerhalb von Hydor gestartete Sitzungen und inzwischen gelöschte Agenten werden ebenfalls nicht genannt. Der Filter und die Suche richten sich nach dem Agenten, als der jede Sitzung wirklich gestartet wurde, auch dem üblichen. So siehst du nur die Sitzungen eines Agenten:
+
+- Klicke oben in der Seitenleiste auf **Sitzungen filtern und gruppieren** und wähle den Agenten unter **Agent**. Das Menü listet die Agenten, als die deine Sitzungen gestartet wurden, die meistgenutzten zuerst (bis zu acht), jeweils mit der Zahl ihrer Sitzungen; **Alle Agenten** zeigt wieder alle Sitzungen. Der Abschnitt erscheint, sobald eine Sitzung als Agent gestartet wurde.
+- Oder öffne die Seite des Agenten und klicke neben **Letzte Sitzungen** auf **Alle 23 in der Seitenleiste anzeigen** (bei höchstens acht Sitzungen steht dort **In der Seitenleiste anzeigen**). Das öffnet die Startseite, und die Seitenleiste zeigt nur die Sitzungen dieses Agenten, andere Filter sind zurückgesetzt; auf dem Smartphone öffnet sich das Menü.
+- Oder gib den Namen des Agenten in die Suche ein (Strg+K): „Tutor“ findet die als Tutor gestarteten Sitzungen. General bleibt dabei außen vor, da es die meisten Sitzungen sind. Die Vorschau einer Sitzung nennt dort den **Agent**.
+
+Solange ein Filter aktiv ist, nennt ihn ein Chip unter **Neue Sitzung** mit seinem Symbol: Ein Klick auf sein × zeigt wieder alle Sitzungen. Der Agentenfilter wirkt zusammen mit den anderen (**Ausführungsumgebung** und **Projekt**), etwa die Sitzungen eines Agenten in einem Projekt. Wird der Agent gelöscht, zeigt die Liste wieder alle Sitzungen. Siehe [Die Seitenleiste](/guide/start#the-sidebar).
 
 ## Einen Agenten duplizieren oder löschen
 

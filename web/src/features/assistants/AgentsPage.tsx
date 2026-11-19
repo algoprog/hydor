@@ -116,14 +116,14 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
   const [versions, setVersions] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
   const a = st?.assistants.find((x) => x.id === id);
-  const recent = useMemo(
+  const mine = useMemo(
     () =>
       Object.values(byKey)
         .filter((s) => s.extra?.assistant === id && !s.archived && !s.subagentOf)
-        .sort((x, y) => (y.createdAt ?? 0) - (x.createdAt ?? 0))
-        .slice(0, 8),
+        .sort((x, y) => (y.createdAt ?? 0) - (x.createdAt ?? 0)),
     [byKey, id],
   );
+  const recent = mine.slice(0, 8);
   if (!st) return <Throbber className="mx-auto my-10 text-fg-3" />;
   if (!a)
     return (
@@ -292,7 +292,22 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
               <div className={cx('h-full rounded-full', spent >= a.budgetUsd ? 'bg-err' : 'bg-accent')} style={{ width: `${Math.min(100, (spent / a.budgetUsd) * 100)}%` }} />
             </div>
           )}
-          <h3 className="mt-4 mb-1.5 text-[14px] font-semibold">Recent sessions</h3>
+          <div className="mt-4 mb-1.5 flex items-baseline gap-2">
+            <h3 className="min-w-0 flex-1 text-[14px] font-semibold">Recent sessions</h3>
+            {/* Every session it started, in the sidebar: the list filtered to this agent (the start page shows it beside its column). */}
+            {mine.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  useUI.getState().set({ assistantFilter: a.id, agentFilter: 'all', spaceFilter: null, sideOpen: true, ...(window.matchMedia('(max-width: 767px)').matches ? { drawerOpen: true } : {}) });
+                  go('/');
+                }}
+                className="shrink-0 text-[12.5px] text-accent hover:underline"
+              >
+                {mine.length > recent.length ? `Show all ${mine.length} in the sidebar` : 'Show them in the sidebar'}
+              </button>
+            )}
+          </div>
           {!recent.length ? (
             <div className="text-[13px] text-fg-3">None yet.</div>
           ) : (

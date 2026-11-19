@@ -498,7 +498,10 @@ interface UIState {
   explorerRoot: string | null;
   showHidden: boolean;
   tabs: OpenTab[];
+  /** The program the sidebar lists the sessions of (Runs on: Claude Code or Codex); all of them with 'all'. */
   agentFilter: 'all' | 'claude' | 'codex';
+  /** The agent (General, Researcher…, by its id) the sidebar lists the sessions of; all when null. */
+  assistantFilter: string | null;
   /** The space the sidebar lists the sessions of; all when null. */
   spaceFilter: string | null;
   /** The sidebar groups sessions by the space or the folder they work in (sessions/groups.ts), else only by day. */
@@ -553,6 +556,7 @@ export const useUI = create<UIState>((set, get) => ({
   showHidden: false,
   tabs: [],
   agentFilter: 'all',
+  assistantFilter: null,
   spaceFilter: null,
   groupByFolder: true,
   groupFolds: {},
