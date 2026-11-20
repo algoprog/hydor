@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.100.0 · 20 November 2026
+
+Any agent can now make, change and delete your agents for you, with their schedules, and schedules you no longer need
+go by themselves.
+
+- **Ask for an agent in any session**: say "make me an agent that sums up my unread newsletters every Friday at 5", and
+  the agent you are talking to makes it, whether it runs on Claude Code, Codex, Custom or another program: its
+  instructions, what it may use, its tier and the rest, and its schedules when it should work by itself. It can also
+  change one of your agents (only what you ask for changes, kept as a new version), give it a schedule, change or
+  remove one, or delete an agent. A card in the conversation shows the agent, or what changes, and when each schedule
+  runs first, and nothing is saved until you answer. Changes to schedules and deletions ask every time (unless the
+  session has Full access), and giving an agent Full access always asks.
+- **Schedules that are no longer needed go**: deleting an agent now deletes its schedules too, since they were written
+  for it. A task that runs once is deleted after a run that went well (one that failed or needs you stays, to see why
+  and run it again). A task that waits for something ("tell me when the new version is out") ends itself once it has
+  happened, and its notification says so. Agents delete tasks nobody needs rather than pausing them.
+
 ## 0.99.0 · 19 November 2026
 
 Projects have a page of their own again, the machine row says which machine finished something, and updates from git
