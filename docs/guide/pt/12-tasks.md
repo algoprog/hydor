@@ -101,7 +101,7 @@ A primeira mensagem de cada execução traz mais do que o seu prompt: uma linha 
 - **Em um horário**: um horário do dia e os dias da semana (D S T Q Q S S). Selecione um dia para ativá-lo ou desativá-lo; os sete dias significam todos os dias, e pelo menos um sempre fica ativado.
 - **Expressão cron…** (em **Em um horário**) transforma o horário e os dias em uma expressão cron, um modo padrão de escrever agendamentos, que você pode então alterar; **Um horário do dia** volta ao modo anterior. Ela tem cinco campos: minuto, hora, dia do mês, mês e dia da semana (0 ou 7 é domingo), no seu fuso horário. `*/15 9-17 * * 1-5` é executada a cada 15 minutos, das 09:00 às 17:45, em dias úteis. Nomes de meses e dias (`jan`, `mon`) e os atalhos `@hourly`, `@daily`, `@weekly`, `@monthly` e `@yearly` também funcionam. Uma expressão que não funciona é recusada, com o motivo, na hora de salvar.
 - **Repetindo**: “A cada [número] minutos” ou “horas”. O menor intervalo é de 5 minutos; uma nova tarefa repetitiva é executada a cada hora. A primeira execução acontece um intervalo depois de você salvar.
-- **Uma vez**: uma data e um horário (uma hora a partir de agora, para começar). Depois da execução, a tarefa se desativa sozinha, mas continua na lista: você pode executá-la de novo com **Executar agora** ou excluí-la.
+- **Uma vez**: uma data e um horário (uma hora a partir de agora, para começar). Depois de uma execução que deu certo (**Concluído** ou **Nada novo**), a tarefa é excluída, porque não tem mais nada a fazer. Depois de uma que falhou ou que precisa de você, ela se desativa sozinha e continua na lista, para você ver por quê e executá-la de novo com **Executar agora**.
 - **Acompanhar**: veja [Acompanhar uma mudança](/guide/tasks#watch-for-a-change).
 - **Webhook**: veja [Iniciar execuções a partir de outro serviço com um webhook](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
@@ -244,6 +244,7 @@ Uma execução avisa como foi com a notificação habitual da sessão dela, com 
 - Uma execução bloqueada envia um aviso de que precisa de você, começando com “Blocked:”.
 - Uma execução que não conseguiu começar (a pasta dela não existe mais, a sessão em que ela publica foi excluída) envia um aviso de falha, “Could not start: …”.
 - Uma tarefa que se pausa sozinha envia um aviso dizendo por quê.
+- Uma execução que encerra a tarefa avisa: “Its job is done, so its schedule was deleted.”
 - Uma execução que publica em uma das suas conversas deixa os avisos dessa conversa como estão.
 
 Um agente também pode enviar uma notificação enquanto trabalha (a ferramenta notify_user dele), para algo que não pode esperar o fim da execução; qualquer agente pode fazer isso, e também o passo de um app.
@@ -255,6 +256,7 @@ Um agente também pode enviar uma notificação enquanto trabalha (a ferramenta 
 - **Editar**: menu da tarefa (⋯) → **Editar** abre o formulário como **Editar tarefa**; selecione **Salvar**.
 - **Duplicar**: abre um formulário de nova tarefa com uma cópia chamada “<nome> (cópia)”, para você alterar e salvar.
 - **Excluir**: pergunta antes: “It stops running, and its history goes. Sessions it started stay.”
+- **Exclusão automática**: uma tarefa que não é mais necessária some sozinha, cerca de um minuto depois do fim da última execução: uma tarefa de uma só vez, depois de uma execução que deu certo, e uma tarefa cuja execução encontrou o trabalho concluído, porque o que ela esperava ou vigiava aconteceu e o prompt dela dizia para parar nesse caso (a notificação da execução informa isso). Os agendamentos de um agente são excluídos com o agente.
 
 ## Deixe um agente configurar uma tarefa
 
@@ -278,11 +280,13 @@ A menos que você peça outra coisa, a tarefa é executada com o agente, o model
 
 Os agentes também podem alterar, pausar, ativar de novo ou excluir suas tarefas, sempre com um cartão antes: **Alterar esta tarefa?** (as partes que mudam, com o valor antigo riscado acima do novo), **Pausar esta tarefa?**, **Ativar esta tarefa de novo?** ou **Excluir esta tarefa?**, cada um com seu próprio sim e não (**Alterar** ou **Manter como está**, **Pausar** ou **Manter em execução**, **Ativar** ou **Manter pausada**, **Excluir** ou **Manter**). Eles também podem listar suas tarefas com a próxima execução de cada uma e como foi a última.
 
+Os agentes excluem uma tarefa que não é mais necessária em vez de pausá-la. Para uma que deve parar quando algo acontecer (“até a nova versão sair”, “assim que minha encomenda chegar”), eles dizem isso no prompt dela, e a execução que vê isso acontecer encerra a tarefa.
+
 Alguns limites mantêm isso sob controle:
 
 - Uma conversa pode ter até cinco propostas aguardando sua resposta.
 - Um agente não pode propor uma nova tarefa depois que você chega a 100.
-- Uma execução agendada não pode agendar nem alterar tarefas; em vez disso, ela é instruída a sugerir uma no resumo.
+- Uma execução agendada não pode agendar nem alterar tarefas; em vez disso, ela é instruída a sugerir uma no resumo. Ela só pode encerrar a própria tarefa, quando o trabalho dela estiver concluído.
 - Um monitor proposto por um agente nunca acessa endereços do seu próprio computador ou da sua rede.
 
 ## Transforme uma sessão em tarefa
@@ -316,6 +320,8 @@ Um lembrete é uma tarefa cuja execução avisa você de algo em um horário def
 - "O que é executado sozinho amanhã, e a que horas?"
 - "Por que tantas das minhas tarefas começaram às 08:00 na segunda? Distribua-as melhor."
 - "Pause meu Resumo da manhã", ou "Execute o relatório semanal agora."
+- "Verifique a cada 30 minutos se minha encomenda foi entregue, me avise quando for e depois pare."
+- "Quais das minhas tarefas agendadas não são mais necessárias? Exclua-as."
 - "Teste meus lembretes de nota fiscal sem enviar nada e mostre os e-mails que ele teria enviado."
 - "Transforme esta conversa em uma tarefa que é executada toda segunda às 9."
 - "Execute meu app Lista de leitura sempre que este feed tiver um post novo, com o link do post."

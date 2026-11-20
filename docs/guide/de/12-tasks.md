@@ -101,7 +101,7 @@ Die erste Nachricht jedes Laufs enthält mehr als deinen Prompt: eine Zeile mit 
 - **Zu einer Uhrzeit**: eine Tageszeit und die Wochentage (S M T W T F S). Wähle einen Tag, um ihn ein- oder auszuschalten; alle sieben bedeuten jeden Tag, und mindestens einer bleibt immer eingeschaltet.
 - **Cron-Ausdruck…** (unter **Zu einer Uhrzeit**) wandelt die Uhrzeit und die Tage in einen Cron-Ausdruck um, eine gängige Schreibweise für Zeitpläne, den du dann ändern kannst; **Stattdessen eine Tageszeit** geht zurück. Er hat fünf Felder: Minute, Stunde, Tag des Monats, Monat und Wochentag (0 oder 7 ist Sonntag), in deiner Zeitzone. `*/15 9-17 * * 1-5` läuft werktags alle 15 Minuten von 09:00 bis 17:45. Monats- und Tagesnamen (`jan`, `mon`) und die Kürzel `@hourly`, `@daily`, `@weekly`, `@monthly` und `@yearly` funktionieren ebenfalls. Ein Ausdruck, der nicht funktioniert, wird beim Speichern mit dem Grund abgelehnt.
 - **Wiederholt**: alle angegebenen Minuten oder Stunden, mindestens fünf Minuten. Neue Wiederholungen laufen stündlich; der erste Lauf startet ein Intervall nach dem Speichern.
-- **Einmal**: ein Datum und eine Uhrzeit (zu Beginn in einer Stunde). Nach ihrem Lauf schaltet sich die Aufgabe selbst aus, bleibt aber in der Liste: Du kannst sie mit **Jetzt ausführen** erneut ausführen oder löschen.
+- **Einmal**: ein Datum und eine Uhrzeit (zu Beginn in einer Stunde). Nach einem erfolgreichen Lauf (**Fertig** oder **Nichts Neues**) wird die Aufgabe gelöscht, da nichts mehr zu tun bleibt. Nach einem fehlgeschlagenen Lauf oder einem, der dich braucht, schaltet sie sich selbst aus und bleibt in der Liste, damit du siehst, warum, und sie mit **Jetzt ausführen** erneut ausführen kannst.
 - **Überwachen**: siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change).
 - **Webhook**: siehe [Läufe per Webhook starten](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
@@ -244,6 +244,7 @@ Ein Lauf sagt dir mit der üblichen Benachrichtigung seiner Sitzung, wie er gela
 - Blockierte Läufe beginnen mit „Blockiert:“ und nennen den Bedarf.
 - Ein Lauf, der nicht starten konnte (sein Ordner ist weg, die Sitzung, in die er schreibt, wurde gelöscht), sendet eine Fehlermeldung: „Konnte nicht gestartet werden: …“.
 - Automatische Aufgabenpausen nennen ihren Grund.
+- Ein Lauf, der seine Aufgabe beendet, sagt es: „Die Aufgabe ist erledigt, daher wurde ihr Zeitplan gelöscht.“
 - Läufe in bestehenden Unterhaltungen ändern deren Benachrichtigungseinstellungen nicht.
 
 Ein Agent kann dir auch während der Arbeit eine Benachrichtigung schicken (sein Werkzeug notify_user), für etwas, das nicht bis zum Ende des Laufs warten kann; das kann jeder Agent, und auch der Schritt einer App.
@@ -255,6 +256,7 @@ Ein Agent kann dir auch während der Arbeit eine Benachrichtigung schicken (sein
 - **Bearbeiten**: Menü der Aufgabe (⋯) → **Bearbeiten** öffnet das Formular als **Aufgabe bearbeiten**; wähle **Speichern**.
 - **Duplizieren** öffnet einen vorausgefüllten Entwurf namens „<Name> (Kopie)“ zum Anpassen und Speichern.
 - **Löschen** fragt nach. Aufgabe und Verlauf verschwinden; gestartete Sitzungen bleiben.
+- **Von selbst löschen**: Eine nicht mehr benötigte Aufgabe verschwindet von selbst, etwa eine Minute nach dem Ende ihres letzten Laufs: eine einmalige Aufgabe nach einem erfolgreichen Lauf und eine Aufgabe, deren Lauf seine Aufgabe erledigt fand, weil das eingetreten ist, worauf sie gewartet oder was sie beobachtet hat, und ihr Prompt sagte, dass sie dann aufhören soll (die Benachrichtigung des Laufs sagt es). Die Zeitpläne eines Agenten werden mit dem Agenten gelöscht.
 
 ## Einen Agenten eine Aufgabe einrichten lassen
 
@@ -278,11 +280,13 @@ Ohne andere Vorgaben übernimmt die Aufgabe Agent, Modell, Berechtigungen und Or
 
 Agenten können deine Aufgaben auch ändern, pausieren, wieder aktivieren oder löschen, immer zuerst mit einer Karte: **Diese Aufgabe ändern?** (die Teile, die sich ändern, der alte Wert durchgestrichen über dem neuen), **Diese Aufgabe pausieren?**, **Diese Aufgabe wieder aktivieren?** oder **Diese Aufgabe löschen?**, jeweils mit eigenem Ja und Nein (**Ändern** oder **Unverändert lassen**, **Pausieren** oder **Weiterlaufen lassen**, **Aktivieren** oder **Pausiert lassen**, **Löschen** oder **Beibehalten**). Sie können auch deine Aufgaben auflisten, mit dem nächsten Lauf jeder Aufgabe und dem Ergebnis des letzten Laufs.
 
+Agenten löschen eine nicht mehr benötigte Aufgabe, statt sie zu pausieren. Bei einer, die enden soll, wenn etwas geschieht („bis die neue Version erschienen ist“, „sobald mein Paket angekommen ist“), sagen sie das in ihrem Prompt, und der Lauf, der es eintreten sieht, beendet die Aufgabe.
+
 Grenzen:
 
 - Eine Unterhaltung kann bis zu fünf Vorschläge haben, die auf deine Antwort warten.
 - Ab 100 vorhandenen Aufgaben können Agenten keine weiteren vorschlagen.
-- Ein geplanter Lauf darf keine Aufgaben erstellen oder ändern; stattdessen soll er es im Bericht vorschlagen.
+- Ein geplanter Lauf darf keine Aufgaben erstellen oder ändern; stattdessen soll er es im Bericht vorschlagen. Er darf nur seine eigene Aufgabe beenden, wenn sie erledigt ist.
 - Vorgeschlagene Überwachungen dürfen nicht auf deinen Computer oder dein privates Netzwerk zugreifen.
 
 ## Aus einer Sitzung eine Aufgabe machen
@@ -316,6 +320,8 @@ Eine Erinnerung ist eine Aufgabe, die dir zu einem Termin eine Nachricht in der 
 - „Was läuft morgen automatisch und wann?“
 - „Warum starteten Montag so viele Aufgaben um 08:00? Verteile sie zeitlich.“
 - „Pausiere meinen Morgenüberblick“ oder „Starte den Wochenbericht jetzt“.
+- „Prüfe alle 30 Minuten, ob mein Paket zugestellt wurde, sag mir Bescheid, sobald es so weit ist, und höre dann auf.“
+- „Welche meiner geplanten Aufgaben werden nicht mehr gebraucht? Lösche sie.“
 - „Teste die Rechnungserinnerungen ohne Versand und zeige die vorgesehenen E-Mails.“
 - „Mache diese Unterhaltung zu einer Aufgabe für jeden Montag um 9.“
 - „Starte meine Leselisten-App mit dem Beitragslink, sobald dieser Feed einen neuen Beitrag hat.“

@@ -14283,7 +14283,7 @@
   "Sessions nobody used for this long are deleted": "この期間誰も使わなかったセッションを削除します",
   "Sessions read": "読み取ったセッション",
   "Sessions run as your user through the installed Claude Code and Codex. History comes from": "セッションは、インストール済みのClaude CodeとCodexを通じて、お使いのユーザーとして実行されます。履歴の取得元：",
-  "Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.": "このエージェントとして開始したセッションは、指示がなくても続きます。スケジュールは通常のスケジュールタスクとして残ります。",
+  "Sessions started as it keep going without its instructions. Its schedules are deleted with it.": "このエージェントとして開始したセッションは、指示がなくても続きます。スケジュールはエージェントと一緒に削除されます。",
   "Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.": "ここで開始したセッションは何も必要ありません。show_htmlツールで、会話の中にページ（グラフ、レポート、モックアップ）をすでに表示できます。",
   "Sessions that run as this account stop working until it signs in again.": "このアカウントで実行されるセッションは、再びサインインするまで動作しません。",
   "Sessions worked in": "作業したセッション",

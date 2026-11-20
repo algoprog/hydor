@@ -101,7 +101,7 @@ Each run's first message carries more than your prompt: a line naming the task, 
 - **At a time**: a time of day and the days of the week (S M T W T F S). Select a day to turn it on or off; all seven means every day, and at least one always stays on.
 - **Cron expression…** (under **At a time**) turns the time and days into a cron expression, a standard way of writing schedules, which you can then change; **A time of day instead** goes back. It has five fields: minute, hour, day of the month, month and weekday (0 or 7 is Sunday), in your time zone. `*/15 9-17 * * 1-5` runs every 15 minutes from 09:00 to 17:45 on weekdays. Month and day names (`jan`, `mon`) and the shortcuts `@hourly`, `@daily`, `@weekly`, `@monthly` and `@yearly` work too. An expression that does not work is refused, with the reason, when you save.
 - **Repeating**: "Every [number] minutes" or "hours". The shortest interval is 5 minutes; a new repeating task runs every hour. The first run comes one interval after you save.
-- **Once**: a date and time (an hour from now to start with). After its run the task turns itself off but stays in the list: you can run it again with **Run now**, or delete it.
+- **Once**: a date and time (an hour from now to start with). After a run that went well (**Done** or **Nothing new**) the task is deleted, since it has nothing left to do. After one that failed or needs you, it turns itself off and stays in the list, so you can see why and run it again with **Run now**.
 - **Watch**: see [Watch for a change](/guide/tasks#watch-for-a-change).
 - **Webhook**: see [Start runs from another service with a webhook](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
@@ -244,6 +244,7 @@ A run tells you how it went with its session's usual notification, titled with t
 - A blocked run sends a notice that it needs you, beginning "Blocked:".
 - A run that could not start (its folder is gone, the session it posts into was deleted) sends a failure notice, "Could not start: …".
 - A task that pauses itself sends a notice saying why.
+- A run that ends its task says so: "Its job is done, so its schedule was deleted."
 - A run that posts into one of your conversations leaves that conversation's notices as they are.
 
 An agent can also send you a notification while it works (its notify_user tool), for something that cannot wait for the run's end; so can any agent, and an app's step.
@@ -255,6 +256,7 @@ An agent can also send you a notification while it works (its notify_user tool),
 - **Edit**: the task's menu (⋯) → **Edit** opens the form as **Edit task**; select **Save**.
 - **Duplicate**: opens a new task form with a copy named "<name> (copy)", to change and save.
 - **Delete**: asks first: "It stops running, and its history goes. Sessions it started stay."
+- **Deleting by itself**: a task that is no longer needed goes by itself, about a minute after its last run ends: a one-off task after a run that went well, and a task whose run found its job done, because what it waited or watched for has happened and its prompt said to stop then (the run's notification says so). An agent's schedules are deleted with the agent.
 
 ## Let an agent set up a task
 
@@ -278,11 +280,13 @@ Unless you ask for something else, the task runs with the conversation's agent, 
 
 Agents can also change, pause, turn back on or delete your tasks, always with a card first: **Change this task?** (the parts that change, the old value struck through above the new), **Pause this task?**, **Turn this task back on?** or **Delete this task?**, each with its own yes and no (**Change it** or **Keep it as is**, **Pause it** or **Keep it running**, **Turn it on** or **Keep it paused**, **Delete it** or **Keep it**). They can also list your tasks with when each runs next and how the last run went.
 
+Agents delete a task that is no longer needed rather than pausing it. For one that should stop when something happens ("until the new version is out", "once my parcel has arrived"), they say so in its prompt, and the run that sees it happen ends the task.
+
 Some limits keep this in hand:
 
 - One conversation can have up to five proposals waiting for your answer.
 - An agent cannot propose a new task once you have 100.
-- A scheduled run cannot schedule or change tasks; it is told to suggest one in its summary instead.
+- A scheduled run cannot schedule or change tasks; it is told to suggest one in its summary instead. It can only end its own task, once its job is done.
 - A watcher an agent proposes never reaches addresses on your own computer or network.
 
 ## Turn a session into a task
@@ -316,6 +320,8 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "What runs by itself tomorrow, and at what time?"
 - "Why did so many of my tasks start at 08:00 on Monday? Spread them out."
 - "Pause my Morning brief", or "Run the weekly report now."
+- "Check every 30 minutes whether my parcel has been delivered, tell me when it has, and then stop."
+- "Which of my scheduled tasks are no longer needed? Delete them."
 - "Test my invoice reminders without sending anything, and show me the emails it would have sent."
 - "Make this conversation a task that runs every Monday at 9."
 - "Run my Reading list app whenever this feed has a new post, with the post's link."

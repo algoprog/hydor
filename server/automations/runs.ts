@@ -30,6 +30,8 @@ export interface RunRow {
   rerun_of: string | null;
   /** 1: a test that sends nothing (calls that act outside are held as "would have sent", server/outbox). */
   dry?: number | null;
+  /** 1: its agent said the schedule's job is over (report_outcome end): the task is deleted a minute after the run ends. */
+  end_task?: number | null;
   /** The template run it started (a task that runs a template). */
   app_run: string | null;
 }
@@ -50,7 +52,9 @@ export function migrateRuns(db: DB) {
   const cols = new Set((db.prepare('pragma table_info(task_runs)').all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('app_run')) db.exec('alter table task_runs add column app_run text');
   if (!cols.has('dry')) db.exec('alter table task_runs add column dry integer');
+  if (!cols.has('end_task')) db.exec('alter table task_runs add column end_task integer');
   db.exec('create index if not exists task_runs_app on task_runs(app_run)');
+  db.exec('create index if not exists task_runs_end on task_runs(task_id) where end_task = 1');
 }
 
 export function toRun(r: RunRow): TaskRun {
@@ -91,7 +95,7 @@ export function startRun(db: DB, r: { taskId: string; trigger: RunTrigger; input
   return id;
 }
 
-type Fields = Partial<Pick<RunRow, 'key' | 'cost_base' | 'sent' | 'queued' | 'outcome' | 'summary' | 'notified' | 'cost_usd' | 'error' | 'app_run'>>;
+type Fields = Partial<Pick<RunRow, 'key' | 'cost_base' | 'sent' | 'queued' | 'outcome' | 'summary' | 'notified' | 'cost_usd' | 'error' | 'app_run' | 'end_task'>>;
 
 /** The task run that started a template run. */
 export function runOfApp(db: DB, appRun: string): RunRow | undefined {
@@ -124,6 +128,13 @@ export const recentRunIn = (db: DB, key: string, ms: number) =>
 /** A task's run still going that one of its triggers started lately. */
 export const openRunOf = (db: DB, taskId: string, trigger: RunTrigger, ms: number) =>
   db.prepare(`select * from task_runs where task_id = ? and trigger = ? and status = 'running' and started_at > ? limit 1`).get(taskId, trigger, Date.now() - ms) as RunRow | undefined;
+
+/** A task's latest run that is not a test. */
+export const lastRealRun = (db: DB, taskId: string) =>
+  db.prepare(`select * from task_runs where task_id = ? and trigger != 'test' order by started_at desc, rowid desc limit 1`).get(taskId) as RunRow | undefined;
+
+/** Whether a task has a run going (a test too). */
+export const hasOpenRun = (db: DB, taskId: string) => !!db.prepare(`select 1 from task_runs where task_id = ? and status = 'running' limit 1`).get(taskId);
 
 export const openRuns = (db: DB) => db.prepare(`select * from task_runs where status = 'running'`).all() as RunRow[];
 

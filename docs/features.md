@@ -155,7 +155,7 @@ agents that speak ACP and take MCP servers.
   as sentences whose underlined words change it in place, and All settings opens the same window for it; Claude Code's
   agent files import. Its page lists its recent sessions, with a link that shows all of them in the sidebar (filtered to that agent). An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
-  listed on its page, and on a week with every other task in the page's Schedules place); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
+  listed on its page, and on a week with every other task in the page's Schedules place; deleted with it); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
   agents: plain subagents on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
   with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
@@ -203,7 +203,10 @@ agents that speak ACP and take MCP servers.
   about it from there, with links to the place. Ask it to change a setting or set something up (a project, an
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at
   once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
-  the session, or not. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
+  the session, or not. Your agents have tools of their own (`list_agents`, `save_agent`, `delete_agent`): any agent
+  makes one from what you say, changes only what you ask (a new version by An agent), adds, changes or removes its
+  schedules in the same step, and deletes one with its schedules; its card shows the agent, or what changes in
+  sentences, and when each schedule runs next, and schedules and deletions ask every time but in Full access. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,
   permissions, spending caps, files and commands stay yours. `page_action` does what an editor does in a click to the
   whole of a kept page, with the editor's own code and a new version: animate every slide, fix what the
   accessibility check finds, describe pictures, PowerPoint compatible or the web format, a theme, the slide shape,
@@ -1752,7 +1755,10 @@ programs shows each program's version and what is out, with Check now, Update no
   A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
   filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
   summary, the cost and the session (or the app's run), and runs again with the same input. Runs with
-  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Test without
+  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. A task no longer
+  needed goes by itself: a one-off after a run that went well (one that failed stays, paused, to run again), and one
+  whose run finds its job done (what it waited or watched for happened, as its prompt said to stop then) ends it
+  with `report_outcome`'s end and says so; agents delete tasks nobody needs rather than pausing them. Test without
   sending runs a task as it would run, but keeps every call that would send, post, delete or pay as "would have
   sent" (listed in the run's history and its session) and makes none of them. A run the computer was off or asleep
   for runs at the next chance; the desktop apps keep the computer awake from a few minutes before a run is due until

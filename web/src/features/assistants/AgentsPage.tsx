@@ -140,7 +140,7 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
     if (
       !(await confirm({
         title: `Delete ${a.name}?`,
-        body: 'Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.',
+        body: 'Sessions started as it keep going without its instructions. Its schedules are deleted with it.',
         confirm: 'Delete',
         danger: true,
       }))

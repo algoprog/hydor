@@ -101,7 +101,7 @@ El primer mensaje de cada ejecución lleva más que tu instrucción: una línea 
 - **A una hora**: una hora del día y los días de la semana (D L M X J V S). Selecciona un día para activarlo o desactivarlo; los siete significan todos los días, y siempre queda al menos uno activado.
 - **Expresión cron…** (bajo **A una hora**) convierte la hora y los días en una expresión cron, una forma estándar de escribir programaciones, que luego puedes modificar; **Mejor una hora del día** vuelve atrás. Tiene cinco campos: minuto, hora, día del mes, mes y día de la semana (0 o 7 es domingo), en tu zona horaria. `*/15 9-17 * * 1-5` se ejecuta cada 15 minutos de 09:00 a 17:45 los días laborables. También funcionan los nombres de meses y días (`jan`, `mon`) y los atajos `@hourly`, `@daily`, `@weekly`, `@monthly` y `@yearly`. Una expresión que no funciona se rechaza, con el motivo, al guardar.
 - **Repetición**: “Cada [número] minutos” u “horas”. El intervalo más corto es de 5 minutos; una tarea repetitiva nueva se ejecuta cada hora. La primera ejecución llega un intervalo después de guardar.
-- **Una vez**: una fecha y una hora (al principio, dentro de una hora). Después de su ejecución, la tarea se desactiva sola pero se queda en la lista: puedes volver a ejecutarla con **Ejecutar ahora**, o eliminarla.
+- **Una vez**: una fecha y una hora (al principio, dentro de una hora). Después de una ejecución que salió bien (**Hecho** o **Nada nuevo**), la tarea se elimina, porque ya no tiene nada que hacer. Después de una que falló o que te necesita, se desactiva sola y se queda en la lista, para que veas por qué y puedas volver a ejecutarla con **Ejecutar ahora**.
 - **Ver**: consulta [Vigilar un cambio](/guide/tasks#watch-for-a-change).
 - **Webhook**: consulta [Iniciar ejecuciones desde otro servicio con un webhook](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
@@ -244,6 +244,7 @@ Una ejecución te cuenta cómo fue con la notificación habitual de su sesión, 
 - Una ejecución bloqueada envía un aviso de que te necesita, que empieza por “Bloqueado:”.
 - Una ejecución que no pudo empezar (su carpeta ya no existe, se eliminó la sesión en la que publica) envía un aviso de fallo, “No se pudo iniciar: …”.
 - Una tarea que se pone en pausa sola envía un aviso que explica por qué.
+- Una ejecución que termina su tarea lo dice: “Su trabajo está hecho, así que se eliminó su programación.”
 - Una ejecución que publica en una de tus conversaciones deja los avisos de esa conversación como están.
 
 Un agente también puede enviarte una notificación mientras trabaja (su herramienta notify_user), para algo que no puede esperar al final de la ejecución; también puede cualquier agente, y el paso de una app.
@@ -255,6 +256,7 @@ Un agente también puede enviarte una notificación mientras trabaja (su herrami
 - **Editar**: el menú de la tarea (⋯) → **Editar** abre el formulario como **Editar tarea**; selecciona **Guardar**.
 - **Duplicar**: abre un formulario de tarea nueva con una copia llamada “<nombre> (copia)”, para cambiarla y guardarla.
 - **Eliminar**: pregunta antes: “Deja de ejecutarse y su historial se elimina. Las sesiones que inició se conservan.”
+- **Eliminación automática**: una tarea que ya no hace falta desaparece sola, aproximadamente un minuto después de que termine su última ejecución: una tarea de una sola vez, tras una ejecución que salió bien, y una tarea cuya ejecución encontró su trabajo terminado, porque ocurrió lo que esperaba o vigilaba y su prompt decía que parara entonces (la notificación de la ejecución lo dice). Las programaciones de un agente se eliminan con el agente.
 
 ## Deja que un agente configure una tarea
 
@@ -278,11 +280,13 @@ Salvo que pidas otra cosa, la tarea se ejecuta con el agente, el modelo, los per
 
 Los agentes también pueden cambiar, pausar, volver a activar o eliminar tus tareas, siempre con una tarjeta antes: **¿Cambiar esta tarea?** (las partes que cambian, con el valor anterior tachado sobre el nuevo), **¿Pausar esta tarea?**, **¿Volver a activar esta tarea?** o **¿Eliminar esta tarea?**, cada una con su sí y su no (**Cambiarlo** o **Dejarla como está**, **Pausarla** o **Mantenerla en marcha**, **Activarla** o **Mantenerla en pausa**, **Eliminarla** o **Conservarla**). También pueden mostrarte tus tareas con cuándo se ejecuta cada una a continuación y cómo salió la última ejecución.
 
+Los agentes eliminan una tarea que ya no hace falta en lugar de ponerla en pausa. Para una que debe detenerse cuando ocurra algo (“hasta que salga la nueva versión”, “cuando llegue mi paquete”), lo dicen en su prompt, y la ejecución que ve que ocurre termina la tarea.
+
 Algunos límites mantienen esto bajo control:
 
 - Una conversación puede tener hasta cinco propuestas esperando tu respuesta.
 - Un agente no puede proponer una tarea nueva cuando ya tienes 100.
-- Una ejecución programada no puede programar ni cambiar tareas; en su lugar, se le indica que sugiera una en su resumen.
+- Una ejecución programada no puede programar ni cambiar tareas; en su lugar, se le indica que sugiera una en su resumen. Solo puede terminar su propia tarea, una vez hecho su trabajo.
 - Un vigilante que propone un agente nunca accede a direcciones de tu propia computadora o red.
 
 ## Convierte una sesión en una tarea
@@ -316,6 +320,8 @@ Un recordatorio es una tarea cuya ejecución te avisa de algo a una hora determi
 - “¿Qué se ejecuta solo mañana y a qué hora?”
 - “¿Por qué tantas de mis tareas empezaron a las 08:00 el lunes? Espárcelas.”
 - “Pausa mi Morning brief”, o “Ejecuta el informe semanal ahora.”
+- “Comprueba cada 30 minutos si ya entregaron mi paquete, avísame cuando lo hayan hecho y luego detente.”
+- “¿Cuáles de mis tareas programadas ya no hacen falta? Elimínalas.”
 - “Prueba mis recordatorios de facturas sin enviar nada y muéstrame los correos que habría enviado.”
 - “Convierte esta conversación en una tarea que se ejecute cada lunes a las 9.”
 - “Ejecuta mi app Reading list cada vez que este feed tenga una publicación nueva, con el enlace de la publicación.”

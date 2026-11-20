@@ -16,6 +16,7 @@ Agenten können die App so bedienen, wie du es auf ihren Seiten tun würdest. Zu
 
 - „Aktiviere die semantische Suche.“
 - „Erstelle für meine Dissertation ein Projekt namens Thesis mit dem Agenten Forscher.“
+- „Erstelle mir einen Agenten, der jeden Freitag um 17 Uhr meine ungelesenen Newsletter zusammenfasst.“
 - „Gib mir werktags um 8 Uhr einen Nachrichtenüberblick zu erneuerbaren Energien.“
 - „Ergänze in meinen Richtlinien, dass Antworten kurz sein sollen.“
 - „Verwende Brave Search vor DuckDuckGo.“
@@ -53,7 +54,7 @@ Bevor ein Agent etwas ändert, erscheint eine Karte in der Unterhaltung und in d
 
 - **Die beabsichtigte Änderung** in den Worten des Agenten, zum Beispiel „Projekt ‚Abschlussarbeit‘ erstellen“.
 - **Zu ändernde Werte**, Feld für Feld: den bisherigen und den neuen Wert einer Einstellung („**Ergebnisse**: 10 → 20“) oder die Angaben für einen neuen Eintrag.
-- **Den eigentlichen Aufruf** in kleiner Schrift, zum Beispiel `PUT /api/search/settings`. So kannst du unabhängig von der Beschreibung prüfen, was ausgeführt wird.
+- **Den eigentlichen Aufruf** in kleiner Schrift, zum Beispiel `PUT /api/search/settings`. So kannst du unabhängig von der Beschreibung prüfen, was ausgeführt wird. Eine Karte zu einem deiner Agenten zeigt stattdessen den Agenten: wie er sein wird oder was sich ändert, in Sätzen, und wann jeder seiner Zeitpläne läuft.
 
 Du hast folgende Möglichkeiten:
 
@@ -61,7 +62,9 @@ Du hast folgende Möglichkeiten:
 - **Für diese Sitzung erlauben** führt sie aus und erlaubt der Sitzung weitere gewöhnliche Änderungen derselben Art ohne erneute Nachfrage. Die unten aufgeführten Änderungen benötigen weiterhin jedes Mal eine Bestätigung.
 - **Nicht erlauben** oder **Ablehnen** verwirft die Änderung. Du kannst einen Grund oder eine Alternative angeben; der Agent erhält deine Antwort.
 
-Einige Aktionen benötigen immer eine Bestätigung, auch nach **Für diese Sitzung erlauben**: Inhalte löschen, eine Sitzung oder einen Aufgabenlauf starten, eine Nachricht an eine andere Sitzung senden, einen MCP-Server hinzufügen, Plugins hinzufügen, aktivieren oder ändern, die Berechtigungen von Custom oder dem Browser ändern, einen Computer oder ein Konto hinzufügen, ein Modell herunterladen, Bildwerkzeuge auf diesem Computer einrichten und die App aktualisieren. Beim Löschen heißt der Button **Löschen**.
+Einige Aktionen benötigen immer eine Bestätigung, auch nach **Für diese Sitzung erlauben**: Inhalte löschen, eine Sitzung oder einen Aufgabenlauf starten, die Zeitpläne eines Agenten hinzufügen, ändern oder entfernen, eine Nachricht an eine andere Sitzung senden, einen MCP-Server hinzufügen, Plugins hinzufügen, aktivieren oder ändern, die Berechtigungen von Custom oder dem Browser ändern, einen Computer oder ein Konto hinzufügen, ein Modell herunterladen, Bildwerkzeuge auf diesem Computer einrichten und die App aktualisieren. Beim Löschen heißt der Button **Löschen**; bei einem neuen Agenten **Agent erstellen** und bei einer Änderung an einem **Speichern**.
+
+Einem deiner Agenten **Voller Zugriff** zu geben (er fragt nie), erfordert jedes Mal eine Bestätigung, auch bei Voller Zugriff in dieser Sitzung, wie bei den Berechtigungen einer Sitzung selbst.
 
 Eine Karte wartet ungefähr neun Minuten. Antwortest du bis dahin nicht, verschwindet sie und der Agent fragt stattdessen in seiner Antwort nach.
 

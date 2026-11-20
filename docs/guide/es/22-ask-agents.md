@@ -16,6 +16,7 @@ Los agentes pueden hacer en la app lo que tú podrías hacer en sus páginas. Al
 
 - "Activa la búsqueda por significado."
 - "Crea un proyecto llamado Tesis para mi disertación, con el agente Investigador."
+- "Hazme un agente que resuma mis boletines sin leer todos los viernes a las 5."
 - "Cada día laborable a las 8, dame un resumen de noticias sobre energías renovables."
 - "Añade a mis pautas que las respuestas deben ser breves."
 - "Usa Brave Search antes que DuckDuckGo."
@@ -53,7 +54,7 @@ Antes de que un agente cambie algo, aparece una tarjeta en la conversación (y e
 
 - **En qué consiste el cambio**, en palabras del agente: "Crear el proyecto “Tesis”".
 - **Lo que cambia**, campo por campo: una configuración como está ahora y como quedará ("**Resultados**: 10 → 20"), o con qué se creará algo nuevo.
-- **La llamada en sí**, en letra pequeña (por ejemplo `PUT /api/search/settings`), para que veas exactamente lo que va a pasar, diga lo que diga el agente.
+- **La llamada en sí**, en letra pequeña (por ejemplo `PUT /api/search/settings`), para que veas exactamente lo que va a pasar, diga lo que diga el agente. Una tarjeta sobre uno de tus agentes muestra en cambio el agente: cómo será, o qué cambia, en frases, y cuándo se ejecuta cada una de sus programaciones.
 
 Después eliges:
 
@@ -61,7 +62,9 @@ Después eliges:
 - **Permitir en esta sesión** lo hace, y deja que esta sesión haga más cambios del mismo tipo cotidiano sin volver a preguntar. Los cambios que preguntan siempre (abajo) siguen preguntando.
 - **No** (o **Rechazar**) no cambia nada. Puedes explicar por qué, o qué hacer en su lugar, y el agente lo lee.
 
-Algunos cambios preguntan siempre, incluso después de **Permitir en esta sesión**: eliminar cualquier cosa, empezar una sesión o la ejecución de una tarea programada, enviar un mensaje a otra sesión, añadir un servidor MCP, añadir, activar o cambiar un plugin, cambiar lo que los agentes pueden hacer en Custom o en el navegador, añadir una máquina o una cuenta, descargar un modelo, configurar en esta computadora las herramientas de imágenes, actualizar la app. En una eliminación, el botón dice **Eliminar**.
+Algunos cambios preguntan siempre, incluso después de **Permitir en esta sesión**: eliminar cualquier cosa, empezar una sesión o la ejecución de una tarea programada, añadir, cambiar o quitar las programaciones de un agente, enviar un mensaje a otra sesión, añadir un servidor MCP, añadir, activar o cambiar un plugin, cambiar lo que los agentes pueden hacer en Custom o en el navegador, añadir una máquina o una cuenta, descargar un modelo, configurar en esta computadora las herramientas de imágenes, actualizar la app. En una eliminación, el botón dice **Eliminar**; en un agente nuevo, **Crear agente**, y en un cambio a uno, **Guardar**.
+
+Dar **Acceso total** a uno de tus agentes (nunca pregunta) lo pregunta siempre, incluso con Acceso total en esta sesión, como ocurre con los permisos propios de una sesión.
 
 Una tarjeta espera unos nueve minutos. Si no respondes en ese tiempo, desaparece y el agente te pregunta en su respuesta.
 

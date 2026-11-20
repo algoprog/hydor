@@ -942,7 +942,7 @@
 "Say what the agent should do":"说出这个智能体该做什么",
 "Schedules":"定时运行",
 "See your agents":"查看你的智能体",
-"Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.":"以它开始的会话会在没有它的指令的情况下继续。它的定时运行会保留，成为普通的定时任务。",
+"Sessions started as it keep going without its instructions. Its schedules are deleted with it.":"以它开始的会话会在没有它的指令的情况下继续。它的定时运行会随它一起删除。",
 "Start empty":"从空白开始",
 "Starts when":"何时开始",
 "system computer overview machine files git terminal preview monitor usage experiments":"系统 电脑 概览 机器 文件 git 终端 预览 监控 用量 实验 system",

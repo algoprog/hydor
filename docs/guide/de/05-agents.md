@@ -163,6 +163,12 @@ Schließt du das Fenster (✕, Esc oder ein Klick daneben), nachdem du etwas ein
 
 **Selbst einrichten** unter dem Feld überspringt den Entwurf und öffnet **Einrichten** nur mit vorausgewähltem Symbol. Siehe [Alle Einstellungen](#all-settings). Du kannst bis zu 200 eigene Agenten behalten.
 
+### Einen Agenten bitten, einen zu erstellen
+
+Frag in einer beliebigen Sitzung in deinen eigenen Worten: „Erstelle mir einen Agenten, der jeden Freitag um 17 Uhr meine ungelesenen Newsletter zusammenfasst.“ Der Agent, mit dem du sprichst, erstellt ihn für dich, egal auf welchem Programm er läuft (Claude Code, Codex, Custom oder einem anderen): Name, Kurzbeschreibung, Anweisungen, was er verwenden darf, Modellstufe und den Rest sowie seine Zeitpläne, wenn er selbstständig arbeiten soll. Zuerst zeigt eine Karte in der Unterhaltung den Agenten und wann seine Zeitpläne laufen, mit **Agent erstellen** und **Nicht**; gespeichert wird nichts, bevor du antwortest (siehe [Eine Änderung auf der Karte bestätigen](/guide/ask-agents#the-card-confirming-a-change)).
+
+Auf dieselbe Weise kann ein Agent einen deiner Agenten ändern (nur was du verlangst, ändert sich, als neue Version festgehalten von **Ein Agent**), ihm einen Zeitplan geben, einen ändern, einen nicht mehr benötigten entfernen oder einen Agenten samt seinen Zeitplänen löschen. Eine Änderung, die Zeitpläne hinzufügt, ändert oder entfernt, und jedes Löschen fragt jedes Mal nach, außer die Sitzung hat Voller Zugriff. Gibst du einem Agenten **Voller Zugriff** (er fragt nie), wird jedes Mal nachgefragt.
+
 ### Alle Einstellungen
 
 **Einrichten** ist der zweite Schritt von **Neuer Agent** und das, was **Alle Einstellungen** auf der Seite eines Agenten für diesen Agenten öffnet, ohne den Schritt **Beschreiben**. Auf dem Smartphone füllt das Fenster den Bildschirm. Oben stehen das Symbol (klicke darauf, um eines von 30 auszuwählen: ein Teleskop, ein Stift, eine Kochmütze, ein Flugzeug, eine Geldbörse und so weiter) und der Name, höchstens 60 Zeichen, etwa „Buchhaltung“ oder „Reiseberatung“. Nur der Name ist Pflicht.
@@ -282,6 +288,8 @@ Ein Agent arbeitet durch direkt gestartete Sitzungen, delegierte Aufträge oder 
 - Auf der Seite des Agenten öffnet **Zeitplan hinzufügen** den Aufgabeneditor mit ausgewähltem Agenten und eingetragener Uhrzeit: Gib ihm einen Namen und die Nachricht, mit der jeder Lauf beginnt, und speichere.
 - Vorhandene Zeitpläne lassen sich öffnen, ändern, pausieren und sofort ausführen.
 - Ein mit dem Agenten entworfener Zeitplan wird bei dessen Erstellung angelegt.
+- Ein Agent kann in jeder Sitzung die Zeitpläne eines Agenten für dich hinzufügen, ändern oder entfernen (siehe [Einen Agenten bitten, einen zu erstellen](#ask-an-agent-to-make-one)).
+- Ein nicht mehr benötigter Zeitplan verschwindet von selbst: ein einmaliger Zeitplan nach einem erfolgreichen Lauf und ein Zeitplan, dessen Lauf seine Aufgabe erledigt findet (worauf er gewartet oder was er beobachtet hat, ist eingetreten, und seine Nachricht sagte, dass er dann aufhören soll), was die Benachrichtigung des Laufs mitteilt. Die Zeitpläne eines Agenten werden mit ihm gelöscht.
 
 Alle Zeitpläne stehen auch unter [Einstellungen → Agenten → Geplante Aufgaben](/settings?s=tasks). Die Aufgabenoption **Agent** bestimmt die Rolle. [**Zeitpläne**](/agents/schedules) in der Spalte der Agentenseite (auf dem Smartphone ein Tab oben) zeigt die Woche mit allen Aufgaben, Ergebnissen und kommenden Läufen. Listeneinträge nennen **Agent ·** und Namen; der Stift öffnet die Agentenseite.
 
@@ -417,7 +425,7 @@ Solange ein Filter aktiv ist, nennt ihn ein Chip unter **Neue Sitzung** mit sein
 Auf der Agentenseite:
 
 - **Duplizieren** (bei jedem Agenten): öffnet das Fenster bei **Einrichten** als neuen Agenten mit allem ausgefüllt und dem Namen „*Name* (Kopie)“. Ändere, was du willst, und klicke auf **Agent erstellen**; seine Seite öffnet sich. So machst du deine eigene Version eines integrierten Agenten.
-- **Löschen** (nur deine eigenen): fragt zuerst „*Name* löschen?“. Sitzungen, die als dieser Agent gestartet wurden, laufen ohne seine Anweisungen weiter; seine Zeitpläne bleiben als gewöhnliche geplante Aufgaben; Agenten, die ihm Arbeit übergeben könnten, führen ihn nicht mehr auf. Projekte, die ihre Sitzungen als er gestartet haben, werden davon befreit: Ihre Sitzungen starten wieder als Allgemein (oder als der Agent, den du wählst). Sein Ergebnisverlauf geht mit ihm; die Seiten und Tabellen, die er gefüllt hat, bleiben dort, wo sie behalten wurden.
+- **Löschen** (nur deine eigenen): fragt zuerst „*Name* löschen?“. Sitzungen, die als dieser Agent gestartet wurden, laufen ohne seine Anweisungen weiter; seine Zeitpläne werden mit ihm gelöscht, da sie für ihn geschrieben wurden; Agenten, die ihm Arbeit übergeben könnten, führen ihn nicht mehr auf. Projekte, die ihre Sitzungen als er gestartet haben, werden davon befreit: Ihre Sitzungen starten wieder als Allgemein (oder als der Agent, den du wählst). Sein Ergebnisverlauf geht mit ihm; die Seiten und Tabellen, die er gefüllt hat, bleiben dort, wo sie behalten wurden.
 
 Auch die Suche per Strg+K beziehungsweise ⌘K findet Agenten nach Name und Beschreibung und öffnet ihre Seite.
 
@@ -508,6 +516,8 @@ Ausgeschaltet bleiben Zwischenprodukte liegen. Änderungen gelten ab der nächst
 
 - „Erstelle Paper scout: werktags um 8 Uhr neue Fachartikel zu meinen Themen suchen und die fünf besten auf einer Seite behalten, auf Quick.“
 - „Erstelle einen Agenten namens Buchhalter, der meine Haushaltskonten in einer Tabelle führt, keine Befehle ausführen kann und höchstens 5 $ im Monat ausgeben darf.“
+- „Erstelle einen Agenten, der stündlich prüft, ob Python 3.15 erschienen ist, mir Bescheid sagt, sobald es so weit ist, und dann aufhört.“
+- „Der Samstagszeitplan meines Paper scout wird nicht mehr gebraucht: Entferne ihn.“ „Lösche meinen Agenten Buchhalter.“
 - „Lass Release manager an Translator und Test runner delegieren.“
 - „Beschränke Translator auf das Projekt Hydor.“
 - „Ordne Quick für Claude Code Haiku und für Custom mein lokales Qwen-Modell zu.“

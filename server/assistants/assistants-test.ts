@@ -190,6 +190,8 @@ const deps = {
   app: fakeApp,
   db,
   sessions: { liveByRun: (runId: string) => live.get(runId) ?? null } as unknown as SessionManager,
+  // Deleting an agent deletes its schedules (none here).
+  scheduler: { list: () => [], remove: () => {} },
   broadcast: () => {},
   toSubscribers: () => {},
   publicBase: () => 'http://127.0.0.1',

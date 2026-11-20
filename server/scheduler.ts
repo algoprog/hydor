@@ -23,7 +23,7 @@ import { nextTier, tierRank, type Tier } from '../shared/tiers.ts';
 import { findAssistant } from './assistants/store.ts';
 import { tierPick } from './assistants/tiers.ts';
 import { deliveryId, passesFilter, verifySignature, type HookCall } from './automations/hooks.ts';
-import { deliveryRun, finishRun, firstDelivery, getRun, listRuns, migrateRuns, openRunIn, openRunOf, openRuns, recentByTask, recentRunIn, runOfApp, setRun, startRun, toRun, dropRuns, type RunRow } from './automations/runs.ts';
+import { deliveryRun, finishRun, firstDelivery, getRun, hasOpenRun, lastRealRun, listRuns, migrateRuns, openRunIn, openRunOf, openRuns, recentByTask, recentRunIn, runOfApp, setRun, startRun, toRun, dropRuns, type RunRow } from './automations/runs.ts';
 import { checkCron, HHMM, nextRun } from './automations/schedule.ts';
 import { checkWatch, sameWatch, validWatch } from './automations/watch.ts';
 
@@ -139,6 +139,10 @@ export type HookResult = { status: 'started' | 'duplicate'; runId?: string; key?
 /** Failures in a row before a task pauses itself, unless it says otherwise. */
 export const DEFAULT_FAIL_LIMIT = 3;
 const NOTEPAD_MAX = 8000;
+/** Added to the summary of a run that ended its own schedule. */
+const SCHEDULE_ENDED = 'Its job is done, so its schedule was deleted.';
+/** A run's one-line summary with SCHEDULE_ENDED after it, as a sentence of its own. */
+const withEnded = (said: string) => (said ? `${/[.!?…]$/.test(said) ? said : `${said}.`} ${SCHEDULE_ENDED}` : SCHEDULE_ENDED);
 
 export function migrateTasks(db: DB) {
   db.exec(`create table if not exists tasks (
@@ -442,6 +446,8 @@ export class Scheduler extends EventEmitter {
         origin,
         app: t.app ? JSON.stringify(t.app) : null,
       });
+    // Turned on (again): a run that had ended its schedule no longer does.
+    if (enabled && old) this.db.prepare('update task_runs set end_task = null where task_id = ? and end_task = 1').run(id);
     this.emit('changed');
     return this.task(id);
   }
@@ -585,10 +591,19 @@ export class Scheduler extends EventEmitter {
   // ---- what a run's agent reports ----------------------------------------------------------------
 
   /** report_outcome: how a run went; it ends with its turn. False when the run is over. */
-  report(runId: string, outcome: RunOutcome, summary: string): boolean {
+  report(runId: string, outcome: RunOutcome, summary: string, end = false): boolean {
     const r = getRun(this.db, runId);
     if (!r || r.status !== 'running') return false;
-    setRun(this.db, runId, { outcome, summary: oneLine(summary, 300) || null });
+    // The schedule's job is over: its task is off at once (no other run starts meanwhile), and goes a minute after this run ends.
+    // Not a test, nor a board card's refresh (stopped on its board).
+    if (end && r.task_id && r.trigger !== 'test' && !this.isBoard(r.task_id)) {
+      this.db.prepare('update tasks set enabled = 0, next_at = null where id = ? and resume = 0').run(r.task_id);
+      setRun(this.db, runId, { outcome, summary: withEnded(oneLine(summary, 300)), end_task: 1 });
+      this.emit('changed');
+      return true;
+    }
+    // Said again without end: the schedule still goes, and its summary still says so.
+    setRun(this.db, runId, { outcome, summary: (r.end_task ? withEnded(oneLine(summary, 300)) : oneLine(summary, 300)) || null });
     return true;
   }
 
@@ -795,6 +810,30 @@ export class Scheduler extends EventEmitter {
       else this.run(r, { trigger: 'schedule' }).catch(() => {});
     }
     this.sweep();
+    this.dropDone();
+  }
+
+  /**
+   * Tasks that are done go: a one-off whose latest run went well, and one whose run said its job is over. A minute after
+   * that run ended, so its notice (4 s) and its cost (20 s) have gone out; the runs go with it. Failed or blocked ones stay
+   * paused, to see why and Run now. Board refreshes and resumes go by themselves.
+   */
+  private dropDone() {
+    const now = Date.now();
+    const rows = this.db
+      .prepare(
+        `select id, json_extract(schedule, '$.kind') as kind from tasks where resume = 0 and enabled = 0 and (json_extract(schedule, '$.kind') = 'once' or id in (select task_id from task_runs where end_task = 1))`,
+      )
+      .all() as { id: string; kind: string }[];
+    for (const { id, kind } of rows) {
+      if (this.starting.has(id) || this.isBoard(id) || hasOpenRun(this.db, id)) continue;
+      // The run that said its job is over (runs a watcher had started already may have come after it); or a one-off's
+      // latest run, when it went well. A recurring task that is only paused stays.
+      const ended = this.db.prepare('select max(ended_at) as at from task_runs where task_id = ? and end_task = 1').get(id) as { at: number | null } | undefined;
+      const last = kind === 'once' ? lastRealRun(this.db, id) : undefined;
+      const at = ended?.at ?? (last && (last.status === 'done' || last.status === 'silent') ? last.ended_at : null);
+      if (at && now - at >= 60_000) this.remove(id);
+    }
   }
 
   /** Times of day and cron tasks, placed again in the user's time zone (one already due keeps its turn). */
@@ -867,6 +906,8 @@ export class Scheduler extends EventEmitter {
       // A test that sends nothing (server/outbox): its calls that act outside answer at once without being made.
       ...(dry ? [DRY_RUN_NOTE] : []),
       'When you finish, call report_outcome once: done, partial, blocked (you need the user) or failed, with a one-line summary the user will see. If there is nothing worth telling them this time, report silent (or begin your reply with [SILENT]): no notification goes out.',
+      // A schedule that goes on: its run may end it, when its job is over for good.
+      ...(s.kind !== 'once' && trigger !== 'test' && !this.isBoard(r.id) ? ['Only when this schedule’s job is over for good (what it waited or watched for has happened, or its instructions say to stop now), report_outcome with end true deletes the schedule; never because a run found nothing new.'] : []),
       notes
         ? `Your notes from earlier runs (task_notes reads and changes them):\n<task-notes>\n${notes}\n</task-notes>`
         : 'If the next run should know something (what you already reported, where you stopped), keep it with task_notes.',
@@ -1110,7 +1151,7 @@ export class Scheduler extends EventEmitter {
       this.settle(r.id);
       this.emit('changed');
       // On a tier that fell short: once more, one tier up, with the same input.
-      const up = this.stepUpOf(r, status);
+      const up = r.end_task ? null : this.stepUpOf(r, status);
       if (up && r.task_id) {
         const task = this.get(r.task_id);
         void this.run(task, { trigger: 'rerun', input: r.input!, rerunOf: r.id, tier: up }).catch(() => {});
@@ -1189,7 +1230,8 @@ export class Scheduler extends EventEmitter {
     setRun(this.db, run.id, { notified: 1 });
     if (run.sent || n.kind !== 'done') return n;
     const status: RunStatus | null = run.status !== 'running' ? run.status : (run.outcome ?? (silentText(n.body) ? 'silent' : null));
-    if (status === 'silent') return null;
+    // A run that ended its schedule is told, even when it had nothing else to say.
+    if (status === 'silent' && !run.end_task) return null;
     const body = run.summary ?? n.body;
     if (status === 'failed' || status === 'error') return { ...n, kind: 'failed', body };
     if (status === 'blocked') return { ...n, kind: 'waiting', body: `Blocked: ${body}` };
@@ -1199,7 +1241,7 @@ export class Scheduler extends EventEmitter {
   /** A run the session said nothing about (a short turn): its own notice, unless it had nothing to report. */
   private noticeLater(id: string) {
     const r = getRun(this.db, id);
-    if (!r?.key || r.notified || r.status === 'silent' || r.status === 'running' || this.isBoard(r.task_id)) return;
+    if (!r?.key || r.notified || (r.status === 'silent' && !r.end_task) || r.status === 'running' || this.isBoard(r.task_id)) return;
     setRun(this.db, id, { notified: 1 });
     const s = this.sessions.summary(r.key);
     const kind: NotifyEvent['kind'] = r.status === 'failed' || r.status === 'error' ? 'failed' : r.status === 'blocked' ? 'waiting' : 'done';

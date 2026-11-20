@@ -16483,7 +16483,7 @@
   "Sessions nobody used for this long are deleted": "Sitzungen, die so lange nicht genutzt wurden, werden gelöscht",
   "Sessions read": "Sitzungen gelesen",
   "Sessions run as your user through the installed Claude Code and Codex. History comes from": "Sitzungen laufen unter deinem Benutzerkonto über die installierten Programme Claude Code und Codex. Der Verlauf stammt aus",
-  "Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.": "Bereits mit diesem Agenten gestartete Sitzungen laufen ohne seine Anweisungen weiter. Seine Zeitpläne bleiben als gewöhnliche geplante Aufgaben erhalten.",
+  "Sessions started as it keep going without its instructions. Its schedules are deleted with it.": "Bereits mit diesem Agenten gestartete Sitzungen laufen ohne seine Anweisungen weiter. Seine Zeitpläne werden mit ihm gelöscht.",
   "Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.": "Hier gestartete Sitzungen benötigen keine zusätzliche Einrichtung: Sie können mit show_html bereits Seiten wie Diagramme, Berichte und Mock-ups in der Unterhaltung anzeigen.",
   "Sessions that know the project": "Sitzungen mit Projektkontext",
   "Sessions that run as this account stop working until it signs in again.": "Sitzungen, die unter diesem Konto laufen, funktionieren erst wieder, wenn es erneut angemeldet ist.",

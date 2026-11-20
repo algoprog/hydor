@@ -427,3 +427,35 @@ async function askCard(ctx: RunCtx, c: CardIn): Promise<{ body: Json; declined?:
 
 /** For tests: forget the sessions that allowed changes. */
 export const forgetAllowed = () => allowed.clear();
+
+/**
+ * A change one of the app's own tools makes (save_agent, delete_agent…), asked as app_api asks: Plan mode refuses it;
+ * Full access asks nothing but `ask`; otherwise a card, which for `confirm` the user may allow for the rest of the
+ * session (the same allowance as app_api's). Null when it may go ahead; else why not, for the agent.
+ */
+export async function confirmChange(ctx: RunCtx, c: { title: string; detail: string; level: 'confirm' | 'always' | 'ask'; danger?: boolean; label?: string }): Promise<string | null> {
+  const mode = modeOf(ctx);
+  if (mode === 'read-only') return 'This session only reads (Plan mode, or read-only): tell the user what you would change instead.';
+  if (c.level === 'confirm' ? mode === 'full' || allowed.has(ctx.key) : c.level === 'always' && mode === 'full') return null;
+  const adapter = ctx.deps.sessions.adapterByRun(ctx.runId);
+  if (!adapter) return 'Nobody can confirm it now (the session is not running in the app).';
+  const card: ApprovalRequest = {
+    id: `app-${crypto.randomBytes(6).toString('hex')}`,
+    kind: 'other',
+    title: c.title.replace(/\s+/g, ' ').trim().slice(0, 120),
+    detail: c.detail.slice(0, 6000),
+    prose: true,
+    options: [
+      { id: 'accept', label: c.label ?? (c.danger ? 'Delete' : 'Allow'), style: c.danger ? 'danger' : 'primary' },
+      ...(c.level === 'confirm' ? [{ id: 'always', label: 'Allow for this session' }] : []),
+      { id: 'deny', label: 'Don’t', style: 'default' as const },
+    ],
+    createdAt: Date.now(),
+  };
+  const limit = AbortSignal.timeout(WAIT_MS);
+  const answer = await adapter.ask(card, { signal: ctx.signal ? AbortSignal.any([ctx.signal, limit]) : limit });
+  if (!answer) return limit.aborted ? 'The user did not answer the card in time; it was withdrawn. Ask them in your reply whether to go ahead.' : 'The card was withdrawn before the user answered.';
+  if (answer.decision !== 'accept' && answer.decision !== 'always') return `The user said no${answer.message?.trim() ? `: “${answer.message.trim()}”` : '.'} Nothing was changed.`;
+  if (answer.decision === 'always') allowed.add(ctx.key);
+  return null;
+}

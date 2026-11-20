@@ -101,7 +101,7 @@ Le premier message de chaque exécution contient plus que votre prompt : une lig
 - **À une heure précise** : une heure de la journée et les jours de la semaine (D L M M J V S). Sélectionnez un jour pour l’activer ou le désactiver ; les sept jours signifient tous les jours, et au moins un jour reste toujours activé.
 - **Expression cron…** (sous **À une heure précise**) transforme l’heure et les jours en expression cron, une manière standard d’écrire des planifications, que vous pouvez ensuite modifier ; **Plutôt une heure de la journée** revient en arrière. Elle comporte cinq champs : minute, heure, jour du mois, mois et jour de la semaine (0 ou 7 pour dimanche), dans votre fuseau horaire. `*/15 9-17 * * 1-5` s’exécute toutes les 15 minutes de 09:00 à 17:45 en semaine. Les noms de mois et de jours (`jan`, `mon`) et les raccourcis `@hourly`, `@daily`, `@weekly`, `@monthly` et `@yearly` fonctionnent aussi. Une expression incorrecte est refusée, avec la raison, à l’enregistrement.
 - **Répétition** : « Toutes les [nombre] minutes » ou « heures ». L’intervalle minimal est de 5 minutes ; une nouvelle tâche répétée s’exécute toutes les heures. La première exécution a lieu un intervalle après l’enregistrement.
-- **Une fois** : une date et une heure (dans une heure au départ). Après son exécution, la tâche se désactive d’elle-même mais reste dans la liste : vous pouvez la relancer avec **Exécuter maintenant**, ou la supprimer.
+- **Une fois** : une date et une heure (dans une heure au départ). Après une exécution qui s’est bien passée (**Terminé** ou **Rien de nouveau**), la tâche est supprimée, car il ne lui reste rien à faire. Après une exécution en échec ou qui a besoin de vous, elle se désactive d’elle-même et reste dans la liste, pour que vous voyiez pourquoi et puissiez la relancer avec **Exécuter maintenant**.
 - **Suivre** : voir [Suivre un changement](/guide/tasks#watch-for-a-change).
 - **Webhook** : voir [Lancer des exécutions depuis un autre service avec un webhook](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
@@ -244,6 +244,7 @@ Une exécution vous indique comment elle s’est passée par la notification hab
 - Une exécution bloquée envoie un avis indiquant qu’elle a besoin de vous, commençant par « Bloqué : ».
 - Une exécution qui n’a pas pu démarrer (son dossier a disparu, la session dans laquelle elle publie a été supprimée) envoie un avis d’échec, « Démarrage impossible : … ».
 - Une tâche qui se met elle-même en pause envoie un avis disant pourquoi.
+- Une exécution qui met fin à sa tâche le dit : « Son travail est terminé, sa planification a donc été supprimée. »
 - Une exécution qui publie dans l’une de vos conversations laisse les avis de cette conversation tels quels.
 
 Un agent peut aussi vous envoyer une notification pendant son travail (son outil notify_user), pour quelque chose qui ne peut pas attendre la fin de l’exécution ; n’importe quel agent peut le faire, ainsi que l’étape d’une app.
@@ -255,6 +256,7 @@ Un agent peut aussi vous envoyer une notification pendant son travail (son outil
 - **Modifier** : menu de la tâche (⋯) → **Modifier** ouvre le formulaire sous le titre **Modifier la tâche** ; sélectionnez **Enregistrer**.
 - **Dupliquer** : ouvre un nouveau formulaire de tâche avec une copie nommée « <nom> (copie) », à modifier puis à enregistrer.
 - **Supprimer** : demande d’abord confirmation : « Elle cesse de s’exécuter et son historique disparaît. Les sessions qu’elle a lancées restent. »
+- **Suppression automatique** : une tâche qui ne sert plus disparaît d’elle-même, environ une minute après la fin de sa dernière exécution : une tâche ponctuelle après une exécution qui s’est bien passée, et une tâche dont l’exécution a trouvé son travail terminé, parce que ce qu’elle attendait ou surveillait s’est produit et que son prompt disait de s’arrêter alors (l’avis de l’exécution le dit). Les planifications d’un agent sont supprimées avec l’agent.
 
 ## Laisser un agent configurer une tâche
 
@@ -278,11 +280,13 @@ Sauf demande contraire, la tâche s’exécute avec l’agent, le modèle, les a
 
 Les agents peuvent aussi modifier, mettre en pause, réactiver ou supprimer vos tâches, toujours avec une carte au préalable : **Modifier cette tâche ?** (les parties qui changent, l’ancienne valeur barrée au-dessus de la nouvelle), **Mettre cette tâche en pause ?**, **Réactiver cette tâche ?** ou **Supprimer cette tâche ?**, chacune avec son oui et son non (**Le modifier** ou **La garder telle quelle**, **Mettre en pause** ou **La laisser active**, **L’activer** ou **La laisser en pause**, **Supprimer** ou **La garder**). Ils peuvent aussi lister vos tâches avec la prochaine exécution de chacune et le déroulement de la dernière.
 
+Les agents suppriment une tâche qui ne sert plus au lieu de la mettre en pause. Pour une tâche qui doit s’arrêter quand quelque chose se produit (« jusqu’à la sortie de la nouvelle version », « dès que mon colis est arrivé »), ils l’écrivent dans son prompt, et l’exécution qui voit cela se produire met fin à la tâche.
+
 Quelques limites gardent le tout sous contrôle :
 
 - Une conversation peut avoir jusqu’à cinq propositions en attente de votre réponse.
 - Un agent ne peut plus proposer de nouvelle tâche dès que vous en avez 100.
-- Une exécution planifiée ne peut pas planifier ni modifier de tâches ; elle est invitée à en suggérer une dans son résumé.
+- Une exécution planifiée ne peut pas planifier ni modifier de tâches ; elle est invitée à en suggérer une dans son résumé. Elle peut seulement mettre fin à sa propre tâche, une fois son travail terminé.
 - Une surveillance proposée par un agent n’accède jamais aux adresses de votre propre ordinateur ou réseau.
 
 ## Transformer une session en tâche
@@ -316,6 +320,8 @@ Un rappel est une tâche dont l’exécution vous informe de quelque chose à un
 - « Qu’est-ce qui s’exécute tout seul demain, et à quelle heure ? »
 - « Pourquoi autant de mes tâches ont-elles démarré à 8 h 00 lundi ? Répartis-les dans le temps. »
 - « Mets en pause mon Morning brief », ou « Exécute le rapport hebdomadaire maintenant. »
+- « Vérifie toutes les 30 minutes si mon colis a été livré, préviens-moi dès que c’est le cas, puis arrête-toi. »
+- « Lesquelles de mes tâches planifiées ne servent plus ? Supprime-les. »
 - « Teste mes rappels de factures sans rien envoyer, et montre-moi les e-mails qu’il aurait envoyés. »
 - « Transforme cette conversation en une tâche qui s’exécute chaque lundi à 9 h. »
 - « Exécute mon app Reading list chaque fois que ce flux a un nouvel article, avec le lien de l’article. »

@@ -163,6 +163,12 @@ Si vous fermez la fenêtre (✕, Échap ou un clic en dehors) après avoir saisi
 
 **Le configurer moi-même**, sous la zone de texte, ignore le brouillon et ouvre **Configuration** avec seulement l’icône remplie (voir [Tous les paramètres](#all-settings)). Vous pouvez avoir jusqu’à 200 agents à vous.
 
+### Demander à un agent d’en créer un
+
+Dans n’importe quelle session, demandez-le avec vos propres mots : « Crée-moi un agent qui résume mes newsletters non lues chaque vendredi à 17 h. » L’agent avec qui vous parlez, quel que soit le programme sur lequel il tourne (Claude Code, Codex, Custom ou un autre), le crée pour vous : son nom, sa ligne de présentation, ses instructions, ce qu’il peut utiliser, son niveau et le reste, ainsi que ses planifications quand il doit travailler tout seul. D’abord, une carte dans la conversation montre l’agent et le moment où ses planifications s’exécutent, avec **Créer l’agent** et **Ne pas** ; rien n’est enregistré tant que vous n’avez pas répondu (voir [La carte : confirmer une modification](/guide/ask-agents#the-card-confirming-a-change)).
+
+De la même façon, un agent peut modifier l’un de vos agents (seul ce que vous demandez change, conservé comme une nouvelle version par **Un agent**), lui donner une planification, en modifier une, en retirer une qui ne sert plus, ou supprimer un agent avec ses planifications. Une modification qui ajoute, modifie ou retire des planifications, et chaque suppression, demande confirmation à chaque fois, sauf si la session a l’Accès complet. Donner l’**Accès complet** à un agent (il ne demande jamais) demande confirmation à chaque fois.
+
 ### Tous les paramètres
 
 **Configuration** est la deuxième étape de **Nouvel agent**, et c’est aussi ce que **Tous les paramètres** ouvre sur la page d’un agent, sans l’étape **Décrire**. Sur un téléphone, la fenêtre occupe tout l’écran. En haut se trouvent l’icône (cliquez dessus pour en choisir une parmi 30 : un télescope, un stylo, une toque de chef, un avion, un portefeuille, etc.) et le nom, de 60 caractères au maximum, par exemple « Comptable » ou « Agent de voyages ». Seul le nom est obligatoire.
@@ -282,6 +288,8 @@ Un agent travaille quand vous démarrez une session avec lui, quand un autre age
 - Sur la page de l’agent, **Ajouter une planification** ouvre l’éditeur de tâche avec l’agent sélectionné et une heure préremplie : donnez-lui un nom et le message que démarre chaque exécution, puis enregistrez.
 - Cliquez sur une planification dans la liste pour la modifier, la mettre en pause ou l’exécuter maintenant.
 - Une planification rédigée avec un nouvel agent est créée avec lui.
+- Un agent, dans n’importe quelle session, peut ajouter, modifier ou retirer les planifications d’un agent pour vous (voir [Demander à un agent d’en créer un](#ask-an-agent-to-make-one)).
+- Une planification qui ne sert plus disparaît d’elle-même : une planification ponctuelle après une exécution qui s’est bien passée, et une planification dont l’exécution trouve son travail terminé (ce qu’elle attendait ou surveillait s’est produit, et son message disait de s’arrêter alors), ce que dit la notification de l’exécution. Les planifications d’un agent sont supprimées avec lui.
 
 Chaque planification se trouve aussi dans [Paramètres → Agents → Tâches planifiées](/settings?s=tasks), avec toutes les autres ; l’option **Agent** d’une tâche est l’agent en tant que lequel ses exécutions travaillent. L’espace [**Planifications**](/agents/schedules) dans la colonne de la page Agents (un onglet en haut sur téléphone) les montre sur une semaine avec toutes les autres tâches : ce qui s’est exécuté, comment cela s’est passé et ce qui s’exécutera ensuite, avec **Agent ·** et le nom de l’agent sur chacune dans sa liste ; son crayon ouvre la page de l’agent.
 
@@ -417,7 +425,7 @@ Tant qu’un filtre est actif, une pastille sous **Nouvelle session** le nomme, 
 Sur la page d’un agent :
 
 - **Dupliquer** (sur tous les agents) : ouvre la fenêtre à **Configuration** comme un nouvel agent avec tout rempli et le nom « *nom* (copie) ». Modifiez ce que vous voulez et cliquez sur **Créer l’agent** ; sa page s’ouvre. C’est ainsi que vous créez votre propre version d’un agent intégré.
-- **Supprimer** (uniquement les vôtres) : demande d’abord « Supprimer *nom* ? ». Les sessions démarrées avec lui continuent sans ses instructions ; ses planifications restent, comme de simples tâches planifiées ; les agents qui pouvaient lui confier du travail ne le listent plus. Les projets qui démarraient leurs sessions avec lui sont débarrassés de cet agent : leurs sessions démarrent de nouveau comme Général (ou l’agent que vous choisissez). Son historique de résultats disparaît avec lui ; les pages et les feuilles de calcul qu’il a remplies restent là où elles étaient conservées.
+- **Supprimer** (uniquement les vôtres) : demande d’abord « Supprimer *nom* ? ». Les sessions démarrées avec lui continuent sans ses instructions ; ses planifications sont supprimées avec lui, puisqu’elles étaient écrites pour lui ; les agents qui pouvaient lui confier du travail ne le listent plus. Les projets qui démarraient leurs sessions avec lui sont débarrassés de cet agent : leurs sessions démarrent de nouveau comme Général (ou l’agent que vous choisissez). Son historique de résultats disparaît avec lui ; les pages et les feuilles de calcul qu’il a remplies restent là où elles étaient conservées.
 
 La zone de recherche (Ctrl+K, ⌘K sur Mac) trouve aussi les agents par nom et par description ; en choisir un ouvre sa page.
 
@@ -508,6 +516,8 @@ Si vous le désactivez, les agents laissent en place ce qu’ils ont créé. Dan
 
 - « Crée-moi un agent appelé Paper scout qui trouve chaque jour ouvré à 8 h les nouveaux articles sur mes sujets de recherche et garde les cinq meilleurs dans une page, en réfléchissant avec Rapide. »
 - « Crée un agent appelé Bookkeeper qui tient les comptes de mon foyer dans une feuille de calcul, ne peut pas exécuter de commandes et ne peut pas dépenser plus de 5 $ par mois. »
+- « Crée un agent qui vérifie toutes les heures si Python 3.15 est sorti, me prévient dès que c’est le cas, puis s’arrête. »
+- « La planification du samedi de mon Paper scout ne sert plus : retire-la. » « Supprime mon agent Bookkeeper. »
 - « Permets à mon agent Release manager de confier du travail à Translator et à Test runner. »
 - « Fais en sorte que mon agent Translator travaille uniquement dans le projet Hydor. »
 - « Fais que Rapide signifie Haiku pour Claude Code et mon modèle Qwen local pour Custom. »

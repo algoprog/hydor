@@ -163,6 +163,12 @@ If you close the window (✕, Esc or a click outside it) after you typed or chan
 
 **Set it up myself**, under the box, skips the draft and opens **Set up** with nothing filled in but the icon (see [All settings](#all-settings)). You can keep up to 200 agents of your own.
 
+### Ask an agent to make one
+
+In any session, ask in your own words: "Make me an agent that sums up my unread newsletters every Friday at 5." The agent you are talking to, whichever program it runs on (Claude Code, Codex, Custom or another), makes it for you: its name, line, instructions, what it may use, its tier and the rest, and its schedules when it should work by itself. First a card in the conversation shows the agent and when its schedules run, with **Create agent** and **Don’t**; nothing is saved until you answer (see [The card: confirming a change](/guide/ask-agents#the-card-confirming-a-change)).
+
+The same way, an agent can change one of your agents (only what you ask for changes, kept as a new version by **An agent**), give it a schedule, change one, remove one that is no longer needed, or delete an agent with its schedules. A change that adds, changes or removes schedules, and every deletion, asks you each time, unless the session has Full access. Giving an agent **Full access** (it never asks) asks every time.
+
 ### All settings
 
 **Set up** is the second step of **New agent**, and what **All settings** on an agent's page opens for that agent, with no **Describe** step. On a phone the window fills the screen. At the top are the icon (click it to pick one of 30: a telescope, a pen, a chef's hat, a plane, a wallet and so on) and the name, up to 60 characters, such as "Bookkeeper" or "Travel agent". Only the name is required.
@@ -282,6 +288,8 @@ An agent works when you start a session as it, when another agent hands it work,
 - On the agent's page, **Add a schedule** opens the task editor with the agent picked and a time filled in: give it a name and the message each run starts with, and save.
 - Click a schedule in the list to change it, pause it or run it now.
 - A schedule drafted with a new agent is made with it.
+- An agent in any session can add, change or remove an agent's schedules for you (see [Ask an agent to make one](#ask-an-agent-to-make-one)).
+- A schedule that is no longer needed goes by itself: a one-off schedule after a run that went well, and a schedule whose run finds its job done (what it waited or watched for has happened, as its message said to stop then), which the run's notification says. An agent's schedules are deleted with it.
 
 Every schedule is also in [Settings → Agents → Scheduled tasks](/settings?s=tasks), with all the others; a task's **Agent** option is the agent its runs work as. The [**Schedules**](/agents/schedules) place in the Agents page's column (a tab at the top on a phone) shows them on a week with every other task: what ran, how it went and what runs next, with **Agent ·** and the agent's name on each in its list; its pencil opens the agent's page.
 
@@ -417,7 +425,7 @@ While a filter is on, a chip under **New session** names it, with its icon: clic
 On an agent's page:
 
 - **Duplicate** (on every agent): opens the window at **Set up** as a new agent with everything filled in and the name "*name* (copy)". Change what you like and click **Create agent**; its page opens. This is how you make your own version of a built-in.
-- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay where they were kept.
+- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules are deleted with it, since they were written for it; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay where they were kept.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.
 
@@ -508,6 +516,8 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 
 - "Make me an agent called Paper scout that finds new papers on my research topics every weekday at 8 and keeps the five best in a page, thinking with Quick."
 - "Make an agent called Bookkeeper that keeps my household accounts in a spreadsheet, can't run commands, and may spend at most $5 a month."
+- "Make an agent that checks every hour whether Python 3.15 is out, tells me when it is, and then stops."
+- "My Paper scout's Saturday schedule is no longer needed: remove it." "Delete my Bookkeeper agent."
 - "Let my Release manager agent hand work to Translator and Test runner."
 - "Make my Translator agent work only in the Hydor project."
 - "Make Quick mean Haiku for Claude Code and my local Qwen model for Custom."

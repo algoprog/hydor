@@ -865,6 +865,148 @@ await test('list_tasks speaks in the user’s time zone', async () => {
   scheduler.remove(t.id);
 });
 
+await test('list_tasks says which of the user’s agents a task runs as', async () => {
+  const scout = saveAssistant(db, { name: 'Shelf scout', instructions: 'Look at the shelf.' });
+  const t = scheduler.save({ ...base, name: 'Shelf check', extra: { assistant: scout.id } });
+  const plain = scheduler.save({ ...base, name: 'No agent' });
+  const lines = ((await tool(ctx, 'list_tasks').run({}, ctx)) as string).split('\n');
+  assert.match(lines.find((l) => l.includes(`- ${t.id} `))!, / · runs as Shelf scout$/);
+  assert.doesNotMatch(lines.find((l) => l.includes(`- ${plain.id} `))!, /runs as/);
+  scheduler.remove(t.id);
+  scheduler.remove(plain.id);
+});
+
+// ---- tasks that are done go ---------------------------------------------------------------------------------
+
+console.log('Tasks that are done');
+const tick = () => (scheduler as any).tick();
+const exists = (id: string) => !!db.prepare('select 1 from tasks where id = ?').get(id);
+/** Moves the end of a task's latest run back, as if it ended `ms` ago. */
+const endedAgo = (taskId: string, ms: number) => db.prepare('update task_runs set ended_at = ? where task_id = ?').run(Date.now() - ms, taskId);
+/** The task's time comes: the next tick starts its run, as it does in the app. */
+const fire = async (id: string) => {
+  const at = Date.now() - 1000;
+  db.prepare('update tasks set next_at = ?, schedule = case when json_extract(schedule, \'$.kind\') = \'once\' then json_object(\'kind\', \'once\', \'at\', ?) else schedule end where id = ?').run(at, at, id);
+  tick();
+  await sleep(50);
+  return scheduler.runs(id, 1)[0].key!;
+};
+const soon = () => ({ kind: 'once' as const, at: Date.now() + 3600_000 });
+
+await test('a one-off task is deleted at the first tick a minute after a run that went well, and not before', async () => {
+  const t = scheduler.save({ ...base, name: 'One shot', schedule: soon() });
+  const key = await fire(t.id);
+  // Its run started: it is off now, but the run is open.
+  assert.equal(scheduler.task(t.id).enabled, false);
+  tick();
+  assert.ok(exists(t.id), 'a run going on keeps it');
+  await sessions.endTurn(scheduler, key, 'Reminded them.');
+  assert.equal(lastRun(t.id).status, 'done');
+  tick();
+  assert.ok(exists(t.id), 'its notice and cost have not gone out yet');
+  endedAgo(t.id, 59_000);
+  tick();
+  assert.ok(exists(t.id), 'not before a minute');
+  endedAgo(t.id, 61_000);
+  tick();
+  assert.ok(!exists(t.id));
+  assert.equal((db.prepare('select count(*) as n from task_runs where task_id = ?').get(t.id) as { n: number }).n, 0);
+});
+
+await test('a one-off task whose run was silent goes too; one that failed, was blocked or was partial stays paused', async () => {
+  const quiet = scheduler.save({ ...base, name: 'Quiet one', schedule: soon() });
+  await sessions.endTurn(scheduler, await fire(quiet.id), '[SILENT] Nothing to say.');
+  assert.equal(lastRun(quiet.id).status, 'silent');
+  endedAgo(quiet.id, 61_000);
+  for (const outcome of ['failed', 'blocked', 'partial'] as const) {
+    const t = scheduler.save({ ...base, name: `One ${outcome}`, schedule: soon() });
+    const key = await fire(t.id);
+    scheduler.report(scheduler.runIn(key)!.id, outcome, 'It did not go through');
+    await sessions.endTurn(scheduler, key, 'No.');
+    endedAgo(t.id, 3600_000);
+    tick();
+    assert.ok(exists(t.id), outcome);
+    assert.equal(scheduler.task(t.id).enabled, false);
+    scheduler.remove(t.id);
+  }
+  tick();
+  assert.ok(!exists(quiet.id));
+});
+
+await test('a one-off task is not deleted while it is on, or when only a test ran', async () => {
+  const t = scheduler.save({ ...base, name: 'Not yet', schedule: soon() });
+  tick();
+  assert.ok(exists(t.id));
+  scheduler.remove(t.id);
+  const u = scheduler.save({ ...base, name: 'Tested', schedule: soon() });
+  db.prepare('update tasks set enabled = 0 where id = ?').run(u.id);
+  const r = await scheduler.testRun({ ...scheduler.task(u.id) });
+  await sessions.endTurn(scheduler, r.key!, 'Fine.');
+  endedAgo(u.id, 3600_000);
+  tick();
+  assert.ok(exists(u.id), 'a test run never deletes it');
+  scheduler.remove(u.id);
+});
+
+await test('report_outcome with end turns the schedule off, and a tick after the run ended deletes it', async () => {
+  const t = scheduler.save({ ...base, name: 'Until it is out', schedule: { kind: 'every', minutes: 30 } });
+  const key = (await scheduler.runNow(t.id))!;
+  assert.match(sessions.created.at(-1).prompt, /report_outcome with end true deletes the schedule/);
+  const mark = sessions.created.at(-1).extra.automations;
+  noteSpawn('run-end', { automations: mark });
+  const runCtx: RunCtx = { runId: 'run-end', key, agent: 'claude', cwd: root, deps };
+  assert.ok((tool(runCtx, 'report_outcome').inputSchema as any).properties.end);
+  const n0 = sessions.notices.length;
+  const text = (await tool(runCtx, 'report_outcome').run({ status: 'done', summary: 'The release is out', end: true }, runCtx)) as string;
+  assert.match(text, /deleted a minute after/);
+  // Off at once: no other run starts meanwhile.
+  const row = db.prepare('select enabled, next_at from tasks where id = ?').get(t.id) as { enabled: number; next_at: number | null };
+  assert.deepEqual([row.enabled, row.next_at], [0, null]);
+  await sessions.endTurn(scheduler, key, 'It is out.');
+  assert.equal(lastRun(t.id).status, 'done');
+  assert.equal(lastRun(t.id).summary, 'The release is out. Its job is done, so its schedule was deleted.');
+  tick();
+  assert.ok(exists(t.id), 'not before a minute');
+  await sleep(4300);
+  assert.equal(sessions.notices.slice(n0).at(-1)!.body, 'The release is out. Its job is done, so its schedule was deleted.');
+  endedAgo(t.id, 61_000);
+  tick();
+  assert.ok(!exists(t.id));
+  // Whatever its status: a run that failed and ended it goes too. Without end, a recurring task stays.
+  const u = scheduler.save({ ...base, name: 'Gives up', schedule: { kind: 'every', minutes: 30 } });
+  const k2 = (await scheduler.runNow(u.id))!;
+  scheduler.report(scheduler.runIn(k2)!.id, 'failed', 'Gone for good', true);
+  await sessions.endTurn(scheduler, k2, 'It was withdrawn.');
+  endedAgo(u.id, 61_000);
+  tick();
+  assert.ok(!exists(u.id));
+  const v = scheduler.save({ ...base, name: 'Carries on', schedule: { kind: 'every', minutes: 30 } });
+  const k3 = (await scheduler.runNow(v.id))!;
+  await sessions.endTurn(scheduler, k3, 'Nothing new.');
+  endedAgo(v.id, 3600_000);
+  tick();
+  assert.ok(exists(v.id));
+  scheduler.remove(v.id);
+});
+
+await test('end is refused in a test run and in a board card’s refresh, and a recurring run is told about it', async () => {
+  const t = scheduler.save({ ...base, name: 'Try it', schedule: { kind: 'every', minutes: 30 } });
+  const r = await scheduler.testRun({ ...scheduler.task(t.id) });
+  noteSpawn('run-try', { automations: sessions.created.at(-1).extra.automations });
+  const runCtx: RunCtx = { runId: 'run-try', key: r.key!, agent: 'claude', cwd: root, deps };
+  const text = (await tool(runCtx, 'report_outcome').run({ status: 'done', summary: 'Works', end: true }, runCtx)) as string;
+  assert.match(text, /A test run ends nothing; on a real run the schedule would be deleted/);
+  assert.equal(scheduler.task(t.id).enabled, true);
+  assert.equal((db.prepare('select end_task from task_runs where task_id = ?').get(t.id) as { end_task: number | null }).end_task, null);
+  assert.doesNotMatch(sessions.created.at(-1).prompt, /report_outcome with end/);
+  scheduler.remove(t.id);
+  // A one-off has no use for it: it goes by itself.
+  const o = scheduler.save({ ...base, name: 'Single', schedule: soon() });
+  await scheduler.runNow(o.id);
+  assert.doesNotMatch(sessions.created.at(-1).prompt, /report_outcome with end/);
+  scheduler.remove(o.id);
+});
+
 // ---- the engineering examples ---------------------------------------------------------------------------------
 
 console.log('Engineering examples');

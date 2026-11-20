@@ -16,6 +16,7 @@ Agents can do in the app what you could do in its pages. Some examples of what y
 
 - "Turn on search by meaning."
 - "Make a project called Thesis for my dissertation, with the Researcher agent."
+- "Make me an agent that sums up my unread newsletters every Friday at 5."
 - "Every weekday at 8, give me a news brief on renewable energy."
 - "Add to my guidelines that answers should be short."
 - "Use Brave Search before DuckDuckGo."
@@ -53,7 +54,7 @@ Before an agent changes anything, a card shows in the conversation (and in your 
 
 - **What the change is**, in the agent's words: "Make the project “Thesis”".
 - **What changes**, field by field: a setting as it is now and as it will be ("**Results**: 10 → 20"), or what a new thing will be made with.
-- **The call itself**, in small print (for example `PUT /api/search/settings`), so you can see exactly what will happen whatever the agent says.
+- **The call itself**, in small print (for example `PUT /api/search/settings`), so you can see exactly what will happen whatever the agent says. A card about one of your agents shows the agent instead: what it will be, or what changes in sentences, and when each of its schedules runs.
 
 Then you choose:
 
@@ -61,7 +62,9 @@ Then you choose:
 - **Allow for this session** makes it, and lets this session make more changes of the same everyday kind without asking again. Changes that ask every time (below) still ask.
 - **Don’t** (or **Decline**) changes nothing. You can say why, or what to do instead, and the agent reads it.
 
-Some changes ask every time, even after **Allow for this session**: deleting anything, starting a session or a scheduled task's run, sending a message to another session, adding an MCP server, adding, turning on or changing a plugin, changing what agents may do in Custom or the browser, adding a machine or an account, downloading a model, setting up the picture tools on this computer, updating the app. For a deletion the button says **Delete**.
+Some changes ask every time, even after **Allow for this session**: deleting anything, starting a session or a scheduled task's run, adding, changing or removing an agent's schedules, sending a message to another session, adding an MCP server, adding, turning on or changing a plugin, changing what agents may do in Custom or the browser, adding a machine or an account, downloading a model, setting up the picture tools on this computer, updating the app. For a deletion the button says **Delete**; for a new agent, **Create agent**, and for a change to one, **Save**.
+
+Giving one of your agents **Full access** (it never asks) asks every time, even with Full access in this session, as a session's own permissions do.
 
 A card waits about nine minutes. If you don't answer by then, it goes away and the agent asks you in its reply instead.
 

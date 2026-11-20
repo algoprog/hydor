@@ -326,6 +326,8 @@ const cleanServer = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
  * computer_act) are kinds of their own; web_search, read_page and http_request are the web; read_document reads files.
  */
 function kindByName(n: string): ToolKind | null {
+  // The user's agents are the app's own, as app_api's changes are, not files.
+  if (/^(list|save|delete)_agent$/.test(n)) return null;
   if (/^browser_/.test(n)) return 'browser';
   if (/^computer_/.test(n)) return 'computer';
   if (/^(web_|fetch|browse|http|read_page)/.test(n)) return 'web';

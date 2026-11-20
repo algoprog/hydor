@@ -933,7 +933,7 @@
 "Say what the agent should do":"Πείτε τι πρέπει να κάνει ο πράκτορας",
 "Schedules":"Προγράμματα",
 "See your agents":"Δείτε τους πράκτορές σας",
-"Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.":"Οι συνεδρίες που ξεκίνησαν ως αυτός συνεχίζουν χωρίς τις οδηγίες του. Τα προγράμματά του μένουν, ως απλές προγραμματισμένες εργασίες.",
+"Sessions started as it keep going without its instructions. Its schedules are deleted with it.":"Οι συνεδρίες που ξεκίνησαν ως αυτός συνεχίζουν χωρίς τις οδηγίες του. Τα προγράμματά του διαγράφονται μαζί του.",
 "Start empty":"Έναρξη από το μηδέν",
 "Starts when":"Ξεκινά όταν",
 "system computer overview machine files git terminal preview monitor usage experiments":"σύστημα υπολογιστής επισκόπηση μηχάνημα αρχεία git τερματικό προεπισκόπηση παρακολούθηση χρήση πειράματα system",

@@ -17437,7 +17437,7 @@
 "Sessions nobody used for this long are deleted":"web/src/features/settings/GeneralSettings.tsx",
 "Sessions read":"server/apps/explore.ts",
 "Sessions run as your user through the installed Claude Code and Codex. History comes from":"web/src/features/settings/GeneralSettings.tsx",
-"Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.":"web/src/features/assistants/AgentsPage.tsx",
+"Sessions started as it keep going without its instructions. Its schedules are deleted with it.":"web/src/features/assistants/AgentsPage.tsx",
 "Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.":"web/src/features/settings/ConnectSettings.tsx",
 "Sessions that run as this account stop working until it signs in again.":"web/src/features/settings/AccountSettings.tsx",
 "Sessions worked in":"web/src/features/files/Places.tsx",

@@ -16,6 +16,7 @@ Les agents peuvent faire dans l’app ce que vous pourriez faire dans ses pages.
 
 - « Active la recherche par le sens. »
 - « Crée un projet nommé Thèse pour mon mémoire, avec l’agent Chercheur. »
+- « Crée-moi un agent qui résume mes newsletters non lues chaque vendredi à 17 h. »
 - « Chaque jour de la semaine à 8 h, fais-moi une revue de presse sur les énergies renouvelables. »
 - « Ajoute à mes consignes que les réponses doivent être courtes. »
 - « Utilise Brave Search avant DuckDuckGo. »
@@ -53,7 +54,7 @@ Avant qu’un agent ne modifie quoi que ce soit, une carte s’affiche dans la c
 
 - **En quoi consiste la modification**, avec les mots de l’agent : « Créer le projet “Thèse” ».
 - **Ce qui change**, champ par champ : un paramètre tel qu’il est maintenant et tel qu’il sera (« **Résultats** : 10 → 20 »), ou ce avec quoi un nouvel élément sera créé.
-- **L’appel lui-même**, en petits caractères (par exemple `PUT /api/search/settings`), pour que vous voyiez exactement ce qui va se passer, quoi que dise l’agent.
+- **L’appel lui-même**, en petits caractères (par exemple `PUT /api/search/settings`), pour que vous voyiez exactement ce qui va se passer, quoi que dise l’agent. Une carte concernant l’un de vos agents montre plutôt l’agent : ce qu’il sera, ou ce qui change, en phrases, et le moment où chacune de ses planifications s’exécute.
 
 Vous choisissez ensuite :
 
@@ -61,7 +62,9 @@ Vous choisissez ensuite :
 - **Autoriser pour cette session** l’effectue, et permet à cette session d’effectuer d’autres modifications du même type courant sans redemander. Les modifications qui demandent toujours confirmation (voir ci-dessous) la demandent encore.
 - **Ne pas** (ou **Décliner**) ne change rien. Vous pouvez dire pourquoi, ou ce qu’il faut faire à la place, et l’agent le lit.
 
-Certaines modifications demandent confirmation à chaque fois, même après **Autoriser pour cette session** : supprimer quoi que ce soit, démarrer une session ou l’exécution d’une tâche planifiée, envoyer un message à une autre session, ajouter un serveur MCP, ajouter, activer ou modifier un plugin, modifier ce que les agents peuvent faire dans Custom ou dans le Navigateur, ajouter une machine ou un compte, télécharger un modèle, installer les outils d’image sur cet ordinateur, mettre à jour l’app. Pour une suppression, le bouton indique **Supprimer**.
+Certaines modifications demandent confirmation à chaque fois, même après **Autoriser pour cette session** : supprimer quoi que ce soit, démarrer une session ou l’exécution d’une tâche planifiée, ajouter, modifier ou retirer les planifications d’un agent, envoyer un message à une autre session, ajouter un serveur MCP, ajouter, activer ou modifier un plugin, modifier ce que les agents peuvent faire dans Custom ou dans le Navigateur, ajouter une machine ou un compte, télécharger un modèle, installer les outils d’image sur cet ordinateur, mettre à jour l’app. Pour une suppression, le bouton indique **Supprimer** ; pour un nouvel agent, **Créer l’agent**, et pour une modification d’un agent, **Enregistrer**.
+
+Donner l’**Accès complet** à l’un de vos agents (il ne demande jamais) demande confirmation à chaque fois, même avec l’Accès complet dans cette session, comme pour les autorisations propres à une session.
 
 Une carte attend environ neuf minutes. Si vous ne répondez pas dans ce délai, elle disparaît et l’agent vous pose la question dans sa réponse.
 

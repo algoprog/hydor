@@ -448,15 +448,15 @@ export const agents: Area = {
       aliases: ['delete', 'rm'],
       args: [agent],
       summary: 'Delete an agent of your own',
-      help: 'Sessions started with it carry on without its instructions; its scheduled tasks stay, as plain tasks. Built-in agents cannot be deleted.',
+      help: 'Sessions started with it carry on without its instructions; its scheduled tasks are deleted with it. Built-in agents cannot be deleted.',
       examples: ['hydor agents remove bookkeeper', 'hydor agents remove bookkeeper -y'],
       async run(ctx, [given]) {
         const found = await findAgent(ctx, given);
         if (found.builtin) throw new UsageError(`“${found.name}” is built in and cannot be removed`);
         if (!(await ctx.confirm(`Remove “${found.name}”?`))) return ctx.out('Not removed.');
-        const r = await ctx.conn.api('DELETE', `/api/assistants/${enc(found.id)}`);
+        const r = await ctx.conn.api<{ schedules?: number }>('DELETE', `/api/assistants/${enc(found.id)}`);
         if (ctx.o.json) return ctx.json(r);
-        ctx.out(`Removed “${found.name}”.`);
+        ctx.out(`Removed “${found.name}”${r.schedules ? ` and ${r.schedules === 1 ? 'its schedule' : `its ${r.schedules} schedules`}` : ''}.`);
       },
     },
   ],

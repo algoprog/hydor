@@ -30,6 +30,7 @@ import { validSchedule } from '../scheduler.ts';
 import { allSpaces, updateSpace } from '../spaces/index.ts';
 import { makeProjectAgent } from './projectAgent.ts';
 import { handBackTool } from './output.ts';
+import { agentTools } from './tools.ts';
 import { madePlaces, resultsPage } from './results.ts';
 import { ensureStanding, inboxCounts, inboxOf, inboxTurnEnded, sendToInbox, standingKey, sweepInboxes } from './inbox.ts';
 import { activity, monthSpend } from './rules.ts';
@@ -320,7 +321,10 @@ function routes(d: Deps) {
     const freed = allSpaces(db).filter((s) => s.assistant === id);
     for (const s of freed) updateSpace(db, s.id, { assistant: '' });
     if (freed.length) d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
-    return state();
+    // Its schedules go with it: one left behind would run without the instructions it was written for.
+    const gone = d.scheduler.list({ boards: false }).filter((t) => t.extra?.assistant === id);
+    for (const t of gone) d.scheduler.remove(t.id);
+    return { ...state(), schedules: gone.length };
   });
 
   // Claude Code's agent files (.claude/agents/*.md): the user's, and a folder's own.
@@ -373,7 +377,7 @@ export const assistants: Feature = {
   routes,
   tools(ctx) {
     const t = handBackTool(ctx);
-    return t ? [t] : [];
+    return [...(t ? [t] : []), ...agentTools(ctx)];
   },
   spawn(s, d) {
     // Custom reads them before each turn (context below) and leaves the tools out itself.

@@ -163,6 +163,12 @@ Si cierras la ventana (✕, Esc o un clic fuera de ella) después de haber escri
 
 **Configurarlo yo**, debajo del cuadro, omite el borrador y abre **Configuración** sin nada rellenado salvo el icono (consulta [Toda la configuración](#all-settings)). Puedes tener hasta 200 agentes propios.
 
+### Pide a un agente que cree uno
+
+En cualquier sesión, pídelo con tus propias palabras: “Hazme un agente que resuma mis boletines sin leer todos los viernes a las 5.” El agente con el que hablas, sea cual sea el programa en el que se ejecuta (Claude Code, Codex, Custom u otro), lo crea por ti: su nombre, línea, instrucciones, lo que puede usar, su nivel y el resto, y sus programaciones cuando deba trabajar por sí solo. Primero una tarjeta en la conversación muestra el agente y cuándo se ejecutan sus programaciones, con **Crear agente** y **No**; no se guarda nada hasta que respondas (consulta [La tarjeta: confirmar un cambio](/guide/ask-agents#the-card-confirming-a-change)).
+
+Del mismo modo, un agente puede cambiar uno de tus agentes (solo cambia lo que pides, y se guarda como una versión nueva por **Un agente**), darle una programación, cambiar una, quitar una que ya no hace falta, o eliminar un agente con sus programaciones. Un cambio que añade, cambia o quita programaciones, y cada eliminación, te pregunta siempre, salvo que la sesión tenga Acceso total. Dar **Acceso total** a un agente (nunca pregunta) lo pregunta siempre.
+
 ### Toda la configuración
 
 **Configuración** es el segundo paso de **Nuevo agente**, y lo que abre **Toda la configuración** en la página de un agente para ese agente, sin el paso **Describir**. En un teléfono la ventana ocupa toda la pantalla. Arriba están el icono (haz clic en él para elegir uno de 30: un telescopio, una pluma, un gorro de chef, un avión, una cartera, etc.) y el nombre, de hasta 60 caracteres, como “Contador” o “Agente de viajes”. Solo el nombre es obligatorio.
@@ -282,6 +288,8 @@ Un agente trabaja cuando empiezas una sesión como él, cuando otro agente le de
 - En la página del agente, **Añadir una programación** abre el editor de tareas con el agente elegido y una hora rellenada: ponle un nombre y el mensaje con el que empieza cada ejecución, y guarda.
 - Haz clic en una programación de la lista para cambiarla, pausarla o ejecutarla ahora.
 - Una programación redactada con un agente nuevo se crea con él.
+- Un agente, en cualquier sesión, puede añadir, cambiar o quitar por ti las programaciones de un agente (consulta [Pide a un agente que cree uno](#ask-an-agent-to-make-one)).
+- Una programación que ya no hace falta desaparece sola: una programación de una sola vez, tras una ejecución que salió bien, y una programación cuya ejecución encuentra su trabajo terminado (ha ocurrido lo que esperaba o vigilaba, y su mensaje decía que parara entonces), lo cual dice la notificación de la ejecución. Las programaciones de un agente se eliminan con él.
 
 Todas las programaciones están también en [Configuración → Agentes → Tareas programadas](/settings?s=tasks), junto con las demás; la opción **Agente** de una tarea es el agente como el que trabajan sus ejecuciones. El lugar [**Programaciones**](/agents/schedules) de la columna de la página Agentes (una pestaña en la parte superior en un teléfono) las muestra en una semana con todas las demás tareas: lo que se ejecutó, cómo fue y lo que se ejecutará a continuación, con **Agente ·** y el nombre del agente en cada una de su lista; su lápiz abre la página del agente.
 
@@ -417,7 +425,7 @@ Mientras hay un filtro activo, un chip bajo **Nueva sesión** lo nombra, con su 
 En la página de un agente:
 
 - **Duplicar** (en todos los agentes): abre la ventana en **Configuración** como un agente nuevo con todo rellenado y el nombre "*nombre* (copia)". Cambia lo que quieras y haz clic en **Crear agente**; se abre su página. Así creas tu propia versión de uno integrado.
-- **Eliminar** (solo los tuyos): primero pregunta "¿Eliminar *nombre*?". Las sesiones empezadas como él siguen sin sus instrucciones; sus programaciones se quedan, como simples tareas programadas; los agentes que podían pasarle trabajo ya no lo listan. Los proyectos que empezaban sus sesiones como él quedan libres de él: sus sesiones vuelven a empezar como General (o el agente que elijas). Su historial de resultados se va con él; las páginas y hojas de cálculo que rellenó se quedan donde se guardaron.
+- **Eliminar** (solo los tuyos): primero pregunta "¿Eliminar *nombre*?". Las sesiones empezadas como él siguen sin sus instrucciones; sus programaciones se eliminan con él, porque se escribieron para él; los agentes que podían pasarle trabajo ya no lo listan. Los proyectos que empezaban sus sesiones como él quedan libres de él: sus sesiones vuelven a empezar como General (o el agente que elijas). Su historial de resultados se va con él; las páginas y hojas de cálculo que rellenó se quedan donde se guardaron.
 
 El cuadro de búsqueda (Ctrl+K, ⌘K en una Mac) también encuentra agentes por nombre y descripción; al elegir uno se abre su página.
 
@@ -508,6 +516,8 @@ Desactívalo y los agentes dejarán en su sitio lo que crearon. En ambos casos, 
 
 - “Hazme un agente llamado Paper scout que encuentre artículos nuevos sobre mis temas de investigación todos los días laborables a las 8 y guarde los cinco mejores en una página, pensando con Rápido.”
 - “Haz un agente llamado Bookkeeper que lleve las cuentas de mi hogar en una hoja de cálculo, que no pueda ejecutar comandos y que gaste como máximo 5 $ al mes.”
+- “Haz un agente que compruebe cada hora si ya salió Python 3.15, me avise cuando salga y luego se detenga.”
+- “La programación de los sábados de mi Paper scout ya no hace falta: quítala.” “Elimina mi agente Bookkeeper.”
 - “Que mi agente Release manager encargue trabajo a Translator y Test runner.”
 - “Haz que mi agente Translator trabaje solo en el proyecto Hydor.”
 - “Haz que Rápido signifique Haiku para Claude Code y mi modelo local Qwen para Custom.”

@@ -14283,7 +14283,7 @@
   "Sessions nobody used for this long are deleted": "Les sessions que personne n’a utilisées depuis ce délai sont supprimées",
   "Sessions read": "Sessions lues",
   "Sessions run as your user through the installed Claude Code and Codex. History comes from": "Les sessions s’exécutent sous votre utilisateur via Claude Code et Codex installés. L’historique provient de",
-  "Sessions started as it keep going without its instructions. Its schedules stay, as plain scheduled tasks.": "Les sessions démarrées avec lui continuent sans ses instructions. Ses planifications restent, sous forme de simples tâches planifiées.",
+  "Sessions started as it keep going without its instructions. Its schedules are deleted with it.": "Les sessions démarrées avec lui continuent sans ses instructions. Ses planifications sont supprimées avec lui.",
   "Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.": "Les sessions démarrées ici n’ont besoin de rien : elles peuvent déjà afficher des pages dans la conversation (graphiques, rapports, maquettes) avec leur outil show_html.",
   "Sessions that run as this account stop working until it signs in again.": "Les sessions qui s’exécutent avec ce compte cessent de fonctionner jusqu’à sa reconnexion.",
   "Sessions worked in": "Sessions travaillées dans",

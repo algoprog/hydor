@@ -163,6 +163,12 @@ Se você fechar a janela (✕, Esc ou um clique fora dela) depois de digitar ou 
 
 **Configurar eu mesmo**, abaixo da caixa, pula o rascunho e abre **Configurar** sem nada preenchido além do ícone (veja [Todas as configurações](#all-settings)). Você pode ter até 200 agentes seus.
 
+### Peça a um agente para criar um
+
+Em qualquer sessão, peça com suas próprias palavras: “Crie um agente que resuma meus boletins não lidos toda sexta às 17h.” O agente com quem você está conversando, seja qual for o programa em que ele roda (Claude Code, Codex, Custom ou outro), cria o agente para você: nome, linha, instruções, o que ele pode usar, o nível e o resto, e os agendamentos dele quando ele deve trabalhar sozinho. Primeiro, um cartão na conversa mostra o agente e quando os agendamentos dele são executados, com **Criar agente** e **Não**; nada é salvo até você responder (veja [O cartão: confirmando uma mudança](/guide/ask-agents#the-card-confirming-a-change)).
+
+Do mesmo modo, um agente pode alterar um dos seus agentes (só muda o que você pede, guardado como uma nova versão por **Um agente**), dar um agendamento a ele, alterar um, remover um que não é mais necessário, ou excluir um agente com os agendamentos dele. Uma mudança que adiciona, altera ou remove agendamentos, e toda exclusão, pergunta a você sempre, a menos que a sessão tenha Acesso total. Dar **Acesso total** a um agente (ele nunca pergunta) pergunta sempre.
+
 ### Todas as configurações
 
 **Configurar** é a segunda etapa de **Novo agente** e também o que **Todas as configurações**, na página de um agente, abre para esse agente, sem a etapa **Descrever**. No celular, a janela ocupa a tela toda. No topo ficam o ícone (clique nele para escolher um entre 30: um telescópio, uma caneta, um chapéu de chef, um avião, uma carteira etc.) e o nome, com até 60 caracteres, como “Contador” ou “Agente de viagens”. Só o nome é obrigatório.
@@ -282,6 +288,8 @@ Um agente trabalha quando você começa uma sessão como ele, quando outro agent
 - Na página do agente, **Adicionar um agendamento** abre o editor de tarefas com o agente escolhido e um horário preenchido: dê um nome e a mensagem com que cada execução começa, e salve.
 - Clique em um agendamento na lista para alterá-lo, pausá-lo ou executá-lo agora.
 - Um agendamento rascunhado com um novo agente é criado com ele.
+- Um agente, em qualquer sessão, pode adicionar, alterar ou remover os agendamentos de um agente para você (veja [Peça a um agente para criar um](#ask-an-agent-to-make-one)).
+- Um agendamento que não é mais necessário some sozinho: um agendamento de uma só vez, depois de uma execução que deu certo, e um agendamento cuja execução encontra o trabalho dele concluído (o que ele esperava ou vigiava aconteceu, e a mensagem dele dizia para parar nesse caso), o que a notificação da execução informa. Os agendamentos de um agente são excluídos com ele.
 
 Todo agendamento também está em [Configurações → Agentes → Tarefas agendadas](/settings?s=tasks), junto com todos os outros; a opção **Agente** de uma tarefa é o agente como o qual as execuções dela trabalham. O lugar [**Agendamentos**](/agents/schedules) na coluna da página de Agentes (uma aba no topo no celular) os mostra em uma semana com todas as outras tarefas: o que foi executado, como foi e o que será executado a seguir, com **Agente ·** e o nome do agente em cada um na lista; o lápis dele abre a página do agente.
 
@@ -417,7 +425,7 @@ Enquanto um filtro está ativo, um botão sob **Nova sessão** o nomeia, com o �
 Na página de um agente:
 
 - **Duplicar** (em todos os agentes): abre a janela em **Configurar** como um novo agente com tudo preenchido e o nome "*nome* (cópia)". Mude o que quiser e clique em **Criar agente**; a página dele abre. É assim que você faz a sua própria versão de um agente integrado.
-- **Excluir** (só os seus): pergunta "Excluir *nome*?" primeiro. As sessões começadas como ele continuam sem as instruções dele; seus agendamentos ficam, como tarefas agendadas comuns; os agentes que poderiam passar trabalho a ele deixam de listá-lo. Os projetos que começavam suas sessões como ele ficam sem ele: as sessões deles voltam a começar como Geral (ou o agente que você escolher). O histórico de resultados dele vai junto; as páginas e planilhas que ele preencheu ficam onde foram guardadas.
+- **Excluir** (só os seus): pergunta "Excluir *nome*?" primeiro. As sessões começadas como ele continuam sem as instruções dele; seus agendamentos são excluídos com ele, já que foram escritos para ele; os agentes que poderiam passar trabalho a ele deixam de listá-lo. Os projetos que começavam suas sessões como ele ficam sem ele: as sessões deles voltam a começar como Geral (ou o agente que você escolher). O histórico de resultados dele vai junto; as páginas e planilhas que ele preencheu ficam onde foram guardadas.
 
 A caixa de busca (Ctrl+K, ⌘K no Mac) também encontra agentes pelo nome e pela descrição; escolher um abre a página dele.
 
@@ -508,6 +516,8 @@ Se você o desativar, os agentes deixam no lugar o que criaram. De qualquer form
 
 - “Crie um agente chamado Caçador de artigos que encontre novos artigos sobre os meus temas de pesquisa todo dia útil às 8h e guarde os cinco melhores em uma página, pensando com o Rápido.”
 - “Crie um agente chamado Contador que mantenha as contas da minha casa em uma planilha, não possa executar comandos e possa gastar no máximo US$ 5 por mês.”
+- “Crie um agente que verifique a cada hora se o Python 3.15 já saiu, me avise quando sair e depois pare.”
+- “O agendamento de sábado do meu Caçador de artigos não é mais necessário: remova-o.” “Exclua meu agente Contador.”
 - “Faça meu agente Gerente de versões passar trabalho para o Tradutor e o Executor de testes.”
 - “Faça meu agente Tradutor trabalhar somente no projeto Hydor.”
 - “Faça o Rápido significar Haiku para o Claude Code e o meu modelo local Qwen para o Custom.”

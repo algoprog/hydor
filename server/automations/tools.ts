@@ -6,11 +6,13 @@
 import crypto from 'node:crypto';
 import { DAY_NAMES, OUTCOME_LABEL, scheduleText, type RunMark, type RunOutcome, type ScheduledTask, type TaskDraft, type TaskProposal, type TaskSchedule } from '../../shared/automations.ts';
 import { acpAgents } from '../agents/acp.ts';
+import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { cleanExtra } from '../scheduler.ts';
+import { getRun } from './runs.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { localText, nextRuns, parseLocal } from './schedule.ts';
@@ -35,7 +37,7 @@ export function runMark(db: DB, ctx: Pick<RunCtx, 'runId' | 'key'>): RunMark | n
 }
 
 /** A scheduled run is going on here (a run's own session, or one it posts into), or this session's parent is one. */
-function inRun(d: Deps, ctx: RunCtx): boolean {
+export function inRun(d: Deps, ctx: RunCtx): boolean {
   if (runMark(d.db, ctx) || d.scheduler.runIn(ctx.key)) return true;
   const parent = sessionExtra(d.db, ctx.key).parent;
   return typeof parent === 'string' && !!(sessionExtra(d.db, parent).automations || d.scheduler.runIn(parent));
@@ -296,7 +298,7 @@ const WATCH_SCHEMA = {
   required: ['kind'],
 };
 
-function scheduleSchema(tz: string) {
+export function scheduleSchema(tz: string) {
   return {
     type: 'object',
     description: `When it runs. Times are wall-clock times in the user's time zone (${tz}).`,
@@ -324,6 +326,7 @@ function scheduleTask(tz: string): RunTool {
       `The user sees a card with the schedule in their time zone (${tz}) and confirms or declines it there. Nothing is saved until then, and their answer comes back to you as a message, so do not ask them to confirm in text.`,
       'Each run gets the prompt in a new session (or in this conversation, with where "here"), so write it as complete instructions that make sense on their own, without this conversation.',
       'For a reminder, the prompt can simply ask the agent to tell the user the reminder.',
+      'A one-off schedule (once) is deleted by itself after a run that went well. For one that should stop when something happens (“until…”, “once X is out”), say so in its prompt: the run ends it with report_outcome’s end when that has happened.',
       'To run one of the user\'s apps each time instead (Apps; app_api GET /api/apps lists them), give template (the app and its answers) in place of prompt: each run is a run of it, with the answers given.',
     ].join(' '),
     inputSchema: {
@@ -364,7 +367,7 @@ function updateTask(tz: string): RunTool {
   return {
     name: 'update_task',
     description:
-      'Change, pause, turn back on or delete one of the user’s scheduled tasks (ids from list_tasks). The user confirms in a card first, and their answer comes back to you as a message. For a change, give only the fields that change.',
+      'Change, pause, turn back on or delete one of the user’s scheduled tasks (ids from list_tasks). The user confirms in a card first, and their answer comes back to you as a message. For a change, give only the fields that change. When a schedule is no longer needed (its job is done, the user no longer wants it, what it was for is over), delete it rather than pause it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -414,23 +417,25 @@ function updateTask(tz: string): RunTool {
 function listTasks(tz: string): RunTool {
   return {
     name: 'list_tasks',
-    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, and whether it is paused. Board cards that keep themselves up to date are among them, marked so: they are changed on their board (save_board), not with update_task.',
+    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, which of the user’s agents it runs as (when it does), and whether it is paused. Board cards that keep themselves up to date are among them, marked so: they are changed on their board (save_board), not with update_task.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { readOnlyHint: true },
     async run(_a, ctx) {
       const d = ctx.deps;
       const tasks = d.scheduler.list({ boards: true });
       if (!tasks.length) return 'There are no scheduled tasks yet.';
-      const lines = tasks.map((t) =>
-        [
+      const lines = tasks.map((t) => {
+        const as = findAssistant(d.db, t.extra?.assistant);
+        return [
           `- ${t.id} · ${t.name}${t.board ? ` (a board card’s refresh, board ${t.board.page}: get_page on it says more, and save_board changes it)` : ''}`,
           scheduleText(t.schedule, tz),
           t.enabled ? (t.nextAt ? `next ${localText(t.nextAt, tz)}` : 'no run to come') : `paused${t.pausedReason ? ` (${t.pausedReason})` : ''}`,
           t.recent?.[0] ? `last: ${OUTCOME_LABEL[t.recent[0].status].toLowerCase()}, ${localText(t.recent[0].at, tz)}` : 'not run yet',
           agentLabel(d.db, t),
           t.target === ctx.key ? 'posts into this conversation' : t.target ? 'posts into another session' : `new session in ${t.cwd}`,
-        ].join(' · '),
-      );
+          ...(as ? [`runs as ${as.name}`] : []),
+        ].join(' · ');
+      });
       return `${lines.join('\n')}\n\nTimes are in ${tz}.`;
     },
   };
@@ -439,10 +444,14 @@ function listTasks(tz: string): RunTool {
 const REPORT_OUTCOME: RunTool = {
   name: 'report_outcome',
   description:
-    'For a scheduled run: say how it went, once, at the end. done; partial; blocked (you need the user: access, a decision); failed; or silent, when there is nothing worth telling the user this time (no notification goes out). The summary is the one line the user sees in the notification and in the task’s history.',
+    'For a scheduled run: say how it went, once, at the end. done; partial; blocked (you need the user: access, a decision); failed; or silent, when there is nothing worth telling the user this time (no notification goes out). The summary is the one line the user sees in the notification and in the task’s history. end true deletes this schedule a minute after the run ends: only when its job is over for good (what it waited or watched for has happened, or its instructions say to stop now), never because this run found nothing new. It does nothing in a test run, and a board card’s refresh is stopped on its board (save_board).',
   inputSchema: {
     type: 'object',
-    properties: { status: { type: 'string', enum: OUTCOMES }, summary: { type: 'string', description: 'One line for the user.' } },
+    properties: {
+      status: { type: 'string', enum: OUTCOMES },
+      summary: { type: 'string', description: 'One line for the user.' },
+      end: { type: 'boolean', description: 'This schedule’s job is over for good: delete it. Never just because nothing new turned up this time.' },
+    },
     required: ['status', 'summary'],
   },
   async run(a, ctx) {
@@ -453,7 +462,16 @@ const REPORT_OUTCOME: RunTool = {
     if (!summary && status !== 'silent') throw new Error('Add a one-line summary for the user.');
     const runId = d.scheduler.runIn(ctx.key)?.id ?? runMark(d.db, ctx)?.run;
     if (!runId) return 'This conversation is not a scheduled run right now, so there is nothing to record.';
-    if (!d.scheduler.report(runId, status, summary)) return 'This run has ended already; there is nothing more to record.';
+    // A schedule ends with a real run of its own: not a test, not a board card's refresh.
+    const row = getRun(d.db, runId);
+    const test = !!runMark(d.db, ctx)?.test || row?.trigger === 'test';
+    const board = !!row?.task_id && d.scheduler.isBoard(row.task_id);
+    const asked = a.end === true || a.end === 'true';
+    const end = asked && !test && !board;
+    if (!d.scheduler.report(runId, status, summary, end)) return 'This run has ended already; there is nothing more to record.';
+    if (asked && test) return `Noted: ${status}. A test run ends nothing; on a real run the schedule would be deleted.`;
+    if (asked && board) return `Noted: ${status}. A board card’s refresh is stopped on its board (save_board), so the schedule stays.`;
+    if (end) return `Noted: ${status}. This schedule is off now and is deleted a minute after the run ends; the user sees your summary.`;
     return status === 'silent' ? 'Noted: nothing to report, so no notification goes out.' : `Noted: ${status}. The user sees your summary when the run ends.`;
   },
 };
