@@ -15,8 +15,8 @@ import { tr } from '../../i18n/runtime';
 import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
 import { useKeepIn } from '../spaces/SpacePick';
 import { useSpacesStore } from '../spaces/state';
-import { openOver, shownStore, showBeside } from '../pages/Canvas';
-import { pageFile, pageStore, PageFrame, StreamFrame, usePreviewMax, type Pick } from '../pages/frame';
+import { openOver, showBeside } from '../pages/Canvas';
+import { pageFile, pageStore, PageFrame, shownStore, StreamFrame, usePreviewMax, type Pick } from '../pages/frame';
 import { PageOverlay } from '../pages/overlay';
 import { CANVAS_MEDIA, onScreen, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
 

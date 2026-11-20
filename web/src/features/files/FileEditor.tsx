@@ -13,6 +13,7 @@ import { openTerminalAt } from '../terminal/TerminalPanel';
 import { mu } from '../../lib/machine';
 import { showInFiles } from '../../lib/nav';
 import { isPreviewable } from '@shared/documents';
+import { isKitPage } from '@shared/page-kit';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { PathCrumbs } from './PathCrumbs';
 import { useSpaceMenu } from './SpaceMenu';
@@ -33,6 +34,8 @@ const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) =
 const FillSign = lazy(() => import('./fill/FillSign').then((m) => ({ default: m.FillSign })));
 // A PDF's reader, to highlight it and keep notes beside it (read/).
 const PdfReader = lazy(() => import('./read/PdfReader').then((m) => ({ default: m.PdfReader })));
+// An HTML file made with the page kit, shown as the app's own pages show (KitPage).
+const KitPage = lazy(() => import('./KitPage').then((m) => ({ default: m.KitPage })));
 
 interface FileData {
   path: string;
@@ -251,7 +254,8 @@ export function FileEditor({
   const isMd = ext === 'md' || ext === 'markdown' || ext === 'mdx';
   const isHtml = ext === 'html' || ext === 'htm';
   const office = isPreviewable(path);
-  // An HTML file shows as a page: sandboxed, with a short-lived link that lets it load its own files.
+  // An HTML file shows as a page: sandboxed, with a short-lived link that lets it load its own files. One made with the
+  // page kit shows with the kit and in the app's theme (KitPage), the link's folder the base of its own addresses.
   const [pageUrl, setPageUrl] = useState<string | null>(null);
   useEffect(() => {
     setPageUrl(null);
@@ -783,7 +787,13 @@ export function FileEditor({
             {bytes(file.size)}. Download it or open it in a terminal.
           </Empty>
         ) : mode === 'preview' && isHtml ? (
-          <PageFrame url={pageUrl} version={file.mtime} title={basename(path)} />
+          isKitPage(doc.current) ? (
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-fg-3"><Throbber size={34} /></div>}>
+              <KitPage key={`${file.mtime}:${doc.current.length}`} html={doc.current} url={pageUrl} path={path} title={basename(path)} />
+            </Suspense>
+          ) : (
+            <PageFrame url={pageUrl} version={file.mtime} title={basename(path)} />
+          )
         ) : mode === 'preview' ? (
           <div className="relative z-10 h-full overflow-auto bg-bg">
             <div className="mx-auto max-w-[860px] px-5 py-6">

@@ -226,6 +226,15 @@ export function memoryStore(): Store & { dump(): Record<string, unknown> } {
   return Object.assign(store, { dump: () => Object.fromEntries([...m].map(([k, v]) => [k, JSON.parse(v)])) });
 }
 
+// The storage of a page shown in the conversation (an HTML file's too, by its path) lasts while the app is open,
+// wherever it shows.
+const shownStores = new Map<string, ReturnType<typeof memoryStore>>();
+export function shownStore(itemId: string) {
+  let s = shownStores.get(itemId);
+  if (!s) shownStores.set(itemId, (s = memoryStore()));
+  return s;
+}
+
 /** A saved page's storage, kept by the server. */
 export const pageStore =
   (id: string): Store =>

@@ -19,7 +19,7 @@ import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { useSpacesStore } from '../spaces/state';
 import { tr } from '../../i18n/runtime';
-import { memoryStore, pageFile, pageStore, type Store } from './frame';
+import { pageFile, pageStore, shownStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedPageOf, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
 import { Studio, type StudioDoc } from './studio/Studio';
 import { exportFile } from './exportFile';
@@ -90,14 +90,6 @@ const titleOf = (it: ToolItem | undefined, kind: PageCall | null): string => {
   if (kind === 'file') return basename(String(input.file_path ?? 'page.html'));
   return typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Page';
 };
-
-// The storage of a page shown in the conversation lasts while the app is open, wherever it shows.
-const shownStores = new Map<string, ReturnType<typeof memoryStore>>();
-export function shownStore(itemId: string) {
-  let s = shownStores.get(itemId);
-  if (!s) shownStores.set(itemId, (s = memoryStore()));
-  return s;
-}
 
 // ---- opening it by itself -------------------------------------------------------------------------------
 

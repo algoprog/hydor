@@ -208,3 +208,10 @@ n-chat:not(:defined)::before{content:var(--n-w-chat-a,"A conversation with its a
 
 /** The ready-made classes and their colours, and the page editor's newer blocks (shared/page-blocks.ts). */
 export const KIT_CSS = BASE_CSS + BLOCKS_CSS.trim().replace(/\n/g, '');
+
+/**
+ * Whether an HTML document was made with the page kit (its body is .n-page, as agents make pages): its colours are
+ * the kit's variables, so it shows as the app shows such a page, with the kit and in the app's light or dark. Opened
+ * without them it has no colours, borders or font (a page an agent copied into a folder, opened in Files).
+ */
+export const isKitPage = (html: string): boolean => /<body\b[^>]*\bclass\s*=\s*["']?[^"'>]*\bn-page\b/i.test(html);

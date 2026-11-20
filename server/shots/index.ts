@@ -14,7 +14,7 @@ import { canCapture, capture, setCaptureDb } from '../capture/index.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { Feature, RunTool, ToolOutput } from '../features/types.ts';
-import { KIT_CSS } from '../../shared/page-kit.ts';
+import { isKitPage, KIT_CSS } from '../../shared/page-kit.ts';
 
 const DIR = path.join(config.dataDir, 'shots');
 /** All the pictures together stay under this; the oldest go first. */
@@ -124,7 +124,7 @@ export function pathOf(url: string): string {
 export function kitPage(file: string): boolean {
   try {
     if (fs.statSync(file).size > 20 * 1024 * 1024) return false;
-    return /<body\b[^>]*\bclass\s*=\s*["']?[^"'>]*\bn-page\b/i.test(fs.readFileSync(file, 'utf8'));
+    return isKitPage(fs.readFileSync(file, 'utf8'));
   } catch {
     return false;
   }
