@@ -1296,6 +1296,94 @@ test('Deep research, as it comes: its questions planned, searched three at a tim
   }
 });
 
+test('Deep research and Compare products in Greek: the writers are told the language, the stand-in models answer in Greek, no program breaks on it, and the report’s sources have a heading in Greek', async () => {
+  // ---- Deep research
+  searchAs = (a) => {
+    const q = String(a.query);
+    const n = /\d/.exec(q)?.[0] ?? '0';
+    return formatSearch({ query: q, provider: 'Test', hits: [{ title: `Μελέτη ${n}`, url: `https://www.statistics${n}.gov.gr/meleti`, date: '2025-03-01', snippet: 'Μια μελέτη.' }, { title: `Ειδήσεις ${n}`, url: `https://www.ertnews.gr/anafora-${n}`, date: '2026-02-01', snippet: 'Μια αναφορά.' }] });
+  };
+  model.answer = (_system, user) => {
+    if (user.startsWith('Plan web research')) return JSON.stringify({ questions: [1, 2].map((n) => ({ question: `Ερώτηση ${n};`, query: `ερώτηση ${n}`, other: `άλλη ερώτηση ${n}` })) });
+    if (user.startsWith('Pull out of the page')) return JSON.stringify({ facts: [`Η σελίδα λέει ${/^The page: .*?, (https:\S+)/m.exec(user)![1]}`], publisher: 'Εκδότης', date: '2026', useful: true });
+    return '{}';
+  };
+  const first = model.calls.length;
+  try {
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:deep-research/runs', payload: { inputs: { topic: 'Πόσο καλά δουλεύουν οι αντλίες θερμότητας;', depth: 'Quick overview' }, lang: 'el' } });
+    assert.equal(res.statusCode, 200, res.body);
+    const runId = res.json().run.id;
+    const write = await agentAnswers(runId, 'write', {
+      summary: 'Δουλεύουν καλά [1].',
+      key_findings: ['Το κρύο δεν είναι πρόβλημα [2]'],
+      report: 'Εισαγωγή [1]. Περισσότερα [2].\n\n## Ανοιχτά ερωτήματα\n\nΤο κόστος διαφέρει.',
+      confidence: 'Μέτρια: λίγες πηγές',
+      sources_heading: 'Πηγές',
+      extra_sources: [],
+    });
+    const prompt = sessions.made.find((m) => m.key === write.key)!.o.prompt as string;
+    assert.match(prompt, /Write everything people will read in Greek\./, 'its writer is told the language');
+    assert.match(prompt, /headed "Open questions" in the language of the report/);
+    const done = await ended(runId, 60_000);
+    assert.equal(done.status, 'done', done.error);
+    const result = done.result as any;
+    assert.match(result.report, /\n\n## Πηγές\n\n1\. /, 'the list of sources is headed in Greek');
+    assert.doesNotMatch(result.report, /## Sources/);
+    assert.equal(result.confidence, 'Μέτρια: λίγες πηγές');
+    const st = Object.fromEntries(store.listSteps(db, runId).map((s) => [s.path, s.status]));
+    for (const id of ['budget', 'queries', 'rank', 'coverage', 'evidence', 'finish']) assert.equal(st[id], 'done', `its program ${id} ran on Greek`);
+    const planned = model.calls.slice(first).filter((c) => c.user.startsWith('Plan web research'));
+    assert.ok(planned.length === 1 && planned.every((c) => /Write everything people will read in Greek\./.test(c.user)), 'its planner too');
+  } finally {
+    searchAs = null;
+  }
+  // ---- Compare products
+  const PHONES = ['Samsung Galaxy S26 Ultra', 'Google Pixel 11 Pro'];
+  searchAs = (a) => {
+    const q = String(a.query);
+    const hits = q.includes('review')
+      ? [{ title: `${q.split(' review')[0]} κριτική`, url: `https://www.insomnia.gr/reviews/${encodeURIComponent(q.split(' ')[0])}`, date: '2026-10-01', snippet: 'Δοκιμή.' }]
+      : [{ title: `${q} τιμή`, url: 'https://www.plaisio.gr/p/1', date: '2026-11-01', snippet: '1.299 €' }];
+    return formatSearch({ query: q, provider: 'Test', hits });
+  };
+  model.answer = (_system, user) => {
+    if (user.startsWith('Someone wants help choosing')) {
+      return JSON.stringify({ named: true, products: PHONES, kind: 'phone', criteria: [{ criterion: 'Κάμερα', weight: 5, good: 'Άριστη' }, { criterion: 'Μπαταρία', weight: 3, good: 'Μια μέρα' }], market: 'Ελλάδα', market_code: 'GR', currency: 'EUR' });
+    }
+    if (user.startsWith('Sum up')) {
+      const product = /^Sum up (.*?) for someone/.exec(user)![1];
+      return JSON.stringify({ found: true, product, price: '1.299 €', shop: 'Plaisio, 1 Νοε 2026', link: 'https://www.plaisio.gr/p/1', strengths: 'Εξαιρετική κάμερα', weaknesses: 'Βαρύ', problems: '', status: 'Σε πώληση', best_for: 'Φωτογράφους', scores: [{ criterion: 'Κάμερα', score: 5, why: 'Άριστη' }, { criterion: 'Μπαταρία', score: product.startsWith('Google') ? 3 : 4, why: 'Καλή' }] });
+    }
+    if (user.startsWith('Write the call')) return JSON.stringify({ recommendation: 'Το Samsung Galaxy S26 Ultra για φωτογραφία.', why: 'Κερδίζει στην κάμερα και στην μπαταρία.', runner_up_why: 'Για όσους θέλουν καθαρό Android', watch_out: ['Η τιμή αλλάζει'] });
+    return '{}';
+  };
+  try {
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:compare-products/runs', payload: { inputs: { products: PHONES.join('\n'), needs: 'Καλή κάμερα και μπαταρία', region: 'GR' }, lang: 'el' } });
+    assert.equal(res.statusCode, 200, res.body);
+    const done = await ended(res.json().run.id, 60_000);
+    assert.equal(done.status, 'done', done.error);
+    const understand = model.calls.slice(first).find((c) => c.user.startsWith('Someone wants help choosing'))!;
+    assert.match(understand.user, /Buying in: GR\n/, 'the country of About you is what the model is told');
+    assert.match(understand.user, /Write everything people will read in Greek\./);
+    const verdict = model.calls.find((c) => c.user.startsWith('Write the call'))!;
+    assert.match(verdict.user, /Write everything people will read in Greek\./);
+    assert.match(verdict.user, /\| Προϊόν \| Κάμερα \(×5\) \| Μπαταρία \(×3\) \| Βαθμός \|/, 'the scores are laid out in Greek for the writer');
+    const result = done.result as any;
+    assert.equal(result.pick, 'Samsung Galaxy S26 Ultra');
+    assert.equal(result.runner_up, 'Google Pixel 11 Pro');
+    assert.equal(result.comparison.length, 2);
+    assert.match(result.recommendation, /Samsung/);
+    assert.match(result.comparison[0].scores, /^Κάμερα: 5\/5 — Άριστη/);
+    const st = Object.fromEntries(store.listSteps(db, done.id).map((x) => [x.path, x.status]));
+    for (const id of ['shortlist', 'score']) assert.equal(st[id], 'done', `its program ${id} ran on Greek`);
+    assert.equal(st['each#1/best'], 'done');
+    const pricesAsked = toolCalls.filter((c) => c.tool === 'web_search' && String(c.args.query).includes('Samsung') && !String(c.args.query).includes('review')).map((c) => c.args.query);
+    assert.ok(pricesAsked.some((q) => /price Ελλάδα/.test(String(q))), 'prices are asked for in the buyer’s country');
+  } finally {
+    searchAs = null;
+  }
+});
+
 test('Trip planner, as it comes: its dates worked out, four branches of research side by side (the forecast only for a trip that is near), the plan on the trip’s own dates and its budget added up; it asks what you would like only when you are there', async () => {
   const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
   model.answer = (_system, user) => {
