@@ -387,7 +387,9 @@ export async function diffText(cwd: string, from: string, to?: string, o: { here
  * a reviewer shown only a diff would not say that anything else is unchanged.
  */
 export function changedFilesLine(text: string): string {
-  const files = [...new Set([...text.matchAll(/^diff --git .* "?b\/(.+?)"?$/gm)].map((m) => m[1]))];
+  // A file moved or renamed is two changes: where it is now, and where it no longer is (named so, a reviewer would
+  // otherwise take the folder it left for unchanged).
+  const files = [...new Set([...[...text.matchAll(/^diff --git .* "?b\/(.+?)"?$/gm)].map((m) => m[1]), ...[...text.matchAll(/^rename from "?(.+?)"?$/gm)].map((m) => m[1])])];
   const untracked = /^\(New files not tracked by git: /m.test(text);
   if (!files.length) return untracked ? 'No file git tracks changed; the new files it does not track are named below, and nothing else changed.' : '';
   const shown = files.slice(0, 200).join(', ');

@@ -134,6 +134,11 @@ test('a change is given to a reviewer with every file in it named first', () => 
   assert.equal(changedFilesLine(`${two}\n(New files not tracked by git: notes.txt)\n`), 'Every file that changed (2): src/a.ts, docs/my notes.md. New files git does not track are named at the end. No other file changed.');
   assert.equal(changedFilesLine('\n(New files not tracked by git: notes.txt)\n'), 'No file git tracks changed; the new files it does not track are named below, and nothing else changed.');
   assert.equal(changedFilesLine(''), '');
+  // A file moved out of a folder is named where it was too: that folder did change.
+  assert.equal(
+    changedFilesLine('diff --git a/test/a.test.js b/src/a.js\nsimilarity index 100%\nrename from test/a.test.js\nrename to src/a.js\n'),
+    'Every file that changed (2): src/a.js, test/a.test.js. No other file changed.',
+  );
   const many = Array.from({ length: 203 }, (_, i) => `diff --git a/f${i} b/f${i}`).join('\n');
   assert.match(changedFilesLine(many), /^Every file that changed \(203\): f0, f1, .*f199 and 3 more\. No other file changed\.$/);
 });
