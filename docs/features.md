@@ -502,7 +502,7 @@ agents that speak ACP and take MCP servers.
   trusts only its own Codex hook (found once per Codex version). Every chat in a project with Wiki memory on uses it (a Confidential chat never does); there is no switch in a chat's own options.
   Plans: an agent adopts a plan you give it or choose (`wiki_plan_preview`, then `wiki_plan_adopt`) as
   `output/projects/<name>/plan.md` in the project's wiki, with an execution register (separate states for implementation, deployment
-  and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as a protected snapshot,
+  and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as an ordinary snapshot file with its checksum (it works on network drives too),
   the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
   write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
