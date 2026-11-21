@@ -430,6 +430,8 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
   const block = (b: any, j: number): string => {
     const s = scope();
     if (b.if && !E.test(b.if, s)) return '';
+    // A run still at work shows the answer so far: what it does not have yet is not drawn yet.
+    if (ctx.partial && E.notYet(JSON.stringify(b) + (b.element ? (def.elements?.[b.element]?.html ?? '') : ''), ctx.result)) return '';
     let v: unknown;
     let waiting = false;
     const m = /^data\.([A-Za-z]\w*)$/.exec(b.data || '');
@@ -480,7 +482,10 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         ? `<nav class="n-ui-tabs" role="tablist">${tabs.map((t: any) => `<button type="button" class="n-ui-tab" role="tab" data-n-page="${esc(t.id)}" aria-selected="${t.id === p.id || (p.tab === false && history.length && history[history.length - 1].page === t.id) ? 'true' : 'false'}">${esc(t.title)}</button>`).join('')}</nav>`
         : '';
     const back = p.tab === false ? `<button type="button" class="n-ui-back" data-n-back>← ${esc(history.length ? (pages.find((x: any) => x.id === history[history.length - 1].page)?.title ?? L('back', 'Back')) : L('back', 'Back'))}</button>` : '';
-    return `${nav}${back}<div class="n-ui-blocks" data-n-pg="${esc(p.id)}">${p.blocks.map(block).join('')}</div>`;
+    const body = p.blocks.map(block).join('');
+    // Nothing of this page there yet: one quiet line.
+    const wait = !body && ctx.partial ? `<p class="n-ui-block n-ui-note">${esc(L('working', 'Still working on this part…'))}</p>` : '';
+    return `${nav}${back}<div class="n-ui-blocks" data-n-pg="${esc(p.id)}">${body || wait}</div>`;
   };
 
   // What a template may not do: run scripts, load frames, or point a link at a script. Its values are escaped

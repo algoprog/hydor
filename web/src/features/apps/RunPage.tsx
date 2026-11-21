@@ -106,10 +106,13 @@ export function viewCan(d: RunDetail): ViewCan[] {
     'run',
     ...(r.source !== 'test' ? (['again', 'start'] as const) : []),
     ...(own ? (['data'] as const) : []),
-    // A one-task run's agent takes follow-ups (a run with steps does not).
-    ...(!d.recipe.steps && r.key && !d.noAsks ? (['ask'] as const) : []),
+    // Its agent takes follow-ups (a finished run with steps starts its session for them with the first).
+    ...(canAsk(d) ? (['ask'] as const) : []),
   ];
 }
+
+/** Whether the run takes a follow-up now: one with a session, or a finished run with steps (its first starts one). */
+export const canAsk = (d: RunDetail) => !d.noAsks && (!!d.run.key || !!d.recipe.steps);
 
 /** A run as its person sees it, on its page and in its session: the result, what was asked, the follow-ups. */
 export function RunView({ d, statusExtra, onAsked }: { d: RunDetail; statusExtra?: ReactNode; onAsked?: () => void }) {
@@ -248,7 +251,7 @@ export function RunPage({ id }: { id: string }) {
           </div>
         )}
       </div>
-      {d?.run.key && !d.noAsks && (
+      {d && canAsk(d) && (
         <AskBox
           d={d}
           onSent={() => {

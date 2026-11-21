@@ -798,7 +798,16 @@ export function uiEngine() {
     return out.join('');
   }
 
-  return { parse, render, fill, valueOf, evaluate, test, lookup, given, esc, md, show, asText, keyOf, num, firstNum, order, same, readPath, formats: Object.keys(F) };
+  /**
+   * Not there yet: while a run with steps works, its view has the answer so far, and a block (its data, words or
+   * element) that names an answer field that answer lacks is left out, as a block whose if does not hold.
+   */
+  const notYet = (src: string, result: unknown): boolean => {
+    for (const m of String(src ?? '').matchAll(/(?:^|[^\w.])result\.([A-Za-z_]\w*)/g)) if (!isObj(result) || !own(result, m[1])) return true;
+    return false;
+  };
+
+  return { parse, render, fill, valueOf, evaluate, test, notYet, lookup, given, esc, md, show, asText, keyOf, num, firstNum, order, same, readPath, formats: Object.keys(F) };
 }
 
 // ---- tidying a view ----------------------------------------------------------------------------------------------
@@ -1170,14 +1179,12 @@ export function checkUi(r: Pick<AppRecipe, 'ui' | 'answer' | 'fields' | 'flow' |
   const placed = Object.values(els).map((e) => e.html).concat(ui.pages.flatMap((p) => p.blocks.map((b) => b.html ?? ''))).join('\n');
   for (const name of Object.keys(ui.widgets ?? {})) if (!used.has(name) && !new RegExp(`<n-widget[^>]*name=["']?${name}\\b`).test(placed)) warnings.push(`Widget “${name}” is on no page`);
   for (const ev of sent) if (!events[ev] && !ev.startsWith('@')) warnings.push(`Its elements send the event “${ev}”, which does nothing: add it to events`);
-  const oneTask = !r.flow;
   for (const [name, acts] of Object.entries(events)) {
     if (!sent.has(name)) warnings.push(`Event “${name}”: no element sends it (data-event="${name}")`);
     for (const a of acts) {
       if (a.do === 'page' && a.page && !pages.has(a.page)) errors.push(`Event “${name}”: there is no page “${a.page}” (${[...pages].join(', ')})`);
       if (a.do === 'run' && a.flow && !flows.has(a.flow)) errors.push(`Event “${name}”: it has no flow “${a.flow}” (${[...flows].join(', ')})`);
       if (a.do === 'data' && a.collection && !collections.has(a.collection)) errors.push(`Event “${name}”: it keeps no list “${a.collection}”${collections.size ? ` (it keeps ${[...collections].join(', ')})` : ''}`);
-      if (a.do === 'ask' && !oneTask) warnings.push(`Event “${name}”: a run with steps takes no follow-ups, so ask does nothing there: use again (run it again with changed answers) or run (one of its flows)`);
       if (a.do === 'again' && a.inputs) for (const k of Object.keys(a.inputs)) if (!fields.has(k)) errors.push(`Event “${name}”: its form has no question “${k}”`);
       if (a.do === 'run' && a.inputs && a.flow) {
         const want = a.flow === 'run' ? fields : new Set((r.flows?.[a.flow]?.inputs ?? []).map((f) => f.id));
