@@ -2015,8 +2015,9 @@ return { days: days.map(({ ings, fits, ...d }) => d), shopping, note, count: day
       { id: 'who', label: 'Who it’s for', type: 'long', required: true, placeholder: 'e.g. My dad, 65, loves gardening and jazz, has everything' },
       { id: 'occasion', label: 'Occasion', type: 'text', placeholder: 'e.g. A birthday, a thank-you, Christmas' },
       { id: 'budget', label: 'Budget', type: 'text', placeholder: 'e.g. €50, or under $100' },
-      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. the UK, or online' },
+      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. the UK, or online', from: 'me.home' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2030,7 +2031,8 @@ Who: {{who}}
 {{#occasion}}Occasion: {{occasion}}
 {{/occasion}}{{#budget}}Budget: {{budget}}
 {{/budget}}{{#region}}Buying in: {{region}}
-{{/region}}
+{{/region}}{{#me.currency}}Their currency: {{me.currency}} (the one for the budget and the prices when the budget names none)
+{{/me.currency}}
 - ideas: each idea in a few words, its kind (Thing, Experience, Handmade, Treat or Subscription), why it suits them in a sentence, a usual price range as two numbers (low and high, in the budget's currency), and a web search that finds one to buy.
 - currency: the budget's currency as a symbol or code (€, $, £…).
 - approach: the thinking behind the ideas, in a sentence.`,
@@ -2097,7 +2099,7 @@ return { items };`,
           code:
             LIST +
             String.raw`// Each idea with one to buy and its picture, and whether it fits the budget (the first number in it): those that do first.
-const budget = num((/\d[\d.,]*/.exec(String(input.budget || '')) || [''])[0].replace(/,(?=\d{3}\b)/g, ''));
+const budget = num((/\d[\d.,]*/.exec(String(input.budget || '')) || [''])[0].replace(/,(?=\d{3}\b)/g, '').replace(/^(\d{1,3})(?:\.(\d{3}))+(?![\d.,])/, (m) => m.replace(/\./g, '')));
 const picks = rows(input.picks);
 const media = list(input.media && input.media.items);
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
