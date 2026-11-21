@@ -368,9 +368,13 @@ function routes(d: Deps) {
   app.get('/api/apps/models', async () => ({ models: customModels() }));
 
   app.post('/api/apps/draft', async (req) => {
-    const key = String((req.body as { key?: string })?.key ?? '');
+    const b = (req.body ?? {}) as { key?: string; turn?: unknown };
+    const key = String(b.key ?? '');
     if (!/^(claude|codex|acp):[A-Za-z0-9._-]{4,80}$/.test(key)) throw new HttpError(400, 'Bad session key');
-    return draftFromSession(d, key);
+    // The reply to draft from, by its place in the session (Do this again… under it); none: the latest.
+    const turn = b.turn === undefined || b.turn === null || b.turn === '' ? undefined : Number(b.turn);
+    if (turn !== undefined && !(Number.isInteger(turn) && turn >= 0)) throw new HttpError(400, 'Bad turn');
+    return draftFromSession(d, key, turn);
   });
 
   // Screens are pages of the template's own, made and removed by their routes: a new template starts without
