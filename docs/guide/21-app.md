@@ -101,7 +101,7 @@ Each motion lasts about a tenth to a quarter of a second, never holds back what 
 
 ## Make the text bigger
 
-If the text is small to read, for instance on a phone, [Settings → App → General → Appearance → Text size](/settings?s=general&find=Text%20size) makes it bigger on this device: **Default**, **Large** (a seventh larger) or **Larger** (a third larger). It enlarges what you read and write: the messages in a conversation (the agent's replies and your own), the Help pages and the box you type in. The menus, the sidebar, the editors and the cards an agent shows keep their size. The choice is kept in this browser, so your phone and your computer can differ.
+If the text is small to read, for instance on a phone, [Settings → App → General → Appearance → Text size](/settings?s=general&find=Text%20size) makes it bigger on this device: **Default**, **Large** (about 15% larger) or **Larger** (about 30% larger). It enlarges what you read and write: the messages in a conversation (the agent's replies and your own), the Help pages and the box you type in. The menus, the sidebar, the editors and the cards an agent shows keep their size. The choice is kept in this browser, so your phone and your computer can differ.
 
 ## Decide what Enter does while an agent works
 

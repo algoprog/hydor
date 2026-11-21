@@ -101,7 +101,7 @@ Cada movimiento dura entre una décima y un cuarto de segundo, nunca retrasa lo 
 
 ## Hacer el texto más grande
 
-Si el texto se te hace pequeño, por ejemplo en el móvil, [Configuración → App → General → Apariencia → Tamaño del texto](/settings?s=general&find=Text%20size) lo agranda en este dispositivo: **Predeterminado**, **Grande** (un séptimo más grande) o **Más grande** (un tercio más grande). Agranda lo que lees y escribes: los mensajes de una conversación (las respuestas del agente y los tuyos), las páginas de Ayuda y el cuadro donde escribes. Los menús, la barra lateral, los editores y las tarjetas que muestra un agente mantienen su tamaño. La elección se guarda en este navegador, así que el móvil y el ordenador pueden ser distintos.
+Si el texto se te hace pequeño, por ejemplo en el móvil, [Configuración → App → General → Apariencia → Tamaño del texto](/settings?s=general&find=Text%20size) lo agranda en este dispositivo: **Predeterminado**, **Grande** (un 15 % más grande, más o menos) o **Más grande** (un 30 % más grande, más o menos). Agranda lo que lees y escribes: los mensajes de una conversación (las respuestas del agente y los tuyos), las páginas de Ayuda y el cuadro donde escribes. Los menús, la barra lateral, los editores y las tarjetas que muestra un agente mantienen su tamaño. La elección se guarda en este navegador, así que el móvil y el ordenador pueden ser distintos.
 
 ## Decidir qué hace Enter mientras un agente trabaja
 

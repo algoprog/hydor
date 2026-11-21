@@ -101,7 +101,7 @@ Jede Bewegung dauert etwa eine Zehntel- bis eine Viertelsekunde, hält nie auf, 
 
 ## Den Text größer machen
 
-Ist dir der Text zu klein, etwa auf dem Handy, machst du ihn unter [Einstellungen → App → Allgemein → Darstellung → Textgröße](/settings?s=general&find=Text%20size) auf diesem Gerät größer: **Standard**, **Groß** (ein Siebtel größer) oder **Größer** (ein Drittel größer). Das vergrößert, was du liest und schreibst: die Nachrichten einer Unterhaltung (die Antworten des Agenten und deine eigenen), die Hilfeseiten und das Eingabefeld. Menüs, Seitenleiste, Editoren und die Karten, die ein Agent zeigt, behalten ihre Größe. Die Auswahl wird in diesem Browser gespeichert, Handy und Computer können also verschieden sein.
+Ist dir der Text zu klein, etwa auf dem Handy, machst du ihn unter [Einstellungen → App → Allgemein → Darstellung → Textgröße](/settings?s=general&find=Text%20size) auf diesem Gerät größer: **Standard**, **Groß** (etwa 15 % größer) oder **Größer** (etwa 30 % größer). Das vergrößert, was du liest und schreibst: die Nachrichten einer Unterhaltung (die Antworten des Agenten und deine eigenen), die Hilfeseiten und das Eingabefeld. Menüs, Seitenleiste, Editoren und die Karten, die ein Agent zeigt, behalten ihre Größe. Die Auswahl wird in diesem Browser gespeichert, Handy und Computer können also verschieden sein.
 
 ## Enter während der Agentenarbeit festlegen
 

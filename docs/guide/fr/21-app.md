@@ -101,7 +101,7 @@ Chaque mouvement dure environ un dixième à un quart de seconde, ne retarde jam
 
 ## Agrandir le texte
 
-Si le texte est trop petit à lire, par exemple sur un téléphone, [Paramètres → App → Général → Apparence → Taille du texte](/settings?s=general&find=Text%20size) l’agrandit sur cet appareil : **Par défaut**, **Grand** (un septième plus grand) ou **Plus grand** (un tiers plus grand). Il agrandit ce que vous lisez et écrivez : les messages d’une conversation (les réponses de l’agent et les vôtres), les pages d’Aide et la zone de saisie. Les menus, la barre latérale, les éditeurs et les cartes qu’un agent affiche gardent leur taille. Le choix est conservé dans ce navigateur : votre téléphone et votre ordinateur peuvent donc différer.
+Si le texte est trop petit à lire, par exemple sur un téléphone, [Paramètres → App → Général → Apparence → Taille du texte](/settings?s=general&find=Text%20size) l’agrandit sur cet appareil : **Par défaut**, **Grand** (environ 15 % plus grand) ou **Plus grand** (environ 30 % plus grand). Il agrandit ce que vous lisez et écrivez : les messages d’une conversation (les réponses de l’agent et les vôtres), les pages d’Aide et la zone de saisie. Les menus, la barre latérale, les éditeurs et les cartes qu’un agent affiche gardent leur taille. Le choix est conservé dans ce navigateur : votre téléphone et votre ordinateur peuvent donc différer.
 
 ## Décider du rôle d’Entrée pendant qu’un agent travaille
 

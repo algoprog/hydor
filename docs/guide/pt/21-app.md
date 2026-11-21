@@ -101,7 +101,7 @@ Cada movimento dura cerca de um décimo a um quarto de segundo, nunca atrasa o q
 
 ## Aumentar o texto
 
-Se o texto está pequeno para ler, por exemplo no celular, [Configurações → App → Geral → Aparência → Tamanho do texto](/settings?s=general&find=Text%20size) o aumenta neste dispositivo: **Padrão**, **Grande** (um sétimo maior) ou **Maior** (um terço maior). Ele aumenta o que você lê e escreve: as mensagens de uma conversa (as respostas do agente e as suas), as páginas da Ajuda e a caixa onde você digita. Os menus, a barra lateral, os editores e os cartões que um agente mostra mantêm o tamanho. A escolha fica guardada neste navegador, então o celular e o computador podem ser diferentes.
+Se o texto está pequeno para ler, por exemplo no celular, [Configurações → App → Geral → Aparência → Tamanho do texto](/settings?s=general&find=Text%20size) o aumenta neste dispositivo: **Padrão**, **Grande** (cerca de 15% maior) ou **Maior** (cerca de 30% maior). Ele aumenta o que você lê e escreve: as mensagens de uma conversa (as respostas do agente e as suas), as páginas da Ajuda e a caixa onde você digita. Os menus, a barra lateral, os editores e os cartões que um agente mostra mantêm o tamanho. A escolha fica guardada neste navegador, então o celular e o computador podem ser diferentes.
 
 ## Decidir o que o Enter faz enquanto um agente trabalha
 
