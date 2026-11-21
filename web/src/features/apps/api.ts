@@ -67,6 +67,8 @@ export interface AppDetail {
   latest?: number;
   /** The keys it needs, and how the vault has each (never a value). */
   secrets?: KeyState[];
+  /** What its questions start from, by question: About you's field (from), the last answer (remember). */
+  starts?: Record<string, string>;
 }
 
 /** What a run's page knows of its app: its face, form and answer, and the view its answer shows in (when it has one). */

@@ -15,6 +15,7 @@ import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, Throbber } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
+import { currentLang } from '../../i18n/locale';
 import { money, useRunEvents, type RunDetail } from './api';
 
 /** Small amounts as they are (a model step costs a fraction of a cent). */
@@ -170,7 +171,7 @@ function FirmUpDialog({ app, recipe, firm, onClose, onUse }: { app: AppDef; reci
         if (bad) toastError(new Error(bad.error));
         setTries(r.runs.filter((x) => x.run).map((x) => ({ label: examples.find((e) => e.id === x.example)?.name || inputsLine(recipe.fields, x.run!.inputs) || x.example, run: x.run! })));
       } else {
-        const runs = await Promise.all(firm.inputs.map((inputs) => post<{ run: AppRun }>(`/api/apps/${enc(app.id)}/runs`, { recipe: changed, inputs, source: 'test' })));
+        const runs = await Promise.all(firm.inputs.map((inputs) => post<{ run: AppRun }>(`/api/apps/${enc(app.id)}/runs`, { recipe: changed, inputs, source: 'test', lang: currentLang() })));
         setTries(runs.map((r, i) => ({ label: inputsLine(recipe.fields, firm.inputs[i]) || tr('A try'), run: r.run })));
       }
     } catch (e) {

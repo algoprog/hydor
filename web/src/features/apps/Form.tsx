@@ -1,7 +1,7 @@
 // An app's form: each field as the right control (text, a long text that grows, number, date, a choice
 // as chips or a list, yes/no, a file), with its help line and what to fix under it. Used by the app's
 // page, the builder's test run and the public page.
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, FileUp, X } from 'lucide-react';
 import type { AppField } from '@shared/apps';
 import { bytes } from '../../lib/format';
@@ -178,6 +178,7 @@ export function AppForm({
   errors,
   disabled,
   maxMb,
+  below,
 }: {
   fields: AppField[];
   values: FormValues;
@@ -187,6 +188,8 @@ export function AppForm({
   errors?: Record<string, string>;
   disabled?: boolean;
   maxMb?: number;
+  /** What shows under a question besides its help (the app's page: Remember for all apps). */
+  below?: (f: AppField) => ReactNode;
 }) {
   if (!fields.length) return <div className="text-[13.5px] text-fg-3">No questions to answer: press Run.</div>;
   return (
@@ -203,6 +206,7 @@ export function AppForm({
           </label>
           <FieldInput f={f} value={values[f.id] ?? ''} onChange={(v) => onChange(f.id, v)} file={files[f.id]} onFile={(v) => onFile(f.id, v)} disabled={disabled} maxMb={maxMb} />
           {errors?.[f.id] ? <div className="mt-1 text-[12px] text-err">{errors[f.id]}</div> : f.help && <div className="mt-1 text-[12px] text-fg-3">{f.help}</div>}
+          {below?.(f)}
         </div>
       ))}
     </div>

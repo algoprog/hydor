@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, ChevronRight, Copy, Download, MoreHorizontal, Pencil, Play, Plus, RefreshCw, SlidersHorizontal, Trash2, TriangleAlert } from 'lucide-react';
 import type { AcpAgentDef, Agent } from '@shared/types';
-import type { AppDef, AppRun, AppTemplate } from '@shared/apps';
+import type { AppDef, AppField, AppRun, AppTemplate } from '@shared/apps';
 import { appInfo } from '@shared/app-manifest';
 import { pagesFor } from '@shared/app-ui';
 import { inputsLine, isActive, madeForSessions, prefillOf } from '@shared/apps';
@@ -35,7 +35,8 @@ import { AppView } from './View';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 import { tr } from '../../i18n/runtime';
-import { LOCALE } from '../../i18n/locale';
+import { currentLang, LOCALE } from '../../i18n/locale';
+import { fromField } from '@shared/app-me';
 import { EXPLORE_ID, sawExplore } from '../home/ExploreButton';
 
 type Tab = 'run' | 'runs' | 'rows' | 'share';
@@ -147,14 +148,20 @@ function LatestRuns({ id, recipe, template }: { id: string; recipe: AppDef | App
   );
 }
 
-function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[] }) {
+function RunTab({ id, recipe, template, again, given, agents, secrets, starts = {} }: { id: string; recipe: AppDef | AppTemplate; template: boolean; again?: string | null; given?: Record<string, string>; agents?: ReactNode; secrets?: KeyState[]; starts?: Record<string, string> }) {
   // The keys it needs: those the vault lacks are asked for here, and saved there as it starts (not those only its other flows need).
   const [keyStates, setKeyStates] = useState<KeyState[]>(keysFor(secrets));
   useEffect(() => setKeyStates(keysFor(secrets)), [secrets]);
   const [keys, setKeys] = useState<KeyInput>(emptyKeys);
   const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
-  // Its form as it starts, with the answers its address gave (?in.<question>=…).
-  const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...given }));
+  // Its form as it starts: what its questions start from (About you, the last answers), then the answers its address gave (?in.<question>=…).
+  const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...starts, ...given }));
+  // Questions filled in from About you that are not needed fold into one line under the form, until Change.
+  const [unfolded, setUnfolded] = useState(false);
+  const folded = unfolded || again ? [] : recipe.fields.filter((f) => f.from && !f.required && starts[f.id] !== undefined && !given?.[f.id]);
+  // Questions from About you that it has nothing for: their answers can go there for every app (ticked unless unticked).
+  const [keepOff, setKeepOff] = useState<Set<string>>(new Set());
+  const keepable = (f: AppField) => !!fromField(f.from) && starts[f.id] === undefined && !!(values[f.id] ?? '').trim();
   // "Run again": the answers of an earlier run (files are chosen afresh).
   useEffect(() => {
     if (!again) return;
@@ -193,7 +200,10 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
     try {
       const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, tier: model ? undefined : (tier ?? undefined), effort: effort ?? undefined, mode: mode ?? undefined } : {};
       if (template) localStorage.setItem('wa.apps.agent', JSON.stringify(pick));
-      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys) });
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys), lang: currentLang() });
+      // Answers to keep in About you, for every app: once the run has started.
+      const keep = Object.fromEntries(recipe.fields.filter((f) => keepable(f) && !keepOff.has(f.id)).map((f) => [fromField(f.from)!, values[f.id]]));
+      if (Object.keys(keep).length) await put('/api/apps/me', keep).catch(() => {});
       go(runPath(r.run.id));
     } catch (e) {
       // Keys it still needs (one removed from the vault meanwhile): asked for here.
@@ -214,7 +224,7 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
           <div className="px-5 pt-4 pb-5 sm:px-6">
             <h2 className="mb-4 text-[15px] font-semibold">{recipe.fields.length ? 'Your answers' : 'Ready to run'}</h2>
             <AppForm
-              fields={recipe.fields}
+              fields={folded.length ? recipe.fields.filter((f) => !folded.includes(f)) : recipe.fields}
               values={values}
               files={files}
               errors={errors}
@@ -228,7 +238,26 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
                   return next;
                 })
               }
+              below={(f) =>
+                keepable(f) ? (
+                  <label className="mt-1.5 inline-flex items-center gap-1.5 text-[12px] text-fg-3">
+                    <input type="checkbox" className="accent-[var(--accent)]" checked={!keepOff.has(f.id)} disabled={busy} onChange={() => setKeepOff((s) => new Set(s.has(f.id) ? [...s].filter((x) => x !== f.id) : [...s, f.id]))} />
+                    Remember for all apps
+                  </label>
+                ) : null
+              }
             />
+            {/* What it took from About you, in a line: Change shows those questions, filled in. */}
+            {folded.length > 0 && (
+              <div className="mt-4 flex min-w-0 items-center gap-2 text-[12.5px] text-fg-3">
+                <span className="min-w-0 truncate">
+                  For <span translate="no">{folded.map((f) => values[f.id]).filter(Boolean).join(' · ')}</span>
+                </span>
+                <button type="button" onClick={() => setUnfolded(true)} className="shrink-0 font-medium text-accent hover:underline">
+                  Change
+                </button>
+              </div>
+            )}
           </div>
           {keyStates.length > 0 && (
             <AppKeys
@@ -383,7 +412,7 @@ function NowLine({ id, template }: { id: string; template: boolean }) {
 /** A run of an app's main flow from its own page, with the answers kept as its settings. */
 async function runFromPage(id: string, home: HomeSettings | undefined, after: () => void) {
   try {
-    await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: home?.inputs ?? {}, source: 'screen' });
+    await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: home?.inputs ?? {}, source: 'screen', lang: currentLang() });
     after();
   } catch (e) {
     toastError(e);
@@ -982,7 +1011,7 @@ export function AppPage({ id, tab, again, prefill }: { id: string; tab: Tab; aga
                 <AppScreen app={d.app} />
               </div>
             ) : (
-              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} />
+              (tab === 'run' || template) && <RunTab key={`${id}:${JSON.stringify(given)}:${d ? 1 : 0}`} id={id} recipe={recipe} template={template} again={again} given={given} agents={agentsCard} secrets={d?.secrets} starts={d?.starts} />
             )}
             {tab === 'runs' && !template && <RunsTab id={id} app={recipe} def={d?.app} />}
             {tab === 'rows' && d?.app && <BatchTab app={d.app} />}

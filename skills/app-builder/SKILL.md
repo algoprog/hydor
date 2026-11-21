@@ -66,6 +66,7 @@ topic says what each part does, and its API topic gives the format.
   item `{{item}}`, and the built-in values `{{today}}`, `{{now}}`, `{{weekday}}`, `{{timezone}}` (the user's) and
   `{{run.source}}` (web, api, task, batch…: guard an Ask a person step with it, so runs nobody watches never wait).
   Fill the answer fields from the steps (`flow.outputs`), or let them come by name.
+- Set `language: "person"` on every new app, so its models and agents write in the user's language; a question about the user (units, currency, country, diet, research fields) says `from: "me.units"` and fills itself from About you, and steps read `{{me.units}}`, `{{language}}`, and code `ctx.locale`.
 
 ## 3. Examples, then try
 

@@ -155,7 +155,9 @@ function valuesAt(flow: Flow, list: ListPath, i: number, fields: AppField[]): Va
     { label: 'The form', vals: fields.map((f) => ({ ref: f.id, label: f.label || f.id })) },
     { label: 'Steps before', vals: before },
     { label: 'Here', vals: here },
-    { label: 'Built in', vals: BUILTIN_VALUES.map((b) => ({ ref: b.ref, label: b.label })) },
+    { label: 'Built in', vals: BUILTIN_VALUES.filter((b) => !b.group).map((b) => ({ ref: b.ref, label: b.label })) },
+    // What the person keeps in About you (empty in a run from a public page).
+    { label: 'About you', vals: BUILTIN_VALUES.filter((b) => b.group === 'About you').map((b) => ({ ref: b.ref, label: b.label })) },
   ].filter((g) => g.vals.length);
 }
 
