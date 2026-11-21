@@ -2314,8 +2314,13 @@ if (input.coming === true || /^(yes|true)$/i.test(String(input.coming))) return 
 const STORES = { 1: 'Steam', 2: 'GamersGate', 3: 'GreenManGaming', 7: 'GOG', 11: 'Humble Store', 13: 'Ubisoft Store', 15: 'Fanatical', 21: 'WinGameStore', 23: 'GameBillet', 25: 'Epic Games Store', 27: 'Gamesplanet', 28: 'Gamesload', 30: 'IndieGala', 35: 'DreamGame' };
 const headers = { 'User-Agent': '${UA}' };
 const plain = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+// A title as its game: the same once an edition word (Deluxe, GOTY, Definitive, Remastered…) and a leading "The" are
+// left out, so "Cyberpunk 2077: Ultimate Edition" is Cyberpunk 2077, and "Portal 2" is not Portal.
+const EDITION = /\b(?:deluxe|goty|game of the year|definitive|remastered|remaster|complete|gold|ultimate|special|enhanced|anniversary|collectors|premium|standard|digital|directors cut|edition|version)\b/g;
+const core = (s) => plain(String(s || '').toLowerCase().replace(/['’]/g, '').replace(/&/g, ' and ').replace(/^the\s+/, '').replace(EDITION, ' '));
 const found = bodyOf(await ctx.tool('http_request', { url: 'https://www.cheapshark.com/api/1.0/games?limit=5&title=' + encodeURIComponent(input.title), headers }, { title: 'Find it at CheapShark' })) || [];
-const g = found.find((x) => plain(x.external) === plain(input.title)) || found[0];
+// Only a hit that is this game: the first of another game would show that game's price. None is no price.
+const g = found.find((x) => plain(x.external) === plain(input.title)) || found.find((x) => core(x.external) && core(x.external) === core(input.title));
 if (!g) return { title: input.title, found: false };
 const d = bodyOf(await ctx.tool('http_request', { url: 'https://www.cheapshark.com/api/1.0/games?id=' + g.gameID, headers }, { title: 'Get its prices' })) || {};
 const deals = (d.deals || []).slice().sort((a, b) => Number(a.price) - Number(b.price));

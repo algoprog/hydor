@@ -217,6 +217,37 @@ test('Trip planner: the map uses the look-up’s places, then the model’s wher
   assert.deepEqual((mixed.stops as Record<string, unknown>[]).map((s) => [s.day, s.lat, s.lng]), [[1, 38.71, -9.13], [2, 38.7, -9.1]]);
 });
 
+// ---- Game finder ---------------------------------------------------------------------------------------------------
+
+test('Game finder: a price only for the game asked for: the same title once normalised, or with an edition word; another game’s is not shown', async () => {
+  const shop = (hits: { gameID: string; external: string }[]) => (_t: string, a: Record<string, unknown>) => {
+    const u = new URL(String(a.url));
+    if (u.searchParams.get('id')) return json(String(a.url), { deals: [{ storeID: '1', price: '9.99', dealID: 'D1' }], cheapestPriceEver: { price: '4.99' } });
+    return json(String(a.url), hits.map((h) => ({ ...h, thumb: 'https://img.example/t.jpg' })));
+  };
+  const price = (title: string, hits: { gameID: string; external: string }[]) => program('game-finder', 'price', { title, coming: false }, shop(hits));
+  const ok = async (title: string, external: string) => assert.equal((await price(title, [{ gameID: '7', external }])).found, true, `${title} ~ ${external}`);
+  const no = async (title: string, external: string) => assert.equal((await price(title, [{ gameID: '7', external }])).found, false, `${title} !~ ${external}`);
+  await ok('Hades', 'HADES');
+  await ok('Cyberpunk 2077', 'Cyberpunk 2077: Ultimate Edition');
+  await ok('The Witcher 3: Wild Hunt', 'Witcher 3: Wild Hunt - Game of the Year Edition');
+  await ok('Deus Ex: Human Revolution - Director’s Cut', 'Deus Ex: Human Revolution');
+  await ok('Fallout 3', 'Fallout 3 Gold');
+  await no('Portal', 'Portal 2');
+  await no('Hades', 'Hades’ Star');
+  await no('Doom', 'Doom Eternal');
+  await no('Hollow Knight', 'Hollow Knight: Silksong');
+  // The first hit is another game, a later one the right game: the right one's price.
+  const both = await price('Portal', [{ gameID: '1', external: 'Portal 2' }, { gameID: '2', external: 'Portal' }]);
+  assert.deepEqual([both.found, both.price, both.store], [true, 9.99, 'Steam']);
+  // Nothing at all matches: a game without a deal, the rest of its card unchanged.
+  const none = await price('Hades', []);
+  assert.deepEqual([none.title, none.found], ['Hades', false]);
+  const done = await program('game-finder', 'final', { games: [{ title: 'Hades', year: 2020, genre: 'Roguelike', platforms: 'PC' }], deals: [none], media: { items: [{ picture: 'https://img.example/h.jpg' }] }, budget: 'Any price', summary: 'One pick.' });
+  const g = (done.games as Record<string, unknown>[])[0];
+  assert.deepEqual([g.price, g.store, g.deal, g.picture], [null, '', null, 'https://img.example/h.jpg']);
+});
+
 // ---- run -----------------------------------------------------------------------------------------------------------
 
 for (const [name, fn] of tests) {
