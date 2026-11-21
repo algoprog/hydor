@@ -44,6 +44,8 @@ export interface CaptureOpts {
   settleMs?: number;
   /** Refuse requests to this machine and private networks (for pages the app did not write). */
   blockPrivate?: boolean;
+  /** Addresses on this machine that may still be reached while private ones are refused, by their start (the app's own media). */
+  allowPrivate?: string[];
   /** Refuse every request but the document itself: a confidential session's page, which may reach nowhere (server/confidential). */
   offline?: boolean;
   /** A second picture of the same page, as it is (another size or format): Captured.alt. */
@@ -171,7 +173,7 @@ export interface Tab {
   evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
 }
 
-type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline' | 'colorScheme' | 'firstScript'>;
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'allowPrivate' | 'offline' | 'colorScheme' | 'firstScript'>;
 
 /** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
 async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
@@ -203,7 +205,7 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
               body: Buffer.from(html, 'utf8').toString('base64'),
             })
             .catch(() => {});
-        } else if (o.offline || (o.blockPrivate && isPrivate(String(p.request?.url ?? '')))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
+        } else if (o.offline || (o.blockPrivate && isPrivate(String(p.request?.url ?? '')) && !o.allowPrivate?.some((a) => String(p.request?.url ?? '').startsWith(a)))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
         else void s.send('Fetch.continueRequest', { requestId: id }).catch(() => {});
       });
       await s.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });

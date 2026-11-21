@@ -4,7 +4,7 @@
 // a small page the capture browser opens at an address of no site, in a fresh context with no sign-in: the page
 // hands the frame the view and the run's values, as the app's pages do by message, and answers what the view asks
 // of its app with nothing (no session, no records). The app's own files show from this server's /app-media/,
-// which needs no sign-in either.
+// which needs no sign-in either; nothing else on this computer or its network is reached.
 import { libsHead } from '../../shared/app-media.ts';
 import { pagesFor } from '../../shared/app-ui.ts';
 import { captureJpeg } from '../browser/jpeg.ts';
@@ -69,7 +69,10 @@ const MAX_HEIGHT = 3000;
 
 /** One picture of the holder page, as tall as what it shows (up to MAX_HEIGHT): the window is made that tall first. */
 function shot(html: string, l: (typeof LOOKS)[number]): Promise<Buffer> {
-  return withTab({ html, width: l.width, height: l.height, scale: l.scale, mobile: l.mobile, settleMs: 2500, colorScheme: l.theme }, async ({ s, evaluate }) => {
+  // The view's own code runs here, on this computer: it may reach the web (its libraries, a map's tiles), but nothing on
+  // this machine or its network beyond the app's own files.
+  const own = `http://127.0.0.1:${config.port}/app-media/`;
+  return withTab({ html, width: l.width, height: l.height, scale: l.scale, mobile: l.mobile, settleMs: 2500, colorScheme: l.theme, blockPrivate: true, allowPrivate: [own] }, async ({ s, evaluate }) => {
     const h = Number(await evaluate<number>('Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)')) || l.height;
     const height = Math.min(Math.max(h, l.height), MAX_HEIGHT);
     if (height !== l.height) {
