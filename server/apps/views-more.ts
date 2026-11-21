@@ -550,7 +550,7 @@ p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.5; } .min { color: var(--
     },
     'fr-ing': {
       description: 'An ingredient and its amount, marked when you have it',
-      html: String.raw`<span class="i{{#have}} have{{/have}}">{{#have}}✓ {{/have}}{{item}}{{#amount}} <small>{{amount}}</small>{{/amount}}</span>`,
+      html: String.raw`<span class="i{{#have}} have{{/have}}">{{#have}}✓ {{/have}}{{item.item}}{{#amount}} <small>{{amount}}</small>{{/amount}}</span>`,
       css: String.raw`.i { display: inline-block; padding: 4px 10px; border: 1px solid var(--n-line); border-radius: 999px; font-size: 13.5px; } .have { border-color: color-mix(in srgb, var(--n-ok) 50%, var(--n-line)); color: var(--n-ok); } small { color: var(--n-muted); }`,
     },
     'fr-copy': {
@@ -641,7 +641,7 @@ h3 { margin: 0 0 8px; font-size: 13px; color: var(--n-muted); } p { margin: 0 0 
     },
     'ml-item': {
       description: 'A thing to buy: how much, for which dinners; ticked off as you shop',
-      html: String.raw`<div class="it{{#state.got.@key}} got{{/state.got.@key}}{{#staple}} staple{{/staple}}"><button type="button" class="tick" data-event="got" title="Got it">✓</button><p>{{item}}{{#amount}} <b>{{amount}}</b>{{/amount}}<small>{{aisle}} · {{meals|short:80}}{{#staple}} · probably in the cupboard{{/staple}}</small></p></div>`,
+      html: String.raw`<div class="it{{#state.got.@key}} got{{/state.got.@key}}{{#staple}} staple{{/staple}}"><button type="button" class="tick" data-event="got" title="Got it">✓</button><p>{{item.item}}{{#amount}} <b>{{amount}}</b>{{/amount}}<small>{{aisle}} · {{meals|short:80}}{{#staple}} · probably in the cupboard{{/staple}}</small></p></div>`,
       css: String.raw`
 .it { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 9px 12px; border-bottom: 1px solid var(--n-line); }
 .tick { width: 24px; height: 24px; border: 1.5px solid var(--n-line); border-radius: 7px; background: none; color: transparent; font: inherit; font-size: 12px; }

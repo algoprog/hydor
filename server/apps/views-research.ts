@@ -200,7 +200,7 @@ const CITE_HEAD = String.raw`<header class="hero">
   </nav>{{/citations}}
 </header>`;
 
-const CITE_NEWS = String.raw`{{#sentences}}<p class="note">{{sentences}}</p>{{/sentences}}
+const CITE_NEWS = String.raw`{{#sentences}}<p class="note says">{{sentences}}</p>{{/sentences}}
 {{#papers}}{{#new}}<section class="mine">
   <h2><span class="lbl">Your paper</span>{{title}}</h2>
   <div class="list">{{#citations|where:mine=$key|where:kind=$state.kind}}<article class="cite k-{{kind|slug}}">
@@ -219,6 +219,7 @@ const CITE_CSS =
   PAPER_CSS +
   BADGE_CSS +
   String.raw`
+.says { margin: 0 0 18px; }
 .mine { margin: 0 0 22px; }
 .mine h2 { margin: 0 0 10px; font-size: 17px; line-height: 1.35; }
 .lbl { display: block; margin-bottom: 2px; color: var(--n-muted); font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }

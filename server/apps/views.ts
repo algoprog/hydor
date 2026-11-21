@@ -137,7 +137,7 @@ h3 { margin: 0 0 6px; font-size: 13px; color: var(--n-muted); } p { margin: 0 0 
   <p class="when">{{inputs.start|date}}{{#result.days|last}} – {{date|date}}{{/result.days}}</p>
   <div class="stats">
     <div class="stat"><b>{{result.days|count}}</b><span>days planned</span></div>
-    {{#result.budget|where:item=Total|first}}<div class="stat"><b>{{estimate|short:22}}</b><span>estimated in all</span></div>{{/result.budget}}
+    {{#result.budget|where:item=Total|first}}<div class="stat"><b>{{estimate|split: (|first|short:22}}</b><span>estimated in all</span></div>{{/result.budget}}
     <div class="stat"><b>{{result.book_ahead|count}}</b><span>to book ahead</span></div>
   </div>
 </header>`,
