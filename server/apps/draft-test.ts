@@ -186,8 +186,18 @@ test('without cards the helper’s answer fields stay; without a helper, the req
   model.answer = () => helperSays({ request: 1, fields: [], prompt: 'Summarise this week’s AI news', parts: [{ text: 'Summarise this week’s AI news' }], example: {} });
   const { recipe } = await draftFromSession(one, 'claude:session-1');
   assert.deepEqual(recipe.answer.map((f) => f.id), ['verdict']);
-  model.answer = () => 'no JSON here';
+  // An answer that is no JSON is asked for again: a small model slips now and then, and the next answer holds.
+  let asked = 0;
+  model.answer = () => (++asked === 1 ? 'Here you go: {"name": "Half an ans' : helperSays({ request: 1, fields: [], prompt: 'Summarise this week’s AI news', parts: [{ text: 'Summarise this week’s AI news' }], example: {} }));
+  const second = await draftFromSession(one, 'claude:session-1');
+  assert.equal(asked, 2);
+  assert.equal(second.recipe.prompt, 'Summarise this week’s AI news');
+  assert.equal(second.note, undefined);
+  // Three answers that are no JSON: the plain draft, the request as it was.
+  asked = 0;
+  model.answer = () => (asked++, 'no JSON here');
   const fallback = await draftFromSession(one, 'claude:session-1');
+  assert.equal(asked, 3);
   assert.equal(fallback.recipe.prompt, '{{request}}');
   assert.equal(fallback.recipe.fields[0].default, 'Summarise this week’s AI news');
   assert.match(fallback.note!, /could not draft it/);

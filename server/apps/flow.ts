@@ -878,6 +878,10 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope,
   const tool = runTools(ctx).find((t) => t.name === s.tool);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
   const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
+  // A step's search is an exact call: its words are searched as written. A search otherwise has filters read out of its
+  // words, and a month and a year that are part of what a step looks for ("events in Lisbon December 2026") became a
+  // filter on when the pages were published: none were, yet. A step that wants a filter sets it (from, to, sites…).
+  if (s.tool === 'web_search' && args.as_written === undefined) args.as_written = true;
   // Tried again while its failure may pass, its host's calls spaced, a look-up kept a while (sturdy.ts).
   // A public page's visitors do not get this computer's browser opening pages for them.
   const called = await callTool(tool, args, ctx, { cache: s.cache, signal: x.abort.signal, browser: !x.pub });

@@ -291,6 +291,48 @@ test('web_search says when no provider could answer for now, and when to ask aga
   assert.equal(out.failure, undefined);
 });
 
+test('a step’s search is searched as written, also from a program; a step that says otherwise keeps its say; an agent’s own search still has its filters read', async () => {
+  forgetAll();
+  calls.length = 0;
+  const program = "const r = await ctx.tool('web_search', { query: 'concerts Lisbon December 2026' }); return { got: r.text.length > 0 };";
+  const a = app({
+    name: 'As written',
+    flow: {
+      steps: [
+        { id: 'events', title: 'Search for events', do: 'tool', tool: 'web_search', with: { query: 'events Lisbon December 2026' } },
+        { id: 'read', title: 'Search, filters read', do: 'tool', tool: 'web_search', with: { query: 'papers on tides since 2024', as_written: false } },
+        { id: 'main', title: 'Search from a program', do: 'code', language: 'javascript', code: program },
+      ],
+    },
+  });
+  const done = await ended(startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: {} }).id);
+  assert.equal(done.status, 'done', done.error);
+  const said = (q: string) => calls.find((c) => c.tool === 'web_search' && c.args.query === q)?.args.as_written;
+  assert.equal(said('events Lisbon December 2026'), true, 'a month and a year in a step’s words are no filter on when a page was published');
+  assert.equal(said('papers on tides since 2024'), false);
+  assert.equal(said('concerts Lisbon December 2026'), true);
+  // The tool itself: the filters of a query's words are read (by the helper model) unless it is asked as written.
+  const reads: string[] = [];
+  const provider: SearchProvider = {
+    id: 'fake',
+    name: 'Fake Search',
+    description: '',
+    caps: { maxK: 30, sites: true, excludeSites: true, categories: false, dates: true, languages: false, fileTypes: true, homepagesOnly: false, filteredSnippets: false },
+    key: 'none',
+    enabledByDefault: true,
+    async search(q, c) {
+      reads.push(`${q.text}: ${c.read ? 'read' : 'as written'}`);
+      return { results: [{ title: 'Tides', url: 'https://example.org/tides', snippet: 'About tides.' }] };
+    },
+  };
+  const kv = new Map<string, string>();
+  const service = new SearchService({ kv: { get: (k) => kv.get(k), set: (k, v) => void kv.set(k, v) }, providers: [provider], ask: async () => '{}' });
+  const search = searchTools(service).find((t) => t.name === 'web_search')!;
+  await search.run({ query: 'tides in May 2026' }, ctx);
+  await search.run({ query: 'tides in June 2026', as_written: true }, ctx);
+  assert.deepEqual(reads, ['tides in May 2026: read', 'tides in June 2026: as written']);
+});
+
 // ---- a run's misses ---------------------------------------------------------------------------------------------
 
 test('format: a tool step’s cache is false or seconds (at most a week), and anything else is said in words', () => {

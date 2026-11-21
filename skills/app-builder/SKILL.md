@@ -52,6 +52,8 @@ the free data services to call; app_guide's apps topic says what each part does,
   and firm it up later.
 - Steps, when parts of the work are fixed:
   - **Use a tool** for one exact call: read a page, search the web, call an address with a saved key, read a document.
+    A search step's words are searched as written ("events Lisbon December 2026" looks for those events): to keep
+    to dates, sites or kinds of page, set `from`, `to`, `sites` or `categories`.
   - **Ask a model** for one quick answer with no tools: sort, pull out, sum up, classify. Cheap; give it outputs.
   - **Decide** by a rule when a value settles it (`{{price}} < 100`), by a question in words otherwise.
   - **Repeat** over a list (a few at a time), or until something holds, with a limit.

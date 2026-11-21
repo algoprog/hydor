@@ -423,7 +423,8 @@ test('Decide, Repeat and a step that fails: a rule picks the path, rounds go thr
   assert.deepEqual(done.result, { lines: [{ line: 'Seen a' }, { line: 'Seen b' }, { line: 'Seen c' }], path: 'Seen yes' });
   assert.deepEqual(stepsOf(r.id).sort(), ['big:done', 'each#1/one:done', 'each#1:done', 'each#2/one:done', 'each#2:done', 'each#3/one:done', 'each#3:done', 'each:done', 'find:done', 'maybe:skipped', 'quiet:failed', 'read:failed', 'sorry:done', 'yes:done'].sort());
   assert.ok(model.calls.some((c) => c.user === 'Item failed because That page could not be read'), 'the failure says why');
-  assert.deepEqual(toolCalls.find((t) => t.tool === 'web_search')!.args, { query: 'about GPUs' });
+  // A step's search goes as written: no filters are read out of its words.
+  assert.deepEqual(toolCalls.find((t) => t.tool === 'web_search')!.args, { query: 'about GPUs', as_written: true });
   assert.ok(!model.calls.some((c) => c.user.includes('never')), 'a rule that does not hold skips its step');
 });
 
