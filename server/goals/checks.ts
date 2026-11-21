@@ -430,9 +430,19 @@ export interface CheckEnv {
   diff(): Promise<string>;
   /** Checks of kind you the person confirmed. */
   confirmed: Record<string, boolean>;
-  /** The reviewer: whether the claim holds in the evidence. */
-  review(claim: string, evidence: string): Promise<{ holds: boolean; score: number; reason: string } | { error: string }>;
+  /** The reviewer: whether the claim holds in the evidence; when it does not for lack of files, which it asks to see (`needs`). */
+  review(claim: string, evidence: string): Promise<{ holds: boolean; score: number; reason: string; needs?: string[] } | { error: string }>;
+  /** The files a reviewer asked for before in this check, that were read (kept in the goal's private state): part of its evidence from the start. */
+  asked?(id: string): string[];
+  /** Files a reviewer asked for now in this check that were read, to be kept with it (addAsked). */
+  askedMore?(id: string, added: string[]): void;
 }
+
+/** How many files a review check keeps that its reviewer asked for. */
+export const ASKED_KEPT = 8;
+
+/** The files kept for a check once `added` came: no path twice, the newest ASKED_KEPT. */
+export const addAsked = (kept: string[], added: string[]): string[] => [...kept.filter((p) => !added.includes(p)), ...added].slice(-ASKED_KEPT);
 
 const errorResult = (id: string, error: string, ms: number, detail?: string): GoalResult => ({ id, holds: false, closeness: 0, error, ...(detail ? { detail } : {}), ms });
 
@@ -473,6 +483,43 @@ export function evidenceFile(cwd: string, name: string): { text: string } | { sk
     return { skip: 'it could not be read' };
   }
 }
+
+/**
+ * A file a reviewer asked for, read only when evidenceFile would read it and git knows it or would: tracked, or new and not
+ * ignored (a file git ignores is where keys usually live), and no part of its path starts with a dot. Outside a git folder:
+ * a file inside the session's folder with no part of its path starting with a dot. Returns the path as it is shown (from
+ * the session's folder, with /), and the text or why it is left out. Only for what a reviewer asks: the files a check
+ * names, which the person agreed, are read by evidenceFile alone.
+ */
+export async function askedFile(cwd: string, name: string): Promise<{ path: string; text: string } | { path: string; skip: string }> {
+  const abs = path.resolve(cwd, name);
+  const rel = path.relative(path.resolve(cwd), abs).split(path.sep).join('/');
+  const shown = rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : name;
+  const r = evidenceFile(cwd, name);
+  if ('skip' in r) return { path: shown, skip: r.skip };
+  const dotted = (p: string) => p.split('/').some((c) => c.startsWith('.'));
+  if (dotted(rel)) return { path: shown, skip: 'its path starts with a dot' };
+  // Where a link leads counts too: a link to .env is not a way to read it.
+  let real = rel;
+  try {
+    real = path.relative(fs.realpathSync(cwd), fs.realpathSync(abs)).split(path.sep).join('/');
+  } catch {}
+  if (dotted(real)) return { path: shown, skip: 'its path starts with a dot' };
+  if ((await git(cwd, ['rev-parse', '--is-inside-work-tree'])).out.trim() === 'true') {
+    // Tracked or new and not ignored: ls-files names it; an ignored file it does not.
+    for (const f of new Set([rel, real])) {
+      const l = await git(cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--', f]);
+      if (!l.ok || !l.out.trim()) return { path: shown, skip: 'git ignores it' };
+    }
+  }
+  return { path: shown, text: r.text };
+}
+
+/** A file's block in the evidence: its text cut at FILE_MAX, or why it is left out. */
+const fileBlock = (shown: string, r: { text: string } | { skip: string }) => {
+  const text = 'text' in r ? r.text : `(Left out: ${r.skip}.)`;
+  return `<file path="${shown}">\n${text.length > FILE_MAX ? `${text.slice(0, FILE_MAX)}\n… (the rest left out)` : text}\n</file>`;
+};
 
 /** Why a command that did not pass could not be run at all, or null when it ran and failed. */
 function cannotRun(r: Ran, timeoutS: number): string | null {
@@ -523,20 +570,45 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
     );
     parts.push(d);
   }
-  for (const f of ev.files ?? []) {
-    const r = evidenceFile(env.cwd, f);
-    const text = 'text' in r ? r.text : `(Left out: ${r.skip}.)`;
-    parts.push(`<file path="${f}">\n${text.length > FILE_MAX ? `${text.slice(0, FILE_MAX)}\n… (the rest left out)` : text}\n</file>`);
+  for (const f of ev.files ?? []) parts.push(fileBlock(f, evidenceFile(env.cwd, f)));
+  // What is in the evidence already, by path from the session's folder: a file is shown once.
+  const shownPaths = new Set((ev.files ?? []).map((f) => path.relative(path.resolve(env.cwd), path.resolve(env.cwd, f)).split(path.sep).join('/')));
+  // The files a reviewer asked for in earlier runs of this check, that can still be read.
+  const read: string[] = [];
+  for (const f of env.asked?.(c.id) ?? []) {
+    if (shownPaths.has(f)) continue;
+    const r = await askedFile(env.cwd, f);
+    if (!('text' in r)) continue;
+    shownPaths.add(r.path);
+    read.push(r.path);
+    parts.push(fileBlock(r.path, r));
   }
   if (ev.run?.trim()) {
     const r = await runCommand(ev.run, env.cwd, timeoutOf(c), env.how);
     const bad = cannotRun(r, timeoutOf(c));
     parts.push(`<output of="${ev.run}" exit="${r.code ?? 'none'}">\n${bad ? `${bad}\n` : ''}${r.output}\n</output>`);
   }
-  const evidence = clipMiddle(parts.join('\n\n') || '(No evidence was named.)', EVIDENCE_MAX);
-  const v = await env.review(c.claim, evidence);
+  let v = await env.review(c.claim, clipMiddle(parts.join('\n\n') || '(No evidence was named.)', EVIDENCE_MAX));
+  // Not holding for lack of files the reviewer names: it is shown those it may see, and asked once more; that answer stands.
+  if (!('error' in v) && !v.holds && v.needs?.length) {
+    const fresh = [...new Set(v.needs)].filter((f) => !shownPaths.has(path.relative(path.resolve(env.cwd), path.resolve(env.cwd, f)).split(path.sep).join('/')));
+    if (fresh.length) {
+      const added: string[] = [];
+      for (const f of fresh) {
+        const r = await askedFile(env.cwd, f);
+        if (shownPaths.has(r.path)) continue;
+        shownPaths.add(r.path);
+        parts.push(fileBlock(r.path, r));
+        if ('text' in r) added.push(r.path);
+      }
+      if (added.length) env.askedMore?.(c.id, added);
+      read.push(...added);
+      v = await env.review(c.claim, clipMiddle(parts.join('\n\n'), EVIDENCE_MAX));
+    }
+  }
   if ('error' in v) return errorResult(c.id, v.error, Date.now() - t0);
-  return { id: c.id, holds: v.holds, closeness: v.holds ? 1 : 0, detail: v.reason, ms: Date.now() - t0 };
+  const also = read.length ? ` Also read, at the reviewer’s request: ${read.join(', ')}.` : '';
+  return { id: c.id, holds: v.holds, closeness: v.holds ? 1 : 0, detail: `${v.reason}${also}`, ms: Date.now() - t0 };
 }
 
 /** Runs checks one after another, commands and numbers first, reviews last; the results in the checks' own order. */

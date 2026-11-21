@@ -95,6 +95,8 @@ export interface GoalPrivate {
   final?: { reran: number; review?: string };
   /** The status it had when the person paused it. */
   pausedFrom?: GoalState['status'];
+  /** By check id, the files a reviewer asked for that the app could read (at most 8 each): part of that check's evidence from the start (checks.ts). */
+  asked?: Record<string, string[]>;
 }
 
 /**

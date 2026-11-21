@@ -223,13 +223,15 @@ const deps = {
   publicBase: () => 'https://naget.test',
 } as unknown as Deps;
 
-let reviewer = { claim: true, broke: false as boolean | string, final: { ok: true, reason: 'The change meets the goal: score.txt says 10.' } as { ok: boolean; reason: string } | 'error' };
+let reviewer = { needs: undefined as string[] | undefined, claim: true, broke: false as boolean | string, final: { ok: true, reason: 'The change meets the goal: score.txt says 10.' } as { ok: boolean; reason: string } | 'error' };
 const asked: { system: string; prompt: string; strong?: boolean }[] = [];
 /** Runs as a reviewer is asked (a test acts while the final check runs). */
 let reviewerHook: ((system: string) => unknown) | undefined;
 setReviewer(async (_d, _key, q) => {
   asked.push({ system: q.system, prompt: q.prompt, strong: q.strong });
   await reviewerHook?.(q.system);
+  // A reviewer that cannot tell until it has seen the file it names.
+  if (q.system.includes('You check one claim') && reviewer.needs && !q.prompt.includes('<file path="guide.md">')) return { holds: false, score: 0.1, reason: 'The guide is not in the evidence.', needs: reviewer.needs };
   if (q.system.includes('You check one claim')) return { holds: reviewer.claim, score: reviewer.claim ? 1 : 0.2, reason: reviewer.claim ? 'It holds: “ok”.' : 'It does not: “nope”.' };
   if (q.system.includes('broke a rule')) {
     if (reviewer.broke === 'error') throw new Error('The helper model did not answer');
@@ -3831,6 +3833,43 @@ test('J5: the tick runs once as the feature starts: a reset a restart cut is dea
   assert.match(g.reason!, /^Putting round 2’s files back did not finish/);
   assert.equal(loadGoal(db, J5)!._.restoreTo, undefined);
   await act(J5, { action: 'stop' });
+});
+
+test('a file a reviewer asked for stays with its check in the goal’s private state, and is in the evidence of the next runs', async () => {
+  const dir = path.join(tmp, 'asks');
+  fs.mkdirSync(dir);
+  write(dir, 'guide.md', 'GUIDE-TEXT\n');
+  write(dir, '.env', 'KEY\n');
+  const M = 'codex:goal-asks';
+  sessions.add(M, { agent: 'codex', cwd: dir });
+  reviewer.claim = false;
+  reviewer.needs = ['guide.md', '.env'];
+  try {
+    await act(M, { action: 'set', objective: 'The guide is right' });
+    await turn(M, async () => {
+      await tool(M, 'goal_propose', { checks: [{ kind: 'review', label: 'Guide', claim: 'The guide is right', evidence: { diff: true } }] });
+    });
+    await until('agreeing', () => goal(M).status === 'agreeing');
+    const first = goal(M).rounds[0].results[0];
+    assert.equal(first.holds, false);
+    assert.equal(first.detail, 'It does not: “nope”. Also read, at the reviewer’s request: guide.md.', 'asked once more, with the guide');
+    assert.deepEqual(goal(M)._.asked, { c1: ['guide.md'] }, 'kept apart from the contract the person agreed');
+    assert.equal(goal(M).contract.checks[0].evidence?.files, undefined);
+    // The next run of the check has it from the start: one question.
+    const before = asked.length;
+    await act(M, { action: 'agree' });
+    await until('round 1', () => goal(M).status === 'working');
+    await turn(M, () => write(dir, 'work.txt', 'x\n'));
+    const claims = asked.slice(before).filter((a) => a.system.includes('You check one claim'));
+    assert.ok(claims.length >= 1);
+    assert.match(claims[0].prompt, /<file path="guide.md">\nGUIDE-TEXT/, 'in the first question');
+    assert.ok(!claims.some((a) => a.prompt.includes('KEY')));
+    assert.deepEqual(goal(M)._.asked, { c1: ['guide.md'] });
+  } finally {
+    reviewer.needs = undefined;
+    reviewer.claim = true;
+    await act(M, { action: 'stop' });
+  }
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

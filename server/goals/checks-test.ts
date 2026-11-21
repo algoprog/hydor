@@ -18,7 +18,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { GoalCheck } from '../../shared/goals.ts';
 import { netCutAvailable, sandboxShell } from '../agent/sandbox.ts';
-import { changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
+import type { Deps } from '../features/types.ts';
+import { addAsked, askedFile, ASKED_KEPT, changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
+import { reviewClaim, setReviewer } from './review.ts';
 import { cleanProtect, MAX_WILDCARDS } from './validate.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -415,6 +417,167 @@ test('in a subfolder of a repository: changed paths are the folder’s own, and 
   await assert.rejects(changedPaths(app, 'f'.repeat(40), b), 'and so do changed paths git cannot list (never “nothing changed”)');
   assert.equal(await sameFiles(repo, a, a), true);
   assert.equal(await sameFiles(repo, a, b), false);
+});
+
+// ---- a reviewer that asks for files -----------------------------------------------------------------------
+
+/** A git folder with tracked, new, ignored and dot files; and a reviewer stub that holds once it has seen `need` and asks for `asks` until then. */
+function askRepo() {
+  const root = fs.mkdtempSync(path.join(tmp, 'asks-'));
+  const g = (...a: string[]) => execFileSync('git', ['-C', root, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { encoding: 'utf8' }).trim();
+  g('init', '-q');
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.mkdirSync(path.join(root, '.hidden'));
+  fs.writeFileSync(path.join(root, '.gitignore'), 'secret.txt\n.env\n');
+  fs.writeFileSync(path.join(root, 'src', 'slug.js'), 'SLUG-BODY\n');
+  fs.writeFileSync(path.join(root, 'src', 'duration.js'), 'DURATION-BODY\n');
+  fs.writeFileSync(path.join(root, '.hidden', 'x.js'), 'HIDDEN-TRACKED\n');
+  g('add', '-A');
+  g('commit', '-q', '-m', 'one');
+  fs.writeFileSync(path.join(root, 'src', 'new.js'), 'NEW-BODY\n');
+  fs.writeFileSync(path.join(root, 'secret.txt'), 'IGNORED-KEY\n');
+  fs.writeFileSync(path.join(root, '.env'), 'DOT-KEY\n');
+  fs.writeFileSync(path.join(root, 'src', '.dot.js'), 'DOT-FILE\n');
+  fs.symlinkSync(path.join(root, 'secret.txt'), path.join(root, 'link-to-secret.txt'));
+  return root;
+}
+const askCheck: GoalCheck = { id: 'c1', kind: 'review', label: 'Guides match', claim: 'The guides match the helpers', evidence: { diff: true } };
+/** Asks go to `asks` in turn; `holdsWith` is what the evidence must contain for the answer to hold. */
+const asking = (asks: (string[] | undefined)[], holdsWith: string, o: Partial<CheckEnv> = {}) => {
+  const evidences: string[] = [];
+  const added: string[][] = [];
+  const e = env({
+    review: async (_claim, evidence) => {
+      evidences.push(evidence);
+      const n = evidences.length - 1;
+      if (evidence.includes(holdsWith)) return { holds: true, score: 1, reason: 'It matches.' };
+      return { holds: false, score: 0.2, reason: 'The evidence does not include the helpers.', ...(asks[n] ? { needs: asks[n] } : {}) };
+    },
+    askedMore: (_id, a) => added.push(a),
+    ...o,
+  });
+  return { e, evidences, added };
+};
+
+test('a reviewer that cannot tell asks for files: the app reads them, asks once more, and says so in the detail', async () => {
+  const root = askRepo();
+  const { e, evidences, added } = asking([['src/slug.js', 'src/duration.js', 'src/new.js']], 'SLUG-BODY', { cwd: root });
+  const r = await runCheck(askCheck, e);
+  assert.equal(evidences.length, 2, 'one more question');
+  assert.doesNotMatch(evidences[0], /SLUG-BODY/);
+  assert.match(evidences[1], /<file path="src\/slug.js">\nSLUG-BODY/);
+  assert.match(evidences[1], /<file path="src\/duration.js">\nDURATION-BODY/);
+  assert.match(evidences[1], /<file path="src\/new.js">\nNEW-BODY/, 'a new file git does not ignore');
+  assert.equal(r.holds, true);
+  assert.equal(r.closeness, 1);
+  assert.equal(r.detail, 'It matches. Also read, at the reviewer’s request: src/slug.js, src/duration.js, src/new.js.');
+  assert.deepEqual(added, [['src/slug.js', 'src/duration.js', 'src/new.js']], 'what was read is for the check to keep');
+});
+
+test('a reviewer that asks and still cannot tell: the second answer stands, its own needs are ignored', async () => {
+  const root = askRepo();
+  const { e, evidences } = asking([['src/slug.js'], ['src/duration.js']], 'NEVER-THERE', { cwd: root });
+  const r = await runCheck(askCheck, e);
+  assert.equal(evidences.length, 2, 'never a third question');
+  assert.doesNotMatch(evidences[1], /DURATION-BODY/, 'the second answer’s needs are not read');
+  assert.equal(r.holds, false);
+  assert.equal(r.closeness, 0);
+  assert.equal(r.detail, 'The evidence does not include the helpers. Also read, at the reviewer’s request: src/slug.js.');
+  assert.equal(r.error, undefined);
+  // No needs (or none read), no more question and no sentence.
+  const none = asking([undefined], 'NEVER-THERE', { cwd: root });
+  const n = await runCheck(askCheck, none.e);
+  assert.equal(none.evidences.length, 1);
+  assert.equal(n.detail, 'The evidence does not include the helpers.');
+  // A first answer that holds is one question, whatever it carries.
+  const holds = asking([['src/slug.js']], 'changed line', { cwd: root });
+  await runCheck(askCheck, holds.e);
+  assert.equal(holds.evidences.length, 1);
+  // An error in the second answer is the check’s error.
+  let n2 = 0;
+  const bad = await runCheck(askCheck, env({ cwd: root, review: async () => (n2++ ? { error: 'The reviewer could not answer' } : { holds: false, score: 0, reason: 'no', needs: ['src/slug.js'] }) }));
+  assert.deepEqual([bad.holds, bad.error], [false, 'The reviewer could not answer']);
+});
+
+test('a file a reviewer asks for is read only when it is in the folder, git does not ignore it and no part of its path starts with a dot', async () => {
+  const root = askRepo();
+  const asks = ['secret.txt', '.env', '.hidden/x.js', 'src/.dot.js', '../elsewhere/secret.txt', '/etc/passwd', 'link-to-secret.txt', 'src/gone.js', 'src', 'src/slug.js'];
+  const { e, evidences, added } = asking([asks], 'SLUG-BODY', { cwd: root });
+  const r = await runCheck(askCheck, e);
+  const ev = evidences[1];
+  assert.match(ev, /<file path="secret.txt">\n\(Left out: git ignores it\.\)/);
+  assert.match(ev, /<file path=".env">\n\(Left out: its path starts with a dot\.\)/);
+  assert.match(ev, /<file path=".hidden\/x.js">\n\(Left out: its path starts with a dot\.\)/, 'tracked, but in a dot folder');
+  assert.match(ev, /<file path="src\/.dot.js">\n\(Left out: its path starts with a dot\.\)/);
+  assert.match(ev, /<file path="..\/elsewhere\/secret.txt">\n\(Left out: it is outside the session’s folder\.\)/);
+  assert.match(ev, /<file path="\/etc\/passwd">\n\(Left out: it is outside the session’s folder\.\)/);
+  assert.match(ev, /<file path="link-to-secret.txt">\n\(Left out: git ignores it\.\)/, 'a link to an ignored file is no way round');
+  assert.match(ev, /<file path="src\/gone.js">\n\(Left out: it does not exist\.\)/);
+  assert.match(ev, /<file path="src">\n\(Left out: it is not a file\.\)/);
+  for (const secret of ['IGNORED-KEY', 'DOT-KEY', 'HIDDEN-TRACKED', 'DOT-FILE']) assert.ok(!ev.includes(secret), secret);
+  assert.deepEqual(added, [['src/slug.js']], 'only what was read is kept');
+  assert.match(r.detail!, /Also read, at the reviewer’s request: src\/slug\.js\.$/);
+  // Outside a git folder: inside the folder and no dot in the path is enough.
+  const plain = fs.mkdtempSync(path.join(tmp, 'plain-'));
+  fs.writeFileSync(path.join(plain, 'a.txt'), 'PLAIN\n');
+  fs.writeFileSync(path.join(plain, '.env'), 'DOT\n');
+  assert.deepEqual(await askedFile(plain, 'a.txt'), { path: 'a.txt', text: 'PLAIN\n' });
+  assert.deepEqual(await askedFile(plain, './a.txt'), { path: 'a.txt', text: 'PLAIN\n' });
+  assert.deepEqual(await askedFile(plain, '.env'), { path: '.env', skip: 'its path starts with a dot' });
+  assert.deepEqual(await askedFile(plain, '../x'), { path: '../x', skip: 'it is outside the session’s folder' });
+});
+
+test('the files a reviewer asked for stay with the check: they are in the first question of its next runs', async () => {
+  const root = askRepo();
+  const kept: Record<string, string[]> = { c1: ['src/slug.js', 'secret.txt'] };
+  const first = asking([], 'SLUG-BODY', { cwd: root, asked: (id) => kept[id] ?? [], askedMore: (id, a) => (kept[id] = addAsked(kept[id] ?? [], a)) });
+  const r = await runCheck(askCheck, first.e);
+  assert.equal(first.evidences.length, 1, 'it holds at once');
+  assert.match(first.evidences[0], /<file path="src\/slug.js">\nSLUG-BODY/);
+  assert.ok(!first.evidences[0].includes('secret.txt'), 'a kept file git ignores now is not read, and not mentioned');
+  assert.equal(r.detail, 'It matches. Also read, at the reviewer’s request: src/slug.js.');
+  // Another check has none of them; a file the check names itself is not shown twice.
+  const other = asking([], 'SLUG-BODY', { cwd: root, asked: (id) => kept[id] ?? [] });
+  await runCheck({ ...askCheck, id: 'c2' }, other.e);
+  assert.doesNotMatch(other.evidences[0], /SLUG-BODY/);
+  const named = asking([], 'SLUG-BODY', { cwd: root, asked: (id) => kept[id] ?? [] });
+  await runCheck({ ...askCheck, evidence: { files: ['src/slug.js'] } }, named.e);
+  assert.equal(named.evidences[0].split('<file path="src/slug.js">').length - 1, 1);
+  // Asked for again over several runs: the same file twice is kept once.
+  const again = asking([['src/duration.js']], 'DURATION-BODY', { cwd: root, asked: (id) => kept[id] ?? [], askedMore: (id, a) => (kept[id] = addAsked(kept[id] ?? [], a)) });
+  const r2 = await runCheck({ ...askCheck, evidence: { files: ['src/slug.js'] } }, again.e);
+  assert.equal(again.evidences.length, 2);
+  assert.equal(r2.holds, true);
+  assert.deepEqual(kept.c1, ['src/slug.js', 'secret.txt', 'src/duration.js']);
+});
+
+test('at most 5 files are asked for in one answer, and at most 8 are kept for a check', async () => {
+  const names = ['a.js', 'b.js', 'c.js', 'd.js', 'e.js', 'f.js', 'g.js'];
+  setReviewer(async () => ({ holds: false, score: 0.1, reason: 'no', needs: [...names, names[0], 3, '', 'a"b.js'] }));
+  try {
+    const v = await reviewClaim({} as Deps, 'k', 'claim', 'evidence');
+    assert.ok(!('error' in v));
+    assert.deepEqual(v.needs, ['a.js', 'b.js', 'c.js', 'd.js', 'e.js'], 'five, each once, only paths');
+    setReviewer(async () => ({ holds: true, score: 1, reason: 'yes', needs: ['a.js'] }));
+    const h = await reviewClaim({} as Deps, 'k', 'claim', 'evidence');
+    assert.ok(!('error' in h) && h.needs === undefined, 'a claim that holds asks for nothing');
+    setReviewer(async () => ({ holds: false, reason: 'no', needs: 'a.js' }));
+    const bad = await reviewClaim({} as Deps, 'k', 'claim', 'evidence');
+    assert.ok(!('error' in bad) && bad.needs === undefined);
+  } finally {
+    setReviewer(null);
+  }
+  const many = Array.from({ length: 12 }, (_, i) => `f${i}.js`);
+  const kept = addAsked(addAsked([], many.slice(0, 5)), many.slice(5, 10));
+  assert.equal(kept.length, ASKED_KEPT);
+  assert.deepEqual(kept, many.slice(2, 10), 'the newest eight');
+  assert.deepEqual(addAsked(['x', 'y'], ['x', 'z']), ['y', 'x', 'z']);
+  // Asking for more than five in the check: only the five of the answer are read.
+  const root = askRepo();
+  for (const n of names) fs.writeFileSync(path.join(root, n), `BODY-${n}\n`);
+  const { e, evidences } = asking([names.slice(0, 5)], 'NEVER', { cwd: root });
+  await runCheck(askCheck, e);
+  assert.equal((evidences[1].match(/<file path=/g) ?? []).length, 5);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------
