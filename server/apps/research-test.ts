@@ -1283,21 +1283,21 @@ test('Paper radar: a topics line from About you (commas) is several topics; line
   assert.deepEqual(fields.cats, ['cs.IR', 'cs.CL']);
 });
 
-test('Reviewer simulator and Paper to talk: a paper that could not be read stops the run with a line on how to give it another way, not the tool’s bare failure', async () => {
+test('Reviewer simulator and Paper to talk: a paper that could not be read stops the run with a line on how to give it another way, not the tool’s bare failure; one that was read needs no program', async () => {
+  const another = 'Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.';
   for (const id of ['reviewer-simulator', 'paper-to-talk']) {
     const t = templateById(id)!;
     const steps = allSteps(t.flow!.steps);
     const read = steps.find((s) => s.id === 'paper_read')!;
     assert.ok(Array.isArray(read.failed) && read.failed[0].id === 'unreadable', `${id}: a failed read has its own step`);
-    assert.ok(steps.some((s) => s.id === 'readable'), `${id}: and a read that gave no page is checked`);
-    // The step that says it, run on a failure.
+    // A read with no page of text stops too; a read with pages skips that step (a computer that cannot run programs still goes on).
+    const text = steps.find((s) => s.id === 'unreadable_text') as CodeStep;
+    assert.ok(text && text.if === '{{paper_read.data.parts}} is empty', `${id}: the check runs only when the paper came back without text`);
+    // The steps that say it, run: only that line, no source line or stack of the program's.
     const bad = steps.find((s) => s.id === 'unreadable') as CodeStep;
-    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: 'read_paper: There is no open copy of this paper\nmore' }, slug: id, seconds: 20 }), /Give it another way: upload its PDF .*arXiv id.*\(It said: There is no open copy of this paper\)/s);
-    // Only that line: no source line or stack of the program's (the line is written out, and the program ends as failed).
-    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: '' }, slug: id, seconds: 20 }), (e: Error) => e.message === 'It stopped with an error:\nGive it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
-    const ok = steps.find((s) => s.id === 'readable') as CodeStep;
-    await assert.rejects(runCode({ language: ok.language, code: ok.code, input: { read: { parts: [], notes: ['The PDF has no text'] } }, slug: id, seconds: 20 }), (e: Error) => e.message === 'It stopped with an error:\nYour paper has no text to read (it said: The PDF has no text). Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
-    assert.equal((await runCode({ language: ok.language, code: ok.code, input: { read: { parts: [{ text: 'x' }] } }, slug: id, seconds: 20 })).values.ok, true);
+    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: 'read_paper: There is no open copy of this paper.\nmore' }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another} (It said: There is no open copy of this paper)`);
+    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: '' }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another}`);
+    await assert.rejects(runCode({ language: text.language, code: text.code, input: { why: ['The PDF has no text.'] }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another} (It said: The PDF has no text)`);
   }
 });
 
@@ -1314,11 +1314,16 @@ test('Reviewer simulator and Paper to talk, whole: a paper with no open copy, or
       const error = String(r.error).replace(/\s+/g, ' ');
       assert.ok(!/file:\/\/|\bat main\b|Node\.js|throw /.test(error), `${id}: no program source or stack in “${error}”`);
       if (paper.includes('no-copy')) assert.equal(error, 'Your paper could not be read: It stopped with an error: Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy. (It said: There is no open copy of this paper anywhere it looked)');
-      else assert.equal(error, 'Check that your paper could be read: It stopped with an error: Your paper has no text to read (it said: The PDF has no text: it is pictures of pages). Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
+      else assert.equal(error, 'Your paper could not be read: It stopped with an error: Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy. (It said: The PDF has no text: it is pictures of pages)');
       // And what could not be had shows under it: the paper, with the tool's own words.
       if (paper.includes('no-copy')) assert.ok((r.misses ?? []).some((m) => /There is no open copy/.test(m.why ?? '')), `${id}: the read is listed as what could not be had`);
     }
   }
+  // A paper that was read: the check is skipped, and the run goes on to its models.
+  seenByModel = [];
+  const read = (await waitFor(startRun({ app: 'tpl:reviewer-simulator', slug: 'reviewer-simulator', recipe: templateById('reviewer-simulator')!, source: 'web', inputs: { paper: '~/papers/draft.pdf', reviewers: '1' } }).id, 60_000))!;
+  assert.equal(store.listSteps(db, read.id).find((s) => s.id === 'unreadable_text')?.status, 'skipped', 'no program for a paper that was read');
+  assert.ok(seenByModel.length > 0, 'its models were asked about the paper: ' + read.status + ' ' + (read.error ?? ''));
 });
 
 // ---- the real services (LIVE=1) ----------------------------------------------------------------------------------

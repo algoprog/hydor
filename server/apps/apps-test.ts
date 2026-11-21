@@ -269,7 +269,7 @@ test('templates: forty-five tasks in steps, each checking out as a save checks i
       } else assert.doesNotThrow(() => new AsyncFunction('input', 'ctx', s.code), `${t.id}: ${s.id} reads as JavaScript`);
       // Where the sandbox cannot run, an agent does a program's work (one inside a round may go without instead).
       // The steps that say a paper could not be read end the run on purpose, with a line the person reads: an agent in their place would go on without the paper.
-      const stops = s.id === 'unreadable' || s.id === 'readable';
+      const stops = s.id === 'unreadable' || s.id === 'unreadable_text';
       assert.ok(s.failed === 'agent' || stops || (s.failed === 'skip' && steps.some((r) => r.do === 'repeat' && allSteps(r.steps).includes(s))), `${t.id}: ${s.id} says what happens when it cannot run`);
     }
   }

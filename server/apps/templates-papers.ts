@@ -31,40 +31,27 @@ const STOP = String.raw`async function stop(line) {
 }
 `;
 
-/** The steps that stop a run clearly when the paper could not be read (read_paper failed, or it came back without a page): a line on it and on how to give it another way, not the tool's bare failure. */
-const unreadable = (what: string) => ({
-  id: 'unreadable',
+/**
+ * The steps that stop a run clearly when the paper could not be read: a line on it and on how to give it another way,
+ * not the tool's bare failure. `unreadable` runs when read_paper failed (its error, as it said it); `unreadableText`
+ * only when it answered without a page of text (a scanned PDF, a file that is no paper), so a paper that was read
+ * needs no program at all (a computer that cannot run programs still reviews it).
+ */
+const stopWith = (id: string, what: string, extra: { if?: string; with: Record<string, string> }) => ({
+  id,
   title: what + ' could not be read',
   do: 'code' as const,
   language: 'javascript' as const,
-  with: { why: '{{error}}' },
+  ...extra,
   code:
     STOP +
-    String.raw`const why = String(input.why || '').split('\n')[0].replace(/^read_paper:\s*/, '').trim();
+    String.raw`const said = (Array.isArray(input.why) ? input.why.join(' ') : String(input.why || '')).split('\n')[0].replace(/^read_paper:\s*/, '').replace(/[.\s]+$/, '').trim();
 await stop(` +
     JSON.stringify(ANOTHER_WAY) +
-    String.raw` + (why ? ' (It said: ' + why.slice(0, 200) + ')' : ''));`,
+    String.raw` + (said ? ' (It said: ' + said.slice(0, 300) + ')' : ''));`,
 });
-const readable = (what: string) => ({
-  id: 'readable',
-  title: 'Check that ' + what.toLowerCase() + ' could be read',
-  do: 'code' as const,
-  language: 'javascript' as const,
-  with: { read: '{{paper_read.data}}' },
-  code:
-    STOP +
-    String.raw`const r = input.read && typeof input.read === 'object' ? input.read : {};
-if (!Array.isArray(r.parts) || !r.parts.length) {
-  const notes = Array.isArray(r.notes) ? r.notes.join(' ') : String(r.notes || '');
-  await stop(` +
-    JSON.stringify(what + ' has no text to read') +
-    String.raw` + (notes ? ' (it said: ' + notes.slice(0, 300) + ')' : '') + '. ' + ` +
-    JSON.stringify(ANOTHER_WAY) +
-    String.raw`);
-}
-return { ok: true };`,
-  outputs: [{ id: 'ok', label: 'Could be read', type: 'yesno' as const }],
-});
+const unreadable = (what: string) => stopWith('unreadable', what, { with: { why: '{{error}}' } });
+const unreadableText = (what: string) => stopWith('unreadable_text', what, { if: '{{paper_read.data.parts}} is empty', with: { why: '{{paper_read.data.notes}}' } });
 
 // ---- what the programs share ----------------------------------------------------------------------------------
 
@@ -1111,7 +1098,7 @@ const REVIEWER_SIMULATOR: Draft = {
   flow: {
     steps: [
       { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 90000 }, failed: [unreadable('Your paper')] },
-      readable('Your paper'),
+      unreadableText('Your paper'),
       {
         id: 'panel',
         title: 'Seat the reviewers',
@@ -1796,7 +1783,7 @@ const PAPER_TO_TALK: Draft = {
   flow: {
     steps: [
       { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 120000 }, failed: [unreadable('Your paper')] },
-      readable('Your paper'),
+      unreadableText('Your paper'),
       {
         id: 'check',
         title: 'Gather its figures',
