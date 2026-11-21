@@ -24648,5 +24648,10 @@
   "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} debe ser una sola línea de texto sin formato y sin caracteres de control (se encontró {2}).",
   "Add this page": "Añadir esta página",
   "On your list": "En tu lista",
-  "Screenshot or PDF": "Captura de pantalla o PDF"
+  "Screenshot or PDF": "Captura de pantalla o PDF",
+  "Model: {0}{1}": "Modelo: {0}{1}",
+  "Models by name": "Modelos por nombre",
+  "The app's settings": "Configuración de la app",
+  "Use the app's settings": "Usar la configuración de la app",
+  "ctx.agent’s tier is \"quick\", \"standard\", \"best\" or \"max\"": "el nivel de ctx.agent es \"quick\", \"standard\", \"best\" o \"max\""
 }

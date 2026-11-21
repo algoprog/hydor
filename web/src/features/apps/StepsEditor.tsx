@@ -6,13 +6,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, 
 import { AppWindow, ArrowDown, ArrowUp, Bot, Braces, CodeXml, Columns2, Copy, Database, Ellipsis, MessageCircleQuestion, MessageSquare, Plus, Repeat, Sigma, Sparkles, Split, Trash2, Wrench, X } from 'lucide-react';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppTemplate } from '@shared/apps';
 import { ANSWER_TYPES, COLUMN_TYPES, fieldId, FIELD_TYPES } from '@shared/apps';
-import type { DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
+import type { AgentStep, DataOp, Flow, Step, StepKind, ValueOp } from '@shared/app-manifest';
 import { allSteps, BUILTIN_VALUES, checkFlow, cleanFlow, givesOf, labelOf, RESCUED, STEP_KINDS, STEP_TOOLS, titleOf, VALUE_OPS } from '@shared/app-manifest';
 import { api, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { BlockChips } from './Blocks';
 import { GraphEditor } from './GraphEditor';
 import { childList, editList, listsOf, move, type ListPath } from './paths';
+import { EffortPicker, ModelPicker } from '../../components/AgentPickers';
 import { cx, IconButton, inputCls, MenuItem, Popover, Segmented, Switch, useMediaQuery } from '../../components/ui';
 
 const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml, value: Sigma };
@@ -551,6 +552,36 @@ function Label({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   );
 }
 
+/**
+ * What an agent step thinks with: a tier or a model by name, and the effort. Unset, it is the app's own ("Who does it" in
+ * Settings), which the pickers then show; picking one here is the step's alone, and a model named wins over a tier.
+ */
+function AgentThinks({ s, set, ctx }: { s: AgentStep; set: (s: Step) => void; ctx: Ctx }) {
+  const r = ctx.recipe;
+  const agent = s.agent ?? r.agent;
+  const acp = s.agent ? s.acpAgent : (s.acpAgent ?? r.acpAgent);
+  // The app's pick applies unless the step has its own agent program, model or tier.
+  const own = !!(s.model || s.tier || s.effort);
+  const inherits = !s.agent || (s.agent === r.agent && (s.agent !== 'acp' || s.acpAgent === r.acpAgent));
+  const model = s.model ?? (!s.tier && inherits ? r.model : undefined);
+  const tier = s.model ? null : (s.tier ?? (!model && inherits ? r.tier : undefined)) ?? null;
+  const effort = s.effort ?? (inherits && !s.model && !s.tier ? r.effort : undefined);
+  return (
+    <div>
+      <Label hint={own ? undefined : 'The app\'s settings'}>What it thinks with</Label>
+      <div className="flex flex-wrap items-center gap-1">
+        <ModelPicker agent={agent} acp={acp} value={model ?? null} onChange={(v) => set({ ...s, model: v ?? undefined, tier: undefined })} tier={tier} onTier={(t) => set({ ...s, tier: t, model: undefined, effort: undefined })} />
+        <EffortPicker agent={agent} acp={acp} model={model} tier={tier} value={effort ?? null} onChange={(v) => set({ ...s, effort: v ?? undefined })} />
+        {own && (
+          <button type="button" onClick={() => set({ ...s, model: undefined, tier: undefined, effort: undefined })} className="px-1.5 text-[12px] text-fg-3 hover:text-fg">
+            Use the app's settings
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; groups: ValGroup[]; ctx: Ctx }) {
   switch (s.do) {
     case 'agent':
@@ -565,6 +596,7 @@ function KindFields({ s, set, groups, ctx }: { s: Step; set: (s: Step) => void; 
             <Label hint={s.outputs?.length ? undefined : s.do === 'agent' ? 'None: its reply' : 'None: its text'}>What it hands in</Label>
             <FieldChips fields={s.outputs ?? []} onChange={(o) => set({ ...s, outputs: o.length ? o : undefined })} add="Add" />
           </div>
+          {s.do === 'agent' && <AgentThinks s={s} set={set} ctx={ctx} />}
           {s.do === 'model' && (
             <label className="block">
               <Label>The model</Label>

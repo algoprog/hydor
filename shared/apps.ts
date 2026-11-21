@@ -2,6 +2,7 @@
 // filling the prompt from the form, the answer fields (their schema for submit_result and the check
 // of what the agent hands in), and CSV in and out for runs over many rows.
 import type { Agent } from './types.ts';
+import { isTier, type Tier } from './tiers.ts';
 import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, cleanScreens, type AppExample, type AppScreen, type CheckResult, type DataCollection, type Flow, type NamedFlow, type Requires, type Step } from './app-manifest.ts';
 import { cleanUi, type AppUi } from './app-ui.ts';
 import { cleanAssets, cleanMedia, type AppAsset } from './app-media.ts';
@@ -87,6 +88,11 @@ export interface AppRecipe {
   /** For agent "acp": which one; Custom's id is "console". */
   acpAgent?: string;
   model?: string;
+  /**
+   * The tier its agent thinks with (Settings → Models → Tiers) in place of a model by name: the tier's model for
+   * whichever program runs it, so it follows the table as models change. A model named here wins over it.
+   */
+  tier?: Tier;
   effort?: string;
   mode?: string;
   /** The folder runs work in; empty: a new folder for each run. */
@@ -903,6 +909,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     agent,
     acpAgent: agent === 'acp' ? str(r.acpAgent, 80) || 'console' : undefined,
     model: opt(r.model, 160),
+    ...(isTier(r.tier) ? { tier: r.tier as Tier } : {}),
     effort: opt(r.effort, 40),
     mode: opt(r.mode, 40),
     cwd: opt(r.cwd, 1000),

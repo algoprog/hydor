@@ -243,7 +243,7 @@ export function RunPage({ id }: { id: string }) {
           </div>
         ) : (
           <div className="mx-auto max-w-[860px] space-y-3 px-4 py-5 sm:px-6">
-            <RunView d={d} onAsked={() => void load()} statusExtra={d.steps ? undefined : <span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} /></span>} />
+            <RunView d={d} onAsked={() => void load()} statusExtra={d.steps ? undefined : <span className="max-sm:hidden"><RunsWith agent={d.recipe.agent} acpAgent={d.recipe.acpAgent} model={d.recipe.model} tier={d.recipe.tier} /></span>} />
             {d.noAsks && d.run.key && <p className="pt-1 text-center text-[12.5px] text-fg-3">{d.noAsks}</p>}
           </div>
         )}

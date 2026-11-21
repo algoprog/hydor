@@ -70,7 +70,7 @@ export interface AppDetail {
 }
 
 /** What a run's page knows of its app: its face, form and answer, and the view its answer shows in (when it has one). */
-export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'ui' | 'assets'> & {
+export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'tier' | 'ui' | 'assets'> & {
   /** Its main flow works in steps (a one-task app's run takes follow-ups). */
   steps?: boolean;
 };

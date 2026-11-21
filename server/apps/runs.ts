@@ -21,6 +21,7 @@ import { spending } from '../budget/spend.ts';
 import { config } from '../config.ts';
 import { extractText } from '../documents/extract.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
+import { tierPick } from '../assistants/tiers.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
@@ -414,14 +415,16 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
     const agent: Agent = o.public ? 'acp' : recipe.agent;
     const acpAgent = o.public ? CONSOLE_ID : recipe.agent === 'acp' ? recipe.acpAgent || CONSOLE_ID : undefined;
     const line = inputsLine(recipe.fields, r.inputs, 50);
+    // A tier in place of a model by name: the tier's model (and effort) for the program that runs it, which follows the table as models change; a program without tiers keeps its default.
+    const pick = !o.public && !recipe.model && recipe.tier ? tierPick(db, recipe.tier, agent, acpAgent) : null;
     const key = await sessions.create({
       agent,
       acpAgent,
       cwd,
       prompt,
-      model: o.public ? o.public.model : recipe.model,
+      model: o.public ? o.public.model : (recipe.model ?? pick?.model),
       // An ACP agent without efforts (Custom) ignores one; Grok Build takes it.
-      effort: o.public ? undefined : recipe.effort,
+      effort: o.public ? undefined : (recipe.effort ?? pick?.effort),
       // Public runs ask before anything Custom's rules would ask about; with no shell or files there is nothing to ask.
       mode: o.public ? 'ask' : modeFor(agent, acpAgent, recipe.mode),
       title: `${recipe.name}${line ? ` · ${line}` : ''}`,

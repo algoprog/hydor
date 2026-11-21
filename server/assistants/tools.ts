@@ -6,7 +6,7 @@
 import { agentChanges, placeName, TOOL_VERBS } from '../../shared/agent-files.ts';
 import { agentMode, ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type Assistant } from '../../shared/assistants.ts';
 import { OUTCOME_LABEL, scheduleText, type ScheduledTask, type TaskSchedule } from '../../shared/automations.ts';
-import { isTier, tierLabel, TIERS } from '../../shared/tiers.ts';
+import { AUTO_MODEL, isTier, tierLabel, TIERS } from '../../shared/tiers.ts';
 import { acpAgents } from '../agents/acp.ts';
 import { localText, nextRuns } from '../automations/schedule.ts';
 import { inRun, toolSchedule, scheduleSchema } from '../automations/tools.ts';
@@ -15,6 +15,7 @@ import type { Deps, RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { call, confirmChange, type Reply } from '../guide/api.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { userTimezone } from '../userPrefs.ts';
+import { autoOffered } from './auto.ts';
 import { exampleMark } from './examples.ts';
 import { monthSpend } from './rules.ts';
 import { allAssistants, cleanAssistant, findAssistant } from './store.ts';
@@ -177,7 +178,8 @@ function addBody(d: Deps, ctx: RunCtx, a: Assistant, s: Json, tz: string): Json 
     agent,
     acpAgent,
     cwd: String(s.cwd ?? '').trim() || project?.folder || config.defaultCwd,
-    ...(a.agent && a.model ? { model: a.model } : {}),
+    // An agent that names a program and a model keeps it; else Automatic where the program offers it (an agent with a tier still runs on its tier).
+    ...(a.agent && a.model ? { model: a.model } : autoOffered(d.db, { agent, acpAgent }) ? { model: AUTO_MODEL } : {}),
     mode: agentMode(a.mode, agent, acpAgent) ?? (agent === 'claude' ? 'default' : agent === 'codex' ? 'auto' : undefined),
     extra: { assistant: a.id },
     enabled: s.paused !== true,

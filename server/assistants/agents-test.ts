@@ -177,6 +177,30 @@ test('tiers follow the models a program offers: the newest of each family, small
   assert.deepEqual(defaultTiers({ claude: CLAUDE_MODELS.filter((m) => !/fable/i.test(m.label)) }).claude.max, { model: 'opus' });
 });
 
+test('Custom’s tiers follow its own models: your Claude plan, then ChatGPT, then the models not on this computer; never a small model as Best', () => {
+  const m = (value: string, label: string, provider: string, local?: boolean): KnownModel => ({ value, label, provider, ...(local ? { local } : {}) });
+  const claudePlan = [m('claude/haiku', 'Claude Haiku 4.5', 'claude'), m('claude/sonnet', 'Claude Sonnet 5.5', 'claude'), m('claude/opus', 'Claude Opus 5.5', 'claude'), m('claude/fable', 'Claude Fable 5.2', 'claude')];
+  const chatgpt = [m('codex/luna', 'GPT-6-Luna', 'codex'), m('codex/terra', 'GPT-6-Terra', 'codex'), m('codex/sol', 'GPT-6-Sol', 'codex'), m('codex/astra', 'GPT-6-Astra', 'codex')];
+  const custom = (ms: KnownModel[]) => defaultTiers({ console: ms }).console;
+  assert.deepEqual(custom([...claudePlan, ...chatgpt]), { quick: { model: 'claude/haiku' }, standard: { model: 'claude/sonnet' }, best: { model: 'claude/opus' }, max: { model: 'claude/fable' } });
+  assert.deepEqual(custom(chatgpt), { quick: { model: 'codex/luna' }, standard: { model: 'codex/terra' }, best: { model: 'codex/sol' }, max: { model: 'codex/astra' } });
+  // An OpenRouter Sonnet beside a model on this computer: the Sonnet on every tier, the local one never picked.
+  const sonnet = m('openrouter/anthropic/claude-sonnet-4.5', 'Anthropic: Claude Sonnet 4.5', 'openrouter');
+  assert.deepEqual(custom([sonnet, m('ollama/qwen3', 'Qwen 3', 'ollama')]), { quick: { model: sonnet.value }, standard: { model: sonnet.value }, best: { model: sonnet.value }, max: { model: sonnet.value } });
+  // Only Haiku: no Best from it, so nothing for Custom.
+  assert.deepEqual(custom([m('openrouter/anthropic/claude-haiku-4.5', 'Anthropic: Claude Haiku 4.5', 'openrouter')]), { quick: {}, standard: {}, best: {}, max: {} });
+  // Only models on this computer: nothing.
+  assert.deepEqual(custom([m('ollama/sonnet', 'Sonnet', 'ollama'), m('endpoint/opus', 'Claude Opus 5', 'endpoint', true)]), { quick: {}, standard: {}, best: {}, max: {} });
+  // Two Opus versions: the newer is Best (and Max, Opus being the strongest there).
+  const opus45 = m('openrouter/anthropic/claude-opus-4.5', 'Anthropic: Claude Opus 4.5', 'openrouter');
+  const opus55 = m('openrouter/anthropic/claude-opus-5.5', 'Anthropic: Claude Opus 5.5', 'openrouter');
+  assert.equal(custom([opus45, opus55]).best.model, opus55.value);
+  // GPT Luna alone is never Custom's Best.
+  assert.deepEqual(custom([m('openrouter/openai/gpt-6-luna', 'OpenAI: GPT-6 Luna', 'openrouter')]), { quick: {}, standard: {}, best: {}, max: {} });
+  // Custom has no models: its tiers stay empty, as before.
+  assert.deepEqual(defaultTiers({ console: [] }).console, { quick: {}, standard: {}, best: {}, max: {} });
+});
+
 test('the models a program lists are remembered, and the tiers nobody changed move with them', () => {
   noteModels(db, 'claude', CLAUDE_MODELS as any);
   noteModels(db, 'codex', CODEX_FULL as any);

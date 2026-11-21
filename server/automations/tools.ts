@@ -5,11 +5,14 @@
 // schedule more; they report how they went and keep a notepad across runs.
 import crypto from 'node:crypto';
 import { DAY_NAMES, OUTCOME_LABEL, scheduleText, type RunMark, type RunOutcome, type ScheduledTask, type TaskDraft, type TaskProposal, type TaskSchedule } from '../../shared/automations.ts';
+import { AUTO_MODEL } from '../../shared/tiers.ts';
 import { acpAgents } from '../agents/acp.ts';
+import { autoOffered } from '../assistants/auto.ts';
 import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
+import { isConfidential } from '../../shared/confidential.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { cleanExtra } from '../scheduler.ts';
 import { getRun } from './runs.ts';
@@ -240,6 +243,10 @@ function draftFrom(d: Deps, ctx: RunCtx, a: Record<string, any>, tz: string): Ta
   const acpAgent = !want ? ctx.acpAgent : acp;
   if (agent === 'acp' && !acpAgents(d.db).some((x) => x.id === acpAgent)) throw new Error(`There is no agent “${want}”. Use claude, codex, or an ACP agent's id (console is Custom).`);
   const same = agent === ctx.agent && acpAgent === ctx.acpAgent;
+  const own = sessionExtra(d.db, ctx.key);
+  // The model given, else Automatic where this conversation is on it (or, for another program, where it is offered), else this conversation's own. Never Automatic for a confidential session.
+  const auto = !isConfidential(own) && (same ? own.auto === true : autoOffered(d.db, { agent, acpAgent }));
+  const model = String(a.model ?? '').trim() || (auto ? AUTO_MODEL : same ? s?.prefs?.model : undefined);
   return strip({
     name: String(a.name ?? '').trim(),
     prompt: String(a.prompt ?? '').trim(),
@@ -247,12 +254,13 @@ function draftFrom(d: Deps, ctx: RunCtx, a: Record<string, any>, tz: string): Ta
     agent,
     acpAgent,
     cwd: String(a.cwd ?? '').trim() || ctx.cwd,
-    model: String(a.model ?? '').trim() || (same ? s?.prefs?.model : undefined),
-    effort: same ? s?.prefs?.effort : undefined,
+    model,
+    // On Automatic the tiers pick the effort with the model: this conversation's may be Max's, once its agent stepped up.
+    effort: same && model !== AUTO_MODEL ? s?.prefs?.effort : undefined,
     mode: same ? s?.prefs?.mode : undefined,
     target: a.where === 'here' ? ctx.key : undefined,
     // Each run starts as this conversation does: its assistant, memory, spending cap, connections.
-    extra: cleanExtra(sessionExtra(d.db, ctx.key)),
+    extra: cleanExtra(own),
     // Or each run runs one of the user's templates, with its form's answers.
     ...(a.template && typeof a.template === 'object' ? { app: { id: String(a.template.id ?? ''), inputs: a.template.inputs ?? {} } } : {}),
   });
@@ -337,7 +345,7 @@ function scheduleTask(tz: string): RunTool {
         schedule: scheduleSchema(tz),
         where: { type: 'string', enum: ['new', 'here'], description: 'new (default): each run starts a new session. here: each run posts into this conversation.' },
         agent: { type: 'string', description: 'Who runs it: claude, codex, or an ACP agent’s id (console is Custom). Default: the agent of this conversation.' },
-        model: { type: 'string', description: 'A model id; default: this conversation’s.' },
+        model: { type: 'string', description: 'A model id, or "auto" for Automatic: the Best tier’s model for the agent, which may move itself to Max when a problem proves too hard. Default: Automatic when this conversation is on it, else this conversation’s model.' },
         cwd: { type: 'string', description: 'The folder runs work in; default: this conversation’s.' },
         template: {
           type: 'object',
@@ -358,7 +366,7 @@ function scheduleTask(tz: string): RunTool {
       if (d.scheduler.list({ boards: false }).length >= 100) throw new Error('There are 100 scheduled tasks already: the user should remove some first.');
       const p = addProposal(d.db, { key: ctx.key, action: 'create', task: draft });
       const first = p.next[0] ? `, first run ${localText(p.next[0], tz)}` : '';
-      return `The user is now looking at a card to confirm “${draft.name}”: ${p.when}${first} (${tz}), ${draft.app ? `running the app “${draft.appName}”` : `run by ${agentLabel(d.db, draft)}`}. Nothing is saved until they confirm, and their answer will come to you as a message. (proposal ${p.id})`;
+      return `The user is now looking at a card to confirm “${draft.name}”: ${p.when}${first} (${tz}), ${draft.app ? `running the app “${draft.appName}”` : `run by ${agentLabel(d.db, draft)}${draft.model === AUTO_MODEL ? ' on Automatic' : ''}`}. Nothing is saved until they confirm, and their answer will come to you as a message. (proposal ${p.id})`;
     },
   };
 }
@@ -377,7 +385,7 @@ function updateTask(tz: string): RunTool {
         prompt: { type: 'string' },
         schedule: scheduleSchema(tz),
         where: { type: 'string', enum: ['new', 'here'] },
-        model: { type: 'string' },
+        model: { type: 'string', description: 'A model id, or "auto" for Automatic: the Best tier’s model for the agent, which may move itself to Max when a problem proves too hard.' },
         cwd: { type: 'string' },
       },
       required: ['id'],

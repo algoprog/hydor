@@ -6,7 +6,7 @@
 import { tierLabel, tierProgram, type Tier, type TierNote } from '../../shared/tiers.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
-import { modelName, tiersOf } from './tiers.ts';
+import { modelName, teamOf, tiersOf } from './tiers.ts';
 
 /** What a session on Automatic starts with: Best's model and effort for its program. */
 export interface AutoPlan {
@@ -21,6 +21,17 @@ export function autoPlan(db: DB, o: { agent: Agent; acpAgent?: string }): AutoPl
   if (!p) return null;
   const { best } = tiersOf(db)[p];
   return { tier: 'best', model: best.model, effort: best.effort };
+}
+
+/**
+ * Whether Automatic is offered for a program: the team is on, the program has tiers, and for Custom Best names a model
+ * (it has none of its own to start on). The start page's choice; whoever asks leaves confidential sessions out.
+ */
+export function autoOffered(db: DB, o: { agent: Agent; acpAgent?: string }): boolean {
+  if (!teamOf(db).on) return false;
+  const p = tierProgram(o.agent, o.acpAgent);
+  if (!p) return false;
+  return p !== 'console' || !!tiersOf(db).console.best.model;
 }
 
 /** What a move to a tier's model says in the conversation. */

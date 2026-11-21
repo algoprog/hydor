@@ -15,6 +15,7 @@
 // apps.ts imports this module back (cleanRecipe tidies a recipe's flow), so what comes from it is used
 // inside functions only, never while the modules load.
 import type { Agent } from './types.ts';
+import { isTier, type Tier } from './tiers.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
 import type { AppSummary } from './app-summary.ts';
 import type { AppSecretState } from './app-secrets.ts';
@@ -61,6 +62,8 @@ export interface AgentStep extends StepCommon {
   agent?: Agent;
   acpAgent?: string;
   model?: string;
+  /** The tier it thinks with in place of a model by name (unset: the app's, unless this step names a model); a model named here wins. */
+  tier?: Tier;
   effort?: string;
   mode?: string;
   assistant?: string;
@@ -348,7 +351,7 @@ export function modelsUsed(r: Pick<AppRecipe, 'agent' | 'acpAgent' | 'model' | '
   const steps = r.flow ? allSteps(r.flow.steps) : [];
   if (!r.flow || steps.some((s) => s.do === 'agent' && !s.agent)) add(r.agent, r.acpAgent, r.model);
   for (const s of steps) {
-    if (s.do === 'agent') add(s.agent ?? r.agent, s.acpAgent ?? (s.agent ? undefined : r.acpAgent), s.model ?? (s.agent && s.agent !== r.agent ? undefined : r.model));
+    if (s.do === 'agent') add(s.agent ?? r.agent, s.acpAgent ?? (s.agent ? undefined : r.acpAgent), s.model ?? (s.tier || (s.agent && s.agent !== r.agent) ? undefined : r.model));
     if (s.do === 'model') add('acp', 'console', s.model);
   }
   return out;
@@ -840,6 +843,7 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       const step: AgentStep = { ...common, do: 'agent', instructions, ...(outputs ? { outputs } : {}) };
       if (agent) step.agent = agent;
       for (const k of ['acpAgent', 'model', 'effort', 'mode', 'assistant'] as const) if (short(x[k], 160)) step[k] = short(x[k], 160);
+      if (isTier(x.tier)) step.tier = x.tier;
       if (Array.isArray(x.tools)) step.tools = [...new Set<string>(x.tools.map((v: unknown) => short(v, 80)).filter(Boolean))].slice(0, 80);
       else if (x.tools === null) step.tools = null;
       const cap = typeof x.capUsd === 'number' && x.capUsd > 0 ? Math.min(x.capUsd, 10_000) : undefined;

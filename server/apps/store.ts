@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
 import type { CheckResult } from '../../shared/app-manifest.ts';
+import { tierLabel } from '../../shared/tiers.ts';
 import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -345,7 +346,8 @@ function toRun(r: RunRow): RunRecord {
     error: r.error ?? undefined,
     costUsd: r.cost_usd ?? undefined,
     agent: recipe.agent,
-    model: recipe.model,
+    // A tier's name when it thinks with a tier instead of a model by name.
+    model: recipe.model ?? (recipe.tier ? tierLabel(recipe.tier) : undefined),
     visitor: r.visitor ?? undefined,
     ip: r.ip ?? undefined,
     batch: r.batch_id ?? undefined,

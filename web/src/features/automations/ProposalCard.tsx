@@ -4,6 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CalendarClock, CalendarPlus, Check, Eye, Pause, Play, Trash2, Webhook, X, type LucideIcon } from 'lucide-react';
 import { scheduleText, watchText, type TaskDraft, type TaskProposal } from '@shared/automations';
+import { AUTO_MODEL } from '@shared/tiers';
 import type { ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
@@ -44,7 +45,7 @@ function Who({ t, sessionKey }: { t: TaskDraft; sessionKey: string }) {
     <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5">
       <AgentIcon agent={t.agent} name={acpName} size={13} />
       <span>{name}</span>
-      <span className="text-fg-3">· {cat ? modelLabel(cat, t.model) : (t.model ?? 'its default model')}</span>
+      <span className="text-fg-3">· {t.model === AUTO_MODEL ? 'Automatic' : cat ? modelLabel(cat, t.model) : (t.model ?? 'its default model')}</span>
       <span className="text-fg-3">· {t.target === sessionKey ? 'in this conversation' : t.target ? 'in another session' : `a new session in ${tildify(t.cwd, home)}`}</span>
     </span>
   );
@@ -242,7 +243,7 @@ export function ProposalCard({ item, sessionKey }: { item: ToolItem; sessionKey:
           </>
         )}
       </div>
-      {editing && <TaskEditor open task={null} initial={task} title={p.action === 'update' ? 'Change the task' : 'Schedule the task'} submitLabel={w.yes} onClose={() => setEditing(false)} onSubmit={(d) => answer(true, d)} />}
+      {editing && <TaskEditor open task={null} initial={task} keepModel={p.action === 'update'} title={p.action === 'update' ? 'Change the task' : 'Schedule the task'} submitLabel={w.yes} onClose={() => setEditing(false)} onSubmit={(d) => answer(true, d)} />}
     </div>
   );
 }

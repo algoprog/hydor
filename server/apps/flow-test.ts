@@ -20,6 +20,7 @@ import { HttpError } from '../auth.ts';
 import { automations } from '../automations/index.ts';
 import { listRuns as listTaskRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
+import { setTiers } from '../assistants/tiers.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { registerFeatures } from '../features/registry.ts';
@@ -1591,6 +1592,143 @@ test('a public page’s flow: its agent steps run in Custom with the page’s mo
   const done = await ended(r.id);
   assert.equal(done.status, 'failed');
   assert.match(done.error!, /cannot use the data/);
+});
+
+// ---- tiers --------------------------------------------------------------------------------------------------
+
+/** What an app run's session was started with: its program, model and effort. */
+const startedWith = (key: string) => {
+  const o = sessions.made.find((m) => m.key === key)!.o;
+  return [o.agent, o.model, o.effort];
+};
+const TIERED = { claude: { quick: { model: 'haiku-t', effort: 'low' }, standard: { model: 'sonnet-t', effort: 'medium' }, best: { model: 'opus-t', effort: 'high' } }, codex: { quick: { model: 'luna-t', effort: 'minimal' }, standard: { model: 'terra-t', effort: 'medium' } } };
+
+test('a tier in place of a model: tidying keeps one that is a tier (on the app and on its agent steps) and drops what is not', () => {
+  assert.equal(cleanRecipe({ name: 'T', tier: 'best' }).tier, 'best');
+  assert.equal('tier' in cleanRecipe({ name: 'T', tier: 'huge' }), false);
+  assert.equal('tier' in cleanRecipe({ name: 'T' }), false);
+  const { flow } = cleanFlow({ steps: [{ id: 'a', do: 'agent', instructions: 'x', tier: 'quick' }, { id: 'b', do: 'agent', instructions: 'y', tier: 'huge' }, { id: 'c', do: 'model', instructions: 'z', tier: 'quick' }] });
+  assert.deepEqual(flow!.steps.map((s) => (s as { tier?: string }).tier), ['quick', undefined, undefined]);
+  assert.equal(cleanRecipe({ name: 'T', flow: { steps: [{ id: 'a', do: 'agent', instructions: 'x', tier: 'max' }] } }).flow!.steps[0].do === 'agent' && (cleanRecipe({ name: 'T', flow: { steps: [{ id: 'a', do: 'agent', instructions: 'x', tier: 'max' }] } }).flow!.steps[0] as { tier?: string }).tier, 'max');
+});
+
+test('a tier in place of a model: a run starts its session on the tier’s model and effort for its program; a model named wins; a program without tiers keeps its default', async () => {
+  setTiers(db, TIERED);
+  try {
+    const quick = app({ name: 'Quick one', prompt: 'Do {{topic}}', tier: 'quick' });
+    const r = startRun({ app: quick.id, slug: quick.slug, recipe: quick, source: 'web', inputs: { topic: 'x' } });
+    await sleep(100);
+    const key = store.getRun(db, r.id)!.key!;
+    assert.deepEqual(startedWith(key), ['claude', 'haiku-t', 'low']);
+    assert.equal(store.getRun(db, r.id)!.model, 'Quick', 'its tier’s name shows where its model would');
+    sessions.end(key, 'Done.');
+    await ended(r.id);
+    // Its own effort wins over the tier's; the tier's model still applies.
+    const own = app({ name: 'Quick own effort', prompt: 'Do {{topic}}', tier: 'quick', effort: 'high' });
+    const r2 = startRun({ app: own.id, slug: own.slug, recipe: own, source: 'web', inputs: { topic: 'x' } });
+    await sleep(100);
+    assert.deepEqual(startedWith(store.getRun(db, r2.id)!.key!), ['claude', 'haiku-t', 'high']);
+    sessions.end(store.getRun(db, r2.id)!.key!, 'Done.');
+    await ended(r2.id);
+    // A model named wins: the tier is not looked at.
+    const both = app({ name: 'Model and tier', prompt: 'Do {{topic}}', tier: 'quick', model: 'named-model' });
+    const r3 = startRun({ app: both.id, slug: both.slug, recipe: both, source: 'web', inputs: { topic: 'x' } });
+    await sleep(100);
+    assert.deepEqual(startedWith(store.getRun(db, r3.id)!.key!), ['claude', 'named-model', undefined]);
+    sessions.end(store.getRun(db, r3.id)!.key!, 'Done.');
+    await ended(r3.id);
+    // Codex has its own table; another ACP agent has none and keeps its default.
+    const codex = app({ name: 'On Codex', prompt: 'Do {{topic}}', tier: 'quick', agent: 'codex' });
+    const r4 = startRun({ app: codex.id, slug: codex.slug, recipe: codex, source: 'web', inputs: { topic: 'x' } });
+    await sleep(100);
+    assert.deepEqual(startedWith(store.getRun(db, r4.id)!.key!), ['codex', 'luna-t', 'minimal']);
+    sessions.end(store.getRun(db, r4.id)!.key!, 'Done.');
+    await ended(r4.id);
+    const other = app({ name: 'On another', prompt: 'Do {{topic}}', tier: 'quick', agent: 'acp', acpAgent: 'grok' });
+    const r5 = startRun({ app: other.id, slug: other.slug, recipe: other, source: 'web', inputs: { topic: 'x' } });
+    await sleep(100);
+    assert.deepEqual(startedWith(store.getRun(db, r5.id)!.key!), ['acp', undefined, undefined]);
+    sessions.end(store.getRun(db, r5.id)!.key!, 'Done.');
+    await ended(r5.id);
+  } finally {
+    setTiers(db, {});
+  }
+});
+
+test('a tier in place of a model: an agent step has its own tier, else the app’s, which goes with it to another program (a model by name does not)', async () => {
+  setTiers(db, TIERED);
+  try {
+    const a = app({
+      name: 'Tiered flow',
+      tier: 'standard',
+      model: 'app-model',
+      flow: {
+        steps: [
+          { id: 'same', do: 'agent', instructions: 'On the same program with {{topic}}' },
+          { id: 'elsewhere', do: 'agent', agent: 'codex', instructions: 'On another program' },
+          { id: 'own', do: 'agent', tier: 'best', instructions: 'With its own tier' },
+          { id: 'named', do: 'agent', model: 'step-model', instructions: 'With its own model' },
+        ],
+      },
+    });
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+    // The app names a model, so the program that is the app's keeps it; the step to Codex has the tier's model there, not the app's.
+    assert.deepEqual(startedWith((await agentAnswers(r.id, 'same', null)).key!), ['claude', 'app-model', undefined]);
+    assert.deepEqual(startedWith((await agentAnswers(r.id, 'elsewhere', null)).key!), ['codex', 'terra-t', 'medium']);
+    assert.deepEqual(startedWith((await agentAnswers(r.id, 'own', null)).key!), ['claude', 'opus-t', 'high']);
+    assert.deepEqual(startedWith((await agentAnswers(r.id, 'named', null)).key!), ['claude', 'step-model', undefined]);
+    assert.equal((await ended(r.id)).status, 'done');
+    // A step with a tier of its own takes the tier even where the app names a model; a step with a model takes no tier.
+    const children = store.listRuns(db, { parent: r.id });
+    assert.equal(children.find((c) => c.step === 'own')!.recipe.model, undefined);
+    assert.equal(children.find((c) => c.step === 'named')!.recipe.tier, undefined);
+  } finally {
+    setTiers(db, {});
+  }
+});
+
+test('a tier in place of a model: a code step’s ctx.agent takes a tier, and one that is not a tier is refused', async () => {
+  setTiers(db, TIERED);
+  try {
+    const a = app({ name: 'Code with tier', flow: { steps: [{ id: 'think', do: 'code', language: 'javascript', code: "const r = await ctx.agent('Think about it', { tier: 'quick', agent: 'codex' });\nreturn { reply: r.reply };" }] } });
+    const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'x' } });
+    let child: store.RunRecord | undefined;
+    for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r.id }).find((c) => c.key)); i++) await sleep(25);
+    assert.ok(child, 'its call started an agent');
+    assert.deepEqual(startedWith(child.key!), ['codex', 'luna-t', 'minimal']);
+    sessions.end(child.key!, 'Thought.');
+    assert.equal((await ended(r.id)).status, 'done');
+    const bad = app({ name: 'Code with a wrong tier', flow: { steps: [{ id: 'think', do: 'code', language: 'javascript', code: "await ctx.agent('Think about it', { tier: 'huge' });\nreturn {};" }] } });
+    const made = sessions.made.length;
+    const r2 = startRun({ app: bad.id, slug: bad.slug, recipe: bad, source: 'web', inputs: { topic: 'x' } });
+    const done = await ended(r2.id);
+    assert.equal(done.status, 'failed');
+    assert.equal(sessions.made.length, made, 'no agent was started for it');
+  } finally {
+    setTiers(db, {});
+  }
+});
+
+test('a tier in place of a model: running a ready-made app with a tier replaces its model and tier for that run; a model given wins', async () => {
+  const run = async (payload: Record<string, unknown>) => {
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:deep-research/runs', payload: { inputs: { topic: 'Heat pumps', depth: 'Quick overview' }, ...payload } });
+    assert.equal(res.statusCode, 200, res.body);
+    const id = res.json().run.id as string;
+    const recipe = store.getRun(db, id)!.recipe;
+    stopRun(id);
+    await ended(id);
+    return recipe;
+  };
+  const tier = await run({ tier: 'quick' });
+  assert.deepEqual([tier.tier, tier.model, tier.agent], ['quick', undefined, 'claude']);
+  const withAgent = await run({ agent: 'codex', tier: 'best' });
+  assert.deepEqual([withAgent.tier, withAgent.model, withAgent.agent], ['best', undefined, 'codex']);
+  const model = await run({ agent: 'claude', model: 'named-model', tier: 'best' });
+  assert.deepEqual([model.tier, model.model], [undefined, 'named-model']);
+  const neither = await run({});
+  assert.deepEqual([neither.tier, neither.model], [undefined, undefined]);
+  const huge = await run({ tier: 'huge' });
+  assert.equal(huge.tier, undefined);
 });
 
 // ---- memory -------------------------------------------------------------------------------------------------

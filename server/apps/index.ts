@@ -25,6 +25,7 @@ import { builderTools } from './builder.ts';
 import { initAppEdits, noteUserEdit, takeAppEdits } from './edits.ts';
 import { isInternal } from '../internal.ts';
 import { checkRun, tryExamples } from './examples.ts';
+import { isTier } from '../../shared/tiers.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -605,7 +606,9 @@ function routes(d: Deps) {
     let recipe: AppRecipe = a ?? template ?? cleanRecipe(b.recipe);
     // A test from the builder runs the recipe as it is on screen; a template takes the agent picked on its page.
     if (b.recipe && typeof b.recipe === 'object') recipe = cleanRecipe(b.recipe);
-    else if (template && typeof b.agent === 'string') recipe = cleanRecipe({ ...template, agent: b.agent, acpAgent: b.acpAgent, model: b.model, mode: b.mode, effort: b.effort });
+    // A model given wins; a tier given in its place replaces the template's model and tier for this run; neither: the program's own default.
+    else if (template && typeof b.agent === 'string') recipe = cleanRecipe({ ...template, agent: b.agent, acpAgent: b.acpAgent, model: b.model, tier: b.model ? undefined : b.tier, mode: b.mode, effort: b.effort });
+    else if (template && (b.model || isTier(b.tier))) recipe = cleanRecipe({ ...template, model: b.model, tier: b.model ? undefined : b.tier });
     if (b.recipe && typeof b.recipe === 'object') {
       const { errors } = problemsOf(db, b.recipe);
       if (errors.length) throw new HttpError(400, errors.length === 1 ? errors[0] : `Fix these first: ${errors.join('; ')}`);
@@ -655,7 +658,7 @@ function routes(d: Deps) {
     installedOr409(db, template);
     const test = old.source === 'test' || old.app === 'test';
     const o = old.recipe;
-    const recipe: AppRecipe = test || (!a && !template) ? o : (a ?? cleanRecipe({ ...template!, agent: o.agent, acpAgent: o.acpAgent, model: o.model, mode: o.mode, effort: o.effort }));
+    const recipe: AppRecipe = test || (!a && !template) ? o : (a ?? cleanRecipe({ ...template!, agent: o.agent, acpAgent: o.acpAgent, model: o.model, tier: o.tier, mode: o.mode, effort: o.effort }));
     const slug = a?.slug ?? template?.id ?? 'test';
     const fields = formOf(recipe);
     const unknown = Object.keys(changes).filter((k) => !fields.some((f) => f.id === k));
@@ -687,7 +690,7 @@ function routes(d: Deps) {
   app.get('/api/apps/runs/:runId', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
-    const { name, icon, color, fields, answer, agent, acpAgent, model } = r.recipe;
+    const { name, icon, color, fields, answer, agent, acpAgent, model, tier } = r.recipe;
     const a = r.app.startsWith('tpl:') ? null : getApp(db, r.app);
     const s = r.key ? sessions.summary(r.key) : null;
     const ui = viewOfRun(db, r);
@@ -696,7 +699,7 @@ function routes(d: Deps) {
     return {
       run: runView(r),
       progress: isActive(r.status) ? await progressOf(r, false) : { steps: [] },
-      recipe: { name, icon, color, fields, answer, agent, acpAgent, model, ...(ui ? { ui } : {}), ...(assets ? { assets } : {}), ...(r.flow ? {} : { steps: !!r.recipe.flow }) },
+      recipe: { name, icon, color, fields, answer, agent, acpAgent, model, ...(tier ? { tier } : {}), ...(ui ? { ui } : {}), ...(assets ? { assets } : {}), ...(r.flow ? {} : { steps: !!r.recipe.flow }) },
       // What its view keeps for it (ticks, values its events kept).
       ...(ui ? { view: getView(db, `run:${r.id}`) } : {}),
       slug: a?.slug ?? null,
@@ -1175,6 +1178,7 @@ function chatRecipe(a: AppDef): AppRecipe {
     agent: a.agent,
     acpAgent: a.acpAgent,
     model: a.model,
+    tier: a.tier,
     effort: a.effort,
     mode: a.mode,
     assistant: a.assistant,

@@ -24648,5 +24648,10 @@
   "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1}は、制御文字を含まない1行のプレーンテキストにしてください（見つかった値：{2}）。",
   "Add this page": "このページを追加",
   "On your list": "リストに追加済み",
-  "Screenshot or PDF": "スクリーンショットまたはPDF"
+  "Screenshot or PDF": "スクリーンショットまたはPDF",
+  "Model: {0}{1}": "モデル：{0}{1}",
+  "Models by name": "名前で指定するモデル",
+  "The app's settings": "アプリの設定",
+  "Use the app's settings": "アプリの設定を使用",
+  "ctx.agent’s tier is \"quick\", \"standard\", \"best\" or \"max\"": "ctx.agentのティアは \"quick\"、\"standard\"、\"best\"、\"max\" のいずれかです"
 }

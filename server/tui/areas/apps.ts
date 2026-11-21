@@ -4,6 +4,7 @@
 // Running an app starts agent work and costs money, so it is never run for a test of the command against a live app.
 import fs from 'node:fs';
 import path from 'node:path';
+import { tierLabel } from '../../../shared/tiers.ts';
 import { cellText, isActive, type AnswerField, type AppField, type AppRun } from '../../../shared/apps.ts';
 import { ApiError, enc } from '../client.ts';
 import { money, timeAgo, truncate } from '../term.ts';
@@ -286,7 +287,7 @@ export const apps: Area = {
               'Runs with',
               e.ready
                 ? 'Claude Code unless you say otherwise'
-                : [recipe.agent === 'acp' ? (recipe.acpAgent === 'console' ? 'custom' : recipe.acpAgent) : recipe.agent, recipe.model].filter(Boolean).join(' · '),
+                : [recipe.agent === 'acp' ? (recipe.acpAgent === 'console' ? 'custom' : recipe.acpAgent) : recipe.agent, recipe.model ?? (recipe.tier ? tierLabel(recipe.tier) : undefined)].filter(Boolean).join(' · '),
             ],
             ['Installed', detail.installed === false ? 'no (a ready-made app, not installed)' : undefined],
             ['Keys', secrets.length ? secrets.map((s) => `${s.name} ${s.have ? 'saved' : p.yellow('missing')}`).join(', ') : undefined],

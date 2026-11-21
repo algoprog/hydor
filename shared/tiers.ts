@@ -2,7 +2,8 @@
 // medium size, Best for a session's main agent (it plans, leads subagents and checks their work) and Max for the hardest
 // problems. Settings → Models → Tiers names each tier's model (and effort) for each agent program; until one is
 // changed it is the newest model of its family the program offers (Haiku, Sonnet, Opus and Fable for Claude Code;
-// Luna, Terra, Sol and Astra for Codex).
+// Luna, Terra, Sol and Astra for Codex). Custom's tiers start on the newest of its models from the user's Claude plan, then
+// its ChatGPT plan, then the models not on this computer, whichever first has a model for Best (never a small one).
 // A session started on Automatic thinks with Best (its main agent may step itself up to Max when a problem proves too
 // hard), and hands clear parts to subagents on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
 // Automatic, and a lead gives each subagent it starts one, never above its own.
@@ -82,8 +83,11 @@ export const newerVersion = (a: number[], b: number[]): boolean => {
   return false;
 };
 
-/** What a model list needs to say of each model for tiers: its name there, what it shows as, and what an alias stands for. */
-export type KnownModel = Pick<ModelOption, 'value' | 'label'> & { resolved?: string; isDefault?: boolean };
+/**
+ * What a model list needs to say of each model for tiers: its name there, what it shows as, and what an alias stands for.
+ * `provider` and `local` are only set for Custom's models (where the model comes from, and whether it runs on this computer).
+ */
+export type KnownModel = Pick<ModelOption, 'value' | 'label'> & { resolved?: string; isDefault?: boolean; provider?: string; local?: boolean };
 
 /** The newest model of a family ("fable", "terra") in a program's list; the one listed first when two are as new. */
 function newestOf(models: KnownModel[], fam: string): KnownModel | undefined {
@@ -109,6 +113,42 @@ const FAMILIES: Record<'claude' | 'codex', Record<Tier, string[]>> = {
   codex: { quick: ['luna', 'terra'], standard: ['terra', 'luna'], best: ['sol', 'terra', 'luna'], max: ['astra', 'sol', 'terra', 'luna'] },
 };
 
+/**
+ * Custom's families, one set per maker (Claude's, then GPT's), each tier's wanted first. Unlike Codex's table, Best never
+ * falls back to Luna: a small model never becomes Custom's Best.
+ */
+const CUSTOM_FAMILIES: Record<Tier, string[]>[] = [
+  { quick: ['haiku', 'sonnet'], standard: ['sonnet', 'haiku'], best: ['opus', 'sonnet'], max: ['fable', 'opus', 'sonnet'] },
+  { quick: ['luna', 'terra'], standard: ['terra', 'luna'], best: ['sol', 'terra'], max: ['astra', 'sol', 'terra'] },
+];
+
+/** Custom's groups of models, tried in this order: your Claude plan, your ChatGPT plan, then every other model not on this computer. */
+const CUSTOM_GROUPS: ((m: KnownModel) => boolean)[] = [
+  (m) => m.provider === 'claude',
+  (m) => m.provider === 'codex',
+  (m) => !m.local && m.provider !== 'ollama' && m.provider !== 'vllm' && m.provider !== 'claude' && m.provider !== 'codex',
+];
+
+/**
+ * Custom's tiers from its own models: for each group in order, each family set in order, each tier's newest model of the
+ * first of its families the group has. The first whose Best got a model wins; none gives every tier nothing (no pick).
+ */
+function customTiers(models: KnownModel[]): TierMap['console'] {
+  for (const inGroup of CUSTOM_GROUPS) {
+    const list = models.filter(inGroup);
+    for (const fams of CUSTOM_FAMILIES) {
+      const found = {} as Record<Tier, KnownModel | undefined>;
+      for (const t of TIERS) {
+        let m: KnownModel | undefined;
+        for (const fam of fams[t.id]) if ((m = newestOf(list, fam))) break;
+        found[t.id] = m;
+      }
+      if (found.best) return { quick: found.quick ? { model: found.quick.value } : {}, standard: found.standard ? { model: found.standard.value } : {}, best: { model: found.best.value }, max: found.max ? { model: found.max.value } : {} };
+    }
+  }
+  return { quick: {}, standard: {}, best: {}, max: {} };
+}
+
 /** Codex's effort for a tier on a model of its own, and where tiers share a model (a plan with few), which then differ by effort alone. */
 const OWN_EFFORT: Record<Tier, string> = { quick: 'medium', standard: 'medium', best: 'high', max: 'high' };
 const SHARED_EFFORT: Record<Tier, string> = { quick: 'low', standard: 'medium', best: 'high', max: 'xhigh' };
@@ -132,10 +172,12 @@ const samePick = (a?: TierPick, b?: TierPick) => (a?.model ?? '') === (b?.model 
 /**
  * What each tier means until it is changed, from the models each program offers (`seen`; none yet: its own names):
  * Claude Code's Haiku, Sonnet, Opus and newest Fable; Codex's Luna, Terra, Sol and Astra, or the nearest it offers,
- * told apart by effort where tiers share a model; nothing for Custom (its models are the user's).
+ * told apart by effort where tiers share a model; Custom's newest of its own models (see customTiers), or nothing when
+ * it has no model it can make a Best of, such as only small or local ones.
  */
 export function defaultTiers(seen: Partial<Record<TierProgram, KnownModel[]>> = {}): TierMap {
   const out: TierMap = { claude: { ...UNSEEN.claude }, codex: { ...UNSEEN.codex }, console: { ...UNSEEN.console } };
+  if (seen.console?.length) out.console = customTiers(seen.console);
   for (const p of ['claude', 'codex'] as const) {
     const models = seen[p];
     if (!models?.length) continue;

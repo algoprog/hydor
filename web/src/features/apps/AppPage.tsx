@@ -10,12 +10,13 @@ import { appInfo } from '@shared/app-manifest';
 import { pagesFor } from '@shared/app-ui';
 import { inputsLine, isActive, madeForSessions, prefillOf } from '@shared/apps';
 import { appSummary } from '@shared/app-summary';
+import { tierLabel, tierProgram, type Tier } from '@shared/tiers';
 import { api, del, enc, post, put } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { EffortPicker, ModelPicker, ModePicker, modelLabel, useCatalog } from '../../components/AgentPickers';
+import { EffortPicker, ModelPicker, ModePicker, modelLabel, tierMeans, useCatalog, useTierPick } from '../../components/AgentPickers';
 import { Button, cx, Empty, IconButton, inputCls, MenuItem, Popover, Section, SheetsOnPhone, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { AgentPicker } from '../home/AgentPicker';
 import { PageHeader } from '../layout/PageHeader';
@@ -40,15 +41,18 @@ import { EXPLORE_ID, sawExplore } from '../home/ExploreButton';
 type Tab = 'run' | 'runs' | 'rows' | 'share';
 
 /** "Claude Code · Sonnet 4.5 · high effort · Auto": what runs an app. */
-export function RunsWith({ agent, acpAgent, model, effort, mode }: { agent: Agent; acpAgent?: string; model?: string; effort?: string; mode?: string }) {
+export function RunsWith({ agent, acpAgent, model, effort, mode, tier }: { agent: Agent; acpAgent?: string; model?: string; effort?: string; mode?: string; tier?: Tier | null }) {
   const cat = useCatalog(agent, agent === 'acp' ? acpAgent : undefined);
+  // A tier stands in for the model by name (a model named wins); its title says which model it means now.
+  const byTier = !!tier && !model && !!tierProgram(agent, acpAgent);
+  const means = tierMeans(cat, useTierPick(agent, acpAgent, byTier ? tier : null));
   const acp = useApp((s) => s.boot?.acpAgents)?.find((a: AcpAgentDef) => a.id === acpAgent);
   const modeLabel = cat?.modes.find((m) => m.value === mode)?.label;
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
       <AgentIcon agent={agent} name={acp?.name} size={13} />
-      <span className="truncate">
-        {agentName(agent, acp?.name)} · {cat ? modelLabel(cat, model) : model || 'default model'}
+      <span className="truncate" title={byTier ? `Model: ${tierLabel(tier!)}${means ? ` · ${means}` : ''}` : undefined}>
+        {agentName(agent, acp?.name)} · {byTier ? tierLabel(tier!) : cat ? modelLabel(cat, model) : model || 'default model'}
         {effort ? ` · ${effort} effort` : ''}
         {modeLabel ? ` · ${modeLabel}` : ''}
       </span>
@@ -166,7 +170,7 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
   const [picking, setPicking] = useState(false);
   const remembered = (() => {
     try {
-      return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; effort?: string | null; mode?: string | null } | null;
+      return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; tier?: Tier | null; effort?: string | null; mode?: string | null } | null;
     } catch {
       return null;
     }
@@ -174,6 +178,8 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
   const [agent, setAgent] = useState<Agent>(template ? (remembered?.agent ?? recipe.agent) : recipe.agent);
   const [acpAgent, setAcpAgent] = useState<string | null>(template ? (remembered?.acpAgent ?? null) : (recipe.acpAgent ?? null));
   const [model, setModel] = useState<string | null>(template ? (remembered?.model ?? null) : (recipe.model ?? null));
+  // The tier it thinks with in place of a model by name: the last pick's, else the app's own; a model named wins.
+  const [tier, setTier] = useState<Tier | null>((template ? (remembered ? (remembered.model ? null : (remembered.tier ?? (recipe.model ? null : recipe.tier))) : recipe.model ? null : recipe.tier) : recipe.model ? null : recipe.tier) ?? null);
   const [effort, setEffort] = useState<string | null>(template ? (remembered?.effort ?? null) : (recipe.effort ?? null));
   const [mode, setMode] = useState<string | null>(template ? (remembered?.mode ?? null) : (recipe.mode ?? null));
   const acpList = useApp((s) => s.boot?.acpAgents) ?? [];
@@ -185,7 +191,7 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
     if (Object.keys(errs).length || lacking.length) return toast(lacking.length && !Object.keys(errs).length ? 'Add the key it needs first' : 'Fill in the questions marked first', 'error');
     setBusy(true);
     try {
-      const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, effort: effort ?? undefined, mode: mode ?? undefined } : {};
+      const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, tier: model ? undefined : (tier ?? undefined), effort: effort ?? undefined, mode: mode ?? undefined } : {};
       if (template) localStorage.setItem('wa.apps.agent', JSON.stringify(pick));
       const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys) });
       go(runPath(r.run.id));
@@ -245,18 +251,26 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
                   setAgent(a);
                   setAcpAgent(aid);
                   setModel(null);
+                  if (!tierProgram(a, aid ?? undefined)) setTier(null);
                   setEffort(null);
                   setMode(null);
                 }}
               />
-              <ModelPicker agent={agent} acp={acpAgent ?? undefined} value={model} onChange={(v) => setModel(v)} />
-              <EffortPicker agent={agent} acp={acpAgent ?? undefined} model={model} value={effort} onChange={setEffort} />
+              <ModelPicker
+                agent={agent}
+                acp={acpAgent ?? undefined}
+                value={model}
+                onChange={(v) => (setModel(v), setTier(null))}
+                tier={tier}
+                onTier={(t) => (setTier(t), setModel(null), setEffort(null))}
+              />
+              <EffortPicker agent={agent} acp={acpAgent ?? undefined} model={model} tier={tier} value={effort} onChange={setEffort} />
               <ModePicker agent={agent} acp={acpAgent ?? undefined} value={mode ?? (agent === 'acp' && acpAgent !== 'console' ? null : 'auto')} onChange={setMode} />
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3.5 sm:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <RunsWith agent={agent} acpAgent={acpAgent ?? undefined} model={model ?? undefined} effort={effort ?? undefined} mode={mode ?? 'auto'} />
+              <RunsWith agent={agent} acpAgent={acpAgent ?? undefined} model={model ?? undefined} tier={tier} effort={effort ?? undefined} mode={mode ?? 'auto'} />
               {template && (
                 <button type="button" onClick={() => setPicking((p) => !p)} className="shrink-0 text-[12.5px] font-medium text-accent hover:underline">
                   {picking ? 'Done' : 'Change'}

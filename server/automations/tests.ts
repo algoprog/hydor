@@ -29,7 +29,7 @@ import { draftFromSession } from './draft.ts';
 import { automationTools, decide, getProposal, noteSpawn } from './tools.ts';
 import { checkWatch, validWatch } from './watch.ts';
 import { ALERT_SOURCES, ALERTS, CI, CI_SERVICES, ciDoctorTask, dependencyTask, hookHelp, incidentTask, issueTriageTask, PR_REVIEW_WHERE, type ExampleTask } from '../../shared/engineering.ts';
-import { validSchedule } from '../scheduler.ts';
+import { cleanExtra, validSchedule } from '../scheduler.ts';
 
 let passed = 0;
 const failures: string[] = [];
@@ -438,6 +438,23 @@ await test('nothing to report: no notice', async () => {
   scheduler.remove(t.id);
 });
 
+await test('a task saved with the model “auto” starts its runs on Automatic', async () => {
+  const t = scheduler.save({ ...base, name: 'Automatic news', model: 'auto' });
+  assert.equal(t.model, 'auto');
+  await scheduler.runNow(t.id);
+  // What the scheduler hands create: the model "auto", which gives the session Best's model and its mark.
+  assert.equal(sessions.created.at(-1).model, 'auto');
+  scheduler.remove(t.id);
+});
+
+await test('a task’s settings never carry a session’s mark that the tiers picked its model', () => {
+  assert.deepEqual(cleanExtra({ auto: true, memory: false, capUsd: 1 }), { memory: false, capUsd: 1 });
+  assert.equal(cleanExtra({ auto: true }), undefined);
+  const t = scheduler.save({ ...base, name: 'Named model', model: 'opus', extra: { auto: true, memory: true } });
+  assert.deepEqual(t.extra, { memory: true });
+  scheduler.remove(t.id);
+});
+
 await test('a run as an agent that thinks with a tier: when it fails, it runs again one tier up, to Best at most', async () => {
   const scout = saveAssistant(db, { name: 'Price scout', instructions: 'Check the price.', tier: 'quick' });
   const t = scheduler.save({ ...base, name: 'Price check', extra: { assistant: scout.id }, schedule: { kind: 'every', minutes: 30 } });
@@ -478,6 +495,22 @@ await test('a run as an agent that thinks with a tier: when it fails, it runs ag
   assert.equal(sessions.created.length, n0 + 5);
   scheduler.remove(t.id);
   scheduler.remove(fixed.id);
+});
+
+await test('an agent with a tier on a task whose model is “auto” still steps up after a failed run', async () => {
+  const scout = saveAssistant(db, { name: 'Auto scout', instructions: 'Check the price.', tier: 'quick' });
+  const t = scheduler.save({ ...base, name: 'Auto price check', model: 'auto', extra: { assistant: scout.id }, schedule: { kind: 'every', minutes: 30 } });
+  const n0 = sessions.created.length;
+  const key = (await scheduler.runNow(t.id))!;
+  // The first run says Automatic; the session manager gives its agent's tier precedence.
+  assert.equal(sessions.created.at(-1).model, 'auto');
+  scheduler.report(scheduler.runIn(key)!.id, 'failed', 'The page did not load');
+  await sessions.endTurn(scheduler, key, 'I could not load the page.');
+  await sleep(50);
+  assert.equal(sessions.created.length, n0 + 2);
+  assert.equal(sessions.created.at(-1).model, 'sonnet');
+  assert.equal(scheduler.runs(t.id, 5)[0].trigger, 'rerun');
+  scheduler.remove(t.id);
 });
 
 await test('failures always notify; three in a row pause the task, saying why', async () => {
@@ -855,6 +888,39 @@ await test('“Make this an automation”: a draft from a session, with its agen
   // A trigger it cannot use: weekdays at 09:00.
   const r2 = await draftFromSession(deps, key, (async () => ({ name: 'X', prompt: 'Y', trigger: { kind: 'sometimes' } })) as never);
   assert.deepEqual(r2.draft.schedule, { kind: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] });
+  sessions.summary = summary;
+});
+await test('schedule_task from a conversation on Automatic drafts Automatic; one on a model picked by name keeps it', async () => {
+  const summary = sessions.summary.bind(sessions);
+  sessions.add('claude:autochat');
+  setSessionExtra(db, 'claude:autochat', { auto: true, memory: true });
+  sessions.summary = (k: string) => (k === 'claude:autochat' ? { ...summary(k), prefs: { model: 'opus', effort: 'high' } } : k === 'claude:named' ? { ...summary(k), prefs: { model: 'sonnet' } } : summary(k));
+  const auto: RunCtx = { runId: 'run-auto', key: 'claude:autochat', agent: 'claude', cwd: root, deps };
+  const text = (await tool(auto, 'schedule_task').run({ name: 'Auto brief', prompt: 'Write the brief.', schedule: { kind: 'every', minutes: 60 } }, auto)) as string;
+  assert.match(text, /run by Claude Code on Automatic/);
+  const p = getProposal(db, /proposal (\w+)/.exec(text)![1]);
+  assert.equal(p.task.model, 'auto');
+  // The conversation's mark is not copied: the task says Automatic with its model.
+  assert.deepEqual(p.task.extra, { memory: true });
+  // A model given wins.
+  const given = getProposal(db, /proposal (\w+)/.exec((await tool(auto, 'schedule_task').run({ name: 'Given', prompt: 'x', model: 'haiku', schedule: { kind: 'every', minutes: 60 } }, auto)) as string)![1]);
+  assert.equal(given.task.model, 'haiku');
+  // A conversation on a model picked by name.
+  sessions.add('claude:named');
+  const named: RunCtx = { runId: 'run-named', key: 'claude:named', agent: 'claude', cwd: root, deps };
+  const keep = getProposal(db, /proposal (\w+)/.exec((await tool(named, 'schedule_task').run({ name: 'Named brief', prompt: 'Write the brief.', schedule: { kind: 'every', minutes: 60 } }, named)) as string)![1]);
+  assert.equal(keep.task.model, 'sonnet');
+  // A confidential conversation never drafts Automatic.
+  setSessionExtra(db, 'claude:autochat', { confidential: true });
+  const conf = getProposal(db, /proposal (\w+)/.exec((await tool(auto, 'schedule_task').run({ name: 'Conf', prompt: 'x', schedule: { kind: 'every', minutes: 60 } }, auto)) as string)![1]);
+  assert.equal(conf.task.model, 'opus');
+  // A task drafted from a conversation on Automatic.
+  setSessionExtra(db, 'claude:autochat', { confidential: null });
+  const ask = (async () => ({ name: 'From auto', prompt: 'Do it.', trigger: { kind: 'every', minutes: 60 } })) as never;
+  sessions.fakes.get('claude:autochat')!.items.push({ kind: 'user', text: 'Please do it' });
+  const drafted = await draftFromSession(deps, 'claude:autochat', ask);
+  assert.equal(drafted.draft.model, 'auto');
+  assert.equal(drafted.draft.extra?.auto, undefined);
   sessions.summary = summary;
 });
 await test('list_tasks speaks in the user’s time zone', async () => {

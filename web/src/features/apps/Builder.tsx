@@ -10,6 +10,7 @@ import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
 import { allSteps, titleOf } from '@shared/app-manifest';
+import { tierLabel, tierProgram } from '@shared/tiers';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
@@ -780,7 +781,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   );
   // Settings, each in a line until it is opened.
   const agentName = recipe.agent === 'acp' ? (acpList.find((a) => a.id === recipe.acpAgent)?.name ?? recipe.acpAgent ?? 'Agent') : recipe.agent === 'codex' ? 'Codex' : 'Claude Code';
-  const whoLine = [agentName, recipe.model || tr('Default model'), recipe.mode === 'auto' || !recipe.mode ? tr('Auto') : recipe.mode].join(' · ');
+  const whoLine = [agentName, recipe.model || (recipe.tier ? tierLabel(recipe.tier) : tr('Default model')), recipe.mode === 'auto' || !recipe.mode ? tr('Auto') : recipe.mode].join(' · ');
   const lists = Object.keys(recipe.data ?? {}).length;
   const keepsLine = [lists ? tr(`${lists} list${lists > 1 ? 's' : ''}`) : tr('No lists'), recipe.memory ? tr('remembers across runs') : null].filter(Boolean).join(' · ');
   const limitsLine =
@@ -986,10 +987,17 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                 agent={recipe.agent}
                 acpId={recipe.acpAgent ?? null}
                 acpList={acpList}
-                onPick={(a: Agent, aid) => set({ agent: a, acpAgent: aid ?? undefined, model: undefined, mode: undefined, effort: undefined })}
+                onPick={(a: Agent, aid) => set({ agent: a, acpAgent: aid ?? undefined, model: undefined, mode: undefined, effort: undefined, tier: tierProgram(a, aid ?? undefined) ? recipe.tier : undefined })}
               />
-              <ModelPicker agent={recipe.agent} acp={recipe.acpAgent} value={recipe.model ?? null} onChange={(v) => set({ model: v ?? undefined })} />
-              <EffortPicker agent={recipe.agent} acp={recipe.acpAgent} model={recipe.model} value={recipe.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
+              <ModelPicker
+                agent={recipe.agent}
+                acp={recipe.acpAgent}
+                value={recipe.model ?? null}
+                onChange={(v) => set({ model: v ?? undefined, tier: undefined })}
+                tier={recipe.tier ?? null}
+                onTier={(t) => set({ tier: t, model: undefined, effort: undefined })}
+              />
+              <EffortPicker agent={recipe.agent} acp={recipe.acpAgent} model={recipe.model} tier={recipe.tier} value={recipe.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
               <ModePicker agent={recipe.agent} acp={recipe.acpAgent} value={recipe.mode ?? (recipe.agent === 'acp' && recipe.acpAgent !== 'console' ? null : 'auto')} onChange={(v) => set({ mode: v })} />
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -752,12 +752,20 @@ agents that speak ACP and take MCP servers.
 - **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers
-  (Haiku, Sonnet, Opus and Fable for Claude Code; Luna, Terra, Sol and Astra for Codex). The start page's Model
+  (Haiku, Sonnet, Opus and Fable for Claude Code; Luna, Terra, Sol and Astra for Codex). Custom's tiers fill
+  themselves in the same way from the models it has: your Claude plan's (Haiku, Sonnet, Opus, the newest Fable),
+  else your ChatGPT plan's (Luna, Terra, Sol, Astra), else the models you added that are not on this computer
+  (OpenRouter, an endpoint) whose names say one of those families; a model on this computer is never picked for you
+  (its name does not say how strong it is), and a small model (Haiku, Luna) never becomes Best, so with only small or
+  local models the tiers stay empty until you choose. Once Best names a model, Custom has Automatic and its sessions
+  lead Hydor subagents. Back to the defaults puts these picks back. The start page's Model
   opens on Automatic: the session starts on Best. The main agent is told to lead: it plans, hands clear parts to
   subagents on Standard and Quick (a subagent asked for with no tier gets Standard, and none thinks with a tier above
   its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem proves harder
   than Best can manage (a line in the conversation says why); a request is not sent to Max on its wording alone.
-  Claude Code's own Agent tool is told the same models. Two switches, **Lead with subagents** and **Max for hard
+  Claude Code's own Agent tool is told the same models. A scheduled task's Model menu offers Automatic first too, and
+  a new task starts on it; an app, and each agent step of its flow, can think with a tier instead of a model by name.
+  Two switches, **Lead with subagents** and **Max for hard
   problems**, turn the team and stepping up to Max off. `scripts/tier-bench` measures what each tier and the team cost
   and how their results compare on your own setup, on tasks of its own, recent contest problems and LiveCodeBench.
 - **Deep research**: one switch under Options, or in a running session from its menu → Session settings → Deep
@@ -851,7 +859,12 @@ agents that speak ACP and take MCP servers.
   your own apps (Most used, A to Z or Newest), the ready-made ones under their kinds (cards of one size, with what
   each asks for and marks for its own view, working in chats and a key it needs) and the ready-made apps you
   uninstalled, to install again; on a phone, one column with the two tabs Agent apps and Connected apps, the pinned and recent apps scrolling sideways. They run
-  from the Apps page, the API, MCP, a public page, or once for each row of a CSV. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
+  from the Apps page, the API, MCP, a public page, or once for each row of a CSV. An app thinks with a tier or a model
+  by name (Edit → Who does it, a step's What it thinks with, or Change beside a ready-made app's "runs with": the
+  Model menu lists Quick, Standard, Best and Max first, each with the model it means now for that program, then the
+  models by name; a tier follows Settings → Models → Tiers and works whichever program runs the app, a model by name
+  wins, an agent step's own pick replaces the app's, and the last pick is remembered); the agents that build apps pick
+  the lowest tier that does the job well. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
   that says in plain words what it asks, gives and does. A session is told of the few apps pinned or run most with
   what they do (the pinned ones first) and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
   form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
@@ -1741,7 +1754,12 @@ programs shows each program's version and what is out, with Check now, Update no
   every few minutes, once, by a cron expression, when a webhook is called, or when a watcher sees a change (new
   items in a feed, a page or a value in JSON changing, new files in a folder, a command's output, new email in a
   connected mail account, new items in a connected app, or a set time before each event in a connected calendar):
-  watchers check without a model and wake the agent only then. New email starts one run
+  watchers check without a model and wake the agent only then. A task's Model menu offers Automatic first, as the
+  start page does (Best, its agent moving itself to Max when a problem proves too hard), when Lead with subagents is
+  on and the program has tiers, and not for a confidential task; a new task starts on it, a saved one keeps its
+  model, and a task an agent makes from a conversation on Automatic (or turned from such a session, or an
+  agent's schedule, unless that agent names a model) starts on it too (`hydor tasks … --model auto`, and `"auto"` as
+  a task's model in the API). New email starts one run
   per email (at most 10 a check, the rest summed up in a line), with the email as outside data and its attachments
   saved in the task's folder, and never the same email twice. A connected app's watcher calls one of the account's
   tools that only looks (never one that sends, changes, deletes or pays), as the Outbox does, at each check: Try it

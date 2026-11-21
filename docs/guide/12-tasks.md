@@ -84,9 +84,9 @@ Times are in your time zone. On a phone, Schedules shows one day at a time: **�
 
 The row under them has the pickers of the start page:
 
-- **Model** and **Effort**: the model and how hard it thinks. Left alone, the agent's defaults.
+- **Model** and **Effort**: the model and how hard it thinks. **Automatic** comes first in the **Model** menu, as on the start page: the task's sessions start on Best, and their main agent may move itself to Max when a problem proves too hard (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). It is offered when [**Lead with subagents**](/settings?s=models&find=Lead%20with%20subagents) is on and the program has tiers (for Custom, once its Best tier names a model), and not for a confidential task. A new task starts on Automatic wherever it is offered; a task you saved before keeps its model, and you can change it here at any time. In a terminal, `hydor tasks new … --model auto` does the same (see [Hydor in a terminal](/guide/terminal)). A model picked by name is used as named. Left alone otherwise, the agent's defaults.
 - **Permissions**: what the agent may do without asking you. A new task starts on **Ask** for Claude Code, **Auto** for Codex and **Auto** for Custom (routine steps go ahead, risky ones ask). Nobody may be watching when a run happens: a run that needs your approval waits for it, in its session and in the [inbox](/guide/inbox).
-- **Agent**, **Memory** (when memory is on), **Spending cap**, **Swarm** and **Research**: each run's new session starts with these, as a session started from the start page would (see [Sessions](/guide/sessions), [Agents](/guide/agents) and [Memory](/guide/memory)). A task that runs as one of your agents is one of that agent's schedules: it shows on the agent's page, and its runs get the agent's tier and count towards its monthly budget. A run that fails or stops with an error on the agent's tier runs again a tier up, up to Best, unless the agent's **Step up when a check fails** is off. When the agent keeps a conversation of its own, each run posts into that conversation instead of starting a new session.
+- **Agent**, **Memory** (when memory is on), **Spending cap**, **Swarm** and **Research**: each run's new session starts with these, as a session started from the start page would (see [Sessions](/guide/sessions), [Agents](/guide/agents) and [Memory](/guide/memory)). A task that runs as one of your agents is one of that agent's schedules: it shows on the agent's page, and its runs get the agent's tier and count towards its monthly budget. A run that fails or stops with an error on the agent's tier runs again a tier up, up to Best, unless the agent's **Step up when a check fails** is off. An agent that thinks with a tier still runs on its tier, whatever the task's model says. When the agent keeps a conversation of its own, each run posts into that conversation instead of starting a new session.
 
 ### The prompt
 
@@ -266,7 +266,7 @@ The card asks **Schedule this task?**, with the task's name and **Waiting for yo
 
 - **When**: the schedule in words, with the next runs in your time zone. For a watcher, what it watches and how often, with the address, the command or a connected app's tool, and "It looks right after you confirm, and the agent wakes only when something changed."
 - **Does**: the prompt (**All of it** opens a long one).
-- **Runs**: the agent, its model, and where: a new session in a folder, or in this conversation.
+- **Runs**: the agent, its model (**Automatic** when the conversation is on it), and where: a new session in a folder, or in this conversation.
 
 Then choose:
 
@@ -276,7 +276,7 @@ Then choose:
 
 The agent hears your answer as a message, including any parts you changed, so you need not tell it. The card stays in the conversation with the outcome ("Scheduled", "Next run …", a link to **Scheduled tasks**), and shows the same on your other devices.
 
-Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder, and each run's session starts with the conversation's settings: its agent, memory, spending cap, connected accounts and project. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
+Unless you ask for something else, the task runs with the conversation's agent, model, permissions and folder (a conversation on **Automatic** makes a task that starts on Automatic too), and each run's session starts with the conversation's settings: its agent, memory, spending cap, connected accounts and project. Ask for the runs to post here, and each one posts into this conversation instead of starting a new session.
 
 Agents can also change, pause, turn back on or delete your tasks, always with a card first: **Change this task?** (the parts that change, the old value struck through above the new), **Pause this task?**, **Turn this task back on?** or **Delete this task?**, each with its own yes and no (**Change it** or **Keep it as is**, **Pause it** or **Keep it running**, **Turn it on** or **Keep it paused**, **Delete it** or **Keep it**). They can also list your tasks with when each runs next and how the last run went.
 
@@ -291,7 +291,7 @@ Some limits keep this in hand:
 
 ## Turn a session into a task
 
-When a session did something you want done again: the session's menu (⋯) → **More** → **Make this an automation**. The [helper model](/settings?s=models&find=Helper%20model) reads the conversation and drafts a task: a prompt that can run again by itself (without this time's one-off details, with your corrections folded in) and a trigger that fits. The agent, model, effort, permissions, folder and the session's settings come from the session; a session in a worktree runs in the repository it came from.
+When a session did something you want done again: the session's menu (⋯) → **More** → **Make this an automation**. The [helper model](/settings?s=models&find=Helper%20model) reads the conversation and drafts a task: a prompt that can run again by itself (without this time's one-off details, with your corrections folded in) and a trigger that fits. The agent, model, effort, permissions, folder and the session's settings come from the session (a session on **Automatic** gives a task that starts on Automatic); a session in a worktree runs in the repository it came from.
 
 The form opens as **New automation from this session**, with a line saying why it picked that trigger. Change anything, try a test run, then save; the task is then in [Settings → Scheduled tasks](/settings?s=tasks). A session with no messages of yours cannot be turned into a task.
 
@@ -311,6 +311,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 
 - "Every weekday at 7:30, give me the weather in Athens and the AI news since yesterday."
 - "Remind me on Friday at 9 to call the dentist."
+- "Make my morning brief run on Automatic."
 - "Watch this product page and tell me when the price drops below €99."
 - "Whenever an email with an invoice arrives from my accountant, save the PDF in ~/Invoices and add a row to my expenses sheet."
 - "Start a task when a new deal comes in HubSpot: look up the company and draft a first reply to its contact."

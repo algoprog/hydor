@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { Check, ChevronRight, Cpu, Gauge, ShieldCheck } from 'lucide-react';
-import { AUTO_MODEL, modelFamily as family, newerVersion as newer } from '@shared/tiers';
+import { AUTO_MODEL, modelFamily as family, newerVersion as newer, tierLabel, tierProgram, TIERS, type Tier, type TierPick } from '@shared/tiers';
 import type { Agent, AgentCatalog, ModelOption, ModelSource, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
 import { go } from '../lib/nav';
+import { useTierMap } from '../features/assistants/agentsState';
 import { agentName } from './AgentIcon';
 import { cx, MenuLabel, OptionRow, Picker } from './ui';
 
@@ -101,6 +102,19 @@ export const MODEL_SOURCES: { source: ModelSource; title: string }[] = [
   { source: 'cloud', title: 'In the cloud' },
 ];
 
+/** The model and effort a tier means for a program now (Settings → Models → Tiers); nothing while the table loads or when the program has no tiers. */
+export function useTierPick(agent: Agent, acp: string | undefined, tier: Tier | null | undefined): TierPick | undefined {
+  const map = useTierMap();
+  const prog = tierProgram(agent, acp);
+  return tier && prog ? map?.[prog]?.[tier] : undefined;
+}
+
+/** "Sonnet 5.5 · High": the model a tier means, with its effort when it sets one. */
+export function tierMeans(c: Catalog | undefined, pick: TierPick | undefined): string {
+  if (!pick) return '';
+  return [modelLabel(c, pick.model), pick.effort && cap(pick.effort)].filter(Boolean).join(' · ');
+}
+
 function ModelMenu({
   agent,
   c,
@@ -109,6 +123,9 @@ function ModelMenu({
   localOnly,
   onClose,
   auto,
+  acp,
+  tier,
+  onTier,
 }: {
   agent: Agent;
   c: Catalog | undefined;
@@ -118,9 +135,15 @@ function ModelMenu({
   onClose?: () => void;
   /** Automatic is offered first, with this line on what it picks. */
   auto?: string;
+  acp?: string;
+  /** The tier picked (no model row is then). */
+  tier?: Tier | null;
+  /** Offers the tiers first, for a program that has them. */
+  onTier?: (t: Tier) => void;
 }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
+  const tierMap = useTierMap();
   if (!c) return <div className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(agent)} models…</div>;
   // A confidential session: only models on this computer or your network.
   const rows = modelRows(c, !!auto).filter((r) => !localOnly || r.opt.local);
@@ -137,13 +160,17 @@ function ModelMenu({
   if (!rows.length) return <NoModels agent={agent} why={c.modelsError} />;
   // The chosen model, with "default" read as the model it stands for.
   const isAuto = !!auto && value === AUTO_MODEL;
-  const chosen = isAuto ? undefined : findModel(c, value);
+  const byTier = !!onTier && !!tier && !!tierProgram(agent, acp);
+  const chosen = isAuto || byTier ? undefined : findModel(c, value);
   const chosenModel = chosen?.value === 'default' ? findModel(c, chosen.resolved) : chosen;
   const selected = (r: ModelRow) => r.opt === chosenModel;
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const found = (r: ModelRow) => words.every((w) => `${r.label} ${r.value ?? ''}`.toLowerCase().includes(w));
   const shown = words.length ? rows.filter(found) : rows.filter((r) => !r.older || open || selected(r));
   const hidden = words.length ? 0 : rows.length - shown.length;
+  // The tiers that name a model or an effort for this program: offered first, but not while searching (as Automatic).
+  const prog = onTier ? tierProgram(agent, acp) : null;
+  const tierRows = prog && !words.length ? TIERS.filter((t) => tierMap?.[prog]?.[t.id]?.model || tierMap?.[prog]?.[t.id]?.effort) : [];
   // Custom's rows carry their source: three sections, an empty one (or one with no match) left out.
   const sections: { title?: string; rows: ModelRow[] }[] = shown.some((r) => r.opt.source)
     ? [...MODEL_SOURCES.map(({ source, title }) => ({ title, rows: shown.filter((r) => r.opt.source === source) })), { title: undefined, rows: shown.filter((r) => !r.opt.source) }].filter((x) => x.rows.length)
@@ -175,6 +202,22 @@ function ModelMenu({
           {isAuto && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
         </button>
       )}
+      {tierRows.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          title={t.hint}
+          onClick={() => onTier!(t.id)}
+          className={cx('mb-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-bg-2', byTier && tier === t.id && 'bg-bg-2')}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] text-fg">{t.label}</span>
+            <span className="block truncate text-[11.5px] leading-snug text-fg-3">{tierMeans(c, tierMap?.[prog!]?.[t.id])}</span>
+          </span>
+          {byTier && tier === t.id && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+        </button>
+      ))}
+      {tierRows.length > 0 && <MenuLabel>Models by name</MenuLabel>}
       {sections.map((sec) => (
         <div key={sec.title ?? ''}>
           {sec.title && <MenuLabel>{sec.title}</MenuLabel>}
@@ -243,6 +286,8 @@ export function ModelPicker({
   label,
   localOnly,
   auto,
+  tier,
+  onTier,
 }: {
   agent: Agent;
   value?: string | null;
@@ -256,19 +301,25 @@ export function ModelPicker({
   localOnly?: boolean;
   /** Offers Automatic first (the start page, where the tiers pick the model), with this line on what it picks; `value` is then "auto" for it. */
   auto?: string;
+  /** The tier picked in place of a model by name (apps): shown by its name, with no model row picked. */
+  tier?: Tier | null;
+  /** Offers the tiers first (for a program that has them): picking one calls this, picking a model calls `onChange`. */
+  onTier?: (t: Tier) => void;
 }) {
   const c = useCatalog(agent, acp);
+  const tierPick = useTierPick(agent, acp, onTier ? tier : null);
   if (agent === 'acp' && !c?.models.length) return null;
-  const isAuto = !!auto && value === AUTO_MODEL;
-  const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
+  const byTier = !!onTier && !!tier && !!tierProgram(agent, acp);
+  const isAuto = !byTier && !!auto && value === AUTO_MODEL;
+  const def = !byTier && !value && label ? c?.models.find((m) => m.isDefault) : undefined;
   // Custom's model: what it comes through, with the name in the title.
-  const via = !isAuto && !def ? findModel(c, value)?.via : undefined;
+  const via = !isAuto && !def && !byTier ? findModel(c, value)?.via : undefined;
   return (
     <Picker
       icon={<Cpu size={label ? 14 : 13} className="shrink-0" />}
       label={label}
-      value={isAuto ? 'Automatic' : c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
-      title={isAuto ? `Model: ${auto}` : def ? `Model: ${agentName(agent)}'s default` : via ? `Model: ${modelLabel(c, value)} · ${via}` : 'Model'}
+      value={byTier ? tierLabel(tier!) : isAuto ? 'Automatic' : c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
+      title={byTier ? `Model: ${tierLabel(tier!)}${tierPick ? ` · ${tierMeans(c, tierPick)}` : ''}` : isAuto ? `Model: ${auto}` : def ? `Model: ${agentName(agent)}'s default` : via ? `Model: ${modelLabel(c, value)} · ${via}` : 'Model'}
       disabled={disabled}
       width={260}
     >
@@ -279,11 +330,20 @@ export function ModelPicker({
           value={value}
           localOnly={localOnly}
           auto={auto}
+          acp={acp}
+          tier={tier}
           onClose={close}
           onPick={(v) => {
             onChange(v);
             close();
           }}
+          onTier={
+            onTier &&
+            ((t) => {
+              onTier(t);
+              close();
+            })
+          }
         />
       )}
     </Picker>
@@ -311,6 +371,7 @@ export function EffortPicker({
   disabled,
   acp,
   label,
+  tier,
 }: {
   agent: Agent;
   model?: string | null;
@@ -320,11 +381,14 @@ export function EffortPicker({
   acp?: string;
   /** Named (the start page): "Effort  Medium". */
   label?: string;
+  /** The tier the model comes from when no `model` is named: the efforts are those of the model it means now. */
+  tier?: Tier | null;
 }) {
   const c = useCatalog(agent, acp);
+  const tierModel = useTierPick(agent, acp, model ? null : tier)?.model;
   // An ACP agent offers efforts only when it says so (Grok Build); until its catalog is here, nothing shows.
   if (agent === 'acp' && !c) return null;
-  const m = findModel(c, model);
+  const m = findModel(c, model || tierModel);
   const levels = m?.efforts ?? [];
   if (c && !levels.length) return null;
   // An effort the model does not take (one kept from another model) shows as the model's default, which is what it runs with.

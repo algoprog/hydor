@@ -4,6 +4,7 @@
 // the task form before anything is saved.
 import type { TaskDraft, TaskSchedule } from '../../shared/automations.ts';
 import { isConfidential } from '../../shared/confidential.ts';
+import { AUTO_MODEL } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { helperJson } from '../helper.ts';
@@ -47,6 +48,7 @@ export async function draftFromSession(d: Deps, key: string, ask: typeof helperJ
   try {
     schedule = validSchedule(toolSchedule(raw.trigger, tz));
   } catch {}
+  const onAuto = s.extra?.auto === true && !isConfidential(s.extra);
   const draft: TaskDraft = {
     name: clip(String(raw.name ?? '').trim() || s.title, 80),
     prompt: String(raw.prompt ?? '').trim() || s.firstPrompt || '',
@@ -55,8 +57,10 @@ export async function draftFromSession(d: Deps, key: string, ask: typeof helperJ
     acpAgent: s.acpAgent,
     // A worktree may go away: runs work in the repository it came from.
     cwd: s.worktree?.repo ?? s.cwd ?? '',
-    model: s.prefs?.model,
-    effort: s.prefs?.effort,
+    // A session on Automatic gives its task Automatic too (its mark is not copied: the task's runs get it from their model),
+    // and the tiers pick the effort with the model: the session's may be Max's, once its agent stepped up.
+    model: onAuto ? AUTO_MODEL : s.prefs?.model,
+    effort: onAuto ? undefined : s.prefs?.effort,
     mode: s.prefs?.mode,
     extra: cleanExtra(s.extra),
     origin: 'session',

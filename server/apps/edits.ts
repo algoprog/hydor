@@ -101,7 +101,7 @@ export function changesOf(before: AppRecipe, after: AppRecipe): string[] {
   if (!same(before.data, after.data)) out.push('What it keeps changed.');
   if (!same(before.ui, after.ui)) out.push(!before.ui ? 'It has a view of its own now.' : !after.ui ? 'Its view was removed: its answer shows as a plain card.' : `Its view changed (${uiChanges(before.ui, after.ui).join(', ') || 'its style'}).`);
   if (!same(before.examples, after.examples)) out.push(`Its examples changed (${after.examples?.length ?? 0} now).`);
-  const others = (['agent', 'acpAgent', 'model', 'effort', 'mode', 'assistant', 'tools', 'limits', 'memory', 'requires', 'description', 'icon', 'color'] as const).filter((k) => !same(before[k], after[k]));
+  const others = (['agent', 'acpAgent', 'model', 'tier', 'effort', 'mode', 'assistant', 'tools', 'limits', 'memory', 'requires', 'description', 'icon', 'color'] as const).filter((k) => !same(before[k], after[k]));
   if (others.length) out.push(`Also changed: ${others.join(', ')}.`);
   return out;
 }

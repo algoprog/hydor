@@ -2,7 +2,10 @@
 // how sessions use them (the team), kept in the kv table. An agent that thinks with a tier starts on its model; a
 // session on Automatic starts on Best's (its agent may step up to Max's); a lead gives each helper a tier. Only the picks
 // that were changed are kept: the others follow the models each program offers, remembered here each time a program
-// lists them, so a tier left alone moves to its family's newest model by itself.
+// lists them, so a tier left alone moves to its family's newest model by itself. Custom's models are not remembered
+// here: they are read from the agent file each time they may have changed.
+import fs from 'node:fs';
+import { AGENT_FILE } from '../models/config.ts';
 import {
   cleanTeam,
   defaultTiers,
@@ -18,7 +21,7 @@ import {
   type TierPick,
   type TierProgram,
 } from '../../shared/tiers.ts';
-import type { Agent, ModelOption } from '../../shared/types.ts';
+import type { Agent, AgentModel, ModelOption } from '../../shared/types.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 
 const KEY = 'models.tiers';
@@ -52,8 +55,32 @@ export function noteModels(db: DB, program: 'claude' | 'codex', models: ModelOpt
   if (next !== (kvGet(db, SEEN) ?? '')) kvSet(db, SEEN, next);
 }
 
-/** What each tier means until it is changed, for the models the programs offer now. */
-export const tierDefaults = (db: DB): TierMap => defaultTiers(seenModels(db));
+/** Custom's models as the agent file holds them now, read again only when the file's time or size changed (asked at every start). */
+let customRead: { key: string; models: KnownModel[] } | undefined;
+
+function customModels(): KnownModel[] {
+  let st: fs.Stats;
+  try {
+    st = fs.statSync(AGENT_FILE);
+  } catch {
+    return [];
+  }
+  const key = `${st.mtimeMs}:${st.size}`;
+  if (customRead?.key === key) return customRead.models;
+  let models: KnownModel[] = [];
+  try {
+    const list = JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')).models;
+    if (Array.isArray(list))
+      models = list
+        .filter((m: AgentModel) => m && typeof m.id === 'string')
+        .map((m: AgentModel) => ({ value: m.id, label: String(m.label ?? m.id), provider: m.provider, local: !!m.local || m.provider === 'ollama' || m.provider === 'vllm' }));
+  } catch {}
+  customRead = { key, models };
+  return models;
+}
+
+/** What each tier means until it is changed, for the models the programs offer now (Custom's: the ones in its agent file). */
+export const tierDefaults = (db: DB): TierMap => defaultTiers({ ...seenModels(db), console: customModels() });
 
 /** The picks that were changed. A table kept before 0.52 had every pick written out: those nobody changed are dropped. */
 function kept(db: DB, defaults: TierMap): TierOverrides {

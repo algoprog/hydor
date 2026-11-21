@@ -29,6 +29,27 @@ the lead's own step up since 0.57.0), why it is shaped as it is, and what the me
 - **Settings → Models → Tiers**: the table, with a row for Max, and two switches: **Lead with helpers** and **Max for
   hard problems**. A tier nobody changed follows its program's newest model of that kind: the app remembers the models
   each program lists (`models.tiers.seen`) and keeps only the picks that were changed.
+- **Scheduled tasks start on Automatic.** A task's `model` may be `"auto"`: its runs start as the start page does, on
+  Best with the step up to Max. The task form offers it first where Automatic is offered (the team on, the program has
+  tiers, for Custom a Best that names a model, never a confidential task) and a new task starts on it; a saved task
+  keeps its model. A task an agent makes from a conversation on Automatic starts on it too (`schedule_task`, "Make
+  this an automation"), and so do the schedules an agent adds to one of the user's agents (`save_agent`) unless that
+  agent names a model. An agent that thinks with a tier still runs on its tier.
+- **Custom's tiers fill themselves in.** A Custom tier nobody changed takes the newest model of its kind from the
+  models Custom has: the user's Claude plan (Haiku, Sonnet, Opus, the newest Fable), else their ChatGPT plan (Luna,
+  Terra, Sol, Astra), else the models added that are not on this computer (OpenRouter, an endpoint) whose names say
+  one of those families (`customTiers` in `shared/tiers.ts`). A model on this computer is never picked, because its
+  name does not say how strong it is, and a small model (Haiku, Luna) never becomes Best: with only small or local
+  models the tiers stay empty until the user chooses. Once Best names a model, Custom has Automatic and its sessions
+  lead Hydor subagents (it has no Agent tool of its own). Back to the defaults puts the picks back. The helper model's
+  fallback to Custom still skips the plans' models.
+- **Apps think with a tier.** A recipe and each agent step of its flow take `tier` (quick, standard, best or max) in
+  place of a model by name: the tier's model and effort for whichever program runs it, read when the run starts, so it
+  follows the table as models change. A model named wins over a tier; a step's own tier or model replaces the app's;
+  a step that runs another program keeps the app's tier but not its model by name. A ready-made app's run options
+  offer the tiers the same way and remember the pick (`POST /api/apps/:id/runs` takes `tier`, a model given wins).
+  The agents that build apps are told to pick the lowest tier that does the job well: quick for short clear jobs,
+  standard for most, best for research and hard reasoning, max rarely.
 
 ## Why it is shaped this way
 
@@ -148,8 +169,11 @@ graded again when the grader itself had failed (its Python lacked a package).
   against people's ratings first.
 - The benchmark ran Claude Code alone. Codex and Custom get the same tiers and the same instructions, with child
   sessions in place of Claude Code's own helpers; the tests check that, nothing has measured it.
-- Custom has no tiers until its models are named in the table, so its sessions lead no team by default.
-- Scheduled tasks and apps name a model or leave it to their program; they do not start on Automatic.
-- A session does not step back down from Max when the hard part is over.
+- A session does not step back down from Max when the hard part is over. Going back from Max to Best in the middle
+  of a conversation drops the prompt cache, so Best rereads the whole conversation at the cache-write price. A step
+  down saves only when the cache has gone cold anyway (the next message comes after the cache's lifetime, an hour in
+  Claude Code, where the reread happens on either model and costs less on Best), or when enough work remains: at the
+  price table's rates, roughly ten to twenty-five model calls. A step down at the person's next message, only when the
+  cache has expired, would never cost more. Not built.
 - The check that steps a child up reads its reply, not its work: a helper that says it is done when it is not is
   caught by its lead, or not at all.

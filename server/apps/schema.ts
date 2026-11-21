@@ -52,6 +52,7 @@ export function appSchema(): Record<string, unknown> {
       outputs: { ...outputs, description: `${outputs.description}; code: the fields of the object it returns` },
       agent: { enum: ['claude', 'codex', 'acp'] },
       model: str('agent: its model; model: one of Custom’s (unset: the helper model)'),
+      tier: { enum: ['quick', 'standard', 'best', 'max'], description: 'agent: the tier its agent thinks with (Settings → Models → Tiers) instead of a model by name: "quick", "standard", "best" or "max". It follows the table as models change and works whichever program runs it. Pick the lowest that does the job well: quick for short clear jobs (a summary, formatting, a look-up), standard for most, best for research and hard reasoning, max rarely. A model by name wins over it (unset: the app’s tier, unless the step names a model)' },
       tools: { type: ['array', 'null'], items: { type: 'string' } },
       capUsd: { type: 'number', description: 'agent: most it may spend, in US dollars' },
       tool: { enum: STEP_TOOLS, description: 'tool: which of the app’s own tools' },
@@ -110,6 +111,7 @@ export function appSchema(): Record<string, unknown> {
       agent: { enum: ['claude', 'codex', 'acp'], description: 'Who does the work: Claude Code, Codex, or Custom (acp)' },
       acpAgent: str('acp: which one ("console" = Custom)'),
       model: str('Its agent’s model'),
+      tier: { enum: ['quick', 'standard', 'best', 'max'], description: 'The tier its agent thinks with (Settings → Models → Tiers) instead of a model by name: "quick", "standard", "best" or "max". It follows the table as models change and works whichever program runs it. Pick the lowest that does the job well: quick for short clear jobs (a summary, formatting, a look-up), standard for most, best for research and hard reasoning, max rarely. A model by name wins over it' },
       effort: str('Its agent’s effort'),
       mode: str('Its agent’s mode (runs go ahead without asking unless set)'),
       cwd: str('The folder every run works in (unset: a new one per run)'),
@@ -267,8 +269,8 @@ interface Said {
 export interface Ctx {
   /** One answer from a model, with no tools: its outputs' fields, or { text }. model: one of Custom's (unset: the helper model). */
   model(instructions: string, o?: Said & { outputs?: Outputs; model?: string }): Promise<Record<string, any>>;
-  /** An agent's session does it, with its tools: its outputs' fields, and { reply }. */
-  agent(instructions: string, o?: Said & { outputs?: Outputs; assistant?: string; agent?: 'claude' | 'codex' | 'acp'; model?: string; tools?: string[]; capUsd?: number }): Promise<Record<string, any>>;
+  /** An agent's session does it, with its tools: its outputs' fields, and { reply }. tier: the tier it thinks with (Settings → Models → Tiers) instead of a model by name, which wins over it. */
+  agent(instructions: string, o?: Said & { outputs?: Outputs; assistant?: string; agent?: 'claude' | 'codex' | 'acp'; model?: string; tier?: 'quick' | 'standard' | 'best' | 'max'; tools?: string[]; capUsd?: number }): Promise<Record<string, any>>;
   /** One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }. */
   tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
   /** Waits for the person: { yes }, or its fields' answers. */

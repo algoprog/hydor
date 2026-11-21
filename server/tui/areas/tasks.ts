@@ -7,6 +7,7 @@
 import path from 'node:path';
 import { scheduleText, type ScheduledTask, type TaskRun, type TaskSchedule, type WatchSpec } from '../../../shared/automations.ts';
 import { enc } from '../client.ts';
+import { modelLabel } from '../lines.ts';
 import { tildify, timeAgo, truncate } from '../term.ts';
 import { choose, fields, flag, markdown, mark, num, pickOne, str, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
 
@@ -154,7 +155,7 @@ const bodyOf = (t: ScheduledTask) => {
 
 const AGENT_OPTIONS = {
   agent: { type: 'string', value: '<program>', desc: 'claude, codex, custom or an ACP agent’s id', values: ['claude', 'codex', 'custom'] as string[] },
-  model: { type: 'string', value: '<name>', desc: 'The model (hydor models lists them)' },
+  model: { type: 'string', value: '<name>', desc: 'The model (hydor models lists them), or auto: Automatic' },
   effort: { type: 'string', value: '<level>', desc: 'How hard it thinks: low, medium, high, xhigh, max' },
   mode: { type: 'string', value: '<mode>', desc: 'What it may do alone: ask, edits, auto, plan, full…' },
   cwd: { type: 'string', value: '<folder>', desc: 'The folder it works in', kind: 'dir' },
@@ -343,7 +344,7 @@ export const tasks: Area = {
             ['State', t.enabled ? 'on' : t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'],
             [
               'Runs',
-              t.board ? undefined : t.app ? `the app “${t.appName ?? t.app.id}”` : [t.agent === 'acp' ? (t.acpAgent === 'console' ? 'custom' : t.acpAgent) : t.agent, t.model, t.effort, t.mode].filter(Boolean).join(' · '),
+              t.board ? undefined : t.app ? `the app “${t.appName ?? t.app.id}”` : [t.agent === 'acp' ? (t.acpAgent === 'console' ? 'custom' : t.acpAgent) : t.agent, t.model === 'auto' ? modelLabel(t.model) : t.model, t.effort, t.mode].filter(Boolean).join(' · '),
             ],
             ['Folder', t.cwd ? tildify(t.cwd, ctx.look.home) : undefined],
             ['Posts into', t.target],

@@ -19,7 +19,7 @@ import type { TurnInfo } from './features/types.ts';
 import { costOf } from './prices.ts';
 import type { SessionManager } from './sessions.ts';
 import { localNow, userTimezone } from './userPrefs.ts';
-import { nextTier, tierRank, type Tier } from '../shared/tiers.ts';
+import { AUTO_MODEL, nextTier, tierRank, type Tier } from '../shared/tiers.ts';
 import { findAssistant } from './assistants/store.ts';
 import { tierPick } from './assistants/tiers.ts';
 import { deliveryId, passesFilter, verifySignature, type HookCall } from './automations/hooks.ts';
@@ -224,8 +224,9 @@ export function cleanExtra(x: unknown): TaskExtra | undefined {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return undefined;
   const out: TaskExtra = {};
   for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
-    // Never another session's link, nor what one session was asked to make (Pages' extra.make: its runs make their own).
-    if (v === null || v === undefined || k === 'parent' || k === 'automations' || k === 'make') continue;
+    // Never another session's link, nor what one session was asked to make (Pages' extra.make: its runs make their own),
+    // nor its mark that the tiers picked its model (a task says Automatic with its model "auto", and its runs get the mark from that).
+    if (v === null || v === undefined || k === 'parent' || k === 'automations' || k === 'make' || k === 'auto') continue;
     if (k === 'capUsd') {
       const n = Number(v);
       if (Number.isFinite(n) && n > 0) out.capUsd = Math.round(n * 100) / 100;
@@ -1028,7 +1029,7 @@ export class Scheduler extends EventEmitter {
 
   /**
    * Whether a finished run goes again one tier up: it ran as an agent that thinks with a tier (its task names no model of
-   * its own), it failed or stopped with an error, its agent steps up, and there is a tier above, no higher than Best.
+   * its own, or Automatic), it failed or stopped with an error, its agent steps up, and there is a tier above, no higher than Best.
    */
   private stepUpOf(r: RunRow, status: RunStatus): Tier | null {
     if (!r.task_id || r.trigger === 'test' || (status !== 'failed' && status !== 'error') || !r.input) return null;
@@ -1038,7 +1039,7 @@ export class Scheduler extends EventEmitter {
     } catch {
       return null;
     }
-    if (row.model || row.target || row.app) return null;
+    if ((row.model && row.model !== AUTO_MODEL) || row.target || row.app) return null;
     // A run its plan's usage limit stopped is no failure of the tier.
     if (r.key && this.sessions.stoppedAtLimit(r.key, r.started_at ?? 0)) return null;
     const a = findAssistant(this.db, parse<TaskExtra>(row.extra)?.assistant);

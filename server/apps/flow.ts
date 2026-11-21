@@ -20,6 +20,7 @@ import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, rea
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
+import { isTier } from '../../shared/tiers.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
 import { AGENT_FILE } from '../models/config.ts';
@@ -444,8 +445,9 @@ function ctxStep(kind: string, a: Record<string, unknown>, id: string): Step {
   };
   const title = typeof a.title === 'string' && a.title.trim() ? a.title.trim().slice(0, 80) : undefined;
   let raw: Record<string, unknown>;
+  if (kind === 'agent' && a.tier !== undefined && !isTier(a.tier)) throw new Error('ctx.agent’s tier is "quick", "standard", "best" or "max"');
   if (kind === 'model' || kind === 'agent')
-    raw = { do: kind, title: title ?? first(a.instructions), instructions: told(a.instructions), outputs: a.outputs, model: a.model, ...(kind === 'agent' ? { assistant: a.assistant, agent: a.agent, tools: a.tools, capUsd: a.capUsd } : {}) };
+    raw = { do: kind, title: title ?? first(a.instructions), instructions: told(a.instructions), outputs: a.outputs, model: a.model, ...(kind === 'agent' ? { assistant: a.assistant, agent: a.agent, tier: a.tier, tools: a.tools, capUsd: a.capUsd } : {}) };
   else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w };
   else if (kind === 'ask') raw = { do: 'ask', title: title ?? first(a.question), question: told(a.question), fields: a.fields, waitHours: a.waitHours };
   else if (kind === 'app') raw = { do: 'app', title: title ?? String(a.app ?? ''), app: a.app, with: w };
@@ -597,8 +599,10 @@ async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scop
       assistant: s.assistant ?? recipe.assistant,
       agent: s.agent ?? recipe.agent,
       acpAgent: s.acpAgent ?? (other ? undefined : recipe.acpAgent),
-      model: s.model ?? (other ? undefined : recipe.model),
-      effort: s.effort ?? (other ? undefined : recipe.effort),
+      // A tier goes with the step to another program (that is what tiers are for); a model by name does not, nor does the app's tier when the step names a model.
+      tier: s.tier ?? (s.model ? undefined : recipe.tier),
+      model: s.model ?? (other || s.tier ? undefined : recipe.model),
+      effort: s.effort ?? (other || s.tier ? undefined : recipe.effort),
       mode: s.mode ?? recipe.mode,
       cwd: x.pub ? undefined : x.folder,
       prompt: agentPrompt(x, s.instructions, scope, at),
@@ -677,6 +681,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       agent: recipe.agent,
       acpAgent: recipe.acpAgent,
       model: recipe.model,
+      tier: recipe.tier,
       effort: recipe.effort,
       mode: recipe.mode,
       cwd: x.pub ? undefined : x.folder,

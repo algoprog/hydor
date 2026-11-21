@@ -57,6 +57,11 @@ topic says what each part does, and its API topic gives the format.
     list's items (or a text's lines) when it asks, and `multi: true` lets the person tick several (the value has one
     a line). Use it to ask which of the things a run found to go on with, instead of a free-text box.
   - **Ask an agent** for the parts that need judgement and tools, with outputs it hands in.
+- Have an app's agent think with a tier, not a model by name: set `tier` on the recipe (and on an agent step that needs
+  another one). A tier is the model Settings → Models → Tiers means for whichever program runs the app, and it follows
+  the table as models change; a `model` named outright wins over it, so leave `model` out. Pick the lowest tier that
+  does the job well: `quick` for short, clear jobs (a summary, formatting, a look-up), `standard` for most,
+  `best` for research and hard reasoning, `max` rarely. A step with no tier of its own uses the app's.
 - Every step's outputs are what later steps use (`{{step.value}}`); the form's answers are `{{field}}`, a Repeat's
   item `{{item}}`, and the built-in values `{{today}}`, `{{now}}`, `{{weekday}}`, `{{timezone}}` (the user's) and
   `{{run.source}}` (web, api, task, batch…: guard an Ask a person step with it, so runs nobody watches never wait).

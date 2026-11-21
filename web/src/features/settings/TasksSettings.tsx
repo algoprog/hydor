@@ -6,7 +6,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
 import { CalendarClock, CalendarDays, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, LayoutDashboard, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
+import { isConfidential } from '@shared/confidential';
 import { hookHelp } from '@shared/engineering';
+import { AUTO_MODEL } from '@shared/tiers';
 import type { AppDef } from '@shared/apps';
 import type { Agent } from '@shared/types';
 import { api, del, enc, post } from '../../lib/api';
@@ -14,11 +16,12 @@ import { basename, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
+import { EffortPicker, ModelPicker, ModePicker, useCatalog } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, useConfirm } from '../../components/ui';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { FeatureStartOptions } from '../registry';
+import { autoOfferedFor, useAutoModel } from '../assistants/autoModel';
 import { AgentPicker } from '../home/AgentPicker';
 import { History } from '../automations/History';
 import { HookOptions } from '../automations/HookOptions';
@@ -411,6 +414,7 @@ export function TaskEditor({
   onSaved,
   onSubmit,
   submitLabel,
+  keepModel,
 }: {
   open: boolean;
   task: ScheduledTask | null;
@@ -424,6 +428,8 @@ export function TaskEditor({
   /** Instead of saving it: what to do with the task as edited (an agent's proposal confirms with it). */
   onSubmit?: (d: TaskDraft) => Promise<void>;
   submitLabel?: string;
+  /** The draft changes a task that is saved already (an agent's proposed change): its model stays as it is. */
+  keepModel?: boolean;
 }) {
   const boot = useApp((s) => s.boot);
   const sessions = useSessions();
@@ -440,6 +446,8 @@ export function TaskEditor({
     };
   };
   const [d, setD] = useState<TaskDraft>(blank);
+  // Whether the model is the task's or was picked here, not left for Automatic to fill in.
+  const modelPicked = useRef(true);
   const [unit, setUnit] = useState<'min' | 'hour'>('hour');
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ next: number[]; tz: string } | null>(null);
@@ -451,9 +459,23 @@ export function TaskEditor({
     setD(task ? { ...start, id: task.id, enabled: task.enabled } : start);
     setUnit(start.schedule.kind === 'every' && start.schedule.minutes % 60 !== 0 ? 'min' : 'hour');
     setTest(null);
+    // A new task with no model of its own starts on Automatic where it is offered (below); a saved one keeps its model.
+    modelPicked.current = !!task || !!keepModel || !!start.model || !!start.app;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task, initial]);
   const set = (p: Partial<TaskDraft>) => setD((x) => ({ ...x, ...p }));
+  // Automatic for the task's program: its line in the model menu. The tiers and the team may load after the form opens,
+  // so a new task whose model nobody has picked takes Automatic once it is offered.
+  const cat = useCatalog(d.agent, d.acpAgent);
+  const confidential = isConfidential(d.extra);
+  const auto = useAutoModel({ agent: d.agent, acpId: d.acpAgent, cat, confidential });
+  useEffect(() => {
+    if (open && !modelPicked.current && auto.on && !d.model) setD((x) => (x.model ? x : { ...x, model: AUTO_MODEL }));
+  }, [open, auto.on, d.model]);
+  // A confidential task picks among this computer's models: no Automatic.
+  useEffect(() => {
+    if (confidential && d.model === AUTO_MODEL) setD((x) => ({ ...x, model: undefined }));
+  }, [confidential, d.model]);
   const sch = d.schedule;
   const recent = useMemo(
     () => sessions.order.map((k) => sessions.byKey[k]).filter((s) => s && !s.archived && !s.subagentOf && s.agent === d.agent && (d.agent !== 'acp' || s.acpAgent === d.acpAgent)).slice(0, 40),
@@ -550,13 +572,13 @@ export function TaskEditor({
             agent={d.agent}
             acpId={d.acpAgent ?? null}
             acpList={boot?.acpAgents ?? []}
-            onPick={(a: Agent, id) => set({ agent: a, acpAgent: id ?? undefined, model: undefined, effort: undefined, mode: a === 'claude' ? 'default' : a === 'codex' ? 'auto' : defaultMode(a, id), target: undefined })}
+            onPick={(a: Agent, id) => set({ agent: a, acpAgent: id ?? undefined, model: autoOfferedFor(auto.team, auto.tiers, a, id, confidential) ? AUTO_MODEL : undefined, effort: undefined, mode: a === 'claude' ? 'default' : a === 'codex' ? 'auto' : defaultMode(a, id), target: undefined })}
           />
           <FolderChip value={d.cwd} onChange={(c) => set({ cwd: c })} />
         </div>
         <div className="flex flex-wrap items-center gap-0.5 rounded-xl border border-line-2 px-1.5 py-1">
-          <ModelPicker label="Model" agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => set({ model: v ?? undefined })} />
-          <EffortPicker label="Effort" agent={d.agent} acp={d.acpAgent} model={d.model ?? null} value={d.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
+          <ModelPicker label="Model" agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => ((modelPicked.current = true), set({ model: v ?? undefined }))} localOnly={confidential} auto={auto.hint ?? (d.model === AUTO_MODEL ? auto.line : undefined)} />
+          <EffortPicker label="Effort" agent={d.agent} acp={d.acpAgent} model={d.model === AUTO_MODEL ? auto.bestModel : (d.model ?? null)} value={d.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
           <ModePicker label="Permissions" agent={d.agent} acp={d.acpAgent} value={d.mode ?? null} onChange={(v) => set({ mode: v })} />
           <FeatureStartOptions value={extra} onChange={(p) => set({ extra: tidyExtra({ ...extra, ...p }) })} cwd={d.cwd} />
         </div>

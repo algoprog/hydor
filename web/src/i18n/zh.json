@@ -26511,5 +26511,10 @@
   "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1} 必须是不含控制字符的单行纯文本（发现：{2}）。",
   "Add this page": "添加此网页",
   "On your list": "在你的列表中",
-  "Screenshot or PDF": "截图或 PDF"
+  "Screenshot or PDF": "截图或 PDF",
+  "Model: {0}{1}": "模型：{0}{1}",
+  "Models by name": "按名称选择模型",
+  "The app's settings": "应用的设置",
+  "Use the app's settings": "使用应用的设置",
+  "ctx.agent’s tier is \"quick\", \"standard\", \"best\" or \"max\"": "ctx.agent 的档位为 \"quick\"、\"standard\"、\"best\" 或 \"max\""
 }

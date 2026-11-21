@@ -21,7 +21,7 @@ Custom reads the project's `AGENTS.md` or `CLAUDE.md` files and follows your [Ag
 ## Start a Custom session
 
 1. On the start page, click **Agent** and pick **Custom** ("Any model: OpenRouter, Ollama, vLLM").
-2. Click **Model** and pick one of your models. If the list is empty, add a model first: **Agent** → **Models for Custom**.
+2. Click **Model** and pick one of your models, or **Automatic** when the menu offers it: Custom's tiers fill themselves in from the models it has (your Claude plan's, then your ChatGPT plan's, then those you added that are not on this computer), and once its Best tier names a model, a session on Automatic starts on it and leads subagents (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). If the list is empty, add a model first: **Agent** → **Models for Custom**.
 3. Under **Options**, pick **Permissions** (see [Choose what Custom may do without asking](#choose-what-custom-may-do-without-asking)). Custom has no Effort setting.
 4. Type the task and press Enter.
 
@@ -261,3 +261,4 @@ Custom's models are in [Settings → Agents → Models](/settings?s=models), and
 - "Why is my first message to Custom so long for a local model?"
 - "How full is the context of my Custom session, and what takes the most?"
 - "Run my Custom session on my Claude plan's Sonnet instead of OpenRouter."
+- "Which model is Best for Custom, and can my Custom sessions start on Automatic?"

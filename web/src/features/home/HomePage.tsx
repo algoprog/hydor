@@ -9,7 +9,7 @@ import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
 import { placeKey } from '@shared/start';
 import { accountAgentOf } from '@shared/grok';
-import { AUTO_MODEL, tierProgram } from '@shared/tiers';
+import { AUTO_MODEL } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -20,7 +20,7 @@ import { startSession, warmMemory } from '../../lib/starting';
 import { agentKey, lastAgent, parseAgentKey, picksAt, placePicks, placeRecord, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { EffortPicker, findModel, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
+import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
 import { cx, IconButton, Popover, SettingChip, SettingLayout, SheetsOnPhone, Switch, useIsMobile } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
@@ -36,7 +36,7 @@ import { Away } from './Away';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
-import { useTeam, useTierMap } from '../assistants/agentsState';
+import { useAutoModel } from '../assistants/autoModel';
 import { assistantIn, useAssistants } from '../assistants/state';
 import { NewSpaceDialog } from '../spaces/parts';
 import type { NewKind } from '../pages/NewDialog';
@@ -285,10 +285,8 @@ function StartComposer({
 
   // Automatic: the tiers pick the model (Best's, and Max's if its agent steps up). Offered where the team is on and the
   // program has tiers (Custom once its Best names a model); a confidential session picks among this computer's models.
-  const tiers = useTierMap();
-  const team = useTeam();
-  const prog = tierProgram(agent, acpId ?? undefined);
-  const autoOn = !!team?.on && !!prog && !isConfidential(extra) && (prog !== 'console' || !!tiers?.console.best.model);
+  const auto = useAutoModel({ agent, acpId, cat, confidential: isConfidential(extra) });
+  const autoOn = auto.on;
   // Each program starts from what it last ran with in this place (else its own default model, effort and permissions),
   // or from a link's model. The account is the one picked for every place (else its last session's). Before the box
   // first shows, so a place's model shows from the start.
@@ -532,14 +530,9 @@ function StartComposer({
   };
 
   // On Automatic the effort is the Best model's to pick from; what Automatic comes to, for its line in the model menu.
-  const bestModel = prog ? (tiers?.[prog].best.model ?? null) : null;
-  const maxModel = prog ? (tiers?.[prog].max.model ?? null) : null;
+  const bestModel = auto.bestModel;
   const effortModel = model === AUTO_MODEL ? bestModel : model;
-  const autoHint = !autoOn
-    ? undefined
-    : team?.hard && maxModel && maxModel !== bestModel
-      ? `${modelLabel(cat, bestModel)}, or ${modelLabel(cat, maxModel)} if the problem proves too hard`
-      : modelLabel(cat, bestModel);
+  const autoHint = auto.hint;
   // What the Options chip names: the settings under it that are not as usual.
   const levels = findModel(cat, effortModel)?.efforts ?? [];
   // An ACP agent takes an effort only when the model offers it (Grok Build does; most others do not).

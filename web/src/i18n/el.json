@@ -26514,5 +26514,10 @@
   "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: το {1} πρέπει να είναι μία γραμμή απλού κειμένου χωρίς χαρακτήρες ελέγχου (βρέθηκε {2}).",
   "Add this page": "Προσθήκη αυτής της σελίδας",
   "On your list": "Στη λίστα σας",
-  "Screenshot or PDF": "Στιγμιότυπο οθόνης ή PDF"
+  "Screenshot or PDF": "Στιγμιότυπο οθόνης ή PDF",
+  "Model: {0}{1}": "Μοντέλο: {0}{1}",
+  "Models by name": "Μοντέλα κατά όνομα",
+  "The app's settings": "Οι ρυθμίσεις της εφαρμογής",
+  "Use the app's settings": "Χρήση των ρυθμίσεων της εφαρμογής",
+  "ctx.agent’s tier is \"quick\", \"standard\", \"best\" or \"max\"": "το ctx.agent έχει βαθμίδα «quick», «standard», «best» ή «max»"
 }

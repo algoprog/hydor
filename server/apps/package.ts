@@ -17,6 +17,7 @@ import { appSummary } from '../../shared/app-summary.ts';
 import { allSteps, checkFlow, cleanData, cleanFlow, cleanRequires, DATA_LIMITS, modelsUsed } from '../../shared/app-manifest.ts';
 import { ASSET_NAME, MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
+import { tierLabel } from '../../shared/tiers.ts';
 import type { AgentModel } from '../../shared/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { findAssistant } from '../assistants/store.ts';
@@ -440,9 +441,9 @@ export async function previewOf(db: DB, pkg: AppPackage, catalog?: Catalog): Pro
   const who: string[] = [];
   for (const r of all) {
     const steps = r.flow ? allSteps(r.flow.steps) : [];
-    const agents = r.flow ? steps.flatMap((s) => (s.do === 'agent' ? [{ agent: s.agent ?? r.agent, acpAgent: s.acpAgent ?? r.acpAgent, model: s.model ?? r.model }] : [])) : [{ agent: r.agent, acpAgent: r.acpAgent, model: r.model }];
+    const agents = r.flow ? steps.flatMap((s) => (s.do === 'agent' ? [{ agent: s.agent ?? r.agent, acpAgent: s.acpAgent ?? r.acpAgent, model: s.model ?? (s.tier ? undefined : r.model), tier: s.model ? undefined : (s.tier ?? r.tier) }] : [])) : [{ agent: r.agent, acpAgent: r.acpAgent, model: r.model, tier: r.model ? undefined : r.tier }];
     for (const s of agents) {
-      const a = `${s.agent === 'acp' && s.acpAgent && s.acpAgent !== 'console' ? s.acpAgent : (AGENT_NAME[s.agent] ?? 'An agent')}${s.model ? ` (${s.model})` : ''}`;
+      const a = `${s.agent === 'acp' && s.acpAgent && s.acpAgent !== 'console' ? s.acpAgent : (AGENT_NAME[s.agent] ?? 'An agent')}${s.model ? ` (${s.model})` : s.tier ? ` (${tierLabel(s.tier)})` : ''}`;
       if (!who.includes(a)) who.push(a);
     }
     // Ask a model steps, and questions in words: one of Custom's models, or the helper model.

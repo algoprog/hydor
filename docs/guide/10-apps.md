@@ -13,7 +13,7 @@ An app holds everything a task needs except the details that change each time:
 - **The form**: the questions someone answers before each run ("Where to?", "How many days").
 - **The task**: what the agent is asked to do, with the answers put in.
 - **The answer**: the fields of the result (a summary, a list, a table) that the agent fills in when it is done. An app without answer fields gives the agent's reply instead.
-- **Who does it**: the agent, its model, its mode, and the tools it may use.
+- **Who does it**: the agent, its model or tier, its mode, and the tools it may use.
 
 Each time you run an app, Hydor starts a session with the filled-in task. The agent works through it from start to finish without stopping to ask you things: it makes sensible assumptions and says what they were. That one go is called a **run**. You can then ask for changes to the result, and the agent hands in an updated one.
 
@@ -152,11 +152,11 @@ A question may have a line of help under it, an example answer in the box, and a
 On a ready-made app, **Change** beside the line under the form shows the pickers (and **Done** folds them away):
 
 - The program: Claude Code, Codex, Custom (Hydor's own agent for any model) or another agent you added.
-- **Model**: the agent's models.
+- **Model**: **Quick**, **Standard**, **Best** and **Max** come first, each with the model it means now for that program (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)); then the agent's models by name. A tier follows [Settings → Models → Tiers](/settings?s=models&find=Tiers) as models change. A model picked by name wins over a tier. Changing the program keeps a tier, but not a model by name.
 - **Effort**: how hard the model thinks, for models that offer levels (not for Custom and the other added agents).
 - **Mode**: what the agent may do without asking you. It starts at **Auto**, because nobody watches a run. A mode that asks before each step leaves the run waiting for you.
 
-This browser remembers your last pick for the next ready-made app you run.
+This browser remembers your last pick, a tier included, for the next ready-made app you run. The ready-made apps themselves are unchanged: they start on whatever you pick here.
 
 ### Attach files
 
@@ -279,7 +279,7 @@ There are four ways to start:
 - **From a ready-made app**: open it and press **Make it mine** (on a phone, **Edit**).
 - **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's program, model, effort, mode and agent. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
 
-You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)).
+You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)). Agents that build apps have them think with a tier, the lowest that does the job well: **Quick** for short, clear jobs (a summary, formatting, a look-up), **Standard** for most, **Best** for research and hard reasoning, and **Max** rarely; you can change it under **Who does it** (see [Who does it](#who-does-it)).
 
 The builder opens under the title **New app**: its icon, name and description on top (click the name or the description to change it), then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Design**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Every tab is as wide as the others; on a computer the tabs stay at the top as you scroll, and on a phone they show in two rows. On a wide screen, **Form** and **Answer** have a **Preview** beside them that changes as you type: the form as the app's page asks it, and a made-up answer as a run shows it. Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
 
@@ -343,7 +343,7 @@ Examples are answers to try the app with, and checks on what a run gives back, s
 
 The section reads: "Runs go ahead without anyone watching, so pick a mode that does not stop to ask (Auto, or one that allows edits)."
 
-- The program, **Model**, **Effort** and **Mode** pickers, as on a ready-made app. The mode starts at **Auto**.
+- The program, **Model**, **Effort** and **Mode** pickers, as on a ready-made app. The mode starts at **Auto**. The **Model** menu lists the tiers first (**Quick**, **Standard**, **Best** and **Max**, each with the model it means now for that program), then the models by name: an app that thinks with a tier follows [Settings → Models → Tiers](/settings?s=models&find=Tiers) as models change, and works whichever program runs it. Pick the lowest tier that does the job well: **Quick** for short, clear jobs (a summary, formatting, a look-up), **Standard** for most, **Best** for research and hard reasoning, **Max** rarely. A model picked by name wins over a tier, and changing the program keeps the tier but clears a model by name.
 - **Agent**: **None**, or an agent each run works as (Researcher, Writer… or one of your own), with its instructions, tier and budget. See [Agents](/guide/agents).
 - **Folder**: **A new folder for each run** by default. **Pick one** makes every run work in a folder you choose (it must exist when a run starts); **Use a new one each time** goes back. With a picked folder, attached files are kept in a separate folder of uploads rather than mixed into yours.
 
@@ -488,7 +488,7 @@ In the conversation, each app the agent saves shows as a card, and on a wide scr
 
 The kinds of steps:
 
-- **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page.
+- **Ask an agent**: a session works on its part with its tools and hands in what it found. Each has a session of its own, which you can open from the run's page. Its **What it thinks with** menus (model and effort) offer the tiers first, as the app's do: a tier or a model picked there replaces the app's for this step alone, and a step that runs another program keeps the app's tier but not its model by name.
 - **Ask a model**: one quick answer from a model, with no tools: sort, pull out, sum up. It costs little, and nothing with a model on this computer.
 - **Use a tool**: one of Hydor's own tools with set inputs: search the web, read a page, find a picture (and a video) of each thing in a list, call an address with a saved key, read a document, make a picture, send you a notification, read what Hydor knows of you, put things in order of what you care about, or keep what it made (slides, a document, a spreadsheet, a LaTeX document or a page, in the files of the project it names). For papers: find and read one (from an open copy, with its record and BibTeX), keep a reading list, and sync it with Zotero. Pictures found that way go in an answer's picture column, and videos (YouTube or Vimeo links) play in a view's video element.
 - **Decide**: one way or the other, by a rule ("the price is under 100") or by a question in words that the helper model answers.
@@ -600,6 +600,7 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 - "Stop all runs of my Price check app, and revoke its API keys."
 - "Uninstall the Weekly news digest app, and stop agents from running my Price check app in sessions."
 - "Make an app with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
+- "Have my Quiz app think with Quick."
 - "Add a step to my Competitor watch app that tells me only when something changed."
 - "In my Shopping scout app, after it finds the products, ask me which ones to compare as choices I can tick, then compare only those."
 - "Install the app in reading-list.hydor-app from my Downloads folder."
