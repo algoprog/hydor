@@ -33,7 +33,13 @@
 // feature starts; a round's start taken before its checkpoint; a failed say that names where the folder is saved.
 // And the commands a refused say gives, run as written: the person's changes to a stash and the goal's own version of
 // each file back (changed by both, added by the goal and deleted by hand, deleted by the goal and brought back), in the
-// worktree's top folder; and nothing touched where git is too old to put files back.
+// worktree's top folder; and nothing touched where git is too old to put files back. And Pause pressed while a round
+// runs: the round is finished and checked (kept, undone, left as it is, or checked again later), then the goal pauses,
+// before the final check, a limit, a question, an ask turn or the next round, also when Pause comes during the final
+// check, while the next round's start is saved, or across a restart; Resume meanwhile takes it back. Rules and settings
+// on a goal stopped at a limit. A check changed only in its target keeps its values, judged again (at once, once the
+// round that runs is over, and at the agreement); one changed in what it measures, or with no value at the start, is
+// measured again.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/driver-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-driver PRICES_URL= node dist/dev/driver-test.js
@@ -43,7 +49,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { goalHead, goalMessageOf, holding, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, holding, standing, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { asked as userAsked } from '../custom/review.ts';
 import { kvSet } from '../db.ts';
@@ -55,7 +61,7 @@ import type { Deps, RunCtx, SpawnAdditions, SpawnInfo } from '../features/types.
 import { setSessionExtra } from '../sessionExtra.ts';
 import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees.ts';
 import { RESTARTED } from './brief.ts';
-import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, retargeted, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -219,8 +225,11 @@ const deps = {
 
 let reviewer = { claim: true, broke: false as boolean | string, final: { ok: true, reason: 'The change meets the goal: score.txt says 10.' } as { ok: boolean; reason: string } | 'error' };
 const asked: { system: string; prompt: string; strong?: boolean }[] = [];
+/** Runs as a reviewer is asked (a test acts while the final check runs). */
+let reviewerHook: ((system: string) => unknown) | undefined;
 setReviewer(async (_d, _key, q) => {
   asked.push({ system: q.system, prompt: q.prompt, strong: q.strong });
+  await reviewerHook?.(q.system);
   if (q.system.includes('You check one claim')) return { holds: reviewer.claim, score: reviewer.claim ? 1 : 0.2, reason: reviewer.claim ? 'It holds: “ok”.' : 'It does not: “nope”.' };
   if (q.system.includes('broke a rule')) {
     if (reviewer.broke === 'error') throw new Error('The helper model did not answer');
@@ -692,24 +701,40 @@ const P = 'claude:goal-pause';
 const wtP = worktree();
 sessions.add(P, { cwd: wtP.path, worktree: wtP });
 
-test('pause: no further message; resume checks the round that ran meanwhile, then goes on', async () => {
+test('P1: Pause while a round runs waits for it: nothing is sent, the round is checked and kept, then the goal pauses; the person’s Undo goes through then; Resume sends the next round', async () => {
   // Never asked which way, so every turn here is a round.
   await agreed(P, { settings: { asks: 'own' } });
-  await act(P, { action: 'pause' });
-  assert.equal(goal(P).status, 'paused');
-  assert.equal(goal(P).reason, 'Paused by you.');
-  assert.equal(goalInfo(db, P)!.status, 'paused');
   const before = sent(P);
+  await act(P, { action: 'pause' });
+  let g = goal(P);
+  assert.deepEqual([g.status, g.pausing, g.round, g.reason], ['working', true, 1, undefined], 'still at work, to pause after the round');
+  assert.equal(goalInfo(db, P)!.status, 'active');
+  // Pause again: nothing changes.
+  await act(P, { action: 'pause' });
+  assert.deepEqual([goal(P).status, goal(P).pausing], ['working', true]);
+  assert.equal(sent(P), before, 'nothing sent');
   await turn(P, () => write(wtP.path, 'score.txt', '5\n'));
-  assert.equal(sent(P), before, 'nothing goes out while paused');
-  assert.equal(goal(P).rounds.length, 1);
+  g = goal(P);
+  assert.equal(g.rounds[1].outcome, 'kept');
+  assert.equal(g.status, 'paused');
+  assert.equal(g.reason, 'Paused by you.');
+  assert.equal(g.pausing, undefined);
+  assert.equal(g.round, undefined);
+  assert.equal(goalInfo(db, P)!.status, 'paused');
+  assert.equal(sent(P), before, 'no message after the round');
+  // Between rounds: the person's say goes through.
+  await act(P, { action: 'round', n: 1, do: 'undo' });
+  assert.equal(goal(P).rounds[1].outcome, 'undone');
+  assert.equal(file(wtP.path, 'score.txt'), '2\n', 'its files went back');
+  assert.equal(goal(P).status, 'paused');
+  assert.equal(sent(P), before);
   await rejects(act(P, { action: 'pause' }).then(() => act(P, { action: 'agree' })), 409);
   await act(P, { action: 'resume' });
-  const g = goal(P);
-  assert.equal(g.rounds[1].outcome, 'kept');
+  g = goal(P);
   assert.equal(g.status, 'working');
   assert.equal(g.round, 2);
   assert.equal(sent(P), before + 1);
+  assert.match(last(P), /round 2/i);
   await rejects(act(P, { action: 'resume' }), 409, /not paused/);
 });
 
@@ -775,7 +800,7 @@ test('keep anyway, undo, and another way from a round: the files follow, between
   assert.equal(goal(K).rounds[2].outcome, 'undone');
   assert.equal(file(wtK.path, 'idea.txt'), null);
   await rejects(act(K, { action: 'round', n: 2, do: 'keep' }), 409, /Wait for the round to end, or pause the goal first/);
-  await act(K, { action: 'pause' });
+  await stopAgent(K);
   await act(K, { action: 'round', n: 2, do: 'keep', reason: 'I like the idea', relax: { c2: 5 } });
   let g = goal(K);
   assert.equal(file(wtK.path, 'idea.txt'), 'a different idea\n', 'the files are round 2’s');
@@ -1297,6 +1322,23 @@ async function atRound2(key: string, o: { checks?: unknown[]; protect?: string[]
   return w;
 }
 
+/**
+ * Paused with the round at work left unchecked: the person stops the agent. (Pause itself now waits for that round to be
+ * checked, P1: this is how a goal still comes to be paused mid-round, as a failed turn is.)
+ */
+async function stopAgent(key: string) {
+  await turn(key, () => {}, { status: 'interrupted' });
+  assert.equal(goal(key).status, 'paused');
+  assert.equal(goal(key).reason, 'You stopped the agent.');
+}
+
+/** Changes the stored goal as a test needs it (a state the app stored before, or after a restart). */
+function remember(key: string, set: (g: ReturnType<typeof goal>) => void) {
+  const g = loadGoal(db, key)!;
+  set(g);
+  saveGoal(db, g);
+}
+
 /** A reset that fails halfway: it really resets to the checkpoint's commit (the first of its steps), then fails, as a clean that cannot remove a file does. */
 let resets = 0;
 async function resetsThenFails(wt: WorktreeInfo, commit: string) {
@@ -1416,7 +1458,7 @@ test('checks that write files git does not ignore, or a hand edit while the sess
   assert.equal(inCheckpoint(w.path, r2.checkpoint!, 'notes.txt'), 'by hand\n');
   assert.ok(inCheckpoint(w.path, r2.checkpoint!, 'result.txt'));
   // Keep anyway brings all of it back.
-  await act(K5, { action: 'pause' });
+  await stopAgent(K5);
   await act(K5, { action: 'round', n: 2, do: 'keep' });
   assert.equal(file(w.path, 'notes.txt'), 'by hand\n');
   assert.equal(file(w.path, 'score.txt'), '3\n');
@@ -1446,16 +1488,22 @@ test('a round is not undone while a message is on its way to the agent, nor when
   assert.equal(goal(K2).rounds[2].outcome, 'undone');
   assert.equal(file(w.path, 'score.txt'), '6\n');
   await act(K2, { action: 'stop' });
-  // Paused while the checks run: the round stays unchecked, its files as they are.
+  // P1: Pause pressed while the checks run: the round is recorded (undone, its files back), then the goal pauses.
   const K3 = 'claude:goal-a1-paused';
   const w3 = await atRound2(K3);
   checkingSoon();
-  const p = whileChecking(() => act(K3, { action: 'pause' }));
+  const n3 = sent(K3);
+  const p = whileChecking(async () => {
+    await act(K3, { action: 'pause' });
+    assert.deepEqual([goal(K3).status, goal(K3).pausing], ['checking', true]);
+  });
   await turn(K3, () => write(w3.path, 'score.txt', '3\n'));
   await p;
   await until('paused', () => goal(K3).status === 'paused');
-  assert.equal(file(w3.path, 'score.txt'), '3\n');
-  assert.equal(goal(K3).rounds.length, 2);
+  assert.equal(goal(K3).rounds[2].outcome, 'undone');
+  assert.equal(file(w3.path, 'score.txt'), '6\n');
+  assert.equal(goal(K3).reason, 'Paused by you.');
+  assert.equal(sent(K3), n3, 'no next round');
   await act(K3, { action: 'stop' });
   await act(K3, { action: 'stop' });
   // A new goal set while the old one's checks run: the old step puts nothing back.
@@ -1532,7 +1580,7 @@ test('I4: the person’s say is refused (409, saying why) unless this session is
   const w = await atRound2(S2);
   await turn(S2, () => write(w.path, 'score.txt', '3\n'));
   assert.equal(goal(S2).rounds[2].outcome, 'undone');
-  await act(S2, { action: 'pause' });
+  await stopAgent(S2);
   // While paused, the agent changed something in a turn of its own, or the person by hand: edits made outside the goal.
   await turn(S2, () => write(w.path, 'notes.txt', 'by the agent\n'));
   // The goal was paused while round 3 ran: the sentence says so (that round's unchecked work, most likely), names Resume first, and gives the same commands.
@@ -2050,6 +2098,42 @@ test('a goal stopped at its limit can be given more: it goes on as after a check
   await rejects(act(C26, { action: 'change', contract: { limits: { rounds: 9 } } }), 409, /The goal is over: set a new one/);
 });
 
+test('P2: a goal stopped at its limit takes rules and settings, which count once Give it more carries it on; a goal reached or stopped refuses them', async () => {
+  const P2L = 'claude:goal-p2-limit';
+  const w = worktree();
+  sessions.add(P2L, { cwd: w.path, worktree: w });
+  await agreed(P2L, { limits: { rounds: 1 }, settings: { asks: 'own' } });
+  await turn(P2L, () => write(w.path, 'score.txt', '5\n'));
+  assert.equal(goal(P2L).status, 'limit');
+  await act(P2L, { action: 'rule', text: 'Keep the public API as it is' });
+  await act(P2L, { action: 'rule', text: 'No new dependencies' });
+  let g = goal(P2L);
+  assert.deepEqual(g.rules.map((r) => r.text), ['Keep the public API as it is', 'No new dependencies']);
+  assert.equal(g.status, 'limit', 'still stopped at its limit');
+  await act(P2L, { action: 'unrule', id: g.rules[1].id });
+  assert.deepEqual(goal(P2L).rules.map((r) => r.text), ['Keep the public API as it is']);
+  await act(P2L, { action: 'settings', settings: { asks: 'every', noAnswerMin: 0 } });
+  g = goal(P2L);
+  assert.deepEqual(g.settings, { asks: 'every', noAnswerMin: 0 });
+  assert.equal(g.status, 'limit');
+  // Given more: the next turn is asked which way (the new setting), with the rule in its message.
+  await act(P2L, { action: 'change', contract: { limits: { rounds: 3 } } });
+  assert.equal(headOf(P2L), 'which way next');
+  assert.match(last(P2L), /From the user \(for every round\):\n- Keep the public API as it is/);
+  assert.doesNotMatch(last(P2L), /No new dependencies/);
+  // Reached or stopped: refused.
+  await act(P2L, { action: 'stop' });
+  await rejects(act(P2L, { action: 'rule', text: 'Too late' }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'unrule', id: goal(P2L).rules[0].id }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'settings', settings: { asks: 'own' } }), 409, /^The goal is over: set a new one$/);
+  assert.equal(goal(P2L).status, 'stopped');
+  remember(P2L, (x) => (x.status = 'reached'));
+  await rejects(act(P2L, { action: 'rule', text: 'Too late' }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'unrule', id: goal(P2L).rules[0].id }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'settings', settings: { asks: 'own' } }), 409, /^The goal is over: set a new one$/);
+  assert.deepEqual(goal(P2L).rules.map((r) => r.text), ['Keep the public API as it is']);
+});
+
 // ---- the end-to-end run's rough edges ---------------------------------------------------------------------------------
 
 test('minutes without an answer are whole minutes: a fraction is refused wherever settings come in, never taken for 0 (wait for the person)', async () => {
@@ -2400,7 +2484,7 @@ test('R3-3: checks that write a file git does not ignore, with another session i
   assert.equal(goal(R33).status, 'working');
   await turn(R33, () => write(w.path, 'score.txt', '4\n'));
   assert.equal(goal(R33).rounds[3].outcome, 'undone');
-  await act(R33, { action: 'pause' });
+  await stopAgent(R33);
   await act(R33, { action: 'round', n: 3, do: 'keep' });
   assert.equal(file(w.path, 'score.txt'), '4\n');
   await act(R33, { action: 'stop' });
@@ -2457,7 +2541,13 @@ test('a check written with its keys in another order, or only renamed, is not a 
   const sent = { kind: 'measure', label: 'Score, renamed', id: 'c1', timeoutS: 30, run: 'npm run eval', target: { value: 1, op: '>=' }, read: 'score: ([0-9.]+)' } as GoalCheck;
   assert.deepEqual(changedChecks([proposed], [sent]), [], 'nothing to measure again: the start keeps its value');
   assert.deepEqual(changedChecks([proposed], [{ ...sent, run: 'npm run eval:all' }]), ['c1']);
-  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  // P3: a new target (or slack, unit, time limit) measures the same thing: judged again, not measured again.
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, slack: 0.3, unit: 'pts', timeoutS: 90 }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, slack: 0.3, unit: 'pts', timeoutS: 90 }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, run: 'npm run eval:all', target: { op: '>=', value: 0.9 } }]), [], 'measured again, not judged again');
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, read: 'total: ([0-9.]+)' }]), ['c1']);
   assert.deepEqual(changedChecks([proposed], [sent, { kind: 'command', label: 'New', run: 'true', id: 'c2' }]), ['c2'], 'a new check is measured');
   const review = { kind: 'review', label: 'Reads well', claim: 'Every error says what to do', evidence: { diff: true, files: ['a.md', 'b.md'] }, id: 'c3' } as GoalCheck;
   assert.deepEqual(changedChecks([review], [{ id: 'c3', evidence: { files: ['a.md', 'b.md'], diff: true }, claim: 'Every error says what to do', label: 'Reads well', kind: 'review' }]), []);
@@ -2485,7 +2575,7 @@ test('where the loop leaves the files after measuring is after its checks: what 
   await agreed(F10, { checks, settings: { asks: 'own' } });
   const g = loadGoal(db, F10)!;
   assert.ok(inCheckpoint(w.path, g._.filesAt!, 'result.txt'), 'taken after the checks ran');
-  await act(F10, { action: 'pause' });
+  await stopAgent(F10);
   await act(F10, { action: 'round', n: 0, do: 'from' });
   assert.equal(goal(F10).best, 0);
   await act(F10, { action: 'stop' });
@@ -2612,7 +2702,7 @@ test('R3-8, I2: a say whose reset does not finish applies nothing of it and paus
   const w = await atRound2(R38);
   await turn(R38, () => write(w.path, 'score.txt', '3\n'));
   assert.equal(goal(R38).rounds[2].outcome, 'undone');
-  await act(R38, { action: 'pause' });
+  await stopAgent(R38);
   resets = 0;
   setRestorer(resetsThenFails);
   try {
@@ -2665,7 +2755,7 @@ test('R12: going back to files the final check already judged does not pay for t
   await turn(R12, () => write(w.path, 'done.txt', 'two\n'));
   assert.equal(loadGoal(db, R12)!._.judged!.length, 2, 'both judged, and failed');
   const n0 = finals();
-  await act(R12, { action: 'pause' });
+  await stopAgent(R12);
   await act(R12, { action: 'round', n: 1, do: 'keep' });
   await act(R12, { action: 'resume' });
   assert.equal(finals(), n0, 'round 1’s files were judged: not reviewed again');
@@ -2951,7 +3041,7 @@ test('J1: a kept round that deleted a tracked file (not committed), then an undo
   assert.equal(goal(J1).rounds[2].outcome, 'undone');
   assert.equal(file(w.path, 'score.txt'), '6\n');
   assert.equal(file(w.path, 'base.txt'), null, 'deleted by the kept round, it stays deleted');
-  await act(J1, { action: 'pause' });
+  await stopAgent(J1);
   await act(J1, { action: 'round', n: 2, do: 'keep' });
   assert.equal(file(w.path, 'score.txt'), '3\n');
   assert.equal(file(w.path, 'base.txt'), null);
@@ -3082,11 +3172,11 @@ async function cutUndo(key: string, w: WorktreeInfo, status: GoalState['status']
   return safety;
 }
 
-test('J4, guard (a round being checked whose reset a restart cut): Pause, then Resume before the first tick after the restart never tries the reset again', async () => {
+test('J4, guard (a round being checked whose reset a restart cut): paused then (as Pause during the checks did before 0.102.1), Resume before the first tick after the restart never tries the reset again', async () => {
   const J4 = 'claude:goal-j4-check';
   const w = await atRound2(J4);
-  const safety = await cutUndo(J4, w, 'checking');
-  await act(J4, { action: 'pause' });
+  const safety = await cutUndo(J4, w, 'paused');
+  remember(J4, (g) => (g._.pausedFrom = 'checking'));
   let tries = 0;
   setRestorer(async (wt, c) => {
     tries++;
@@ -3322,13 +3412,407 @@ test('K3: with a git too old, the goal saves and touches nothing: an undone roun
     assert.equal(g.status, 'working', 'not paused: the goal goes on from the files as they are');
     assert.equal(loadGoal(db, K3)!._.restoreTo, undefined, 'no mark');
     assert.equal(file(w.path, 'score.txt'), '3\n');
-    await act(K3, { action: 'pause' });
+    await stopAgent(K3);
     await rejects(act(K3, { action: 'round', n: 1, do: 'keep' }), 409, /^Putting files back needs git 2\.22 or newer; this computer has 2\.17\.1\.$/);
     assert.equal(file(w.path, 'score.txt'), '3\n');
   } finally {
     setGitVersionReader(null);
   }
   await act(K3, { action: 'stop' });
+});
+
+// ---- P1: Pause while a round runs pauses after that round ---------------------------------------------------------------
+
+/** A worktree session whose goal runs round 1 (its message sent). */
+async function round1(key: string, o: { checks?: unknown[]; limits?: Record<string, number>; settings?: Record<string, unknown> } = {}) {
+  const w = worktree();
+  sessions.add(key, { cwd: w.path, worktree: w });
+  await agreed(key, { checks: o.checks, limits: o.limits, settings: o.settings ?? { asks: 'own' } });
+  assert.deepEqual([goal(key).status, goal(key).round], ['working', 1]);
+  return w;
+}
+const finalsAsked = () => asked.filter((a) => a.system.includes('You are the last check')).length;
+/** Paused by the person, after the round: where nothing goes on and nothing waits to be checked. */
+const pausedAfter = (key: string) => {
+  const g = goal(key);
+  assert.deepEqual([g.status, g.reason, g.pausing, g.round], ['paused', 'Paused by you.', undefined, undefined]);
+};
+
+test('P1: Pause while a round runs and the round is worse: it is undone, its files put back, then the goal pauses; Resume sends the next round', async () => {
+  const PA = 'claude:goal-p1-worse';
+  const w = await atRound2(PA);
+  const n = sent(PA);
+  await act(PA, { action: 'pause' });
+  await turn(PA, () => write(w.path, 'score.txt', '3\n'));
+  assert.equal(goal(PA).rounds[2].outcome, 'undone');
+  assert.equal(file(w.path, 'score.txt'), '6\n', 'its files went back');
+  pausedAfter(PA);
+  assert.equal(sent(PA), n);
+  await act(PA, { action: 'resume' });
+  assert.deepEqual([goal(PA).status, goal(PA).round, headOf(PA)], ['working', 3, 'round 3 of 8']);
+  assert.equal(sent(PA), n + 1);
+  await act(PA, { action: 'stop' });
+});
+
+test('P1: Pause while a round runs and every check holds after it: paused, not reached, no final review asked; Resume: the final check, reached', async () => {
+  const PB = 'claude:goal-p1-holds';
+  const w = await round1(PB);
+  reviewer.final = { ok: true, reason: 'The change meets the goal.' };
+  await act(PB, { action: 'pause' });
+  const f0 = finalsAsked();
+  await turn(PB, () => {
+    write(w.path, 'score.txt', '10\n');
+    write(w.path, 'done.txt', 'done\n');
+  });
+  assert.equal(goal(PB).rounds[1].outcome, 'kept');
+  pausedAfter(PB);
+  assert.equal(finalsAsked(), f0, 'no final review asked');
+  await act(PB, { action: 'resume' });
+  assert.equal(goal(PB).status, 'reached');
+  assert.equal(finalsAsked(), f0 + 1);
+});
+
+test('P1: Pause pressed while the final check runs: what it found is kept, the goal pauses instead of being reached; Resume: reached, without another review', async () => {
+  const PL = 'claude:goal-p1-final';
+  const w = await round1(PL);
+  reviewer.final = { ok: true, reason: 'The change meets the goal.' };
+  const f0 = finalsAsked();
+  reviewerHook = async (system) => {
+    if (!system.includes('You are the last check')) return;
+    reviewerHook = undefined;
+    await act(PL, { action: 'pause' });
+    assert.deepEqual([goal(PL).status, goal(PL).pausing], ['checking', true]);
+  };
+  try {
+    await turn(PL, () => {
+      write(w.path, 'score.txt', '10\n');
+      write(w.path, 'done.txt', 'done\n');
+    });
+  } finally {
+    reviewerHook = undefined;
+  }
+  assert.equal(finalsAsked(), f0 + 1);
+  pausedAfter(PL);
+  await act(PL, { action: 'resume' });
+  assert.equal(goal(PL).status, 'reached');
+  assert.equal(finalsAsked(), f0 + 1, 'the files it judged are not reviewed again');
+});
+
+test('P1: Resume before the round has been checked takes the pause back: nothing else changes, and the round’s end goes on to the next round', async () => {
+  const PC = 'claude:goal-p1-takeback';
+  const w = await round1(PC);
+  const n = sent(PC);
+  await act(PC, { action: 'pause' });
+  assert.equal(goal(PC).pausing, true);
+  const back = await act(PC, { action: 'resume' });
+  assert.equal(back!.pausing, undefined);
+  assert.deepEqual([goal(PC).status, goal(PC).pausing, goal(PC).round], ['working', undefined, 1]);
+  assert.equal(sent(PC), n);
+  await turn(PC, () => write(w.path, 'score.txt', '5\n'));
+  assert.equal(goal(PC).rounds[1].outcome, 'kept');
+  assert.deepEqual([goal(PC).status, goal(PC).round], ['working', 2]);
+  assert.equal(sent(PC), n + 1);
+  await act(PC, { action: 'stop' });
+});
+
+test('P1: a say while the goal pauses after the round is refused with what to do', async () => {
+  const PD = 'claude:goal-p1-say';
+  await atRound2(PD);
+  await act(PD, { action: 'pause' });
+  await rejects(act(PD, { action: 'round', n: 1, do: 'keep' }), 409, /^The goal pauses once this round has been checked: give your say then\.$/);
+  await act(PD, { action: 'stop' });
+});
+
+test('P1: Pause while a round runs, asked which way after every round: paused after the round, no ask turn sent; Resume sends it', async () => {
+  const PE = 'claude:goal-p1-asks';
+  const w = await round1(PE, { settings: { asks: 'every', noAnswerMin: 0 } });
+  const n = sent(PE);
+  await act(PE, { action: 'pause' });
+  await turn(PE, () => write(w.path, 'score.txt', '5\n'));
+  pausedAfter(PE);
+  assert.ok(!loadGoal(db, PE)!._.askTurn);
+  assert.equal(sent(PE), n);
+  await act(PE, { action: 'resume' });
+  assert.equal(loadGoal(db, PE)!._.askTurn, true);
+  assert.equal(headOf(PE), 'which way next');
+  assert.equal(sent(PE), n + 1);
+  await act(PE, { action: 'stop' });
+});
+
+test('P1: the goal pauses after the round, and that round’s turn fails: paused with the failure’s reason, the pause after the round gone with it', async () => {
+  const PF = 'claude:goal-p1-failed';
+  await round1(PF);
+  await act(PF, { action: 'pause' });
+  await turn(PF, () => {}, { status: 'failed', error: 'API error 500' });
+  const g = goal(PF);
+  assert.deepEqual([g.status, g.reason, g.pausing, g.round], ['paused', 'The turn failed: API error 500', undefined, 1]);
+  await act(PF, { action: 'stop' });
+});
+
+test('P1: a rounds limit met by the round the goal pauses after: paused first; Resume finds the limit', async () => {
+  const PG = 'claude:goal-p1-limit';
+  const w = await round1(PG, { limits: { rounds: 1 } });
+  await act(PG, { action: 'pause' });
+  await turn(PG, () => write(w.path, 'score.txt', '5\n'));
+  pausedAfter(PG);
+  await act(PG, { action: 'resume' });
+  assert.equal(goal(PG).status, 'limit');
+  assert.equal(goal(PG).reason, 'It ran its 1 round');
+  await act(PG, { action: 'stop' });
+});
+
+test('P1: a money limit reached while the goal pauses after the round still stops that round midway; the pause goes', async () => {
+  const PH = 'claude:goal-p1-money';
+  const w = await round1(PH, { limits: { rounds: 8, usd: 1 } });
+  await act(PH, { action: 'pause' });
+  sessions.all.get(PH)!.live = 'working';
+  write(w.path, 'half.txt', 'half done\n');
+  db.prepare("insert into sessions (key, agent, id, path, cost_usd) values (?, 'claude', ?, '/nowhere', 2.5) on conflict(key) do update set cost_usd = excluded.cost_usd").run(PH, PH);
+  await tick(deps);
+  const g = goal(PH);
+  assert.deepEqual([g.status, g.pausing], ['limit', undefined]);
+  assert.equal(g.rounds.at(-1)!.why, 'Stopped at the limit midway');
+  db.prepare('delete from sessions where key = ?').run(PH);
+  await act(PH, { action: 'stop' });
+});
+
+test('P1: Pause pressed while the next round’s start is saved: paused before that round, nothing sent; Resume starts it', async () => {
+  const PM = 'claude:goal-p1-starting';
+  const w = await round1(PM);
+  const n = sent(PM);
+  let pressed = false;
+  setCheckpointer(async (wt) => {
+    const c = await checkpoint(wt);
+    if (!pressed && loadGoal(db, PM)?._.starting) {
+      pressed = true;
+      await act(PM, { action: 'pause' });
+      assert.deepEqual([goal(PM).status, goal(PM).pausing], ['checking', true]);
+    }
+    return c;
+  });
+  try {
+    await turn(PM, () => write(w.path, 'score.txt', '5\n'));
+  } finally {
+    setCheckpointer(null);
+  }
+  assert.ok(pressed);
+  pausedAfter(PM);
+  assert.equal(sent(PM), n);
+  assert.ok(loadGoal(db, PM)!._.starting, 'the round to start is kept');
+  await act(PM, { action: 'resume' });
+  assert.deepEqual([goal(PM).status, goal(PM).round], ['working', 2]);
+  assert.equal(sent(PM), n + 1);
+  await act(PM, { action: 'stop' });
+});
+
+test('P1: a goal stored as pausing and read again after a restart: the end of its round the loop never heard of still pauses it', async () => {
+  const PI = 'claude:goal-p1-restart';
+  const w = await round1(PI);
+  await act(PI, { action: 'pause' });
+  assert.equal(loadGoal(db, PI)!.pausing, true, 'kept with the goal');
+  const n = sent(PI);
+  // The round's turn ends as the app restarts: the loop never hears of it; the tick finds it.
+  await turn(PI, () => write(w.path, 'score.txt', '5\n'), { tell: false });
+  await tick(deps);
+  assert.equal(goal(PI).rounds[1].outcome, 'kept');
+  pausedAfter(PI);
+  assert.equal(sent(PI), n);
+  await act(PI, { action: 'stop' });
+});
+
+test('P1: a restart cut the turn of the round the goal pauses after: it pauses, saying so, instead of sending the round again (a turn with no end, a turn cut with its reason, a message that never went out)', async () => {
+  // A turn begun and never ended (the tick's two quiet minutes).
+  const PJ = 'claude:goal-p1-cut';
+  await round1(PJ);
+  await act(PJ, { action: 'pause' });
+  const n = sent(PJ);
+  await sleep(5);
+  sessions.all.get(PJ)!.items.push({ kind: 'user', id: 'pj1', seq: 0, ts: Date.now(), text: 'round 1' } as TimelineItem);
+  await tick(deps);
+  await tick(deps, Date.now() + UNSENT_MS + 1000);
+  let g = goal(PJ);
+  assert.deepEqual([g.status, g.pausing, g.round], ['paused', undefined, 1]);
+  assert.equal(g.reason, 'Paused by you. A restart of the app cut round 1’s turn short: Resume to check what it did.');
+  assert.equal(sent(PJ), n, 'not sent again');
+  await act(PJ, { action: 'stop' });
+  // A turn cut with the restart's own reason (Custom's).
+  const PK = 'claude:goal-p1-cut-reason';
+  await round1(PK);
+  await act(PK, { action: 'pause' });
+  const k = sent(PK);
+  await turn(PK, () => {}, { status: 'failed', error: `${CUT_BY_RESTART}.` });
+  g = goal(PK);
+  assert.deepEqual([g.status, g.pausing, g.round], ['paused', undefined, 1]);
+  assert.equal(g.reason, 'Paused by you. A restart of the app cut round 1’s turn short: Resume to check what it did.');
+  assert.equal(sent(PK), k, 'not sent again');
+  await act(PK, { action: 'stop' });
+  // The round's message never reached the agent (the app restarted as it was sent).
+  const PN = 'claude:goal-p1-unsent';
+  await round1(PN);
+  await act(PN, { action: 'pause' });
+  const u = sent(PN);
+  await tick(deps, Date.now() + UNSENT_MS + 1000);
+  g = goal(PN);
+  assert.deepEqual([g.status, g.pausing], ['paused', undefined]);
+  assert.equal(g.reason, 'Paused by you. Round 1’s message did not reach the agent (the app restarted as it was sent): Resume to go on.');
+  assert.equal(sent(PN), u, 'not sent again');
+  await act(PN, { action: 'stop' });
+});
+
+test('P1: a round that cannot be checked yet (the session worked while its checks ran) keeps the pause after it, and is checked later as before', async () => {
+  const PR = 'claude:goal-p1-recheck';
+  const w = await atRound2(PR);
+  const f = sessions.all.get(PR)!;
+  await act(PR, { action: 'pause' });
+  checkingSoon();
+  const t = whileChecking(() => f.items.push({ kind: 'user', id: 'pr1', seq: 0, ts: Date.now(), text: 'Also add a note' } as TimelineItem));
+  await turn(PR, () => write(w.path, 'score.txt', '3\n'));
+  await t;
+  assert.deepEqual([goal(PR).status, goal(PR).pausing, goal(PR).round], ['working', true, 2], 'to be checked again, still to pause after it');
+  await turn(PR);
+  assert.equal(goal(PR).rounds[2].outcome, 'undone');
+  pausedAfter(PR);
+  await act(PR, { action: 'stop' });
+});
+
+test('P1: paused while the person’s say put the files back (a question open): the say is done and the goal stays paused, nothing sent', async () => {
+  const PO = 'claude:goal-p1-say-paused';
+  const w = worktree();
+  sessions.add(PO, { cwd: w.path, worktree: w });
+  await agreed(PO, { settings: { asks: 'every', noAnswerMin: 0 } });
+  await turn(PO, () => write(w.path, 'score.txt', '6\n'));
+  await turn(PO, async () => {
+    await tool(PO, 'goal_ask', { question: 'Which way?', ways: [{ name: 'Up' }, { name: 'Down' }], pick: 1 });
+  });
+  assert.equal(goal(PO).status, 'asking');
+  const n = sent(PO);
+  setRestorer(async (wt, c) => {
+    await act(PO, { action: 'pause' });
+    return restoreCheckpoint(wt, c);
+  });
+  try {
+    await act(PO, { action: 'round', n: 1, do: 'undo' });
+  } finally {
+    setRestorer(null);
+  }
+  assert.equal(goal(PO).rounds[1].outcome, 'undone');
+  assert.equal(file(w.path, 'score.txt'), '2\n');
+  assert.equal(goal(PO).status, 'paused');
+  assert.equal(sent(PO), n, 'no round started');
+  await act(PO, { action: 'stop' });
+});
+
+// ---- P3: a changed target keeps the check's values ---------------------------------------------------------------------
+
+/** How many times a check that notes each run in `log` ran. */
+const runsIn = (log: string) => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length : 0);
+
+test('P3: a check changed only in its target keeps its values: judged again in the start and the best round, nothing runs, no since; through a change at once and once the round that runs is over; a changed command is measured again', async () => {
+  const P3 = 'claude:goal-p3';
+  const w = worktree();
+  sessions.add(P3, { cwd: w.path, worktree: w });
+  const log = path.join(tmp, 'p3-runs.log');
+  const checks = [
+    { kind: 'measure', label: 'Score', run: `echo x >> ${log}; cat score.txt`, target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await agreed(P3, { checks, settings: { asks: 'own' } });
+  // Round 1 raises the score to 6; the goal pauses after it, between rounds.
+  await act(P3, { action: 'pause' });
+  await turn(P3, () => write(w.path, 'score.txt', '6\n'));
+  let g = goal(P3);
+  assert.deepEqual([g.status, g.best, g.round], ['paused', 1, undefined]);
+  const score = (r: number) => goal(P3).rounds[r].results.find((x) => x.id === 'c1')!;
+  assert.deepEqual([score(0).value, score(0).holds, score(1).value, score(1).holds], [2, false, 6, false]);
+  // At once: 5 is enough now, and its name, slack, unit and time limit change too. Nothing runs.
+  let n = runsIn(log);
+  const to = (target: { op: '>=' | '<='; value: number }, more: Record<string, unknown> = {}) => goal(P3).contract.checks.map((c) => (c.id === 'c1' ? { ...c, target, ...more } : c));
+  await act(P3, { action: 'change', contract: { checks: to({ op: '>=', value: 5 }, { label: 'Score (5 is enough)', slack: 0.2, unit: 'pts', timeoutS: 60 }) } });
+  g = goal(P3);
+  assert.equal(runsIn(log), n, 'nothing ran');
+  assert.equal(g.status, 'paused', 'not measuring');
+  assert.equal(loadGoal(db, P3)!._.remeasure, undefined);
+  assert.deepEqual([score(0).value, score(0).holds, score(0).since, score(0).closeness], [2, false, undefined, 0], 'the start keeps its value: judged again, still short of 5');
+  assert.deepEqual([score(1).value, score(1).holds, score(1).closeness], [6, true, 1], 'the best round: 6 meets 5 now');
+  assert.equal(g.rounds[1].score, 0.5, 'scored again: one of two checks holds');
+  assert.deepEqual(standing(g).map((r) => [r.id, r.holds]), [['c1', true], ['c2', false]]);
+  // Through a change while a round runs: it counts once that round is over, and still nothing is measured again.
+  await act(P3, { action: 'resume' });
+  assert.deepEqual([goal(P3).status, goal(P3).round], ['working', 2]);
+  await act(P3, { action: 'change', contract: { checks: to({ op: '>=', value: 7 }) } });
+  assert.equal(goal(P3).pending?.checks?.find((c) => c.id === 'c1')!.target!.value, 7);
+  assert.equal(goal(P3).contract.checks.find((c) => c.id === 'c1')!.target!.value, 5, 'round 2 is judged by the checks it started with');
+  n = runsIn(log);
+  await turn(P3, () => write(w.path, 'score.txt', '6\n'));
+  g = goal(P3);
+  assert.equal(runsIn(log), n + 1, 'only round 2’s own checks ran');
+  assert.deepEqual([g.status, g.round], ['working', 3], 'not measured first');
+  assert.equal(g.contract.checks.find((c) => c.id === 'c1')!.target!.value, 7);
+  assert.deepEqual([score(0).value, score(0).holds, score(0).since], [2, false, undefined]);
+  assert.deepEqual([score(1).value, score(1).holds], [6, false], 'judged again against 7');
+  assert.ok(score(1).closeness > 0 && score(1).closeness < 1);
+  // A changed command measures something else: measured again before the next round, its start value from then (since).
+  await act(P3, { action: 'pause' });
+  await turn(P3);
+  assert.equal(goal(P3).status, 'paused');
+  n = runsIn(log);
+  await act(P3, { action: 'change', contract: { checks: goal(P3).contract.checks.map((c) => (c.id === 'c1' ? { ...c, run: `echo y >> ${log}; cat score.txt` } : c)) } });
+  assert.deepEqual(loadGoal(db, P3)!._.remeasure, ['c1']);
+  await act(P3, { action: 'resume' });
+  await until('measured', () => goal(P3).status !== 'measuring');
+  assert.equal(runsIn(log), n + 1, 'measured again');
+  assert.equal(score(0).since, 3);
+  assert.equal(score(0).value, 6);
+  await act(P3, { action: 'stop' });
+});
+
+test('P3: at the agreement, a check changed only in its target keeps the value measured when it was proposed: judged again, nothing runs, round 1 goes', async () => {
+  const P3a = 'claude:goal-p3-agree';
+  const w = worktree();
+  // Its agent runs commands unasked: the proposal is measured at once, before the agreement.
+  sessions.add(P3a, { cwd: w.path, worktree: w, mode: 'bypassPermissions' });
+  const log = path.join(tmp, 'p3a-runs.log');
+  const checks = [
+    { kind: 'measure', label: 'Score', run: `echo x >> ${log}; cat score.txt`, target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await act(P3a, { action: 'set', objective: 'Score reaches 10 and done.txt exists', settings: { asks: 'own' } });
+  await turn(P3a, async () => {
+    assert.equal((await tool(P3a, 'goal_propose', { checks, protect: ['docs/'], limits: { rounds: 8 } })).isError, false);
+  });
+  await until('agreeing', () => goal(P3a).status === 'agreeing');
+  const c1 = () => goal(P3a).rounds[0].results.find((x) => x.id === 'c1')!;
+  assert.deepEqual([c1().value, c1().holds], [2, false]);
+  const n = runsIn(log);
+  await act(P3a, { action: 'agree', contract: { checks: goal(P3a).contract.checks.map((c) => (c.id === 'c1' ? { ...c, target: { op: '>=', value: 2 } } : c)) } });
+  assert.equal(runsIn(log), n, 'nothing ran');
+  assert.deepEqual([goal(P3a).status, goal(P3a).round], ['working', 1], 'not measured first');
+  assert.deepEqual([c1().value, c1().holds, c1().closeness, c1().since], [2, true, 1, undefined]);
+  await act(P3a, { action: 'stop' });
+});
+
+test('P3: a changed check the start holds no value of (it could not run there) is measured again, even when only its time limit changed', async () => {
+  const P3b = 'claude:goal-p3-novalue';
+  const w = worktree();
+  sessions.add(P3b, { cwd: w.path, worktree: w, mode: 'bypassPermissions' });
+  const checks = [
+    { kind: 'measure', label: 'Speed', run: 'cat speed.txt', target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await act(P3b, { action: 'set', objective: 'Speed reaches 10 and done.txt exists', settings: { asks: 'own' } });
+  await turn(P3b, async () => {
+    assert.equal((await tool(P3b, 'goal_propose', { checks, protect: ['docs/'], limits: { rounds: 8 } })).isError, false);
+  });
+  await until('agreeing', () => goal(P3b).status === 'agreeing');
+  const c1 = () => goal(P3b).rounds[0].results.find((x) => x.id === 'c1')!;
+  assert.ok(c1().error, 'it could not run at the start');
+  // What a longer time limit would have let it read.
+  write(w.path, 'speed.txt', '4\n');
+  await act(P3b, { action: 'agree', contract: { checks: goal(P3b).contract.checks.map((c) => (c.id === 'c1' ? { ...c, timeoutS: 120 } : c)) } });
+  await until('measured', () => goal(P3b).status !== 'measuring');
+  assert.deepEqual([c1().value, c1().error], [4, undefined], 'measured again');
+  assert.deepEqual([goal(P3b).status, goal(P3b).round], ['working', 1]);
+  await act(P3b, { action: 'stop' });
 });
 
 // Last: the tick it starts looks at every goal.
@@ -3351,10 +3835,11 @@ test('J5: the tick runs once as the feature starts: a reset a restart cut is dea
 
 // ---- run ---------------------------------------------------------------------------------------------
 
+// About two and a half minutes on a quiet computer: room for a busy one (scripts/test.mjs stops a file at fifteen).
 setTimeout(() => {
   console.error('driver-test: timed out');
   process.exit(1);
-}, 240_000).unref();
+}, 480_000).unref();
 // TEST_ONLY=<words>: only the tests whose name holds them (to see one test fail when a guard is taken out by hand).
 const only = process.env.TEST_ONLY;
 for (const [name, fn] of tests) {
