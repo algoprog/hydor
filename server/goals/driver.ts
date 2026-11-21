@@ -467,19 +467,21 @@ async function workedSince(d: Deps, s: SessionSummary, at: number): Promise<bool
 /**
  * Whether a Hydor subagent of the session has a turn whose report has not reached it yet (server/children marks each
  * child's last reported turn as extra.reported): between a subagent's turn ending and its report arriving (seconds to
- * minutes) its lead is not done. Turns that ended more than ten minutes ago are left out (a report that never comes, as
- * for a confidential subagent of a session that is not, must not hold the goal for ever).
+ * minutes) its lead is not done. Also while a report is being written (L3: reportTurn marks the turn reported before it
+ * sends it, and a long reply is summarized first, up to a minute): the round would be checked, and judged, without what
+ * the subagent brought. Turns that ended more than ten minutes ago are left out (a report that never comes, as for a
+ * confidential subagent of a session that is not, must not hold the goal for ever).
  */
 export async function reportsPending(d: Deps, key: string, now = Date.now()): Promise<boolean> {
-  // A swarm's lead (S2.1) also waits for a member's report still being written (marked reported before it is sent: a
-  // long one is summarized first), and for a member being stopped (stopping is not counted among its running children).
+  // A swarm's lead (S2.1) also waits for a member being stopped (stopping is not counted among its running children).
   const team = leadsSwarm(d, key);
   for (const k of childKeys(d.db, key)) {
-    if (team && reportOnItsWay(k)) return true;
     const s = d.sessions.summary(k);
     if (team && s?.live?.status === 'stopping') return true;
-    if (!s || liveBusy(s) || (s.endedAt ?? 0) < now - 10 * 60_000) continue;
+    if (!s) continue;
     if (confidentialKey(d.db, k) && !confidentialKey(d.db, key)) continue;
+    if (reportOnItsWay(k)) return true;
+    if (liveBusy(s) || (s.endedAt ?? 0) < now - 10 * 60_000) continue;
     const turn = lastTurn((await d.sessions.timeline(k).catch(() => null))?.parser.items ?? []);
     if (turn?.prompt && turn.status && sessionExtra(d.db, k).reported !== turn.prompt.id) return true;
   }

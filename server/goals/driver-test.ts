@@ -4283,6 +4283,33 @@ test('L1: a change that lowers a limit below what the goal has used (money, time
   await act(C1, { action: 'stop' });
 });
 
+test('L3: in a session without a swarm, a Hydor subagent’s report still on its way (its turn ended, the report being written) holds the round; once it is delivered and the lead’s turn ends, the round is checked', async () => {
+  const P = 'claude:goal-l3-plain';
+  const w = worktree();
+  sessions.add(P, { cwd: w.path, worktree: w });
+  await agreed(P, { checks: SLOW_SCORE, settings: { asks: 'own' } });
+  const kid = 'claude:goal-l3-kid';
+  sessions.add(kid, { cwd: w.path, title: 'Helper' });
+  setSessionExtra(db, kid, { parent: P });
+  // The subagent's turn ends; its report is marked and still being written (a long reply is summarized first).
+  reportBegins(kid);
+  try {
+    const id = await memberTurn(kid, () => write(w.path, 'score.txt', '6\n'), { report: false });
+    setSessionExtra(db, kid, { reported: id });
+    await turn(P);
+    assert.deepEqual([goal(P).status, goal(P).rounds.length], ['working', 1], 'not checked while its report is on its way');
+    await tick(deps);
+    assert.equal(goal(P).rounds.length, 1);
+  } finally {
+    reportEnds(kid);
+  }
+  // Delivered: the lead takes it in, and its turn ends.
+  await turn(P);
+  assert.equal(goal(P).rounds[1].outcome, 'kept');
+  assert.equal(goal(P).rounds[1].members, undefined, 'members are a swarm’s');
+  await act(P, { action: 'stop' });
+});
+
 // Last: the tick it starts looks at every goal.
 test('J5: the tick runs once as the feature starts: a reset a restart cut is dealt with at once, not a tick later', async () => {
   const J5 = 'claude:goal-j5';

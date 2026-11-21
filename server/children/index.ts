@@ -652,7 +652,7 @@ export async function catchUp(d: Deps) {
  */
 export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'external'> & { endedAt?: number }) {
   if (t.external) return;
-  // On its way until it is sent: a goal's round (server/goals) is not over while a member's report is.
+  // On its way until it is sent: the round of its lead's goal (server/goals) is not over while its report is.
   reportBegins(t.key);
   try {
     await reportNow(d, t);
