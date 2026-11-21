@@ -683,6 +683,10 @@ export class AcpLive extends LiveAdapter {
     this.emit('result');
   }
 
+  /**
+   * Cancels the turn. Custom (Hydor's own agent, server/agent) kills the turn's foreground command when it is cancelled
+   * (killTree on abort) and keeps the ones it started in the background; other ACP agents do as their program does.
+   */
   async interrupt(): Promise<void> {
     if (!this.acpSession) return;
     this.rpc.notify('session/cancel', { sessionId: this.acpSession });

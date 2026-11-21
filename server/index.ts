@@ -103,6 +103,7 @@ import { goalDefaults, setGoalDefaults } from './goals/settings.ts';
 import { parseGoalAction } from './goals/validate.ts';
 import { loadGoal } from './goals/store.ts';
 import { goalOver } from '../shared/goals.ts';
+import { goalTeamChange } from './goals/driver.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
 
@@ -2132,6 +2133,9 @@ app.patch('/api/sessions/:key/extra', async (req) => {
   checkExtraChange(db, key, patch);
   // Browser-only (Do this here) is set when a session starts and stays (server/browser/handoff.ts).
   checkBrowserOnlyChange(db, key, patch);
+  // A goal that is not over goes with a swarm, not with a campaign, a deep research or an arena match (server/goals).
+  const team = goalTeamChange(db, key, patch);
+  if (team) throw new HttpError(409, team);
   const extra = setSessionExtra(db, key, patch);
   sessions.queueSummary(key);
   return { extra };

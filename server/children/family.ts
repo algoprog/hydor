@@ -25,11 +25,32 @@ export const isRunningStatus = (status: string | undefined) => !!status && RUNNI
 /** How a lead's message to its Hydor subagent begins (message_child). */
 export const FROM_LEAD = 'Message from the session that started you:';
 
+/** How the swarm board's messages to a lead or a member begin (server/swarm: a batch of posts, a message for a member). */
+export const FROM_BOARD = '[Swarm board · ';
+
 /**
- * Whether a message is one agents send each other through the app: a lead's to its Hydor subagent (message_child), or
- * a Hydor subagent's report to its lead (its reply, how it stopped, its step up a tier).
+ * Whether a message is one agents send each other through the app: a lead's to its Hydor subagent (message_child), a
+ * Hydor subagent's report to its lead (its reply, how it stopped, its step up a tier), or what the swarm board passes on
+ * between a swarm's lead and its members.
  */
-export const betweenAgents = (text: string) => text.startsWith(`${FROM_LEAD}\n`) || /^\[(Reply from the|The) Hydor subagent "/.test(text);
+export const betweenAgents = (text: string) => text.startsWith(`${FROM_LEAD}\n`) || /^\[(Reply from the|The) Hydor subagent "/.test(text) || text.startsWith(FROM_BOARD);
+
+/**
+ * Child sessions whose report to their parent is being written now (server/children reportTurn: its turn read, a long
+ * reply summarized, a step up weighed, then sent), by how many: the turn is marked reported before that is done, so for
+ * up to a minute nothing else says a report is on its way.
+ */
+const reporting = new Map<string, number>();
+export function reportBegins(key: string) {
+  reporting.set(key, (reporting.get(key) ?? 0) + 1);
+}
+export function reportEnds(key: string) {
+  const n = (reporting.get(key) ?? 1) - 1;
+  if (n > 0) reporting.set(key, n);
+  else reporting.delete(key);
+}
+/** Whether a child's report is being written now (reportBegins … reportEnds). */
+export const reportOnItsWay = (key: string) => reporting.has(key);
 
 /**
  * Whether the queue of a session still at work when the app restarted goes out when its turn ends, as it would have

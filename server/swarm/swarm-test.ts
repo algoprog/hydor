@@ -22,6 +22,7 @@ import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
+import { dropGoal, saveGoal } from '../goals/store.ts';
 import { addPost, partsOf, postsOf, swarm, tellLead } from './index.ts';
 import { CAMPAIGN_MEMBER_INSTRUCTIONS, MEMBER_INSTRUCTIONS } from './instructions.ts';
 import { noteRun, roleOf } from './roles.ts';
@@ -93,6 +94,12 @@ class Sessions extends EventEmitter {
   async interrupt(key: string) {
     this.interrupted.push(key);
     this.all.get(key)!.live = 'idle';
+  }
+  /** The session's own Stop all (SessionManager.stopAll): here, which sessions it was asked for. */
+  stoppedAll: string[] = [];
+  async stopAll(key: string) {
+    this.stoppedAll.push(key);
+    return { turn: false, tasks: 0, children: 0 };
   }
   accountOf() {
     return undefined;
@@ -275,6 +282,27 @@ test('routes: the board of a lead only, and the user stopping members tells the 
   assert.deepEqual(r, { stopped: ['claude:m5'] });
   assert.match(delivered(LEAD).at(-1)!.text, /^\[The user stopped the swarm member “Five” \(claude:m5\)\./);
   await assert.rejects(routes.get('POST /api/swarm/:key/stop')!({ params: { key: LEAD }, body: { member: 'claude:solo' } }), (e: unknown) => e instanceof HttpError && e.status === 404);
+  assert.deepEqual(sessions.stoppedAll, [], 'without a goal the lead goes on, told of it');
+  // S5.2: with a goal whose round is at work, Stop all stops the whole team, the lead too (the session's own Stop all, which
+  // pauses the goal), and sends the lead nothing that would wake it and carry the round on.
+  const g = { key: LEAD, id: 'g1', status: 'working' as const, round: 2, contract: { objective: 'x', checks: [], protect: [], limits: { rounds: 5 } }, settings: { asks: 'own' as const, noAnswerMin: 0 }, rounds: [], undo: true, rules: [], next: [], dropped: [], startedAt: 1, spentUsd: 0, activeMs: 0, _: { spentAtStart: 0 } };
+  saveGoal(db, g);
+  sessions.all.get('claude:m5')!.live = 'working';
+  const n = delivered(LEAD).length;
+  assert.deepEqual(await routes.get('POST /api/swarm/:key/stop')!({ params: { key: LEAD }, body: {} }), { stopped: ['claude:m5'] });
+  assert.deepEqual(sessions.stoppedAll, [LEAD]);
+  assert.equal(delivered(LEAD).length, n, 'nothing woke the lead');
+  // One member stopped by name, or a goal not at work (asking, paused): as before.
+  sessions.all.get('claude:m5')!.live = 'working';
+  await routes.get('POST /api/swarm/:key/stop')!({ params: { key: LEAD }, body: { member: 'claude:m5' } });
+  assert.deepEqual(sessions.stoppedAll, [LEAD]);
+  assert.equal(delivered(LEAD).length, n + 1);
+  saveGoal(db, { ...g, status: 'asking' });
+  sessions.all.get('claude:m5')!.live = 'working';
+  await routes.get('POST /api/swarm/:key/stop')!({ params: { key: LEAD }, body: {} });
+  assert.deepEqual(sessions.stoppedAll, [LEAD]);
+  assert.equal(delivered(LEAD).length, n + 2);
+  dropGoal(db, LEAD);
 });
 
 test('the setting: how many members of a swarm at once (Settings → Capabilities → Subagents)', async () => {

@@ -10,7 +10,7 @@
 //   DATA_DIR=/tmp/hydor-test-goal-brief PRICES_URL= node dist/dev/brief-test.js
 import assert from 'node:assert/strict';
 import { goalMessageOf, type GoalCheck, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
-import { askMessage, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, reminderMessage, RESTARTED, restartedMessage, roundMessage, whereItStands } from './brief.ts';
+import { askMessage, DETAIL_ALL, DETAIL_EACH, draftMessage, draftNotes, GOAL_FOOT, MEMBERS_NAMED, reminderMessage, RESTARTED, restartedMessage, roundMessage, whereItStands } from './brief.ts';
 
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
@@ -222,6 +222,42 @@ test('a reason from a model or a person that ends with a full stop gets no secon
   const fix = roundMessage(goal(), { n: 2, fix: { by: 'final', reason: 'It says yes...' } });
   assert.match(fix, /did not pass: It says yes\. Put that right/);
   for (const m of [kept, undone, fix]) assert.ok(!/[.!?]\.(\s|$)/.test(m.replace(/…/g, '')), m);
+});
+
+test('S2.3, S2.4: a swarm lead’s round message ends with the swarm’s paragraphs and its members (at most 8 by name), after an undone round with its sentence; its draft says the members wait; a plain session’s are as they were', () => {
+  const crew = Array.from({ length: 10 }, (_, i) => ({ title: `Angle ${i + 1}`, state: i === 0 ? 'working' : i === 1 ? 'stopped' : 'waiting for you', ...(i === 2 ? { last: 'Found the slow query.' } : {}) }));
+  const g = goal({ rounds: [...goal().rounds, round(1, [res('c1', true)], 'undone')] });
+  const m = roundMessage(g, { n: 2, swarm: { members: crew } });
+  const plain = roundMessage(g, { n: 2 });
+  const close = 'The app runs the checks itself when your turn ends. You cannot end the goal, and saying it is done changes nothing. Work on what does not hold yet, check your work as you go, then call goal_report (what you did, what remains) and end your turn.';
+  assert.ok(plain.includes(close));
+  assert.ok(!m.includes(close), 'in place of the usual closing paragraph');
+  const tail = m.slice(m.indexOf('You lead a swarm'));
+  assert.equal(
+    tail,
+    [
+      'You lead a swarm in this goal. Put your members on what does not hold yet: one angle or one check each, and tell each which files are its own, because they all work in this folder (give none a worktree or folder of its own: the app checks this folder, and can only undo a round whose work is all here). Pass on what the user asked for above and what must not change.',
+      'Last round was undone: what your members changed in it is gone from this folder; say so to those you put to work again. Members from earlier rounds are still there and remember their work: give them their next step with message_child, start a new member only for a new angle, and stop one whose angle is used up with swarm_stop.',
+      [
+        'Your members now:',
+        '- “Angle 1” (working)',
+        '- “Angle 2” (stopped)',
+        '- “Angle 3” (waiting for you): Found the slow query.',
+        ...Array.from({ length: MEMBERS_NAMED - 3 }, (_, i) => `- “Angle ${i + 4}” (waiting for you)`),
+        '- and 2 more',
+      ].join('\n'),
+      'The round is over when you have called goal_report (what the swarm did, what remains) and every member’s turn has ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
+      GOAL_FOOT,
+    ].join('\n\n'),
+  );
+  // No member yet, and a last round that was kept: no undone sentence.
+  const first = roundMessage(goal({ rounds: [...goal().rounds, round(1, [res('c1', true)], 'kept')] }), { n: 2, swarm: { members: [] } });
+  assert.match(first, /\n\nYou have no members yet: start one per angle with start_child_session\.\n\n/);
+  assert.doesNotMatch(first, /Last round was undone/);
+  assert.match(first, /\n\nMembers from earlier rounds are still there/);
+  // The draft, its notes and its reminder: the members wait for the first round; a plain session's say nothing of them.
+  for (const text of [draftMessage('Make it fast', { swarm: true }), draftNotes({ swarm: true }), reminderMessage('Make it fast', { swarm: true })]) assert.ok(text.includes('Do not start your swarm’s members yet: they come with the first round.'), text);
+  for (const text of [draftMessage('Make it fast'), draftNotes(), reminderMessage('Make it fast')]) assert.ok(!text.includes('swarm'), text);
 });
 
 test('sent again after a restart cut the turn short: the same message, its head first, then a line that says why', () => {
