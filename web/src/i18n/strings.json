@@ -1480,7 +1480,6 @@
 "{0}: give it as text":"shared/apps.ts",
 "{0}: give it blocks (what it shows)":"shared/app-ui.ts",
 "{0}: give it branches, each a list of steps":"shared/app-manifest.ts",
-"{0}: give it more than that.":"server/goals/driver.ts",
 "{0}: give it the steps to repeat":"shared/app-manifest.ts",
 "{0}: give its fields ({ \"title\": \"text\" }) or {} for any records":"shared/app-manifest.ts",
 "{0}: give its path on this computer, or an address":"server/apps/media.ts",
