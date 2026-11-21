@@ -88,7 +88,7 @@ function bodyOf(r) {
 }
 `;
 
-/** The place a name stands for: Open-Meteo's search first (English names), then OpenStreetMap's (any language, any kind of place). */
+/** The place a name stands for: Open-Meteo's search first (names in the person's language), then OpenStreetMap's (any language, any kind of place). */
 const PLACE = String.raw`// The place a search found that fits what was asked best: one in the region or country named after a comma ("Paris,
 // Texas"), then one of exactly that name, then the most populous. When it finds none (a name in another language, a
 // coast, a district), OpenStreetMap's search is asked instead.
@@ -106,7 +106,7 @@ async function placeOf(found, asked, ctx) {
     return { name: p.name, label: [p.name, region, p.country].filter(Boolean).join(', '), lat: Number(p.latitude), lng: Number(p.longitude), country: p.country || '', coast: /^ISLS?$/.test(String(p.feature_code || '')) };
   }
   try {
-    const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(String(asked || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look it up on OpenStreetMap' });
+    const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=' + encodeURIComponent((ctx.locale && ctx.locale.lang) || 'en') + '&q=' + encodeURIComponent(String(asked || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look it up on OpenStreetMap' });
     const hit = (bodyOf(r) || [])[0];
     if (hit && isFinite(Number(hit.lat))) {
       const parts = String(hit.display_name || '').split(', ');
@@ -166,6 +166,20 @@ function siteOf(url) {
 /** TheSportsDB's free key, for anyone to use (30 calls a minute). */
 const SPORTSDB = 'https://www.thesportsdb.com/api/v1/json/123';
 
+const DAY_COLS = [
+  { id: 'date', label: 'Date', type: 'date' as const },
+  { id: 'icon', label: 'Sky', type: 'text' as const },
+  { id: 'sky', label: 'In words', type: 'text' as const },
+  { id: 'high', label: 'High', type: 'number' as const },
+  { id: 'low', label: 'Low', type: 'number' as const },
+  { id: 'rain', label: 'Rain', type: 'number' as const },
+  { id: 'chance', label: 'Chance of rain, %', type: 'number' as const },
+  { id: 'wind', label: 'Wind', type: 'number' as const },
+  { id: 'uv', label: 'UV index', type: 'number' as const },
+  { id: 'sunrise', label: 'Sunrise', type: 'text' as const },
+  { id: 'sunset', label: 'Sunset', type: 'text' as const },
+  { id: 'score', label: 'Good to be out (0 to 10)', type: 'number' as const },
+];
 const RESULT_COLS = [
   { id: 'date', label: 'Date', type: 'date' as const },
   { id: 'opponent', label: 'Opponent', type: 'text' as const },
@@ -349,8 +363,10 @@ const GAME_COLS = [
   { id: 'hours', label: 'Hours to finish', type: 'number' as const },
   { id: 'why', label: 'Why', type: 'text' as const },
   { id: 'free', label: 'Free to play', type: 'yesno' as const },
-  { id: 'price', label: 'Best price now, $', type: 'number' as const },
-  { id: 'lowest', label: 'Lowest ever, $', type: 'number' as const },
+  { id: 'price', label: 'Best price now, US$', type: 'number' as const },
+  { id: 'lowest', label: 'Lowest ever, US$', type: 'number' as const },
+  { id: 'price_text', label: 'Best price now', type: 'text' as const, description: 'The price in US dollars as the person reads it, with its worth in their currency when that is another' },
+  { id: 'lowest_text', label: 'Lowest ever', type: 'text' as const },
   { id: 'store', label: 'Store', type: 'text' as const },
   { id: 'deal', label: 'Deal', type: 'url' as const },
   { id: 'picture', label: 'Picture', type: 'image' as const },
@@ -430,15 +446,16 @@ export const MORE: Draft[] = [
     category: 'Weather',
     description: 'The days ahead anywhere: highs and lows, rain and wind on charts, the next 48 hours, the best days for what you plan, and what to wear.',
     fields: [
-      { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Lisbon, or Zermatt, Switzerland' },
-      { id: 'days', label: 'How far ahead', type: 'choice', options: ['3 days', '7 days', '14 days'], default: '7 days' },
+      { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Lisbon, or Zermatt, Switzerland', from: 'me.home' },
+      { id: 'days', label: 'How far ahead', type: 'choice', options: ['3 days', '7 days', '14 days'], default: '7 days', remember: true },
       { id: 'plans', label: 'What you’re planning', type: 'text', placeholder: 'e.g. A hike, a picnic, drying the washing' },
-      { id: 'units', label: 'Units', type: 'choice', options: ['Celsius', 'Fahrenheit'], default: 'Celsius' },
+      { id: 'units', label: 'Units', type: 'choice', options: ['Metric', 'Imperial'], default: 'Metric', from: 'me.units' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
-        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name={{place}}' }, failed: 'skip' },
+        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language={{lang}}&format=json&name={{place}}' }, failed: 'skip' },
         {
           id: 'spot',
           title: 'Pick the place',
@@ -452,7 +469,7 @@ export const MORE: Draft[] = [
 const p = await placeOf(input.found, input.place, ctx);
 if (!p) throw new Error('No place called “' + input.place + '” was found: check its spelling, or add its country');
 const days = Math.min(16, Math.max(1, parseInt(String(input.days || '7'), 10) || 7));
-const us = input.units === 'Fahrenheit';
+const us = /^(?:imperial|fahrenheit)$/i.test(String(input.units || ''));
 const url =
   'https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lng + (p.coast ? '&elevation=0' : '') + '&timezone=auto&forecast_days=' + days + '&forecast_hours=48' +
   '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m' +
@@ -483,7 +500,7 @@ return { label: p.label, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, url };
 // with a score for how good it is to be out (dry, mild and calm days highest), the next 48 hours, and the weather now.
 const f = bodyOf(input.forecast);
 if (!f || !f.daily || !Array.isArray(f.daily.time)) throw new Error('The forecast did not come back: try again in a minute');
-const us = input.units === 'Fahrenheit';
+const us = /^(?:imperial|fahrenheit)$/i.test(String(input.units || ''));
 const at = (a, i) => (Array.isArray(a) && a[i] !== null && a[i] !== undefined && isFinite(Number(a[i])) ? Number(a[i]) : null);
 const one = (v) => (v === null ? null : Math.round(v * 10) / 10);
 const d = f.daily;
@@ -531,26 +548,15 @@ return {
   unit: us ? '°F' : '°C',
   rain_unit: us ? 'in' : 'mm',
   wind_unit: us ? 'mph' : 'km/h',
+  // The sky in words is English here; for a person who reads another language, the next step says each phrase in it.
+  phrases: ctx.locale && ctx.locale.lang && ctx.locale.lang !== 'en' ? [...new Set(days.map((x) => x.sky).concat([now[0]]).filter(Boolean))] : [],
 };`,
           outputs: [
             {
               id: 'days',
               label: 'The days',
               type: 'table',
-              columns: [
-                { id: 'date', label: 'Date', type: 'date' },
-                { id: 'icon', label: 'Sky', type: 'text' },
-                { id: 'sky', label: 'In words', type: 'text' },
-                { id: 'high', label: 'High', type: 'number' },
-                { id: 'low', label: 'Low', type: 'number' },
-                { id: 'rain', label: 'Rain', type: 'number' },
-                { id: 'chance', label: 'Chance of rain, %', type: 'number' },
-                { id: 'wind', label: 'Wind', type: 'number' },
-                { id: 'uv', label: 'UV index', type: 'number' },
-                { id: 'sunrise', label: 'Sunrise', type: 'text' },
-                { id: 'sunset', label: 'Sunset', type: 'text' },
-                { id: 'score', label: 'Good to be out (0 to 10)', type: 'number' },
-              ],
+              columns: DAY_COLS,
             },
             { id: 'hours', label: 'The next 48 hours', type: 'table', columns: [{ id: 'time', label: 'Time', type: 'text' }, { id: 'hour', label: 'Hour', type: 'text' }, { id: 'temp', label: 'Temperature', type: 'number' }, { id: 'chance', label: 'Chance of rain, %', type: 'number' }, { id: 'icon', label: 'Sky', type: 'text' }] },
             { id: 'now_temp', label: 'Now', type: 'number' },
@@ -564,6 +570,39 @@ return {
             { id: 'unit', label: 'Temperature unit', type: 'text' },
             { id: 'rain_unit', label: 'Rain unit', type: 'text' },
             { id: 'wind_unit', label: 'Wind unit', type: 'text' },
+            { id: 'phrases', label: 'The skies to say in the person’s language', type: 'list' },
+          ],
+          failed: 'agent',
+        },
+        {
+          id: 'skies',
+          title: 'Say the skies in your language',
+          do: 'model',
+          if: '{{shape.phrases}} is not empty',
+          instructions: `Say each of these weather descriptions in {{language}}, in a few plain words each (they sit on a small card):
+
+{{shape.phrases}}
+
+- skies: one row for each, in the same order: the description exactly as written above (sky), and what it says in {{language}} (words).`,
+          outputs: [{ id: 'skies', label: 'The skies', type: 'table', columns: [{ id: 'sky', label: 'As written', type: 'text' }, { id: 'words', label: 'In their language', type: 'text' }] }],
+          failed: 'skip',
+        },
+        {
+          id: 'words',
+          title: 'Put the words on the days',
+          do: 'code',
+          language: 'javascript',
+          with: { days: '{{shape.days}}', now_sky: '{{shape.now_sky}}', skies: '{{skies.skies}}' },
+          code:
+            LIST +
+            String.raw`// The days and the sky now with their words said in the person's language where the step before gave them; as they are
+// (English) where it did not, or for an English reader.
+const said = new Map(rows(input.skies).map((r) => [String(r.sky || '').trim().toLowerCase(), String(r.words || '').trim()]));
+const say = (w) => said.get(String(w || '').trim().toLowerCase()) || w;
+return { days: rows(input.days).map((d) => ({ ...d, sky: say(d.sky) })), now_sky: say(input.now_sky) };`,
+          outputs: [
+            { id: 'days', label: 'The days', type: 'table', columns: DAY_COLS },
+            { id: 'now_sky', label: 'The sky now', type: 'text' },
           ],
           failed: 'agent',
         },
@@ -573,7 +612,7 @@ return {
           do: 'model',
           instructions: `Read this weather forecast for {{spot.label}} and say in plain words what to expect{{#plans}}, and when is best for this: {{plans}}{{/plans}}. Today is {{today}}. Temperatures in {{shape.unit}}, rain in {{shape.rain_unit}}, wind in {{shape.wind_unit}}; "score" is how good a day is to be out, from 0 to 10.
 
-{{shape.days}}
+{{words.days}}
 
 - summary: the days ahead in two or three sentences: the trend, the best of it and the worst of it.
 - best: the best days {{#plans}}for that{{/plans}}{{^plans}}to be out{{/plans}}, best first, at most three: each its date exactly as listed (YYYY-MM-DD) and why, in a few words.
@@ -593,9 +632,9 @@ return {
         summary: '{{read.summary}}',
         now_temp: '{{shape.now_temp}}',
         feels: '{{shape.feels}}',
-        now_sky: '{{shape.now_sky}}',
+        now_sky: '{{words.now_sky}}',
         now_icon: '{{shape.now_icon}}',
-        days: '{{shape.days}}',
+        days: '{{words.days}}',
         hours: '{{shape.hours}}',
         best: '{{read.best}}',
         wear: '{{read.wear}}',
@@ -619,20 +658,7 @@ return {
         label: 'The days',
         type: 'table',
         required: true,
-        columns: [
-          { id: 'date', label: 'Date', type: 'date' },
-          { id: 'icon', label: 'Sky', type: 'text' },
-          { id: 'sky', label: 'In words', type: 'text' },
-          { id: 'high', label: 'High', type: 'number' },
-          { id: 'low', label: 'Low', type: 'number' },
-          { id: 'rain', label: 'Rain', type: 'number' },
-          { id: 'chance', label: 'Chance of rain, %', type: 'number' },
-          { id: 'wind', label: 'Wind', type: 'number' },
-          { id: 'uv', label: 'UV index', type: 'number' },
-          { id: 'sunrise', label: 'Sunrise', type: 'text' },
-          { id: 'sunset', label: 'Sunset', type: 'text' },
-          { id: 'score', label: 'Good to be out (0 to 10)', type: 'number' },
-        ],
+        columns: DAY_COLS,
       },
       { id: 'hours', label: 'The next 48 hours', type: 'table', columns: [{ id: 'time', label: 'Time', type: 'text' }, { id: 'hour', label: 'Hour', type: 'text' }, { id: 'temp', label: 'Temperature', type: 'number' }, { id: 'chance', label: 'Chance of rain, %', type: 'number' }, { id: 'icon', label: 'Sky', type: 'text' }] },
       { id: 'best', label: 'Best days', type: 'table', columns: [{ id: 'date', label: 'Date', type: 'date' }, { id: 'why', label: 'Why', type: 'text' }] },
@@ -645,7 +671,7 @@ return {
     ],
     examples: [
       { id: 'a-week-in-lisbon', name: 'A week in Lisbon', inputs: { place: 'Lisbon', days: '7 days', plans: 'A day at the beach' }, checks: ['{{answer.days}} is not empty', '{{answer.place}} contains Portugal', '{{answer.unit}} = °C'] },
-      { id: 'a-town-by-its-region-in-fahrenheit', name: 'A town by its region, in Fahrenheit', inputs: { place: 'Paris, Texas', days: '3 days', units: 'Fahrenheit' }, checks: ['{{answer.place}} contains Texas', '{{answer.unit}} = °F'] },
+      { id: 'a-town-by-its-region-in-fahrenheit', name: 'A town by its region, in Fahrenheit', inputs: { place: 'Paris, Texas', days: '3 days', units: 'Imperial' }, checks: ['{{answer.place}} contains Texas', '{{answer.unit}} = °F'] },
     ],
   },
   {
@@ -658,12 +684,13 @@ return {
     fields: [
       { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Crete, or Kyoto' },
       { id: 'for_what', label: 'Best for', type: 'choice', options: ['City sightseeing', 'Beach and sun', 'Hiking', 'Snow and skiing', 'Escaping the heat'], default: 'City sightseeing' },
-      { id: 'units', label: 'Units', type: 'choice', options: ['Celsius', 'Fahrenheit'], default: 'Celsius' },
+      { id: 'units', label: 'Units', type: 'choice', options: ['Metric', 'Imperial'], default: 'Metric', from: 'me.units' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
-        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name={{place}}' }, failed: 'skip' },
+        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language={{lang}}&format=json&name={{place}}' }, failed: 'skip' },
         {
           id: 'spot',
           title: 'Pick the place',
@@ -732,7 +759,9 @@ return { picture: file && !drawn && /^https?:\/\/\S+$/.test(src) ? src : null };
 const h = bodyOf(input.history);
 const d = h && h.daily;
 if (!d || !Array.isArray(d.time) || !d.time.length) throw new Error('The weather of past years did not come back: try again in a minute');
-const NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// The months' short names in the person's language (Jan, Feb… in English).
+const monthName = new Intl.DateTimeFormat((ctx.locale && ctx.locale.lang) || 'en', { month: 'short', timeZone: 'UTC' });
+const NAMES = Array.from({ length: 12 }, (_v, k) => monthName.format(new Date(Date.UTC(2024, k, 15))));
 const m = NAMES.map(() => ({ high: [], low: [], rain: 0, wet: 0, sun: [], snow: 0, years: new Set() }));
 d.time.forEach((t, i) => {
   const k = Number(String(t).slice(5, 7)) - 1;
@@ -750,7 +779,7 @@ d.time.forEach((t, i) => {
   if ((v(d.snowfall_sum) || 0) >= 1) x.snow++;
 });
 const mean = (a) => (a.length ? a.reduce((s, y) => s + y, 0) / a.length : null);
-const us = input.units === 'Fahrenheit';
+const us = /^(?:imperial|fahrenheit)$/i.test(String(input.units || ''));
 const temp = (c) => (c === null ? null : Math.round((us ? c * 9 / 5 + 32 : c) * 10) / 10);
 const fit = (x, lo, hi, soft) => (x === null ? 0 : x < lo ? Math.max(0, 1 - (lo - x) / soft) : x > hi ? Math.max(0, 1 - (x - hi) / soft) : 1);
 const SCORE = {
@@ -812,7 +841,7 @@ return { months, best: ranked.slice(0, 3).map((x) => x.month), worst: ranked.sli
 {{months.months}}
 
 - summary: when to go and why in two or three sentences, the shoulder months too.
-- best: the three best months, best first: each the month as written above (Jan, Feb…) and why, in a sentence with the numbers that matter.
+- best: the three best months, best first: each the month exactly as written in the table above, and why, in a sentence with the numbers that matter.
 - avoid: the months to avoid, each with why, in a few words.
 - tips: a few tips for a visit then: what to pack for that weather, and what the season is usually like there (busy or quiet, dearer or cheaper) as far as is well known; say so when unsure.`,
           outputs: [
@@ -867,19 +896,32 @@ return { months, best: ranked.slice(0, 3).map((x) => x.month), worst: ranked.sli
     category: 'Sports',
     description: 'Any team at a glance: its next matches, latest results and form, where it stands in its league, and the week’s news about it.',
     fields: [
-      { id: 'team', label: 'Team', type: 'text', required: true, placeholder: 'e.g. Arsenal, Boston Celtics, Olympiacos' },
+      { id: 'team', label: 'Team', type: 'text', required: true, placeholder: 'e.g. Arsenal, Boston Celtics, Olympiacos', from: 'me.teams' },
       { id: 'sport', label: 'Sport or league', type: 'text', placeholder: 'e.g. Premier League, or basketball', help: 'Helps when several teams share the name' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
-        { id: 'find_team', title: 'Find the team', do: 'tool', tool: 'http_request', with: { url: `${SPORTSDB}/searchteams.php?t={{team}}` }, failed: 'skip' },
+        {
+          id: 'mine',
+          title: 'Which team',
+          do: 'code',
+          language: 'javascript',
+          with: { team: '{{team}}' },
+          code: String.raw`// The team asked for. When the question started from the teams in About you it holds several, separated by commas: the
+// first is looked up (naming another is one change in the box).
+return { team: String(input.team || '').split(/\s*[,;\n]\s*/).map((t) => t.trim()).filter(Boolean)[0] || '' };`,
+          outputs: [{ id: 'team', label: 'Team', type: 'text' }],
+          failed: 'agent',
+        },
+        { id: 'find_team', title: 'Find the team', do: 'tool', tool: 'http_request', with: { url: `${SPORTSDB}/searchteams.php?t={{mine.team}}` }, failed: 'skip' },
         {
           id: 'team_info',
           title: 'Pick the team',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{find_team}}', team: '{{team}}', sport: '{{sport}}' },
+          with: { found: '{{find_team}}', team: '{{mine.team}}', sport: '{{sport}}' },
           code:
             BODY +
             TEAM +
@@ -1155,22 +1197,35 @@ return {
     category: 'Sports',
     description: 'Two teams before they meet: their form, the last meetings, team news and what the experts expect, with the chances of each result.',
     fields: [
-      { id: 'team', label: 'Team', type: 'text', required: true, placeholder: 'e.g. Arsenal' },
+      { id: 'team', label: 'Team', type: 'text', required: true, placeholder: 'e.g. Arsenal', from: 'me.teams' },
       { id: 'opponent', label: 'Opponent', type: 'text', required: true, placeholder: 'e.g. Chelsea' },
       { id: 'competition', label: 'Sport or competition', type: 'text', placeholder: 'e.g. Premier League, or the NBA' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
+        {
+          id: 'mine',
+          title: 'Which team',
+          do: 'code',
+          language: 'javascript',
+          with: { team: '{{team}}' },
+          code: String.raw`// The team asked for. When the question started from the teams in About you it holds several, separated by commas: the
+// first is looked up (naming another is one change in the box).
+return { team: String(input.team || '').split(/\s*[,;\n]\s*/).map((t) => t.trim()).filter(Boolean)[0] || '' };`,
+          outputs: [{ id: 'team', label: 'Team', type: 'text' }],
+          failed: 'agent',
+        },
         {
           id: 'look',
           title: 'Look both teams up',
           do: 'parallel',
           branches: [
-            [{ id: 'find_team', title: 'Find the team', do: 'tool', tool: 'http_request', with: { url: `${SPORTSDB}/searchteams.php?t={{team}}` }, failed: 'skip' }],
+            [{ id: 'find_team', title: 'Find the team', do: 'tool', tool: 'http_request', with: { url: `${SPORTSDB}/searchteams.php?t={{mine.team}}` }, failed: 'skip' }],
             [{ id: 'find_opponent', title: 'Find the opponent', do: 'tool', tool: 'http_request', with: { url: `${SPORTSDB}/searchteams.php?t={{opponent}}` }, failed: 'skip' }],
-            [{ id: 'previews', title: 'Search for previews', do: 'tool', tool: 'web_search', with: { query: '{{team}} vs {{opponent}} {{competition}} preview prediction team news', k: 10 }, failed: 'skip' }],
-            [{ id: 'meetings', title: 'Search for their last meetings', do: 'tool', tool: 'web_search', with: { query: '{{team}} {{opponent}} head to head last meetings results', k: 8 }, failed: 'skip' }],
+            [{ id: 'previews', title: 'Search for previews', do: 'tool', tool: 'web_search', with: { query: '{{mine.team}} vs {{opponent}} {{competition}} preview prediction team news', k: 10 }, failed: 'skip' }],
+            [{ id: 'meetings', title: 'Search for their last meetings', do: 'tool', tool: 'web_search', with: { query: '{{mine.team}} {{opponent}} head to head last meetings results', k: 8 }, failed: 'skip' }],
           ],
         },
         {
@@ -1178,7 +1233,7 @@ return {
           title: 'Pick the previews to read',
           do: 'code',
           language: 'javascript',
-          with: { previews: '{{previews}}', team: '{{find_team}}', opponent: '{{find_opponent}}', team_name: '{{team}}', opponent_name: '{{opponent}}', competition: '{{competition}}' },
+          with: { previews: '{{previews}}', team: '{{find_team}}', opponent: '{{find_opponent}}', team_name: '{{mine.team}}', opponent_name: '{{opponent}}', competition: '{{competition}}' },
           code:
             BODY +
             HITS +
@@ -1218,7 +1273,7 @@ return {
           over: '{{sources.items}}',
           atOnce: 2,
           as: 'page',
-          steps: [{ id: 'page_text', title: 'Read a preview', do: 'tool', tool: 'read_page', with: { url: '{{page.url}}', question: 'Form, head-to-head, team news (injuries, suspensions), likely line-ups, and the prediction for {{team}} against {{opponent}}' }, failed: 'skip' }],
+          steps: [{ id: 'page_text', title: 'Read a preview', do: 'tool', tool: 'read_page', with: { url: '{{page.url}}', question: 'Form, head-to-head, team news (injuries, suspensions), likely line-ups, and the prediction for {{mine.team}} against {{opponent}}' }, failed: 'skip' }],
         },
         {
           id: 'preview',
@@ -1239,7 +1294,7 @@ Their last meetings:
 - summary: what to expect, in three or four sentences.
 - prediction: a likely result, like "{{sources.team}} 2–1 {{sources.opponent}}".
 - team_win, draw, opponent_win: the chances of each result in percent (they add up to 100; a draw is 0 where the sport has none), from the sources' predictions and the form.
-- team_form, opponent_form: each team's last five results, oldest first, as letters (W, D, L).
+- team_form, opponent_form: each team's last five results, oldest first, as the letters W, D and L (always these three letters, in whatever language you write).
 - meetings: their last meetings, newest first, at most six: the date, the home team, the away team and the score.
 - team_news, opponent_news: injuries, suspensions and doubts for each.
 - keys: three to five things to watch.`,
@@ -1371,10 +1426,11 @@ return { chances, team_pct: a, draw_pct: d, opponent_pct: b, total_pct: a + d + 
     description: 'Recipes for what is in your fridge: what each uses of yours and what is missing, with photos, the steps timed out, and a video when there is one.',
     fields: [
       { id: 'have', label: 'What you have', type: 'long', required: true, placeholder: 'e.g. chicken, rice, peppers, garlic, a lemon, eggs' },
-      { id: 'diet', label: 'Diet', type: 'choice', options: ['Anything', 'Vegetarian', 'Vegan', 'No pork', 'Gluten-free'], default: 'Anything' },
-      { id: 'time', label: 'Time to cook', type: 'choice', options: ['Any', 'Under 30 minutes', 'Under an hour'], default: 'Any' },
+      { id: 'diet', label: 'Diet', type: 'choice', options: ['Anything', 'Vegetarian', 'Vegan', 'Pescatarian', 'No pork', 'Gluten-free'], default: 'Anything', from: 'me.diet' },
+      { id: 'time', label: 'Time to cook', type: 'choice', options: ['Any', 'Under 30 minutes', 'Under an hour'], default: 'Any', remember: true },
       { id: 'basics', label: 'Count salt, oil and spices as there', type: 'yesno', default: 'Yes' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -1385,15 +1441,35 @@ return { chances, team_pct: a, draw_pct: d, opponent_pct: b, total_pct: a + d + 
           language: 'javascript',
           with: { have: '{{have}}', diet: '{{diet}}' },
           code:
+            LIST +
             KITCHEN +
             String.raw`// What you have, one thing each, without amounts; and the searches of the recipe database: each thing as written and
 // in the other number ("egg" and "eggs" find different recipes), six things at most, the basics last; and the
-// recipes of a vegetarian or vegan diet, to keep to them.
+// recipes of a vegetarian or vegan diet, to keep to them. The database names ingredients in English: a list in another
+// language (or with letters beyond a to z) is first turned into English names by a quick model, and what the person
+// wrote for each is kept (own), to show it back in their words.
+let said = String(input.have || '');
+const own = [];
+const named = [];
+if (((ctx.locale && ctx.locale.lang) || 'en') !== 'en' || /[^\x00-\x7f]/.test(said)) {
+  try {
+    const got = await ctx.model(
+      'The recipe database names ingredients in English. Turn what this person has into English ingredient names: one row for each thing, without amounts, in the singular (chicken, red pepper, egg), and with it the words they wrote for it, exactly as they wrote them.\n\nWhat they have: {{have}}\n\nThe English names are words to search with, not text for people to read: write them in English, whatever language the rest of your answer is in.',
+      { with: { have: said }, title: 'Say what they have in English', outputs: [{ id: 'names', label: 'Ingredients', type: 'table', required: true, columns: [{ id: 'english', label: 'In English', type: 'text' }, { id: 'own', label: 'As they wrote it', type: 'text' }] }] },
+    );
+    for (const r of rows(got && got.names)) if (String(r.english || '').trim()) named.push({ english: String(r.english).trim(), own: String(r.own || '').trim() });
+  } catch (e) {}
+  if (named.length) said = named.map((r) => r.english).join(', ');
+}
 const have = [];
-for (const part of String(input.have || '').split(/,|;|\n|\band\b|\+/i)) {
+for (const part of said.split(/,|;|\n|\band\b|\+/i)) {
   const t = part.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').replace(/^\s*[\d.,\/½¼¾]+\s*[a-z]{0,5}\.?\s+(?:of\s+)?/i, '').trim();
   const w = words(t);
   if (w.length && !have.some((h) => words(h).join(' ') === w.join(' '))) have.push(w.join(' '));
+}
+for (const r of named) {
+  const key = words(r.english).join(' ');
+  if (key && r.own && r.own.toLowerCase() !== r.english.toLowerCase() && !own.some((o) => o.have === key)) own.push({ have: key, own: r.own });
 }
 if (!have.length) throw new Error('Say what you have, like: chicken, rice, peppers');
 const main = have.filter((h) => !isStaple(h)).concat(have.filter((h) => isStaple(h))).slice(0, 6);
@@ -1408,10 +1484,11 @@ main.forEach((t, n) => {
   for (const term of [t, other(t)]) items.push({ n: n + 1, term, url: '${MEALDB}/filter.php?i=' + encodeURIComponent(term.replace(/ /g, '_')) });
 });
 if (input.diet === 'Vegetarian' || input.diet === 'Vegan') for (const c of input.diet === 'Vegan' ? ['Vegan'] : ['Vegetarian', 'Vegan']) items.push({ n: 0, term: c, url: '${MEALDB}/filter.php?c=' + c });
-return { items, have, count: have.length };`,
+return { items, have, own, count: have.length };`,
           outputs: [
             { id: 'items', label: 'Searches', type: 'table', columns: [{ id: 'n', label: 'Thing', type: 'number' }, { id: 'term', label: 'Search', type: 'text' }, { id: 'url', label: 'Address', type: 'url' }] },
             { id: 'have', label: 'What you have', type: 'list' },
+            { id: 'own', label: 'In their own words', type: 'table', columns: [{ id: 'have', label: 'In English', type: 'text' }, { id: 'own', label: 'As they wrote it', type: 'text' }] },
             { id: 'count', label: 'How many things', type: 'number' },
           ],
           failed: 'agent',
@@ -1461,7 +1538,7 @@ return { items: all.slice(0, 8).map((m) => ({ id: m.id, name: m.name, matched: m
           title: 'See what each needs',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{details.items}}', have: '{{items.have}}', diet: '{{diet}}', basics: '{{basics}}' },
+          with: { found: '{{details.items}}', have: '{{items.have}}', own: '{{items.own}}', diet: '{{diet}}', basics: '{{basics}}' },
           code:
             LIST +
             BODY +
@@ -1469,6 +1546,12 @@ return { items: all.slice(0, 8).map((m) => ({ id: m.id, name: m.name, matched: m
             String.raw`// Each recipe against what you have: what it uses of yours, what you would need (the basics count as there when the
 // form says so), whether it suits the diet; the closest six first. And the method of the first four, for timing.
 const have = list(input.have).map(String);
+const ownOf = new Map(rows(input.own).map((r) => [String(r.have), String(r.own)]));
+// What of yours a recipe uses, in the words they wrote it in where they wrote it in another language.
+const mineAs = (x) => {
+  const h = have.find((y) => matches(y, x.item));
+  return (h && ownOf.get(h)) || x.item;
+};
 const basics = input.basics !== 'No';
 const out = [];
 for (const r of list(input.found)) {
@@ -1492,7 +1575,7 @@ const recipes = top.map(({ m, used, needed }) => ({
   difficulty: '',
   uses: used.length,
   missing: needed.length,
-  uses_list: used.map((x) => x.item).join(', '),
+  uses_list: used.map(mineAs).join(', '),
   missing_list: needed.map((x) => x.item).join(', '),
   fits: null,
   video: linkOf(m.strYoutube),
@@ -1596,12 +1679,13 @@ return { recipes, steps, shopping, summary };`,
     category: 'Food',
     description: 'A week of dinners picked for your household and diet, each with its recipe and photo, and one shopping list for all of them, by aisle.',
     fields: [
-      { id: 'days', label: 'How many dinners', type: 'number', default: '7' },
-      { id: 'people', label: 'For how many people', type: 'number', default: '2' },
-      { id: 'diet', label: 'Diet', type: 'choice', options: ['Anything', 'Vegetarian', 'Vegan', 'Pescatarian', 'No pork'], default: 'Anything' },
-      { id: 'likes', label: 'Likes and dislikes', type: 'text', placeholder: 'e.g. Loves Mexican food, no mushrooms, quick on weekdays' },
+      { id: 'days', label: 'How many dinners', type: 'number', default: '7', remember: true },
+      { id: 'people', label: 'For how many people', type: 'number', default: '2', from: 'me.household' },
+      { id: 'diet', label: 'Diet', type: 'choice', options: ['Anything', 'Vegetarian', 'Vegan', 'Pescatarian', 'No pork'], default: 'Anything', from: 'me.diet' },
+      { id: 'likes', label: 'Likes and dislikes', type: 'text', placeholder: 'e.g. Loves Mexican food, no mushrooms, quick on weekdays', remember: true },
       { id: 'start', label: 'Starting on', type: 'date', help: 'Today, unless you say' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -1616,11 +1700,12 @@ const n = Math.min(14, Math.max(1, Math.round(Number(input.days) || 7)));
 const from = /^\d{4}-\d{2}-\d{2}$/.test(String(input.start || '')) ? input.start : String(input.today || '').slice(0, 10);
 const start = new Date(from + 'T00:00:00Z');
 if (isNaN(start.getTime())) throw new Error('The first day should be a date, like 2026-11-20');
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// The weekday in the person's language (Monday in English).
+const weekday = new Intl.DateTimeFormat((ctx.locale && ctx.locale.lang) || 'en', { weekday: 'long', timeZone: 'UTC' });
 const dates = [];
 for (let i = 0; i < n; i++) {
   const d = new Date(start.getTime() + i * 86400000);
-  dates.push({ day: i + 1, date: d.toISOString().slice(0, 10), weekday: WEEKDAYS[d.getUTCDay()] });
+  dates.push({ day: i + 1, date: d.toISOString().slice(0, 10), weekday: weekday.format(d) });
 }
 const KINDS = {
   Vegetarian: ['Vegetarian', 'Vegan', 'Pasta', 'Side'],
@@ -1656,7 +1741,18 @@ const rnd = () => {
   h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909);
   return ((h >>>= 0) % 100000) / 100000;
 };
-const no = [...String(input.likes || '').toLowerCase().matchAll(/\b(?:no|not|without|hates?|avoid|dislikes?)\s+([a-z]+)/g)].map((m) => m[1].replace(/s$/, ''));
+// What they rule out, as English words to look for in the recipes' names ("no mushrooms"): read from the likes as
+// written in English; a quick model reads them when the likes are in another language.
+let no = [...String(input.likes || '').toLowerCase().matchAll(/\b(?:no|not|without|hates?|avoid|dislikes?)\s+([a-z]+)/g)].map((m) => m[1].replace(/s$/, ''));
+if (String(input.likes || '').trim() && (((ctx.locale && ctx.locale.lang) || 'en') !== 'en' || /[^\x00-\x7f]/.test(String(input.likes)))) {
+  try {
+    const got = await ctx.model(
+      'List the foods this person says they dislike or do not want in their dinners, each as one English word for the food in the singular (mushroom, onion, cheese): "{{likes}}"\n\nNothing for what they like. The words are for searching recipe names, not for people to read: English, whatever language the rest of your answer is in.',
+      { with: { likes: String(input.likes) }, title: 'Read what they do not want', outputs: [{ id: 'avoid', label: 'Foods to leave out', type: 'list' }] },
+    );
+    no = no.concat(list(got && got.avoid).map((w) => String(w).toLowerCase().trim().replace(/s$/, '')).filter((w) => /^[a-z]{3,}$/.test(w)));
+  } catch (e) {}
+}
 const per = list(input.found).map((r, i) => {
   const meals = ((bodyOf(r) || {}).meals || []).filter((m) => !no.some((w) => String(m.strMeal).toLowerCase().includes(w)));
   for (let j = meals.length - 1; j > 0; j--) {
@@ -2048,11 +2144,12 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
     description: 'Films and shows picked for your mood tonight, with where each streams in your country, its rating, its picture and trailer, and why it fits.',
     fields: [
       { id: 'mood', label: 'In the mood for', type: 'text', required: true, placeholder: 'e.g. Something funny and light, or a gripping thriller' },
-      { id: 'kind', label: 'Film or show', type: 'choice', options: ['Either', 'A film', 'A show'], default: 'Either' },
-      { id: 'services', label: 'Services you have', type: 'text', placeholder: 'e.g. Netflix, Prime Video, Disney+' },
-      { id: 'country', label: 'Country', type: 'text', placeholder: 'e.g. United Kingdom' },
+      { id: 'kind', label: 'Film or show', type: 'choice', options: ['Either', 'A film', 'A show'], default: 'Either', remember: true },
+      { id: 'services', label: 'Services you have', type: 'text', placeholder: 'e.g. Netflix, Prime Video, Disney+', from: 'me.services' },
+      { id: 'country', label: 'Country', type: 'text', placeholder: 'e.g. United Kingdom', from: 'me.country' },
       { id: 'seen', label: 'Loved lately, or seen already', type: 'long', placeholder: 'e.g. Loved Severance and Knives Out' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2065,7 +2162,7 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
 
 {{fresh.text}}
 
-- picks: each its title as it is known in English, its year, Film or Show, its genre, its length in minutes (an episode's, for a show), and why it fits tonight in a sentence.`,
+- picks: each its title as it is known in English, its year, its kind (the word Film or the word Show, exactly), its genre, its length in minutes (an episode's, for a show), and why it fits tonight in a sentence.`,
           outputs: [{ id: 'picks', label: 'Picks', type: 'table', required: true, columns: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'year', label: 'Year', type: 'number' }, { id: 'kind', label: 'Film or show', type: 'text' }, { id: 'genre', label: 'Genre', type: 'text' }, { id: 'minutes', label: 'Minutes', type: 'number' }, { id: 'why', label: 'Why', type: 'text' }] }],
         },
         {
@@ -2076,26 +2173,34 @@ return { ideas: ideas.map(({ at, ...x }) => x), budget, summary: String(input.ap
           with: { picks: '{{pick.picks}}', country: '{{country}}' },
           code:
             LIST +
-            String.raw`// For each pick: where to find more about it (TVmaze for a show, Wikipedia for a film) and the search for where it streams;
-// and its title with its year in brackets, which finds its own trailer and not another's of the same name.
+            String.raw`// For each pick: where to find more about it (TVmaze for a show, Wikipedia for a film: in the person's language first,
+// English when that has nothing) and the search for where it streams; and its title with its year in brackets, which
+// finds its own trailer and not another's of the same name. The country as a name (About you keeps its two letters).
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+let country = String(input.country || '').trim();
+if (/^[A-Za-z]{2}$/.test(country)) {
+  try {
+    country = new Intl.DisplayNames(['en'], { type: 'region' }).of(country.toUpperCase()) || country;
+  } catch (e) {}
+}
 const picks = rows(input.picks).slice(0, 6);
 const items = picks.map((p) => {
   const show = /show|series/i.test(String(p.kind || ''));
   const title = String(p.title || '').trim();
-  const info = show
-    ? 'https://api.tvmaze.com/singlesearch/shows?q=' + encodeURIComponent(title)
-    : 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=1&prop=pageimages|description|info&inprop=url&piprop=thumbnail&pithumbsize=400&gsrsearch=' + encodeURIComponent(title + ' ' + (p.year || '') + ' film');
-  return { title, show, info, query: title + ' ' + (p.year || '') + ' where to watch streaming ' + String(input.country || '') };
+  const wiki = (l, film) => 'https://' + l + '.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=1&prop=pageimages|description|info&inprop=url&piprop=thumbnail&pithumbsize=400&gsrsearch=' + encodeURIComponent(title + ' ' + (p.year || '') + (film ? ' film' : ''));
+  const info = show ? 'https://api.tvmaze.com/singlesearch/shows?q=' + encodeURIComponent(title) : wiki(lang, lang === 'en');
+  return { title, show, info, info_en: !show && lang !== 'en' ? wiki('en', true) : '', query: title + ' ' + (p.year || '') + ' where to watch streaming ' + country };
 });
 const names = picks.map((p) => {
   const title = String(p.title || '').trim();
   return title && num(p.year) ? title + ' (' + num(p.year) + ')' : title;
 });
 const shows = items.filter((x) => x.show).length;
-return { items, names, kind: shows && shows === items.length ? 'TV series' : shows ? 'film or TV series' : 'film' };`,
+return { items, names, country, kind: shows && shows === items.length ? 'TV series' : shows ? 'film or TV series' : 'film' };`,
           outputs: [
-            { id: 'items', label: 'Look-ups', type: 'table', columns: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'show', label: 'A show', type: 'yesno' }, { id: 'info', label: 'Where to find more', type: 'url' }, { id: 'query', label: 'Search', type: 'text' }] },
+            { id: 'items', label: 'Look-ups', type: 'table', columns: [{ id: 'title', label: 'Title', type: 'text' }, { id: 'show', label: 'A show', type: 'yesno' }, { id: 'info', label: 'Where to find more', type: 'url' }, { id: 'info_en', label: 'The English Wikipedia, when the first has nothing', type: 'text' }, { id: 'query', label: 'Search', type: 'text' }] },
             { id: 'names', label: 'Titles and years', type: 'list' },
+            { id: 'country', label: 'Country', type: 'text' },
             { id: 'kind', label: 'What they are', type: 'text' },
           ],
           failed: 'agent',
@@ -2117,13 +2222,20 @@ return { items, names, kind: shows && shows === items.length ? 'TV series' : sho
               title: 'Put it together',
               do: 'code',
               language: 'javascript',
-              with: { info: '{{info}}', where: '{{where}}', title: '{{it.title}}' },
+              with: { info: '{{info}}', where: '{{where}}', title: '{{it.title}}', info_en: '{{it.info_en}}' },
               code:
                 BODY +
                 HITS +
                 String.raw`// Its picture, rating and channel (from TVmaze) or its picture and page (from Wikipedia), and what the search says of where it streams.
-const b = bodyOf(input.info) || {};
-const page = b.query && b.query.pages ? b.query.pages[0] || {} : null;
+// A film the person's own Wikipedia has no page for is looked for at the English one.
+let b = bodyOf(input.info) || {};
+let page = b.query && b.query.pages ? b.query.pages[0] || {} : null;
+if (input.info_en && !(page && page.fullurl)) {
+  try {
+    const en = bodyOf(await ctx.tool('http_request', { url: input.info_en, headers: { 'User-Agent': '${UA}' } }, { title: 'Look for it on the English Wikipedia' })) || {};
+    if (en.query && en.query.pages) (b = en), (page = en.query.pages[0] || {});
+  } catch (e) {}
+}
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '')) ? String(v) : null);
 const channel = b.webChannel ? b.webChannel.name : b.network ? b.network.name : '';
 return {
@@ -2150,7 +2262,7 @@ return {
           id: 'streams',
           title: 'Find where each streams',
           do: 'model',
-          instructions: `Say where each of these streams in {{#country}}{{country}}{{/country}}{{^country}}the viewer's country{{/country}}, from what was found about it (services like Netflix, Prime Video, Disney+, Max, Apple TV+; or to rent or buy){{#services}}, and whether it is on one of their services: {{services}}{{/services}}. Then pick the one to watch tonight.
+          instructions: `Say where each of these streams in {{#urls.country}}{{urls.country}}{{/urls.country}}{{^urls.country}}the viewer's country{{/urls.country}}, from what was found about it (services like Netflix, Prime Video, Disney+, Max, Apple TV+; or to rent or buy){{#services}}, and whether it is on one of their services: {{services}}{{/services}}. Then pick the one to watch tonight.
 
 {{look.items}}
 
@@ -2209,11 +2321,12 @@ return { picks };`,
     category: 'Fun',
     description: 'Games for what you like and where you play, out now or coming soon: each with its picture, its trailer and why it fits, and for PC its best price.',
     fields: [
-      { id: 'likes', label: 'What you like', type: 'long', placeholder: 'e.g. Cozy co-op games like Stardew Valley, or tense strategy. Empty: the best of them' },
-      { id: 'platform', label: 'Where you play', type: 'choice', options: ['Any', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch 2', 'Nintendo Switch', 'Phone or tablet'], default: 'Any' },
+      { id: 'likes', label: 'What you like', type: 'long', placeholder: 'e.g. Cozy co-op games like Stardew Valley, or tense strategy. Empty: the best of them', remember: true },
+      { id: 'platform', label: 'Where you play', type: 'choice', options: ['Any', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch 2', 'Nintendo Switch', 'Phone or tablet'], default: 'Any', remember: true },
       { id: 'when', label: 'Out now or coming', type: 'choice', options: ['Out now', 'Coming soon', 'Both'], default: 'Out now' },
-      { id: 'budget', label: 'Budget', type: 'choice', options: ['Any price', 'Free to play', 'Under 20'], default: 'Any price' },
+      { id: 'budget', label: 'Budget', type: 'choice', options: ['Any price', 'Free to play', 'Under 20'], default: 'Any price', remember: true },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2265,11 +2378,11 @@ return {
   - title: as its makers write it;
   - year: when it came or comes out;
   - out: for a game still to come, when it comes out, as the sources give it ("12 Nov 2026", "Feb 2027", "Spring 2027"); empty for one out now;
-  - coming: true for a game still to come, false for one out now;
+  - coming: true for a game still to come, false for one out now (the words true and false, whatever language you write in);
   - genre, and platforms: the ones it is on;
   - hours: about how long its main part takes; empty when not known;
   - why: why it fits, in a sentence;
-  - free: whether it is free to play.
+  - free: whether it is free to play (true or false).
 - summary: the picks in a sentence, for the person who asked (nothing on what the sources leave out).`,
           outputs: [
             {
@@ -2356,6 +2469,7 @@ return {
           with: { games: '{{pick.games}}', deals: '{{deals.items}}', media: '{{media.data}}', budget: '{{budget}}', summary: '{{pick.summary}}' },
           code:
             LIST +
+            BODY +
             String.raw`// Each game with its picture and trailer, and its price where one was found; with a budget, those within it first.
 // A note a model may still add on its sources ("(from general knowledge; not in the snippets)", "; one source gives
 // another date") is left out: the cards show the fields as they are.
@@ -2384,24 +2498,51 @@ const games = rows(input.games).map((g, i) => {
     price: num(d.price), lowest: num(d.lowest), store: String(d.store || ''), deal: d.deal || null, picture: m.picture || d.picture || null, video: m.video || null, at: i,
   };
 });
+// Prices are CheapShark's, in US dollars: written as the person's language writes money, as "US$" (plain "$" for one whose
+// currency is the dollar). For another currency, its worth at the rate of the day, from one call (left out when it fails).
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const mine = String((ctx.locale && ctx.locale.currency) || '').toUpperCase();
+const dollars = (n) => new Intl.NumberFormat(lang, { style: 'currency', currency: 'USD' }).formatToParts(n).map((p) => (p.type === 'currency' && p.value === '$' && mine !== 'USD' ? 'US$' : p.value)).join('');
+let rate = null;
+let rateNote = '';
+if (/^[A-Z]{3}$/.test(mine) && mine !== 'USD' && games.some((g) => g.price !== null)) {
+  try {
+    const r = bodyOf(await ctx.tool('http_request', { url: 'https://api.frankfurter.dev/v2/rate/usd/' + mine.toLowerCase() }, { title: 'Get the dollar’s rate in ' + mine }));
+    if (r && Number(r.rate) > 0) {
+      rate = Number(r.rate);
+      rateNote = '1 US$ = ' + new Intl.NumberFormat(lang, { style: 'currency', currency: mine, maximumFractionDigits: 4 }).format(rate) + (r.date ? ' (' + r.date + ')' : '');
+    }
+  } catch (e) {}
+}
+const money = (n) => {
+  if (n === null) return '';
+  try {
+    return dollars(n) + (rate ? ' (≈ ' + new Intl.NumberFormat(lang, { style: 'currency', currency: mine }).format(n * rate) + ')' : '');
+  } catch (e) {
+    return String(n);
+  }
+};
+for (const g of games) (g.price_text = money(g.price)), (g.lowest_text = money(g.lowest));
 const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || g.coming || (g.price !== null && g.price < 20) : true);
 games.sort((a, b) => Number(within(b)) - Number(within(a)) || a.at - b.at);
 // The picks in their first sentence: what follows it is a model's notes on what the sources lacked.
 const said = String(input.summary || '').replace(/\s+/g, ' ').trim();
 const first = (/^.*?[.!?](?=\s+[A-Z]|$)/.exec(said) || [said])[0];
-return { games: games.map(({ at, ...g }) => g), summary: first.length > 20 ? first : said };`,
+return { games: games.map(({ at, ...g }) => g), summary: first.length > 20 ? first : said, rate: rateNote };`,
           outputs: [
             { id: 'games', label: 'Games', type: 'table', columns: GAME_COLS },
             { id: 'summary', label: 'In short', type: 'text' },
+            { id: 'rate', label: 'The dollar’s rate', type: 'text', description: 'What a US dollar is worth in the person’s currency, with its date; empty when they use dollars or the rate could not be had' },
           ],
           failed: 'agent',
         },
       ],
-      outputs: { summary: '{{final.summary}}', games: '{{final.games}}' },
+      outputs: { summary: '{{final.summary}}', games: '{{final.games}}', rate: '{{final.rate}}' },
     },
     answer: [
       { id: 'summary', label: 'In short', type: 'text', required: true },
       { id: 'games', label: 'Games', type: 'table', required: true, columns: GAME_COLS },
+      { id: 'rate', label: 'The dollar’s rate', type: 'text' },
     ],
     examples: [
       { id: 'cozy-co-op', name: 'Cozy co-op on PC', inputs: { likes: 'Cozy co-op games like Stardew Valley', platform: 'PC' }, checks: ['{{answer.games}} is not empty'] },
@@ -2649,7 +2790,7 @@ return { from: iso(from), to: iso(to), label, month: MONTHS[from.getUTCMonth()] 
           ],
           failed: 'agent',
         },
-        { id: 'search', title: 'Look the city up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name={{city}}' }, failed: 'skip' },
+        { id: 'search', title: 'Look the city up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language={{lang}}&format=json&name={{city}}' }, failed: 'skip' },
         {
           id: 'spot',
           title: 'Pick the city',
@@ -3180,7 +3321,7 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
     prompt: '',
     flow: {
       steps: [
-        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name={{place}}' }, failed: 'skip' },
+        { id: 'search', title: 'Look the place up', do: 'tool', tool: 'http_request', with: { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language={{lang}}&format=json&name={{place}}' }, failed: 'skip' },
         {
           id: 'spot',
           title: 'Pick the place',
