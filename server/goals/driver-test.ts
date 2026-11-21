@@ -957,6 +957,12 @@ test('rules for every round: a round that broke one is undone; rules and unrule'
   assert.equal(goal(U).rounds[1].why, 'It broke a rule of yours: “No new files”: It added a dependency.');
   assert.equal(goal(U).rounds[1].cause, 'rule');
   assert.ok(asked.some((a) => a.system.includes('broke a rule') && a.prompt.includes('1. No new files') && a.prompt.includes('extra.txt')));
+  // The rules' reviewer is told which round it is and what was kept before it (a rule about order, "first this, that only
+  // later", cannot be judged from one round's change: on a real goal a later round doing the later part was undone for it),
+  // gets the change with its files named first, and is the stronger reviewer.
+  const ruleAsk = asked.find((a) => a.system.includes('broke a rule'))!;
+  assert.match(ruleAsk.prompt, /<round>\nThis is round 1\. No round was kept before it\.\n<\/round>\n\n<change>\nEvery file that changed \(/);
+  assert.equal(ruleAsk.strong, true);
   assert.match(last(U), /From the user \(follow these first\):\n- No new files/);
   reviewer.broke = false;
   await act(U, { action: 'unrule', id });
@@ -1529,7 +1535,15 @@ test('I4: the person’s say is refused (409, saying why) unless this session is
   await act(S2, { action: 'pause' });
   // While paused, the agent changed something in a turn of its own, or the person by hand: edits made outside the goal.
   await turn(S2, () => write(w.path, 'notes.txt', 'by the agent\n'));
-  await rejects(act(S2, { action: 'round', n: 2, do: 'keep' }), 409, new RegExp(`^This file changed outside the goal since it last left the files: notes\\.txt\\. To put your change aside in a stash, run this in ${w.path} \\(the worktree’s top folder: the paths are relative to it\\): git stash push --include-untracked -- notes\\.txt\\. Then try again\\.$`));
+  // The goal was paused while round 3 ran: the sentence says so (that round's unchecked work, most likely), names Resume first, and gives the same commands.
+  assert.equal(goal(S2).round, 3);
+  await rejects(
+    act(S2, { action: 'round', n: 2, do: 'keep' }),
+    409,
+    new RegExp(
+      `^Round 3 was under way when the goal was paused, and the app has not checked it yet: this file holds its work \\(or a change of your own\\): notes\\.txt\\. Resume the goal to have that round checked\\. To give your say now instead, first set that change aside in a stash: run this in ${w.path} \\(the worktree’s top folder: the paths are relative to it\\): git stash push --include-untracked -- notes\\.txt\\. Then try again\\.$`,
+    ),
+  );
   assert.equal(file(w.path, 'notes.txt'), 'by the agent\n');
   assert.equal(goal(S2).best, 1, 'nothing of the say was done');
   fs.rmSync(path.join(w.path, 'notes.txt'));

@@ -1345,8 +1345,10 @@ async function checkStep(d: Deps, key: string) {
       change = null;
     }
     const texts = g.rules.map((r) => r.text);
-    let r = change == null ? ({ error: 'no change to read' } as const) : await reviewRules(d, key, texts, change);
-    if ('error' in r && change != null) r = await reviewRules(d, key, texts, change);
+    // With which round this is and what the rounds kept before it did (their reports): a rule about order needs it.
+    const about = { round: g.round ?? g.rounds.length, before: g.rounds.filter((x) => x.n > 0 && x.outcome === 'kept').slice(-8).map((x) => `Round ${x.n}: ${clip((x.did ?? x.way ?? 'no report').replace(/\s+/g, ' '), 300)}`) };
+    let r = change == null ? ({ error: 'no change to read' } as const) : await reviewRules(d, key, texts, change, about);
+    if ('error' in r && change != null) r = await reviewRules(d, key, texts, change, about);
     if ('error' in r) rulesUnchecked = true;
     else rule = r.broke ?? undefined;
   }
@@ -1908,16 +1910,28 @@ const shellQuoted = (p: string) => (/^[\w./@+-]+$/.test(p) ? p : `'${p.replace(/
  * the goal's own work that is not committed, and the folder would still not be as the goal left it. Committing does not
  * help either: the files would still differ, and the say would take the commit off the branch.
  */
-function editedText(h: Edited): string {
+function editedText(h: Edited, open?: number): string {
   const { paths } = h;
-  if (!paths.length) return 'The folder has changes made outside the goal since it last left the files: put aside (or undo) the changes to the files git status shows you changed, and only those, then try again.';
+  // Paused while round `open` ran: what differs is most likely that round's own work, which the app has not checked yet
+  // (to the loop it is a change since it last left the files, like any other). Said as that, with what Resume does:
+  // called the person's change, they were told to put aside work they had not made.
+  const yours = open == null;
+  const under = `Round ${open} was under way when the goal was paused, and the app has not checked it yet`;
+  if (!paths.length)
+    return yours
+      ? 'The folder has changes made outside the goal since it last left the files: put aside (or undo) the changes to the files git status shows you changed, and only those, then try again.'
+      : `${under}: the folder holds its work. Resume the goal to have that round checked, then try again.`;
   const one = paths.length === 1;
   const named = `${paths.slice(0, 5).join(', ')}${paths.length > 5 ? ` and ${paths.length - 5} more` : ''}`;
-  const head = `${one ? 'This file' : 'These files'} changed outside the goal since it last left the files: ${named}.`;
+  const head = yours
+    ? `${one ? 'This file' : 'These files'} changed outside the goal since it last left the files: ${named}.`
+    : `${under}: ${one ? 'this file holds' : 'these files hold'} its work (or a change of your own): ${named}. Resume the goal to have that round checked.`;
+  const lead = yours ? 'To' : 'To give your say now instead, first';
+  const then = yours ? ',' : ':';
   const at = h.at.slice(0, 12);
   const top = shellQuoted(h.top);
   if (!h.here || !h.left || !h.committed) {
-    return `${head} To put your changes aside in a stash and put back the goal’s own version of the files, run these in ${top} (the worktree’s top folder): git stash push --include-untracked (everything changed since the last commit goes to the stash, your changes with it), then git restore --source=${at} --worktree -- :/. Then try again.`;
+    return `${head} ${lead} ${yours ? 'put your changes aside' : 'set those changes aside'} in a stash and put back the goal’s own version of the files${then} run these in ${top} (the worktree’s top folder): git stash push --include-untracked (everything changed since the last commit goes to the stash${yours ? ', your changes with it' : ''}), then git restore --source=${at} --worktree -- :/. Then try again.`;
   }
   const list = (ps: string[]) => ps.map(shellQuoted).join(' ');
   const left = new Set(h.left);
@@ -1928,8 +1942,9 @@ function editedText(h: Edited): string {
     h.left.length ? `git restore --source=${at} --worktree -- ${list(h.left)}` : '',
     gone.length ? `rm -f -- ${list(gone)}` : '',
   ].filter(Boolean);
-  const what = [h.here.length ? `put your ${one ? 'change' : 'changes'} aside in a stash` : '', h.left.length || gone.length ? `put back the goal’s own version of ${one ? 'that file' : 'those files'}` : ''].filter(Boolean).join(' and ');
-  return `${head} To ${what}, run ${steps.length > 1 ? 'these' : 'this'} in ${top} (the worktree’s top folder: the paths are relative to it): ${steps.join(', then ')}. Then try again.`;
+  const aside = yours ? `put your ${one ? 'change' : 'changes'} aside in a stash` : `set ${one ? 'that change' : 'those changes'} aside in a stash`;
+  const what = [h.here.length ? aside : '', h.left.length || gone.length ? `put back the goal’s own version of ${one ? 'that file' : 'those files'}` : ''].filter(Boolean).join(' and ');
+  return `${head} ${lead} ${what}${then} run ${steps.length > 1 ? 'these' : 'this'} in ${top} (the worktree’s top folder: the paths are relative to it): ${steps.join(', then ')}. Then try again.`;
 }
 const SAY_COMMITTED = 'A commit was made in the folder since the goal last left the files, and going to that round would take it off the branch: move it to a branch of its own first, then try again.';
 
@@ -1983,7 +1998,8 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
       if (h.by === 'other') throw new HttpError(409, `Another session (“${clip(h.who, 80)}”) is at work in the same folder: wait for it to finish, then try again.`);
       if (h.by === 'commit') throw new HttpError(409, SAY_COMMITTED);
       if (h.by === 'git') throw new HttpError(409, `${h.why}.`);
-      throw new HttpError(409, editedText(h));
+      // Paused while a round ran: the round left unchecked, whose work this most likely is, is named.
+      throw new HttpError(409, editedText(h, f.status === 'paused' && f.round != null ? f.round : undefined));
     }
     f = fresh(d, g);
     if (!f) return;
