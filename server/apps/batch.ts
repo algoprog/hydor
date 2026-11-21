@@ -24,7 +24,8 @@ export function startBatch(db: DB, o: { app: string; slug: string; recipe: AppRe
   const id = insertBatch(db, { app: o.app, name: o.name?.slice(0, 120), concurrency, total: rows.length });
   slugs.set(id, o.slug);
   rows.forEach((row, i) => {
-    const { errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false);
+    // A question the row leaves out takes what it starts from (About you, its last answer), as the run will.
+    const { errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false, {}, undefined, o.app);
     if (errors.length) {
       const r = insertRun(db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: 'batch', inputs: Object.fromEntries(Object.entries(row ?? {}).map(([k, v]) => [k, cellText(v)])), status: 'failed', batch: id, row: i + 1 });
       updateRun(db, r.id, { error: errors.join('; '), endedAt: Date.now() });

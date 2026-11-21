@@ -108,6 +108,8 @@ export function ensureTables(db: DB) {
   if (!cols.has('told')) db.exec('alter table app_runs add column told integer not null default 0');
   // What a run's flow could not have (calls that failed after their tries, steps that failed), as JSON.
   if (!cols.has('misses')) db.exec('alter table app_runs add column misses text');
+  // The language a run writes in (a tag), so running it again and talking to it keep to it.
+  if (!cols.has('lang')) db.exec('alter table app_runs add column lang text');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -307,6 +309,7 @@ interface RunRow {
   asked_by: string | null;
   told: number | null;
   misses: string | null;
+  lang: string | null;
   created_at: number;
   started_at: number | null;
   ended_at: number | null;
@@ -364,6 +367,7 @@ function toRun(r: RunRow): RunRecord {
     nudged: !!r.nudged,
     ...(r.asked_by ? { askedBy: r.asked_by, told: !!r.told } : {}),
     ...(r.misses ? { misses: parse<RunMiss[]>(r.misses, []) } : {}),
+    ...(r.lang ? { lang: r.lang } : {}),
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
     endedAt: r.ended_at ?? undefined,
@@ -376,15 +380,15 @@ export function runView(r: RunRecord): AppRun {
   return view;
 }
 
-export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string }): RunRecord {
+export function insertRun(db: DB, r: { app: string; appName: string; recipe: AppRecipe; source: RunSource; inputs: Record<string, string>; status?: RunStatus; visitor?: string; ip?: string; batch?: string; row?: number; parent?: string; step?: string; flow?: string; example?: string; askedBy?: string; lang?: string }): RunRecord {
   const id = newId(8);
   // The version it runs, when it runs the template as saved (a try of changes not saved yet runs none).
   const last = r.source === 'step' ? null : latestVersion(db, r.app);
   const version = last && last.core === coreOf(r.recipe) ? last.n : null;
   db.prepare(
-    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, Date.now());
+    `insert into app_runs (id, app_id, app_name, recipe, source, status, inputs, visitor, ip, batch_id, row_no, parent, step, flow, example, version, asked_by, lang, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, r.app, r.appName, JSON.stringify(r.recipe), r.source, r.status ?? 'starting', JSON.stringify(r.inputs), r.visitor ?? null, r.ip ?? null, r.batch ?? null, r.row ?? null, r.parent ?? null, r.step ?? null, r.flow ?? null, r.example ?? null, version, r.askedBy ?? null, r.lang ?? null, Date.now());
   return getRun(db, id)!;
 }
 

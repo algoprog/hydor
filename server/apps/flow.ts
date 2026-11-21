@@ -18,6 +18,7 @@ import type { AnswerField, AppField, AppRecipe, RunMiss, RunProgress, RunStepVie
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, MAX_MISSES, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
 import { cardLines } from '../../shared/app-cards.ts';
+import { languageLine, localeOf } from '../../shared/app-me.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -31,7 +32,8 @@ import { userTimezone } from '../userPrefs.ts';
 import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
-import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, runVars, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { aboutMe } from './me.ts';
 import { takeInAnswer } from './media.ts';
 import { callKey, callTool, firstLine, whatOf, whyOf } from './sturdy.ts';
 import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
@@ -200,8 +202,8 @@ async function pauseAt(x: Exec, at: string) {
 }
 
 async function go(x: Exec, inputs: Record<string, unknown>) {
-  // The built-in values: the moment, in the user's time zone, and what started the run.
-  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source } };
+  // The built-in values: the moment, in the user's time zone, what started the run, the language it writes in, and About you (none for a public page's run).
+  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source }, ...runVars(x.run, !!x.pub) };
   const scope: Scope = { inputs, steps: Object.fromEntries(allSteps(x.flow.steps).map((s) => [s.id, null])), vars };
   try {
     await runList(x, x.flow.steps, scope, '');
@@ -386,14 +388,23 @@ function syncStatus(x: Exec) {
   }
 }
 
+/** Whether the run's model and agent steps write in the person's language (the app says language: "person", and it is not English). */
+const languageOn = (x: Exec) => x.run.recipe.language === 'person' && !!languageLine(x.run.lang);
+
+/** A model's or an agent's instructions, with the line on the language to write in after them when the app answers in the person's. */
+const withLanguage = (x: Exec, instructions: string) => (languageOn(x) ? `${instructions}\n\n${languageLine(x.run.lang)}` : instructions);
+
 /** A short program, run in a sandbox of its own with the values given (server/apps/code.ts). */
 async function codeStep(x: Exec, s: CodeStep, scope: Scope, at: string): Promise<Record<string, unknown>> {
   const input = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
   let n = 0;
+  // ctx.locale: the run's language, and where the person is (a public page's visitor: only the language).
+  const locale = localeOf(x.run.lang || 'en', x.pub ? {} : aboutMe(db()).values, x.pub ? 'UTC' : userTimezone(db()));
   const out = await runCode({
     language: s.language,
     code: s.code,
     input,
+    locale,
     slug: x.slug,
     requires: x.run.recipe.requires,
     seconds: s.seconds ?? 20,
@@ -625,14 +636,14 @@ async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scop
       effort: s.effort ?? (other || s.tier ? undefined : recipe.effort),
       mode: s.mode ?? recipe.mode,
       cwd: x.pub ? undefined : x.folder,
-      prompt: agentPrompt(x, s.instructions, scope, at),
+      prompt: withLanguage(x, agentPrompt(x, s.instructions, scope, at)),
       fields: [],
       answer: s.outputs ?? [],
       tools: s.tools !== undefined ? s.tools : recipe.tools,
       limits: { capUsd: capFor(x, s.capUsd) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x, s.capUsd) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
     record(x, at, s, { childRun: childId });
   }
   const done = await follow(x, childId);
@@ -691,6 +702,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       '',
       owed.length ? `Do what it was to do, then hand in what it would have given: ${owed.map((f) => f.id).join(', ')}${owed.some((f) => STRUCTURED.has(f.id)) ? ' (lists and records as JSON)' : ''}.` : 'Do what it was to do.',
       'Do only this step’s work: the rest of the run carries on after you.',
+      ...(s.do === 'model' && languageOn(x) ? ['', languageLine(x.run.lang)] : []),
     ].join('\n');
     const child = cleanRecipe({
       name: `${recipe.name} · ${titleOf(s)}`,
@@ -712,7 +724,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       limits: { capUsd: capFor(x) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
     record(x, at, s, { status: 'running', rescued: true, childRun: childId, error: msg, endedAt: undefined });
   }
   const done = await follow(x, childId);
@@ -762,7 +774,7 @@ async function appStep(x: Exec, s: Extract<Step, { do: 'app' }>, scope: Scope, a
     const given = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
     // The other app's form takes text, numbers and yes or no: lists and tables go in as text.
     const inputs = Object.fromEntries(Object.entries(given).map(([k, v]) => [k, v !== null && typeof v === 'object' ? asText(v) : v]));
-    childId = startRun({ app: target.id, slug: target.slug, recipe: target, source: 'app', inputs, parent: x.run.id, step: at }).id;
+    childId = startRun({ app: target.id, slug: target.slug, recipe: target, source: 'app', inputs, parent: x.run.id, step: at, lang: x.run.lang }).id;
     record(x, at, s, { childRun: childId });
   }
   const done = await follow(x, childId);
@@ -822,7 +834,7 @@ async function askOutputs(x: Exec, prompt: string, outputs: AnswerField[], model
 }
 
 async function modelStep(x: Exec, s: Extract<Step, { do: 'model' }>, scope: Scope, cost: Cost): Promise<Record<string, unknown>> {
-  const prompt = fillRefs(s.instructions, scope).slice(0, 100_000);
+  const prompt = withLanguage(x, fillRefs(s.instructions, scope).slice(0, 100_000));
   if (!s.outputs?.length) {
     const text = await ask(x, `${STEP_SYSTEM} Do what is asked and answer with the result itself: no preamble.`, prompt, s.model, cost);
     return { text: text.trim() };

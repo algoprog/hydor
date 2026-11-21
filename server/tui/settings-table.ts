@@ -745,6 +745,7 @@ row('assistants', 'Task folders', 'text', {
   write: put('/api/assistants/settings', (v) => ({ taskRoot: v })),
   note: 'A full path or one starting with ~/; an empty value goes back to the default.',
 });
+row('apps', 'About you', 'page', { note: 'Its fields (where you live, units, currency, diet, research fields…) are set on the page, one row each.' });
 row('apps', 'Run without asking', 'list', {
   items: 'the apps agents run without asking first, by their ids (tpl:<id> for a ready-made app, as this shows them)',
   check: (v) => ((v as string[]).find((i) => !/^\S+$/.test(i)) ? 'An app is named by its id, with no spaces (tpl:<id> for a ready-made one)' : null),

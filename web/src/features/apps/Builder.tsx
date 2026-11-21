@@ -4,14 +4,16 @@
 // what is on screen before saving. "Save as an app" in a session's menu, and Do this again… under a reply, open it
 // with a draft from that session (from that reply's turn), What changes each time? on top.
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Shapes, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Languages, Palette, Plus, Puzzle, Settings2, Shapes, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
+import { FROM_FIELDS, fromField, languageName, meVars, type AboutMe } from '@shared/app-me';
 import { tr } from '../../i18n/runtime';
+import { currentLang } from '../../i18n/locale';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
-import { allSteps, BUILTIN_ROOTS, momentOf, titleOf } from '@shared/app-manifest';
+import { allSteps, BUILTIN_VALUES, momentOf, titleOf } from '@shared/app-manifest';
 import { tierLabel, tierProgram } from '@shared/tiers';
-import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
+import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders, TASK_VALUES } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
@@ -211,12 +213,14 @@ const BLANK: AppRecipe = {
   answer: [],
   tools: null,
   limits: {},
+  // A new app answers in the person's language.
+  language: 'person',
 };
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language };
 };
 
 /** A text box that grows with what is written in it, and with how narrow it is. `base`: its look, the kit's field unless given. */
@@ -366,6 +370,7 @@ function Needed({ on, onChange }: { on: boolean; onChange: (on: boolean) => void
 
 function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; auto: boolean; onChange: (f: AppField, id?: string) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const [more, setMore] = useState(!f.label);
+  const from = fromField(f.from);
   return (
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
@@ -400,6 +405,7 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
           {more ? 'Fewer details' : 'Help text, example, default…'}
           <ChevronDown size={12} className={cx('transition-transform', more && 'rotate-180')} />
         </button>
+        {!more && (from || f.remember) && <span>{from ? tr(`From About you: ${tr(FROM_FIELDS.find((x) => x.id === from)!.label)}`) : 'Remembers the last answer'}</span>}
       </div>
       {more && (
         <div className="grid gap-2 @xl:grid-cols-3">
@@ -412,6 +418,25 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
           <Labeled label="Filled in at first">
             <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
           </Labeled>
+          {/* What it starts from instead: About you (the person's own record), or their last answer here. Not for a file. */}
+          {f.type !== 'file' && (
+            <>
+              <Labeled label="Filled in from">
+                <select className={small} value={from ?? ''} onChange={(e) => onChange({ ...f, from: e.target.value ? `me.${e.target.value}` : undefined, remember: e.target.value ? undefined : f.remember })}>
+                  <option value="">Nothing</option>
+                  {FROM_FIELDS.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {tr(`About you: ${tr(x.label)}`)}
+                    </option>
+                  ))}
+                </select>
+              </Labeled>
+              <label className="flex h-8.5 cursor-pointer items-center gap-2 self-end text-[13px] text-fg-2 @xl:col-span-2">
+                <Switch on={!!f.remember} onChange={(on) => onChange({ ...f, remember: on || undefined, from: on ? undefined : f.from })} label="Remember the last answer" />
+                Remember the last answer
+              </label>
+            </>
+          )}
         </div>
       )}
     </Row>
@@ -568,7 +593,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
     if (Object.keys(errs).length) return toast(`Fill in ${Object.keys(errs).map((k) => recipe.fields.find((f) => f.id === k)?.label).join(', ')}`, 'error');
     setBusy(true);
     try {
-      const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId ?? 'test')}/runs`, { recipe, source: 'test', inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])) });
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId ?? 'test')}/runs`, { recipe, source: 'test', inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), lang: currentLang() });
       setRun({ run: r.run });
     } catch (e) {
       toastError(e);
@@ -709,7 +734,8 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
     else if (from)
       post<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }>('/api/apps/draft', { key: from, ...(turn ? { turn: Number(turn) } : {}) }).then(
         (r) => {
-          setRecipe(r.recipe);
+          // A new app answers in the person's language.
+          setRecipe({ ...r.recipe, language: r.recipe.language ?? 'person' });
           if (r.note) setNote(r.note);
           if (r.parts?.length) setParts(r.parts);
         },
@@ -739,6 +765,11 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
     }, () => {});
   });
   const used = useMemo(() => new Set(placeholders(recipe?.prompt ?? '')), [recipe?.prompt]);
+  // What the person keeps in About you, for the task's Preview.
+  const [me, setMe] = useState<AboutMe>({});
+  useEffect(() => {
+    api<{ values: AboutMe }>('/api/apps/me').then((r) => setMe(r.values), () => {});
+  }, []);
 
   if (!recipe)
     return (
@@ -749,8 +780,8 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
     );
 
   const ids = recipe.fields.map((f) => f.id);
-  // The built-in values (today, now, weekday…) are no questions: they fill themselves in.
-  const unknown = [...used].filter((p) => !BUILTIN_ROOTS.has(p) && !ids.includes(p));
+  // The built-in values (today, now, weekday, the language, About you…) are no questions: they fill themselves in.
+  const unknown = [...used].filter((p) => !TASK_VALUES.includes(p) && !ids.includes(p));
   const unusedNeeded = recipe.fields.filter((f) => f.required && !used.has(f.id));
 
   const insert = (text: string) => {
@@ -822,6 +853,12 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
   const inSteps = () => set({ flow: { steps: [{ id: 'task', title: 'Do the task', do: 'agent', instructions: recipe.prompt, ...(recipe.answer.length ? { outputs: cleanAnswer() } : {}) }] }, prompt: '' });
 
   const sample = Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || `[${f.label || f.id}]`]));
+  // About you as the person keeps it (what is empty by its name in brackets), and the language of this page.
+  const previewVars: Record<string, unknown> = {
+    language: languageName(currentLang()),
+    lang: currentLang(),
+    ...Object.fromEntries(Object.entries(meVars(me)).map(([k, v]) => [`me.${k}`, (Array.isArray(v) ? v.length : v !== '') ? v : `[${tr(BUILTIN_VALUES.find((b) => b.ref === `me.${k}`)?.label ?? k)}]`])),
+  };
   const back = saved ? appPath(saved.id) : template ? appPath(`tpl:${template}`) : '/apps';
 
   // What it does, as one task, a list of steps or a graph of them (on a computer): a task becomes a first step.
@@ -983,6 +1020,21 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
                         {b}
                       </button>
                     ))}
+                    {/* The run's language and what the person keeps in About you, in a menu. */}
+                    <select
+                      aria-label="Insert a value about the person"
+                      disabled={preview}
+                      value=""
+                      onChange={(e) => e.target.value && insert(`{{${e.target.value}}}`)}
+                      className="h-6.5 max-w-[9rem] rounded-md bg-bg-2 px-1.5 text-[12px] text-fg-3 ring-1 ring-line ring-inset hover:text-fg disabled:opacity-50"
+                    >
+                      <option value="">About you…</option>
+                      {BUILTIN_VALUES.filter((b) => b.group || b.ref === 'language').map((b) => (
+                        <option key={b.ref} value={b.ref}>
+                          {tr(b.label)}
+                        </option>
+                      ))}
+                    </select>
                     <span className="flex-1" />
                     <button type="button" onClick={() => setPreview((p) => !p)} aria-pressed={preview} className={cx('inline-flex h-6.5 items-center gap-1.5 rounded-md px-2 text-[12.5px] transition-colors', preview ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}>
                       <Eye size={13} />
@@ -990,7 +1042,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
                     </button>
                   </div>
                   {preview ? (
-                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids, moment: momentOf(Intl.DateTimeFormat().resolvedOptions().timeZone) }) || <span className="text-fg-3">Nothing yet.</span>}</div>
+                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids, moment: momentOf(Intl.DateTimeFormat().resolvedOptions().timeZone), vars: previewVars }) || <span className="text-fg-3">Nothing yet.</span>}</div>
                   ) : (
                     <textarea
                       ref={prompt}
@@ -1166,6 +1218,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
             </div>
           </Fold>
 
+          <SwitchRow icon={<Languages size={16} />} title="Answers in the person’s language" sub="Its models and agents write what people read in the language the run was started in (the page’s, or the one they write to an agent in)." on={recipe.language === 'person'} onChange={(on) => set({ language: on ? 'person' : undefined })} />
           <SwitchRow icon={<Puzzle size={16} />} title="A block" sub="Offered when other apps add a step: its form is what it is given, its answer what it gives." on={!!recipe.block} onChange={(on) => set({ block: on || undefined })} />
           </div>
 

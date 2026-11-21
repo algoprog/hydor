@@ -91,7 +91,7 @@ export const appsFeature: WebFeature = {
   nav: [{ id: 'apps', path: '/apps', label: 'Apps', icon: <LayoutGrid size={17} />, match: (p) => p === '/apps' || p.startsWith('/apps/') }],
   toolViews: { submit_result: { place: 'answer', Row: SubmitRow }, use_app: USE_APP_VIEW, ...BUILDER_VIEWS },
   noteViews: { 'app-run': AppRunNote },
-  settings: [{ id: 'apps', label: 'Apps', icon: LayoutGrid, sub: 'Which apps agents run for you without asking first', Body: AllowedSettings }],
+  settings: [{ id: 'apps', label: 'Apps', icon: LayoutGrid, sub: 'What apps know about you, and which run without asking', Body: AllowedSettings }],
   // A template an agent builds, beside its conversation while it is new.
   sessionSide: { useOpen: useAppSideOpen, close: closeAppSide, Panel: AppSide },
   sessionPane: { label: 'Result', icon: <ClipboardCheck size={13} />, match: (s) => !!runOfSession(s), placeholder: 'Ask for a change to the result…', Body: AppSessionPane },

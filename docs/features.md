@@ -898,7 +898,20 @@ agents that speak ACP and take MCP servers.
   card only when it needs details your message left out, and a scheduled task's own session runs apps without asking.
   Its run and its view show in the conversation, and when its answer does not fit and the agent answers itself, the
   card is taken out so there is one answer. Each app's Agents can
-  use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
+  use it switch keeps agents from running it, and blocks and apps made for their own page stay out. About you
+  (Settings → Apps) is one short record apps read instead of asking every run: where you live, country, language,
+  units, currency, diet, people at home, streaming services, teams, research fields, topics, venues, you as an author
+  (with an ORCID or OpenAlex id) and what you can run on; what is left empty is worked out where it can be (the country
+  from the time zone, units and currency from the country, the language from the app's) and shown greyed with where
+  it came from. Only you change it (an agent asks first, each time), and public pages never see it. A question can
+  start from a field of it (Filled in from), and those not needed fold into one line under the form ("For Thessaloniki
+  · metric · EUR", with Change); one About you has nothing for offers Remember for all apps; another can start from
+  your last answer to it in that app (Remember the last answer, kept on the server for every device). Runs from the
+  API, rows of a CSV, schedules and agents take those starting values for what they leave out. Each run writes in a
+  language: the page's, a public visitor's, the one you write to an agent in, else About you's, else English, kept
+  for Run again from here; an app with Answers in the person’s language (on for new apps) has its models and agents
+  write in it, steps read {{language}}, {{lang}} and {{me.units}}…, and code steps get ctx.locale (language,
+  country, time zone, currency, units) with Intl's data for every language. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
   sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Explore, one

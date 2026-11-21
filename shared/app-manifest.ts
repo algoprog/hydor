@@ -20,6 +20,7 @@ import type { AnswerField, AppField, AppRecipe } from './apps.ts';
 import type { AppSummary } from './app-summary.ts';
 import type { AppSecretState } from './app-secrets.ts';
 import { ANSWER_TYPES, cardName, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
+import { ME_FIELDS, ME_REFS } from './app-me.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
 
@@ -444,20 +445,47 @@ export const STEP_TOOLS = [
  */
 export const STEP_ONLY_TOOLS = ['user_profile', 'rank_by_interest', 'work_log', 'experiment_wait', 'read_paper', 'reading_list', 'zotero_sync'];
 
+/** What each {{me.…}} holds, for the pickers and the graph. */
+const ME_HINTS: Record<(typeof ME_REFS)[number], string> = {
+  home: 'As they wrote it: Thessaloniki, Greece',
+  country: 'Two letters, as GR',
+  units: 'metric or imperial',
+  currency: 'Three letters, as EUR',
+  diet: 'As they wrote it: vegetarian, no nuts',
+  household: 'How many people, a number',
+  services: 'A list: Netflix, Disney+',
+  teams: 'A list of teams',
+  fields: 'A list of research fields',
+  topics: 'A list of topics',
+  venues: 'A list: SIGIR, ACL',
+  author: 'Their name as on their papers',
+  author_id: 'Their ORCID or OpenAlex id, when they gave one',
+  compute: 'What they can run things on, in a line',
+};
+
 /**
  * Values every step can use beside the form's answers and the steps' values: the moment, in the user's time
- * zone, and the run (what started it). A flow fills them when it starts.
+ * zone, the run (what started it) and the language it writes in, and what the person keeps in About you
+ * (group "About you"; empty in a run from a public page). A flow fills them when it starts.
  */
-export const BUILTIN_VALUES = [
+export const BUILTIN_VALUES: readonly { ref: string; label: string; hint: string; group?: 'About you' }[] = [
   { ref: 'today', label: 'Today', hint: 'The date, as 2026-11-02' },
   { ref: 'now', label: 'Now', hint: 'The date and time, as 2026-11-02 14:30' },
   { ref: 'weekday', label: 'The day of the week', hint: 'Monday, Tuesday…' },
   { ref: 'timezone', label: 'The time zone', hint: 'Where those are, as Europe/Athens' },
   { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app, session (an agent ran it for you in a session)' },
   { ref: 'run.id', label: 'The run', hint: 'Its id, as its page has it' },
-] as const;
+  { ref: 'language', label: 'The language to write in', hint: 'Its English name, as Greek: the one the run was started in, else English' },
+  { ref: 'lang', label: 'Its language code', hint: 'As el, de or en' },
+  ...ME_REFS.map((r) => ({ ref: `me.${r}`, label: r === 'author_id' ? 'Your author id' : ME_FIELDS.find((f) => f.id === r)!.label, hint: ME_HINTS[r], group: 'About you' as const })),
+];
 /** The names those values go by. */
-export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run']);
+export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run', 'language', 'lang', 'me']);
+/**
+ * Of those, the names added after apps had steps and questions of their own: an app's step or question by that name
+ * (the step "me" that reads the person's profile, Translate's question "language") still means its own.
+ */
+export const OWN_FIRST = new Set(['language', 'lang', 'me']);
 
 /** The moment's values in a time zone (an IANA name; UTC when it is not one). */
 export function momentOf(timeZone = 'UTC', at = Date.now()): { today: string; now: string; weekday: string; timezone: string } {
@@ -576,7 +604,7 @@ export function collapseSteps(r: { fields: AppField[]; answer: AnswerField[]; fl
   let body = JSON.stringify(picked);
   for (const ref of refsIn(picked)) {
     const root = rootOf(ref);
-    if (inside.has(root) || BUILTIN_ROOTS.has(root)) continue;
+    if (inside.has(root) || (BUILTIN_ROOTS.has(root) && !(OWN_FIRST.has(root) && (form.has(root) || everyStep.some((s) => s.id === root))))) continue;
     const own = root === 'inputs' ? segOf(ref) : form.has(root) ? root : undefined;
     if (own && form.has(own)) {
       // The template's own questions are its block's too, by the same names.
@@ -1183,11 +1211,15 @@ export function lookup(path: string, s: Scope): { found: boolean; value: unknown
   if (!parts) return { found: false, value: undefined };
   const [root, ...rest] = parts as [string, ...(string | number)[]];
   let v: unknown;
+  const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
   if (root === 'inputs') v = s.inputs;
-  else if (Object.prototype.hasOwnProperty.call(s.vars, root)) v = s.vars[root];
-  else if (Object.prototype.hasOwnProperty.call(s.steps, root)) v = s.steps[root] ?? {};
-  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' ? {} : momentOf()[root as 'today'];
-  else if (Object.prototype.hasOwnProperty.call(s.inputs, root)) v = s.inputs[root];
+  else if (has(s.vars, root) && !OWN_FIRST.has(root)) v = s.vars[root];
+  else if (has(s.steps, root)) v = s.steps[root] ?? {};
+  // A question of the app's own by one of the later built-in names is its own.
+  else if (OWN_FIRST.has(root) && has(s.inputs, root)) v = s.inputs[root];
+  else if (has(s.vars, root)) v = s.vars[root];
+  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' || root === 'me' ? {} : root === 'language' ? 'English' : root === 'lang' ? 'en' : momentOf()[root as 'today'];
+  else if (has(s.inputs, root)) v = s.inputs[root];
   else return { found: false, value: undefined };
   for (const k of rest) {
     if (v === null || v === undefined) break;
@@ -1575,7 +1607,13 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
         if (field && field !== 'id' && field !== 'source') note(errors, `${where} uses {{${p}}}: a run gives id and source`);
         continue;
       }
-      if (BUILTIN_ROOTS.has(root) || names.has(root)) continue;
+      // About you, the language: unless the app has a step or a question of that name, which is its own.
+      if (OWN_FIRST.has(root) && !byId.has(root) && !fieldIds.has(root) && !names.has(root)) {
+        if (root === 'me' && field && !(ME_REFS as readonly string[]).includes(field)) note(errors, `${where} uses {{${p}}}: About you gives ${ME_REFS.join(', ')}`);
+        else if (root === 'me' && !field) note(warnings, `${where} uses {{me}} alone: name a field of About you, as {{me.units}}`);
+        continue;
+      }
+      if ((BUILTIN_ROOTS.has(root) && !OWN_FIRST.has(root)) || names.has(root)) continue;
       const at = seen.get(root);
       if (at) {
         const gives = givesOf(at.step);
