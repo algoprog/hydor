@@ -449,6 +449,7 @@ async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Pro
     try {
       await askRun(r, text);
     } catch (e) {
+      updateRun(db, r.id, { told: true });
       return { text: `The change could not be sent: ${(e as Error).message}`, isError: true };
     }
     // Its card shows under this turn now, where its answer changes.

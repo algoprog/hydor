@@ -706,7 +706,7 @@ async function changeFlowRun(r: RunRecord, text: string) {
     }
     const titles = (recipe.flow?.steps ?? []).map((s, i) => `${i + 1}. ${titleOf(s)}`);
     const about = [
-      `The person wants a change to the result of a run of the app “${recipe.name}”${recipe.description?.trim() ? `, which ${recipe.description.trim().replace(/^./, (c) => c.toLowerCase())}` : ''}.`,
+      `The person wants a change to the result of a run of the app “${recipe.name}”.${recipe.description?.trim() ? `\nWhat the app gives: ${recipe.description.trim()}` : ''}`,
       titles.length ? `Its steps, in order:\n${titles.join('\n')}` : '',
       `In ${dir}:\n- answers.json: the answers its form was given\n${r.result ? '- result.json: its result as it is now' : '- reply.md: its answer as it is now'}${files.length ? `\n- steps/: what each step gave (${files.slice(0, 12).join(', ')}${files.length > 12 ? `, and ${files.length - 12} more` : ''})` : ''}`,
     ].filter(Boolean);
