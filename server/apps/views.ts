@@ -1132,6 +1132,7 @@ const CONTRACT: AppUi = {
       title: 'In short',
       blocks: [
         { element: 'contract-hero' },
+        { title: 'Not all of it was read', text: '{{result.cut_note}}', if: 'result.cut_note' },
         { title: 'What it says', text: '{{result.summary}}', width: 'two-thirds' },
         { title: 'Ask before you sign', element: 'questions', width: 'third', if: 'result.questions' },
       ],
@@ -1184,7 +1185,7 @@ ol { margin: 0 0 12px; padding-left: 20px; font-size: 14.5px; line-height: 1.5; 
     flag: {
       description: 'A red flag, as serious as it is: the clause, what is wrong, and what to ask',
       html: String.raw`<article class="f sev-{{severity|slug}}">
-  <div class="top"><span class="sev">{{severity}}</span>{{#clause}}<span class="clause">{{clause}}</span>{{/clause}}</div>
+  <div class="top"><span class="sev">{{#severity|is:High}}High{{/severity}}{{#severity|is:Medium}}Medium{{/severity}}{{#severity|is:Low}}Low{{/severity}}</span>{{#clause}}<span class="clause">{{clause}}</span>{{/clause}}</div>
   <p class="issue">{{issue}}</p>
   {{#ask}}<p class="ask"><b>Ask</b> {{ask}}</p>{{/ask}}
 </article>`,
