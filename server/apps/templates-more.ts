@@ -2559,25 +2559,36 @@ return { games: games.map(({ at, ...g }) => g), summary: first.length > 20 ? fir
     description: 'A quiz on any topic to play right on its page: pick your answers, see what you got right with a short explanation, and your score.',
     fields: [
       { id: 'topic', label: 'Topic', type: 'text', required: true, placeholder: 'e.g. The solar system, 90s films, the Roman Empire' },
-      { id: 'level', label: 'How hard', type: 'choice', options: ['Easy', 'Medium', 'Hard'], default: 'Medium' },
-      { id: 'count', label: 'Questions', type: 'choice', options: ['5', '10', '15'], default: '10' },
+      { id: 'level', label: 'How hard', type: 'choice', options: ['Easy', 'Medium', 'Hard'], default: 'Medium', remember: true },
+      { id: 'count', label: 'Questions', type: 'choice', options: ['5', '10', '15'], default: '10', remember: true },
       { id: 'players', label: 'Who’s playing', type: 'text', placeholder: 'e.g. Kids aged 10, or a pub quiz team' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
-        { id: 'wiki', title: 'Find the topic on Wikipedia', do: 'tool', tool: 'http_request', with: { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=1&srsearch={{topic}}', headers: HEADERS }, failed: 'skip' },
+        { id: 'wiki', title: 'Find the topic on Wikipedia', do: 'tool', tool: 'http_request', with: { url: 'https://{{lang}}.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=1&srsearch={{topic}}', headers: HEADERS }, failed: 'skip' },
         {
           id: 'page',
           title: 'Pick its page',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{wiki}}' },
+          with: { found: '{{wiki}}', topic: '{{topic}}' },
           code:
             BODY +
-            String.raw`// The Wikipedia page that search found first, to read for facts.
-const hit = (((bodyOf(input.found) || {}).query || {}).search || [])[0];
-return hit ? { title: hit.title, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(hit.title.replace(/ /g, '_')) } : { title: '', url: null };`,
+            String.raw`// The Wikipedia page that search found first, to read for facts: in the person's language, else the English one.
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const first = (r, l) => {
+  const hit = (((bodyOf(r) || {}).query || {}).search || [])[0];
+  return hit ? { title: hit.title, url: 'https://' + l + '.wikipedia.org/wiki/' + encodeURIComponent(hit.title.replace(/ /g, '_')) } : null;
+};
+let page = first(input.found, lang);
+if (!page && lang !== 'en') {
+  try {
+    page = first(await ctx.tool('http_request', { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=1&srsearch=' + encodeURIComponent(String(input.topic || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look for it on the English Wikipedia' }), 'en');
+  } catch (e) {}
+}
+return page || { title: '', url: null };`,
           outputs: [{ id: 'title', label: 'Its page', type: 'text' }, { id: 'url', label: 'Address', type: 'url' }],
           failed: 'agent',
         },
@@ -2591,7 +2602,7 @@ return hit ? { title: hit.title, url: 'https://en.wikipedia.org/wiki/' + encodeU
 Facts ({{page.title}}, Wikipedia):
 {{facts.text}}
 {{/facts.text}}
-- questions: each the question, four answers (a, b, c, d), only one right, the others believable, the right one's letter (A, B, C or D), and why it is right in a sentence.
+- questions: each the question, four answers (a, b, c, d), only one right, the others believable, the right one's letter (the Latin letter A, B, C or D, even when you write in another language), and why it is right in a sentence.
 - intro: two sentences that set up the topic.`,
           outputs: [
             { id: 'questions', label: 'Questions', type: 'table', required: true, columns: [{ id: 'question', label: 'Question', type: 'text' }, { id: 'a', label: 'A', type: 'text' }, { id: 'b', label: 'B', type: 'text' }, { id: 'c', label: 'C', type: 'text' }, { id: 'd', label: 'D', type: 'text' }, { id: 'answer', label: 'Right answer', type: 'text' }, { id: 'explain', label: 'Why', type: 'text' }] },
@@ -2618,7 +2629,9 @@ const L = ['a', 'b', 'c', 'd'];
 const questions = [];
 for (const q of rows(input.questions)) {
   const opts = L.map((k) => String(q[k] || '').trim());
-  const right = L.indexOf(String(q.answer || '').trim().toLowerCase().charAt(0));
+  // The letter A to D, as a Latin letter even when the model wrote its Greek or Cyrillic look-alike or a full-width one.
+  const said = String(q.answer || '').trim().normalize('NFKC').toLowerCase().charAt(0);
+  const right = L.indexOf({ 'α': 'a', 'β': 'b', 'γ': 'c', 'δ': 'd', 'а': 'a', 'в': 'b', 'с': 'c', 'д': 'd' }[said] || said);
   if (!q.question || right < 0 || opts.some((o) => !o) || new Set(opts.map((o) => o.toLowerCase())).size < 4) continue;
   const order = [0, 1, 2, 3];
   for (let j = 3; j > 0; j--) {
@@ -3214,24 +3227,37 @@ return { charts, points };`,
     description: 'Any topic, from a war to a technology, as a timeline you can scroll and see on a chart: its key moments with dates, its eras, and the story in short.',
     fields: [
       { id: 'topic', label: 'Topic', type: 'text', required: true, placeholder: 'e.g. The space race, the history of jazz, the iPhone' },
-      { id: 'detail', label: 'How much', type: 'choice', options: ['Key moments', 'In depth'], default: 'Key moments' },
+      { id: 'detail', label: 'How much', type: 'choice', options: ['Key moments', 'In depth'], default: 'Key moments', remember: true },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
-        { id: 'wiki', title: 'Find the topic on Wikipedia', do: 'tool', tool: 'http_request', with: { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=5&srsearch={{topic}}', headers: HEADERS }, failed: 'skip' },
+        { id: 'wiki', title: 'Find the topic on Wikipedia', do: 'tool', tool: 'http_request', with: { url: 'https://{{lang}}.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=5&srsearch={{topic}}', headers: HEADERS }, failed: 'skip' },
         {
           id: 'page',
           title: 'Pick its page',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{wiki}}' },
+          with: { found: '{{wiki}}', topic: '{{topic}}' },
           code:
             BODY +
-            String.raw`// The page to read: a "Timeline of…" or "History of…" page among the first results, else the first.
-const hits = ((bodyOf(input.found) || {}).query || {}).search || [];
-const hit = hits.find((h) => /^(timeline|history) of /i.test(h.title)) || hits[0];
-return hit ? { title: hit.title, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(hit.title.replace(/ /g, '_')) } : { title: '', url: null };`,
+            String.raw`// The page to read: a "Timeline of…" or "History of…" page (or the same in the person's language) among the first
+// results, else the first; from the person's Wikipedia, else the English one.
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const HISTORY = /^(?:(?:timeline|history) of |(?:geschichte|zeitleiste|chronik|histoire|chronologie|historia|cronolog[ií]a|hist[oó]ria|cronologia|ιστορία|χρονολόγιο)(?=\s|$))|歴史|年表|历史|歷史/i;
+const best = (r, l) => {
+  const hits = ((bodyOf(r) || {}).query || {}).search || [];
+  const hit = hits.find((h) => HISTORY.test(h.title)) || hits[0];
+  return hit ? { title: hit.title, url: 'https://' + l + '.wikipedia.org/wiki/' + encodeURIComponent(hit.title.replace(/ /g, '_')) } : null;
+};
+let page = best(input.found, lang);
+if (!page && lang !== 'en') {
+  try {
+    page = best(await ctx.tool('http_request', { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&list=search&srlimit=5&srsearch=' + encodeURIComponent(String(input.topic || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look for it on the English Wikipedia' }), 'en');
+  } catch (e) {}
+}
+return page || { title: '', url: null };`,
           outputs: [{ id: 'title', label: 'Its page', type: 'text' }, { id: 'url', label: 'Address', type: 'url' }],
           failed: 'agent',
         },
@@ -3270,7 +3296,19 @@ const events = rows(input.events)
   .sort((a, b) => a.year - b.year);
 if (!events.length) throw new Error('No dated moments came out of it: try naming the topic another way');
 const era = (y) => (eras.find((e) => y >= e.from && y <= (e.to === null ? Infinity : e.to)) || {}).name || '';
-const shown = (y) => (y < 0 ? -y + ' BCE' : String(y));
+// A year before the common era as the person's language writes it ("BCE" in English; "π.Χ." in Greek, "紀元前" in Japanese).
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const bce = new Intl.DateTimeFormat(lang, { year: 'numeric', era: 'short', timeZone: 'UTC' });
+const before = (y) => {
+  try {
+    const d = new Date(Date.UTC(2000, 0, 1));
+    d.setUTCFullYear(y + 1);
+    return bce.format(d);
+  } catch (e) {
+    return -y + ' BCE';
+  }
+};
+const shown = (y) => (y < 0 ? (lang === 'en' ? -y + ' BCE' : before(y)) : String(y));
 const kinds = [...new Set(events.map((e) => e.kind))];
 const figure = {
   data: kinds.map((k) => {
