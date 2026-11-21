@@ -3835,10 +3835,11 @@ test('J5: the tick runs once as the feature starts: a reset a restart cut is dea
 
 // ---- run ---------------------------------------------------------------------------------------------
 
+// About two and a half minutes on a quiet computer: room for a busy one (scripts/test.mjs stops a file at fifteen).
 setTimeout(() => {
   console.error('driver-test: timed out');
   process.exit(1);
-}, 240_000).unref();
+}, 480_000).unref();
 // TEST_ONLY=<words>: only the tests whose name holds them (to see one test fail when a guard is taken out by hand).
 const only = process.env.TEST_ONLY;
 for (const [name, fn] of tests) {
