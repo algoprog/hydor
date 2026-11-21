@@ -3,6 +3,27 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.101.0 · 21 November 2026
+
+Bigger text on your phone, pictures and PDFs that work again in the desktop app, and plan revisions that work on
+network drives.
+
+- **Text size**: Settings → General → Appearance → Text size makes the messages in a conversation, the Help pages and
+  the box you type in larger on the device you set it on: Default, Large or Larger (about 15% or 30% bigger). Menus and
+  editors keep their size. An agent can change it for you too: "make the text bigger on this device".
+- **Pictures and PDFs in the desktop app**: the screenshots agents take of web pages, PDF and picture exports of pages,
+  documents and slides, and the thumbnails of pages and files failed in the desktop app when Settings → Browser was on
+  Best available. They now always use a Chromium the app can start itself (Chrome, one it downloaded or Playwright's),
+  while agents' browsing still uses the app's own browser.
+- **Plan revisions on network drives**: revising a Wiki Memory plan no longer makes the old version read-only or locked,
+  which failed on SMB shares; the old version is kept as ordinary files with a checksum. When a revision is refused,
+  the message names the field and the line and says what to do, a plan's status may be words ("In progress"), and the
+  fields the app fills in itself no longer trip agents up.
+- **Saved keys stay put when a whole configuration goes back**: a saved key in an answer shows as [secret NAME], and
+  agents now send it back as {{NAME}}, so an update that needs every setting again keeps its secrets without the agent
+  seeing them.
+- Agents can switch the app on a device to any of its eight languages, not only four.
+
 ## 0.100.0 · 20 November 2026
 
 Any agent can now make, change and delete your agents for you, with their schedules, and schedules you no longer need
