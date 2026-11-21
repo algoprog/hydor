@@ -203,6 +203,11 @@ export interface GoalState {
   best?: number;
   /** The round in progress (the next number), while one runs. */
   round?: number;
+  /**
+   * Pause was pressed while a round ran: that round is finished and checked as any round (kept, undone or left as it
+   * is), and then the goal pauses. Resume meanwhile takes the pause back, and the goal carries straight on.
+   */
+  pausing?: true;
   /** Whether rounds can be undone here: the session works in a worktree. */
   undo: boolean;
   rules: GoalRule[];
