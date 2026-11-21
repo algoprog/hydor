@@ -3192,10 +3192,14 @@ for (const l of new Set([lang, 'en']))
   for (let k = 0; k < 12; k++)
     for (const o of [{ month: 'long' }, { month: 'short' }, { day: 'numeric', month: 'long' }, { day: 'numeric', month: 'short' }])
       for (const p of new Intl.DateTimeFormat(l, { ...o, timeZone: 'UTC' }).formatToParts(new Date(Date.UTC(2024, k, 15)))) if (p.type === 'month') monthNames.add(flat(p.value));
-const named = new RegExp('^(?:\\d{1,2}[ .-]?)?(?:' + [...monthNames].filter(Boolean).map((n) => n.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')).join('|') + ')\\.?(?:[ ,.-]+\\d{1,4})?(?:[ ,.-]+\\d{2,4})?$');
+// Some languages have a month in two forms (the standalone "Ιανουάριος" and the one beside a day "Ιανουαρίου"): a long
+// name outside a to z also matches by its stem with up to three more letters.
+const esc = (n) => n.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+const alternatives = [...monthNames].filter(Boolean).flatMap((n) => (/[^\x00-\x7f]/.test(n) && n.length >= 6 ? [esc(n), esc(n.slice(0, -2)) + '[^ \\d.,-]{0,3}'] : [esc(n)]));
+const named = new RegExp('^(?:\\d{1,2}[ .-]?)?(?:' + alternatives.join('|') + ')\\.?(?:[ ,.-]+\\d{1,4})?(?:[ ,.-]+\\d{2,4})?$');
 const isDate = (v) => {
   const t = String(v || '').trim();
-  return /^\d{4}-\d{2}(-\d{2})?$|^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$|^\d{4}\/\d{1,2}$|^\d{4}年\d{1,2}月(\d{1,2}日)?$|^(q[1-4]|h[12])( \d{4})?$|^(19|20)\d{2}$/i.test(t) || named.test(flat(t));
+  return /^\d{4}-\d{2}(-\d{2})?$|^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$|^\d{4}\/\d{1,2}$|^(?:\d{4}年)?\d{1,2}月(\d{1,2}日)?$|^(q[1-4]|h[12])( \d{4})?$|^(19|20)\d{2}$/i.test(t) || named.test(flat(t));
 };
 const head = table[0].every((c) => asNum(c) === null) ? table[0] : table[0].map((_c, i) => 'Column ' + (i + 1));
 const body = (table[0] === head ? table.slice(1) : table).slice(0, 2000);
