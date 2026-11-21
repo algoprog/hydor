@@ -68,5 +68,5 @@ function GoalStartOption({ value, onChange, scheduled }: { value: SessionExtra; 
 export const goalFeature: WebFeature = {
   id: 'goal',
   StartOptions: GoalStartOption,
-  settings: [{ id: 'goals', label: 'Goals', icon: Target, sub: 'What a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick', Body: GoalsSettingsBody }],
+  settings: [{ id: 'goals', label: 'Goals', icon: Target, sub: 'What a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick', Body: GoalsSettingsBody, part: 'goal' }],
 };

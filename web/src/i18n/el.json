@@ -26740,6 +26740,7 @@
   "{0}: try again in a moment": "{0}: δοκιμάστε ξανά σε λίγο",
   "{0}: wait for it to finish first": "{0}: περιμένετε πρώτα να ολοκληρωθεί",
   "goal::Goal": "Στόχος",
+  "goal::Goals": "Στόχοι",
   "goal::Needs": "Στόχος τιμής",
   "goal::Target": "Τιμή-στόχος",
   "Changed after round {0}": "Αλλαγές μετά τον γύρο {0}",

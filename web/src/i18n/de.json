@@ -25515,6 +25515,7 @@
   "{0}: try again in a moment": "{0}: versuche es gleich noch einmal",
   "{0}: wait for it to finish first": "{0}: warte zuerst, bis es fertig ist",
   "goal::Goal": "Ziel",
+  "goal::Goals": "Ziele",
   "goal::Needs": "Soll",
   "goal::Target": "Zielwert",
   "Changed after round {0}": "Geändert nach Runde {0}",

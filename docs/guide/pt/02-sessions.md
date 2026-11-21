@@ -410,7 +410,7 @@ Quando ele pergunta, um cartão de pergunta mostra de dois a quatro caminhos par
 
 Sem resposta, ele continua com a escolha dele depois de 10 minutos (um número inteiro de minutos, de 0 a 1.440, em que 0 espera), ou espera por você: **Se você não responder** tem as duas opções. O cartão faz a contagem regressiva ("continua com a escolha dele em 9 min") e **Espere por mim** para o relógio. Uma verificação que só você pode confirmar, ou algo que só você pode dar, sempre espera por você.
 
-Os valores iniciais de um novo objetivo (as rodadas, quanto ele pergunta a você e os minutos até seguir com a própria escolha) são definidos para todos os novos objetivos em [Configurações → Recursos → Metas](/settings?s=goals); aqui você os muda para um só objetivo.
+Os valores iniciais de um novo objetivo (as rodadas, quanto ele pergunta a você e os minutos até seguir com a própria escolha) são definidos para todos os novos objetivos em [Configurações → Recursos → Objetivos](/settings?s=goals); aqui você os muda para um só objetivo.
 
 ### Conduza como quiser
 

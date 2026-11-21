@@ -139,11 +139,11 @@ O que agora é igual para todos os agentes: o cartão de acordo, as verificaçõ
 
 - Uma verificação do **Revisor**, e a verificação final, são julgadas por um modelo que não fez nenhum do trabalho. Em uma [sessão confidencial](/guide/sessions#keep-a-session-confidential), esse é um modelo neste computador; sem um, a verificação não pode ser executada.
 - Os comandos de verificação são executados como os comandos do próprio Custom: no modo Automático com **Sandbox para comandos** ativado, dentro do sandbox, restritos à pasta da sessão; nos outros modos, como os comandos do próprio Custom; em uma sessão confidencial, sempre dentro do sandbox e sem rede.
-- As rodadas que um novo objetivo recebe vêm de **Rodadas que um objetivo pode executar** em [Configurações → Recursos → Metas](/settings?s=goals). Esse valor vale para os objetivos de todos os agentes, não apenas os do Custom.
+- As rodadas que um novo objetivo recebe vêm de **Rodadas que um objetivo pode executar** em [Configurações → Recursos → Objetivos](/settings?s=goals). Esse valor vale para os objetivos de todos os agentes, não apenas os do Custom.
 
 Os objetivos que o Custom tinha em andamento antes desta versão não foram mantidos: defina um novo.
 
-Para mudar quantas rodadas um novo objetivo recebe, abra [Configurações → Recursos → Metas](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) e escolha **10**, **30** ou **100** na linha **Rodadas que um objetivo pode executar**. Você pode definir outro número no cartão de acordo, e o agente também pode propor um.
+Para mudar quantas rodadas um novo objetivo recebe, abra [Configurações → Recursos → Objetivos](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) e escolha **10**, **30** ou **100** na linha **Rodadas que um objetivo pode executar**. Você pode definir outro número no cartão de acordo, e o agente também pode propor um.
 
 ## Conversas longas e respostas longas
 

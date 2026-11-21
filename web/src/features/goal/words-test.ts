@@ -1,6 +1,7 @@
 // OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/goal/words-test.ts && node dist/dev/words-test.js
 import assert from 'node:assert/strict';
 import { holding, tally, type GoalState } from '../../../../shared/goals.ts';
+import { duration } from '../../lib/format.ts';
 import { canSetGoal, goalStartPatch, leadsTeam, swarmStartPatch } from './can.ts';
 import { samples, sampleOf, STATUSES } from './samples.ts';
 import {
@@ -120,7 +121,7 @@ test('the bar’s time runs on from when the page got the goal while a round run
   for (const status of ['paused', 'asking', 'needs-you', 'agreeing', 'drafting', 'measuring', 'reached', 'stopped', 'limit'] as const) assert.equal(activeNow({ ...w, status }, t0 + 7000, t0), 58 * 60000, status);
   // A clock that went back never takes time away; a fresh goal at its start reads "0 s".
   assert.equal(activeNow(w, t0 - 5000, t0), 58 * 60000);
-  assert.equal(timeText({ ...g('working'), activeMs: 0 }, activeNow({ ...g('working'), activeMs: 0 }, t0, t0)), '0 s of 3h 0m');
+  assert.equal(timeText({ ...g('working'), activeMs: 0 }, activeNow({ ...g('working'), activeMs: 0 }, t0, t0)), '0.0 s of 3h 0m');
 });
 
 test('a goal paused before any round says only "paused"; the round in progress is the next number when none is set', () => {
@@ -211,11 +212,14 @@ test('the tally and what holds, as the bar and the report say them', () => {
 test('durations, money and limits', () => {
   assert.equal(spanText(45000), '45 s');
   // Whole seconds at least: no milliseconds, no decimals.
-  assert.equal(spanText(0), '0 s');
-  assert.equal(spanText(400), '0 s');
-  assert.equal(spanText(5000), '5 s');
+  assert.equal(spanText(0), '0.0 s');
+  assert.equal(spanText(400), '0.0 s');
+  assert.equal(spanText(5000), duration(5000));
+  assert.equal(spanText(5000), '5.0 s');
   assert.equal(spanText(59600), '1m 0s');
-  assert.equal(timeText({ ...g('working'), activeMs: 0 }), '0 s of 3h 0m');
+  // One way in every screen of the goal: the app's own (lib/format.ts duration), never milliseconds.
+  for (const ms of [0, 400, 999, 1000, 5000, 9400, 45000, 59000, 60000, 480000, 71 * 60000]) assert.ok(!/ms/.test(spanText(ms)), String(ms));
+  assert.equal(timeText({ ...g('working'), activeMs: 0 }), '0.0 s of 3h 0m');
   assert.equal(spanText(8 * 60000), '8m 0s');
   assert.equal(spanText(71 * 60000), '1h 11m');
   assert.equal(spanText(180 * 60000), '3h 0m');

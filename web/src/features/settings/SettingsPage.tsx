@@ -45,6 +45,8 @@ interface SectionDef {
   label: string;
   icon: LucideIcon;
   sub: string;
+  /** The part of the app whose words the label is in (a capability's own: "goal::Goals"). */
+  part?: string;
   /** Shown for one working folder at a time (project servers and instruction files). */
   folder?: boolean;
 }
@@ -84,7 +86,7 @@ if (machineId) for (const g of GROUPS) g.items = g.items.filter((d) => d.id !== 
 
 /** The built-in groups, then the capabilities' sections (search, browser, memory…), read when first needed. */
 let all: { label: string; items: SectionDef[] }[] | null = null;
-const groups = () => (all ??= [...GROUPS, { label: 'Capabilities', items: featureSections().map(({ id, label, icon, sub }): SectionDef => ({ id, label, icon, sub })) }].filter((g) => g.items.length));
+const groups = () => (all ??= [...GROUPS, { label: 'Capabilities', items: featureSections().map(({ id, label, icon, sub, part }): SectionDef => ({ id, label, icon, sub, part })) }].filter((g) => g.items.length));
 const sections = () => groups().flatMap((g) => g.items);
 export const isSettingsSection = (s: string | null): s is SettingsSection => sections().some((d) => d.id === s);
 /** Every section with its tab, for the search box. */
@@ -190,7 +192,7 @@ function SectionList({ onOpen }: { onOpen: (id: SettingsSection) => void }) {
                   <d.icon size={16} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[14.5px] text-fg">{d.label}</span>
+                  <span data-i18n={d.part} className="block text-[14.5px] text-fg">{d.label}</span>
                   <span className="block truncate text-[12.5px] text-fg-3">{d.sub}</span>
                 </span>
                 <ChevronRight size={16} className="shrink-0 text-fg-3" />
@@ -224,7 +226,7 @@ function SectionRows({ current, onOpen }: { current: SettingsSection | null; onO
                   <span className="flex w-5 shrink-0 justify-center">
                     <d.icon size={15} className="text-fg-3" />
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{d.label}</span>
+                  <span data-i18n={d.part} className="min-w-0 flex-1 truncate">{d.label}</span>
                 </button>
               );
             })}
@@ -288,7 +290,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
   if (mobile) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PageHeader title={def ? def.label : 'Settings'} back={def ? { label: 'All settings', onClick: () => go(url({ s: null })) } : undefined} />
+        <PageHeader title={def ? <span data-i18n={def.part}>{def.label}</span> : 'Settings'} back={def ? { label: 'All settings', onClick: () => go(url({ s: null })) } : undefined} />
         {/* The list stays built under an open section, so it keeps its place; each section opens at its top. */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div inert={!!def} className="absolute inset-0 overflow-y-auto">
@@ -328,7 +330,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
               </span>
               <div className="min-w-0 flex-1">
                 <h1 className="text-[22px] leading-tight font-semibold tracking-tight">
-                  <span data-tip={SECTION_TIPS[def.id]}>{def.label}</span>
+                  <span data-tip={SECTION_TIPS[def.id]} data-i18n={def.part}>{def.label}</span>
                 </h1>
                 <p className="mt-1 text-[13.5px] leading-snug text-fg-3">
                   {def.sub} <LearnMore id={def.id} />
