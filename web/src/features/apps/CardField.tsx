@@ -9,7 +9,8 @@ const AnswerBlock = lazy(() => import('../../components/answer/AnswerUi').then((
 
 /**
  * `from`: the run it is pinned from (its session is where the card's own buttons and kept ticks belong); `publicView`:
- * an app's public page, where nothing is pinned or kept; `demo`: a made-up answer (the builder's preview).
+ * an app's public page, where nothing is pinned or kept and its pictures load straight from the web (a public run may
+ * only point there); `demo`: a made-up answer (the builder's preview).
  */
 export function CardField({ ui, data, from, publicView, demo }: { ui: string; data: unknown; from?: CardSource; publicView?: boolean; demo?: boolean }) {
   const code = useMemo(() => JSON.stringify(data && typeof data === 'object' ? data : {}), [data]);
@@ -18,7 +19,7 @@ export function CardField({ ui, data, from, publicView, demo }: { ui: string; da
     <div className="md [&>.aui]:my-0 [&>.aui-wait]:my-0">
       <MdCtx.Provider value={md}>
         <Suspense fallback={<div className="aui-wait my-3" />}>
-          <AnswerBlock name={ui} code={code} done demo={demo || publicView} noPin={publicView || demo} />
+          <AnswerBlock name={ui} code={code} done demo={demo || publicView} noPin={publicView || demo} webPictures={publicView} />
         </Suspense>
       </MdCtx.Provider>
     </div>
