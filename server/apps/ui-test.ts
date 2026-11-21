@@ -167,15 +167,18 @@ test('a view checked against its app: elements, pages, flows and lists it names,
   assert.doesNotMatch(w, /follow-ups/);
 });
 
-test('a view while its run works: a block that names an answer field the answer so far lacks is not there yet', () => {
+test('a view while its run works: a block whose answer the answer so far lacks is not there yet', () => {
   const so = { weather: 'Sunny', map: [] };
-  assert.equal(E.notYet(JSON.stringify({ element: 'day', data: 'result.days', each: true }), so), true);
-  assert.equal(E.notYet(JSON.stringify({ title: 'Weather', text: '{{result.weather}} · {{inputs.city}}' }), so), false);
-  // An element's own html counts with its block, and an empty list that is there is there.
-  assert.equal(E.notYet(JSON.stringify({ element: 'card' }) + '<p>{{#result.events}}{{name}}{{/result.events}}</p>', so), true);
-  assert.equal(E.notYet(JSON.stringify({ element: 'map', data: 'result.map' }), so), false);
+  // A block waits for its main field: what its data names, else its if.
+  assert.equal(E.notYet({ element: 'day', data: 'result.days', each: true }, so), true);
+  assert.equal(E.notYet({ element: 'map', data: 'result.map' }, so), false, 'an empty list that is there is there');
+  assert.equal(E.notYet({ element: 'know-weather', if: 'result.weather' }, so, '<p>{{result.weather}} {{#result.rain}}{{result.rain}}{{/result.rain}}</p>'), false, 'not for the optional parts its element names');
+  // Without one, every answer field its words or element name.
+  assert.equal(E.notYet({ title: 'Weather', text: '{{result.weather}} · {{inputs.city}}' }, so), false);
+  assert.equal(E.notYet({ element: 'card' }, so, '<p>{{#result.events}}{{name}}{{/result.events}}</p>'), true);
+  assert.equal(E.notYet({ element: 'pace', html: '<button data-event="slow">Relaxed</button>' }, so), false, 'naming none, it never waits');
   // Another run's answer (the last run, a flow's run in the view's state) is not this answer.
-  assert.equal(E.notYet(JSON.stringify({ text: '{{last.result.days}} {{state.trip.result.days}}' }), so), false);
+  assert.equal(E.notYet({ text: '{{last.result.days}} {{state.trip.result.days}}' }, so), false);
   assert.equal(E.notYet('{{result.days}}', null), true);
 });
 

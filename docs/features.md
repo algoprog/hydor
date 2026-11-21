@@ -987,7 +987,8 @@ agents that speak ACP and take MCP servers.
   ones to sum up a page, translate, answer from the web, sort into kinds or pull out facts) or by an agent, shown
   step by step on the run's page, run again from any step there (the steps before it giving what they gave, also
   from a test run in its Edit) and resumed after a restart, its result filling in under the status card as its
-  steps end (a view draws the parts whose answer is there, the rest when it is; on its page, in a conversation
+  steps end (a view draws the parts whose answer is there, the rest when it is, opens on a page with something
+  to show and holds its buttons that would start another run until it is done; on its page, in a conversation
   and on its public page); keep records between runs that its steps, its agents
   and the API share (lists named in its Edit, with the fields their records hold); remember across runs in a
   memory of its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers
