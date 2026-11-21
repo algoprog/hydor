@@ -17,6 +17,9 @@ import { HttpError } from '../auth.ts';
 import { vaultTables } from '../connections/vault.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures } from '../features/registry.ts';
+import { SearchService } from '../search/service.ts';
+import { searchTools } from '../search/tools.ts';
+import { SearchError, type SearchProvider } from '../search/types.ts';
 import type { Deps, Feature, RunCtx, RunTool, ToolOutput } from '../features/types.ts';
 import { botWall, failureOf, retryAfterMs } from '../web/failure.ts';
 import { apps } from './index.ts';
@@ -251,6 +254,36 @@ test('a page that keeps programs out is read once in the browser; when it is kep
   assert.equal(kept.ok, false);
   assert.equal(!kept.ok && whyOf('read_page', kept.failure), 'it keeps programs out');
   assert.equal(browser.reads.length, 2);
+});
+
+test('web_search says when no provider could answer for now, and when to ask again; a search tried then answers', async () => {
+  forgetAll();
+  let asked = 0;
+  const provider: SearchProvider = {
+    id: 'fake',
+    name: 'Fake Search',
+    description: '',
+    caps: { maxK: 30, sites: true, excludeSites: true, categories: false, dates: true, languages: false, fileTypes: true, homepagesOnly: false, filteredSnippets: false },
+    key: 'none',
+    enabledByDefault: true,
+    async search() {
+      if (++asked === 1) throw new SearchError('limit', 'Fake Search is limiting requests; it can be asked again in 1 s', Date.now() + 1000);
+      return { results: [{ title: 'Tides', url: 'https://example.org/tides', snippet: 'About tides.' }] };
+    },
+  };
+  const kv = new Map<string, string>();
+  const service = new SearchService({ kv: { get: (k) => kv.get(k), set: (k, v) => void kv.set(k, v) }, providers: [provider] });
+  const search = searchTools(service).find((t) => t.name === 'web_search')!;
+  const t0 = Date.now();
+  const r = await callTool(search, { query: 'tides' }, ctx, { random: half });
+  assert.equal(r.ok, true, r.ok ? '' : r.text);
+  assert.deepEqual([asked, r.tries], [2, 2]);
+  assert.ok(Date.now() - t0 >= 900, `it waited until it could ask again (${Date.now() - t0} ms)`);
+  // A provider that lacks its key does not pass in a moment: no structured failure, so no second try.
+  const keyless = new SearchService({ kv: { get: () => undefined, set: () => {} }, providers: [{ ...provider, search: async () => Promise.reject(new SearchError('auth', 'Fake Search needs a key', Date.now() + 3600_000)) }] });
+  const out = (await searchTools(keyless).find((t) => t.name === 'web_search')!.run({ query: 'x' }, ctx)) as ToolOutput;
+  assert.equal(out.isError, true);
+  assert.equal(out.failure, undefined);
 });
 
 // ---- a run's misses ---------------------------------------------------------------------------------------------
