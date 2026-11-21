@@ -7,7 +7,7 @@ import type { GoalCheck } from '../../shared/goals.ts';
 import { confidentialKey, privateHelper } from '../confidential/index.ts';
 import type { Deps } from '../features/types.ts';
 import { helperJson, type HelperAsk } from '../helper.ts';
-import { clipMiddle, EVIDENCE_MAX } from './checks.ts';
+import { clipMiddle, EVIDENCE_MAX, withFiles } from './checks.ts';
 
 export const NO_LOCAL_REVIEWER = 'No model on this computer to review with';
 
@@ -34,9 +34,14 @@ const RULES = [
   'When you are unsure, the answer is no.',
 ];
 
+/** Said to every reviewer that gets a change: what it may conclude about the files that are not in it. */
+const WHOLE =
+  'A change you are given is the whole of it, and begins with a line that names every file that changed: a file or folder that is not named there did not change. A long change has its middle left out and says so; the line of files is still whole.';
+
 const CLAIM_SYSTEM = [
   'You check one claim about a software project for an app that drives an AI agent towards a goal the user set.',
   'You get the claim and evidence: what changed since the goal started, files of the project, the output of a command.',
+  WHOLE,
   ...RULES,
   'Answer with JSON only: {"holds": true or false, "score": a number from 0 to 1 for how close it is to holding, "reason": "one or two sentences, quoting the evidence"}',
 ].join('\n');
@@ -44,6 +49,7 @@ const CLAIM_SYSTEM = [
 const RULES_SYSTEM = [
   'You check whether one round of an AI agent’s work broke a rule the user gave it for every round.',
   'You get the rules and the change the round made.',
+  WHOLE,
   ...RULES,
   'A rule is broken only when the change plainly goes against it.',
   'Answer with JSON only: {"broke": true or false, "rule": "the rule it broke, as written", "reason": "one sentence, quoting the change"}',
@@ -56,6 +62,7 @@ const FINAL_SYSTEM = [
   '- answers written into the code for the cases the checks try (special cases, hard-coded results);',
   '- something removed or switched off just so a check passes;',
   '- the goal itself not really met, whatever the checks say.',
+  WHOLE,
   ...RULES,
   'Answer with JSON only: {"ok": true or false, "reason": "one or two sentences, quoting the change"}',
 ].join('\n');
@@ -84,7 +91,7 @@ export async function reviewRules(d: Deps, key: string, rules: string[], change:
     const v = await ask(
       d,
       key,
-      { system: RULES_SYSTEM, prompt: `<rules>\n${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n</rules>\n\n<change>\n${clipMiddle(change, EVIDENCE_MAX)}\n</change>\n\nYour JSON answer:`, timeoutMs: 180_000, maxTokens: 400 },
+      { system: RULES_SYSTEM, prompt: `<rules>\n${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n</rules>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>\n\nYour JSON answer:`, timeoutMs: 180_000, maxTokens: 400 },
       'a review',
     );
     if (typeof v.broke !== 'boolean') return { error: 'The reviewer gave no answer that could be read' };
@@ -106,7 +113,7 @@ export async function finalReview(d: Deps, key: string, objective: string, check
       key,
       {
         system: FINAL_SYSTEM,
-        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(change, EVIDENCE_MAX)}\n</change>\n\nYour JSON answer:`,
+        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>\n\nYour JSON answer:`,
         timeoutMs: 300_000,
         maxTokens: 600,
         strong: true,

@@ -43,7 +43,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { goalHead, goalMessageOf, holding, type GoalAction, type GoalState } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, holding, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { asked as userAsked } from '../custom/review.ts';
 import { kvSet } from '../db.ts';
@@ -55,7 +55,7 @@ import type { Deps, RunCtx, SpawnAdditions, SpawnInfo } from '../features/types.
 import { setSessionExtra } from '../sessionExtra.ts';
 import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees.ts';
 import { RESTARTED } from './brief.ts';
-import { BACKGROUND_GRACE_MS, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -2435,6 +2435,19 @@ test('a message to the agent waits while the files are being put back', async ()
   }
   assert.equal(file(w.path, 'score.txt'), '6\n');
   await act(F13, { action: 'stop' });
+});
+
+test('a check written with its keys in another order, or only renamed, is not a changed check', () => {
+  // As the agent's proposal keeps it (its id last) and as a change keeps it (its id after its name): the same check.
+  const proposed = { kind: 'measure', label: 'Score', timeoutS: 30, run: 'npm run eval', target: { op: '>=', value: 1 }, read: 'score: ([0-9.]+)', id: 'c1' } as GoalCheck;
+  const sent = { kind: 'measure', label: 'Score, renamed', id: 'c1', timeoutS: 30, run: 'npm run eval', target: { value: 1, op: '>=' }, read: 'score: ([0-9.]+)' } as GoalCheck;
+  assert.deepEqual(changedChecks([proposed], [sent]), [], 'nothing to measure again: the start keeps its value');
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, run: 'npm run eval:all' }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [sent, { kind: 'command', label: 'New', run: 'true', id: 'c2' }]), ['c2'], 'a new check is measured');
+  const review = { kind: 'review', label: 'Reads well', claim: 'Every error says what to do', evidence: { diff: true, files: ['a.md', 'b.md'] }, id: 'c3' } as GoalCheck;
+  assert.deepEqual(changedChecks([review], [{ id: 'c3', evidence: { files: ['a.md', 'b.md'], diff: true }, claim: 'Every error says what to do', label: 'Reads well', kind: 'review' }]), []);
+  assert.deepEqual(changedChecks([review], [{ ...review, evidence: { diff: true, files: ['b.md', 'a.md'] } }]), ['c3'], 'the order of a list counts');
 });
 
 test('the files a round changed that git cannot list: a check that could not run, never “nothing changed”', async () => {

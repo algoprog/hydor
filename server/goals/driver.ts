@@ -763,10 +763,30 @@ function reachedSummary(g: StoredGoal, f: { reran: number; review?: string }): s
   return [`${allHold(n)}: in the last round${again}.`, f.review ? 'A review of the whole change found the goal met.' : '', yours.length ? `You confirmed ${listed(yours)}.` : ''].filter(Boolean).join(' ');
 }
 
-/** Checks whose definition differs from before, or that are new. */
-function changedChecks(before: GoalCheck[], after: GoalCheck[]): string[] {
-  const was = new Map(before.map((c) => [c.id, JSON.stringify(c)]));
-  return after.filter((c) => was.get(c.id) !== JSON.stringify(c)).map((c) => c.id);
+/** A value with its objects' keys in one order and nothing undefined, so the same thing reads the same however it was written. */
+const canonical = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>)
+            .filter(([, x]) => x !== undefined)
+            .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+            .map(([k, x]) => [k, canonical(x)]),
+        )
+      : v;
+/** What of a check decides what the app measures: all of it but its name. */
+const measured = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+
+/**
+ * Checks that are new or whose definition differs from before: those are measured again, and the start then holds where
+ * they stand now, not where they stood at the start (since). A check written with its keys in another order (what the
+ * agent proposed and what a change sends are written differently) or only renamed is the same check: counted as changed,
+ * every check lost its value at the start the first time the person changed any of them.
+ */
+export function changedChecks(before: GoalCheck[], after: GoalCheck[]): string[] {
+  const was = new Map(before.map((c) => [c.id, measured(c)]));
+  return after.filter((c) => was.get(c.id) !== measured(c)).map((c) => c.id);
 }
 
 /**
