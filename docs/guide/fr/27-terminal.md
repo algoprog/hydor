@@ -198,7 +198,7 @@ Fonctionnement commun à toutes :
 
 | Commande | Ce qu’elle fait |
 | --- | --- |
-| `hydor sessions` | Vos dernières sessions, chacune avec une marque : ● en cours, ● a besoin de vous, ✓ terminée, ✗ erreur. Ses verbes font ce que fait le menu d’une session : `search`, `rename`, `archive` et `unarchive`, `pin` et `unpin`, `read`, `snooze`, `move` vers un projet, `fork`, `goal` (définir un objectif avec des mots, ou le mettre en pause avec `--pause`, le reprendre avec `--resume` ou l’effacer avec `--clear` : l’agent propose les vérifications et rien ne démarre tant que vous n’avez pas appuyé sur **Début** sur sa carte dans l’app), `share` (un lien en lecture seule), `changes` (les fichiers qu’elle a modifiés), `commands` (les commandes qu’elle a exécutées), `queue` (les messages en attente, avec `queue clear` et `queue remove`), `show`, `export` (la conversation en fichier Markdown, `-o -` pour l’afficher, ou `--library` pour un document dans le projet de la session), `send`, `stop` et `delete`. |
+| `hydor sessions` | Vos dernières sessions, chacune avec une marque : ● en cours, ● a besoin de vous, ✓ terminée, ✗ erreur. Ses verbes font ce que fait le menu d’une session : `search`, `rename`, `archive` et `unarchive`, `pin` et `unpin`, `read`, `snooze`, `move` vers un projet, `fork`, `goal` (sans mots, il montre l’objectif : son état, le tour, chaque vérification, ce qu’il a dépensé et une question éventuelle ; avec des mots, il en définit un, et l’agent propose les vérifications ; `--start` appuie sur **Début** pour elles, `--answer 1,3` répond à sa question avec les numéros affichés (avec `--other "une voie à vous"` et `--note`), `--wait` met la question en attente, `--more rounds=8,usd=5,minutes=60` lui en donne plus, `--rule "…"` ajoute une règle, et `--pause`, `--resume` et `--clear` le pilotent : une action par appel, et rien ne démarre tant que vous n’avez pas appuyé sur **Début**, ici ou dans l’app), `share` (un lien en lecture seule), `changes` (les fichiers qu’elle a modifiés), `commands` (les commandes qu’elle a exécutées), `queue` (les messages en attente, avec `queue clear` et `queue remove`), `show`, `export` (la conversation en fichier Markdown, `-o -` pour l’afficher, ou `--library` pour un document dans le projet de la session), `send`, `stop` et `delete`. |
 | `hydor inbox` | Ce qui attend votre réponse (approbations, questions, une clé demandée par un agent, une compétence à examiner) : `list`, et `show` pour un élément, avec l’endroit où y répondre. |
 | `hydor outbox` | Les appels en attente de votre accord (les outils d’un compte connecté réglés sur Demander d’abord) : `list`, `show` pour l’un d’eux avec ses données d’entrée, `send` (tel quel, ou avec `--set NAME=value` pour modifier un champ) et `drop`. |
 | `hydor away` | Ce qui s’est passé depuis votre dernière visite, comme le montre **Pendant votre absence** sur la page d’accueil : ce qui attend votre réponse, les sessions terminées ou en échec, ce qui s’est exécuté tout seul avec son coût, et ce qui s’exécute ensuite aujourd’hui. `hydor away seen` marque tout comme vu. |
@@ -210,6 +210,11 @@ hydor sessions search connexion      # sessions sur la connexion
 hydor sessions rename 6f1e "Corriger le bug de connexion"
 hydor sessions fork 6f1e "essayer plutôt avec un cache"
 hydor sessions export 6f1e -o notes.md  # la conversation en Markdown
+hydor sessions goal 6f1e "tous les tests passent et la PR est ouverte"  # définir un objectif : l’agent propose les vérifications
+hydor sessions goal 6f1e                  # voir : état, tour, vérifications, dépenses, sa question
+hydor sessions goal 6f1e --start          # appuyer sur Début : les tours commencent
+hydor sessions goal 6f1e --answer 1,3    # répondre à sa question : voies 1 et 3, dans cet ordre
+hydor sessions goal 6f1e --more rounds=20,usd=10  # lui en donner plus, aussi à une limite
 hydor inbox
 hydor away                           # ce qui s’est passé pendant votre absence
 ```

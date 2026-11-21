@@ -198,7 +198,7 @@ Como todos funcionam:
 
 | Comando | O que faz |
 | --- | --- |
-| `hydor sessions` | Suas últimas sessões, cada uma com uma marca: ● trabalhando, ● precisa de você, ✓ concluída, ✗ erro. Os verbos dele fazem o que o menu de uma sessão faz: `search`, `rename`, `archive` e `unarchive`, `pin` e `unpin`, `read`, `snooze`, `move` para um projeto, `fork`, `goal` (defina um objetivo em palavras, ou use `--pause`, `--resume` e `--clear` nele: o agente propõe as verificações e nada começa até você pressionar **Início** no cartão dele no app), `share` (um link somente leitura), `changes` (os arquivos que ela alterou), `commands` (os comandos que ela executou), `queue` (as mensagens em espera, e `queue clear` e `queue remove`), `show`, `export` (a conversa como um arquivo Markdown, `-o -` para imprimir, ou `--library` para um documento no projeto da sessão), `send`, `stop` e `delete`. |
+| `hydor sessions` | Suas últimas sessões, cada uma com uma marca: ● trabalhando, ● precisa de você, ✓ concluída, ✗ erro. Os verbos dele fazem o que o menu de uma sessão faz: `search`, `rename`, `archive` e `unarchive`, `pin` e `unpin`, `read`, `snooze`, `move` para um projeto, `fork`, `goal` (sem palavras mostra o objetivo: o estado, a rodada, cada verificação, o que gastou e uma pergunta pendente; com palavras define um, e o agente propõe as verificações; `--start` pressiona **Início** nelas, `--answer 1,3` responde à pergunta pelos números mostrados (com `--other "um caminho seu"` e `--note`), `--wait` deixa a pergunta esperando, `--more rounds=8,usd=5,minutes=60` dá mais a ele, `--rule "…"` adiciona uma regra, e `--pause`, `--resume` e `--clear` o controlam: uma ação por chamada, e nada começa até você pressionar **Início**, aqui ou no app), `share` (um link somente leitura), `changes` (os arquivos que ela alterou), `commands` (os comandos que ela executou), `queue` (as mensagens em espera, e `queue clear` e `queue remove`), `show`, `export` (a conversa como um arquivo Markdown, `-o -` para imprimir, ou `--library` para um documento no projeto da sessão), `send`, `stop` e `delete`. |
 | `hydor inbox` | O que espera por você (aprovações, perguntas, uma chave que um agente pediu, uma habilidade para revisar): `list`, e `show` para um item, com o lugar onde respondê-lo. |
 | `hydor outbox` | Chamadas retidas esperando o seu OK (as ferramentas de uma conta conectada em Perguntar antes): `list`, `show` para uma delas com a entrada, `send` (como está, ou com `--set NAME=value` para alterar um campo) e `drop`. |
 | `hydor away` | O que aconteceu desde a sua última visita, como o mostra **Enquanto você estava fora**, na página inicial: o que espera por você, sessões que terminaram ou falharam, o que rodou sozinho com o custo e o que roda a seguir hoje. `hydor away seen` marca tudo como visto. |
@@ -210,6 +210,11 @@ hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
+hydor sessions goal 6f1e "all tests pass and the PR is open"  # definir um objetivo: o agente propõe as verificações
+hydor sessions goal 6f1e                  # ver: estado, rodada, verificações, gasto, a pergunta
+hydor sessions goal 6f1e --start          # pressionar Início: as rodadas começam
+hydor sessions goal 6f1e --answer 1,3    # responder à pergunta: caminhos 1 e 3, nessa ordem
+hydor sessions goal 6f1e --more rounds=20,usd=10  # dar mais a ele, também num limite
 hydor inbox
 hydor away                           # what happened while you were away
 ```

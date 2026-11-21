@@ -198,7 +198,7 @@ hydor completion install
 
 | 命令 | 作用 |
 | --- | --- |
-| `hydor sessions` | 你最近的会话，每个都带一个标记：● 工作中，● 需要你处理，✓ 已完成，✗ 出错。它的动词与会话菜单的功能一一对应：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`（用文字设定目标，或用 `--pause`、`--resume`、`--clear` 暂停、继续、清除目标：智能体会提出检查项，在你于应用中点击它卡片上的**开始**之前不会启动任何操作）、`share`（只读链接）、`changes`（它改动过的文件）、`commands`（它运行过的命令）、`queue`（等待中的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话导出为 Markdown 文件，用 `-o -` 直接打印，或用 `--library` 在会话所属项目中生成文档）、`send`、`stop` 和 `delete`。 |
+| `hydor sessions` | 你最近的会话，每个都带一个标记：● 工作中，● 需要你处理，✓ 已完成，✗ 出错。它的动词与会话菜单的功能一一对应：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`（不带文字时显示目标：它的状态、轮次、每个检查项、已花费的费用和等待回答的问题；带文字则设定一个目标，智能体会提出检查项；`--start` 对这些检查项点击**开始**，`--answer 1,3` 按显示的编号回答它的问题（可配合 `--other "你自己的办法"` 和 `--note`），`--wait` 让问题继续等你，`--more rounds=8,usd=5,minutes=60` 给它更多额度，`--rule "…"` 添加一条规则，`--pause`、`--resume`、`--clear` 用来暂停、继续、清除：每次调用只做一个操作，在你于这里或应用中点击**开始**之前不会启动任何操作）、`share`（只读链接）、`changes`（它改动过的文件）、`commands`（它运行过的命令）、`queue`（等待中的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话导出为 Markdown 文件，用 `-o -` 直接打印，或用 `--library` 在会话所属项目中生成文档）、`send`、`stop` 和 `delete`。 |
 | `hydor inbox` | 等你处理的事项（批准、问题、智能体索要的密钥、待审核的技能）：`list`，以及 `show`（查看某一项，并告诉你在哪里回复）。 |
 | `hydor outbox` | 等你确认的调用（已连接账户的工具设为“先询问”时）：`list`，`show`（查看某一项及其输入），`send`（原样发送，或用 `--set NAME=value` 修改某个字段）和 `drop`。 |
 | `hydor away` | 自你上次访问以来发生的事，就像起始页的**你不在时**所显示的那样：等你处理的事项、已完成或失败的会话、自动运行的内容及其费用，以及今天接下来要运行的内容。`hydor away seen` 会把这一切标为已查看。 |
@@ -210,6 +210,11 @@ hydor sessions search login          # 与登录有关的会话
 hydor sessions rename 6f1e "修复登录问题"
 hydor sessions fork 6f1e "改用缓存试试"
 hydor sessions export 6f1e -o notes.md  # 把对话导出为 Markdown
+hydor sessions goal 6f1e "all tests pass and the PR is open"  # 设定目标：智能体提出检查项
+hydor sessions goal 6f1e                  # 查看：状态、轮次、检查项、花费、它的问题
+hydor sessions goal 6f1e --start          # 点击开始：各轮开始
+hydor sessions goal 6f1e --answer 1,3    # 回答它的问题：办法 1 和 3，按此顺序
+hydor sessions goal 6f1e --more rounds=20,usd=10  # 给它更多额度，达到上限时也可以
 hydor inbox
 hydor away                           # 你不在时发生了什么
 ```

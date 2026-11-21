@@ -198,7 +198,7 @@ How they all work:
 
 | Command | What it does |
 | --- | --- |
-| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal` (set a goal in words, or `--pause`, `--resume` and `--clear` it: the agent proposes the checks and nothing starts until you press **Start** on its card in the app), `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the session's project), `send`, `stop` and `delete`. |
+| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal` (with no words it shows the goal: its state, the round, each check, what it has spent and any question; with words it sets one, and the agent proposes the checks; `--start` presses **Start** on them, `--answer 1,3` answers its question by the numbers shown (`--other "a way of your own"` and `--note` go with it), `--wait` holds the question, `--more rounds=8,usd=5,minutes=60` gives it more, `--rule "…"` adds a rule, and `--pause`, `--resume` and `--clear` steer it: one action a call, and nothing starts until you press **Start**, here or in the app), `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the session's project), `send`, `stop` and `delete`. |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
 | `hydor outbox` | Calls held for your OK (a connected account's tools on Ask first): `list`, `show` for one with its input, `send` (as it is, or with `--set NAME=value` to change a field) and `drop`. |
 | `hydor away` | What happened since your last visit, as the start page's **While you were away** shows it: what waits on you, sessions that finished or failed, what ran by itself with its cost, and what runs next today. `hydor away seen` marks it all as seen. |
@@ -210,6 +210,11 @@ hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
+hydor sessions goal 6f1e "all tests pass and the PR is open"  # set a goal: the agent proposes the checks
+hydor sessions goal 6f1e                  # look: state, round, checks, spending, its question
+hydor sessions goal 6f1e --start          # press Start: the rounds begin
+hydor sessions goal 6f1e --answer 1,3    # answer its question: ways 1 and 3, in that order
+hydor sessions goal 6f1e --more rounds=20,usd=10  # give it more, also at a limit
 hydor inbox
 hydor away                           # what happened while you were away
 ```

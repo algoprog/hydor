@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import nodePath from 'node:path';
 import { ApiError, type Conn } from '../client.ts';
 import { Cancelled, UsageError } from './kit.ts';
-import { boldMatches, parseUntil } from './sessions.ts';
+import { answerWays, boldMatches, moreLimits, parseUntil } from './sessions.ts';
 import { fakeConn, run, type Answer } from './test-kit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
@@ -39,6 +39,8 @@ const routes = (extra: Record<string, Answer> = {}): Record<string, Answer> => (
   'GET /api/sessions?limit=1000&archived=1': { sessions: [old] },
   [`GET /api/sessions/${encodeURIComponent(a.key)}`]: { summary: a, live: { goal: { objective: 'All tests pass', status: 'active', turns: 2, reason: 'one fails' } } },
   [`GET /api/sessions/${encodeURIComponent(c.key)}`]: { summary: c, live: null },
+  [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: null },
+  [`GET /api/goals/${encodeURIComponent(c.key)}`]: { goal: null },
   ...extra,
 });
 const path = (s: { key: string }, rest = '') => `/api/sessions/${encodeURIComponent(s.key)}${rest}`;
@@ -161,6 +163,124 @@ test('goal: see it, set it, pause, resume, clear; one at a time', async () => {
   assert.match(r.out, /Goal cleared/);
   await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--clear', '--pause']), /^Pick one/);
   await refused(run(t.conn, ['sessions', 'goal', 'fix the login', 'words', '--clear']), /^Pick one/);
+});
+
+/** The goal of the app's loop as GET /api/goals/:key gives it, partly. */
+const appGoal = (o: Record<string, unknown> = {}) => ({
+  key: a.key,
+  id: 'g1',
+  status: 'asking',
+  contract: {
+    objective: 'Search answers in under 300 ms with every test passing',
+    title: 'Faster search',
+    checks: [
+      { id: 'c1', kind: 'command', label: 'Tests pass', run: 'npm test' },
+      { id: 'c2', kind: 'measure', label: 'Search time', run: 'node bench.js', unit: 'ms', target: { op: '<=', value: 300 } },
+    ],
+    protect: [],
+    limits: { rounds: 12, usd: 5, minutes: 60 },
+  },
+  settings: { asks: 'forks', noAnswerMin: 10 },
+  rounds: [
+    { n: 0, results: [{ id: 'c1', holds: false, closeness: 0, ms: 1 }, { id: 'c2', holds: false, value: 910, closeness: 0.2, ms: 1 }], score: 0.1, outcome: 'start' },
+    { n: 3, results: [{ id: 'c1', holds: true, closeness: 1, ms: 1 }, { id: 'c2', holds: false, value: 365.5, closeness: 0.8, ms: 1 }], score: 0.9, outcome: 'kept' },
+  ],
+  round: 4,
+  undo: true,
+  rules: [{ id: 'r1', text: 'Never touch the migrations', at: 1 }],
+  next: [],
+  dropped: [],
+  question: {
+    id: 'q1',
+    kind: 'way',
+    question: 'Which way next?',
+    context: 'Caching helped most.',
+    ways: [{ name: 'Add an index', why: 'cheap' }, { name: 'Cache results' }, { name: 'Rewrite the query' }],
+    pick: 1,
+    askedAt: 1,
+    expiresAt: Date.now() + 7 * 60_000,
+  },
+  spentUsd: 1.234,
+  activeMs: 14 * 60_000,
+  startedAt: 1,
+  ...o,
+});
+
+test('goal: with no words the app’s goal is shown (state, round, checks, spending, question, report); --json gives it as the API does', async () => {
+  const g = appGoal();
+  const t = fakeConn(routes({ [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: g } }));
+  let r = await run(t.conn, ['sessions', 'goal', 'fix the login']);
+  assert.match(r.out, /^Goal +Faster search$/m);
+  assert.match(r.out, /Search answers in under 300 ms/);
+  assert.match(r.out, /^State +a question waits for you$/m);
+  assert.match(r.out, /^Round +round 4 of 12$/m);
+  assert.match(r.out, /^Spent +\$1\.23 of its \$5\.00$/m);
+  assert.match(r.out, /^Worked +14 min of its 60 min$/m);
+  assert.match(r.out, /^Rules +1\. Never touch the migrations$/m);
+  assert.match(r.out, /Tests pass: holds/);
+  assert.match(r.out, /Search time: not yet \(value 365\.5 ms, target <= 300 ms\)/);
+  assert.match(r.out, /^ {2}Which way next\?$/m);
+  assert.match(r.out, /^ {2}1\. Add an index$/m);
+  assert.match(r.out, /^ {2}2\. Cache results \(its pick\)$/m);
+  assert.match(r.out, /^ {2}3\. Rewrite the query$/m);
+  assert.match(r.out, /goes on with its pick in [67] min/i);
+  assert.equal(t.calls.some((x) => x.path === path(a)), false, 'the program’s goal is not asked for');
+  r = await run(t.conn, ['sessions', 'goal', 'fix the login', '--json']);
+  assert.deepEqual(r.json, [{ goal: g }]);
+  // Over: the report's summary; a waiting question that does not expire.
+  const over = appGoal({ status: 'limit', reason: 'It ran 12 rounds', question: undefined, round: undefined, report: { summary: 'Tests pass; search is at 365 ms.' } });
+  const t2 = fakeConn(routes({ [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: over } }));
+  r = await run(t2.conn, ['sessions', 'goal', 'fix the login']);
+  assert.match(r.out, /^State +stopped at a limit$/m);
+  assert.match(r.out, /^Why +It ran 12 rounds$/m);
+  assert.match(r.out, /^Round +3 of 12 rounds run$/m);
+  assert.match(r.out, /Report\n {2}Tests pass; search is at 365 ms\./);
+  const waits = fakeConn(routes({ [`GET /api/goals/${encodeURIComponent(a.key)}`]: { goal: appGoal({ question: { ...appGoal().question, expiresAt: undefined } }) } }));
+  assert.match((await run(waits.conn, ['sessions', 'goal', 'fix the login'])).out, /It waits for you: --answer 1,3/);
+  // No app goal and none of the program's: nothing; the program's own goal as before is in the test above.
+  assert.match((await run(fakeConn(routes()).conn, ['sessions', 'goal', 'Write'])).out, /has no goal/);
+});
+
+test('goal: --start, --answer, --other, --note, --wait, --more, --rule are one action each, with their request bodies', async () => {
+  const t = fakeConn(routes({ [path(a, '/goal')]: { goal: { status: 'working' } } }));
+  const body = () => t.calls.at(-1)!.body;
+  let r = await run(t.conn, ['sessions', 'goal', 'fix the login', '--start']);
+  assert.deepEqual(t.calls.at(-1), { method: 'POST', path: path(a, '/goal'), body: { action: 'agree' } });
+  assert.match(r.out, /Goal started/);
+  await run(t.conn, ['sessions', 'goal', 'fix the login', '--answer', '1,3']);
+  assert.deepEqual(body(), { action: 'answer', ways: [0, 2] });
+  await run(t.conn, ['sessions', 'goal', 'fix the login', '--answer', '3, 1', '--other', 'try sharding', '--note', 'keep the API']);
+  assert.deepEqual(body(), { action: 'answer', ways: [2, 0], other: 'try sharding', note: 'keep the API' });
+  await run(t.conn, ['sessions', 'goal', 'fix the login', '--other', 'try sharding']);
+  assert.deepEqual(body(), { action: 'answer', ways: [], other: 'try sharding' });
+  await run(t.conn, ['sessions', 'goal', 'fix the login', '--wait']);
+  assert.deepEqual(body(), { action: 'wait' });
+  r = await run(t.conn, ['sessions', 'goal', 'fix the login', '--more', 'rounds=8,usd=5,minutes=60']);
+  assert.deepEqual(body(), { action: 'change', contract: { limits: { rounds: 8, usd: 5, minutes: 60 } } });
+  assert.match(r.out, /Limits changed/);
+  await run(t.conn, ['sessions', 'goal', 'fix the login', '--more', 'usd=2.5']);
+  assert.deepEqual(body(), { action: 'change', contract: { limits: { usd: 2.5 } } });
+  r = await run(t.conn, ['sessions', 'goal', 'fix the login', '--rule', 'Never touch the migrations']);
+  assert.deepEqual(body(), { action: 'rule', text: 'Never touch the migrations' });
+  assert.match(r.out, /Rule added/);
+  r = await run(t.conn, ['sessions', 'goal', 'fix the login', '--start', '--json']);
+  assert.deepEqual(r.json, [{ goal: { status: 'working' } }], 'the API’s answer');
+  // One action a call, and the way numbers are read.
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--start', '--wait']), /^Pick one: .*--start.*--answer.*--wait.*--more.*--rule.*--clear/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--answer', '1', '--rule', 'x']), /^Pick one/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--more', 'rounds=8', '--pause']), /^Pick one/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', 'some words', '--start']), /^Pick one/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--note', 'x']), /^--note goes with --answer or --other/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--answer', '0']), /^--answer takes the numbers of the ways, from 1/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--answer', 'one']), /^--answer takes the numbers/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--more', 'rounds=lots']), /^--more takes limits like rounds=8,usd=5,minutes=60/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--more', 'days=3']), /^--more takes limits/);
+  await refused(run(t.conn, ['sessions', 'goal', 'fix the login', '--rule', ' ']), /^--rule takes the rule/);
+  assert.deepEqual(answerWays('2'), [1]);
+  assert.deepEqual(moreLimits('minutes=30'), { minutes: 30 });
+  // The server's refusal is printed as it is.
+  const no = fakeConn(routes({ [path(a, '/goal')]: new ApiError(409, 'It has run 4 rounds: give it more than that.') }));
+  await refused(run(no.conn, ['sessions', 'goal', 'fix the login', '--more', 'rounds=4']), /^It has run 4 rounds: give it more than that\.$/, ApiError);
 });
 
 test('share: make a link, list, turn off', async () => {
