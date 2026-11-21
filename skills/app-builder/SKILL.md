@@ -133,6 +133,9 @@ pages made for it. The format is in app_guide's API topic (Apps: views).
 ## 5. Safe and cheap
 
 - Limits: runs a day and the most a run may spend. Tools: only those it needs.
+- No waits or retry loops of your own around a service, in a step or a program: the app tries a failed call
+  again, spaces the calls to one service and keeps look-ups for a while by itself (a tool step's `cache: false`
+  when an answer must be fresh). What a run could not get shows on its page and in `{{run.misses}}`.
 - A step that may fail says what happens then (If it fails…: go on without it, other steps, or `failed: "agent"`:
   an agent does a tool, model, code, data or app step's work with what it was given, and the run goes on).
 - Nothing reaches outside data and private data and sends things out in one step without an Ask a person first.
