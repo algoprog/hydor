@@ -918,8 +918,14 @@ agents that speak ACP and take MCP servers.
   joined in order) and plots in 2D and 3D (Plotly: lines, stacked bars, areas, scatter, pies, histograms, boxes,
   heatmaps, 3D points, lines and surfaces); and widgets, elements drawn by a script of their own that imports
   npm packages at exact versions from jsDelivr (a 3D scene with three.js, a chart library, a game), reaching the
-  app only through the view's events. An answer can hold pictures, videos and files (a media field, a picture
-  column): what an agent hands in from this computer, a picture it found on the web or one it drew is kept as a
+  app only through the view's events. An answer field can be a card too (A card… in its Answer tab: any of the
+  answer UIs a conversation shows, picked from the catalog with each drawn small, its Preview drawn with the card's
+  example; ui(<name>) as a step's output): its agent or model is told the card's type and an example and must give
+  real pictures, what it hands in is checked as save_board checks a card, and the card shows wherever the answer
+  does, as in a conversation (Copy as text, Full screen, Pin to a board from the run), the API giving its data and a
+  CSV of rows, the tool other agents call and a chat's agent its text; so an app of short fields and cards looks as
+  good as an answer in a chat without a view (a view cannot place a card yet: Plain answer shows it). An answer can
+  hold pictures, videos and files (a media field, a picture column): what an agent hands in from this computer, a picture it found on the web or one it drew is kept as a
   copy, served at an address nobody can guess that never runs as a page of the app. An app has files of its own
   too (pictures, videos, data, added in its Design tab or by app_save), shown by name in its view and travelling
   in its file. An app names the keys it needs (API keys, tokens) and never their values: they are asked for on
@@ -954,8 +960,14 @@ agents that speak ACP and take MCP servers.
   each step's instructions, code steps as functions, its screens, with a schema for editors), changed in any
   editor or by a coding agent, each saved change coming back as a version. The command line's app commands make a
   app and its folder, try its examples as you save, and export and import it. Describe one on the New
-  app page and the App builder assistant makes it. Save as an app turns a session that went well into one,
-  with steps drafted from the tools it called (read a page, search the web) when they check out. Agents build
+  app page and the App builder assistant makes it. Do this again… under the last reply of a turn that used a tool or showed a card
+  (or Save as an app in a session's menu, for its latest turn) turns that turn into an app: the helper model finds the
+  message the work began with, the corrections after it ("in euros", "shorter") become the task's standing
+  instructions, the reply's cards its card fields (its words beside them a Summary), this request's answers its first
+  example with checks from the reply, and What changes each time? on top shows the request with each question's
+  words as a chip (a click keeps them as they are; selected words become a new question); steps are drafted from the
+  tools it called (read a page, search the web) when they check out. Its Run it every… opens a new scheduled task
+  with the turn's request. Agents build
   apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step; its view too),
   app_try (its examples or a set of answers, waited for, with the names its view uses that a try did not give),
   app_screen and app_data (the records it keeps: read, or added to). A

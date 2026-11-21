@@ -214,6 +214,7 @@ Below it comes the result. An app with a view shows it there (see [Its view](#it
 - Short answer fields (text, numbers, dates, links, yes or no) sit together in one card.
 - Long text, lists and tables each get a card under their heading. Long text has a **Copy** button; tables have **Copy** and **CSV** (a download), and a column of pictures shows them small (a click opens one large).
 - Pictures, videos, sounds and files: pictures in a grid (a click opens one large, and the arrows go through the others), videos and sounds to play, other files to download. One on another site (a video on YouTube, a page) opens there.
+- Cards (a comparison, an itinerary, a recipe, a chart…) show as wide as the rest, drawn as in a conversation, under their heading unless the card has a title of its own. Point at one for what a card has in a conversation: **Show the data**, **Copy as text**, **Full screen**, and under **…** **Pin to a board** (the board's card then says it came from this run) and the card as a picture.
 - On a phone, a table too wide for the screen shows as a card for each row.
 
 The agent's own reply follows. It is open, under **Answer**, when the app has no answer fields; otherwise it is folded under **The agent's reply**. **What was asked** (folded) lists the answers the run was given.
@@ -237,6 +238,8 @@ An app's view is made for its answer: pages that show it in elements of their ow
 - On an app of your own, a view can also ask its agent for a change (an app without steps), run one of its other flows, or keep a record in what it keeps.
 
 A view shows on the run's page, in its session's **Result**, and on the app's public page, where its pages and ticks work but nothing reaches the app (no run again, no new runs, nothing kept).
+
+A view cannot place a card field among its own blocks yet: **Plain answer** shows the cards. For an answer a card draws well, a card field is the simpler way, and a view is for what no card draws.
 
 ## Ask for changes to the result
 
@@ -277,7 +280,11 @@ There are four ways to start:
 - **From scratch**: **New app** → **Start from scratch** on the Apps page, the **Make an app** tile under your own apps, or go to [/apps/new](/apps/new).
 - **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** and press **Make it**. A session starts as the **App builder** ([Agents](/guide/agents)), which makes the app, tries it and hands it over.
 - **From a ready-made app**: open it and press **Make it mine** (on a phone, **Edit**).
-- **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's program, model, effort, mode and agent. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
+- **From a session that went well**: under the agent's last reply of a turn in which it used a tool or showed a card, press **Do this again…** (the circling arrows, beside **Read aloud**) → **Make it an app**; or, in the session's menu (⋯), **More** → **Save as an app**, which starts from the latest turn. The page says "Drafting an app from the session…" while the helper model reads your messages up to that reply, the reply itself with its cards, and the tools the agent called. It finds the message the work began with: the parts of it that would change from one use to the next become questions, and what you said after it ("in euros", "shorter", "not that one") goes into the task, as what you want every time. The reply's cards become card fields of the answer, and its words beside them, when they are more than a line or two, a **Summary**; a reply without cards becomes answer fields of the other kinds. Your answers in the session become its first example, **From the session**, with checks from the reply (each needed field filled in, a card holding as many as the reply's did). The draft keeps the session's program, model, effort, mode and agent. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
+
+  On top of the page, **What changes each time?** shows your request with the words each question takes the place of in colour. Click one to keep those words as they are: its question leaves the form, and the words go back into the task. Select other words, and **Ask this each time** makes them a question of their own, put in the task where they were. The tabs under it work as for any app.
+
+  **Do this again…** → **Run it every…** instead opens the form of a new [scheduled task](/guide/tasks) with what you asked in that turn, to run on a schedule as it is. Neither is offered in a confidential session.
 
 You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)). Agents that build apps have them think with a tier, the lowest that does the job well: **Quick** for short, clear jobs (a summary, formatting, a look-up), **Standard** for most, **Best** for research and hard reasoning, and **Max** rarely; you can change it under **Who does it** (see [Who does it](#who-does-it)).
 
@@ -322,20 +329,24 @@ The fields the agent fills in when it is done. They show as a card or a table, a
 **Add an answer field** adds a row with:
 
 - A heading ("Recommendation").
-- Its kind: **Text**, **Long text** (formatted text), **Number**, **Yes / no**, **Date**, **Link**, **List**, **Table** or **Pictures, videos or files**.
+- Its kind: **Text**, **Long text** (formatted text), **Number**, **Yes / no**, **Date**, **Link**, **List**, **Table**, **Pictures, videos or files** or **A card…**.
 - **Needed**: the agent must fill it in.
 - **What goes here, for the agent (optional)**: a hint for the agent.
 - For a **Table**: its **Columns**, each with a name and a kind (**Text**, **Number**, **Yes / no**, **Date**, **Link** or **Picture**). **Add a column** adds one; a table keeps at least one.
 
 An answer field's **⋯** menu has **Move up**, **Move down** and **Remove**.
 
+**A card…** opens **Pick a card**: the cards agents show answers in during a conversation (the [Answer UIs](/answers)), with a box to find one ("compare", "recipe", "map") and their groups, each drawn small with an example. Pick one, and the field shows **Card:** and its name, with **Change** to pick another. Its agent then fills the card in when it is done, told what the card takes and shown a short example, and with pictures only from real addresses (a search, a page it read, a file on this computer). The card shows wherever the answer does: the run's page, the session's **Result**, the app's card in a conversation, the public page and a test run (see [Follow a run and read its result](#follow-a-run-and-read-its-result)). The **Preview** beside the tab draws it with its example. An app made only of short fields and cards looks as good as an answer in a conversation, without a view of its own. Cards that read their numbers from a spreadsheet or a file are not offered in apps yet.
+
 A **Pictures, videos or files** field (and a **Picture** column) takes what the agent found or made: an address on the web, or a file on this computer (a photo in your Pictures folder, a chart it drew, a recording), each with a caption. Hydor keeps a copy of a file on this computer, and of a picture on the web (up to 15 MB), so it shows wherever the answer does; videos on the web stay links. A public page's runs may only point at the web.
 
-Hydor checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses. When something doesn't fit, the agent is told what to fix. An app can have up to 30 answer fields, and a table up to 16 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
+Hydor checks what the agent hands in: numbers must be numbers, dates real dates, links full web addresses, a card's data what its card takes. When something doesn't fit, the agent is told what to fix. An app can have up to 30 answer fields, and a table up to 16 columns. A new answer field takes its name for programs from its heading when you save; after that the name stays, so programs that read it keep working.
 
 ### Examples
 
 Examples are answers to try the app with, and checks on what a run gives back, so you can try a change and notice when the app gets worse. **Add an example** adds one: give it a name if you like, fill in its answers, and **Add a check** for each thing a good run gives. A check is a rule on the run's values, as a step's rule is: `{{answer.unread}} > 0`, `{{find.count}} = 3`, `{{reply}} contains Lisbon`. The **{ }** button puts in a value: the form's answers, what the steps gave, **Its answer** (`{{answer.field}}`) and **Its reply**.
+
+An app drafted from a session starts with one, **From the session**: the answers of the request it came from, with checks from the reply.
 
 **Try them** runs every example as a test run, with the app as it is on screen, saved or not; the flask button beside one tries only that one. Each shows how its last try went, **Passed**, how many checks failed or **Did not finish**, with how long it took and what it cost; an open example says what each failed check saw ("answer.unread is 2").
 
@@ -404,7 +415,7 @@ curl -X POST https://your-address/api/apps/trip-planner/run \
 
 - Send the form's answers under `inputs`, by their placeholder names. For a file question, give the path of a file on this computer, or send the file under `files` with its `name` and its contents in base64 as `data`.
 - `wait` is how many seconds to wait for the answer, at most 900.
-- The reply has the run's `status`, `result` (the answer fields), `reply` (the agent's last words) and `session` (a link to it), plus `error` and `costUsd` when there are any.
+- The reply has the run's `status`, `result` (the answer fields; a card field as the card's data, the JSON a ```ui block holds), `reply` (the agent's last words) and `session` (a link to it), plus `error` and `costUsd` when there are any.
 - A run still going can be asked about at `GET …/run/<run>?wait=60`.
 - Behind a proxy that cuts long requests (Cloudflare's stops at 100 seconds), wait less and ask again.
 
@@ -412,7 +423,7 @@ A key may make up to 30 calls a minute, and the app's daily limit applies. More 
 
 ## Let other agents run an app as a tool
 
-Claude Code, Cursor or another agent connected to Hydor's own MCP server (a standard way for agents to reach tools) can run your app as a tool. Under **API & sharing** → **Other agents**, the switch **Offer to other agents** offers it as a tool named after its address, like `app_trip_planner`. It is on for new apps. The agent fills in the form as the tool's input and waits for the answer; a long run comes back with its id, which the agent checks with a second tool, `app_run_status`. The address and the tokens such agents need are in [Settings → App → Connect other agents](/settings?s=connect).
+Claude Code, Cursor or another agent connected to Hydor's own MCP server (a standard way for agents to reach tools) can run your app as a tool. Under **API & sharing** → **Other agents**, the switch **Offer to other agents** offers it as a tool named after its address, like `app_trip_planner`. It is on for new apps. The agent fills in the form as the tool's input and waits for the answer (a card field comes to it as text, a table as a table); a long run comes back with its id, which the agent checks with a second tool, `app_run_status`. The address and the tokens such agents need are in [Settings → App → Connect other agents](/settings?s=connect).
 
 ## Open a public page anyone can use
 
@@ -448,7 +459,7 @@ A file question takes its cell as text: a path on this computer, or a web addres
 While the rows run, a table fills in: the row number, the first two questions, the state, up to four answer fields (or the reply), and a link to each run. Above it: how many are done, how many did not finish, the cost so far and how many run at once, with a progress bar.
 
 - **Stop** ends the rows still waiting and interrupts the ones running.
-- **CSV** downloads the results: each row's answers, every answer field, its state, any error, its cost and a link to its session. Cells a spreadsheet would treat as a formula start with an apostrophe.
+- **CSV** downloads the results: each row's answers, every answer field (a card as its text, as **Copy as text** gives it), its state, any error, its cost and a link to its session. Cells a spreadsheet would treat as a formula start with an apostrophe.
 - The **×** closes the table.
 
 Rows keep going if Hydor restarts. **Earlier tables** lists your past runs of rows (the last 30) with their progress and whether they are **Running**, **Stopped** or **Finished**; click one to open its table again.
@@ -585,6 +596,7 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 
 - "Make an app called Weekly report that asks for a project and a date range, and answers with a summary and a table of what changed."
 - "Turn this session into an app I can run again."
+- "Show the answer of my Price check app as a comparison card instead of a table."
 - "Pin the Trip planner and my Weekly report to the top of the Apps page, the report first."
 - "Which apps did I use lately, and how did their last runs go?"
 - "Run my Price check again with the same answers as last time."

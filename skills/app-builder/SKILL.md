@@ -79,8 +79,11 @@ topic says what each part does, and its API topic gives the format.
 
 ## 4. Design how its answer looks
 
-Give every app people will read a view (`ui`, saved with app_save): its answer then opens in pages made for it,
-not a plain card. The format is in app_guide's API topic (Apps: views).
+Prefer card fields: an answer field `{ id, label, type: "ui", ui: "<card>" }` (a step's output `ui(<card>)`) is one
+of the answer UIs a chat shows (find_ui gives their names and data), filled in by the app's agent and drawn as in a
+chat, with no view to write; a comparison, an itinerary, a recipe or a chart look right at once. Write a view only
+for what no card draws (a view cannot place a card yet), as `ui`, saved with app_save: its answer then opens in
+pages made for it. The format is in app_guide's API topic (Apps: views).
 
 - **Pages** are tabs, one for each thing a person comes back to (the trip, the days, what to book, the budget),
   at most four or five; a detail page (`tab: false`) opens from a click on an item (a day, a product).
