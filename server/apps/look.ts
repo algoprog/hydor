@@ -103,7 +103,7 @@ export interface Looked {
 export async function lookAtRun(r: RunRecord, can: () => boolean = canCapture): Promise<Looked> {
   const ui = r.recipe.ui;
   if (r.status !== 'done' || !r.result) return { text: `No pictures: run ${r.id} did not finish with an answer.`, images: [] };
-  if (!ui || !pagesFor(ui, 'run').length) return { text: 'No pictures: it has no view for a run’s answer, which shows as the plain card and tables (give it a ui to design how it looks).', images: [] };
+  if (!ui || !pagesFor(ui, 'run').length) return { text: 'No pictures: it has no view of its own, so its answer shows as its fields and cards, which the app draws itself and need no look (a view, ui, is only for what no card draws).', images: [] };
   if (!can()) return { text: 'No pictures: this computer has no browser to draw them with (the user can download one in Settings → Browser). Open the run’s page to see it, or ask the user how it looks.', images: [] };
   const html = shell(r.recipe.name);
   const view = uiOf(r);
