@@ -49,7 +49,7 @@ import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
 import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFolder, unwatch } from './folder.ts';
 import { appSchema } from './schema.ts';
-import { appChanged, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { appChanged, askRun, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, whyNoAsks, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -682,16 +682,6 @@ function routes(d: Deps) {
     return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}) });
   };
 
-  /** Why a run takes no follow-ups, or nothing when it does. */
-  const noAsks = (r: RunRecord): string | undefined => {
-    if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
-    if (isFlowRun(r)) return 'A run with steps takes no follow-ups: change the answers and run it again, or open a step’s session to go on there.';
-    const s = r.key ? sessions.summary(r.key) : null;
-    if (!s) return r.key ? 'Its session is gone.' : undefined;
-    if (s.external && (!s.live || s.live.status === 'exited')) return `Its session is open in ${s.external.client}: continue it there.`;
-    return undefined;
-  };
-
   app.get('/api/apps/runs/:runId', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
@@ -714,7 +704,7 @@ function routes(d: Deps) {
       ...(r.status === 'waiting' && isFlowRun(r) && askOf(r) ? { question: askOf(r) } : {}),
       // Follow-ups typed while the agent works wait their turn in the session's queue.
       queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
-      noAsks: noAsks(r),
+      noAsks: whyNoAsks(r),
     };
   });
 
@@ -856,20 +846,17 @@ function routes(d: Deps) {
     return { run: runView(r) };
   });
 
-  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
+  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is); a finished flow's first starts its session. */
   app.post('/api/apps/runs/:runId/ask', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
-    const why = noAsks(r);
+    const why = whyNoAsks(r);
     if (why) throw new HttpError(409, why);
-    if (!r.key) throw new HttpError(409, 'It has not started yet: ask once it has.');
     const text = String((req.body as { text?: unknown })?.text ?? '').trim();
     if (!text) throw new HttpError(400, 'Write what to change');
     if (text.length > 20_000) throw new HttpError(413, 'That is too long for a follow-up (at most 20,000 characters)');
     noteUserMessage();
-    await sessions.deliverOrQueue(r.key, text);
-    // Sent: its turn has begun (a queued one opens the run when it goes out).
-    if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
+    await askRun(r, text);
     return { run: runView(getRun(db, r.id)!) };
   });
 
@@ -1094,10 +1081,13 @@ function submitTool(ctx: RunCtx): RunTool | null {
   const hit = runOfCtx(ctx);
   if (!hit || !hit.run.recipe.answer.length) return null;
   const answer = hit.run.recipe.answer;
+  // Once it has a result, a change hands in only the fields that change.
+  const had = !!hit.run.result;
+  const schema = answerSchema(answer);
   return {
     name: 'submit_result',
-    description: `Hand in the result of this run of the app "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
-    inputSchema: answerSchema(answer),
+    description: `Hand in the result of this run of the app "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again. Once there is a result, a change needs only the fields that change (each one whole): those left out stay as they are.`,
+    inputSchema: had ? { ...schema, required: [] } : schema,
     async run(args, c) {
       const now = runOfCtx(c);
       if (!now) return { text: 'This session was not started from an app, so there is nothing to hand in.', isError: true };
@@ -1106,13 +1096,16 @@ function submitTool(ctx: RunCtx): RunTool | null {
       const ids = new Set(answer.map((f) => f.id));
       const keys = Object.keys(args ?? {});
       if (keys.length === 1 && !ids.has(keys[0]) && args[keys[0]] && typeof args[keys[0]] === 'object') raw = args[keys[0]];
+      // The fields it leaves out stay as they are (a change to a result hands in what changed); one sent empty is emptied.
+      const before = getRun(c.deps.db, now.run.id)?.result;
+      if (before && raw && typeof raw === 'object' && !Array.isArray(raw)) raw = { ...before, ...(raw as Record<string, unknown>) };
       // A public run's answer may only point at the web: nothing on this computer.
       const local = !(now.mark.public || now.run.source === 'public');
       const checked = checkAnswer(now.run.recipe.answer, raw, { local });
-      if (!checked.ok) return { text: `The result does not fit the answer fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call submit_result again with all the fields.`, isError: true };
+      if (!checked.ok) return { text: `The result does not fit the answer fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call submit_result again${before ? '' : ' with all the fields'}.`, isError: true };
       // Files on this computer it points at (and pictures as data: addresses): a copy kept, shown by its address.
       const taken = await takeInAnswer(c.deps.db, now.run.recipe.answer, checked.value, { cwd: c.cwd, local });
-      if (taken.errors.length) return { text: `Some of its files could not be kept:\n${taken.errors.map((e) => `- ${e}`).join('\n')}\nFix these (a path that is there, or an https:// address) and call submit_result again with all the fields.`, isError: true };
+      if (taken.errors.length) return { text: `Some of its files could not be kept:\n${taken.errors.map((e) => `- ${e}`).join('\n')}\nFix these (a path that is there, or an https:// address) and call submit_result again${before ? '' : ' with all the fields'}.`, isError: true };
       saveResult(now.run.id, taken.value);
       return 'Saved: the person sees this result now. Finish with a short reply (a sentence or two); no need to repeat the result.';
     },

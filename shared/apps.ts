@@ -254,6 +254,8 @@ export interface AppRun {
   version?: number;
   /** What its flow could not have: calls that still failed after their tries, steps that failed (at most 30). */
   misses?: RunMiss[];
+  /** While a run with steps works: the answer fields its steps have given so far (each one that fits); gone once it ends. */
+  partial?: Record<string, unknown>;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;

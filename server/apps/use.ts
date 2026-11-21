@@ -8,7 +8,8 @@
 // the session as a message when it ends. Which apps: those installed whose page lets agents use them, made for it.
 // There may be very many: agents are told of the few the user pinned to the top of the Apps page or runs most, and
 // find the others with find_apps (search.ts: the best twenty for a few words on what the user wants, by words and by
-// meaning; pins.ts: the pinned ones first, then those used lately).
+// meaning; pins.ts: the pinned ones first, then those used lately). A change the user then asks of what an app gave
+// (another order, shorter, one thing for another) goes to that run (use_app with run and change), whose card updates.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,7 +28,7 @@ import { opensTurn } from '../opinion/turns.ts';
 import { allowApp, allowedApps } from './allowed.ts';
 import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
-import { startRun, waitFor } from './runs.ts';
+import { askRun, startRun, waitFor, whyNoAsks } from './runs.ts';
 import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
@@ -94,7 +95,7 @@ export function useNote(db: DB): string | null {
   const list = usableApps(db);
   if (!list.length) return null;
   const head =
-    "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: the app's own card asks them first (unless they chose to always run it) and for what is missing, then shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.";
+    "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: the app's own card asks them first (unless they chose to always run it) and for what is missing, then shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same. When they then ask to change what an app gave (another order, shorter, one thing for another, a column more), ask the app for it with use_app's run and change, so its card updates, rather than answering beside it; a new question (another place, other dates) is a new run.";
   if (list.length <= NAMED) return [head, ...list.map((u) => appLine(u, false))].join('\n');
   const used = byUse(db, list);
   // Those they pinned to the top of their Apps page come first, and say so.
@@ -377,7 +378,7 @@ const MISFIT = 'If its answer misses what the user asked, do not add a second an
 
 /** What the call answers once the run ended, or while it goes on. */
 function endText(r: RunRecord): string {
-  if (r.status === 'done') return `${r.appName} is done. Its card, with the answer as the app shows it, shows right under your reply: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it, and if you point to the card, it is below, not above. ${MISFIT}\n\n${runText(r)}`;
+  if (r.status === 'done') return `${r.appName} is done. Its card, with the answer as the app shows it, shows right under your reply: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it, and if you point to the card, it is below, not above. ${MISFIT} If the user then asks to change what it gave, call use_app with run "${r.id}" and change.\n\n${runText(r)}`;
   if (r.status === 'stopped') return `${r.appName} was stopped before it finished.\n\n${runText(r)}`;
   if (r.status === 'failed') return `${r.appName} failed: ${r.error ?? 'it did not finish'}. Its card, under your reply, says so. Tell the user, and offer what could help (a detail it lacked, trying again).\n\n${runText(r)}`;
   const waiting = r.status === 'waiting' ? ' It waits for the user’s answer to one of its questions, on its card.' : '';
@@ -424,6 +425,60 @@ async function waitAndSay(ctx: RunCtx, id: string, ms: number): Promise<string> 
   if (!r) return 'That run is gone.';
   if (!isActive(r.status)) updateRun(db, id, { told: true });
   return endText(r);
+}
+
+// ---- a change asked of what a run gave ------------------------------------------------------------------------
+
+/**
+ * A change the user asks of what a run gave (use_app with run and change): it goes to the run as a follow-up from its
+ * page would (a run with steps gets its session for changes with the first), the run's card moves under this turn,
+ * and the call waits for that turn to end, then gives back the updated answer.
+ */
+async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Promise<string | { text: string; isError: true }> {
+  const { db } = c.deps;
+  if (isActive(r.status)) return { text: `${r.appName} is still at work on that run: wait for it first (use_app with run "${r.id}"), then ask for the change.`, isError: true };
+  const why = whyNoAsks(r);
+  if (why) return { text: `${r.appName} cannot change what that run gave: ${why}`, isError: true };
+  if (text.length > 20_000) return { text: 'That change is too long (at most 20,000 characters).', isError: true };
+  const sent = Date.now();
+  const before = JSON.stringify(r.result ?? null);
+  watching.add(r.id);
+  try {
+    // This session hears how it went by a message if it ends after the call stops waiting.
+    updateRun(db, r.id, { told: false });
+    try {
+      await askRun(r, text);
+    } catch (e) {
+      return { text: `The change could not be sent: ${(e as Error).message}`, isError: true };
+    }
+    // Its card shows under this turn now, where its answer changes.
+    const note = notesOf(db, c.key, 'app-run').find((n) => (n.data as { run?: string } | null)?.run === r.id);
+    if (note) {
+      removeNote(db, note.id);
+      addNote(db, { key: c.key, kind: 'app-run', anchor: await turnAnchor(c.deps, c.key), data: note.data });
+    }
+    // Until that turn has ended (the run opens again when its agent goes to work).
+    for (let left = ms; left > 0 && !c.signal?.aborted; ) {
+      const now = getRun(db, r.id);
+      if (!now || (!isActive(now.status) && (now.endedAt ?? 0) >= sent)) break;
+      const step = Math.min(left, isActive(now.status) ? 5_000 : 400);
+      if (isActive(now.status)) await waitFor(r.id, step);
+      else await new Promise((ok) => setTimeout(ok, step));
+      left -= step;
+    }
+  } finally {
+    watching.delete(r.id);
+  }
+  const now = getRun(db, r.id);
+  if (!now) return 'That run is gone.';
+  if (isActive(now.status) || (now.endedAt ?? 0) < sent)
+    return `${now.appName} is still making the change (run ${now.id}); its card here shows it at work. Its new answer comes to you as a message when it is done: end your turn now (say it is on its way), or call use_app with run "${now.id}" to wait for it.`;
+  updateRun(db, now.id, { told: true });
+  const said = now.reply ? `\n\nWhat its agent said: ${clip(now.reply)}` : '';
+  if (now.status !== 'done') return `${now.appName} could not make the change: ${now.error ?? 'it did not finish'}.${said}\n\n${runText(now)}`;
+  if (JSON.stringify(now.result ?? null) === before && now.result)
+    return `${now.appName} did not change its answer (its agent's words say why: another question is a new run, with use_app and the new answers). Tell the user in a sentence.${said}\n\n${runText(now)}`;
+  return `${now.appName} changed its answer as asked. Its card, under your reply, shows the new one: say in a sentence or two what changed, without repeating it.${said}\n\n${runText(now)}`;
 }
 
 // ---- the tool -------------------------------------------------------------------------------------------------
@@ -483,6 +538,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       'Unless the user chose to always run that app, its card first asks them whether to run it, showing what it does. If they say no, do the job another way (or ask them in words); do not call it again for the same request.',
       'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card, which shows under your reply (below it, not above).',
       'If an app’s answer turns out not to fit what the user asked and you answer yourself instead, call use_app with run (the run’s id) and remove: true: its card leaves the conversation, so it shows one answer, not two. The run stays in the app’s history.',
+      'When the user asks to change what an app gave here (another order, shorter or warmer, one thing swapped for another, a column more), call use_app with run (the run’s id) and change (what they want, in their words): the app’s own agent changes its answer, its card moves under your reply with the new answer, and the call waits for it as for a run. Use it for a change to that answer, not for a new question (another place, other dates): that is a new run.',
       many
         ? `The user has ${list.length} apps: find the one to run with find_apps, which gives each one's name to use here and what its form asks.`
         : `The apps (? marks a question it can do without):\n${list.map((u) => appLine(u, true)).join('\n')}`,
@@ -496,6 +552,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
         wait: { type: 'number', description: 'Most seconds to wait for its answer (1 to 540; 300 unless set).' },
         run: { type: 'string', description: 'A run started here before that was still running: waits for its answer. With remove: true, the run whose card to take out.' },
         remove: { type: 'boolean', description: 'With run: takes that run’s card out of this conversation (its answer did not fit and you answer yourself). The run stays in the app’s history.' },
+        change: { type: 'string', description: 'With run: a change the user asks of what that run gave (“swap days 2 and 3”, “shorter, and warmer”), sent to the app; its card updates. Not for a new question.' },
       },
     },
     async run(args, c) {
@@ -510,6 +567,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
           if (note) removeNote(db, note.id);
           return note ? `Removed ${r.appName}'s card; the run stays in the app's history.` : `${r.appName}'s card is not in this conversation (it may be gone already); the run stays in the app's history.`;
         }
+        if (typeof args.change === 'string' && args.change.trim()) return changeRun(c, r, args.change.trim(), Math.min(wait, CALL_MS));
         return waitAndSay(c, r.id, wait);
       }
       const now = usableApps(db);

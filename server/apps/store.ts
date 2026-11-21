@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import type { AppBatch, AppDef, AppRecipe, AppRun, PublicSettings, RunMiss, RunSource, RunStatus, StepStatus } from '../../shared/apps.ts';
 import type { CheckResult } from '../../shared/app-manifest.ts';
 import { tierLabel } from '../../shared/tiers.ts';
-import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
+import { cleanPublic, cleanRecipe, DEFAULT_PUBLIC, isActive, RESERVED_SLUGS, slugify } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { dropMediaRefs, dropRunMediaOfApp, refMedia, shasOfAssets } from './media.ts';
@@ -108,6 +108,8 @@ export function ensureTables(db: DB) {
   if (!cols.has('told')) db.exec('alter table app_runs add column told integer not null default 0');
   // What a run's flow could not have (calls that failed after their tries, steps that failed), as JSON.
   if (!cols.has('misses')) db.exec('alter table app_runs add column misses text');
+  // A run with steps at work: the answer fields its steps have given so far, as JSON (none once it ends).
+  if (!cols.has('partial')) db.exec('alter table app_runs add column partial text');
 }
 
 // ---- apps --------------------------------------------------------------------------------------------
@@ -307,6 +309,7 @@ interface RunRow {
   asked_by: string | null;
   told: number | null;
   misses: string | null;
+  partial: string | null;
   created_at: number;
   started_at: number | null;
   ended_at: number | null;
@@ -364,6 +367,8 @@ function toRun(r: RunRow): RunRecord {
     nudged: !!r.nudged,
     ...(r.asked_by ? { askedBy: r.asked_by, told: !!r.told } : {}),
     ...(r.misses ? { misses: parse<RunMiss[]>(r.misses, []) } : {}),
+    // What its steps have given so far, only while it works.
+    ...(r.partial && isActive(r.status as RunStatus) ? { partial: parse<Record<string, unknown>>(r.partial, {}) } : {}),
     createdAt: r.created_at,
     startedAt: r.started_at ?? undefined,
     endedAt: r.ended_at ?? undefined,
@@ -435,7 +440,7 @@ export function runIdByKey(db: DB, key: string): string | null {
   return r?.id ?? null;
 }
 
-export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null; checks: CheckResult[]; told: boolean; misses: RunMiss[] }>) {
+export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: RunStatus; result: Record<string, unknown> | null; reply: string; error: string | null; costUsd: number; nudged: boolean; startedAt: number; endedAt: number | null; checks: CheckResult[]; told: boolean; misses: RunMiss[]; partial: Record<string, unknown> | null }>) {
   const sets: string[] = [];
   const vals: unknown[] = [];
   const put = (col: string, v: unknown) => {
@@ -454,6 +459,7 @@ export function updateRun(db: DB, id: string, p: Partial<{ key: string; status: 
   if (p.checks !== undefined) put('checks', JSON.stringify(p.checks));
   if (p.told !== undefined) put('told', p.told ? 1 : 0);
   if (p.misses !== undefined) put('misses', p.misses.length ? JSON.stringify(p.misses) : null);
+  if (p.partial !== undefined) put('partial', p.partial && Object.keys(p.partial).length ? JSON.stringify(p.partial) : null);
   if (!sets.length) return;
   db.prepare(`update app_runs set ${sets.join(', ')} where id = ?`).run(...vals, id);
 }
