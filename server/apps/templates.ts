@@ -3361,7 +3361,7 @@ return { items: kept.map((t, i) => ({ part: i + 1, of: kept.length, text: t })),
 // order (those with a day first); what to watch out for, the most serious first; and the usual topics it says nothing on.
 const TOPICS = ['term', 'money', 'ending', 'liability', 'confidentiality', 'ip', 'exclusivity', 'disputes', 'other'];
 const NAMES = { term: 'How long it runs and how it renews', money: 'Money', ending: 'Ending it', liability: 'Liability and indemnities', confidentiality: 'Confidentiality', ip: 'Intellectual property', disputes: 'How disputes are settled' };
-const key = (t) => String(t || '').toLowerCase().replace(/\W+/g, ' ').trim();
+const key = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const WORDS = [
   ['ending', /terminat|notice|cancel/],
   ['ip', /intellect|copyright|licen/],
