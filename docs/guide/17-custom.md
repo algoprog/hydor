@@ -139,11 +139,11 @@ What is the same for every agent now: the agreement card, the checks, the rounds
 
 - A **Reviewer** check, and the final check, are judged by a model that did none of the work. In a [confidential session](/guide/sessions#keep-a-session-confidential) that is a model on this computer; without one, the check cannot run.
 - Check commands run the way Custom's own commands do: in Auto mode with **Sandbox for commands** on, inside the sandbox, kept to the session's folder; in its other modes as its own commands run; in a confidential session always inside the sandbox without network.
-- The rounds a new goal gets come from **Rounds before a goal pauses** below. It now holds for every agent's goals, not only Custom's.
+- The rounds a new goal gets come from **Rounds a goal may run** in [Settings → Capabilities → Goals](/settings?s=goals). It holds for every agent's goals, not only Custom's.
 
 Goals Custom had running before this version are not carried over: set a new one.
 
-To change how many rounds a new goal gets, open [Settings → Capabilities → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) and pick **10**, **30** or **100** in the **Rounds before a goal pauses** row of the **Goals** group. You can set another number on the agreement card, and the agent may propose one.
+To change how many rounds a new goal gets, open [Settings → Capabilities → Goals](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) and pick **10**, **30** or **100** in the **Rounds a goal may run** row. You can set another number on the agreement card, and the agent may propose one.
 
 ## Long conversations and long output
 
@@ -226,11 +226,10 @@ A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessio
 
 ## Settings → Capabilities → Custom
 
-[Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode, a sandbox for commands, and how long goals run") has three rows:
+[Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode and a sandbox for commands") has two rows:
 
 - **Auto mode** (one of Custom's modes, beside Ask, Accept edits, Full access and Plan): its (i) says what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
 - **Sandbox for commands** (in Auto mode, commands change files only in the session's folder and /tmp on Linux, the temporary folders on a Mac, or a temporary folder of their own on Windows; Full access runs without this sandbox or approval prompts): a switch, on by default. Greyed out when the sandbox can't run here (bubblewrap on Linux, Seatbelt on a Mac, Git for Windows and the .NET Framework on Windows), and the row says why.
-- **Rounds before a goal pauses**, in the **Goals** group (the rounds a new goal of any agent is given; you can set another number on the goal's agreement card): **10**, **30** (the default) or **100** rounds. A goal that runs out of rounds stops at its limit, and you can give it more.
 
 Custom's models are in [Settings → Agents → Models](/settings?s=models), and the model that does the checks is the **Helper model** there.
 

@@ -270,6 +270,14 @@
 - [**每个会话同时工作的数量**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：一个会话同时运行的 Hydor 子智能体数量。
 - [**集群规模**](/settings?s=children&find=Swarm%20size)：一个集群或战役中同时工作的智能体数量。
 
+### 目标
+
+[设置 → 目标](/settings?s=goals)：新目标的起始设置：轮数、向你询问的频率，以及何时按它自己的选择继续。详见[会话](/guide/sessions)。
+
+- [**目标最多可运行的轮数**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run)：新目标在达到上限而停止前可运行的轮数，除非智能体提议更少，或你在认可时修改。
+- [**目标向你询问的频率**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you)：新目标是自行推进、在转折点询问，还是每一轮都询问。
+- [**等待多久后按它自己的选择继续**](/settings?s=goals&find=Goes%20on%20with%20its%20own%20pick%20after)：新目标在询问问题后，等待你回答多久才按它自己的选择继续；0 表示一直等你。
+
 ### 图片、视频和音频
 
 [设置 → 图片、视频和音频](/settings?s=images)：智能体通过 OpenRouter 为你做的图片、视频、音乐和语音，以及由谁来写它们的说明。详见[文档、图片、视频和语音](/guide/documents-voice)。
@@ -312,11 +320,10 @@
 
 ### Custom
 
-[设置 → Custom](/settings?s=custom)：自动模式、命令沙盒，以及目标的运行时长。详见[Custom，Hydor 自带的智能体](/guide/custom)。
+[设置 → Custom](/settings?s=custom)：自动模式和用于运行命令的沙盒。详见[Custom，Hydor 自带的智能体](/guide/custom)。
 
 - [**自动模式**](/settings?s=custom&find=Auto%20mode)：Custom 会自行批准安全的步骤。
 - [**命令沙盒**](/settings?s=custom&find=Sandbox%20for%20commands)：自动模式的命令在沙盒中运行；完全访问不使用沙盒。
-- [**目标暂停前的轮数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：任意智能体的新目标在达到上限停止之前可以运行的轮次数。
 
 ## 问问智能体
 

@@ -364,7 +364,7 @@ The agent reads the project and proposes the checks, the paths it may not change
 - **Reviewer**: a sentence a reviewer must find true. The reviewer is a model that did none of the work: it reads what changed, the files or the output the check names, and says whether the sentence holds, with its reason. It is for what no command can show, such as "the settings page has a dark mode".
 - **You**: something only you can confirm. It waits for you when everything else holds.
 
-**Kept safe** shows the paths the agent cannot change (the tests, the test data, the checks' own scripts) and where it works. **Limits** are the most rounds, money (at API prices) and time it may use; the rounds come from [Rounds before a goal pauses](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) (30 unless you change it), and money and time are open until you set them. Under **How much it asks you** you can still change how often it asks. If the session's spending has no price (a model without one), the card says the money limit cannot stop it, and the rounds and the time still do.
+**Kept safe** shows the paths the agent cannot change (the tests, the test data, the checks' own scripts) and where it works. **Limits** are the most rounds, money (at API prices) and time it may use; the rounds come from [Rounds a goal may run](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) (30 unless you change it), and money and time are open until you set them. Under **How much it asks you** you can still change how often it asks. If the session's spending has no price (a model without one), the card says the money limit cannot stop it, and the rounds and the time still do.
 
 The app measures where things stand before any round, so the card says "measured 3 min ago · 3 of 5 hold". It does this right after the proposal only when the session's permissions already let the agent run commands without asking (Claude Code's **Bypass**, Codex's and Custom's **Full access**) and the session is not confidential. Otherwise nothing runs yet, the card says "not measured yet" and "The checks run for the first time when you press Start": the commands are the agent's proposal, and you agree to them first. A check that could not run counts as not holding; the card says so and the button reads **Start anyway**.
 
@@ -409,6 +409,8 @@ When every check holds, the app does not trust it at once: it runs the commands 
 When it asks, a question card shows two to four ways to go on, each with why, what it should bring, what it costs and **Its pick** on the agent's own. Tick a way, or several, and they are followed one after the other, in the order you ticked them. **Something else: say which way** takes a way of your own, and **A note for the agent (optional)** goes into the next round. The main button reads **Go this way**, or **Follow these 2, in this order**; **Only its pick** takes the agent's pick. Keys 1 to 4 tick a way.
 
 With no answer, it goes on with its pick after 10 minutes (a whole number of minutes, 0 to 1,440, where 0 waits), or waits for you: **If you don’t answer** has both. The card counts down ("goes on with its pick in 9 min") and **Wait for me** stops the clock. A check only you can confirm, or something only you can give, always waits for you.
+
+What a new goal starts from (its rounds, how much it asks you, and the minutes before it goes on with its pick) is set for every new goal in [Settings → Capabilities → Goals](/settings?s=goals); here you change it for one goal.
 
 ### Steer it whenever you want
 

@@ -270,6 +270,14 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Trabajando a la vez, por sesión**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): Cuántos subagentes de Hydor ejecuta una sesión a la vez.
 - [**Tamaño del enjambre**](/settings?s=children&find=Swarm%20size): Cuántos agentes de un enjambre o campaña trabajan a la vez.
 
+### Objetivos
+
+[Configuración → Objetivos](/settings?s=goals): los valores con los que empieza un objetivo nuevo: sus rondas, cuánto te pregunta y cuándo sigue con su propia elección. Más en [Sesiones](/guide/sessions).
+
+- [**Rondas que puede ejecutar un objetivo**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run): Cuántas rondas tiene un objetivo nuevo antes de detenerse en su límite, a menos que el agente proponga menos o tú lo cambies al aceptar.
+- [**Cuánto te pregunta un objetivo**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you): Si un objetivo nuevo trabaja por su cuenta, pregunta en los puntos de decisión o pregunta en cada ronda.
+- [**Sigue con su propia elección después de**](/settings?s=goals&find=Goes%20on%20with%20its%20own%20pick%20after): Cuánto espera un objetivo nuevo tu respuesta a una pregunta antes de seguir con su propia elección; con 0 espera tu respuesta.
+
 ### Imágenes, video y audio
 
 [Configuración → Imágenes, video y audio](/settings?s=images): imágenes, videos, música y voces que los agentes crean para ti mediante OpenRouter, y quién escribe sus pies de imagen. Más en [Documentos, imágenes, videos y voz](/guide/documents-voice).
@@ -312,11 +320,10 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 
 ### Custom
 
-[Configuración → Custom](/settings?s=custom): modo automático, un entorno aislado para comandos y cuánto duran los objetivos. Más en [Custom, el agente propio de la app](/guide/custom).
+[Configuración → Custom](/settings?s=custom): modo automático y un sandbox para comandos. Más en [Custom, el agente propio de la app](/guide/custom).
 
 - [**Modo automático**](/settings?s=custom&find=Auto%20mode): Custom aprueba por sí mismo los pasos seguros.
 - [**Entorno aislado para comandos**](/settings?s=custom&find=Sandbox%20for%20commands): Los comandos del modo Automático se ejecutan en un entorno aislado; Acceso total se ejecuta sin él.
-- [**Rondas antes de pausar un objetivo**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Cuántas rondas tiene un objetivo nuevo de cualquier agente antes de detenerse en su límite.
 
 ## Preguntar a un agente
 

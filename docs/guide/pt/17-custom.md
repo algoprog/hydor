@@ -139,11 +139,11 @@ O que agora é igual para todos os agentes: o cartão de acordo, as verificaçõ
 
 - Uma verificação do **Revisor**, e a verificação final, são julgadas por um modelo que não fez nenhum do trabalho. Em uma [sessão confidencial](/guide/sessions#keep-a-session-confidential), esse é um modelo neste computador; sem um, a verificação não pode ser executada.
 - Os comandos de verificação são executados como os comandos do próprio Custom: no modo Automático com **Sandbox para comandos** ativado, dentro do sandbox, restritos à pasta da sessão; nos outros modos, como os comandos do próprio Custom; em uma sessão confidencial, sempre dentro do sandbox e sem rede.
-- As rodadas que um novo objetivo recebe vêm de **Rodadas antes de um objetivo pausar**, abaixo. Agora esse valor vale para os objetivos de todos os agentes, não apenas os do Custom.
+- As rodadas que um novo objetivo recebe vêm de **Rodadas que um objetivo pode executar** em [Configurações → Recursos → Metas](/settings?s=goals). Esse valor vale para os objetivos de todos os agentes, não apenas os do Custom.
 
 Os objetivos que o Custom tinha em andamento antes desta versão não foram mantidos: defina um novo.
 
-Para mudar quantas rodadas um novo objetivo recebe, abra [Configurações → Recursos → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) e escolha **10**, **30** ou **100** na linha **Rodadas antes de um objetivo pausar** do grupo **Metas**. Você pode definir outro número no cartão de acordo, e o agente também pode propor um.
+Para mudar quantas rodadas um novo objetivo recebe, abra [Configurações → Recursos → Metas](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) e escolha **10**, **30** ou **100** na linha **Rodadas que um objetivo pode executar**. Você pode definir outro número no cartão de acordo, e o agente também pode propor um.
 
 ## Conversas longas e respostas longas
 
@@ -226,11 +226,10 @@ Um [limite de gastos](/guide/usage#cap-what-a-session-spends) também funciona e
 
 ## Configurações → Recursos → Custom
 
-[Configurações → Recursos → Custom](/settings?s=custom) (“Modo automático, um sandbox para comandos e por quanto tempo os objetivos são executados”) tem três linhas:
+[Configurações → Recursos → Custom](/settings?s=custom) (“Modo automático e um sandbox para comandos”) tem duas linhas:
 
 - **Modo automático** (um dos modos do Custom, ao lado de Perguntar, Aceitar edições, Acesso total e Planejar): o (i) dele diz o que o modo Automático deixa passar, o que sempre pergunta e que o modelo auxiliar faz a verificação. Não há nada para ligar: você escolhe Automático por sessão em **Permissões**.
 - **Sandbox para comandos** (no modo Automático, os comandos alteram arquivos apenas na pasta da sessão e em /tmp no Linux, nas pastas temporárias no Mac, ou em uma pasta temporária própria no Windows; o Acesso total executa sem esse sandbox e sem pedidos de aprovação): um interruptor, ativado por padrão. Fica esmaecido quando o sandbox não pode ser executado aqui (bubblewrap no Linux, Seatbelt no Mac, Git for Windows e .NET Framework no Windows), e a linha explica o motivo.
-- **Rodadas antes de um objetivo pausar**, no grupo **Metas** (as rodadas que um novo objetivo de qualquer agente recebe; você pode definir outro número no cartão de acordo do objetivo): **10**, **30** (o padrão) ou **100** rodadas. Um objetivo que fica sem rodadas para no limite, e você pode dar mais a ele.
 
 Os modelos do Custom estão em [Configurações → Agentes → Modelos](/settings?s=models), e o modelo que faz as verificações é o **Modelo auxiliar** lá.
 

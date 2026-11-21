@@ -139,11 +139,11 @@ Ce qui est désormais identique pour tous les agents : la carte d’accord, les 
 
 - Une vérification **Relecteur**, ainsi que la vérification finale, sont jugées par un modèle qui n’a fait aucun des travaux. Dans une [session confidentielle](/guide/sessions#keep-a-session-confidential), c’est un modèle présent sur cet ordinateur ; sans modèle de ce type, la vérification ne peut pas s’exécuter.
 - Les commandes de vérification s’exécutent comme les commandes propres à Custom : en mode Automatique avec **Bac à sable pour les commandes** activé, dans le bac à sable, limitées au dossier de la session ; dans ses autres modes, comme s’exécutent ses propres commandes ; dans une session confidentielle, toujours dans le bac à sable sans réseau.
-- Le nombre de tours accordés à un nouvel objectif vient de **Tours avant la pause d’un objectif**, plus bas. Il s’applique désormais aux objectifs de tous les agents, pas seulement à ceux de Custom.
+- Le nombre de tours accordés à un nouvel objectif vient de **Tours qu’un objectif peut exécuter** dans [Paramètres → Capacités → Objectifs](/settings?s=goals). Il s’applique aux objectifs de tous les agents, pas seulement à ceux de Custom.
 
 Les objectifs que Custom avait en cours avant cette version ne sont pas repris : définissez-en un nouveau.
 
-Pour changer le nombre de tours d’un nouvel objectif, ouvrez [Paramètres → Capacités → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) et choisissez **10**, **30** ou **100** dans la ligne **Tours avant la pause d’un objectif** du groupe **Objectifs**. Vous pouvez indiquer un autre nombre sur la carte d’accord, et l’agent peut en proposer un.
+Pour changer le nombre de tours d’un nouvel objectif, ouvrez [Paramètres → Capacités → Objectifs](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) et choisissez **10**, **30** ou **100** dans la ligne **Tours qu’un objectif peut exécuter**. Vous pouvez indiquer un autre nombre sur la carte d’accord, et l’agent peut en proposer un.
 
 ## Longues conversations et longues sorties
 
@@ -226,11 +226,10 @@ Un [plafond de dépenses](/guide/usage#cap-what-a-session-spends) fonctionne aus
 
 ## Paramètres → Capacités → Custom
 
-[Paramètres → Capacités → Custom](/settings?s=custom) (« Mode automatique, un bac à sable pour les commandes, et la durée d’exécution des objectifs ») comporte trois lignes :
+[Paramètres → Capacités → Custom](/settings?s=custom) (« Mode automatique et bac à sable pour les commandes ») comporte deux lignes :
 
 - **Mode automatique** (l’un des modes de Custom, avec Demander, Accepter les modifications, Accès complet et Planifier) : son (i) indique ce que le mode automatique laisse passer, ce qui demande toujours une confirmation, et que c’est le modèle d’appoint qui effectue la vérification. Rien à activer : vous choisissez le mode automatique pour chaque session sous **Autorisations**.
 - **Bac à sable pour les commandes** (en mode automatique, les commandes ne modifient des fichiers que dans le dossier de la session et dans /tmp sous Linux, dans les dossiers temporaires sur un Mac, ou dans un dossier temporaire qui leur est propre sous Windows ; Accès complet s’exécute sans ce bac à sable ni demandes d’approbation) : un interrupteur, activé par défaut. Il est grisé lorsque le bac à sable ne peut pas fonctionner ici (bubblewrap sous Linux, Seatbelt sur un Mac, Git for Windows et .NET Framework sous Windows), et la ligne en indique la raison.
-- **Tours avant la pause d’un objectif**, dans le groupe **Objectifs** (le nombre de tours accordé à un nouvel objectif de n’importe quel agent ; vous pouvez fixer un autre nombre sur la carte d’accord de l’objectif) : **10**, **30** (par défaut) ou **100** tours. Un objectif qui n’a plus de tours s’arrête à sa limite, et vous pouvez lui en accorder davantage.
 
 Les modèles de Custom se trouvent dans [Paramètres → Agents → Modèles](/settings?s=models), et le modèle qui effectue les vérifications y est le **Modèle d’appoint**.
 

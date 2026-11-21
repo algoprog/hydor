@@ -1,16 +1,15 @@
-// Custom, the app's own agent: Settings → Custom, for Auto mode, the sandbox for its commands, and how
-// long a goal may run. Its models are in Settings → Models.
+// Custom, the app's own agent: Settings → Custom, for Auto mode and the sandbox for its commands. Its models are in
+// Settings → Models.
 import { useEffect, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { api, put } from '../../lib/api';
 import { toastError } from '../../lib/store';
-import { Segmented, Switch, Throbber } from '../../components/ui';
+import { Switch, Throbber } from '../../components/ui';
 import { Group, Row, Stack } from '../settings/kit';
 import type { WebFeature } from '../registry';
 
 interface CustomSettingsView {
   sandbox: boolean;
-  goalRounds: number;
   /** A sandbox for commands works on this machine (named when it was bubblewrap alone). */
   bwrap: boolean;
   /** Which one (a server before 0.66 sends neither this nor platform: it is bubblewrap there). */
@@ -47,7 +46,6 @@ function CustomSettings() {
   const save = (p: Partial<CustomSettingsView>) => put<CustomSettingsView>('/api/custom/settings', p).then(setSt, toastError);
   // The rows show at once; each control comes as the settings arrive.
   const wait = <Throbber className="text-fg-3" />;
-  const rounds = !st || ['10', '30', '100'].includes(String(st.goalRounds)) ? ['10', '30', '100'] : ['10', '30', '100', String(st.goalRounds)];
   return (
     <Stack>
       <Group>
@@ -72,19 +70,11 @@ function CustomSettings() {
           control={st ? <Switch on={st.sandbox} onChange={(on) => void save({ sandbox: on })} label="Sandbox for commands" disabled={!st.bwrap} /> : wait}
         />
       </Group>
-      <Group title="Goals">
-        <Row
-          label="Rounds before a goal pauses"
-          hint="How many rounds a new goal gets, for every agent"
-          info="A goal works round after round until the checks you agree hold. A new goal of any agent gets this many rounds; you can set another number when you agree its checks. A goal that runs out of rounds stops, and you can give it more."
-          control={st ? <Segmented size="sm" value={String(st.goalRounds)} options={rounds.map((v) => ({ value: v, label: v }))} onChange={(v) => void save({ goalRounds: Number(v) })} /> : wait}
-        />
-      </Group>
     </Stack>
   );
 }
 
 export const customFeature: WebFeature = {
   id: 'custom',
-  settings: [{ id: 'custom', label: 'Custom', icon: ShieldCheck, sub: 'Auto mode, a sandbox for commands, and how long goals run', Body: CustomSettings }],
+  settings: [{ id: 'custom', label: 'Custom', icon: ShieldCheck, sub: 'Auto mode and a sandbox for commands', Body: CustomSettings }],
 };
