@@ -366,7 +366,6 @@ const GAME_COLS = [
   { id: 'price', label: 'Best price now, US$', type: 'number' as const },
   { id: 'lowest', label: 'Lowest ever, US$', type: 'number' as const },
   { id: 'price_text', label: 'Best price now', type: 'text' as const, description: 'The price in US dollars as the person reads it, with its worth in their currency when that is another' },
-  { id: 'lowest_text', label: 'Lowest ever', type: 'text' as const },
   { id: 'store', label: 'Store', type: 'text' as const },
   { id: 'deal', label: 'Deal', type: 'url' as const },
   { id: 'picture', label: 'Picture', type: 'image' as const },
@@ -2524,7 +2523,7 @@ const money = (n) => {
     return String(n);
   }
 };
-for (const g of games) (g.price_text = money(g.price)), (g.lowest_text = money(g.lowest));
+for (const g of games) g.price_text = money(g.price);
 const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || g.coming || (g.price !== null && g.price < 20) : true);
 games.sort((a, b) => Number(within(b)) - Number(within(a)) || a.at - b.at);
 // The picks in their first sentence: what follows it is a model's notes on what the sources lacked.
@@ -3438,7 +3437,7 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
     description: 'What is around any place, on a map: the kinds of place you name (dog parks, cafés, playgrounds…) from OpenStreetMap, and sights, museums, parks and landmarks from Wikipedia and Wikidata, with pictures and a line on each, the best for you picked out and put in walking order.',
     fields: [
       { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Alfama, Lisbon, or the Colosseum' },
-      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, views, or kinds of place on OpenStreetMap: dog parks, cafés, playgrounds', remember: true },
+      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, views, or kinds of place on OpenStreetMap: dog parks, cafés, playgrounds' },
       { id: 'radius', label: 'How far around', type: 'choice', options: ['A short walk (1 km)', 'Nearby (3 km)', 'The wider area (10 km)'], default: 'Nearby (3 km)', remember: true },
     ],
     language: 'person',

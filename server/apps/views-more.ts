@@ -781,7 +781,7 @@ const GAMES: AppUi = {
       blocks: [
         { title: 'Best price now, and lowest ever (US$)', element: 'plot', data: 'result.games', with: { kind: 'bar', x: 'title', y: ['price', 'lowest'], height: 260 } },
         { text: '{{result.rate}}', if: 'result.rate' },
-        { element: 'table', data: 'result.games', with: { columns: ['title', 'price_text', 'lowest_text', 'store'] } },
+        { element: 'table', data: 'result.games', with: { columns: ['title', 'price_text', 'lowest', 'store'] } },
       ],
     },
     { id: 'time', title: 'Time to finish', if: 'result.games|sum:hours', blocks: [{ title: 'Hours for the main part', element: 'plot', data: 'result.games', with: { kind: 'hbar', x: 'title', y: 'hours', height: 280 } }] },
@@ -800,7 +800,7 @@ const GAMES: AppUi = {
   <span class="tags"><span class="tag">{{genre}}</span>{{#coming}}<span class="tag soon">{{#out}}Coming {{out}}{{/out}}{{^out}}Coming soon{{/out}}</span>{{/coming}}</span><h3>{{title}}{{#year}} <small>{{year}}</small>{{/year}}</h3>
   <p>{{why}}</p>
   <p class="muted">{{platforms}}{{#hours}} · about {{hours}} h{{/hours}}</p>
-  <p class="price">{{#free}}<b>Free to play</b>{{/free}}{{^free}}{{#price}}<b>{{price_text}}</b> at {{store}}{{#lowest}} · lowest ever {{lowest_text}}{{/lowest}}{{/price}}{{/free}}</p>
+  <p class="price">{{#free}}<b>Free to play</b>{{/free}}{{^free}}{{#price}}<b>{{price_text}}</b> at {{store}}{{#lowest}} · lowest ever US&#36;{{lowest|number}}{{/lowest}}{{/price}}{{/free}}</p>
 </button>`,
       css:
         CARD +
