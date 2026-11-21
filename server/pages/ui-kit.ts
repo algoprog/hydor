@@ -166,7 +166,8 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     now: new Date().toISOString().slice(0, 16).replace('T', ' '),
   });
   const scope = (stack: any[] = [], event: Record<string, unknown> = {}) => ({ root: rootNow(event), stack, lang: cfg.lang || 'en', words });
-  const shown = (p: any) => p.tab !== false && (!p.if || E.test(p.if, scope()));
+  // A page whose answer is not there yet keeps its tab while its run works (dimmed, below).
+  const shown = (p: any) => p.tab !== false && (!p.if || E.test(p.if, scope()) || (!!ctx.partial && E.notYet({ if: p.if }, ctx.result)));
   const firstPage = () => (pages.find((p: any) => p.id === cfg.start && shown(p)) ?? pages.find(shown) ?? pages[0])?.id ?? '';
 
   // ---- drawing -----------------------------------------------------------------------------------------------------
@@ -431,8 +432,10 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     const i = scopes.push({ stack, key }) - 1;
     return `<div class="n-el n-el-${esc(name)}" data-n-i="${i}">${html}</div>`;
   };
-  /** What a block names: its own settings and words, and its element's html. */
-  const srcOf = (b: any) => JSON.stringify(b) + (b.element ? (def.elements?.[b.element]?.html ?? '') : '');
+  /** Its element's html (what it names counts with the block's own words). */
+  const htmlOf = (b: any) => (b.element ? (def.elements?.[b.element]?.html ?? '') : '');
+  /** While its run works: a block whose answer is not there yet (shared/app-ui.ts notYet). */
+  const notThere = (b: any) => !!ctx.partial && E.notYet(b, ctx.result, htmlOf(b));
   /**
    * While a run works: whether a page has something of its answer to draw (a block whose answer fields are there; a
    * page that shows nothing of the answer always has). Pages without it wait: their tab is dimmed, and the view opens
@@ -443,22 +446,20 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     const s = scope();
     let ofAnswer = false;
     for (const b of p.blocks ?? []) {
-      if (b.if && !E.test(b.if, s)) continue;
-      const src = srcOf(b);
-      if (!E.notYet(src, {})) continue;
+      if (!E.notYet(b, {}, htmlOf(b))) continue;
       ofAnswer = true;
-      if (!E.notYet(src, ctx.result)) return true;
+      if (!notThere(b) && (!b.if || E.test(b.if, s))) return true;
     }
     return !ofAnswer;
   };
   const block = (b: any, j: number): string => {
     const s = scope();
-    if (b.if && !E.test(b.if, s)) return '';
     // A run still at work shows the answer so far: what it does not have yet is not drawn yet.
-    if (ctx.partial && E.notYet(srcOf(b), ctx.result)) {
+    if (notThere(b)) {
       held++;
       return '';
     }
+    if (b.if && !E.test(b.if, s)) return '';
     let v: unknown;
     let waiting = false;
     const m = /^data\.([A-Za-z]\w*)$/.exec(b.data || '');
@@ -595,8 +596,20 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
       const next = document.createElement('div');
       next.append(t.content);
       morph(box, Object.assign(next, { id: 'n-ui', className: 'n-ui' }));
+      // On another page now: its tab in sight, where the tabs are wider than the screen (a phone).
+      if (page !== drawnPage) {
+        drawnPage = page;
+        const nav = box.querySelector('.n-ui-tabs');
+        const tab = nav?.querySelector('[aria-selected=true]');
+        if (nav && tab) {
+          const a = tab.getBoundingClientRect();
+          const b = nav.getBoundingClientRect();
+          if (a.left < b.left || a.right > b.right) nav.scrollLeft += a.left - b.left - 16;
+        }
+      }
     });
   }
+  let drawnPage = '';
 
   // ---- what a click does -----------------------------------------------------------------------------------------
   const toast = (text: string, error = false) => text && call('say', { text, error }).catch(() => {});

@@ -799,11 +799,16 @@ export function uiEngine() {
   }
 
   /**
-   * Not there yet: while a run with steps works, its view has the answer so far, and a block (its data, words or
-   * element) that names an answer field that answer lacks is left out, as a block whose if does not hold.
+   * Not there yet: while a run with steps works, its view has the answer so far, and a block whose answer is not in it
+   * is left out, as a block whose if does not hold. A block waits for its main field (what its data or its if names),
+   * else for every answer field it names (its words, its element's html); a block that names none never waits.
    */
-  const notYet = (src: string, result: unknown): boolean => {
-    for (const m of String(src ?? '').matchAll(/(?:^|[^\w.])result\.([A-Za-z_]\w*)/g)) if (!isObj(result) || !own(result, m[1])) return true;
+  const notYet = (b: unknown, result: unknown, html = ''): boolean => {
+    const has = (k: string) => isObj(result) && own(result, k);
+    const field = (v: unknown) => (typeof v === 'string' ? /^\s*result\.([A-Za-z_]\w*)/.exec(v)?.[1] : undefined);
+    const main = isObj(b) ? (field(b.data) ?? field(b.if)) : undefined;
+    if (main) return !has(main);
+    for (const m of `${typeof b === 'string' ? b : JSON.stringify(b ?? '')}${html}`.matchAll(/(?:^|[^\w.])result\.([A-Za-z_]\w*)/g)) if (!has(m[1])) return true;
     return false;
   };
 
