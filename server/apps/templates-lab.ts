@@ -1300,9 +1300,30 @@ const SWEEP: Draft = {
   flow: {
     steps: [
       {
+        id: 'ready',
+        title: 'See what is still to find out',
+        do: 'code',
+        language: 'javascript',
+        with: { settings: '{{settings}}', budget: '{{budget}}' },
+        code:
+          SETTINGS +
+          String.raw`// The script is read by an agent only for what the form leaves open: the settings to tune (none that read as
+// "name: values"), or how long a run takes (when the budget is in GPU hours, which the number of runs depends on).
+// With the settings given and a budget in runs, nothing needs finding out.
+const given = Object.keys(settingLines(input.settings, {})).length;
+const hours = budgetOf(input.budget, 1).hours;
+return { need: !given || hours ? 'yes' : '', why: !given && hours ? 'the settings and the time a run takes' : !given ? 'the settings' : hours ? 'the time a run takes' : '' };`,
+        outputs: [
+          { id: 'need', label: 'The script is to be read', type: 'text' },
+          { id: 'why', label: 'What it is read for', type: 'text' },
+        ],
+        failed: 'skip',
+      },
+      {
         id: 'read',
         title: 'Read the script and propose a sweep',
         do: 'agent',
+        if: '{{ready.need}} is not empty',
         instructions: `Plan a hyperparameter sweep of a training script, within a budget. Read the script, do not run it, and change nothing.
 
 The command: {{command}}
@@ -1338,12 +1359,14 @@ Hand in:
         title: 'Fit the sweep to the budget',
         do: 'code',
         language: 'javascript',
-        with: { settings: '{{read.settings}}', given: '{{settings}}', command: '{{read.command}}', hours: '{{read.hours}}', gpus: '{{read.gpus}}', budget: '{{budget}}' },
+        with: { settings: '{{read.settings}}', given: '{{settings}}', command: '{{read.command}}', form: '{{command}}', hours: '{{read.hours}}', gpus: '{{read.gpus}}', budget: '{{budget}}' },
         code:
           LIST +
           SETTINGS +
           String.raw`// The sweep within its budget: each setting's values (the researcher's own lines first), every combination (grid) when
-// they fit, else as many random draws as the budget allows; the command with a {name} for each setting.
+// they fit, else as many random draws as the budget allows; the command with a {name} for each setting. When nobody read
+// the script, the settings are the researcher's own, the command is the one given and a run is taken to need one GPU
+// hour (said with the plan: only a budget in GPU hours needed it known, and then the script was read).
 const params = {};
 for (const s of rows(input.settings)) settingLines(String(s.name || '').trim() + ': ' + String(s.values || ''), params);
 settingLines(input.given, params);
@@ -1354,9 +1377,10 @@ const b = budgetOf(input.budget, each);
 const grid = names.reduce((n, k) => n * params[k].length, 1);
 const mode = grid <= b.most ? 'grid' : 'random';
 const runs = mode === 'grid' ? grid : b.most;
-let command = String(input.command || '').trim();
+let command = String(input.command || input.form || '').trim();
 for (const k of names) if (!command.includes('{' + k + '}')) command += ' --' + k.replace(/_/g, '-') + ' {' + k + '}';
 return {
+  guess: Number(input.hours) > 0 ? '' : 'yes',
   params,
   mode,
   runs,
@@ -1370,6 +1394,7 @@ return {
   list: names.map((k) => '- ' + k + ': ' + params[k].join(', ')).join('\n'),
 };`,
         outputs: [
+          { id: 'guess', label: 'A run’s time was taken as an hour', type: 'text' },
           { id: 'params', label: 'Settings and values', type: 'text' },
           { id: 'mode', label: 'Grid or random', type: 'text' },
           { id: 'runs', label: 'Runs', type: 'number' },
@@ -1389,7 +1414,7 @@ return {
         title: 'Check the plan',
         do: 'ask',
         if: someoneThere('check'),
-        question: 'The sweep would try:\n\n{{plan.list}}\n\n{{plan.runs}} runs ({{plan.mode}} of {{plan.grid}} combinations), about {{plan.hours}} GPU hours of your budget of {{plan.budget}}. The command: {{plan.command}}\n\nStart it as it is, or write what to change.',
+        question: 'The sweep would try:\n\n{{plan.list}}\n\n{{plan.runs}} runs ({{plan.mode}} of {{plan.grid}} combinations), about {{plan.hours}} GPU hours{{#plan.guess}} if a run takes an hour (it was not given){{/plan.guess}}, of your budget of {{plan.budget}}. The command: {{plan.command}}\n\nStart it as it is, or write what to change.',
         fields: [{ id: 'changes', label: 'Changes, one setting a line', type: 'long', help: 'Like lr: 1e-4, 3e-4 for other values, or drop dropout to leave one out; leave it empty to start as it is' }],
         waitHours: 72,
         failed: 'skip',
