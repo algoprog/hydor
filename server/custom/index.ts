@@ -6,7 +6,7 @@ import { confidentialKey, privateHelper } from '../confidential/index.ts';
 import type { Feature } from '../features/types.ts';
 import { runOf } from '../mcp.ts';
 import { reviewStep, type StepInfo } from './review.ts';
-import { customSettings, setCustomSettings, type CustomSettings } from './settings.ts';
+import { customSettings, setCustomSettings } from './settings.ts';
 
 export const custom: Feature = {
   id: 'custom',
@@ -36,10 +36,10 @@ export const custom: Feature = {
     });
     // bwrap: a sandbox for commands works here (the name from when it was Linux's alone, which older web apps read);
     // sandboxKind says which, and platform which system it is on, for the words beside the switch.
-    const state = () => ({ ...customSettings(d.db), bwrap: !!sandboxAvailable(), sandboxKind: sandboxAvailable()?.kind ?? null, platform: process.platform });
+    const state = () => ({ sandbox: customSettings(d.db).sandbox, bwrap: !!sandboxAvailable(), sandboxKind: sandboxAvailable()?.kind ?? null, platform: process.platform });
     d.app.get('/api/custom/settings', async () => state());
     d.app.put('/api/custom/settings', async (req) => {
-      setCustomSettings(d.db, (req.body ?? {}) as Partial<CustomSettings>);
+      setCustomSettings(d.db, (req.body ?? {}) as { sandbox?: boolean });
       return state();
     });
   },

@@ -51,6 +51,13 @@ export interface GoalSettings {
 
 /** A new goal asks at turning points and goes on with its pick after ten minutes (the user's choice, 2026-11-20). */
 export const GOAL_SETTINGS: GoalSettings = { asks: 'forks', noAnswerMin: 10 };
+/** Rounds a new goal gets before it stops at its limit, unless the agent proposes fewer or the person changes it (Settings → Goals). */
+export const GOAL_ROUNDS = 30;
+
+/** What a new goal starts from, as Settings → Capabilities → Goals sets it: its rounds, how much it asks, and the minutes before it goes on with its own pick. */
+export interface GoalDefaults extends GoalSettings {
+  rounds: number;
+}
 /** Rounds without progress before it changes its approach (or asks which way). */
 export const GOAL_PATIENCE = 2;
 export const GOAL_MAX_CHECKS = 12;

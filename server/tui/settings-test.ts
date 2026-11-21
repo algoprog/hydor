@@ -314,8 +314,12 @@ test('changing a switch, a number, a choice, a text and a list calls the right e
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/browser/settings', body: { allow: ['example.com'], block: ['ads.example'] } }]);
   r = await set('computer.computer-use', 'on');
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/computer/settings', body: { enabled: true } }]);
-  r = await set('custom.rounds-before-a-goal-pauses', '100');
-  assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/custom/settings', body: { goalRounds: 100 } }]);
+  r = await set('goals.rounds-a-goal-may-run', '100');
+  assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/goal-settings', body: { rounds: 100 } }]);
+  r = await set('goals.how-much-a-goal-asks-you', 'every');
+  assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/goal-settings', body: { asks: 'every' } }]);
+  r = await set('goals.goes-on-with-its-own-pick-after', '0');
+  assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/goal-settings', body: { noAnswerMin: 0 } }]);
   r = await set('skills.suggest-skills-that-fit', 'off');
   assert.deepEqual(r.writes, [{ method: 'PUT', path: '/api/skillpack/settings', body: { suggest: false } }]);
   r = await set('general.update-automatically', 'on');

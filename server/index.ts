@@ -99,6 +99,7 @@ import { codexFolderNames } from './codex-projects.ts';
 import { claimSessions, syncFoundProjects } from './spaces/found.ts';
 import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
+import { goalDefaults, setGoalDefaults } from './goals/settings.ts';
 import { parseGoalAction } from './goals/validate.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
@@ -828,6 +829,9 @@ app.post('/api/sessions/:key/flags', async (req) => {
 });
 /** A goal the app's own loop drives towards (server/goals): set it, agree its checks, answer it, steer it, pause or stop it. */
 app.post('/api/sessions/:key/goal', async (req) => ({ goal: await sessions.goal(K(req), parseGoalAction(req.body)) }));
+/** What a new goal starts from (Settings → Capabilities → Goals): rounds, how much it asks, minutes before it goes on with its own pick. */
+app.get('/api/goal-settings', async () => goalDefaults(db));
+app.put('/api/goal-settings', async (req) => setGoalDefaults(db, req.body ?? {}));
 
 app.post('/api/sessions/:key/settle', async (req) => {
   await sessions.settle(K(req));
