@@ -19,7 +19,7 @@ import { isTier, type Tier } from './tiers.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
 import type { AppSummary } from './app-summary.ts';
 import type { AppSecretState } from './app-secrets.ts';
-import { ANSWER_TYPES, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
+import { ANSWER_TYPES, cardName, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
 
@@ -667,15 +667,22 @@ const KIND_NAMES: Record<string, string> = {
   url: 'url', link: 'url',
   list: 'list',
   table: 'table',
+  ui: 'ui', card: 'ui',
 };
 const COLUMN_KINDS = new Set(['text', 'number', 'yesno', 'date', 'url']);
-const KINDS_SAID = 'text, long, number, yesno, date, url, list, table(column: kind, …)';
+const KINDS_SAID = 'text, long, number, yesno, date, url, list, table(column: kind, …), ui(card name)';
 
-/** "table(name: text, price: number)", "list(text)", "long" → an answer field's kind (and a table's columns). */
-export function readKind(s: string): { type: string; columns?: { id: string; label: string; type: string }[] } | { error: string } {
+/** "table(name: text, price: number)", "list(text)", "long", "ui(comparison)" → an answer field's kind (and a table's columns, a card's name). */
+export function readKind(s: string): { type: string; columns?: { id: string; label: string; type: string }[]; ui?: string } | { error: string } {
   const m = /^\s*([A-Za-z]+)\s*(?:\((.*)\))?\s*$/s.exec(String(s ?? ''));
   const type = m ? KIND_NAMES[m[1].toLowerCase()] : undefined;
   if (!m || !type) return { error: `“${String(s).slice(0, 40)}” is not a kind of value (${KINDS_SAID})` };
+  if (type === 'ui') {
+    const asked = (m[2] ?? '').trim();
+    if (!asked) return { error: 'a card needs its name: ui(comparison), as find_ui names them' };
+    const ui = cardName(asked);
+    return ui ? { type, ui } : { error: `there is no card called “${asked.slice(0, 40)}” (find_ui finds the one that fits)` };
+  }
   if (type !== 'table') return { type };
   const columns: { id: string; label: string; type: string }[] = [];
   for (const part of (m[2] ?? '').split(',').map((x) => x.trim()).filter(Boolean)) {
@@ -704,13 +711,19 @@ export function cleanOutputs(raw: unknown, errors: string[], where: string): Ans
   const fields = list.flatMap((x: any) => {
     if (!x || typeof x !== 'object') return [];
     const said = typeof x.kind === 'string' ? x.kind : typeof x.type === 'string' && !ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : null;
-    if (said === null) return [{ ...x, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    if (said === null) {
+      if (x.type === 'ui' && !cardName(x.ui)) {
+        errors.push(`${where}, output ${x.id ?? x.label ?? '?'}: ${x.ui ? `there is no card called “${String(x.ui).slice(0, 40)}” (find_ui finds the one that fits)` : 'a card needs its name (ui: "comparison")'}`);
+        return [];
+      }
+      return [{ ...x, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    }
     const k = readKind(said);
     if ('error' in k) {
       errors.push(`${where}, output ${x.id ?? x.label ?? '?'}: ${k.error}`);
       return [];
     }
-    return [{ ...x, type: k.type, columns: k.columns ?? x.columns, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    return [{ ...x, type: k.type, columns: k.columns ?? x.columns, ...(k.ui ? { ui: k.ui } : {}), label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
   });
   const out = cleanAnswer(fields);
   return out.length ? out : undefined;

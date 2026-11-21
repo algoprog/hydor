@@ -27,7 +27,7 @@ export interface AppField {
   default?: string;
 }
 
-export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media';
+export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media' | 'ui';
 export type ColumnType = 'text' | 'number' | 'yesno' | 'date' | 'url' | 'image';
 
 export interface AnswerColumn {
@@ -46,6 +46,8 @@ export interface AnswerField {
   required?: boolean;
   /** For a table: its columns. */
   columns?: AnswerColumn[];
+  /** For a card (type "ui"): the answer UI that draws it, by its name in the catalog (shared/answer-ui): "comparison", "itinerary"… Its value is the card's data. */
+  ui?: string;
 }
 
 export interface AppLimits {
@@ -385,9 +387,10 @@ export const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
   { value: 'list', label: 'List' },
   { value: 'table', label: 'Table' },
   { value: 'media', label: 'Pictures, videos or files' },
+  { value: 'ui', label: 'A card' },
 ];
 
-export const COLUMN_TYPES = [...ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table' && t.value !== 'media'), { value: 'image', label: 'Picture' }] as { value: ColumnType; label: string }[];
+export const COLUMN_TYPES = [...ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table' && t.value !== 'media' && t.value !== 'ui'), { value: 'image', label: 'Picture' }] as { value: ColumnType; label: string }[];
 
 /** Icons an app can wear (lucide names; the pages draw them). */
 export const APP_ICONS = [
@@ -605,6 +608,43 @@ export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o:
 
 // ---- the answer ------------------------------------------------------------------------------------
 
+/**
+ * How a card field (type "ui") is named and checked: by the catalog of answer UIs (shared/answer-ui), which is large,
+ * so this file, which the pages load at once, does not import it. shared/app-cards.ts sets these when it is loaded,
+ * and the server always loads it (runs.ts). Until then a card's name is kept as it is written and its data is only
+ * checked to be one object.
+ */
+export interface CardRules {
+  /** The UI's own name for a name or another name agents write for it; undefined when the catalog has none. */
+  name: (ui: string) => string | undefined;
+  /** What does not fit the UI's type in the data, in words ("items is missing"). */
+  check: (ui: string, data: Record<string, unknown>) => string[];
+}
+let cardRules: CardRules | null = null;
+export const setCardRules = (r: CardRules) => void (cardRules = r);
+
+/** A card's name as the catalog writes it ("compare" → "comparison"); undefined when there is no such card. */
+export function cardName(ui: unknown): string | undefined {
+  const n = typeof ui === 'string' ? ui.trim().toLowerCase().slice(0, 60) : '';
+  if (!n) return undefined;
+  return cardRules ? cardRules.name(n) : n;
+}
+
+/**
+ * A card field's value: the card's data, one object (its JSON text, or a list taken as its items, as a reply's block
+ * is), checked against its UI's type. A card that reads its numbers from a spreadsheet or a file (`from`) is not
+ * offered in apps: what a run gives stays as it was.
+ */
+function cardValue(f: AnswerField, v: unknown): { v: Record<string, unknown> } | { e: string[] } {
+  const d = Array.isArray(v) ? { items: v } : v;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return { e: [`should be the ${f.ui ?? 'card'} card's data: one JSON object`] };
+  const data = d as Record<string, unknown>;
+  if (data.from !== undefined && data.from !== null) return { e: ['a card in an app holds its values itself: give them in place of from (cards that read a spreadsheet or a file are not offered in apps)'] };
+  const bad = cardRules && f.ui ? cardRules.check(f.ui, data) : [];
+  if (bad.length) return { e: [`its data does not fit the ${f.ui} card: ${bad.slice(0, 4).join('; ')} (its type is in your instructions)`] };
+  return { v: data };
+}
+
 function columnSchema(t: ColumnType, description?: string): Record<string, unknown> {
   const d = description ? { description } : {};
   if (t === 'number') return { type: 'number', ...d };
@@ -644,6 +684,7 @@ export function answerSchema(answer: AnswerField[]): Record<string, unknown> {
       };
     } else if (f.type === 'markdown') properties[f.id] = { type: 'string', description: `${description}. Markdown.` };
     else if (f.type === 'media') properties[f.id] = { ...MEDIA_SCHEMA, description: `${description}. Pictures, videos, sounds or files: one object each.` };
+    else if (f.type === 'ui') properties[f.id] = { type: 'object', description: `${description}. The ${f.ui ?? ''} card's data: one object of the type your instructions give.` };
     else properties[f.id] = columnSchema(f.type, description);
   }
   return { type: 'object', properties, required: answer.filter((f) => f.required).map((f) => f.id) };
@@ -715,12 +756,16 @@ export function checkAnswer(answer: AnswerField[], raw: unknown, o: { local?: bo
   const errors: string[] = [];
   for (const f of answer) {
     let v = unwrap(src[f.id]);
-    if (empty(v) || (Array.isArray(v) && !v.length)) {
+    if (empty(v) || (Array.isArray(v) && !v.length) || (f.type === 'ui' && v && typeof v === 'object' && !Object.keys(v).length)) {
       if (f.required) errors.push(`${f.id}: missing (${ANSWER_TYPES.find((t) => t.value === f.type)?.label.toLowerCase() ?? f.type})`);
       else value[f.id] = f.type === 'list' || f.type === 'table' || f.type === 'media' ? [] : null;
       continue;
     }
-    if (f.type === 'media') {
+    if (f.type === 'ui') {
+      const c = cardValue(f, v);
+      if ('e' in c) errors.push(...c.e.map((e) => `${f.id}: ${e}`));
+      else value[f.id] = c.v;
+    } else if (f.type === 'media') {
       const m = cleanMedia(v, { local });
       if (m.errors.length) errors.push(...m.errors.map((e) => `${f.id}: ${e}`));
       else value[f.id] = m.items;
@@ -849,7 +894,9 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
     if (!x || typeof x !== 'object') return [];
     const label = str(x.label, 80) || str(x.id, 80);
     if (!label) return [];
-    const type: AnswerType = ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
+    // A card the catalog does not have stays as formatted text: the agent's answer still shows.
+    const ui = x.type === 'ui' ? cardName(x.ui) : undefined;
+    const type: AnswerType = x.type === 'ui' && !ui ? 'markdown' : ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
     const id = fieldId(str(x.id, 40) || label, atTaken);
     atTaken.push(id);
     const cTaken: string[] = [];
@@ -863,7 +910,7 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
             return [{ id: cid, label: cl, type: COLUMN_TYPES.some((t) => t.value === c.type) ? c.type : 'text', description: opt(c.description, 200) }];
           })
         : undefined;
-    return [{ id, label, type, description: opt(x.description, 400), required: !!x.required || undefined, columns: type === 'table' ? (columns?.length ? columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined }];
+    return [{ id, label, type, description: opt(x.description, 400), required: !!x.required || undefined, columns: type === 'table' ? (columns?.length ? columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined, ...(type === 'ui' ? { ui } : {}) }];
   });
 }
 

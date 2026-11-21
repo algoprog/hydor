@@ -16,6 +16,7 @@ import os from 'node:os';
 import { userLang } from '../language/index.ts';
 import { answerUi } from '../../shared/answer-ui/index.ts';
 import { isDataRef } from '../../shared/answer-ui/data-ref.ts';
+import { uiBlocks } from '../../shared/answer-ui/blocks.ts';
 import type { RunStatus, RunTrigger } from '../../shared/automations.ts';
 import {
   asTaskSchedule,
@@ -244,14 +245,6 @@ export function refreshPrompt(o: { db: DB; board: string; card: BoardCard; quest
   ]
     .filter(Boolean)
     .join('\n\n');
-}
-
-/** The ```ui blocks of a reply: each one's name and the text inside it. */
-function uiBlocks(reply: string): { name: string; body: string }[] {
-  const out: { name: string; body: string }[] = [];
-  const re = /(^|\n)[ \t]*(`{3,}|~{3,})ui[ \t]+([A-Za-z0-9_-]+)[^\n]*\n([\s\S]*?)\n[ \t]*\2[ \t]*(?=\n|$)/g;
-  for (let m = re.exec(reply); m; m = re.exec(reply)) out.push({ name: m[3], body: m[4] });
-  return out;
 }
 
 const preview = (s: string, n = 140) => {
