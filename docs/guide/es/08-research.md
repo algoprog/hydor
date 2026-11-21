@@ -144,6 +144,8 @@ También puedes activar o desactivar un enjambre, o cambiarlo a una campaña, de
 
 Un miembro que termina su ángulo envía su informe al responsable. Un mensaje para un miembro que no está trabajando lo despierta.
 
+**Un enjambre con un objetivo**: una sesión que dirige un enjambre puede tener un objetivo que la app comprueba. Cada ronda es entonces el trabajo de todo el enjambre, y la app, no el responsable, decide cuándo está hecho. Consulta [Un objetivo para un enjambre](/guide/sessions#a-goal-for-a-swarm).
+
 ### Seguimiento: la barra y el tablero
 
 La sesión del responsable tiene una barra sobre el cuadro de mensaje: **Enjambre** · «eligiendo sus ángulos» al principio, y luego algo como «3 trabajando · 2 terminados · 14 publicaciones», y **Tablero**. La sesión de cada miembro también tiene una barra: «En el enjambre de» y el título del responsable («sus publicaciones e informe van allí»), con **Tablero** y **Responsable**. En la barra lateral los miembros aparecen bajo el responsable, agrupados en una línea como «5 miembros del enjambre · 3 trabajando».

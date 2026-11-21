@@ -144,6 +144,8 @@ You can also turn a swarm on or off, or change it to a campaign, inside a sessio
 
 A member that finishes its angle sends its report to the lead. A message for a member that is not working wakes it up.
 
+**A swarm with a goal**: a session that leads a swarm can have a goal the app checks. Each round is then the whole swarm's work, and the app, not the lead, decides when it is done. See [A goal for a swarm](/guide/sessions#a-goal-for-a-swarm).
+
 ### Follow it: the bar and the board
 
 The lead's session has a bar above the message box: **Swarm** · "choosing its angles" at first, then something like "3 working · 2 done · 14 posts", and **Board**. Each member's session has a bar too: "In the swarm of" and the lead's title ("its posts and report go there"), with **Board** and **Lead**. In the sidebar the members sit under the lead, folded into a line like "5 swarm members · 3 working".

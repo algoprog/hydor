@@ -144,6 +144,8 @@ Vous pouvez aussi activer ou désactiver un essaim, ou le changer en campagne, a
 
 Un membre qui termine son angle envoie son rapport à l’agent principal. Un message destiné à un membre qui ne travaille pas le réveille.
 
+**Un essaim avec un objectif** : une session qui dirige un essaim peut avoir un objectif que l’app vérifie. Chaque tour est alors le travail de tout l’essaim, et c’est l’app, et non l’agent principal, qui décide quand c’est terminé. Voir [Un objectif pour un essaim](/guide/sessions#a-goal-for-a-swarm).
+
 ### Suivre l’essaim : la barre et le tableau de bord
 
 La session de l’agent principal affiche une barre au-dessus de la zone de message : **Essaim** · « choix des angles » au début, puis quelque chose comme « 3 au travail · 2 terminés · 14 publications », et **Tableau de bord**. La session de chaque membre a aussi une barre : « Dans l’essaim de » suivi du titre de l’agent principal (« ses publications et son rapport vont là »), avec **Tableau de bord** et **Responsable**. Dans la barre latérale, les membres figurent sous l’agent principal, regroupés sur une ligne comme « 5 membres de l’essaim · 3 au travail ».
