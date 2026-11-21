@@ -21,6 +21,16 @@ const someoneThere = (field: string) => `{{${field}}} and {{run.source}} = web o
 /** What a step says when the paper could not be read: how to give it another way, in a line the person reads. */
 const ANOTHER_WAY = 'Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.';
 
+/**
+ * A program's way to end the run with one line for the person: the line written out, then the program stops as
+ * failed, so the run's error is that line (a thrown error would bring the program's own source line and stack along).
+ */
+const STOP = String.raw`async function stop(line) {
+  await new Promise((done) => process.stderr.write(line + '\n', done));
+  process.exit(1);
+}
+`;
+
 /** The steps that stop a run clearly when the paper could not be read (read_paper failed, or it came back without a page): a line on it and on how to give it another way, not the tool's bare failure. */
 const unreadable = (what: string) => ({
   id: 'unreadable',
@@ -28,7 +38,12 @@ const unreadable = (what: string) => ({
   do: 'code' as const,
   language: 'javascript' as const,
   with: { why: '{{error}}' },
-  code: 'const why = String(input.why || "").split("\\n")[0].replace(/^read_paper:\\s*/, "").trim();\nthrow new Error(' + JSON.stringify(ANOTHER_WAY) + ' + (why ? " (It said: " + why.slice(0, 200) + ")" : ""));',
+  code:
+    STOP +
+    String.raw`const why = String(input.why || '').split('\n')[0].replace(/^read_paper:\s*/, '').trim();
+await stop(` +
+    JSON.stringify(ANOTHER_WAY) +
+    String.raw` + (why ? ' (It said: ' + why.slice(0, 200) + ')' : ''));`,
 });
 const readable = (what: string) => ({
   id: 'readable',
@@ -36,7 +51,18 @@ const readable = (what: string) => ({
   do: 'code' as const,
   language: 'javascript' as const,
   with: { read: '{{paper_read.data}}' },
-  code: 'const r = input.read && typeof input.read === "object" ? input.read : {};\nif (!Array.isArray(r.parts) || !r.parts.length) {\n  const notes = Array.isArray(r.notes) ? r.notes.join(" ") : String(r.notes || "");\n  throw new Error(' + JSON.stringify(ANOTHER_WAY) + ' + (notes ? " (It said: " + notes.slice(0, 300) + ")" : ""));\n}\nreturn { ok: true };',
+  code:
+    STOP +
+    String.raw`const r = input.read && typeof input.read === 'object' ? input.read : {};
+if (!Array.isArray(r.parts) || !r.parts.length) {
+  const notes = Array.isArray(r.notes) ? r.notes.join(' ') : String(r.notes || '');
+  await stop(` +
+    JSON.stringify(what + ' has no text to read') +
+    String.raw` + (notes ? ' (it said: ' + notes.slice(0, 300) + ')' : '') + '. ' + ` +
+    JSON.stringify(ANOTHER_WAY) +
+    String.raw`);
+}
+return { ok: true };`,
   outputs: [{ id: 'ok', label: 'Could be read', type: 'yesno' as const }],
 });
 

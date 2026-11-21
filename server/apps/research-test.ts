@@ -833,6 +833,13 @@ const services: Feature = {
           stepTool('web_search', async (a) => JSON.stringify({ results: [{ title: `${String(a.query)}`, url: 'https://sigir2027.org/calls/full-papers', snippet: 'Call for full papers' }] })),
           stepTool('read_page', async (a) => `The call for full papers at ${String(a.url)}: papers are up to 9 pages, references not counted. Use the ACM template: https://www.acm.org/publications/proceedings-template`),
           stepTool('notify_user', async (a) => (notified.push(a), 'Sent.')),
+          // A paper with no open copy fails; a scanned one comes back with no text; any other is read.
+          stepTool('read_paper', async (a) => {
+            const p = String(a.paper ?? '');
+            if (p.includes('no-copy')) throw new Error('read_paper: There is no open copy of this paper anywhere it looked');
+            if (p.includes('scanned')) return JSON.stringify({ found: true, title: 'A scanned paper', parts: [], notes: ['The PDF has no text: it is pictures of pages'] });
+            return JSON.stringify({ found: true, title: 'A readable paper', parts: ['[Page 1] Abstract. We study things.'] });
+          }),
           RANK_BY_INTEREST,
           USER_PROFILE,
         ]
@@ -1285,10 +1292,31 @@ test('Reviewer simulator and Paper to talk: a paper that could not be read stops
     // The step that says it, run on a failure.
     const bad = steps.find((s) => s.id === 'unreadable') as CodeStep;
     await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: 'read_paper: There is no open copy of this paper\nmore' }, slug: id, seconds: 20 }), /Give it another way: upload its PDF .*arXiv id.*\(It said: There is no open copy of this paper\)/s);
-    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: '' }, slug: id, seconds: 20 }), (e: Error) => (e.message.split('\n').find((l) => l.startsWith('Error: Give it another way')) ?? '').endsWith('an open copy.'));
+    // Only that line: no source line or stack of the program's (the line is written out, and the program ends as failed).
+    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: '' }, slug: id, seconds: 20 }), (e: Error) => e.message === 'It stopped with an error:\nGive it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
     const ok = steps.find((s) => s.id === 'readable') as CodeStep;
-    await assert.rejects(runCode({ language: ok.language, code: ok.code, input: { read: { parts: [], notes: ['The PDF has no text'] } }, slug: id, seconds: 20 }), /Give it another way.*\(It said: The PDF has no text\)/s);
+    await assert.rejects(runCode({ language: ok.language, code: ok.code, input: { read: { parts: [], notes: ['The PDF has no text'] } }, slug: id, seconds: 20 }), (e: Error) => e.message === 'It stopped with an error:\nYour paper has no text to read (it said: The PDF has no text). Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
     assert.equal((await runCode({ language: ok.language, code: ok.code, input: { read: { parts: [{ text: 'x' }] } }, slug: id, seconds: 20 })).values.ok, true);
+  }
+});
+
+test('Reviewer simulator and Paper to talk, whole: a paper with no open copy, or one with no text, ends the run with that line and how to give it another way', async () => {
+  reply = () => ({});
+  for (const id of ['reviewer-simulator', 'paper-to-talk']) {
+    const t = templateById(id)!;
+    for (const paper of ['~/papers/no-copy.pdf', '~/papers/scanned.pdf']) {
+      seenByModel = [];
+      const r = (await waitFor(startRun({ app: `tpl:${id}`, slug: id, recipe: t, source: 'web', inputs: { paper } }).id, 60_000))!;
+      assert.equal(r.status, 'failed', `${id}: ${paper} stops the run`);
+      assert.equal(seenByModel.length, 0, `${id}: no model was asked about a paper it could not read`);
+      // The run's error, as its page shows it: what happened and how to give the paper another way, in words alone.
+      const error = String(r.error).replace(/\s+/g, ' ');
+      assert.ok(!/file:\/\/|\bat main\b|Node\.js|throw /.test(error), `${id}: no program source or stack in “${error}”`);
+      if (paper.includes('no-copy')) assert.equal(error, 'Your paper could not be read: It stopped with an error: Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy. (It said: There is no open copy of this paper anywhere it looked)');
+      else assert.equal(error, 'Check that your paper could be read: It stopped with an error: Your paper has no text to read (it said: The PDF has no text: it is pictures of pages). Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.');
+      // And what could not be had shows under it: the paper, with the tool's own words.
+      if (paper.includes('no-copy')) assert.ok((r.misses ?? []).some((m) => /There is no open copy/.test(m.why ?? '')), `${id}: the read is listed as what could not be had`);
+    }
   }
 });
 
