@@ -57,6 +57,7 @@ export function appSchema(): Record<string, unknown> {
       capUsd: { type: 'number', description: 'agent: most it may spend, in US dollars' },
       tool: { enum: STEP_TOOLS, description: 'tool: which of the app’s own tools' },
       with: values('tool, app, code: its inputs, each a value or text with {{values}}; data: the record, or what to change'),
+      cache: { type: ['boolean', 'number'], description: 'tool: how long the answer of a look-up (read_page, web_search, http_request GET) is kept for the same call: false never, else seconds (unset: 5 minutes, a day for places and encyclopedias)' },
       rule: str('decide: a rule'),
       ask: str('decide: or a question in words, answered yes or no'),
       then: { type: 'array', items: { $ref: '#/$defs/step' } },
@@ -271,8 +272,12 @@ export interface Ctx {
   model(instructions: string, o?: Said & { outputs?: Outputs; model?: string }): Promise<Record<string, any>>;
   /** An agent's session does it, with its tools: its outputs' fields, and { reply }. tier: the tier it thinks with (Settings → Models → Tiers) instead of a model by name, which wins over it. */
   agent(instructions: string, o?: Said & { outputs?: Outputs; assistant?: string; agent?: 'claude' | 'codex' | 'acp'; model?: string; tier?: 'quick' | 'standard' | 'best' | 'max'; tools?: string[]; capUsd?: number }): Promise<Record<string, any>>;
-  /** One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }. */
-  tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
+  /**
+   * One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }.
+   * A failure that may pass (a service limiting requests, one down for a moment) is tried again by the app first; a look-up's
+   * answer is kept a while for the same call: cache false never keeps it, a number of seconds keeps it that long.
+   */
+  tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string; cache?: false | number }): Promise<{ text: string; data?: unknown }>;
   /** Waits for the person: { yes }, or its fields' answers. */
   ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[]; multi?: boolean }[]; waitHours?: number }): Promise<Record<string, any>>;
   /** Another of the user's apps, by its address: its answer fields, and { reply }. */

@@ -908,7 +908,8 @@ test('scheduled tasks run a template: its answers set or filled from a webhook c
 test('run again from a step: the steps before it give what they gave, the rest run as the template is now (or as the builder sends it)', async () => {
   const flow = (prefix: string) => ({
     steps: [
-      { id: 'search', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } },
+      // Not kept: run again from the start, the search is made again.
+      { id: 'search', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' }, cache: false },
       { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: `${prefix}{{search.data.results[0].title}}` } },
     ],
     outputs: { note: '{{keep.record.title}}' },

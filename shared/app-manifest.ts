@@ -88,7 +88,16 @@ export interface ToolStep extends StepCommon {
   tool: string;
   /** Its inputs: values, or text with {{values}} in it. */
   with?: Record<string, unknown>;
+  /**
+   * How long its answer is kept for the same call (read_page, web_search, http_request GET): false never, else seconds
+   * (unset: five minutes, a day for places and encyclopedias). A view's run-again buttons repeat the same look-ups, and
+   * the services limit them.
+   */
+  cache?: false | number;
 }
+
+/** The longest a tool step may keep an answer (cache), in seconds: a week. */
+export const MOST_CACHE_SECONDS = 7 * 24 * 3600;
 
 /** One path or the other: by a rule, or by a question in words that the helper model answers ({{id.yes}}). */
 export interface DecideStep extends StepCommon {
@@ -867,7 +876,11 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       const tool = short(x.tool, 80);
       if (!tool) t.errors.push(`${where}: name the tool it uses`);
       const w = cleanWith(x.with, t.errors, where);
-      return { ...common, do: 'tool', tool, ...(w ? { with: w } : {}) };
+      let cache: false | number | undefined;
+      if (x.cache === false || x.cache === 0) cache = false;
+      else if (typeof x.cache === 'number' && Number.isFinite(x.cache) && x.cache > 0) cache = Math.min(Math.round(x.cache), MOST_CACHE_SECONDS);
+      else if (x.cache !== undefined && x.cache !== null && x.cache !== true) t.errors.push(`${where}: "cache" is false (never keep its answer) or how many seconds to keep it`);
+      return { ...common, do: 'tool', tool, ...(w ? { with: w } : {}), ...(cache !== undefined ? { cache } : {}) };
     }
     case 'decide': {
       const rule2 = text(x.rule, 2000);

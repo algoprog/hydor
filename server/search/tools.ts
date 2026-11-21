@@ -4,7 +4,7 @@
 // and Codex are told to search with their own web search instead.
 import { formatSearch } from '../../shared/search.ts';
 import { extractText } from '../documents/extract.ts';
-import type { RunCtx, RunTool, ToolOutput } from '../features/types.ts';
+import type { RunCtx, RunTool, ToolFailure, ToolOutput } from '../features/types.ts';
 import { researchFor } from '../research/index.ts';
 import { fetchPage } from '../web/fetch.ts';
 import { ArgError, filtersText, pageArgs, searchArgs } from './args.ts';
@@ -34,6 +34,27 @@ export function noProviderAnswer(e: NoProvider, ctx: Pick<RunCtx, 'agent' | 'key
       isError: true,
     };
   return { text: `${e.message} Tell the user: Settings → Search can take a key or turn on another provider.`, isError: true };
+}
+
+/**
+ * No provider could answer: whether that may pass (one limiting requests or failing for now) and when the first of them
+ * may be asked again, for an app's flow to try the search again then (ToolOutput.failure). Providers that need a key,
+ * or whose allowance is used up, do not pass in a moment.
+ */
+function searchFailure(e: NoProvider, s: SearchService): ToolFailure | undefined {
+  const now = Date.now();
+  let wait: number | undefined;
+  let kind: 'limit' | 'down' | undefined;
+  for (const f of e.failed) {
+    const was = f.kind === 'resting' ? s.searcher.resting.get(f.id)?.kind : f.kind;
+    if (was !== 'limit' && was !== 'unavailable') continue;
+    if (kind !== 'limit') kind = was === 'limit' ? 'limit' : 'down';
+    const until = s.searcher.resting.get(f.id)?.until;
+    const w = until && until > now ? until - now : 0;
+    wait = wait === undefined ? w : Math.min(wait, w);
+  }
+  if (!kind) return undefined;
+  return { kind, ...(wait ? { waitMs: wait } : {}) };
 }
 
 /** Added to every agent's instructions. */
@@ -127,7 +148,8 @@ function webSearch(s: SearchService): RunTool {
       } catch (e) {
         if (e instanceof NoProvider) {
           s.changed();
-          return noProviderAnswer(e, ctx);
+          const failure = searchFailure(e, s);
+          return { ...noProviderAnswer(e, ctx), ...(failure ? { failure } : {}) };
         }
         if (e instanceof SearchError) return { text: e.message, isError: true };
         throw e;
@@ -161,7 +183,7 @@ function readPageTool(s: SearchService): RunTool {
       }
       const n = s.naget();
       const r = await readPage(args, { fetchPage, extract: extractText, naget: n.ctx, nagetWhy: n.why, nagetFailed: (e) => s.searcher.rest('naget', e) });
-      return { text: r.text, isError: r.isError };
+      return { text: r.text, isError: r.isError, ...(r.failure ? { failure: r.failure } : {}) };
     },
   };
 }

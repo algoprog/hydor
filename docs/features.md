@@ -992,7 +992,15 @@ agents that speak ACP and take MCP servers.
   it, and offers Firm it up for an agent step that did the same in each of its last runs: fixed steps in its
   place (the tools it called, with the values it called them with, then a model step), tried on its examples
   first, with what a run takes and costs either way. Beside a conversation, a step's menu has Ask the agent about
-  it. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
+  it. When the web lets a step down, its tool calls (and a program's ctx.tool) are tried again while the failure
+  may pass (a service limiting requests, one down or slow for a moment, a dropped connection: three tries, after
+  the wait it asks for, else about 1 s and 3 s, at most 20 s a call), spaced per service for every run (Semantic
+  Scholar and Nominatim once a second, arXiv every 3 s; a service that says wait holds every caller), look-ups kept
+  for five minutes (a day for places and encyclopedias; a tool step's cache: false or seconds), and a page that
+  keeps programs out read once in the computer's own headless browser; what still could not be had shows on the
+  run's page as one folded line (3 things could not be had: each step, what it wanted and why, such as "it needs
+  the key …" or "it would do more with the key … (optional)"), reaches its view (run.misses, run.missed), the API,
+  and the agent that ran it in a session. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
   searched. An app can have a screen of its own in place of its form: a page made from its parts (its form,
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
   edited in the app's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other

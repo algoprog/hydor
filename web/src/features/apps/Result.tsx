@@ -3,7 +3,7 @@
 // phone become a card a row when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, ExternalLink, FileDown, Hand, PanelsTopLeft, Play, Square, Table2 } from 'lucide-react';
-import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
+import type { AnswerColumn, AnswerField, AppRun, RunMiss, RunProgress } from '@shared/apps';
 import type { CardSource } from '@shared/boards';
 import { cellText, isActive, toCsv } from '@shared/apps';
 import { mediaKind, mediaSrc, videoEmbed, type AppAsset, type MediaItem } from '@shared/app-media';
@@ -445,6 +445,7 @@ export function RunStatusCard({ run, progress, publicView, children, followUp }:
         {children}
       </div>
       {run.error && (run.status === 'failed' || run.status === 'stopped' || run.status === 'done') && <div className={cx('mt-1.5 pl-8 text-[13px] leading-snug', run.status === 'done' ? 'text-fg-3' : 'text-err')}>{run.error}</div>}
+      {!publicView && !!run.misses?.length && <Misses misses={run.misses} />}
       {active && progress && (progress.steps.length > 0 || progress.said) && (
         <div className="mt-2.5 space-y-1 border-t border-line pt-2.5 pl-8">
           {progress.steps.map((s, i) => (
@@ -457,6 +458,33 @@ export function RunStatusCard({ run, progress, publicView, children, followUp }:
           ))}
           {progress.said && <div className="line-clamp-2 pt-1 text-[12.5px] leading-snug text-fg-3 italic">“{progress.said}”</div>}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** What the run's steps could not have (a site that keeps programs out, a service limiting requests): one quiet line, opened to the list. */
+function Misses({ misses }: { misses: RunMiss[] }) {
+  const [open, setOpen] = useState(false);
+  const n = misses.reduce((a, m) => a + (m.times ?? 1), 0);
+  return (
+    <div className="mt-1.5 pl-8">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-left text-[12.5px] text-fg-3 hover:text-fg-2">
+        <ChevronRight size={13} className={cx('shrink-0 transition-transform', open && 'rotate-90')} />
+        {n === 1 ? '1 thing could not be had' : `${n} things could not be had`}
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 pl-[17px] text-[12.5px] leading-snug text-fg-3">
+          {misses.map((m, i) => (
+            <li key={i}>
+              <span className="text-fg-2" translate="no">
+                {m.step}
+              </span>
+              {m.what && <span translate="no"> · {m.what}</span>}: {m.why}
+              {(m.times ?? 1) > 1 && ` (${m.times} times)`}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

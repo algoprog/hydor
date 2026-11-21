@@ -14,9 +14,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
+import type { AnswerField, AppField, AppRecipe, RunMiss, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
-import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
+import { checkAnswer, cleanRecipe, isActive, MAX_MISSES, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
 import { cardLines } from '../../shared/app-cards.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
@@ -33,6 +33,7 @@ import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
 import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
 import { takeInAnswer } from './media.ts';
+import { callKey, callTool, firstLine, whatOf, whyOf } from './sturdy.ts';
 import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
@@ -54,6 +55,10 @@ interface Exec {
   ended: { id: string; kind: Step['do']; values: Record<string, unknown> }[];
   /** A test run tried in the graph: the steps it pauses before, whether it pauses before the next one too, and where it waits now (each with what lets it go on). */
   pause?: { before: Set<string>; next: boolean; at: Map<string, () => void> };
+  /** What it could not have (kept with the run); the places in the flow that missed, each with the miss it counts in; and the calls behind them (the same call answering later takes its miss back). */
+  misses: RunMiss[];
+  missAt: Map<string, RunMiss>;
+  missedCalls: Map<string, string>;
 }
 
 const execs = new Map<string, Exec>();
@@ -63,6 +68,9 @@ class Stopped extends Error {
     super('Stopped');
   }
 }
+
+/** A step failed and its miss is kept: the steps it is inside (a Decide, At the same time) fail for it, and keep none of their own. */
+class StepFailed extends Error {}
 
 const db = () => runDeps().db;
 
@@ -112,7 +120,15 @@ function execOf(r: RunRecord, o: FlowStart): Exec {
     waiting: new Set(),
     ended: [],
     ...(o.pause?.length ? { pause: { before: new Set(o.pause), next: false, at: new Map() } } : {}),
+    ...missesOf(r),
+    missedCalls: new Map(),
   };
+}
+
+/** A run's misses as it kept them (it carries on after a restart). */
+function missesOf(r: RunRecord): Pick<Exec, 'misses' | 'missAt'> {
+  const misses = (r.misses ?? []).map((m) => ({ ...m }));
+  return { misses, missAt: new Map(misses.filter((m) => m.path).map((m) => [m.path!, m])) };
 }
 
 /** Starts a run's flow in the background; it ends the run itself. */
@@ -251,7 +267,7 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
     }
     const msg = ((e as Error).message || 'It failed').slice(0, 2000);
     record(x, at, s, { status: 'failed', error: msg, endedAt: Date.now(), ...spent() });
-    return failed(x, s, scope, prefix, msg);
+    return failed(x, s, scope, prefix, msg, e instanceof StepFailed);
   }
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
@@ -259,12 +275,15 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
 }
 
 /** A step failed: its own steps for that run (then the flow goes on), it is skipped, an agent does its work, or the run stops. */
-async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string) {
+async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string, inside = false) {
   scope.steps[s.id] = {};
+  // A step that failed for one inside it, or for a call it made (a tool step, a program's ctx.tool, a Repeat's round), has its miss already.
+  const at = `${prefix}${s.id}`;
+  if (!inside && ![...x.missAt.keys()].some((p) => p === at || p.startsWith(`${at}/`) || p.startsWith(`${at}#`))) noteMiss(x, { step: titleOf(s), why: firstLine(msg), path: at });
   if (s.failed === 'agent') return rescue(x, s, scope, prefix, msg);
   if (Array.isArray(s.failed)) return runList(x, s.failed, { inputs: scope.inputs, steps: scope.steps, vars: { ...scope.vars, error: msg } }, prefix);
   if (s.failed === 'skip') return;
-  throw new Error(`${titleOf(s)}: ${msg}`);
+  throw new StepFailed(`${titleOf(s)}: ${msg}`);
 }
 
 type Cost = { usd: number };
@@ -276,7 +295,7 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
     case 'model':
       return modelStep(x, s, scope, cost);
     case 'tool':
-      return toolStep(x, s, scope);
+      return toolStep(x, s, scope, at);
     case 'app':
       return appStep(x, s, scope, at, before);
     case 'data':
@@ -449,7 +468,7 @@ function ctxStep(kind: string, a: Record<string, unknown>, id: string): Step {
   if (kind === 'agent' && a.tier !== undefined && !isTier(a.tier)) throw new Error('ctx.agent’s tier is "quick", "standard", "best" or "max"');
   if (kind === 'model' || kind === 'agent')
     raw = { do: kind, title: title ?? first(a.instructions), instructions: told(a.instructions), outputs: a.outputs, model: a.model, ...(kind === 'agent' ? { assistant: a.assistant, agent: a.agent, tier: a.tier, tools: a.tools, capUsd: a.capUsd } : {}) };
-  else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w };
+  else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w, cache: a.cache };
   else if (kind === 'ask') raw = { do: 'ask', title: title ?? first(a.question), question: told(a.question), fields: a.fields, waitHours: a.waitHours };
   else if (kind === 'app') raw = { do: 'app', title: title ?? String(a.app ?? ''), app: a.app, with: w };
   else if (kind === 'data')
@@ -705,7 +724,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
     const why = done.status !== 'done' ? done.error || 'it did not finish' : `it did not hand in ${owed.map((f) => f.id).join(', ')}`;
     const all = `${msg} (and the agent in its place: ${why})`;
     record(x, at, s, { status: 'failed', error: all.slice(0, 2000), endedAt: Date.now() });
-    throw new Error(`${titleOf(s)}: ${all}`);
+    throw new StepFailed(`${titleOf(s)}: ${all}`);
   }
   const values: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(done.result ?? {})) {
@@ -721,6 +740,8 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now() });
+  // The agent got what the step could not: nothing is missing.
+  dropMiss(x, at);
 }
 
 /** How deep a run is in apps calling apps. */
@@ -826,7 +847,7 @@ async function judge(x: Exec, question: string, cost: Cost): Promise<{ yes: bool
 
 // ---- tools ------------------------------------------------------------------------------------------------
 
-async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope): Promise<Record<string, unknown>> {
+async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope, at: string): Promise<Record<string, unknown>> {
   if (!STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
   const allowed = x.run.recipe.tools;
@@ -834,9 +855,20 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
   const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName }, step: true };
   const tool = runTools(ctx).find((t) => t.name === s.tool);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
-  const out = await tool.run(valueOf(s.with ?? {}, scope) as Record<string, unknown>, ctx);
-  const text = typeof out === 'string' ? out : out.text;
-  if (typeof out === 'object' && out.isError) throw new Error(text.slice(0, 800) || 'The tool failed');
+  const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
+  // Tried again while its failure may pass, its host's calls spaced, a look-up kept a while (sturdy.ts).
+  // A public page's visitors do not get this computer's browser opening pages for them.
+  const called = await callTool(tool, args, ctx, { cache: s.cache, signal: x.abort.signal, browser: !x.pub });
+  const sig = callKey(s.tool, args);
+  if (!called.ok) {
+    const optional = (key: string) => !!x.run.recipe.secrets?.some((k) => k.name === key && k.optional);
+    noteMiss(x, { step: titleOf(s), what: whatOf(s.tool, args), why: whyOf(s.tool, called.failure, optional), path: at }, sig);
+    throw new Error(called.text.slice(0, 800) || 'The tool failed');
+  }
+  // The same call failed before in this run and answers now (a program that tries again itself): it was had after all.
+  const earlier = x.missedCalls.get(sig);
+  if (earlier) dropMiss(x, earlier);
+  const text = called.text;
   const values: Record<string, unknown> = { text: text.slice(0, 200_000) };
   if (/^\s*[[{]/.test(text)) {
     try {
@@ -844,6 +876,33 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
     } catch {}
   }
   return values;
+}
+
+// ---- what could not be had -----------------------------------------------------------------------------------
+
+/** Keeps a miss with the run (one a place in the flow; the same one again counts times), at most MAX_MISSES. */
+function noteMiss(x: Exec, m: RunMiss & { path: string }, sig?: string) {
+  if (x.missAt.has(m.path)) return;
+  let into = x.misses.find((o) => o.step === m.step && o.what === m.what && o.why === m.why);
+  if (into) into.times = (into.times ?? 1) + 1;
+  else if (x.misses.length < MAX_MISSES) x.misses.push((into = m));
+  else return;
+  x.missAt.set(m.path, into);
+  if (sig) x.missedCalls.set(sig, m.path);
+  updateRun(db(), x.run.id, { misses: x.misses });
+  noteChanged(x.run.id);
+}
+
+/** What this place in the flow missed was had after all. */
+function dropMiss(x: Exec, path: string) {
+  const m = x.missAt.get(path);
+  if (!m) return;
+  x.missAt.delete(path);
+  for (const [k, p] of x.missedCalls) if (p === path) x.missedCalls.delete(k);
+  if ((m.times ?? 1) > 1) m.times = m.times! - 1 > 1 ? m.times! - 1 : undefined;
+  else x.misses.splice(x.misses.indexOf(m), 1);
+  updateRun(db(), x.run.id, { misses: x.misses });
+  noteChanged(x.run.id);
 }
 
 // ---- what the app keeps -----------------------------------------------------------------------------------------

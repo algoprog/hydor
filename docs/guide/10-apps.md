@@ -209,6 +209,8 @@ The status card at the top says where it stands:
 - **Done in** the time it took, with what it cost.
 - **Stopped**, or **It did not finish** with the reason.
 
+When an app with steps could not have something it looked for (a site that keeps programs out, a service limiting requests), a quiet line under it says so, such as **3 things could not be had**, folded: a click opens the list (see [When the web lets a step down](#when-the-web-lets-a-step-down)).
+
 Below it comes the result. An app with a view shows it there (see [Its view](#its-view)); **Plain answer**, in the status card, shows it as the plain card and tables instead, and **Its view** goes back. Without a view:
 
 - Short answer fields (text, numbers, dates, links, yes or no) sit together in one card.
@@ -517,6 +519,17 @@ While a run works, its page lists the steps as they go. Once it ends, **Steps** 
 
 Once a run with steps has ended, each of its steps has **Run again from here** (↺): a new run with the same answers, in which the steps before that one give what they gave this time (marked **From the last run**, at no cost) and the rest run as the app is now. A **Test run** in **Edit** has it too, with what is on screen: change a later step and try it again without running the first ones.
 
+### When the web lets a step down
+
+Sites and services do not always answer: some limit how often they may be asked, some are down or slow for a moment, and some pages keep programs out. An app's steps (a **Use a tool** step, and `ctx.tool` in a program) meet that as well as they can; agents in their sessions decide for themselves.
+
+- **Tried again**: a call that fails in a way that may pass (a service limiting requests, one down or slow for a moment, a connection that dropped) is tried again, three tries in all, after the wait the service asks for, else about a second and then three. One call never waits more than 20 seconds, and one that cannot work (a page that is not there, a key that is missing, a request the service refused) is not tried again.
+- **Not too often**: calls to a service that asks for it are spaced out, for all your apps and runs at once: Semantic Scholar and OpenStreetMap's Nominatim once a second, arXiv once every three seconds. When a service says to wait, every run waits for it.
+- **Not twice**: a page read, a web search or a request that only fetches is kept for five minutes (a day for places and encyclopedia articles), so the buttons of a view that run the app again don't ask the same thing again. A **Use a tool** step can keep its answer longer, or not at all.
+- **In the browser**: a page that keeps programs out (a check that asks whether you are human, or a refusal) is opened once in Hydor's own browser, out of sight, when this computer has one (not for a public page's visitors). Nothing is sent to other services to read it for you.
+
+What still could not be had shows on the run's page as one folded line in the status card, such as **3 things could not be had**: a click opens the list, each with its step, what it wanted and why ("it limits requests", "it keeps programs out", "no answer in time", "it needs the key SEMANTIC_SCHOLAR_API_KEY"). A key the app can do without reads "it would do more with the key … (optional)": give it on the app's page (see [Give it the keys it needs](#give-it-the-keys-it-needs)). An agent that ran the app for you hears the same in a line, to tell you, and an app's view can show it too.
+
 ### Firm it up
 
 Over the steps in **Edit**, an app's latest runs tell you two things. A step that failed and had an agent do its work says in how many runs that happened, and why it failed the last time; **Ask an agent to fix it** asks the agent beside it (when the app is open beside a conversation) or starts a session with the **App builder**. An agent step that did the same in each of its last runs (it read the page it was given, then answered, say) offers **Firm it up**: fixed steps that could do it for less, a tool step for each call the agent made, with the values it made them with, then a model step with its instructions and what the tools gave. **Try them on its examples** (or **Try them**, with the answers of those runs, when it has no examples) runs them first and shows what a run takes and costs with its agent and with the steps; **Use these steps** puts them in its place on screen, and **Save** keeps them. The tool steps it makes have an agent do their work if they fail, so a run that worked before still works.
@@ -625,4 +638,5 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 - "In my Price check app's view, add a button on each shop that runs it again for that shop only."
 - "Firm up my Link digest app, and try it on its examples first."
 - "Make the Look up its title step of my Link digest hand its work to an agent when it fails."
+- "My last Citation alerts run came back nearly empty: what could it not have, and why?"
 - "Have Explore make a new edition every morning at 6:30, always with Formula 1 in it."

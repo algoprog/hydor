@@ -338,8 +338,23 @@ function clip(v: unknown, depth = 0): unknown {
   return v;
 }
 
-/** A run as the agent reads it: how it went, what it gave (shortened), and its page. */
+/** What the run could not have, as one line the agent can pass on to the person ('' when nothing was missed). */
+export function missLine(r: Pick<RunRecord, 'misses'>): string {
+  const list = r.misses ?? [];
+  if (!list.length) return '';
+  const n = list.reduce((a, m) => a + (m.times ?? 1), 0);
+  const named = list.slice(0, 3).map((m) => `${m.step}${m.what ? ` (${m.what})` : ''}: ${m.why}`);
+  const more = list.length > 3 ? `; and ${list.length - 3} more` : '';
+  return `It could not have ${n === 1 ? 'one thing' : `${n} things`} (its page lists them): ${named.join('; ')}${more}. Say so to the user in a few words.`;
+}
+
+/** A run as the agent reads it: how it went, what it gave (shortened), and its page; then what it could not have. */
 function runText(r: RunRecord): string {
+  const missed = missLine(r);
+  return `${runJson(r)}${missed ? `\n\n${missed}` : ''}`;
+}
+
+function runJson(r: RunRecord): string {
   return JSON.stringify(
     {
       app: r.appName,
