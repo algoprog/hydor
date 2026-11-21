@@ -23,7 +23,7 @@ import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, turnAt, turnsOf, type Turn } from '../opinion/turns.ts';
-import { childKeys, FROM_LEAD, parentOf, stillRunning } from './family.ts';
+import { childKeys, FROM_LEAD, parentOf, reportBegins, reportEnds, stillRunning } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
@@ -652,6 +652,16 @@ export async function catchUp(d: Deps) {
  */
 export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'external'> & { endedAt?: number }) {
   if (t.external) return;
+  // On its way until it is sent: a goal's round (server/goals) is not over while a member's report is.
+  reportBegins(t.key);
+  try {
+    await reportNow(d, t);
+  } finally {
+    reportEnds(t.key);
+  }
+}
+
+async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'external'> & { endedAt?: number }) {
   const parent = parentOf(d.db, t.key);
   if (!parent || !d.sessions.summary(parent)) return;
   // A confidential child's words go to a confidential parent only (server/confidential).

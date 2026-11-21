@@ -39,7 +39,10 @@
 // check, while the next round's start is saved, or across a restart; Resume meanwhile takes it back. Rules and settings
 // on a goal stopped at a limit. A check changed only in its target keeps its values, judged again (at once, once the
 // round that runs is over, and at the agreement); one changed in what it measures, or with no value at the start, is
-// measured again.
+// measured again. And swarm rounds: a swarm's lead may have a goal (a campaign, a research, an arena may not); its round is
+// over once its members are quiet, their reports in (also while one is written) and its board delivered, once; its round
+// message names its members; a round records how many worked; an undone round takes their changes; a limit stops them;
+// Stop all pauses the goal; a member's goal tools say whose goal it is.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/driver-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-driver PRICES_URL= node dist/dev/driver-test.js
@@ -58,10 +61,13 @@ import { HttpError } from '../auth.ts';
 import { CONFIDENTIAL_TOOLS } from '../confidential/index.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx, SpawnAdditions, SpawnInfo } from '../features/types.ts';
-import { setSessionExtra } from '../sessionExtra.ts';
+import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees.ts';
-import { RESTARTED } from './brief.ts';
-import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, retargeted, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { draftMessage, RESTARTED } from './brief.ts';
+import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, retargeted, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, goalStopAll, goalTeamChange, isDriving, LEADS_GOAL, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setLimitWaitStep, setRestorer, settled, stopTick, STOPPED_SWARM, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { childKeys, reportBegins, reportEnds, reportOnItsWay } from '../children/family.ts';
+import { reportTurn } from '../children/index.ts';
+import { addPost, members as swarmMembers, postsOf } from '../swarm/index.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -151,6 +157,10 @@ class Sessions extends EventEmitter {
     // As create() stores it: its folder always, its worktree only when it has one of its own (a fork has none).
     db.prepare('insert or ignore into app_sessions (key, agent, cwd, worktree, created_at, updated_at) values (?, ?, ?, ?, ?, ?)').run(key, f.agent ?? 'claude', f.cwd, f.worktree ? JSON.stringify(f.worktree) : null, Date.now(), Date.now());
   }
+  /** How many of a session's child sessions are in a turn. */
+  running(key: string): number {
+    return childKeys(db, key).filter((k) => ['starting', 'working', 'waiting'].includes(this.all.get(k)?.live ?? '')).length;
+  }
   /** How often each session's summary was asked for. */
   asked = new Map<string, number>();
   summary(key: string): SessionSummary | null {
@@ -175,7 +185,8 @@ class Sessions extends EventEmitter {
       updatedAt: Date.now(),
       ...(f.archived ? { archived: true } : {}),
       ...(f.resumeAt ? { resumeAt: f.resumeAt } : {}),
-      ...(f.helpers ? { helpers: f.helpers } : {}),
+      // As the session manager counts them: its child sessions whose turn runs (unless a test says how many).
+      ...((f.helpers ?? this.running(key)) ? { helpers: f.helpers ?? this.running(key) } : {}),
       goal: f.goal ?? goalInfo(db, key),
     };
   }
@@ -1141,12 +1152,18 @@ test('refused for a Hydor subagent, a session run outside the app, and Plan mode
   await rejects(act('claude:goal-nobody', { action: 'set', objective: 'x' }), 404);
 });
 
-test('a goal and a team do not combine in this version: a session that leads a swarm, a campaign, a deep research or an arena match is refused', async () => {
+test('S1: a session that leads a swarm may have a goal (its draft says the members come with the first round); a campaign, a deep research or an arena match is refused, each with its sentence', async () => {
+  const SW = 'claude:goal-g1-swarm';
+  sessions.add(SW, { cwd: PLAIN });
+  setSessionExtra(db, SW, { swarm: true });
+  await act(SW, { action: 'set', objective: 'Make it fast' });
+  assert.equal(goal(SW).status, 'drafting');
+  assert.match(last(SW), /Do no work on it yet\. Do not start your swarm’s members yet: they come with the first round\.\nRead the project/);
+  await act(SW, { action: 'stop' });
   const cases: [string, Record<string, unknown>, string][] = [
-    ['claude:goal-g1-swarm', { swarm: true }, 'This session leads a swarm: a goal for a team comes in a later version.'],
-    ['claude:goal-g1-campaign', { swarm: 'campaign' }, 'This session leads a campaign: a goal for a team comes in a later version.'],
-    ['claude:goal-g1-research', { research: { depth: 'quick' } }, 'This session leads a deep research: a goal for a team comes in a later version.'],
-    ['claude:goal-g1-arena', { arena: 'match1' }, 'This session leads an arena match: a goal for a team comes in a later version.'],
+    ['claude:goal-g1-campaign', { swarm: 'campaign' }, 'This session leads a campaign: a goal works with a swarm, not with a campaign yet.'],
+    ['claude:goal-g1-research', { research: { depth: 'quick' } }, 'This session leads a deep research: a goal does not go with it.'],
+    ['claude:goal-g1-arena', { arena: 'match1' }, 'This session is in an arena match: a goal does not go with it.'],
   ];
   for (const [key, extra, why] of cases) {
     sessions.add(key, { cwd: PLAIN });
@@ -1156,9 +1173,12 @@ test('a goal and a team do not combine in this version: a session that leads a s
     // Nothing for the agent to propose to either.
     assert.equal((await tool(key, 'goal_propose', { checks: CHECKS })).text, 'This session has no goal.');
   }
+  assert.equal(teamRefusal({ swarm: true }), null);
   assert.equal(teamRefusal({ swarm: false }), null);
   assert.equal(teamRefusal({}), null);
   assert.equal(teamRefusal(undefined), null);
+  // A plain session's draft is as it was.
+  assert.doesNotMatch(draftMessage('Make it fast'), /swarm/);
 });
 
 test('the tools: without a goal they say so; a scheduled run cannot use them; confidential sessions keep them', async () => {
@@ -1286,10 +1306,23 @@ test('a session started with a goal hears what the loop asks with its first mess
   await turn(S);
   assert.equal(spawnOf({ agent: 'claude', key: S, cwd: PLAIN, runId: 'r3', resume: true, extra: {} }), undefined);
   assert.equal(headOf(S), 'agree the checks', 'the reminder after a first turn without a proposal');
-  // Never in a scheduled run, a try of an agent's examples, or a session that leads its own work.
-  for (const extra of [{ automations: { task: 't', run: 'r' } }, { agentExample: { agent: 'a', run: 'r', example: 'e' } }, { swarm: true }, { swarm: 'campaign' }, { research: { depth: 'quick' } }, { arena: 'match1' }]) {
+  // Never in a scheduled run or a try of an agent's examples: ignored without a word.
+  for (const extra of [{ automations: { task: 't', run: 'r' } }, { agentExample: { agent: 'a', run: 'r', example: 'e' } }]) {
     assert.equal(goalStartIgnored(extra), true, JSON.stringify(extra));
     assert.equal(spawnOf({ agent: 'claude', cwd: PLAIN, runId: 'rx', resume: false, extra: { ...extra, goal: { start: true } }, prompt: 'x' } as SpawnInfo), undefined, JSON.stringify(extra));
+  }
+  // S1: a swarm's lead started with a goal hears it, with its members to wait for the first round; a campaign, a deep
+  // research or an arena match is refused with its sentence (the person hears it: goalNotSetText), not ignored.
+  assert.equal(goalStartIgnored({ swarm: true }), false);
+  assert.equal(goalStartRefusal({ request: 'x', agent: 'claude', extra: { swarm: true } }), null);
+  assert.match(String(spawnOf({ agent: 'claude', cwd: PLAIN, runId: 'rs', resume: false, extra: { swarm: true, goal: { start: true } }, prompt: 'x' } as SpawnInfo)?.notes?.[0]), /Do not start your swarm’s members yet: they come with the first round\./);
+  for (const [extra, why] of [
+    [{ swarm: 'campaign' }, 'This session leads a campaign: a goal works with a swarm, not with a campaign yet.'],
+    [{ research: { depth: 'quick' } }, 'This session leads a deep research: a goal does not go with it.'],
+    [{ arena: 'match1' }, 'This session is in an arena match: a goal does not go with it.'],
+  ] as const) {
+    assert.equal(goalStartIgnored(extra), false, JSON.stringify(extra));
+    assert.equal(goalStartRefusal({ request: 'x', agent: 'claude', extra: extra as never }), why);
   }
   assert.equal(goalStartIgnored({ goal: { start: true }, memory: false }), false);
   assert.equal(goalStartIgnored(undefined), false);
@@ -3813,6 +3846,381 @@ test('P3: a changed check the start holds no value of (it could not run there) i
   assert.deepEqual([c1().value, c1().error], [4, undefined], 'measured again');
   assert.deepEqual([goal(P3b).status, goal(P3b).round], ['working', 1]);
   await act(P3b, { action: 'stop' });
+});
+
+// ---- swarm rounds: a goal for a session that leads a swarm (S1 to S8) ---------------------------------------------------
+
+/** A worktree session that leads a swarm, its members in its folder; its goal agreed, round 1 sent. */
+async function swarmGoal(key: string, titles: string[], o: { checks?: unknown[]; limits?: Record<string, number>; settings?: Record<string, unknown> } = {}) {
+  const w = worktree();
+  sessions.add(key, { cwd: w.path, worktree: w, title: 'The lead' });
+  setSessionExtra(db, key, { swarm: true });
+  const crew = titles.map((title, i) => {
+    const k = `${key}-m${i + 1}`;
+    sessions.add(k, { cwd: w.path, title });
+    setSessionExtra(db, k, { parent: key });
+    return k;
+  });
+  await agreed(key, { checks: o.checks ?? SLOW_SCORE, limits: o.limits, settings: o.settings ?? { asks: 'own' } });
+  assert.deepEqual([goal(key).status, goal(key).round], ['working', 1]);
+  return { w, crew };
+}
+
+/**
+ * A member's turn: it works in the lead's folder and its turn ends; then its report is written as the app writes it
+ * (children's reportTurn: marked reported, and sent to the lead unless it was stopped), unless `report` is false. The id
+ * of the message that began the turn.
+ */
+async function memberTurn(k: string, work: () => void = () => {}, o: { report?: boolean; status?: 'completed' | 'interrupted'; reply?: string } = {}) {
+  const f = sessions.all.get(k)!;
+  const startedAt = Date.now();
+  const id = `mu${++sessions.n}`;
+  f.live = 'working';
+  f.items.push({ kind: 'user', id, seq: 0, ts: startedAt, text: 'Your angle' } as TimelineItem);
+  work();
+  await sleep(2);
+  f.live = 'idle';
+  const endedAt = Date.now();
+  f.items.push({ kind: 'assistant', id: `ma${sessions.n}`, seq: 0, ts: endedAt, text: o.reply ?? 'Done: the score is up.' } as TimelineItem);
+  f.items.push({ kind: 'turn', id: `mt${sessions.n}`, seq: 0, ts: endedAt, status: o.status ?? 'completed' } as TimelineItem);
+  f.endedAt = endedAt;
+  await sleep(2);
+  if (o.report !== false) await reportTurn(deps, { key: k, startedAt, endedAt, external: false });
+  return id;
+}
+
+const toLead = (key: string) => sessions.delivered.filter((m) => m.key === key);
+
+test('S2.1, the gate: a swarm’s round is not over while a member works or its report is on its way (also while the report is still being written); then the lead’s turn ends and the round is checked, with how many members worked', async () => {
+  const G = 'claude:goal-sw-gate';
+  const { w, crew } = await swarmGoal(G, ['Speed', 'Cache']);
+  const [m1] = crew;
+  // The lead puts a member to work and ends its turn, waiting for it.
+  sessions.all.get(m1)!.live = 'working';
+  await turn(G);
+  assert.deepEqual([goal(G).status, goal(G).rounds.length], ['working', 1], 'not checked while a member works');
+  await tick(deps);
+  assert.equal(goal(G).rounds.length, 1);
+  // Its turn ends (it raised the score in the lead's folder); its report is not out yet.
+  const id = await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'), { report: false });
+  await tick(deps);
+  assert.equal(goal(G).rounds.length, 1, 'its report is on its way');
+  // Marked reported, and still being written (a long reply is summarized first): on its way all the same.
+  reportBegins(m1);
+  try {
+    setSessionExtra(db, m1, { reported: id });
+    await tick(deps);
+    assert.equal(goal(G).rounds.length, 1, 'its report is still being written');
+  } finally {
+    reportEnds(m1);
+  }
+  // The app's own report of a turn says it is on its way while it is written.
+  const m2 = crew[1];
+  let during = false;
+  sessions.timelineHook = (k) => {
+    if (k === m2) during = reportOnItsWay(m2);
+  };
+  try {
+    await memberTurn(m2, () => {}, { reply: 'Looked at the cache: nothing to gain.' });
+  } finally {
+    sessions.timelineHook = undefined;
+  }
+  assert.equal(during, true, 'on its way while it was written');
+  assert.equal(reportOnItsWay(m2), false);
+  // The reports reach the lead, whose turn ends: the round is checked.
+  await turn(G);
+  const g = goal(G);
+  assert.equal(g.rounds[1].outcome, 'kept');
+  assert.equal(g.rounds[1].members, 2, 'both its members worked in the round');
+  assert.equal(g.round, 2);
+  await act(G, { action: 'stop' });
+});
+
+test('S2.1, the board: posts the lead has not had go to it once the team is quiet, once (not after five minutes); its next turn ends with nothing new: checked; and the tick does the same', async () => {
+  const B = 'claude:goal-sw-board';
+  const { w, crew } = await swarmGoal(B, ['Speed']);
+  const [m1] = crew;
+  // As its last act the member posts its progress (its batch would wait five minutes), then its turn ends and its report goes to the lead.
+  addPost(db, { swarm: B, from: m1, kind: 'progress', text: 'Score is 6 now; the cache comes next.' });
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  const n = toLead(B).length;
+  await turn(B);
+  assert.deepEqual([goal(B).status, goal(B).rounds.length], ['working', 1], 'not checked while the board has news for the lead');
+  assert.equal(toLead(B).length, n + 1);
+  assert.match(toLead(B).at(-1)!.text, /^\[Swarm board · 1 new post\]\n- “Speed” .* · progress: Score is 6 now/);
+  // The lead reads it and ends its turn: nothing new, the round is checked; the batch went once.
+  await turn(B);
+  assert.equal(goal(B).rounds[1].outcome, 'kept');
+  assert.equal(toLead(B).filter((m) => m.text.startsWith('[Swarm board')).length, 1);
+  assert.equal(postsOf(db, B, { limit: 5 }).length, 1);
+  await act(B, { action: 'stop' });
+});
+
+test('S2.1, the board through the tick: a round to be checked again (a member worked during its checks), the member then stopped with a post as its last act: the tick delivers the board once, and checks the round at its next look', async () => {
+  const B2 = 'claude:goal-sw-board-tick';
+  const { w, crew } = await swarmGoal(B2, ['Speed']);
+  const [m1] = crew;
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  await turn(B2);
+  assert.equal(goal(B2).rounds[1].outcome, 'kept');
+  // Round 2 is worse, and the member begins a turn while its checks run: not undone, to be checked again.
+  await memberTurn(m1, () => write(w.path, 'score.txt', '3\n'));
+  checkingSoon();
+  const t = whileChecking(() => {
+    sessions.all.get(m1)!.items.push({ kind: 'user', id: 'swb-late', seq: 0, ts: Date.now(), text: 'One more thing' } as TimelineItem);
+  });
+  await turn(B2);
+  await t;
+  assert.deepEqual([goal(B2).status, goal(B2).rounds.length], ['working', 2]);
+  // The lead stops it; as its last act it posted; a stopped member's turn is reported to nobody.
+  addPost(db, { swarm: B2, from: m1, kind: 'progress', text: 'Halfway.' });
+  setSessionExtra(db, m1, { swarmStopped: Date.now() });
+  const mf = sessions.all.get(m1)!;
+  mf.items.push({ kind: 'turn', id: 'swb-late-t', seq: 0, ts: Date.now(), status: 'interrupted' } as TimelineItem);
+  mf.endedAt = Date.now();
+  await sleep(3);
+  const n = toLead(B2).length;
+  await reportTurn(deps, { key: m1, startedAt: mf.endedAt - 1, endedAt: mf.endedAt, external: false });
+  assert.equal(toLead(B2).length, n, 'no report of a stopped member');
+  const boards = () => toLead(B2).filter((m) => m.text.startsWith('[Swarm board')).length;
+  await tick(deps);
+  assert.equal(goal(B2).rounds.length, 2, 'not checked: the board went to the lead first');
+  assert.equal(toLead(B2).length, n + 1);
+  assert.equal(boards(), 1, 'the board, once');
+  // (Here the lead's turn on it ended at once.) Nothing new: checked, and no second delivery.
+  await tick(deps);
+  assert.equal(goal(B2).rounds[2].outcome, 'undone');
+  assert.equal(boards(), 1);
+  await act(B2, { action: 'stop' });
+});
+
+test('S2.1: a member being stopped (its status stopping, not yet counted among the running) holds the round; stopped, its cut turn is not reported and the round is checked', async () => {
+  const S = 'claude:goal-sw-stopping';
+  const { w, crew } = await swarmGoal(S, ['Speed']);
+  const [m1] = crew;
+  write(w.path, 'score.txt', '6\n');
+  sessions.all.get(m1)!.live = 'stopping';
+  await turn(S);
+  assert.equal(goal(S).rounds.length, 1, 'not checked while a member is stopping');
+  setSessionExtra(db, m1, { swarmStopped: Date.now() });
+  const n = toLead(S).length;
+  await memberTurn(m1, () => {}, { status: 'interrupted' });
+  assert.equal(toLead(S).length, n, 'a stopped member’s cut turn is reported to nobody');
+  await tick(deps);
+  assert.equal(goal(S).rounds[1].outcome, 'kept');
+  await act(S, { action: 'stop' });
+});
+
+test('S3: an undone round takes the members’ changes with it (the files go back); a member at work while the checks run holds the undo, as the session’s own subagent does', async () => {
+  const U = 'claude:goal-sw-undo';
+  const { w, crew } = await swarmGoal(U, ['Speed']);
+  const [m1] = crew;
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  await turn(U);
+  assert.equal(goal(U).rounds[1].outcome, 'kept');
+  // Round 2: the member makes it worse and leaves a file of its own.
+  await memberTurn(m1, () => {
+    write(w.path, 'score.txt', '3\n');
+    write(w.path, 'member.txt', 'mine\n');
+  });
+  await turn(U);
+  let g = goal(U);
+  assert.equal(g.rounds[2].outcome, 'undone');
+  assert.equal(file(w.path, 'score.txt'), '6\n');
+  assert.equal(file(w.path, 'member.txt'), null, 'the member’s change went with the round');
+  // Round 3's message says so.
+  assert.match(last(U), /Last round was undone: what your members changed in it is gone from this folder; say so to those you put to work again\. Members from earlier rounds are still there/);
+  // Round 3: worse again, and the member begins a turn while the checks run: not put back, checked again later.
+  await memberTurn(m1, () => write(w.path, 'score.txt', '2\n'));
+  checkingSoon();
+  const t = whileChecking(() => {
+    sessions.all.get(m1)!.items.push({ kind: 'user', id: 'swu-late', seq: 0, ts: Date.now(), text: 'One more thing' } as TimelineItem);
+  });
+  await turn(U);
+  await t;
+  g = goal(U);
+  assert.deepEqual([g.status, g.rounds.length, g.round], ['working', 3, 3], 'not undone while a member worked during the checks');
+  assert.equal(file(w.path, 'score.txt'), '2\n');
+  sessions.all.get(m1)!.items.push({ kind: 'turn', id: 'swu-late-t', seq: 0, ts: Date.now(), status: 'completed' } as TimelineItem);
+  sessions.all.get(m1)!.endedAt = Date.now();
+  await sleep(5);
+  setSessionExtra(db, m1, { reported: 'swu-late' });
+  await turn(U);
+  assert.equal(goal(U).rounds[3].outcome, 'undone');
+  assert.equal(file(w.path, 'score.txt'), '6\n');
+  await act(U, { action: 'stop' });
+});
+
+test('S2.3: a swarm lead’s round message names its members (how each stands, the first line of its last report or post) in place of the usual closing paragraph; a plain session’s keeps that paragraph', async () => {
+  const M = 'claude:goal-sw-message';
+  const { crew } = await swarmGoal(M, ['Speed', 'Cache', 'Docs', 'Waits']);
+  const [m1, m2, m3, m4] = crew;
+  const first = last(M);
+  assert.match(first, /You lead a swarm in this goal\. Put your members on what does not hold yet: one angle or one check each/);
+  assert.match(first, /Your members now:\n- “Speed” \(not started a turn yet\)\n- “Cache” \(not started a turn yet\)/);
+  assert.match(first, /The round is over when you have called goal_report \(what the swarm did, what remains\) and every member’s turn has ended: then the app runs the checks on this folder\. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do\.\n\n\(This message is from the app’s goal loop/);
+  assert.doesNotMatch(first, /The app runs the checks itself when your turn ends/);
+  // How each stands now: at work, waiting for the lead (its report, or a later post), stopped.
+  await memberTurn(m2, () => {}, { reply: 'Cache added for the search results.\nMore below.' });
+  await memberTurn(m3, () => {}, { reply: 'Docs updated.' });
+  await sleep(3);
+  addPost(db, { swarm: M, from: m3, kind: 'finding', text: 'The docs build is slow\nbecause of images.' });
+  await memberTurn(m4, () => {});
+  setSessionExtra(db, m4, { swarmStopped: Date.now() });
+  sessions.all.get(m1)!.live = 'working';
+  const now = await swarmMembers(deps, M);
+  assert.deepEqual(
+    now.map((x) => [x.title, x.state, x.last]),
+    [
+      ['Speed', 'working', undefined],
+      ['Cache', 'waiting for you', 'Cache added for the search results.'],
+      ['Docs', 'waiting for you', 'The docs build is slow'],
+      ['Waits', 'stopped', 'Done: the score is up.'],
+    ],
+  );
+  // A plain session's round message: the usual closing paragraph, nothing of a swarm.
+  const P = 'claude:goal-sw-plain';
+  const w2 = worktree();
+  sessions.add(P, { cwd: w2.path, worktree: w2 });
+  await agreed(P, { settings: { asks: 'own' } });
+  assert.match(last(P), /The app runs the checks itself when your turn ends\. You cannot end the goal, and saying it is done changes nothing\. Work on what does not hold yet, check your work as you go, then call goal_report \(what you did, what remains\) and end your turn\./);
+  assert.doesNotMatch(last(P), /swarm|members/);
+  await act(P, { action: 'stop' });
+  await act(M, { action: 'stop' });
+});
+
+test('S4.2: a money limit in the middle of a swarm’s round stops its members at work too (none goes on spending); the half round is recorded once they stopped, and a member still at work after the wait is said in the report', async () => {
+  const L = 'claude:goal-sw-limit';
+  const { w, crew } = await swarmGoal(L, ['Speed', 'Cache', 'Idle'], { limits: { rounds: 8, usd: 1 } });
+  const [m1, m2, m3] = crew;
+  sessions.all.get(L)!.live = 'working';
+  sessions.all.get(m1)!.live = 'working';
+  sessions.all.get(m2)!.live = 'working';
+  write(w.path, 'half.txt', 'half done\n');
+  // m1 writes once more as it stops, a moment after it is told to; m2 does not stop at all (its program is slow to answer).
+  const interrupt = sessions.interrupt.bind(sessions);
+  sessions.interrupt = async (k: string) => {
+    if (k === m2) return void sessions.interrupted.push(k);
+    if (k === m1) {
+      sessions.interrupted.push(k);
+      setTimeout(() => {
+        write(w.path, 'last.txt', 'its last write\n');
+        sessions.all.get(m1)!.live = 'idle';
+      }, 40);
+      return;
+    }
+    return interrupt(k);
+  };
+  setLimitWaitStep(5);
+  const before = sessions.interrupted.length;
+  db.prepare("insert into sessions (key, agent, id, path, cost_usd) values (?, 'claude', ?, '/nowhere', 2.5) on conflict(key) do update set cost_usd = excluded.cost_usd").run(L, L);
+  try {
+    await tick(deps);
+  } finally {
+    sessions.interrupt = interrupt;
+    setLimitWaitStep(null);
+  }
+  const g = goal(L);
+  assert.equal(g.status, 'limit');
+  assert.deepEqual(sessions.interrupted.slice(before).sort(), [L, m1, m2].sort(), 'the lead and the members at work; not the idle one');
+  for (const k of [m1, m2]) assert.ok(sessionExtra(db, k).swarmStopped, 'stopped as swarm_stop stops one: its cut turn wakes nobody');
+  assert.equal(sessionExtra(db, m3).swarmStopped, undefined);
+  const half = g.rounds.at(-1)!;
+  assert.deepEqual([half.n, half.why], [1, 'Stopped at the limit midway']);
+  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'half.txt'), 'half done\n');
+  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'last.txt'), 'its last write\n', 'taken once the member that could stop had stopped');
+  assert.match(g.report!.summary, /A member of the swarm was still at work when round 1’s files were saved: what it wrote after that is in the folder but not in the round\.$/);
+  db.prepare('delete from sessions where key = ?').run(L);
+  sessions.all.get(m2)!.live = 'idle';
+  await act(L, { action: 'stop' });
+});
+
+test('S5.2: Stop all on a swarm’s lead pauses its goal, also while the lead waited for its members (no turn of its ends then); the members’ cut turns are not reported; Resume checks the round. A turn of the lead’s that Stop all cut pauses it too', async () => {
+  const SA = 'claude:goal-sw-stopall';
+  const { w, crew } = await swarmGoal(SA, ['Speed']);
+  const [m1] = crew;
+  await turn(SA, () => {
+    sessions.all.get(m1)!.live = 'working';
+  });
+  // Stop all while the lead waits: its member stops with it (marked, so its cut turn is not reported), and the goal pauses.
+  const n = toLead(SA).length;
+  await memberTurn(
+    m1,
+    () => {
+      write(w.path, 'score.txt', '6\n');
+      setSessionExtra(db, m1, { stoppedWithParent: Date.now() });
+      goalStopAll(deps, SA);
+    },
+    { status: 'interrupted' },
+  );
+  let g = goal(SA);
+  assert.deepEqual([g.status, g.reason, g.round, g.rounds.length], ['paused', STOPPED_SWARM, 1, 1]);
+  assert.equal(toLead(SA).length, n, 'nothing woke the lead');
+  await act(SA, { action: 'resume' });
+  assert.equal(goal(SA).rounds[1].outcome, 'kept', 'Resume checks what it did');
+  // The lead in a turn: Stop all cuts it, and that turn's end pauses the goal as when the person stops the agent.
+  await memberTurn(m1, () => setSessionExtra(db, m1, { stoppedWithParent: Date.now() }), { status: 'interrupted' });
+  await turn(SA, () => {}, { status: 'interrupted' });
+  g = goal(SA);
+  assert.deepEqual([g.status, g.reason], ['paused', 'You stopped the agent.']);
+  await act(SA, { action: 'stop' });
+  // Not a swarm's lead: Stop all leaves its goal to its own turn's end, as before.
+  const P = 'claude:goal-sw-stopall-plain';
+  const w2 = worktree();
+  sessions.add(P, { cwd: w2.path, worktree: w2 });
+  await agreed(P, { settings: { asks: 'own' } });
+  goalStopAll(deps, P);
+  assert.equal(goal(P).status, 'working');
+  await act(P, { action: 'stop' });
+});
+
+test('S3, S6: a say while a member is at work is refused with the swarm’s sentence; a member that calls a goal tool hears the goal is its lead’s (a plain subagent: no goal)', async () => {
+  const Y = 'claude:goal-sw-say';
+  const { w, crew } = await swarmGoal(Y, ['Speed']);
+  const [m1] = crew;
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  await turn(Y);
+  assert.equal(goal(Y).rounds[1].outcome, 'kept');
+  await stopAgent(Y);
+  // A member at work (woken by another's message, say): the say waits for it.
+  sessions.all.get(m1)!.live = 'working';
+  await rejects(act(Y, { action: 'round', n: 1, do: 'undo' }), 409, /^This session’s agent or a member of its swarm is at work: wait for them to finish, then try again\.$/);
+  for (const [name, args] of [
+    ['goal_report', { did: 'Raised the score.' }],
+    ['goal_propose', { checks: CHECKS }],
+    ['goal_ask', { question: 'q', ways: [{ name: 'a' }, { name: 'b' }], pick: 1 }],
+    ['goal_note', { text: 'x' }],
+  ] as const)
+    assert.equal((await tool(m1, name, args)).text, LEADS_GOAL, name);
+  assert.equal(LEADS_GOAL, 'This goal is your lead’s: post what you found to the swarm board with swarm_post, and it reaches the lead.');
+  // A Hydor subagent of a session that does not lead a swarm: as before.
+  const PL = 'claude:goal-sw-plain-lead';
+  sessions.add(PL, { cwd: PLAIN });
+  await act(PL, { action: 'set', objective: 'Make it fast' });
+  const kid = 'claude:goal-sw-plain-kid';
+  sessions.add(kid, { cwd: PLAIN });
+  setSessionExtra(db, kid, { parent: PL });
+  assert.equal((await tool(kid, 'goal_report', { did: 'x' })).text, 'This session has no goal.');
+  await act(PL, { action: 'stop' });
+  sessions.all.get(m1)!.live = 'idle';
+  await act(Y, { action: 'stop' });
+});
+
+test('S1: while a goal is not over, turning on a campaign, a deep research or an arena match is refused; a swarm on or off is not', async () => {
+  const X = 'claude:goal-sw-extra';
+  sessions.add(X, { cwd: PLAIN });
+  assert.equal(goalTeamChange(db, X, { swarm: 'campaign' }), null, 'no goal');
+  await act(X, { action: 'set', objective: 'Make it fast' });
+  const no = 'This session has a goal: stop the goal first, or lead a swarm with it.';
+  assert.equal(goalTeamChange(db, X, { swarm: 'campaign' }), no);
+  assert.equal(goalTeamChange(db, X, { research: { depth: 'quick' } }), no);
+  assert.equal(goalTeamChange(db, X, { arena: 'match1' }), no);
+  assert.equal(goalTeamChange(db, X, { swarm: true }), null);
+  assert.equal(goalTeamChange(db, X, { swarm: false }), null);
+  assert.equal(goalTeamChange(db, X, { research: null, arena: null }), null, 'turning them off');
+  assert.equal(goalTeamChange(db, X, { memory: false }), null);
+  await act(X, { action: 'stop' });
+  assert.equal(goalTeamChange(db, X, { swarm: 'campaign' }), null, 'a goal that is over');
 });
 
 // Last: the tick it starts looks at every goal.

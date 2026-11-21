@@ -42,7 +42,7 @@ import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKe
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
-import { goalAction, goalNotSetText, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal } from './goals/driver.ts';
+import { goalAction, goalNotSetText, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, goalStopAll } from './goals/driver.ts';
 import { goalStartSettings } from './goals/validate.ts';
 import { goalHoldsNotices, goalInfo, hasGoal } from './goals/store.ts';
 import type { GoalAction, GoalState } from '../shared/goals.ts';
@@ -1645,12 +1645,12 @@ export class SessionManager extends EventEmitter {
     const titling = !o.title?.trim() && request ? (isConfidential(o.extra) ? confidentialTitle(this.db, request) : titleFor(this.db, request)) : null;
     // Started with a goal (the start page's Goal option): its first message is the goal, and its agent gets what the goal
     // loop asks first with that message. Its settings are checked as a goal's are (a 400). Not without a message, in Plan
-    // mode, for a Hydor subagent (server/goals refuses those): the session starts as a plain one, its first message goes
-    // out as it is, and the person hears why below. In a scheduled run or a try of an agent's examples, or in a session
-    // that leads its own work (a swarm, a research, an arena), it is ignored without a word: nobody there set it.
+    // mode, for a Hydor subagent, or with a team that cannot have one (a campaign, a deep research, an arena match): the
+    // session starts as a plain one, its first message goes out as it is, and the person hears why below. A swarm may.
+    // In a scheduled run or a try of an agent's examples it is ignored without a word: nobody there set it.
     let goalOff: string | null = null;
     if (o.extra?.goal?.start) {
-      goalOff = goalStartIgnored(o.extra) ? null : goalStartRefusal({ request, parent: o.extra.parent, mode: o.mode, agent: o.agent });
+      goalOff = goalStartIgnored(o.extra) ? null : goalStartRefusal({ request, parent: o.extra.parent, mode: o.mode, agent: o.agent, extra: o.extra });
       if (goalOff || goalStartIgnored(o.extra)) o = { ...o, extra: { ...o.extra, goal: undefined } };
       else goalStartSettings(o.extra.goal);
     }
@@ -2623,6 +2623,12 @@ export class SessionManager extends EventEmitter {
     }
     const mine = await this.stopOwn(key);
     for (const k of below) await this.stopOwn(k).catch(() => {});
+    // A swarm's lead with a goal at work: the goal pauses (server/goals), also when the lead itself was not in a turn.
+    let d: ReturnType<typeof featureDeps> | null = null;
+    try {
+      d = featureDeps();
+    } catch {}
+    if (d) goalStopAll(d, key);
     return { turn: mine.turn, tasks: mine.tasks, children: running.get(key)?.size ?? 0 };
   }
 

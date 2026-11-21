@@ -6,7 +6,9 @@
 // members are told, and how word gets around. A finding, a question, a part done or failed, or a message for the
 // lead reaches the lead within a minute, progress alone every few minutes, in one message that wakes it; a
 // message for a member that is not working wakes that member (in a swarm, so does what the lead tells
-// everyone). The lead stops members with swarm_stop, the user from the session's swarm bar.
+// everyone). The lead stops members with swarm_stop, the user from the session's swarm bar (Stop all, while the lead's
+// goal has a round at work, stops the lead too, and the goal pauses). The goal loop (server/goals) reads what it needs of
+// a swarm here: whether the board holds news for the lead (boardWaits), that news now (boardNow), and the members.
 import { CAMPAIGN_KINDS, campaignParts, partNamed, partsTally, SWARM_KINDS, swarmMode, type CampaignPart, type SwarmBoard, type SwarmKind, type SwarmMode, type SwarmPost } from '../../shared/swarm.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
@@ -14,6 +16,8 @@ import { childKeys, stillRunning } from '../children/family.ts';
 import { swarmSize } from '../children/index.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
+import { goalInfo } from '../goals/store.ts';
+import { findTurn } from '../opinion/turns.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { CAMPAIGN_MEMBER_INSTRUCTIONS, campaignLeadInstructions, leadInstructions, MEMBER_INSTRUCTIONS } from './instructions.ts';
 import { givenRole, noteRun, roleFromExtra, roleOf, roleWords } from './roles.ts';
@@ -248,6 +252,65 @@ export async function stopMember(d: Deps, member: string) {
   setSessionExtra(d.db, member, { swarmStopped: Date.now() });
   if (busy(d.sessions.summary(member))) await d.sessions.interrupt(member).catch(() => {});
 }
+
+// ---- what the goal loop needs of a swarm (server/goals: a goal for a session that leads one) ---------------
+
+/**
+ * Whether the board holds posts its lead has not had yet: a batch for it is on its way (its timer runs, it waits for the
+ * lead's turn to end, or the lead's next turn end schedules it). Read from the board itself, so it holds across a restart
+ * (which loses the timers); a lead that read the board with swarm_read has nothing waiting.
+ */
+export function boardWaits(db: DB, swarm: string): boolean {
+  return unread(db, swarm, swarm).length > 0;
+}
+
+/**
+ * What the lead has not had of the board, in one message now instead of when its timer says: the goal loop's round is
+ * over once the team is quiet, and a progress post must not hold it for five minutes. Called with the lead idle: the
+ * posts are marked read as they go out, so the next look finds nothing waiting unless something new was posted.
+ */
+export async function boardNow(d: Deps, swarm: string) {
+  const t = timers.get(swarm);
+  if (t) clearTimeout(t.t);
+  timers.delete(swarm);
+  pending.delete(swarm);
+  await tellLead(d, swarm).catch(() => {});
+}
+
+/** A member as the goal loop's round message names it to its lead. */
+export interface MemberNow {
+  key: string;
+  title: string;
+  state: 'working' | 'waiting for you' | 'stopped' | 'not started a turn yet';
+  /** The first line of its last report (its last finished turn's reply) or of its last post, whichever came later. */
+  last?: string;
+}
+
+/** The lead's members, oldest first, as the goal loop's round message names them (server/goals/brief.ts). */
+export async function members(d: Deps, swarm: string): Promise<MemberNow[]> {
+  const out: MemberNow[] = [];
+  const firstLine = (t: string) => clip(t.split('\n').find((l) => l.trim()) ?? '', 160);
+  const posts = postsOf(d.db, swarm, { limit: 300 });
+  for (const k of childKeys(d.db, swarm)) {
+    const s = d.sessions.summary(k);
+    if (!s) continue;
+    const working = busy(s) || !!stillRunning(s);
+    const state: MemberNow['state'] = working ? 'working' : stopped(d.db, k) ? 'stopped' : !s.endedAt ? 'not started a turn yet' : 'waiting for you';
+    const turn = findTurn((await d.sessions.timeline(k).catch(() => null))?.parser.items ?? [], undefined, busy(s));
+    const post = posts.filter((p) => p.from === k).at(-1);
+    const turnAt = turn?.last.ts ?? 0;
+    const said = post && post.at >= turnAt ? post.text : turn?.reply.trim() ? turn.reply : post?.text;
+    const last = said ? firstLine(said) : '';
+    out.push({ key: k, title: s.title || 'member', state, ...(last ? { last } : {}) });
+  }
+  return out;
+}
+
+/** Whether a lead's goal (server/goals) has a round at work: a Stop all on its board then stops the whole team. */
+const goalAtWork = (db: DB, swarm: string) => {
+  const g = goalInfo(db, swarm)?.app;
+  return g?.state === 'working' || g?.state === 'checking';
+};
 
 // ---- the tools ------------------------------------------------------------------------------------------
 
@@ -536,11 +599,16 @@ export const swarm: Feature = {
       const members = childKeys(d.db, key);
       if (one && !members.includes(one)) throw new HttpError(404, 'That is not a member of this swarm');
       const keys = one ? [one] : members.filter((k) => busy(d.sessions.summary(k)));
+      // A lead whose goal has a round at work (server/goals): Stop all stops the whole team, the lead too (the session's
+      // own Stop all), and the goal pauses. Nothing is sent to the lead: it would wake it and carry the round on, and the
+      // next round's message names how each member stands.
+      const withGoal = !one && goalAtWork(d.db, key);
       for (const k of keys) await stopMember(d, k);
+      if (withGoal) await d.sessions.stopAll(key);
       d.broadcast({ t: 'feature', id: 'swarm', key, data: { stopped: keys } });
       // The lead hears of it, since stopped members send no report of the turn cut short.
       const team = modeOf(d.db, key);
-      if (keys.length)
+      if (keys.length && !withGoal)
         await d.sessions
           .deliverOrQueue(key, `[The user stopped ${keys.length === 1 ? `the ${team} member ${nameOf(d, key, keys[0])}` : `${keys.length} ${team} members: ${keys.map((k) => nameOf(d, key, k)).join(', ')}`}. Stopped members keep what they did; message_child gives one more to do.]`)
           .catch(() => {});

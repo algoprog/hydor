@@ -18,7 +18,7 @@ export const goals: Feature = {
     // message, also when its agent had to start again before it got it. By the goal once it is set (Codex learns its key later).
     const g = s.key ? loadGoal(d.db, s.key) : null;
     const first = g ? g.status === 'drafting' && !!g._.first : !s.resume && !!s.extra?.goal?.start && !!s.prompt && !goalStartIgnored(s.extra);
-    return first ? { notes: [draftNotes()] } : undefined;
+    return first ? { notes: [draftNotes({ swarm: s.extra?.swarm === true })] } : undefined;
   },
 
   turnEnd(t, d) {

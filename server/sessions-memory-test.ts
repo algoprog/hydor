@@ -22,7 +22,9 @@ import { buildApi, SNOOZE_MS, askedNot, loadGates, saveGates } from './wiki/ask.
 import type { BuildOffer } from './wiki/areas/build.ts';
 import { saveJob, wikiJobEvents, type JobState } from './wiki/areas/jobs.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
-import { dropGoal, saveGoal } from './goals/store.ts';
+import { dropGoal, loadGoal, saveGoal } from './goals/store.ts';
+import { registerFeatures } from './features/registry.ts';
+import { STOPPED_SWARM } from './goals/driver.ts';
 import { checkpoint } from './worktrees.ts';
 import { execFileSync } from 'node:child_process';
 
@@ -628,6 +630,77 @@ test('create() with a goal: in Plan mode the session starts plain and the person
   // In a scheduled run it is ignored without a word, as before.
   const quiet = await created({ mode: 'plan', extra: { goal: { start: true }, automations: { task: 't', run: 'r' } } });
   assert.equal(quiet.notices.some((x: any) => /goal was not set/.test(x.body ?? '')), false);
+});
+
+/** Runs `fn` with the capabilities' deps registered (the goal loop takes them), as the app has them once it is up. */
+async function withDeps<T>(h: { m: any }, fn: () => Promise<T>): Promise<T> {
+  registerFeatures([], { db, sessions: h.m, broadcast: () => {}, publicBase: () => 'https://naget.test' } as any);
+  try {
+    return await fn();
+  } finally {
+    registerFeatures([], null as any);
+  }
+}
+
+test('S1: create() with a goal and a swarm sets the goal (its first message carries the draft); with a campaign, a deep research or an arena match the person hears why it was not set', async () => {
+  const h0 = manager();
+  const h = await withDeps(h0, () => created({ extra: { swarm: true, goal: { start: true, asks: 'own' } } }));
+  assert.ok(h.spawned[0].extra?.goal?.start, 'the draft goes with the first message');
+  assert.equal(loadGoal(db, h.key)?.status, 'drafting');
+  assert.equal(h.notices.some((x: any) => /goal was not set/.test(x.body ?? '')), false);
+  dropGoal(db, h.key);
+  for (const [extra, why] of [
+    [{ swarm: 'campaign' }, 'The goal was not set: this session leads a campaign: a goal works with a swarm, not with a campaign yet.'],
+    [{ research: { depth: 'quick' } }, 'The goal was not set: this session leads a deep research: a goal does not go with it.'],
+    [{ arena: 'match1' }, 'The goal was not set: this session is in an arena match: a goal does not go with it.'],
+  ] as const) {
+    const warn = console.warn;
+    console.warn = () => {};
+    let c: Awaited<ReturnType<typeof created>>;
+    try {
+      c = await created({ extra: { ...extra, goal: { start: true } } });
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(c.spawned[0].extra?.goal, undefined, 'no goal goes with the first message');
+    assert.equal(loadGoal(db, c.key), null);
+    assert.equal(c.notices.find((x: any) => x.kind === 'waiting' && x.key === c.key)?.body, why);
+  }
+});
+
+test('S5.2: the session’s Stop all pauses the goal of a swarm’s lead whose round is at work, even with the lead between turns; a session without a swarm keeps it', async () => {
+  for (const [swarm, status, reason] of [
+    [true, 'paused', STOPPED_SWARM],
+    [false, 'working', undefined],
+  ] as const) {
+    const h = manager();
+    const key = `claude:${crypto.randomUUID()}`;
+    db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, ?, ?)').run(key, 'claude', folder, Date.now(), Date.now());
+    if (swarm) setSessionExtra(db, key, { swarm: true });
+    h.sessions(key);
+    Object.assign(h.m, { heldDone: new Map(), holdQueue: () => {} });
+    saveGoal(db, {
+      key,
+      id: 'g1',
+      status: 'working',
+      round: 2,
+      contract: { objective: 'Fast checkout', checks: [], protect: [], limits: { rounds: 5 } },
+      settings: { asks: 'own', noAnswerMin: 10 },
+      rounds: [],
+      undo: true,
+      rules: [],
+      next: [],
+      dropped: [],
+      startedAt: 1,
+      spentUsd: 0,
+      activeMs: 0,
+      _: { spentAtStart: 0, activeSince: Date.now() },
+    });
+    await withDeps(h, () => h.m.stopAll(key));
+    const g = loadGoal(db, key)!;
+    assert.deepEqual([g.status, g.reason], [status, reason], String(swarm));
+    dropGoal(db, key);
+  }
 });
 
 test('create(): a Codex session asks like the others', async () => {

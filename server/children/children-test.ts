@@ -1183,6 +1183,17 @@ test('after a restart, a queue of what agents sent each other (or the goal loop 
   assert.equal(queueGoesOn([lead, round], {}), true);
   assert.equal(queueGoesOn([round, { text: 'Also fix the README', at: 3000, attachments: 0 }], {}), false, 'a person’s message still waits for Resume');
   assert.equal(queueGoesOn([{ ...round, text: 'Goal · round 3 (typed by hand)' }], {}), false);
+  // S7: the swarm board's batches for a lead and its messages for a member are between agents too: a lead at work when the
+  // app restarted, with a batch queued, takes it when its turn ends instead of holding it for Resume (with a goal, holding
+  // it stopped the whole swarm after every deploy).
+  const batch = { text: '[Swarm board · 2 new posts]\n- “Speed” (claude:m1) · finding: the cache halves it\n(swarm_read shows the members and the whole board; swarm_post answers everyone or one member.)', at: 2800, attachments: 0 };
+  const forMember = { text: '[Swarm board · a message for you]\n- the lead · note: try the index', at: 2900, attachments: 0 };
+  assert.equal(betweenAgents(batch.text), true);
+  assert.equal(betweenAgents(forMember.text), true);
+  assert.equal(queueGoesOn([batch], {}), true);
+  assert.equal(queueGoesOn([round, batch, report], {}), true);
+  assert.equal(queueGoesOn([batch], { stoppedAll: 3000 }), false, 'a Stop all after it still holds it');
+  assert.equal(betweenAgents('Swarm board · 2 new posts (typed by hand)'), false);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

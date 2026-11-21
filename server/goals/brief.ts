@@ -22,21 +22,28 @@ const PROPOSE = [
   'Then stop. The app measures where things stand and shows the user, and nothing starts before they agree.',
 ].join('\n');
 
+/** A session that leads a swarm (S2.4): its members come with the first round, not while the checks are agreed. */
+export interface ForTeam {
+  swarm?: boolean;
+}
+const NO_MEMBERS_YET = 'Do not start your swarm’s members yet: they come with the first round.';
+const noWork = (o: ForTeam) => `Do no work on it yet.${o.swarm ? ` ${NO_MEMBERS_YET}` : ''}`;
+
 /** The first message of a goal: agree what done means, before any work. */
-export function draftMessage(objective: string): string {
-  return join([goalHead('agree the checks'), `The user set this goal:\n“${quote(objective)}”`, `Do no work on it yet.\n${PROPOSE}`, GOAL_FOOT]);
+export function draftMessage(objective: string, o: ForTeam = {}): string {
+  return join([goalHead('agree the checks'), `The user set this goal:\n“${quote(objective)}”`, `${noWork(o)}\n${PROPOSE}`, GOAL_FOOT]);
 }
 
 /** The same, for a session started with a goal: it goes ahead of the person's first message, which is the goal. */
-export function draftNotes(): string {
-  return join([goalHead('agree the checks'), 'The user’s message below is a goal they set for this session: the app’s goal loop drives it round after round, and decides itself when it is reached by running checks.', `Do no work on it yet.\n${PROPOSE}`]);
+export function draftNotes(o: ForTeam = {}): string {
+  return join([goalHead('agree the checks'), 'The user’s message below is a goal they set for this session: the app’s goal loop drives it round after round, and decides itself when it is reached by running checks.', `${noWork(o)}\n${PROPOSE}`]);
 }
 
 /** When the drafting turn ended without a proposal. */
-export function reminderMessage(objective: string): string {
+export function reminderMessage(objective: string, o: ForTeam = {}): string {
   return join([
     goalHead('agree the checks'),
-    `The goal still has no checks. Do no work on it yet: call goal_propose now, then stop. If you do not, the app proposes one check itself: a reviewer reads the change against the goal.\nThe goal: “${quote(objective)}”`,
+    `The goal still has no checks. Do no work on it yet: call goal_propose now, then stop.${o.swarm ? ` ${NO_MEMBERS_YET}` : ''} If you do not, the app proposes one check itself: a reviewer reads the change against the goal.\nThe goal: “${quote(objective)}”`,
     PROPOSE,
     GOAL_FOOT,
   ]);
@@ -147,6 +154,30 @@ export interface RoundBrief {
   changeApproach?: boolean;
   /** Every check holds, and this is what is left to put right (a failed final check, the person's "Not yet"). */
   fix?: GoalFix;
+  /** The session leads a swarm (S2.3): its members as they stand now (server/swarm members), oldest first. */
+  swarm?: { members: { title: string; state: string; last?: string }[] };
+}
+
+/** How many members a swarm lead's round message names one by one. */
+export const MEMBERS_NAMED = 8;
+
+/**
+ * The end of a swarm lead's round message, in place of the usual closing paragraph (S2.3): what the swarm does with the
+ * round, its members as they stand (after a round that was undone, that their changes in it are gone), and when the round
+ * is over.
+ */
+function swarmClose(g: Pick<GoalState, 'rounds'>, team: NonNullable<RoundBrief['swarm']>): string {
+  const lastRun = g.rounds.filter((r) => r.n > 0).reduce<GoalRound | undefined>((a, r) => (!a || r.n > a.n ? r : a), undefined);
+  const undone = lastRun?.outcome === 'undone' ? 'Last round was undone: what your members changed in it is gone from this folder; say so to those you put to work again. ' : '';
+  const named = team.members.slice(0, MEMBERS_NAMED).map((m) => `- “${m.title}” (${m.state})${m.last ? `: ${m.last}` : ''}`);
+  const more = team.members.length - named.length;
+  const now = team.members.length ? `Your members now:\n${[...named, ...(more > 0 ? [`- and ${more} more`] : [])].join('\n')}` : 'You have no members yet: start one per angle with start_child_session.';
+  return join([
+    'You lead a swarm in this goal. Put your members on what does not hold yet: one angle or one check each, and tell each which files are its own, because they all work in this folder (give none a worktree or folder of its own: the app checks this folder, and can only undo a round whose work is all here). Pass on what the user asked for above and what must not change.',
+    `${undone}Members from earlier rounds are still there and remember their work: give them their next step with message_child, start a new member only for a new angle, and stop one whose angle is used up with swarm_stop.`,
+    now,
+    'The round is over when you have called goal_report (what the swarm did, what remains) and every member’s turn has ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
+  ]);
 }
 
 /** The message that starts a round. */
@@ -165,7 +196,9 @@ export function roundMessage(g: Pick<GoalState, 'contract' | 'rounds' | 'best' |
     fromUser,
     g.contract.protect.length ? `Do not change: ${g.contract.protect.join(', ')}` : '',
     o.changeApproach && !o.way ? 'The last rounds made no progress: take a clearly different approach than before.' : '',
-    `The app runs the checks itself when your turn ends. You cannot end the goal, and saying it is done changes nothing. ${o.fix ? (o.fix.by === 'final' ? 'Put right what the final check found' : 'Put right what the user says') : 'Work on what does not hold yet'}, check your work as you go, then call goal_report (what you did, what remains) and end your turn.`,
+    o.swarm
+      ? swarmClose(g, o.swarm)
+      : `The app runs the checks itself when your turn ends. You cannot end the goal, and saying it is done changes nothing. ${o.fix ? (o.fix.by === 'final' ? 'Put right what the final check found' : 'Put right what the user says') : 'Work on what does not hold yet'}, check your work as you go, then call goal_report (what you did, what remains) and end your turn.`,
     GOAL_FOOT,
   ]);
 }
