@@ -82,6 +82,11 @@ export interface GoalResult {
   detail?: string;
   /** The check could not be run or read (a missing command, no number, a reviewer without an answer): it counts as not holding. */
   error?: string;
+  /**
+   * In the start's results only: this check was measured for the first time after this round, not at the start (the person
+   * added or changed it while the goal ran). Its value is where that check starts from; the screens show no value "at the start".
+   */
+  since?: number;
   ms: number;
 }
 
