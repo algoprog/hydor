@@ -2794,8 +2794,10 @@ searches.forEach((s, i) => {
   }
 });
 const lead = (g) => g.items.slice().sort((a, b) => b.original - a.original || a.aggregator - b.aggregator || a.rank - b.rank)[0];
-const room = Math.max(1, Number(input.stories) || 8);
 const per = topics.map((t) => groups.filter((g) => g.topic === t.topic).sort((a, b) => b.items.length - a.items.length || lead(a).rank - lead(b).rank));
+// Room for the digest's length, and for at least one story of every topic that has one (twelve at most), so a topic
+// with news is not left out for want of room.
+const room = Math.max(Math.max(1, Number(input.stories) || 8), Math.min(12, per.filter((p) => p.length).length));
 const items = [];
 for (let turn = 0; items.length < Math.ceil(room * 1.5) && per.some((p) => p.length > turn); turn++)
   per.forEach((p, i) => {
@@ -2875,7 +2877,6 @@ The article: {{story.title}}, {{story.url}} ({{story.site}}{{#story.date}}, {{st
 // across the topics until the digest is full, with their dates and links checked; a topic without one says so.
 const since = String(input.since || '');
 const today = String(input.today || '');
-const room = Math.max(1, Number(input.stories) || 8);
 const reads = list(input.reads);
 const day = (v) => (/\d{4}-\d{2}-\d{2}/.exec(String(v || '')) || [''])[0];
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
@@ -2889,6 +2890,9 @@ rows(input.candidates).forEach((c, i) => {
 });
 const topics = rows(input.topics).map((t) => t.topic);
 const per = topics.map((t) => kept.filter((s) => s.topic === t).sort((a, b) => b.weight - a.weight));
+// As many as the digest's length, and at least one for every topic that has a story (twelve at most): a topic is quiet
+// only when it had none that held up, never for want of room.
+const room = Math.max(Math.max(1, Number(input.stories) || 8), Math.min(12, per.filter((p) => p.length).length));
 const chosen = [];
 for (let turn = 0; chosen.length < room && per.some((p) => p.length > turn); turn++) per.forEach((p) => p[turn] && chosen.length < room && chosen.push(p[turn]));
 const stories = topics.flatMap((t) => chosen.filter((s) => s.topic === t)).map(({ weight, ...s }) => s);

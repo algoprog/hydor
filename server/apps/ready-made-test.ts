@@ -248,6 +248,42 @@ test('Game finder: a price only for the game asked for: the same title once norm
   assert.deepEqual([g.price, g.store, g.deal, g.picture], [null, '', null, 'https://img.example/h.jpg']);
 });
 
+// ---- Weekly news digest --------------------------------------------------------------------------------------------
+
+test('News digest: with more topics than room (8 topics, the shortest length) every topic that has a story keeps one; only a topic with none is quiet', async () => {
+  const topics = Array.from({ length: 8 }, (_, i) => ({ topic: `Topic ${i + 1}`, query: `Topic ${i + 1}` }));
+  const names = ['solar', 'whales', 'tariffs', 'chips', 'vaccines', 'rockets', 'wine', 'chess'];
+  // Each topic's search: two stories of its own, except topic 8, which found nothing.
+  const searches = topics.map((t, i) => (i === 7 ? { data: { results: [] } } : { data: { results: [0, 1].map((k) => ({ title: `${names[i]} breakthrough number ${k} reported ${['alpha', 'bravo'][k]} ${names[i]}x`, url: `https://news${i}.example/${k}`, date: '2026-11-19' })) } }));
+  const g = await program('news-digest', 'group', { searches, topics, since: '2026-11-14', today: '2026-11-21', skip: '', stories: 4 });
+  const items = g.items as Record<string, unknown>[];
+  assert.deepEqual([...new Set(items.map((x) => x.topic))], topics.slice(0, 7).map((t) => t.topic), 'every topic with a story has a candidate');
+  assert.ok(items.length <= 18 && items.length >= 7, `${items.length} candidates`);
+  assert.deepEqual(g.quiet, ['Topic 8']);
+  // Each candidate is read and held up: the digest has room for all seven topics (more than its four), one each.
+  const reads = items.map(() => ({ what: 'Something happened.', why: 'It matters.', date: '2026-11-19', this_week: true, original: true, source: 'News' }));
+  const sel = await program('news-digest', 'select', { candidates: items, reads, quiet: g.quiet, topics, since: '2026-11-14', today: '2026-11-21', stories: 4 });
+  const stories = sel.stories as Record<string, unknown>[];
+  assert.deepEqual(stories.filter((x) => x.summary).map((x) => x.topic), topics.slice(0, 7).map((t) => t.topic));
+  assert.deepEqual(sel.quiet, ['Topic 8'], 'quiet only when it truly had none');
+  assert.equal(stories.filter((x) => !x.summary).length, 1);
+  assert.equal(stories.find((x) => x.topic === 'Topic 8')!.title, 'No real news this week');
+  assert.equal(sel.count, 7);
+  // Two topics at the shortest length keep to the length (four stories).
+  const two = await program('news-digest', 'select', {
+    candidates: ['A', 'A', 'A', 'A', 'B', 'B', 'B'].map((t, i) => ({ topic: `Topic ${t}`, title: `Story ${i}`, url: `https://x.example/${i}`, date: '2026-11-19', coverage: 1 })),
+    reads: Array.from({ length: 7 }, () => ({ what: 'w', why: 'y', date: '2026-11-19', this_week: true, original: true })),
+    quiet: [], topics: [{ topic: 'Topic A' }, { topic: 'Topic B' }], since: '2026-11-14', today: '2026-11-21', stories: 4,
+  });
+  assert.equal(two.count, 4);
+  // A topic whose stories were all read and found old is quiet: none held up.
+  const old = await program('news-digest', 'select', {
+    candidates: [{ topic: 'Topic A', title: 'Old', url: 'https://x.example/o', date: '2026-01-01', coverage: 1 }],
+    reads: [{ what: 'w', date: '2026-01-01', this_week: false }], quiet: [], topics: [{ topic: 'Topic A' }], since: '2026-11-14', today: '2026-11-21', stories: 4,
+  });
+  assert.deepEqual(old.quiet, ['Topic A']);
+});
+
 // ---- run -----------------------------------------------------------------------------------------------------------
 
 for (const [name, fn] of tests) {
