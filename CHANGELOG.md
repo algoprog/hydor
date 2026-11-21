@@ -3,6 +3,27 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.102.1 · 21 November 2026
+
+One goal bar again instead of a growing stack, a Pause that lets the round finish, and spending that keeps counting
+for Claude Code.
+
+- **The goal bar no longer piles up**: in a session with a goal, the bar above the message box was drawn again and
+  again, one more copy every few seconds. There is one again.
+- **Pause waits for the round**: pressing **Pause** while a round runs no longer leaves that round unchecked. The round
+  is finished and checked first (the bar says "pausing after this round"), and then the goal waits. That is the moment
+  for **Keep anyway…**, **Undo** and **Another way from here**, which were refused after a pause before. **Resume**
+  before then takes the pause back. To stop the agent at once, stop it in the session as before.
+- **Spending keeps counting for Claude Code**: once Claude Code had restarted, a session's spending stood still, so a
+  spending cap or a goal's money limit could be passed without anyone noticing. Every model call counts again. What a
+  session spent in such a gap before this version is not added afterwards.
+- You can add or remove a rule, and change how much a goal asks, while it waits at a limit: its report shows them there.
+- A check whose target you change keeps where it started: it is judged again against the new target instead of being
+  measured afresh.
+- A goal with a very small money limit says what it spent to a tenth of a cent ("It spent $0.006 of its $0.003").
+- For the reviewer of a goal's checks, a file that was moved counts as changed where it was too, so the folder it left
+  no longer reads as untouched.
+
 ## 0.102.0 · 21 November 2026
 
 Give a session a goal and the app itself checks every round, a project's memory in one list, and model tiers for
