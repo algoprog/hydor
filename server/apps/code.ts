@@ -6,12 +6,14 @@
 //
 // It reaches the world outside only through `ctx`: each call (ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data,
 // ctx.app) goes to the flow as a line on file descriptor 3, and its answer comes back on standard input. The
-// flow runs each as a step of its own (flow.ts), so the time a call takes is not the program's own.
+// flow runs each as a step of its own (flow.ts), so the time a call takes is not the program's own. ctx.locale
+// is no call: the run's language and where the person is (shared/app-me.ts), for Intl and the like.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Requires } from '../../shared/app-manifest.ts';
+import type { RunLocale } from '../../shared/app-me.ts';
 import { sandboxAvailable } from '../agent/sandbox.ts';
 import { envDir } from './env.ts';
 
@@ -44,6 +46,7 @@ const call = (kind, args) =>
     fs.writeSync(3, JSON.stringify({ id, call: kind, args }) + '\\n');
   });
 const ctx = Object.freeze({
+  locale: Object.freeze(JSON.parse(fs.readFileSync('locale.json', 'utf8'))),
   model: (instructions, o = {}) => call('model', { ...o, instructions }),
   agent: (instructions, o = {}) => call('agent', { ...o, instructions }),
   tool: (tool, inputs = {}, o = {}) => call('tool', { ...o, tool, with: inputs }),
@@ -74,6 +77,11 @@ process.exit(0);
 
 /** ctx in Python: each call waits for its answer. */
 const PY_CTX = `import json, os, sys
+class _Locale(dict):
+    # ctx.locale.lang and ctx.locale['lang'] alike.
+    def __getattr__(self, k):
+        try: return self[k]
+        except KeyError: raise AttributeError(k)
 class _Data:
     def __init__(self, call): self._call = call
     def add(self, collection, record, **o): return self._call('data', {**o, 'op': 'add', 'collection': collection, 'with': record})
@@ -86,6 +94,7 @@ class _Ctx:
     def __init__(self):
         self._n = 0
         self.data = _Data(self._call)
+        with open('locale.json') as f: self.locale = _Locale(json.load(f))
     def _call(self, kind, args):
         # with is Python's own word: with_ stands for it.
         if 'with_' in args: args['with'] = args.pop('with_')
@@ -138,7 +147,7 @@ const MOST_CALLS = 500;
 const CALL_LINE = 1 << 20;
 
 /** Runs a code step's program and reads what it returned; throws with its last lines when it fails. `files` are absolute paths bound read-only at the same path in the sandbox (those that exist). */
-export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall; files?: string[] }): Promise<CodeOut> {
+export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; locale?: RunLocale; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall; files?: string[] }): Promise<CodeOut> {
   // bubblewrap alone: the mounts below are its own (a Mac's Seatbelt or Windows' low integrity don't run code steps).
   const sb = sandboxAvailable();
   const bwrap = sb?.kind === 'bwrap' ? sb.bin : null;
@@ -178,6 +187,7 @@ export async function runCode(o: { language: 'javascript' | 'typescript' | 'pyth
       cmd = ['/usr/bin/prlimit', `--as=${2 << 30}`, '--', py, '-I', 'main.py'];
     }
     fs.writeFileSync(path.join(work, 'input.json'), JSON.stringify(o.input));
+    fs.writeFileSync(path.join(work, 'locale.json'), JSON.stringify(o.locale ?? { lang: 'en', language: 'English', country: '', timeZone: 'UTC', currency: '', units: '' }));
     const args = [
       '--unshare-all',
       '--die-with-parent',

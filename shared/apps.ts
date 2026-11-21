@@ -7,6 +7,7 @@ import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequire
 import { cleanUi, type AppUi } from './app-ui.ts';
 import { cleanAssets, cleanMedia, type AppAsset } from './app-media.ts';
 import { cleanSecrets, type AppSecret } from './app-secrets.ts';
+import { fromField, ME_REFS } from './app-me.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -25,6 +26,13 @@ export interface AppField {
   multi?: boolean;
   /** What the form starts with (and what an API call without it gets). */
   default?: string;
+  /**
+   * A field of About you the answer starts from ("me.units"): the form shows it filled in, and a run that leaves the
+   * question unanswered (the API, a row, a schedule, an agent) takes it before the default.
+   */
+  from?: string;
+  /** It starts from the person's last answer to it in this app (not for a file), kept on the server: for what About you has no field for. */
+  remember?: boolean;
 }
 
 export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media' | 'ui';
@@ -147,6 +155,11 @@ export interface AppRecipe {
   sessions?: boolean;
   /** An app that opens on its own page: when Update automatically runs it until you pick another time (HH:MM) and days (0 is Sunday; unset: every day). */
   home?: HomeStart;
+  /**
+   * "person": its model and agent steps (and a one-task app's agent) write what people read in the run's language
+   * (what started the run says which; else About you's; else English). Unset: as written, with no word on language.
+   */
+  language?: 'person';
 }
 
 export interface HomeStart {
@@ -254,6 +267,8 @@ export interface AppRun {
   version?: number;
   /** What its flow could not have: calls that still failed after their tries, steps that failed (at most 30). */
   misses?: RunMiss[];
+  /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
+  lang?: string;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -497,14 +512,20 @@ const given = (v: string | undefined) => !!v && !!v.trim() && v.trim().toLowerCa
  * the field was answered (and not with No), {{^id}}…{{/id}} only when it was not; {{today}} is today's
  * date. Placeholders that name no field stay as they are (a web app's own {{braces}}).
  */
-export function fillTemplate(tpl: string, values: Record<string, string>, o: { today?: string; moment?: Partial<Record<'today' | 'now' | 'weekday' | 'timezone', string>>; known?: string[] } = {}): string {
+export function fillTemplate(
+  tpl: string,
+  values: Record<string, string>,
+  o: { today?: string; moment?: Partial<Record<'today' | 'now' | 'weekday' | 'timezone', string>>; known?: string[]; vars?: Record<string, unknown> } = {},
+): string {
   const known = new Set(o.known ?? Object.keys(values));
   const moment: Record<string, string> = { today: o.today ?? o.moment?.today ?? new Date().toISOString().slice(0, 10), ...(o.moment?.now ? { now: o.moment.now } : {}), ...(o.moment?.weekday ? { weekday: o.moment.weekday } : {}), ...(o.moment?.timezone ? { timezone: o.moment.timezone } : {}) };
+  // Other values by name ("me.units", "language"): a list as one line.
+  for (const [k, v] of Object.entries(o.vars ?? {})) moment[k] = Array.isArray(v) ? v.join(', ') : v === null || v === undefined ? '' : String(v);
   const builtIn = (id: string) => !known.has(id) && id in moment;
   const value = (id: string) => (builtIn(id) ? moment[id] : (values[id] ?? ''));
   let out = String(tpl ?? '');
   // Sections, innermost first, until none are left.
-  const section = /\{\{([#^])\s*([\w-]+)\s*\}\}((?:(?!\{\{[#^]\s*\2\s*\}\})[\s\S])*?)\{\{\/\s*\2\s*\}\}/g;
+  const section = /\{\{([#^])\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}((?:(?!\{\{[#^]\s*\2\s*\}\})[\s\S])*?)\{\{\/\s*\2\s*\}\}/g;
   for (let i = 0; i < 20; i++) {
     const next = out.replace(section, (all, kind: string, id: string, body: string) => {
       if (!known.has(id) && !builtIn(id)) return all;
@@ -514,17 +535,20 @@ export function fillTemplate(tpl: string, values: Record<string, string>, o: { t
     if (next === out) break;
     out = next;
   }
-  out = out.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (all, id: string) => (known.has(id) || builtIn(id) ? value(id) : all));
+  out = out.replace(/\{\{\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}/g, (all, id: string) => (known.has(id) || builtIn(id) ? value(id) : all));
   return out
     .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
+/** Names a task fills besides its questions: the moment, the run's language and About you (`me.units`). */
+export const TASK_VALUES = ['today', 'now', 'weekday', 'timezone', 'language', 'lang', ...ME_REFS.map((r) => `me.${r}`)];
+
 /** The placeholders a prompt uses. */
 export function placeholders(tpl: string): string[] {
   const out = new Set<string>();
-  for (const m of String(tpl ?? '').matchAll(/\{\{\s*[#^/]?\s*([\w-]+)\s*\}\}/g)) out.add(m[1]);
+  for (const m of String(tpl ?? '').matchAll(/\{\{\s*[#^/]?\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}/g)) out.add(m[1]);
   return [...out];
 }
 
@@ -578,14 +602,15 @@ function checkPicks(f: AppField, v: unknown): { value: string } | { error: strin
  * The form's answers, tidied and checked against its fields: every field gets a value (its default or
  * empty), yes/no as Yes or No, numbers and dates in a plain form. `errors` say what to fix, in words.
  */
-export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o: { maxText?: number; maxLong?: number } = {}): { values: Record<string, string>; errors: string[] } {
+export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o: { maxText?: number; maxLong?: number; starts?: Record<string, string> } = {}): { values: Record<string, string>; errors: string[] } {
   const values: Record<string, string> = {};
   const errors: string[] = [];
   const maxText = o.maxText ?? 2000;
   const maxLong = o.maxLong ?? 60_000;
   for (const f of fields) {
     let v: unknown = raw?.[f.id];
-    if (v === undefined || v === null) v = f.default ?? '';
+    // Left unanswered: what it starts from (About you, the last answer), else its default.
+    if (v === undefined || v === null) v = o.starts?.[f.id] ?? f.default ?? '';
     if (f.type === 'choice' && f.multi) {
       const picked = checkPicks(f, v);
       if ('error' in picked) errors.push(picked.error);
@@ -946,7 +971,24 @@ export function cleanFields(raw: unknown): AppField[] {
     const id = fieldId(str(x.id, 40) || label, taken);
     taken.push(id);
     const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
-    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, ...(type === 'choice' && x.multi ? { multi: true } : {}), default: opt(x.default, 4000) }];
+    // It starts from About you, or from the last answer (one or the other; never a file).
+    const from = type === 'file' ? undefined : fromField(x.from);
+    const remember = !from && type !== 'file' && x.remember === true;
+    return [
+      {
+        id,
+        label,
+        type,
+        required: !!x.required || undefined,
+        help: opt(x.help, 240),
+        placeholder: opt(x.placeholder, 160),
+        options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined,
+        ...(type === 'choice' && x.multi ? { multi: true } : {}),
+        default: opt(x.default, 4000),
+        ...(from ? { from: `me.${from}` } : {}),
+        ...(remember ? { remember: true } : {}),
+      },
+    ];
   });
 }
 
@@ -1000,6 +1042,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(r.block === true ? { block: true } : {}),
     ...(typeof r.sessions === 'boolean' ? { sessions: r.sessions } : {}),
     ...(home ? { home } : {}),
+    ...(r.language === 'person' ? { language: 'person' as const } : {}),
   };
 }
 

@@ -14,6 +14,7 @@ import type { SessionExtra } from '../../shared/features.ts';
 import type { AnswerField, AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import { momentOf } from '../../shared/app-manifest.ts';
+import { languageLine, languageName, meVars } from '../../shared/app-me.ts';
 // Loaded first of the cards' part for the whole server: it tells shared/apps.ts how to name and check a card field.
 import { cardLines } from '../../shared/app-cards.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
@@ -29,6 +30,7 @@ import { costOf, rateFor } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { ensureEnv } from './env.ts';
+import { aboutMe, keepAnswers, runLanguage, startsFor } from './me.ts';
 import { refMedia } from './media.ts';
 import { needSecrets } from './secrets.ts';
 import { addModels, modelStates, needModels } from './models.ts';
@@ -193,24 +195,31 @@ export interface StartInput {
   example?: string;
   /** The session whose agent runs it for the user (use_app). */
   askedBy?: string;
+  /** The language it writes in, as what started it says (a tag: the device's, a visitor's, the one a chat's agent gave); else About you's, else English. */
+  lang?: string;
 }
 
 /** The questions a run answers: the template's form, or the inputs of the flow it runs. */
 export const formOf = (recipe: AppRecipe, flow?: string) => (flow ? (recipe.flows?.[flow]?.inputs ?? []) : recipe.fields);
 
-/** The checked form, or an error that says what to fix. */
-export function checkedInputs(recipe: AppRecipe, inputs: Record<string, unknown>, isPublic: boolean, files: Record<string, unknown> = {}, flow?: string) {
+/**
+ * The checked form, or an error that says what to fix. With `app` (not on a public page), a question left
+ * unanswered takes what it starts from (About you, its last answer) before its default.
+ */
+export function checkedInputs(recipe: AppRecipe, inputs: Record<string, unknown>, isPublic: boolean, files: Record<string, unknown> = {}, flow?: string, app?: string) {
   // A file field with a file sent counts as answered.
   const raw = { ...inputs };
   const fields = formOf(recipe, flow);
   for (const f of fields) if (f.type === 'file' && files[f.id]) raw[f.id] = (files[f.id] as { name?: string }).name || 'file';
-  return checkInputs(fields, raw, { maxLong: isPublic ? 12_000 : 60_000, maxText: isPublic ? 600 : 2000 });
+  const starts = app && !isPublic && fields.some((f) => f.from || f.remember) ? startsFor(d().db, fields, app) : undefined;
+  return checkInputs(fields, raw, { maxLong: isPublic ? 12_000 : 60_000, maxText: isPublic ? 600 : 2000, starts });
 }
 
 /** Creates the run and starts its session in the background (unless it waits in line). */
 export function startRun(o: StartInput): RunRecord {
   if (o.flow && !o.recipe.flows?.[o.flow]) throw new HttpError(400, `The app has no flow “${o.flow}”${o.recipe.flows ? ` (it has ${Object.keys(o.recipe.flows).join(', ')})` : ''}`);
-  const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow);
+  // An agent step's run has no form of its own: its step's flow filled its task.
+  const { values, errors } = checkedInputs(o.recipe, o.inputs, !!o.public, o.files, o.flow, o.source === 'step' ? undefined : o.app);
   if (errors.length) throw new HttpError(400, `Check the form: ${errors.join('; ')}`);
   // The keys it needs, before it starts (an agent step's run goes by its app's; a public run cannot use them).
   if (!o.public && o.source !== 'step') {
@@ -224,7 +233,10 @@ export function startRun(o: StartInput): RunRecord {
     if (typeof f?.data !== 'string' || typeof f.name !== 'string') throw new HttpError(400, 'Send each file as a name and its base64 contents');
     if (f.data.length * 0.75 > maxFile) throw new HttpError(413, `${f.name} is too big (at most ${maxFile >> 20} MB)`);
   }
-  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy });
+  const lang = runLanguage(d().db, o.lang, !!o.public);
+  const r = insertRun(d().db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: o.source, inputs: values, status: o.queued ? 'queued' : 'starting', visitor: o.visitor, ip: o.ip, batch: o.batch, row: o.row, parent: o.parent, step: o.step, flow: o.flow, example: o.example, askedBy: o.askedBy, lang });
+  // The person's own answers to questions that remember theirs, for their next run.
+  keepAnswers(d().db, o.app, o.source, formOf(o.recipe, o.flow), values);
   // Its first steps replay that run's (before it starts, so its flow finds them).
   if (o.reuse?.steps.length) reuseSteps(d().db, o.reuse.run, r.id, o.reuse.steps);
   if (!o.queued) go(r, o);
@@ -379,6 +391,21 @@ export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appNam
   return lines.join('\n');
 }
 
+/**
+ * The values a run's task and steps get besides the form's and the moment: the language it writes in ({{language}},
+ * {{lang}}) and About you ({{me.units}}…), which a public page's run gets empty.
+ */
+export function runVars(r: Pick<RunRecord, 'lang'>, isPublic: boolean): { language: string; lang: string; me: ReturnType<typeof meVars> } {
+  const lang = r.lang || 'en';
+  return { language: languageName(lang), lang, me: meVars(isPublic ? {} : aboutMe(d().db).values) };
+}
+
+/** Those values by the names a task writes them ("me.units"). */
+function taskVars(r: Pick<RunRecord, 'lang'>, isPublic: boolean): Record<string, unknown> {
+  const v = runVars(r, isPublic);
+  return { language: v.language, lang: v.lang, ...Object.fromEntries(Object.entries(v.me).map(([k, x]) => [`me.${k}`, x])) };
+}
+
 async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe' | 'source' | 'files' | 'public'>) {
   const { db, sessions } = d();
   const recipe = o.recipe;
@@ -407,7 +434,10 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
         docs.push(`<document name="${safeName(f.name)}">\n${text ? text.slice(0, 60_000) : '(This file could not be read as text.)'}\n</document>`);
       } else values[id] = file;
     }
-    let prompt = fillTemplate(recipe.prompt, values, { known: recipe.fields.map((f) => f.id), moment: momentOf(userTimezone(d().db)) });
+    let prompt = fillTemplate(recipe.prompt, values, { known: recipe.fields.map((f) => f.id), moment: momentOf(userTimezone(d().db)), vars: taskVars(r, !!o.public) });
+    // An app that answers in the person's language says so after its task.
+    const tongue = recipe.language === 'person' ? languageLine(r.lang) : '';
+    if (tongue) prompt = `${prompt}\n\n${tongue}`;
     // Custom on a public run hears nothing from the capabilities: what it needs to know comes with the message.
     if (o.public) prompt = `${prompt}\n\n---\n${runInstructions(r)}${docs.length ? `\n\n${docs.join('\n\n')}` : ''}`;
     const mark: AppMark = { id: r.app, run: r.id, name: recipe.name, ...(o.public ? { public: true, web: o.public.web } : {}) };

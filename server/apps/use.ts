@@ -32,6 +32,7 @@ import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
+import { startsFor } from './me.ts';
 import { pinsOf, theirsFirst } from './pins.ts';
 
 /** One app agents may run: the name they give it by, its run's app ("tpl:<id>" for a ready-made one), and what it is. */
@@ -240,20 +241,24 @@ function overview(db: DB, u: Usable) {
   return { approve: true, ...(u.recipe.description?.trim() ? { about: u.recipe.description.trim() } : {}), ...(steps.length ? { steps } : {}), ...(last ? { lastRun: last } : {}), link: pageOf(u) };
 }
 
+/** Whether the app needs a key the vault does not have. */
+const keysLack = (ctx: RunCtx, u: Usable) => missingSecrets(ctx.deps.db, u.recipe).length > 0;
+
 /**
  * The app's card with the questions left: those it needs that the request did not answer (or answered in a way the
  * form does not take) and the optional ones it left out, each filled in as far as it can be. Gives the answers
  * merged into the request's, or why there are none. `approve`: the card asks whether to run the app at all, with an overview of it, even when nothing is missing.
  */
-async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, raw: Record<string, unknown>, ms: number, approve: boolean): Promise<{ values: Record<string, string>; files: Record<string, Sent> } | { why: 'nobody' | 'declined' | 'timeout' }> {
+async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, raw: Record<string, unknown>, ms: number, approve: boolean, starts: Record<string, string> = {}): Promise<{ values: Record<string, string>; files: Record<string, Sent> } | { why: 'nobody' | 'declined' | 'timeout' }> {
   const adapter = ctx.deps.sessions.adapterByRun(ctx.runId);
   if (!adapter) return { why: 'nobody' };
   const fields = u.recipe.fields;
   const asked = fields.filter((f) => !(f.id in got.values || f.id in got.files) || !fine(f, got.values, got.files));
+  // Answered with what they start from (About you, the last answer): enough to run without asking.
+  const started = { ...starts, ...got.values };
+  if (!approve && !keysLack(ctx, u) && fields.every((f) => fine(f, started, got.files))) return { values: started, files: got.files };
   // Keys it needs that the vault does not have: the card asks for them too (they go straight to the vault).
   const keys = missingSecrets(ctx.deps.db, u.recipe);
-  // Everything answered already (ask: true on a form the request filled in) and every key there: nothing to show, unless it asks whether to run the app.
-  if (!approve && !asked.length && !keys.length) return { values: got.values, files: got.files };
   const given = fields.filter((f) => !asked.includes(f));
   const card: ApprovalRequest = {
     id: `app-${crypto.randomBytes(6).toString('hex')}`,
@@ -276,7 +281,9 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
         const keep = said && f.type !== 'file' && fine(f, { [f.id]: said }, {});
         // What the request said that the form does not take ("in May" for a date) shows under the question.
         const note = said && !keep && f.type !== 'file' ? `From your message: “${clipLine(said, 80)}”` : got.unread.includes(f.id) ? `“${clipLine(String(raw[f.id] ?? ''), 80)}” is not a file here: pick it` : '';
-        return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
+        // Nothing said for it: filled in with what it starts from (About you, the last answer), to change.
+        const start = !said && starts[f.id] !== undefined ? starts[f.id] : undefined;
+        return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : start !== undefined ? { default: start } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
       }),
     },
     app: {
@@ -297,6 +304,8 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
       const v = String(a.form?.[f.id] ?? '').trim();
       delete values[f.id];
       delete files[f.id];
+      // One that started filled in and was cleared on the card stays empty (the run would fill it again).
+      if (!v && starts[f.id] !== undefined) values[f.id] = '';
       if (!v) continue;
       if (f.type === 'file') {
         // A file picked on the card was saved ahead of the answer (POST /api/uploads): its path.
@@ -479,7 +488,8 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
     name: 'use_app',
     description: [
       "Runs one of the user's apps for them, here in the conversation: use it when they ask for what one of their apps does, instead of doing that work yourself.",
-      'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
+      'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. Questions about them that they keep in About you (their units, currency, country, diet…) are filled in from it when you leave them out. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
+      'Give language: the language the user writes to you in, as a tag (el, de, ja…), so the app answers in it.',
       'Unless the user chose to always run that app, its card first asks them whether to run it, showing what it does. If they say no, do the job another way (or ask them in words); do not call it again for the same request.',
       'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card, which shows under your reply (below it, not above).',
       'If an app’s answer turns out not to fit what the user asked and you answer yourself instead, call use_app with run (the run’s id) and remove: true: its card leaves the conversation, so it shows one answer, not two. The run stays in the app’s history.',
@@ -493,6 +503,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
         app: { type: 'string', ...(many ? {} : { enum: list.map((u) => u.ref) }), description: many ? 'Which app, by the name find_apps gives it (in quotes there).' : 'Which app, as listed.' },
         inputs: { type: 'object', description: 'The answers to its form that the user gave, by the names listed.' },
         ask: { type: 'boolean', description: 'Show its card even when nothing it needs is missing.' },
+        language: { type: 'string', description: 'The language the user writes to you in, as a tag: el, de, ja, en…' },
         wait: { type: 'number', description: 'Most seconds to wait for its answer (1 to 540; 300 unless set).' },
         run: { type: 'string', description: 'A run started here before that was still running: waits for its answer. With remove: true, the run whose card to take out.' },
         remove: { type: 'boolean', description: 'With run: takes that run’s card out of this conversation (its answer did not fit and you answer yourself). The run stays in the app’s history.' },
@@ -521,11 +532,15 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       }
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
       let got = intake(u.recipe.fields, raw, c.cwd);
+      // What the questions it left out start from: About you, the user's last answers.
+      const given = (f: AppField) => got.values[f.id] !== undefined || !!got.files[f.id];
+      const starts = Object.fromEntries(Object.entries(startsFor(db, u.recipe.fields, u.app)).filter(([id]) => !given(u.recipe.fields.find((f) => f.id === id)!)));
+      const withStarts = { ...starts, ...got.values };
       // What it needs and lacks (or the user may add to, when asked): the app's card.
       // Asked first unless the user chose to always run it, or a scheduled task runs in this session (the user set it up and nobody is there to answer).
       const approve = !allowedApps(db).includes(u.app) && !inTaskRun(db, c.key);
-      if (approve || u.recipe.fields.some((f) => !fine(f, got.values, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
-        const a = await askUser(c, u, got, raw, CALL_MS - 60_000, approve);
+      if (approve || u.recipe.fields.some((f) => !fine(f, withStarts, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
+        const a = await askUser(c, u, got, raw, CALL_MS - 60_000, approve, starts);
         if ('why' in a) {
           if (a.why === 'declined' && approve) return `The user chose not to run ${u.recipe.name}. Don't run it again for this request: do what they asked another way, or ask them in words.`;
           if (a.why === 'declined') return `The user closed ${u.recipe.name}'s card without running it. Ask in words if you still need it, or go on without it.`;
@@ -541,7 +556,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
           if (!a) return { text: 'That app is gone.', isError: true };
           checkDaily(db, a);
         }
-        r = startRun({ app: u.app, slug: u.slug, recipe: u.recipe, source: 'session', inputs: got.values, ...(Object.keys(got.files).length ? { files: got.files } : {}), askedBy: c.key });
+        r = startRun({ app: u.app, slug: u.slug, recipe: u.recipe, source: 'session', inputs: got.values, ...(Object.keys(got.files).length ? { files: got.files } : {}), askedBy: c.key, ...(typeof args.language === 'string' ? { lang: args.language } : {}) });
       } catch (e) {
         return { text: `${u.recipe.name} could not start: ${(e as Error).message}`, isError: true };
       }

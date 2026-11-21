@@ -83,6 +83,8 @@ import {
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
 import { allowApp, allowedApps } from './allowed.ts';
+import { aboutMe, changeAboutMe, forgetAnswers, startsFor } from './me.ts';
+import { FROM_FIELDS, fromField } from '../../shared/app-me.ts';
 import { appHint, findAppsTool, tellAsker, usableApps, useAppTool, useNote } from './use.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
@@ -158,6 +160,14 @@ function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: stri
   for (const [name, a] of Object.entries(recipe.assets ?? {})) if (!hasMedia(db, a.sha)) errors.push(`Its file “${name}” is not kept here: add it again (assets)`);
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
+  // What a question starts from: a field of About you that is there, or the last answer; never for a file.
+  for (const x of Array.isArray(src.fields) ? src.fields : []) {
+    if (!x || typeof x !== 'object') continue;
+    const name = String(x.label || x.id || 'A question');
+    if (x.from !== undefined && x.from !== null && x.from !== '' && !fromField(x.from)) errors.push(`${name}: from names a field of About you: ${FROM_FIELDS.map((f) => `me.${f.id}`).join(', ')}`);
+    if (x.type === 'file' && (x.from || x.remember)) errors.push(`${name}: a file question starts empty (no from or remember)`);
+    else if (fromField(x.from) && x.remember === true) errors.push(`${name}: from or remember, not both`);
+  }
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
@@ -318,6 +328,15 @@ function routes(d: Deps) {
   });
 
   /** The apps pinned to the top of the Apps page, in their order: yours by id, ready-made ones as "tpl:<id>". */
+  // About you: the record apps start their questions from and steps read ({{me.units}}), as set and with what is not set worked out.
+  app.get('/api/apps/me', async () => aboutMe(db));
+  /** A change to it: only the fields given; null or empty clears one. */
+  app.put('/api/apps/me', async (req) => {
+    const b = req.body;
+    if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'Send the fields to change, as { "units": "metric" }');
+    return changeAboutMe(db, b);
+  });
+
   app.get('/api/apps/pins', async () => ({ ids: pinsOf(db) }));
 
   /** Pins these apps to the top of the Apps page, in this order, in place of those pinned before (every device shows the same). */
@@ -424,10 +443,12 @@ function routes(d: Deps) {
       const latest = listRuns(db, { app: id, limit: 20 }).find((x) => x.status === 'done' && !x.flow && !x.parent && x.source !== 'chat');
       return { view: getView(db, `app:${id}`), home: homeOf(db, d.scheduler, id, r), ...(latest ? { latest: latest.endedAt ?? latest.createdAt } : {}) };
     };
-    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template) };
+    // What its questions start from (About you, the last answers), for its form.
+    const starts = (id: string, r: AppRecipe) => (r.fields.some((f) => f.from || f.remember) ? { starts: startsFor(db, r.fields, id) } : {});
+    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
     const today = dayStart();
     const own = ownPage(a!.id, a!);
-    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own, ...starts(a!.id, a!) };
   });
 
   /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
@@ -490,6 +511,7 @@ function routes(d: Deps) {
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
+    forgetAnswers(db, a.id);
     unpinned(a.id);
     return { ok: true };
   });
@@ -632,6 +654,8 @@ function routes(d: Deps) {
       files: b.files && typeof b.files === 'object' ? b.files : undefined,
       // Another of its flows, by name (a screen's form or button).
       flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
+      // The language the page is in, which the run writes in.
+      lang: typeof b.lang === 'string' ? b.lang : undefined,
       // A try in the graph: steps it pauses before, and steps frozen at what they gave in an earlier try of the same template.
       ...(b.source === 'test' ? triedIn(db, b, a?.id ?? (template ? `tpl:${template.id}` : 'test')) : {}),
     });
@@ -679,7 +703,7 @@ function routes(d: Deps) {
       }
     }
     if (a && !test) checkDaily(db, a);
-    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}) });
+    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}), ...(old.lang ? { lang: old.lang } : {}) });
   };
 
   /** Why a run takes no follow-ups, or nothing when it does. */
@@ -851,6 +875,8 @@ function routes(d: Deps) {
       source: test ? 'test' : 'web',
       inputs: old.inputs,
       ...(old.flow ? { flow: old.flow } : {}),
+      // In the language it wrote in.
+      ...(old.lang ? { lang: old.lang } : {}),
       reuse: { run: old.id, steps: flow.steps.slice(0, k).map((s) => s.id) },
     });
     return { run: runView(r) };
