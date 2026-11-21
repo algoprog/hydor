@@ -203,12 +203,13 @@ export const APP_SERVICES: AppService[] = [
   {
     id: 'frankfurter',
     name: 'Frankfurter',
-    hosts: ['api.frankfurter.app'],
-    about: 'Exchange rates from the European Central Bank: today’s, a past day’s, or a range of days.',
+    hosts: ['api.frankfurter.dev'],
+    about: 'Exchange rates from central banks and official sources, for over 200 currencies: today’s, a past day’s, or a period of days.',
     keyless: true,
     examples: [
-      { what: 'Today’s rates from euros', url: 'https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY' },
-      { what: 'One rate over a month', url: 'https://api.frankfurter.app/2026-10-01..2026-10-31?from=USD&to=EUR' },
+      { what: 'One rate, today: { date, base, quote, rate }', url: 'https://api.frankfurter.dev/v2/rate/eur/usd' },
+      { what: 'Several rates from one currency', url: 'https://api.frankfurter.dev/v2/rates?base=eur&quotes=usd,gbp,jpy' },
+      { what: 'One rate over a period', url: 'https://api.frankfurter.dev/v2/rates?from=2026-10-01&to=2026-10-31&base=usd&quotes=eur' },
     ],
   },
 ];
