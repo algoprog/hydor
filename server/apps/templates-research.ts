@@ -893,6 +893,7 @@ const CITE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'mark', label: 'The mention', type: 'text' },
   { id: 'post', label: 'After the mention', type: 'text' },
   { id: 'influential', label: 'Builds on it heavily', type: 'yesno' },
+  { id: 'unread', label: 'Its sentence is still to be read', type: 'yesno' },
 ];
 const MY_PAPER_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'key', label: 'Paper id', type: 'text' },
@@ -918,7 +919,7 @@ const CITATION_ALERTS: Draft = {
   ],
   prompt: '',
   data: {
-    cited: { fields: fieldsOf({ title: 'text', citing: 'list', count: 'number' }), description: 'Each of your papers, by its key, with the papers seen citing it' },
+    cited: { fields: fieldsOf({ title: 'text', citing: 'list', count: 'number', pending: 'list' }), description: 'Each of your papers, by its key, with the papers seen citing it, and those whose citing sentence is still to be read' },
   },
   secrets: [S2_KEY, OPENALEX_KEY],
   flow: {
@@ -944,6 +945,7 @@ const plain = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').t
 const notes = [];
 let author = null;
 let papers = [];
+let viaOa = false;
 try {
   if (/^A\d{5,}$/i.test(me) || /openalex\.org\/A\d+/i.test(me)) throw new Error('an OpenAlex id');
   let id = /^\d{3,}$/.test(me) ? me : '';
@@ -960,7 +962,10 @@ try {
   const ps = await s2('author/' + id + '/papers?fields=title,year,venue,externalIds,citationCount,publicationDate,authors&limit=500', 'Read your papers');
   papers = rows(ps && ps.data).map((p) => Object.assign(fromS2(p), { year: p.year || null }));
 } catch (e) {
-  if (!/OpenAlex id/.test(e.message)) notes.push('Semantic Scholar did not answer (' + failedWhy(e) + '), so OpenAlex did, without the citing sentences');
+  if (!/OpenAlex id/.test(e.message)) {
+    viaOa = true;
+    notes.push('Semantic Scholar did not answer (' + failedWhy(e) + '), so OpenAlex did, without the citing sentences');
+  }
   const oaId = (/A\d{5,}/i.exec(me) || [])[0];
   let a = null;
   if (oaId) a = bodyOf(await keyed('https://api.openalex.org/authors/' + oaId.toUpperCase(), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
@@ -999,7 +1004,7 @@ const chosen = most.concat(latest).map((p) => ({
   arxiv: p.arxiv || '',
   first: String((p.authors || [])[0] || '').split(/\s+/).pop(),
 }));
-return { author: author, papers: chosen, all: papers.length, notes: notes.join('. ') };`,
+return { author: author, papers: chosen, all: papers.length, via_oa: viaOa ? 'yes' : '', notes: notes.join('. ') };`,
         outputs: [
           { id: 'author', label: 'You', type: 'text', description: 'name, id, where, citations, hindex, source' },
           {
@@ -1021,6 +1026,7 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
             ],
           },
           { id: 'all', label: 'Papers of yours', type: 'number' },
+          { id: 'via_oa', label: 'Found on OpenAlex, as Semantic Scholar did not answer', type: 'text' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1031,7 +1037,7 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
         do: 'code',
         language: 'javascript',
         seconds: 110,
-        with: { papers: '{{who.papers}}', seen: '{{seen.records}}', today: '{{today}}' },
+        with: { papers: '{{who.papers}}', seen: '{{seen.records}}', today: '{{today}}', via_oa: '{{who.via_oa}}' },
         code:
           LIST +
           HTTP +
@@ -1040,8 +1046,9 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
           String.raw`// For each of your papers, the papers citing it, newest first, with the sentences that cite it (Semantic Scholar's; a
 // paper it has not read has none): those not seen before are new. The first time a paper is looked at, only those of the
 // last month count as new (the rest are taken as seen). When Semantic Scholar is too busy, OpenAlex says who cited it,
-// without the sentences.
-const seen = new Map(rows(input.seen).map((r) => [String(r.id), new Set(list(r.citing).map(String))]));
+// without the sentences: those citations are shown (marked as without their sentence) and kept as still to be read, and
+// the next update, when Semantic Scholar answers, shows each again with its sentence.
+const seen = new Map(rows(input.seen).map((r) => [String(r.id), { set: new Set(list(r.citing).map(String)), pending: list(r.pending).map(String) }]));
 const today = String(input.today || '').slice(0, 10);
 const month = new Date(Date.parse(today) - 31 * 86400000).toISOString().slice(0, 10);
 const notes = [];
@@ -1052,17 +1059,18 @@ let s2Down = false;
 let oaCalls = 0;
 for (const mine of rows(input.papers)) {
   const before = seen.get(mine.key);
-  const known = before || new Set();
+  const known = before ? before.set : new Set();
+  const pending = new Set(before ? before.pending : []);
+  const hadPending = pending.size;
   let citing = [];
   let from = '';
   if (mine.s2 && !s2Down) {
     try {
-      const r = await s2('paper/' + mine.s2 + '/citations?fields=contexts,intents,isInfluential,title,authors,year,venue,externalIds,publicationDate&limit=' + (before ? 30 : 100), 'Who cited “' + clip(mine.title, 50) + '”');
+      const r = await s2('paper/' + mine.s2 + '/citations?fields=contexts,intents,isInfluential,title,authors,year,venue,externalIds,publicationDate&limit=' + (before && !pending.size ? 30 : 100), 'Who cited “' + clip(mine.title, 50) + '”');
       citing = rows(r && r.data).map((c) => Object.assign(fromS2(c.citingPaper || {}), { contexts: list(c.contexts).map(String), intents: list(c.intents).map(String), influential: !!c.isInfluential, year: (c.citingPaper || {}).year || null }));
       from = 's2';
     } catch (e) {
       s2Down = true;
-      notes.push('Semantic Scholar was too busy, so OpenAlex said who cited your papers, without the sentences');
     }
   }
   if (!from && oaCalls < (keyState.OPENALEX_API_KEY === false ? 12 : 60)) {
@@ -1087,30 +1095,45 @@ for (const mine of rows(input.papers)) {
   citing.sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const now = new Set(known);
   let n = 0;
+  // Citations from OpenAlex have no sentence; when Semantic Scholar was meant to give them (it knows your paper, or it
+  // answered for none of them), they stay to be read again.
+  const noSentence = from === 'oa' && (!!mine.s2 || String(input.via_oa) === 'yes');
+  const row = (c, key, extra) => Object.assign({ key: key, mine: mine.key, title: c.title, authors: byline(c.authors), venue: c.where || '', year: c.year || Number(String(c.date).slice(0, 4)) || null, date: /^\d{4}-\d{2}-\d{2}$/.test(String(c.date)) ? c.date : null, url: c.url || '', contexts: c.contexts.slice(0, 3), intents: c.intents.join(', '), influential: c.influential, first: mine.first, myYear: mine.year }, extra);
   for (const c of citing) {
     if (!c.title) continue;
     const key = paperKey(c);
+    // One seen without its sentence, now read: shown again with it.
+    if (from === 's2' && pending.has(key)) {
+      if (c.contexts.length) {
+        pending.delete(key);
+        n++;
+        if (fresh.length < 60) fresh.push(row(c, key, {}));
+      }
+      continue;
+    }
     if (known.has(key)) continue;
     now.add(key);
     // The first look at a paper: only last month's are news.
     if (!before && !(String(c.date) >= month)) continue;
     n++;
-    if (fresh.length < 60) fresh.push({ key: key, mine: mine.key, title: c.title, authors: byline(c.authors), venue: c.where || '', year: c.year || Number(String(c.date).slice(0, 4)) || null, date: /^\d{4}-\d{2}-\d{2}$/.test(String(c.date)) ? c.date : null, url: c.url || '', contexts: c.contexts.slice(0, 3), intents: c.intents.join(', '), influential: c.influential, first: mine.first, myYear: mine.year });
+    if (noSentence && pending.size < 200) pending.add(key);
+    if (fresh.length < 60) fresh.push(row(c, key, { unread: noSentence }));
   }
   counts[mine.key] = n;
-  if (now.size !== known.size || !before) keep.push({ id: mine.key, title: mine.title, citing: Array.from(now).slice(-1500), count: now.size, had: !!before });
+  if (now.size !== known.size || !before || pending.size !== hadPending) keep.push({ id: mine.key, title: mine.title, citing: Array.from(now).slice(-1500), count: now.size, pending: Array.from(pending), had: !!before });
 }
 // The citing sentences to sort, numbered.
 const sortable = fresh.filter((c) => c.contexts.length).slice(0, 40);
 const linesOut = sortable.map((c, i) => (i + 1) + '. Citing: ' + c.title + (c.intents ? ' (intents: ' + c.intents + ')' : '') + '\n' + c.contexts.map((t) => '   “' + clip(t, 500) + '”').join('\n'));
 sortable.forEach((c, i) => (c.n = i + 1));
-return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'), sorting: sortable.length, notes: notes.filter((x, i) => notes.indexOf(x) === i).join('. ') };`,
+return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'), sorting: sortable.length, unread: fresh.filter((c) => c.unread).length, notes: notes.filter((x, i) => notes.indexOf(x) === i).join('. ') };`,
         outputs: [
           { id: 'fresh', label: 'New citations', type: 'table', columns: [{ id: 'key', label: 'Paper id', type: 'text' }, { id: 'mine', label: 'Your paper', type: 'text' }, { id: 'title', label: 'Citing paper', type: 'text' }, { id: 'n', label: 'Number', type: 'number' }] },
           { id: 'counts', label: 'New for each paper', type: 'text' },
           { id: 'keep', label: 'Seen now', type: 'table', columns: [{ id: 'id', label: 'Your paper', type: 'text' }, { id: 'count', label: 'Citations seen', type: 'number' }] },
           { id: 'to_sort', label: 'The citing sentences', type: 'text' },
           { id: 'sorting', label: 'How many to sort', type: 'number' },
+          { id: 'unread', label: 'Citations whose sentence could not be read', type: 'number' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1133,7 +1156,7 @@ return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'
         title: 'Lay out who cited you',
         do: 'code',
         language: 'javascript',
-        with: { author: '{{who.author}}', papers: '{{who.papers}}', fresh: '{{cites.fresh}}', counts: '{{cites.counts}}', keep: '{{cites.keep}}', kinds: '{{sort.kinds}}', notes: '{{who.notes}}', more: '{{cites.notes}}', today: '{{today}}' },
+        with: { author: '{{who.author}}', papers: '{{who.papers}}', fresh: '{{cites.fresh}}', counts: '{{cites.counts}}', keep: '{{cites.keep}}', kinds: '{{sort.kinds}}', unread: '{{cites.unread}}', notes: '{{who.notes}}', more: '{{cites.notes}}', today: '{{today}}' },
         code:
           LIST +
           String.raw`// Each new citation with how it cites you, and its sentence split around the mention of your paper (its first author's
@@ -1178,12 +1201,12 @@ const citations = rows(input.fresh).map((c) => {
   const kind = KINDS.find((x) => String(k.kind || '').toLowerCase().indexOf(x) >= 0) || (list(c.contexts).length ? 'mentions' : '');
   const best = list(c.contexts).map(String).find((t) => split(t, c.first, c.myYear).mark) || list(c.contexts).map(String).sort((a, b) => b.length - a.length)[0] || '';
   const parts = split(best, c.first, c.myYear);
-  return { key: c.key, mine: c.mine, title: c.title, authors: c.authors, venue: c.venue, year: Number(c.year) || null, date: c.date || null, url: link(c.url), kind: kind, gist: String(k.gist || '').trim(), pre: parts.pre, mark: parts.mark, post: parts.post, influential: !!c.influential };
+  return { key: c.key, mine: c.mine, title: c.title, authors: c.authors, venue: c.venue, year: Number(c.year) || null, date: c.date || null, url: link(c.url), kind: kind, gist: String(k.gist || '').trim(), pre: parts.pre, mark: parts.mark, post: parts.post, influential: !!c.influential, unread: !!c.unread };
 });
 const papers = rows(input.papers).map((p) => ({ key: p.key, title: p.title, year: Number(p.year) || null, venue: p.venue, cited: Number(p.citations) || 0, new: Number(counts[p.key]) || 0, url: link(p.url) }));
 papers.sort((a, b) => b.new - a.new || b.cited - a.cited);
 for (const k of rows(input.keep)) {
-  const rec = { title: k.title, citing: list(k.citing), count: Number(k.count) || 0 };
+  const rec = { title: k.title, citing: list(k.citing), count: Number(k.count) || 0, pending: list(k.pending).map(String) };
   if (k.had) await ctx.data.update('cited', { id: k.id, set: rec, title: 'Keep the citations seen' });
   else await ctx.data.add('cited', Object.assign({ id: k.id }, rec), { title: 'Keep the citations seen' });
 }
@@ -1199,6 +1222,7 @@ return {
   papers: papers,
   checked: String(input.today || '').slice(0, 10),
   source: a.source || '',
+  sentences: Number(input.unread) > 0 ? 'The citing sentences could not be read this time (Semantic Scholar limits requests); they are tried again at the next update.' : '',
   note: [input.notes, input.more].filter(Boolean).join('. '),
 };`,
         outputs: [
@@ -1212,6 +1236,7 @@ return {
           { id: 'papers', label: 'Your papers', type: 'table', columns: MY_PAPER_COLS },
           { id: 'checked', label: 'Checked', type: 'date' },
           { id: 'source', label: 'Where from', type: 'text' },
+          { id: 'sentences', label: 'About the citing sentences', type: 'text' },
           { id: 'note', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1228,6 +1253,7 @@ return {
       citations: '{{report.citations}}',
       papers: '{{report.papers}}',
       source: '{{report.source}}',
+      sentences: '{{report.sentences}}',
       note: '{{report.note}}',
     },
   },
@@ -1242,6 +1268,7 @@ return {
     { id: 'citations', label: 'New citations', type: 'table', columns: CITE_COLS },
     { id: 'papers', label: 'Your papers', type: 'table', columns: MY_PAPER_COLS },
     { id: 'source', label: 'Where from', type: 'text' },
+    { id: 'sentences', label: 'About the citing sentences', type: 'text', description: 'Said only when they could not be read this time' },
     { id: 'note', label: 'What did not answer', type: 'text' },
   ],
   examples: [

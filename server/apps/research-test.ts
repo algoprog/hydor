@@ -378,6 +378,43 @@ test('Citation alerts: who cited each paper, new ones against those seen (the fi
 
 // ---- Hugging Face: New-model watch's programs ---------------------------------------------------------------------
 
+test('Citation alerts: when Semantic Scholar cannot give the citing sentences, OpenAlex says who cited, the answer says plainly that the sentences are to be read again, and those citations stay to be read: the next update shows each with its sentence', async () => {
+  const down: Route = (u) => (u.host === 'api.semanticscholar.org' ? { status: 403 } : null);
+  const mine = [{ key: 'axcolbert', title: 'ColBERT', s2: 'p1', oa: 'W2995', first: 'Khattab', year: 2020 }];
+  routes = [down, openAlexRoute];
+  const before = [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757'], count: 1 }];
+  const v = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const fresh = v.fresh as Record<string, unknown>[];
+  assert.ok(fresh.length > 0, 'OpenAlex gave citing papers');
+  assert.ok(fresh.every((c) => c.unread === true && (c.contexts as unknown[]).length === 0), 'each marked as without its sentence');
+  assert.equal(v.unread, fresh.length);
+  assert.equal(v.sorting, 0, 'no sentence to sort');
+  assert.doesNotMatch(String(v.notes), /too busy/, 'said in the answer’s own words, not among the notes');
+  const keep = (v.keep as Record<string, unknown>[])[0];
+  assert.deepEqual((keep.pending as string[]).slice().sort(), fresh.map((c) => c.key as string).sort(), 'kept as still to be read');
+  // What the answer says, and each citation marked.
+  const ctx = ctxOf();
+  ctx.data.set('cited', before.map((x) => ({ ...x })));
+  const r = await program('citation-alerts', 'report', { author: { name: 'Omar Khattab', source: 'Semantic Scholar' }, papers: [{ key: 'axcolbert', title: 'ColBERT', citations: 3000 }], fresh, counts: v.counts, keep: v.keep, unread: v.unread, kinds: [], notes: '', more: v.notes, today: '2026-11-05' }, ctx);
+  assert.equal(r.sentences, 'The citing sentences could not be read this time (Semantic Scholar limits requests); they are tried again at the next update.');
+  assert.ok((r.citations as Record<string, unknown>[]).every((c) => c.unread === true && c.kind === '' && c.gist === '' && c.mark === ''));
+  assert.deepEqual(ctx.data.get('cited')![0].pending, keep.pending, 'the record keeps what is to be read');
+  // Semantic Scholar answering: no such sentence is said; one it reads (not all of them have) is shown again with it, and leaves the list.
+  busyOnce.clear();
+  routes = [s2Route];
+  const base = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const withSentence = (base.fresh as Record<string, unknown>[]).filter((c) => (c.contexts as unknown[]).length).map((c) => c.key as string);
+  const all = (base.fresh as Record<string, unknown>[]).map((c) => c.key as string);
+  assert.ok(withSentence.length > 0 && withSentence.length < all.length, 'the fixture has some with a sentence, some without');
+  const again = await program('citation-alerts', 'cites', { papers: mine, seen: [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757', ...all], count: 4, pending: all }], today: '2026-11-05' }, ctxOf());
+  assert.deepEqual((again.fresh as Record<string, unknown>[]).map((c) => c.key).sort(), withSentence.slice().sort(), 'those with a sentence are shown again with it');
+  assert.ok((again.fresh as Record<string, unknown>[]).every((c) => !c.unread && (c.contexts as unknown[]).length > 0));
+  assert.equal(again.unread, 0);
+  assert.deepEqual(((again.keep as Record<string, unknown>[])[0].pending as string[]).sort(), all.filter((k) => !withSentence.includes(k)).sort(), 'the others stay to be read');
+  const quiet = await program('citation-alerts', 'report', { author: {}, papers: [], fresh: again.fresh, counts: again.counts, keep: again.keep, unread: again.unread, kinds: [], notes: '', more: '', today: '2026-11-05' }, ctxOf());
+  assert.equal(quiet.sentences, '');
+});
+
 test('New-model watch: the newest models, those old enough with downloads to look at (most downloaded first), those too new to wait; their pages and cards; the licence and size kept to', async () => {
   routes = [(u) => (u.host === 'huggingface.co' && u.pathname === '/api/models' ? fixture('hf-models.json') : null)];
   asked.length = 0;

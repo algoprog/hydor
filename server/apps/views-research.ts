@@ -200,10 +200,11 @@ const CITE_HEAD = String.raw`<header class="hero">
   </nav>{{/citations}}
 </header>`;
 
-const CITE_NEWS = String.raw`{{#papers}}{{#new}}<section class="mine">
+const CITE_NEWS = String.raw`{{#sentences}}<p class="note">{{sentences}}</p>{{/sentences}}
+{{#papers}}{{#new}}<section class="mine">
   <h2><span class="lbl">Your paper</span>{{title}}</h2>
   <div class="list">{{#citations|where:mine=$key|where:kind=$state.kind}}<article class="cite k-{{kind|slug}}">
-    <p class="top">{{#kind}}<span class="badge kb">{{kind}}</span>{{/kind}}{{#influential}}<span class="badge info">Builds on it heavily</span>{{/influential}}{{#gist}}<span class="gist">{{gist}}</span>{{/gist}}</p>
+    <p class="top">{{#unread}}<span class="gist">Sentence not read yet</span>{{/unread}}{{#kind}}<span class="badge kb">{{kind}}</span>{{/kind}}{{#influential}}<span class="badge info">Builds on it heavily</span>{{/influential}}{{#gist}}<span class="gist">{{gist}}</span>{{/gist}}</p>
     {{#mark}}<blockquote>{{pre}}<mark>{{mark}}</mark>{{post}}</blockquote>{{/mark}}{{^mark}}{{#pre}}<blockquote>{{pre}}</blockquote>{{/pre}}{{/mark}}
     <p class="who"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{title}}</a></p>
     <p class="by">{{authors}}{{#venue}} · {{venue}}{{/venue}}{{#year}} · {{year}}{{/year}}</p>
