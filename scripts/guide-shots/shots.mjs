@@ -245,16 +245,18 @@ export const SHOTS = [
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 1101 }),
   {
-    // A project's Memory tab on its Wiki part, in the project's details window: the articles of its wiki memory by area,
-    // an area's hub open, and what new documents did lately.
+    // A project's Memory tab on its Wiki chip, in the project's details window: the wiki's areas as chips, one area's
+    // list (its overview first, then its articles) and that overview open in the pane on the right.
     id: 'wiki-memory',
     height: 860,
     async take(p, ctx) {
       const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
       await ctx.go(`/projects/${id}/memory?part=wiki`, { settle: 2000 });
-      // One area folded, one area's hub open.
-      await p.click(`js:document.querySelector('[role="dialog"] button[aria-label="Research methods"]')`, { wait: 400 });
-      await p.click(button('Library use and services'), { wait: 900 });
+      // The area's chip (the first button with its name: the list's row comes after the chips), then its overview, the first row of its list.
+      const named = (which) =>
+        `js:[...document.querySelectorAll('[role="dialog"] button, [role="dialog"] [role="button"]')].filter((b) => b.textContent.trim().startsWith('Library use and services'))${which}`;
+      await p.click(named('[0]'), { wait: 900 });
+      await p.click(named('.pop()'), { wait: 900 });
       await p.park();
       return p.shot(ctx.file);
     },

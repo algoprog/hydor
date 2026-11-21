@@ -165,11 +165,11 @@ Pour ajouter des fichiers depuis un autre endroit de l’app, utilisez **Ajouter
 
 ### Mémoire
 
-Ce dont le projet se souvient, en trois parties, affichées une à la fois sous un commutateur : **Notes**, **Wiki** et **Documents**. Un lien vers une partie ouvre la fenêtre directement dessus, tout comme les adresses des anciens onglets Knowledge et LLM Wiki.
+Ce dont le projet se souvient, dans une seule liste : ses notes, les articles de son wiki et ses documents. Une zone de recherche en haut parcourt les trois à la fois, **Ajouter** permet d’ajouter une note, des fichiers ou un dossier à tenir à jour, et les pastilles **Tout**, **Notes**, **Wiki** et **Documents** restreignent la liste. Cliquez sur une ligne pour l’ouvrir à droite (sur un téléphone, elle prend la place de la liste). Un lien vers une pastille ouvre la fenêtre sur celle-ci, et il en va de même pour les adresses des anciens onglets Knowledge et LLM Wiki.
 
-- **Notes** : les notes de mémoire que les agents ont conservées sur le projet, telles que les liste [Paramètres → Mémoire](/settings?s=memory), avec **Ajouter une note** et un champ de recherche. Ce sont les brefs faits avec lesquels démarre chaque session du projet (voir [Mémoire](/guide/memory)).
-- **Wiki** : les articles et les sources de la mémoire wiki du projet, à lire, et les **Mises à jour récentes** issues des documents nouveaux et modifiés. Les agents l’écrivent ; vous le lisez ici (voir [Mémoire wiki](/guide/wiki-memory#a-projects-memory-tab)).
-- **Documents** : les documents propres au projet, que seules ses sessions consultent, et s’ils consultent aussi les connaissances partagées. Voir [Donner des documents propres à un projet](#give-a-project-documents-of-its-own). Les documents nouveaux et modifiés mettent aussi à jour les notes et le wiki du projet tant que la mémoire wiki et **Apprendre des nouveaux documents** sont activées (voir [Apprendre des nouveaux documents](/guide/wiki-memory#learn-from-new-documents)). Lorsqu’un projet a plus de documents que son wiki n’en lit (100 au départ), le wiki lit les documents épinglés, ceux que les agents ont le plus utilisés et les plus récents, jusqu’à ce nombre, et cette partie l’indique : « Son wiki lit 100 de ses 240 documents : les épinglés, les plus utilisés et les plus récents. Les agents les consultent tous. » Le menu **Plus** d’un document dans la liste propose **Lire dans la mémoire wiki** pour en épingler un (voir [Quand un projet a trop de documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Notes** : les notes de mémoire que des agents ont conservées sur le projet, telles que les liste [Paramètres → Mémoire](/settings?s=memory), avec le profil du projet en premier. Ce sont les faits brefs avec lesquels démarre chaque session du projet (voir [Mémoire](/guide/memory)).
+- **Wiki** : les articles et les sources de la mémoire wiki du projet, à lire. Les agents l’écrivent ; vous le lisez ici. Le menu **⋯** propose ses tâches et **Mises à jour du wiki…** (voir [Mémoire wiki](/guide/wiki-memory#a-projects-memory-tab)).
+- **Documents** : les documents propres au projet, que seules ses sessions consultent, et les dossiers qu’il tient à jour. Voir [Donner des documents en propre à un projet](#give-a-project-documents-of-its-own). Les documents nouveaux et modifiés mettent aussi à jour les notes et le wiki du projet tant que la mémoire wiki et **Apprendre des nouveaux documents** sont activées (voir [Apprendre des nouveaux documents](/guide/wiki-memory#learn-from-new-documents)). Lorsqu’un projet compte plus de documents que son wiki n’en lit (100 au départ), le wiki lit les documents épinglés, ceux que les agents ont le plus utilisés et les plus récents, jusqu’à ce nombre, et la pastille l’indique : « Son wiki lit 100 de ses 240 documents : les épinglés, les plus utilisés et les plus récents. Les agents les parcourent tous. » Cliquez sur un document et activez **Lire dans la mémoire wiki** pour l’épingler (voir [Quand un projet a trop de documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 
 ### Compétences
 
@@ -293,7 +293,7 @@ Un groupe est un projet qui réunit plusieurs projets, pour un travail qui les t
 
 Vous pouvez aussi transformer un projet existant en groupe : dans son onglet **Paramètres**, choisissez des projets sous **Les projets qu’il réunit** et cliquez sur **Enregistrer**. Modifiez les projets d’un groupe de la même façon. Retirez-les tous et il redevient un simple projet.
 
-L’onglet **Mémoire** d’un groupe, sous **Documents**, affiche aussi **Aussi les documents des projets qu’il regroupe** : chacun de ses projets, avec le nombre de documents qu’il contient. Cliquez sur l’un d’eux pour ouvrir les documents de ce projet. Son onglet **Compétences** affiche de la même façon **Aussi les compétences des projets qu’il réunit**.
+L’onglet **Mémoire** d’un groupe, sous sa pastille **Documents**, liste aussi **Également consultés :** chacun des projets qu’il réunit, avec son nombre de documents. Cliquez sur l’un d’eux pour ouvrir les documents de ce projet. Son onglet **Compétences** affiche de la même façon **Aussi les compétences des projets qu’il réunit**.
 
 ### Limites
 
@@ -383,7 +383,7 @@ Chaque lien est un long code aléatoire qui ouvre un projet pour une personne. U
 Les agents peuvent rechercher dans des documents que vous ajoutez une seule fois : contrats, manuels, notes, articles, un dossier entier. Ils trouvent des passages d’après leurs mots ou leur sens, et citent le fichier et la page qu’ils ont lus. Les documents sont conservés dans des **bases de connaissances** : des collections nommées de fichiers que vous y avez déposés et de dossiers de cet ordinateur.
 
 - **Connaissances partagées** ([la page Connaissances partagées](/knowledge)) : chaque session y cherche, y compris dans un projet, sauf si le projet le désactive.
-- **Les connaissances propres à un projet**, dans son onglet **Mémoire**, sous **Documents** : seules les sessions de ce projet y cherchent, ainsi que celles d’un groupe qui intègre le projet.
+- **Les connaissances propres à un projet**, dans son onglet **Mémoire** (la pastille **Documents**) : seules les sessions de ce projet les consultent, ainsi que celles d’un groupe qui réunit ce projet.
 
 Les Connaissances partagées forment une page à part, sans colonne de projets à côté. Pour l’ouvrir, cliquez sur **Connaissances partagées** dans le texte en haut de [Paramètres → Mémoire](/settings?s=memory), ou saisissez « connaissances partagées » dans la zone de recherche (Ctrl+K).
 
@@ -445,13 +445,14 @@ Le bouton ⋯ (**Plus**) en haut à droite d’une base de connaissances ouvre s
 
 ## Donner à un projet ses propres documents
 
-Ouvrez les détails du projet, allez dans son onglet **Mémoire** et choisissez **Documents**.
+Ouvrez les détails du projet, allez dans son onglet **Mémoire** et choisissez la pastille **Documents**.
 
-- **Rechercher aussi dans les connaissances partagées** est un interrupteur, activé par défaut. Désactivez-le et les sessions du projet ne recherchent que dans les documents propres au projet (et, dans un groupe, dans ceux de ses projets). La ligne située dessous indique combien de documents partagés existent, avec un lien **Connaissances partagées**.
-- Tant qu’il n’y a aucun document, déposez des documents ou un dossier dans la zone, ou choisissez-les : une base de connaissances portant le nom du projet est créée pour les accueillir. **Commencer plutôt par un dossier de cet ordinateur** crée une base vide, portant le nom du projet, à laquelle ajouter un dossier.
-- Dès qu’il y a des documents, l’onglet affiche un champ de recherche (voir [Faire une recherche vous-même](#try-a-search-yourself)), les bases de connaissances du projet avec les mêmes cartes et les mêmes menus que les bases partagées, et **Nouvelle base de connaissances** en bas.
+- Ajoutez des documents avec **Ajouter** → **Fichiers…**, ou déposez des fichiers ou un dossier n’importe où dans l’onglet : une base de connaissances portant le nom du projet est créée pour eux, et les documents rejoignent la liste. **Ajouter** → **Un dossier à garder à jour…** (ou **Ajouter un dossier** sous la pastille) lit un dossier de cet ordinateur à l’endroit où il se trouve, comme dans [Ajouter un dossier sur cet ordinateur](#add-a-folder-on-this-computer) ; un × à côté d’un dossier arrête sa lecture, après confirmation. Tant qu’il n’y a aucun document, la pastille sert de zone de dépôt, avec **Ajouter un dossier à garder à jour** en dessous.
+- Chaque document est une ligne (« Document · 12 passages · 2,1 Mo · lu hier »). Cliquez dessus pour voir d’où il vient, son format, sa taille et ses passages, la date de sa lecture, ainsi que **Ouvrir**, **Retirer** (pour un fichier que vous avez ajouté : cela supprime la copie conservée par Hydor) et **Lire dans la mémoire wiki**. **Relire les documents**, dans le menu **⋯**, relit aussitôt les fichiers et les dossiers.
+- Le champ de recherche au-dessus de la liste explore les documents en même temps que les notes et le wiki du projet (voir [Essayer une recherche vous-même](#try-a-search-yourself)).
+- Le fait que les sessions du projet consultent aussi les connaissances partagées se règle par un interrupteur de son onglet **Paramètres**, **Rechercher aussi dans les connaissances partagées**, activé tant que vous ne le désactivez pas : désactivé, elles ne consultent que les documents propres au projet (et, dans un groupe, ceux de ses projets). La ligne en dessous indique combien de documents partagés existent, avec un lien **Connaissances partagées**.
 
-Une base de connaissances partagée peut être déplacée dans un projet depuis son menu (**Déplacer vers**), et inversement.
+Une base de connaissances peut être déplacée dans un projet depuis son menu sur la page Connaissances partagées (**Déplacer vers**), et inversement. L’index de recherche propre au wiki, une base appelée « Wiki du projet », n’apparaît pas parmi les documents d’un projet.
 
 ## Comment les agents recherchent dans vos documents
 
@@ -473,9 +474,9 @@ Un agent recherche par les mots et par le sens ensemble, sauf s’il en demande 
 
 ### Faire une recherche vous-même
 
-Au-dessus des bases de connaissances, un champ indique « Essayez une recherche, comme les agents : une question, ou “mots exacts” entre guillemets ». Saisissez votre recherche et appuyez sur Entrée. Jusqu’à 10 passages reviennent, chacun avec son fichier et sa page, sa base de connaissances et la manière dont il a été trouvé : **par les mots**, **par le sens**, ou les deux, ou **par le texte exact** pour un texte exact. Cliquez sur l’un d’eux pour ouvrir le fichier.
+Sur la page Connaissances partagées, au-dessus des bases de connaissances, un champ indique « Essayez une recherche, comme le font les agents : une question, ou des « mots exacts » entre guillemets ». Saisissez votre recherche et appuyez sur Entrée. Jusqu’à 10 passages reviennent, chacun avec son fichier et sa page, sa base de connaissances et la façon dont il a été trouvé : **par les mots**, **par le sens**, ou les deux, ou **par texte exact** pour un texte exact. Cliquez sur l’un d’eux pour ouvrir le fichier.
 
-Sur la page Connaissances partagées, la recherche porte sur ce que recherche une session hors de tout projet. Dans la partie Documents d’un projet (son onglet **Mémoire**), elle porte sur ce que recherche une session de ce projet.
+Sur la page Connaissances partagées, ce champ cherche ce que cherche une session extérieure à tout projet. Dans un projet, le champ de recherche de son onglet **Mémoire** cherche ensemble dans les notes, le wiki et les documents du projet, et jamais dans les connaissances partagées.
 
 ## Quelles sessions recherchent dans quelles connaissances
 

@@ -4,9 +4,11 @@
 // stays). A stopped job says where it stopped, with Continue; a failed one says why, with Try again; a finished one says what it made.
 // The 'card' variant is for the card of a session that waits for its project's memory: compact, no frame of its own and no buttons
 // (the card has its own Start now and Stop building). Under 480 px wide the buttons are full width and 44 px tall.
-import { Check, X } from 'lucide-react';
+// The 'bar' variant is one line for a project's Memory tab: what it is doing, about how long is left, a thin bar, its action
+// (Stop, Continue, Try again, or × once it ended) and Details, which shows the steps.
+import { Check, ChevronDown, RefreshCw, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button, IconButton, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, IconButton, Throbber, useConfirm } from '../../components/ui';
 import { enc, post } from '../../lib/api';
 import { toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
@@ -91,12 +93,16 @@ const titleOf = (job: WikiJob) =>
         : tr('Updating the wiki');
 const phoneBtn = 'max-[479px]:min-h-11 max-[479px]:w-full';
 
-export function WikiJobProgress({ project, variant = 'panel', onStopped }: { project: string; variant?: 'panel' | 'card'; onStopped?: () => void }) {
-  const [job, refresh] = useWikiJob(project, true);
+/** `shared`: the job and its refresh, when the page already follows the job (it then is not asked for twice). */
+export function WikiJobProgress({ project, variant = 'panel', onStopped, shared }: { project: string; variant?: 'panel' | 'card' | 'bar'; onStopped?: () => void; shared?: [WikiJob | null, () => void] }) {
+  const own = useWikiJob(project, !shared);
+  const [job, refresh] = shared ?? own;
+  const [details, setDetails] = useState(false);
   const [ask, confirmNode] = useConfirm();
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState(false);
   const card = variant === 'card';
+  const bar = variant === 'bar';
   useEffect(() => setGone(false), [project, job?.startedAt]);
   if (!job || job.state === 'idle' || job.kind === 'reorganise' || gone) return null;
   if (!card && job.state !== 'running' && wasDismissed(project, job)) return null;
@@ -143,6 +149,97 @@ export function WikiJobProgress({ project, variant = 'panel', onStopped }: { pro
       {text}
     </p>
   );
+  const stepsNode = (
+    <>
+      <ul className="space-y-1.5 text-[13px]">
+        {shown.map((s, i) => {
+          const state = s.done >= s.total ? 'done' : i === firstOpen ? 'now' : 'later';
+          return (
+            <li key={`${s.id}${s.essential}`} className={`flex items-start gap-2 leading-snug ${state === 'later' ? 'text-fg-3' : ''}`}>
+              <Dot state={state} />
+              <span className="min-w-0 break-words">{stepLabel(s, build)}</span>
+            </li>
+          );
+        })}
+        {later.length > 0 && (
+          <li className="flex items-start gap-2 leading-snug text-fg-3">
+            <Dot state="later" />
+            <span className="min-w-0 break-words">{tr(`Later, in the background: ${laterLine(later)}`)}</span>
+          </li>
+        )}
+        {allRead &&
+          after.map((s) => (
+            <li key={s.id} className={`flex items-start gap-2 leading-snug ${s.done >= s.total ? '' : 'text-fg-3'}`}>
+              <Dot state={s.done >= s.total ? 'done' : s.id === 'organise' || after[0].done >= after[0].total ? 'now' : 'later'} />
+              <span className="min-w-0 break-words">{stepLabel(s, build)}</span>
+            </li>
+          ))}
+      </ul>
+      {!!p?.current.length && (
+        <p className="text-[12.5px] leading-snug break-words text-fg-3">
+          <span>{tr('Reading now')}</span>: <span translate="no">{p.current.join(' · ')}</span>
+        </p>
+      )}
+    </>
+  );
+  if (bar) {
+    const quiet = 'h-7 !px-2 text-[12.5px]';
+    const line = running ? (left ? timeLeft(left) : '') : job.state === 'stopped' ? (resumable ? tr(`Stopped at ${job.done} of ${job.total}`) : tr('Stopped')) : job.state === 'failed' ? (job.error ?? '') : (job.did ?? []).slice(0, 1).join(' · ');
+    const open = details && (running || job.state === 'failed');
+    return (
+      <section aria-label={titleOf(job)} className="relative overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[12.5px]">
+          {running ? <Throbber size={14} /> : job.state === 'failed' ? <TriangleAlert size={14} className="shrink-0 text-err" /> : job.state === 'done' ? <Check size={14} className="shrink-0 text-ok" /> : <RefreshCw size={14} className="shrink-0 text-fg-3" />}
+          <span className="min-w-0 flex-1 truncate" title={job.state === 'failed' ? job.error : undefined}>
+            <span className="font-medium">{titleOf(job)}</span>
+            {line && (
+              <span translate={running || job.state === 'stopped' ? undefined : 'no'} className={job.state === 'failed' ? 'text-err' : 'text-fg-3'}>
+                {' · '}
+                {line}
+              </span>
+            )}
+          </span>
+          {(running || job.state === 'failed') && (
+            <Button size="sm" variant="ghost" className={cx(quiet, 'gap-0.5')} aria-expanded={open} onClick={() => setDetails((d) => !d)}>
+              Details
+              <ChevronDown size={12} className={open ? 'rotate-180' : ''} />
+            </Button>
+          )}
+          {running && (
+            <Button size="sm" variant="ghost" className={quiet} disabled={busy} onClick={() => void stop()}>
+              Stop
+            </Button>
+          )}
+          {job.state === 'stopped' && resumable && (
+            <Button size="sm" variant="ghost" className={cx(quiet, 'text-accent')} disabled={busy} onClick={() => void act(`${base}/continue`)}>
+              Continue
+            </Button>
+          )}
+          {job.state === 'failed' && (
+            <Button size="sm" variant="ghost" className={quiet} disabled={busy} onClick={() => void tryAgain()}>
+              Try again
+            </Button>
+          )}
+          {!running && (
+            <IconButton label={tr('Dismiss')} size="sm" onClick={dismiss}>
+              <X size={14} />
+            </IconButton>
+          )}
+        </div>
+        {running && (
+          <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={titleOf(job)} className="h-[3px] bg-bg-2">
+            <span className="block h-full bg-accent transition-[width] duration-500" style={{ width: `${Math.max(pct, 2)}%` }} />
+          </div>
+        )}
+        {open && (
+          <div className="space-y-2.5 border-t border-line px-3 py-2.5">
+            {running ? stepsNode : <p role="alert" translate="no" className="text-[12.5px] leading-snug break-words text-err">{job.error ?? ''}</p>}
+          </div>
+        )}
+        {confirmNode}
+      </section>
+    );
+  }
   return (
     <section aria-label={titleOf(job)} className={card ? 'space-y-2.5' : 'space-y-2.5 rounded-xl border border-line bg-panel p-3'}>
       <div className="flex items-center gap-2">
@@ -160,35 +257,7 @@ export function WikiJobProgress({ project, variant = 'panel', onStopped }: { pro
           <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={titleOf(job)} className="h-1.5 overflow-hidden rounded-full bg-bg-2">
             <span className="block h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.max(pct, 2)}%` }} />
           </div>
-          <ul className="space-y-1.5 text-[13px]">
-            {shown.map((s, i) => {
-              const state = s.done >= s.total ? 'done' : i === firstOpen ? 'now' : 'later';
-              return (
-                <li key={`${s.id}${s.essential}`} className={`flex items-start gap-2 leading-snug ${state === 'later' ? 'text-fg-3' : ''}`}>
-                  <Dot state={state} />
-                  <span className="min-w-0 break-words">{stepLabel(s, build)}</span>
-                </li>
-              );
-            })}
-            {later.length > 0 && (
-              <li className="flex items-start gap-2 leading-snug text-fg-3">
-                <Dot state="later" />
-                <span className="min-w-0 break-words">{tr(`Later, in the background: ${laterLine(later)}`)}</span>
-              </li>
-            )}
-            {allRead &&
-              after.map((s) => (
-                <li key={s.id} className={`flex items-start gap-2 leading-snug ${s.done >= s.total ? '' : 'text-fg-3'}`}>
-                  <Dot state={s.done >= s.total ? 'done' : s.id === 'organise' || after[0].done >= after[0].total ? 'now' : 'later'} />
-                  <span className="min-w-0 break-words">{stepLabel(s, build)}</span>
-                </li>
-              ))}
-          </ul>
-          {!!p?.current.length && (
-            <p className="text-[12.5px] leading-snug break-words text-fg-3">
-              <span>{tr('Reading now')}</span>: <span translate="no">{p.current.join(' · ')}</span>
-            </p>
-          )}
+          {stepsNode}
           {card && <p className="text-[12.5px] leading-snug text-fg-3">{tr('You can close the app: it keeps going.')}</p>}
           {!card && (
             <div className="flex flex-wrap gap-2 max-[479px]:flex-col">
@@ -226,6 +295,7 @@ export function WikiJobProgress({ project, variant = 'panel', onStopped }: { pro
         </>
       )}
       {job.state === 'done' && status(<span translate="no">{(job.did ?? []).slice(0, 1).join(' · ')}</span>)}
+      {confirmNode}
     </section>
   );
 }

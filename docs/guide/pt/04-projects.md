@@ -165,11 +165,11 @@ Para adicionar arquivos de outros lugares do app, use **Adicionar a um projeto**
 
 ### Memória
 
-O que o projeto lembra, em três partes, uma de cada vez sob uma chave: **Notas**, **Wiki** e **Documentos**. Um link para uma parte abre a janela nela, e os endereços das antigas abas Knowledge e LLM Wiki também.
+O que o projeto lembra, em uma lista: as notas, os artigos da wiki e os documentos dele. Uma caixa de busca no topo pesquisa nos três de uma vez, **Adicionar** coloca uma nota, arquivos ou uma pasta para manter atualizada, e as etiquetas **Todos**, **Notas**, **Wiki** e **Documentos** restringem a lista. Clique em uma linha para abri-la à direita (no celular, ela ocupa o lugar da lista). Um link para uma etiqueta abre a janela nela, e os endereços das antigas abas Knowledge e LLM Wiki também.
 
-- **Notas**: as notas de memória que os agentes guardaram sobre o projeto, como lista [Configurações → Memória](/settings?s=memory), com **Adicionar uma nota** e um campo de busca. São os fatos curtos com que toda sessão do projeto começa (veja [Memória](/guide/memory)).
-- **Wiki**: os artigos e as fontes da memória wiki do projeto, para ler, e **Atualizações recentes** de documentos novos e alterados. Os agentes a escrevem; você a lê aqui (veja [Memória wiki](/guide/wiki-memory#a-projects-memory-tab)).
-- **Documentos**: os documentos do próprio projeto, que só as sessões dele pesquisam, e se elas pesquisam também o Conhecimento compartilhado. Veja [Dar documentos próprios a um projeto](#give-a-project-documents-of-its-own). Documentos novos e alterados também atualizam as notas e a wiki do projeto enquanto a Memória wiki e **Aprender com novos documentos** estão ativadas (veja [Aprender com novos documentos](/guide/wiki-memory#learn-from-new-documents)). Um projeto com mais documentos do que a wiki dele lê (100 no começo) faz a wiki ler os fixados, os que os agentes mais usaram e os mais novos, até esse número, e esta parte avisa: “A wiki dele lê 100 dos 240 documentos: os fixados, os mais usados e os mais novos. Os agentes pesquisam todos.” O menu **Mais** de um documento na lista tem **Ler na memória wiki** para fixar um (veja [Quando um projeto tem documentos demais](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Notas**: as notas de memória que os agentes guardaram sobre o projeto, como [Configurações → Memória](/settings?s=memory) as lista, com o perfil do projeto primeiro. São os fatos curtos com que toda sessão do projeto começa (veja [Memória](/guide/memory)).
+- **Wiki**: os artigos e as fontes da memória wiki do projeto, para ler. Os agentes a escrevem; você a lê aqui. O menu **⋯** tem as tarefas dela e **Atualizações da wiki…** (veja [Memória wiki](/guide/wiki-memory#a-projects-memory-tab)).
+- **Documentos**: os documentos do próprio projeto, que só as sessões dele pesquisam, e as pastas que ele mantém atualizadas. Veja [Dar documentos próprios a um projeto](#give-a-project-documents-of-its-own). Documentos novos e alterados também atualizam as notas e a wiki do projeto enquanto a Memória wiki e **Aprender com novos documentos** estão ativadas (veja [Aprender com novos documentos](/guide/wiki-memory#learn-from-new-documents)). Em um projeto com mais documentos do que a wiki lê (100 no início), a wiki lê os fixados, os mais usados pelos agentes e os mais novos, até esse número, e a etiqueta avisa: “A wiki dele lê 100 dos seus 240 documentos: os fixados, os mais usados e os mais recentes. Os agentes pesquisam em todos.” Clique em um documento e ative **Ler na memória wiki** para fixá-lo (veja [Quando um projeto tem documentos demais](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 
 ### Habilidades
 
@@ -293,7 +293,7 @@ Um grupo é um projeto que reúne vários projetos, para um trabalho que passa p
 
 Você também pode transformar um projeto existente em um grupo: na aba **Configurações** dele, escolha projetos em **Os projetos que ele reúne** e clique em **Salvar**. Mude os projetos de um grupo do mesmo jeito. Tire todos e ele volta a ser um projeto simples.
 
-A aba **Memória** de um grupo, em **Documentos**, também mostra **Também os documentos dos projetos que ele reúne**: cada um dos projetos, com quantos documentos tem. Clique em um para abrir os documentos desse projeto. A aba **Habilidades** dele mostra **Também as habilidades dos projetos que ele reúne** do mesmo jeito.
+A aba **Memória** de um grupo, abaixo do chip **Documentos**, também lista **Também pesquisado:** cada um dos projetos que ele reúne, com quantos documentos tem. Clique em um para abrir os documentos desse projeto. A aba **Habilidades** dele mostra **Também as habilidades dos projetos que ele reúne** do mesmo modo.
 
 ### Limites
 
@@ -383,7 +383,7 @@ Cada link é um código aleatório longo que abre um projeto para uma pessoa. Um
 Os agentes podem pesquisar documentos que você adiciona uma vez: contratos, manuais, notas, artigos, uma pasta inteira. Eles encontram trechos pelas palavras ou pelo significado, e citam o arquivo e a página que leram. Os documentos ficam em **bases de conhecimento**: coleções com nome de arquivos que você soltou e de pastas deste computador.
 
 - **Conhecimento compartilhado** ([a página Conhecimento compartilhado](/knowledge)): toda sessão o pesquisa, também em um projeto, a menos que o projeto desative isso.
-- **O conhecimento próprio de um projeto**, na aba **Memória** dele, em **Documentos**: só as sessões desse projeto o pesquisam, e as sessões de um grupo que reúne o projeto.
+- **O conhecimento próprio de um projeto**, na aba **Memória** dele (o chip **Documentos**): só as sessões desse projeto o pesquisam, e as sessões de um grupo que reúne o projeto.
 
 O Conhecimento compartilhado é uma página própria, sem coluna de projetos ao lado. Para abri-la, clique em **Conhecimento compartilhado** no texto no topo de [Configurações → Memória](/settings?s=memory), ou digite "conhecimento compartilhado" na caixa de busca (Ctrl+K).
 
@@ -445,13 +445,14 @@ O botão ⋯ (**Mais**) no canto superior direito de uma base de conhecimento ab
 
 ## Dar documentos próprios a um projeto
 
-Abra os detalhes do projeto, vá até a aba **Memória** e escolha **Documentos**.
+Abra os detalhes do projeto, vá até a aba **Memória** e escolha o chip **Documentos**.
 
-- **Pesquisar também o conhecimento compartilhado** é uma chave, ativada a menos que você a desative. Desative-a e as sessões do projeto pesquisam apenas os documentos do próprio projeto (e, em um grupo, os dos projetos dele). A linha abaixo dela informa quantos documentos compartilhados existem, com um link para **Conhecimento compartilhado**.
-- Sem nenhum documento ainda, solte documentos ou uma pasta na caixa, ou escolha-os: uma base de conhecimento com o nome do projeto é criada para eles. **Começar com uma pasta deste computador** cria uma base vazia, com o nome do projeto, para você adicionar uma pasta.
-- Quando já tiver documentos, a aba mostra uma caixa de busca (veja [Faça uma busca você mesmo](#try-a-search-yourself)), as bases de conhecimento do projeto, com os mesmos cartões e menus das compartilhadas, e **Nova base de conhecimento** no final.
+- Adicione documentos com **Adicionar** → **Arquivos…**, ou solte arquivos ou uma pasta em qualquer lugar da aba: uma base de conhecimento com o nome do projeto é criada para eles, e os documentos entram na lista. **Adicionar** → **Uma pasta para manter atualizada…** (ou **Adicionar uma pasta** sob o chip) lê uma pasta deste computador no lugar onde ela está, como em [Adicionar uma pasta neste computador](#add-a-folder-on-this-computer); um × ao lado de uma pasta para de lê-la, depois de perguntar. Sem nenhum documento ainda, o chip é uma área para soltar arquivos, com **Adicionar uma pasta para manter atualizada** embaixo.
+- Cada documento é uma linha ("Documento · 12 trechos · 2,1 MB · lido ontem"). Clique nela para ver de onde ele vem, o formato, o tamanho e os trechos, quando foi lido, **Abrir**, **Remover** (para um arquivo que você adicionou: isso exclui a cópia que o Hydor guardou) e **Ler na memória wiki**. **Ler os documentos novamente**, no menu **⋯**, lê os arquivos e as pastas de novo na hora.
+- A caixa de busca acima da lista pesquisa os documentos junto com as notas e a wiki do projeto (veja [Faça uma busca você mesmo](#try-a-search-yourself)).
+- Se as sessões do projeto também pesquisam o conhecimento compartilhado é uma opção na aba **Configurações** dele, **Pesquisar também o conhecimento compartilhado**, ativada a menos que você a desative: desativada, elas pesquisam apenas os documentos do próprio projeto (e, em um grupo, os dos projetos dele). A linha abaixo diz quantos documentos compartilhados existem, com um link para **Conhecimento compartilhado**.
 
-Uma base de conhecimento compartilhada pode ser movida para um projeto a partir do menu dela (**Mover para**), e de volta.
+Uma base de conhecimento pode ser movida para um projeto a partir do menu dela na página Conhecimento compartilhado (**Mover para**), e de volta. O índice de busca da própria wiki, uma base chamada "Project wiki", não aparece na lista de documentos de um projeto.
 
 ## Como os agentes pesquisam seus documentos
 
@@ -473,9 +474,9 @@ Um agente pesquisa por palavras e por significado ao mesmo tempo, a menos que pe
 
 ### Faça uma busca você mesmo
 
-Acima das bases de conhecimento, um campo diz “Faça uma busca, como os agentes: uma pergunta, ou “palavras exatas” entre aspas”. Digite e pressione Enter. Voltam até 10 trechos, cada um com o arquivo e a página, a base de conhecimento e como foi encontrado: **por palavras**, **por significado**, ou ambos, ou **por texto exato** para texto exato. Clique em um para abrir o arquivo.
+Na página Conhecimento compartilhado, acima das bases de conhecimento, um campo diz "Faça uma busca, como os agentes: uma pergunta, ou “palavras exatas” entre aspas". Digite e pressione Enter. Voltam até 10 trechos, cada um com o arquivo e a página, a base de conhecimento e como foi encontrado: **por palavras**, **por significado**, ou ambos, ou **por texto exato** para texto exato. Clique em um para abrir o arquivo.
 
-Na página Conhecimento compartilhado, ele pesquisa o que uma sessão fora de qualquer projeto pesquisa. Na parte Documentos de um projeto (a aba **Memória** dele), ele pesquisa o que uma sessão desse projeto pesquisa.
+Na página Conhecimento compartilhado, esse campo pesquisa o que uma sessão fora de qualquer projeto pesquisa. Em um projeto, a caixa de busca da aba **Memória** dele pesquisa as notas, a wiki e os documentos do próprio projeto juntos, e nunca o conhecimento compartilhado.
 
 ## Quais sessões pesquisam qual conhecimento
 

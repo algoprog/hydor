@@ -61,7 +61,7 @@ function titles(d: Pick<Deps, 'sessions'>) {
   };
 }
 
-function labelled(d: Pick<Deps, 'sessions'>, list: MemoryEntry[]): MemoryListEntry[] {
+export function labelled(d: Pick<Deps, 'sessions'>, list: MemoryEntry[]): MemoryListEntry[] {
   const title = titles(d);
   return list.map((e) => ({
     ...e,
@@ -228,7 +228,13 @@ export function memoryRoutes(d: Deps) {
     if (q.stale === '1') return { entries: labelled(d, staleEntries(db, { limit: 100 })) };
     const text = q.q?.trim();
     if (text && status === 'active' && !ids) {
-      const places = scope ? (db.prepare('select distinct scope, scope_key as scopeKey from memory_entries where scope = ?').all(scope) as { scope: MemoryScope; scopeKey: string }[]) : 'all';
+      // One place (a project's notes) is searched alone: searching them all and keeping its notes after would lose its matches to the others'.
+      const places =
+        scope && q.key != null
+          ? [{ scope, scopeKey: q.key }]
+          : scope
+            ? (db.prepare('select distinct scope, scope_key as scopeKey from memory_entries where scope = ?').all(scope) as { scope: MemoryScope; scopeKey: string }[])
+            : 'all';
       const found = await findNotes(db, { places, query: text, limit: 100, kinds, mode: 'all' });
       return { entries: labelled(d, found.map((f) => f.entry).filter((e) => q.key == null || e.scopeKey === q.key)) };
     }

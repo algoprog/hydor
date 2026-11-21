@@ -9,6 +9,7 @@ import type { KnowledgeBase, KnowledgeDoc, KnowledgeSource } from '../../shared/
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
+import { isWikiBase } from '../wiki/knowledge/bindings.ts';
 
 export const KNOWLEDGE_DIR = () => path.join(config.dataDir, 'knowledge');
 export const filesDir = (base: string) => path.join(KNOWLEDGE_DIR(), base.replace(/[^a-z0-9]/g, ''), 'files');
@@ -99,6 +100,7 @@ export function baseView(db: DB, r: BaseRow, indexing?: { done: number; total: n
     errors,
     indexing,
     indexedAt: r.indexed_at ?? undefined,
+    ...(isWikiBase(db, r.id) ? { wiki: true } : {}),
   };
 }
 

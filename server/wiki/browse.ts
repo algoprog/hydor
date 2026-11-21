@@ -4,18 +4,29 @@ import path from 'node:path';
 import { readWiki } from './core.ts';
 import { wikiFileActive } from './knowledge/bindings.ts';
 
-export interface WikiEntry { path: string; title: string }
+export interface WikiEntry { path: string; title: string; updated?: number; summary?: string }
 
-/** The `title:` of a document's frontmatter, without its quotes ("Bob's guide" stays whole). */
-export function titleOf(content: string): string {
+/** A frontmatter field's one-line value, without its quotes ("Bob's guide" stays whole); empty when it is not there. */
+function frontValue(content: string, key: string): string {
   const front = /^---\s*\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1];
-  const value = front && /^title\s*:[ \t]*(.+?)[ \t]*$/im.exec(front)?.[1];
+  const value = front && new RegExp(`^${key}\\s*:[ \\t]*(.+?)[ \\t]*$`, 'im').exec(front)?.[1];
   if (!value) return '';
   if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
     try { return String(JSON.parse(value)).trim(); } catch { /* not JSON: take it as written */ }
   }
   const quoted = /^(["'])([\s\S]*)\1$/.exec(value);
   return (quoted ? quoted[2] : value).trim();
+}
+
+/** The `title:` of a document's frontmatter, without its quotes ("Bob's guide" stays whole). */
+export function titleOf(content: string): string {
+  return frontValue(content, 'title');
+}
+
+/** The `summary:` of a document's frontmatter, unquoted, cut to 200 characters; empty without one. */
+export function summaryOf(content: string): string {
+  const text = frontValue(content, 'summary').replace(/\s+/g, ' ');
+  return text.length > 200 ? `${text.slice(0, 199).trimEnd()}…` : text;
 }
 
 /** List active Markdown articles and source notes, without opening hidden or linked directories. */
@@ -43,7 +54,8 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
         try {
           if (!wikiFileActive(root, path.join(root, name))) continue;
           const document = readWiki(root, name);
-          out.push({ path: name, title: titleOf(document.content) || entry.name.replace(/\.md$/i, '') });
+          const summary = summaryOf(document.content);
+          out.push({ path: name, title: titleOf(document.content) || entry.name.replace(/\.md$/i, ''), updated: Math.round(fs.statSync(path.join(root, name)).mtimeMs), ...(summary ? { summary } : {}) });
         } catch {
           // Inactive, inaccessible or unsafe documents are not listed.
         }

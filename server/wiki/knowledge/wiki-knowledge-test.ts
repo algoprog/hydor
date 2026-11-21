@@ -6,7 +6,7 @@ import path from 'node:path';
 import { openDb, kvSet } from '../../db.ts';
 import { progress, scanSoon } from '../../knowledge/indexer.ts';
 import { searchKnowledge } from '../../knowledge/search.ts';
-import { docsOf } from '../../knowledge/store.ts';
+import { baseRow, baseView, createBase, docsOf } from '../../knowledge/store.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './index.ts';
 import { wikiBaseVisible, wikiDocumentVisible } from './bindings.ts';
 import { basesFor, basesOfSession } from '../../knowledge/scope.ts';
@@ -33,6 +33,10 @@ try {
   setSessionExtra(db, 'codex:wiki-off', { confidential: true });
   assert.equal(basesOfSession(db, 'codex:wiki-off').some((b) => b.id === binding.base), false, 'a Confidential chat gets no wiki');
   assert.equal(basesOfSession(db, 'codex:wiki-on').some((b) => b.id === binding.base), true);
+  // The wiki's own index says so in what the page gets; a base a person made does not.
+  assert.equal(baseView(db, baseRow(db, binding.base)).wiki, true);
+  const mine = createBase(db, { name: 'Handbook' });
+  assert.equal('wiki' in baseView(db, baseRow(db, mine.id)), false);
   const again = ensureWikiKnowledge(db, { root: hub, space: null });
   assert.equal(binding.base, again.base);
   for (let i = 0; i < 100 && (!docsOf(db, binding.base).length || progress.size); i++) await new Promise((r) => setTimeout(r, 20));

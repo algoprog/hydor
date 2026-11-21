@@ -148,7 +148,7 @@ The helper reads a source and decides which articles it bears on, from a list of
 
 - **Documents.** A new or changed document is read once its folder has been quiet for half a minute, one at a time, and at most 40 an hour. The helper reads up to its first 40,000 characters. Large data files are analysed with code in a sandbox, where there is one.
 - **Conversations.** A project's recent conversations are read about once a day. Not all: a busy project has more than are worth reading, so each gets a score from what its text shows (commits made in it, corrections you made, failures that were fixed, and its length) and the best go first. A session is also read once it has had no new turn for 30 minutes, up to eight a day for a project in all. This follows **Learn from conversations**.
-- **Commit messages.** Once a day, for a project in a Git repository, the new commit messages (up to 60, not the code) are read as one source, "Commits &lt;from&gt;–&lt;to&gt;", and listed as **Commits** under **Recent updates**. Secrets are cut out of them first.
+- **Commit messages.** Once a day, for a project in a Git repository, the new commit messages (up to 60, not the code) are read as one source, "Commits &lt;from&gt;–&lt;to&gt;", and listed as **Commits** in **Wiki updates…**. Secrets are cut out of them first.
 - **Notes from memory**, as above.
 
 ### Revisions and long articles
@@ -171,7 +171,7 @@ New articles are placed as they are written. Now and then, and never more than o
 
 Reading a thousand papers with the helper model would take days. A project's wiki reads **at most a limit** of its documents: **Most documents to read into the wiki** in **Settings → Memory → Wiki memory**, 100 at first, or a number of its own on the project's **Settings** tab. Over it, the wiki reads the **pinned** ones first, then those agents **used most** (found with a document search or read), then the newest. The rest stay searchable.
 
-Pin a document in the project's **Documents** list: its menu has **Read into wiki memory**. For the folders holding documents the wiki does not read, the helper writes an **Overview** article from titles, sizes, dates and first lines: what kinds of documents are there, how many, and the notable ones, at most three overviews an hour. The project's **Memory** tab says "reads 100 of its 240 documents (the pinned, the most used and the newest)".
+Pin a document by opening it on the project's **Memory** tab and turning on its switch **Read into wiki memory**. For the folders holding documents the wiki does not read, the helper writes an **Overview** article from titles, sizes, dates and first lines: what kinds of documents are there, how many, and the notable ones, at most three overviews an hour. The project's **Memory** tab says "reads 100 of its 240 documents (the pinned, the most used and the newest)".
 
 ## Models with a small context
 
@@ -194,7 +194,7 @@ Two more rules protect a small window. Your **profile** is cut to its first 400 
 ## What you see and control
 
 - **Settings → Memory** shows your profile, every note with its history, what the last tidy-up changed, and the switches. A note's dialog says where it belongs, who wrote it and how it is known, how often agents were given it and used it, and its end date.
-- **A project's Memory tab** has three parts: **Notes**, **Wiki** and **Documents**. **Recent updates** under the wiki lists what documents, conversations, commits, overviews and code changes did lately.
+- **A project's Memory tab** is one list of its notes, its wiki's articles and its documents, newest first, with one search over all three (by words, and by meaning when that is on; it looks only in that project) and chips **All**, **Notes**, **Wiki** and **Documents** to narrow it. A click opens a note, article or document beside the list. Its **⋯** menu has the wiki's jobs and **Wiki updates…**, which lists what documents, conversations, commits, overviews and code changes did lately. A note search inside a project looks only at that project's notes, so its matches no longer lose out to other projects' notes.
 - **Undo.** After a reply, the chip **Memory · 1 added** opens what an agent saved, with **Undo this change**. **What changed** does the same for the tidy-up. Deleted notes stay 30 days.
 - **Off switches.** The **Memory** switch at the top of **Settings → Memory** turns it off for all sessions; a session's menu turns it off for one. With it off, a session gets no notes and saves nothing. **Learn from conversations**, **Tidy up automatically** and **Search by meaning** each have a switch of their own, and **Wiki memory** is on or off for all projects and for each project.
 - **Confidential sessions** save nothing, are never read by learning, and do not use wiki memory.

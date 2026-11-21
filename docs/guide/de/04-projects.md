@@ -165,11 +165,11 @@ Um Dateien von anderswo in der App hinzuzufügen, nutze **Zu einem Projekt hinzu
 
 ### Memory
 
-Drei Bereiche zeigen das Projektwissen, über eine Auswahl einzeln aufrufbar: **Notizen**, **Wiki** und **Dokumente**. Ein Link zu einem Bereich öffnet das Fenster direkt dort, ebenso die alten Adressen der Tabs Wissen und LLM Wiki.
+Was das Projekt sich merkt, in einer Liste: seine Notizen, die Artikel seines Wikis und seine Dokumente. Ein Suchfeld oben durchsucht alle drei auf einmal, **Hinzufügen** legt eine Notiz, Dateien oder einen Ordner ab, der aktuell gehalten wird, und die Chips **Alle**, **Notizen**, **Wiki** und **Dokumente** grenzen die Liste ein. Klicke auf eine Zeile, um sie rechts zu öffnen (auf einem Smartphone nimmt sie den Platz der Liste ein). Ein Link zu einem Chip öffnet das Fenster direkt dort, und die Adressen der alten Tabs „Knowledge“ und „LLM Wiki“ tun das ebenfalls.
 
-- **Notizen**: die gespeicherten Memory-Notizen des Projekts wie unter [Einstellungen → Memory](/settings?s=memory), mit **Notiz hinzufügen** und Suchfeld. Diese kurzen Fakten erhält jede Projektsitzung zum Start; siehe [Memory](/guide/memory).
-- **Wiki**: Artikel und Quellen des Projekt-Wiki-Memory zum Lesen sowie **Letzte Aktualisierungen** durch neue und geänderte Dokumente. Agenten schreiben das Wiki, du liest es hier; siehe [Wiki-Memory](/guide/wiki-memory#a-projects-memory-tab).
-- **Dokumente**: die eigenen Dokumente des Projekts, die nur seine Sitzungen durchsuchen, und ob sie auch das gemeinsame Wissen durchsuchen. Siehe [Eigene Projektdokumente](#give-a-project-documents-of-its-own). Neue und geänderte Dokumente ergänzen außerdem die Notizen und das Wiki des Projekts, solange Wiki-Memory und **Aus neuen Dokumenten lernen** eingeschaltet sind (siehe [Aus neuen Dokumenten lernen](/guide/wiki-memory#learn-from-new-documents)). Hat ein Projekt mehr Dokumente, als sein Wiki einliest (zunächst 100), liest das Wiki bis zu dieser Zahl die angehefteten Dokumente ein, dann die, die Agenten am häufigsten genutzt haben, und die neuesten. Dieser Bereich sagt es dir: „Sein Wiki liest 100 seiner 240 Dokumente ein: die angehefteten, die am häufigsten genutzten und die neuesten. Agenten durchsuchen alle.“ Im Menü **Mehr** eines Dokuments in der Liste heftest du es mit **Ins Wiki-Memory einlesen** an (siehe [Wenn ein Projekt zu viele Dokumente hat](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Notizen**: die Memory-Notizen, die Agenten über das Projekt angelegt haben, so wie [Einstellungen → Memory](/settings?s=memory) sie auflistet, mit dem Profil des Projekts zuerst. Sie sind die kurzen Fakten, mit denen jede Sitzung im Projekt beginnt (siehe [Memory](/guide/memory)).
+- **Wiki**: die Artikel und Quellen des Wiki-Memorys des Projekts, zum Lesen. Agenten schreiben es; du liest es hier. Das **⋯**-Menü enthält seine Aufgaben und **Wiki-Updates…** (siehe [Wiki-Memory](/guide/wiki-memory#a-projects-memory-tab)).
+- **Dokumente**: die eigenen Dokumente des Projekts, die nur seine Sitzungen durchsuchen, und die Ordner, die es aktuell hält. Siehe [Einem Projekt eigene Dokumente geben](#give-a-project-documents-of-its-own). Neue und geänderte Dokumente aktualisieren auch die Notizen und das Wiki des Projekts, solange Wiki-Memory und **Aus neuen Dokumenten lernen** eingeschaltet sind (siehe [Aus neuen Dokumenten lernen](/guide/wiki-memory#learn-from-new-documents)). Hat ein Projekt mehr Dokumente, als sein Wiki einliest (anfangs 100), liest das Wiki die angehefteten, die von Agenten am häufigsten genutzten und die neuesten bis zu dieser Zahl, und der Chip weist darauf hin: „Sein Wiki liest 100 seiner 240 Dokumente ein: die angehefteten, die am häufigsten genutzten und die neuesten. Agenten durchsuchen alle.“ Klicke auf ein Dokument und schalte **Ins Wiki-Memory einlesen** ein, um es anzuheften (siehe [Wenn ein Projekt zu viele Dokumente hat](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 
 ### Skills
 
@@ -293,7 +293,7 @@ Eine Gruppe ist ein Projekt, das mehrere andere für übergreifende Arbeit bünd
 
 Du kannst auch ein bestehendes Projekt zu einer Gruppe machen: Wähle auf seinem Tab **Einstellungen** unter **Die Projekte, die es zusammenbringt** Projekte aus und klicke auf **Speichern**. Die Projekte einer Gruppe änderst du auf dieselbe Weise. Nimmst du alle heraus, ist es wieder ein gewöhnliches Projekt.
 
-Im Tab **Memory** einer Gruppe zeigt **Dokumente** außerdem **Auch die Dokumente der Projekte, die es zusammenführt**: jedes ihrer Projekte, mit der Zahl seiner Dokumente. Klicke eines an, um die Dokumente dieses Projekts zu öffnen. Ihr Tab **Skills** zeigt **Auch die Skills der Projekte, die es zusammenbringt** auf dieselbe Weise.
+Der Tab **Memory** einer Gruppe listet unter dem Chip **Dokumente** außerdem unter **Ebenfalls durchsucht:** jedes Projekt auf, das sie zusammenbringt, samt der Zahl seiner Dokumente. Klicke auf eines, um die Dokumente dieses Projekts zu öffnen. Ihr Tab **Skills** zeigt **Auch die Skills der Projekte, die sie zusammenbringt** auf dieselbe Weise.
 
 ### Grenzen
 
@@ -383,7 +383,7 @@ Jeder lange Zufallscode öffnet ein Projekt für eine Person. Ungültige Codes z
 Einmal hinzugefügte Verträge, Handbücher, Notizen, Fachartikel und Ordner lassen sich von Agenten nach Wörtern oder Bedeutung durchsuchen. Antworten zitieren Datei und Seite. **Wissensdatenbanken** sind benannte Sammlungen hochgeladener Dateien und lokaler Ordner.
 
 - **Gemeinsames Wissen** ([die Seite Gemeinsames Wissen](/knowledge)) ist für alle Sitzungen verfügbar, auch in Projekten, sofern dort nicht ausgeschaltet.
-- **Das eigene Wissen eines Projekts**, in seinem Tab **Memory** unter **Dokumente**: Nur die Sitzungen dieses Projekts durchsuchen es, und die Sitzungen einer Gruppe, die das Projekt einbindet.
+- **Das eigene Wissen eines Projekts** auf seinem Tab **Memory** (der Chip **Dokumente**): Nur die Sitzungen dieses Projekts durchsuchen es, und die Sitzungen einer Gruppe, die das Projekt einbindet.
 
 Das gemeinsame Wissen ist eine eigene Seite, ohne Projektspalte daneben. Um es zu öffnen, klicke im Text oben in [Einstellungen → Memory](/settings?s=memory) auf **Gemeinsames Wissen** oder tippe „gemeinsames Wissen“ ins Suchfeld (Strg+K).
 
@@ -445,13 +445,14 @@ Die Schaltfläche ⋯ (**Mehr**) oben rechts an einer Wissensdatenbank öffnet i
 
 ## Eigene Projektdokumente
 
-Öffne die Details des Projekts, gehe zum Tab **Memory** und wähle **Dokumente**.
+Öffne die Details des Projekts, gehe zum Tab **Memory** und wähle den Chip **Dokumente**.
 
-- **Auch das geteilte Wissen durchsuchen** ist ein Schalter, der eingeschaltet ist, solange du ihn nicht ausschaltest. Schaltest du ihn aus, durchsuchen die Sitzungen des Projekts nur die eigenen Dokumente des Projekts (und in einer Gruppe die ihrer Projekte). Die Zeile darunter sagt, wie viele gemeinsame Dokumente es gibt, mit einem Link **Gemeinsames Wissen**.
-- Ohne Dokumente legst du Dateien oder Ordner ab oder wählst sie aus. Es entsteht eine nach dem Projekt benannte Datenbank. **Stattdessen mit einem Ordner auf diesem Computer beginnen** erstellt zunächst eine leere für die Ordnerzuordnung.
-- Mit Dokumenten erscheinen Suchfeld, siehe [Selbst suchen](#try-a-search-yourself), die Projekt-Wissensdatenbanken mit denselben Karten und Menüs wie gemeinsame Bestände sowie unten **Neue Wissensdatenbank**.
+- Füge Dokumente mit **Hinzufügen** → **Dateien…** hinzu oder ziehe Dateien oder einen Ordner an eine beliebige Stelle des Tabs: Dafür wird eine nach dem Projekt benannte Wissensdatenbank angelegt, und die Dokumente kommen in die Liste. **Hinzufügen** → **Ein Ordner, der aktuell gehalten wird…** (oder **Ordner hinzufügen** unter dem Chip) liest einen Ordner auf diesem Computer an Ort und Stelle, wie unter [Einen Ordner auf diesem Computer hinzufügen](#add-a-folder-on-this-computer) beschrieben; ein × neben einem Ordner beendet das Lesen, nach einer Rückfrage. Solange es noch keine Dokumente gibt, ist der Chip eine Ablagefläche, mit **Ordner hinzufügen, der aktuell gehalten wird** darunter.
+- Jedes Dokument ist eine Zeile („Dokument · 12 Passagen · 2,1 MB · gestern gelesen“). Klicke darauf, um zu sehen, woher es stammt, sein Format, seine Größe und Passagen, wann es gelesen wurde, **Öffnen**, **Entfernen** (bei einer von dir hinzugefügten Datei: Das löscht die Kopie, die Hydor aufbewahrt hat) und **Ins Wiki-Memory einlesen**. **Dokumente erneut lesen** im Menü **⋯** liest die Dateien und Ordner sofort erneut.
+- Das Suchfeld über der Liste durchsucht die Dokumente zusammen mit den Notizen und dem Wiki des Projekts (siehe [Selbst eine Suche ausprobieren](#try-a-search-yourself)).
+- Ob die Sitzungen des Projekts auch das Gemeinsame Wissen durchsuchen, steuerst du mit einem Schalter im Tab **Einstellungen**: **Auch das geteilte Wissen durchsuchen**. Er ist an, solange du ihn nicht ausschaltest; ausgeschaltet durchsuchen sie nur die eigenen Dokumente des Projekts (und in einer Gruppe die ihrer Projekte). Die Zeile darunter nennt, wie viele gemeinsame Dokumente es gibt, mit einem Link **Gemeinsames Wissen**.
 
-Über **Verschieben nach** lassen sich gemeinsame Wissensdatenbanken in Projekte und wieder zurück verschieben.
+Eine Wissensdatenbank lässt sich über ihr Menü auf der Seite „Gemeinsames Wissen“ in ein Projekt verschieben (**Verschieben nach**) und wieder zurück. Der eigene Suchindex des Wikis, eine Datenbank namens „Project wiki“, wird nicht unter den Dokumenten eines Projekts aufgeführt.
 
 ## Wie Agenten deine Dokumente durchsuchen
 
@@ -473,9 +474,9 @@ Ohne ausdrückliche Einschränkung kombiniert der Agent Wort- und Bedeutungssuch
 
 ### Selbst suchen
 
-Über den Wissensdatenbanken steht ein Feld mit „Probiere die Suche wie ein Agent aus: mit einer Frage oder ‚genauen Wörtern‘ in Anführungszeichen“. Tippe etwas ein und drücke die Eingabetaste. Bis zu 10 Passagen kommen zurück, jede mit ihrer Datei und Seite, ihrer Wissensdatenbank und der Art, wie sie gefunden wurde: **Wörter**, **Bedeutung** oder beides, oder **Exakt** für genauen Text. Klicke eine an, um die Datei zu öffnen.
+Auf der Seite „Gemeinsames Wissen“ steht über den Wissensdatenbanken ein Feld mit „Probiere die Suche wie ein Agent aus: mit einer Frage oder ‚genauen Wörtern‘ in Anführungszeichen“. Tippe etwas ein und drücke die Eingabetaste. Bis zu 10 Passagen kommen zurück, jeweils mit Datei und Seite, ihrer Wissensdatenbank und der Art, wie sie gefunden wurde: **nach Wörtern**, **nach Bedeutung** oder beides, oder **nach genauem Text** für genaue Texte. Klicke auf eine, um die Datei zu öffnen.
 
-Auf der Seite „Gemeinsames Wissen“ durchsucht sie, was eine Sitzung außerhalb jedes Projekts durchsucht. Im Teil „Dokumente“ eines Projekts (sein Tab **Memory**) durchsucht sie, was eine Sitzung in diesem Projekt durchsucht.
+Auf der Seite „Gemeinsames Wissen“ durchsucht dieses Feld das, was eine Sitzung außerhalb jedes Projekts durchsucht. In einem Projekt durchsucht das Suchfeld im Tab **Memory** die eigenen Notizen, das Wiki und die Dokumente des Projekts zusammen, aber nie das Gemeinsame Wissen.
 
 ## Welche Sitzungen welches Wissen durchsuchen
 

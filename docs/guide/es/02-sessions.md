@@ -243,7 +243,7 @@ Cuando empiezas una sesión en la página de inicio en un proyecto cuya [memoria
 
 - **Crear memoria y empezar**: la memoria empieza a crearse, la tarjeta se convierte en su progreso y la sesión muestra **Creando memoria**. Tu mensaje espera («Se enviará al agente cuando la memoria esté lista») y llega al agente en cuanto se escribe la parte más importante: una visión general del proyecto a partir de sus archivos, sus notas y las conversaciones con más contenido. El resto se sigue creando en segundo plano, y los agentes lo encuentran a medida que aparece. **Empezar ahora** envía tu mensaje de inmediato y deja que la creación continúe; **Detener la creación** la detiene (lo que ya se escribió se conserva) y arranca el agente. Puedes cerrar la app: el agente empieza por sí solo. Si la creación falla antes de ese punto, la tarjeta lo indica, con **Reintentar** y **Empezar de todos modos**. Si el agente terminó antes de recibir tu mensaje (se bloqueó, o la computadora se reinició durante la espera) y no se puede volver a arrancar, la tarjeta ofrece **Empezar en una nueva sesión**: una nueva sesión con la misma configuración recibe tu mensaje, asume lo que enviaste mientras tanto, y la vacía se archiva.
 - **Empezar sin memoria**: el agente empieza ahora, y este proyecto no vuelve a preguntar durante una semana.
-- **No preguntar por este proyecto**: no vuelve a preguntar nunca por este proyecto. **Crear desde el historial** sigue disponible en la pestaña **Memoria** de los detalles del proyecto.
+- **No preguntar para este proyecto**: no vuelve a preguntar nunca para este proyecto. **Crear la wiki a partir del historial…** sigue estando en el menú **⋯** de la pestaña **Memoria** de los detalles del proyecto.
 
 Todo lo que envíes mientras espera llega al agente después de tu primer mensaje. Solo pregunta cuando empiezas tú mismo una sesión en la página de inicio, nunca para ejecuciones programadas, apps, subagentes ni sesiones que empieza un agente, y tampoco para un proyecto que ya tuvo una creación.
 
@@ -334,6 +334,7 @@ Un pequeño anillo con un porcentaje junto al micrófono se va llenando a medida
 
 - **Contexto**: el anillo y la fila **Contexto** en Opciones («42 % en uso»). Apunta al anillo para ver el número exacto de tokens. Se vuelve ámbar por encima del 85 %. Haz clic en el anillo, o en **Compactar** en Opciones, para compactar la conversación (no mientras un turno está en marcha). En una sesión de Custom, apunta al anillo para ver los tokens y un desglose de en qué se van, y el desglose está bajo la flecha de la fila **Contexto**; Custom condensa por sí solo, así que no hay **Compactar** y hacer clic en el anillo no hace nada (consulta [Conversaciones largas y salidas largas](/guide/custom#long-conversations-and-long-output)).
 - **caché 4m** (Claude Code): la caché de prompts mantiene la conversación lista durante un tiempo (5 minutos o una hora), así que el siguiente mensaje es más barato y rápido. Cuenta hacia atrás mientras no envías nada; un mensaje antes de que acabe la reutiliza y reinicia la cuenta. **caché fría** significa que el siguiente mensaje la vuelve a crear.
+
 - **85 tok/s**: lo rápido que se escribió la última respuesta, en tokens por segundo.
 
 ## Detener un turno, detener el agente o reanudar

@@ -728,6 +728,21 @@ test('AGENTS.md suggestions over the routes: listed with their note and project,
   await app.close();
 });
 
+test('searching one project\'s notes by its key searches only its place: matches are not lost to the notes of other projects', async () => {
+  const other = path.join(tmp, 'ks-other');
+  const mine = path.join(tmp, 'ks-mine');
+  for (let i = 0; i < 120; i++) add(R(other), `Gizmo gizmo gizmo number ${i}.`);
+  const own = add(R(mine), 'Our single note that mentions the gizmo once, among a good many other words that make it rank below the short ones.');
+  const app = Fastify();
+  memoryRoutes({ app, db, broadcast: () => {}, sessions: { summary: () => undefined } } as unknown as Deps);
+  const search = async (key: string) => (await app.inject({ method: 'GET', url: `/api/memory/entries?q=gizmo&scope=repo&key=${encodeURIComponent(key)}` })).json().entries as { id: number; scopeKey: string }[];
+  assert.deepEqual((await search(mine)).map((e) => e.id), [own.id]);
+  const theirs = await search(other);
+  assert.equal(theirs.length, 100);
+  assert.ok(theirs.every((e) => e.scopeKey === other));
+  await app.close();
+});
+
 for (const [name, fn] of tests) {
   store.clearAll(db);
   for (const k of ['memory.agents.suggestions', 'memory.agents.asked', 'memory.refile.asked']) kvSet(db, k, '');

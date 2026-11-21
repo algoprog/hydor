@@ -10,9 +10,9 @@ Memory has three parts, which work as one:
 
 - **Memory notes**: short facts every agent starts with, about you, a project or a session. Most of this topic is about them.
 - **Wiki memory**: longer articles, with their sources, that agents keep for each project (and one shared set), written from its documents, its conversations and its commits (see [Wiki memory](/guide/wiki-memory)). Agents are given a line for the articles that bear on what you ask, and the project's plans in progress, without asking.
-- **Documents**: the files themselves, which agents search and cite, and are not given unasked. They are kept in [Shared knowledge](/knowledge) and on each project's **Memory** tab, under **Documents** (see [Projects and knowledge](/guide/projects)).
+- **Documents**: the files themselves, which agents search and cite, and are not given unasked. They are kept in [Shared knowledge](/knowledge) and on each project's **Memory** tab, among its notes and wiki articles (the **Documents** chip; see [Projects and knowledge](/guide/projects)).
 
-A project's **Memory** tab shows all three. When a document is added or changed, the helper model reads it, adds a few notes to the project's memory and updates its wiki (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)).
+A project's **Memory** tab shows all three in one list, with a search box over them (see [A project's Memory tab](/guide/wiki-memory#a-projects-memory-tab)). When a document is added or changed, the helper model reads it, adds a few notes to the project's memory and updates its wiki (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)).
 
 Memory notes are short: each is a sentence or two, at most 500 characters. Every agent the app runs shares them: Claude Code, Codex, Custom and the agents that speak ACP, such as Gemini CLI. Claude Code's and Codex's own memories stay off in the sessions the app runs, so these notes are the one memory they all share, and you can see and undo everything they keep. Each note belongs to one of three places:
 

@@ -3,26 +3,24 @@
 // sidebar, share it with people, delete it) and Close; its tabs under them. Overview: its sessions, who it is shared
 // with (ShareDialog.tsx) and what every session in it gets (its folder, guidelines, memory, skills and assistant), with a
 // group's projects. Then its files (SpaceFiles: its folder, and the things kept in it), its
-// memory (its notes, its wiki memory, and its documents: those only its sessions search, with the shared ones too unless it leaves them out), its skills
+// memory (memory/ProjectMemory: its notes, its wiki memory and its own documents in one list), its skills
 // (SpaceSkills), its agents and its settings. The tabs change in the window, not the address. It shows at once from the
 // projects the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, MessagesSquare, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
-import type { KnowledgeBase } from '@shared/knowledge';
+import { Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, LayoutDashboard, MessagesSquare, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserRound, X } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type Space, type SpaceView } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, IconButton, inputCls, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
-import { api, enc, patch, post } from '../../lib/api';
+import { api, enc, patch } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { closeProject, go, openProject, openSession, type ProjectPart, type ProjectTab } from '../../lib/nav';
 import { toastError, useApp, useSessions } from '../../lib/store';
-import type { PickedFile } from '../../lib/upload';
 import { tr } from '../../i18n/runtime';
 import { AgentsBoard } from '../assistants/AgentsBoard';
 import { AssistantIcon } from '../assistants/icons';
 import { useAssistantsState } from '../assistants/state';
-import { addFiles, BaseCard, DropFiles, MeaningHint, MeaningWait, TrySearch, useKnowledge } from '../knowledge/parts';
+import { useKnowledge } from '../knowledge/parts';
 import { ActivityText } from '../sessions/SessionList';
 import { MemberPicker, memberNames, SpaceMark, startInSpace } from './parts';
 import { deleteSpace, SpaceMenu } from './ProjectMenu';
@@ -33,14 +31,13 @@ import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { DEFAULT_WIKI_DOCUMENTS } from '@shared/wiki';
 import { DocumentLimit } from '../wiki/DocumentLimit';
-import { DocumentsNoteOf, SpaceWiki } from '../wiki/SpaceWiki';
 import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/spaceMemory';
-import { PlacePage } from '../memory/MemoryNotes';
+import { ProjectMemory } from './memory/ProjectMemory';
 import { loadSpaces, useSpaces } from './state';
 
 export type SpaceTab = ProjectTab;
 
-/** The parts of the Memory tab: notes first. */
+/** The kinds the Memory tab's chips narrow its list to: all first. */
 export type MemoryPart = ProjectPart;
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
@@ -305,173 +302,10 @@ function SharedWith({ s }: { s: Space }) {
   );
 }
 
-// ---- Memory ------------------------------------------------------------------------------------------------------
-
-/** The Memory tab: the project's notes, its wiki memory and its documents, one part at a time. */
-function MemoryTab({ s, onSaved, memory, part, onPart }: { s: Space; onSaved: (next: Space) => void; memory: SpaceMemory; part: MemoryPart; onPart: (p: MemoryPart) => void }) {
-  const home = useApp((x) => x.boot?.home);
-  const articles = memory.wiki?.on ? memory.wiki.articles?.length : undefined;
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Segmented<MemoryPart>
-          value={part}
-          onChange={onPart}
-          options={[
-            { value: 'notes', label: <PartLabel name="Notes" n={memory.notes} /> },
-            { value: 'wiki', label: <PartLabel name="Wiki" n={articles} /> },
-            { value: 'documents', label: <PartLabel name="Documents" n={undefined} /> },
-          ]}
-        />
-        {/* On a narrow screen the explanation takes a row of its own under the switch. */}
-        {part === 'notes' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">Short facts agents start with in this project.</span>}
-        {part === 'wiki' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">Articles agents keep for this project, from its documents and its work.</span>}
-        {part === 'documents' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">The files themselves: agents search them and cite what they read.</span>}
-      </div>
-      {part === 'notes' ? (
-        memory.key ? (
-          <PlacePage key={memory.key} place={{ kind: 'repo', key: memory.key }} embedded />
-        ) : (
-          <div className="flex justify-center py-6 text-fg-3">
-            <Throbber size={24} />
-          </div>
-        )
-      ) : part === 'wiki' ? (
-        <SpaceWiki id={s.id} view={memory.wiki} version={memory.version} onStart={(prompt) => startInSpace(s, prompt)} />
-      ) : (
-        <DocumentsPart s={s} onSaved={onSaved} wikiOn={memory.wiki?.on === true} version={memory.version} />
-      )}
-      {part === 'notes' && memory.key && (
-        <p className="text-[12px] text-fg-3">
-          <span>Folder</span>: <span translate="no">{tildify(memory.key, home)}</span>
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** A part's name in the switch, with how many it holds when that is known and not nothing. */
-function PartLabel({ name, n }: { name: string; n?: number }) {
-  return (
-    <>
-      {name}
-      {!!n && <span className="tnum text-fg-3">{n}</span>}
-    </>
-  );
-}
-
-/** Documents only this space's sessions search, and whether they search the shared ones too. */
-function DocumentsPart({ s, onSaved, wikiOn, version }: { s: Space; onSaved: (next: Space) => void; wikiOn: boolean; version: number }) {
-  const [st, load] = useKnowledge();
-  const wikiSettings = useWikiSettings();
-  const spaces = useSpaces();
-  const own = st?.bases.filter((b) => b.space === s.id) ?? [];
-  const sharedDocs = (st?.bases ?? []).filter((b) => !b.space || (spaces && !spaces.some((x) => x.id === b.space))).reduce((n, b) => n + b.docs, 0);
-  const useShared = s.sharedKnowledge !== false;
-  const members = (s.members ?? []).map((id) => spaces?.find((x) => x.id === id)).filter((x): x is SpaceView => !!x);
-  const setShared = async (on: boolean) => {
-    try {
-      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { sharedKnowledge: on }));
-      loadSpaces();
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  const newBase = async () => {
-    try {
-      await post('/api/knowledge', { name: own.length ? 'New knowledge base' : s.name, space: s.id });
-      load();
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  /** Files dropped before the space has a base: one is made for them, named for the space. */
-  const firstFiles = async (picked: PickedFile[]) => {
-    try {
-      const b = await post<KnowledgeBase>('/api/knowledge', { name: s.name, space: s.id });
-      await addFiles(b, picked);
-      load();
-    } catch (e) {
-      toastError(e);
-    }
-  };
-  return (
-    <div className="space-y-5">
-      {wikiOn && wikiSettings?.fromDocuments && <p className="text-[12.5px] text-fg-3">New and changed documents also update this project’s notes and wiki.</p>}
-      {wikiOn && wikiSettings?.fromDocuments && <DocumentsNoteOf id={s.id} on version={version} />}
-      <div className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2">
-          <BookOpen size={16} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium">Also search the shared knowledge</div>
-          <div className="text-[12.5px] text-fg-3">
-            {sharedDocs ? `${plural(sharedDocs, 'document', 'documents')} every session can search` : 'Documents every session can search'}
-            {' · '}
-            <button type="button" onClick={() => go('/knowledge')} className="font-medium text-accent hover:underline">
-              Shared knowledge
-            </button>
-          </div>
-        </div>
-        <Switch on={useShared} label="Also search the shared knowledge" onChange={(v) => void setShared(v)} />
-      </div>
-      {members.length > 0 && (
-        <div className="rounded-2xl border border-line bg-panel px-4 py-3.5">
-          <div className="text-[13.5px] font-medium">Also the documents of the projects it brings together</div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {members.map((m) => (
-              <button key={m.id} type="button" onClick={() => openProject(m.id, 'memory', { part: 'documents' })} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
-                <SpaceMark s={m} size={15} />
-                <span translate="no" className="min-w-0 truncate">
-                  {m.name}
-                </span>
-                <span className="tnum text-fg-3">{m.docs}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {!st ? (
-        <div className="flex justify-center py-6 text-fg-3">
-          <Throbber size={24} />
-        </div>
-      ) : !own.length ? (
-        <div className="rounded-2xl border border-line bg-panel">
-          <Blank icon={<BookOpen size={19} />} title="No documents yet">
-            {members.length
-              ? 'Documents of the group’s own, beside those of its projects: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'
-              : 'Documents only this project’s sessions search: papers, contracts, notes, a whole folder. Agents find passages by their words or what they mean, and cite the file and page they read.'}
-          </Blank>
-          <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-            <DropFiles big onFiles={(p) => void firstFiles(p)} />
-            <div className="mt-3 text-center">
-              <Button variant="ghost" icon={<FolderPlus size={14} />} onClick={() => void newBase()}>
-                Start with a folder on this computer instead
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          <TrySearch space={s.id} />
-          {!st.meaning && <MeaningHint />}
-          <MeaningWait st={st} bases={own} />
-          {own.map((b) => (
-            <BaseCard key={b.id} b={b} meaning={st.meaning} />
-          ))}
-          <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => void newBase()}>
-            New knowledge base
-          </Button>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ---- Settings ----------------------------------------------------------------------------------------------------
 
 /** One part of a space's settings: what it is on the left (above, on a phone), its fields on the right. */
-function Row({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+function Row({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
   return (
     <section className="grid gap-3 px-4 py-5 sm:grid-cols-[minmax(0,210px)_minmax(0,1fr)] sm:gap-8 sm:px-6">
       <div>
@@ -514,6 +348,17 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
   const dirty = !sameMembers || (['name', 'description', 'instructions', 'assistant', 'color'] as const).some((k) => (form[k] ?? '') !== (s[k] ?? ''));
   const color = form.color ?? s.color;
   const wikiDefault = useWikiSettings()?.enabled ?? true;
+  const [knowledge] = useKnowledge();
+  const sharedDocs = (knowledge?.bases ?? []).filter((b) => !b.wiki && (!b.space || (spaces && !spaces.some((x) => x.id === b.space)))).reduce((n, b) => n + b.docs, 0);
+  /** "Also search the shared knowledge" saves at once, apart from the form (absent means on). */
+  const setShared = async (on: boolean) => {
+    try {
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { sharedKnowledge: on }));
+      loadSpaces();
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const wikiChoice = s.wikiMemory === true ? 'on' : s.wikiMemory === false ? 'off' : 'inherit';
   /** The project's own Wiki memory switch saves at once, apart from the form: true, false, or null (as in Settings). */
   const setWiki = async (choice: 'inherit' | 'on' | 'off') => {
@@ -658,6 +503,20 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
             </div>
           </Row>
         )}
+        <Row
+          title="Also search the shared knowledge"
+          sub={
+            <>
+              {sharedDocs ? `${plural(sharedDocs, 'document', 'documents')} every session can search` : 'Documents every session can search'}
+              {' · '}
+              <button type="button" onClick={() => go('/knowledge')} className="font-medium text-accent hover:underline">
+                Shared knowledge
+              </button>
+            </>
+          }
+        >
+          <Switch on={s.sharedKnowledge !== false} label="Also search the shared knowledge" onChange={(v) => void setShared(v)} />
+        </Row>
         {!isGroup(s) && (
           <Row title="Searchable from other projects" sub="Agents in your other projects can find and read this project’s notes, wiki, documents and conversations when they look for them. They never change them.">
             <Switch on={s.memoryShared !== false} label="Searchable from other projects" onChange={(v) => void setMemoryShared(v)} />
@@ -718,14 +577,15 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
   const spaces = useSpaces();
   const view = spaces?.find((x) => x.id === id);
   const [tab, setTab] = useState<SpaceTab>(first);
-  const [part, setPart] = useState<MemoryPart>(firstPart ?? 'notes');
+  const [part, setPart] = useState<MemoryPart>(firstPart ?? 'all');
   // Asked again for a tab while the window is open (its Files from a message's Show, say): that tab shows.
   const asked = useRef(req);
   useEffect(() => {
     if (req === asked.current) return;
     asked.current = req;
     setTab(first);
-    if (firstPart) setPart(firstPart);
+    // The Memory tab opens on the chip asked for, else All.
+    setPart(firstPart ?? 'all');
   }, [req, first, firstPart]);
   // Opened to share it (from the search box, the guide or an agent): the Share dialog opens over the window, once.
   const shared = useRef(false);
@@ -773,7 +633,7 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
   const to = (t: SpaceTab) => {
     setTab(t);
-    if (t === 'memory') setPart('notes');
+    if (t === 'memory') setPart('all');
   };
   return (
     <>
@@ -785,12 +645,17 @@ export function SpacePage({ id, tab: first, part: firstPart, share, req }: { id:
             <SpaceFiles s={s} onSaved={saved} />
           </div>
         </div>
+      ) : tab === 'memory' ? (
+        // Its list and its reader scroll in their own boxes, so the window keeps its height.
+        <div className="min-h-0 flex-1 pb-[var(--safe-bottom)]">
+          <div className="h-full px-3 pt-4 pb-3 sm:px-6">
+            <ProjectMemory s={s} view={view} memory={memory} part={part} onPart={setPart} onTab={to} />
+          </div>
+        </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pb-[var(--safe-bottom)]">
           <div className="px-3 py-5 sm:px-6 sm:py-6">
-            {tab === 'memory' ? (
-              <MemoryTab s={s} onSaved={saved} memory={memory} part={part} onPart={setPart} />
-            ) : tab === 'skills' ? (
+            {tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
             ) : tab === 'agents' ? (
               <AgentsBoard space={s} />

@@ -10,9 +10,9 @@ A memória tem três partes, que funcionam como uma só:
 
 - **Notas da memória**: fatos curtos com os quais todo agente começa, sobre você, um projeto ou uma sessão. A maior parte deste tópico trata delas.
 - **Memória wiki**: artigos mais longos, com suas fontes, que os agentes mantêm para cada projeto (e um conjunto compartilhado), escritos a partir de seus documentos, suas conversas e seus commits (veja [Memória wiki](/guide/wiki-memory)). Os agentes recebem, sem precisar pedir, uma linha para os artigos que têm relação com o que você pede e os planos em andamento do projeto.
-- **Documentos**: os próprios arquivos, que os agentes pesquisam e citam, e que não são entregues sem que sejam pedidos. Ficam em [Conhecimento compartilhado](/knowledge) e na aba **Memória** de cada projeto, em **Documentos** (veja [Projetos e conhecimento](/guide/projects)).
+- **Documentos**: os próprios arquivos, que os agentes pesquisam e citam, e que não são entregues sem serem pedidos. Ficam no [Conhecimento compartilhado](/knowledge) e na aba **Memória** de cada projeto, junto com suas notas e artigos wiki (o filtro **Documentos**; veja [Projetos e conhecimento](/guide/projects)).
 
-A aba **Memória** de um projeto mostra as três. Quando um documento é adicionado ou alterado, o modelo auxiliar o lê, acrescenta algumas notas à memória do projeto e atualiza a wiki dele (veja [Aprender com novos documentos](/guide/wiki-memory#learn-from-new-documents)).
+A aba **Memória** de um projeto mostra as três partes em uma só lista, com uma caixa de busca sobre elas (veja [A aba Memória de um projeto](/guide/wiki-memory#a-projects-memory-tab)). Quando um documento é adicionado ou alterado, o modelo auxiliar o lê, adiciona algumas notas à memória do projeto e atualiza a wiki dele (veja [Aprender com novos documentos](/guide/wiki-memory#learn-from-new-documents)).
 
 As notas da memória são curtas: cada uma tem uma ou duas frases, com no máximo 500 caracteres. Todo agente que o app executa as compartilha: Claude Code, Codex, Custom e os agentes que falam ACP, como o Gemini CLI. As memórias próprias do Claude Code e do Codex ficam desligadas nas sessões que o app executa, então estas notas são a única memória que todos compartilham, e você pode ver e desfazer tudo o que eles guardam. Cada nota pertence a um de três lugares:
 

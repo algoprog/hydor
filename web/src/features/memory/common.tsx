@@ -104,7 +104,7 @@ export function HistoryList({ id }: { id: number }) {
 }
 
 /** What a topic or profile sums up. */
-export function Children({ id }: { id: number }) {
+export function Children({ id, onOpen }: { id: number; onOpen?: (e: MemoryListEntry) => void }) {
   const [list, setList] = useState<MemoryListEntry[] | null>(null);
   const version = useMemory((s) => s.version);
   useEffect(() => {
@@ -118,7 +118,13 @@ export function Children({ id }: { id: number }) {
     <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-[12.5px] leading-snug">
       {list.map((e) => (
         <li key={e.id} translate="no" className={cx('break-words', e.status === 'deleted' ? 'text-fg-3 line-through decoration-fg-3/60' : 'text-fg-2')}>
-          {e.text}
+          {onOpen && e.status !== 'deleted' ? (
+            <button type="button" onClick={() => onOpen(e)} className="text-left underline-offset-2 hover:text-fg hover:underline">
+              {e.text}
+            </button>
+          ) : (
+            e.text
+          )}
         </li>
       ))}
     </ul>

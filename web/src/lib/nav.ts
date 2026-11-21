@@ -6,11 +6,11 @@ import { useUI } from './store';
 
 /** The tabs of a project's details window, and the parts of its Memory tab. */
 export type ProjectTab = 'overview' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
-export type ProjectPart = 'notes' | 'wiki' | 'documents';
+export type ProjectPart = 'all' | 'notes' | 'wiki' | 'documents';
 
 /**
  * The project whose details show in a window over the page (features/spaces/ProjectDialog, held by the shell), if any:
- * the tab it opened on, the part of its Memory, whether it opened to share it. `n` counts the openings, so one opened
+ * the tab it opened on, the chip of its Memory (none: All), whether it opened to share it. `n` counts the openings, so one opened
  * again (on another tab, say) starts afresh.
  */
 export const useProjectWindow = create<{ at: { id: string; tab: ProjectTab; part?: ProjectPart; share?: boolean; dir?: string; n: number; req: number } | null }>(() => ({ at: null }));
@@ -56,7 +56,7 @@ export function projectAddress(path: string): { id?: string; tab: ProjectTab; pa
   let part: ProjectPart | undefined;
   if (t === 'knowledge') part = 'documents';
   else if (t === 'wiki') part = 'wiki';
-  else if (t === 'memory') part = q.get('part') === 'wiki' || q.get('part') === 'documents' ? (q.get('part') as ProjectPart) : undefined;
+  else if (t === 'memory') part = q.get('part') === 'notes' || q.get('part') === 'wiki' || q.get('part') === 'documents' ? (q.get('part') as ProjectPart) : undefined;
   const tab: ProjectTab = t === 'knowledge' || t === 'wiki' ? 'memory' : PROJECT_TABS.includes(t ?? '') ? (t as ProjectTab) : 'overview';
   return { id, tab, part, share: q.get('share') === '1' || undefined, dir: q.get('dir') || undefined };
 }

@@ -165,11 +165,11 @@ Para añadir archivos desde otro lugar de la app, usa **Añadir a un proyecto** 
 
 ### Memoria
 
-Lo que recuerda el proyecto, en tres partes, de una en una bajo un interruptor: **Notas**, **Wiki** y **Documentos**. Un enlace a una parte abre la ventana en ella, y también lo hacen las direcciones de las antiguas pestañas Knowledge y LLM Wiki.
+Lo que el proyecto recuerda, en una sola lista: sus notas, los artículos de su wiki y sus documentos. Un cuadro de búsqueda en la parte superior busca en los tres a la vez, **Añadir** incorpora una nota, archivos o una carpeta para mantenerla actualizada, y los chips **Todos**, **Notas**, **Wiki** y **Documentos** reducen la lista. Haz clic en una fila para abrirla a la derecha (en un teléfono ocupa el lugar de la lista). Un enlace a un chip abre la ventana en él, y también lo hacen las direcciones de las antiguas pestañas Knowledge y LLM Wiki.
 
-- **Notas**: las notas de memoria que los agentes guardaron sobre el proyecto, tal como las lista [Configuración → Memoria](/settings?s=memory), con **Añadir una nota** y un campo de búsqueda. Son los datos breves con los que empieza cada sesión del proyecto (consulta [Memoria](/guide/memory)).
-- **Wiki**: los artículos y fuentes de la memoria wiki del proyecto, para leer, y **Actualizaciones recientes** a partir de documentos nuevos y modificados. Los agentes la escriben; tú la lees aquí (consulta [Memoria wiki](/guide/wiki-memory#a-projects-memory-tab)).
-- **Documentos**: los documentos propios del proyecto, que solo buscan sus sesiones, y si buscan también en el conocimiento compartido. Consulta [Dar documentos propios a un proyecto](#give-a-project-documents-of-its-own). Los documentos nuevos y modificados también actualizan las notas y la wiki del proyecto mientras la Memoria wiki y **Aprender de documentos nuevos** están activadas (consulta [Aprender de documentos nuevos](/guide/wiki-memory#learn-from-new-documents)). Un proyecto con más documentos de los que lee su wiki (100 al principio) hace que la wiki lea los fijados, los que los agentes usaron más y los más recientes, hasta ese número, y esta parte lo indica: “Su wiki lee 100 de sus 240 documentos: los fijados, los más usados y los más recientes. Los agentes buscan en todos.” El menú **Más** de un documento en la lista tiene **Leer en la memoria wiki** para fijar uno (consulta [Cuando un proyecto tiene demasiados documentos](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Notas**: las notas de memoria que los agentes guardaron sobre el proyecto, como las muestra [Configuración → Memoria](/settings?s=memory), con el perfil del proyecto primero. Son los datos breves con los que empieza cada sesión del proyecto (consulta [Memoria](/guide/memory)).
+- **Wiki**: los artículos y las fuentes de la memoria wiki del proyecto, para leer. Los agentes la escriben; tú la lees aquí. El menú **⋯** tiene sus tareas y **Actualizaciones de la wiki…** (consulta [Memoria wiki](/guide/wiki-memory#a-projects-memory-tab)).
+- **Documentos**: los documentos propios del proyecto, en los que solo buscan sus sesiones, y las carpetas que mantiene actualizadas. Consulta [Dar documentos propios a un proyecto](#give-a-project-documents-of-its-own). Los documentos nuevos y modificados también actualizan las notas y la wiki del proyecto mientras la Memoria wiki y **Aprender de documentos nuevos** están activadas (consulta [Aprender de documentos nuevos](/guide/wiki-memory#learn-from-new-documents)). Si un proyecto tiene más documentos de los que lee su wiki (100 al principio), la wiki lee los fijados, los que más usaron los agentes y los más recientes, hasta ese número, y el chip lo indica: “Su wiki lee 100 de sus 240 documentos: los fijados, los más usados y los más recientes. Los agentes buscan en todos.” Haz clic en un documento y activa **Leer en la memoria wiki** para fijarlo (consulta [Cuando un proyecto tiene demasiados documentos](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 
 ### Habilidades
 
@@ -293,7 +293,7 @@ Un grupo es un proyecto que reúne varios proyectos, para un trabajo que los aba
 
 También puedes convertir un proyecto existente en un grupo: en su pestaña **Configuración**, elige proyectos en **Los proyectos que reúne** y haz clic en **Guardar**. Los proyectos de un grupo se cambian del mismo modo. Si quitas todos, vuelve a ser un proyecto normal.
 
-La pestaña **Memoria** de un grupo, bajo **Documentos**, también muestra **También los documentos de los proyectos que reúne**: cada uno de sus proyectos, con cuántos documentos tiene. Haz clic en uno para abrir los documentos de ese proyecto. Su pestaña **Habilidades** muestra **También las habilidades de los proyectos que reúne** de la misma manera.
+La pestaña **Memoria** de un grupo, bajo su chip **Documentos**, también muestra **También se busca en:** cada uno de los proyectos que reúne, con cuántos documentos tiene. Haz clic en uno para abrir los documentos de ese proyecto. Su pestaña **Habilidades** muestra **También las habilidades de los proyectos que reúne** de la misma manera.
 
 ### Límites
 
@@ -383,7 +383,7 @@ Cada enlace es un código aleatorio largo que abre un proyecto para una persona.
 Los agentes pueden buscar en documentos que agregas una sola vez: contratos, manuales, notas, artículos, una carpeta entera. Encuentran pasajes por sus palabras o por su significado, y citan el archivo y la página que leyeron. Los documentos se guardan en **bases de conocimiento**: colecciones con nombre de archivos que soltaste y carpetas de esta computadora.
 
 - **Conocimiento compartido** ([la página de Conocimiento compartido](/knowledge)): toda sesión lo busca, también en un proyecto, a menos que el proyecto lo desactive.
-- **El conocimiento propio de un proyecto**, en su pestaña **Memoria**, en **Documentos**: solo lo buscan las sesiones de ese proyecto y las de un grupo que incluye el proyecto.
+- **El conocimiento propio de un proyecto**, en su pestaña **Memoria** (la etiqueta **Documentos**): solo lo buscan las sesiones de ese proyecto, y las de un grupo que incluya el proyecto.
 
 Conocimiento compartido es una página propia, sin columna de proyectos al lado. Para abrirla, haz clic en **Conocimiento compartido** en el texto de la parte superior de [Configuración → Memoria](/settings?s=memory), o escribe “conocimiento compartido” en el cuadro de búsqueda (Ctrl+K).
 
@@ -445,13 +445,14 @@ El botón ⋯ (**Más**) en la parte superior derecha de una base de conocimient
 
 ## Dar documentos propios a un proyecto
 
-Abre los detalles del proyecto, ve a su pestaña **Memoria** y elige **Documentos**.
+Abre los detalles del proyecto, ve a su pestaña **Memoria** y elige el chip **Documentos**.
 
-- **Buscar también en el conocimiento compartido** es un interruptor, activado a menos que lo desactives. Si lo desactivas, las sesiones del proyecto buscan solo en los documentos del propio proyecto (y, en un grupo, en los de sus proyectos). La línea de debajo indica cuántos documentos compartidos hay, con un enlace a **Conocimiento compartido**.
-- Si aún no hay documentos, arrastra documentos o una carpeta al recuadro, o elígelos: se crea para ellos una base de conocimiento con el nombre del proyecto. **Mejor empezar con una carpeta de esta computadora** crea una base vacía, con el nombre del proyecto, a la que puedes añadir una carpeta.
-- Cuando ya tiene documentos, la pestaña muestra un cuadro de búsqueda (consulta [Prueba una búsqueda tú mismo](#try-a-search-yourself)), las bases de conocimiento del proyecto con las mismas tarjetas y menús que las compartidas, y **Nueva base de conocimiento** al final.
+- Añade documentos con **Añadir** → **Archivos…**, o suelta archivos o una carpeta en cualquier parte de la pestaña: se crea una base de conocimiento con el nombre del proyecto para ellos, y los documentos se incorporan a la lista. **Añadir** → **Una carpeta para mantener actualizada…** (o **Añadir una carpeta** debajo del chip) lee una carpeta de esta computadora donde está, como en [Añadir una carpeta en esta computadora](#add-a-folder-on-this-computer); una × junto a una carpeta deja de leerla, tras pedir confirmación. Si aún no hay documentos, el chip es una zona para soltar archivos, con **Añadir una carpeta para mantener actualizada** debajo.
+- Cada documento es una fila (“Documento · 12 pasajes · 2,1 MB · leído ayer”). Haz clic en ella para ver de dónde viene, su formato, tamaño y pasajes, cuándo se leyó, **Abrir**, **Quitar** (para un archivo que añadiste: esto elimina la copia que Hydor guardó) y **Leer en la memoria wiki**. **Volver a leer los documentos**, en el menú **⋯**, vuelve a leer los archivos y carpetas de inmediato.
+- El cuadro de búsqueda sobre la lista busca en los documentos junto con las notas y la wiki del proyecto (consulta [Probar una búsqueda tú mismo](#try-a-search-yourself)).
+- Que las sesiones del proyecto busquen también en el conocimiento compartido es un interruptor en su pestaña **Configuración**, **Buscar también en el conocimiento compartido**, activado a menos que lo desactives: si está desactivado, solo buscan en los documentos propios del proyecto (y, en un grupo, en los de sus proyectos). La línea que hay debajo indica cuántos documentos compartidos hay, con un enlace a **Conocimiento compartido**.
 
-Una base de conocimiento compartida se puede mover a un proyecto desde su menú (**Mover a**), y también de vuelta.
+Una base de conocimiento se puede mover a un proyecto desde su menú en la página de Conocimiento compartido (**Mover a**), y de vuelta. El índice de búsqueda propio de la wiki, una base llamada “Project wiki”, no aparece entre los documentos de un proyecto.
 
 ## Cómo buscan los agentes en tus documentos
 
@@ -473,9 +474,9 @@ Un agente busca por palabras y por significado a la vez, a menos que pida solo u
 
 ### Prueba una búsqueda tú mismo
 
-Encima de las bases de conocimiento, un campo dice “Prueba una búsqueda, como lo hacen los agentes: una pregunta, o “palabras exactas” entre comillas”. Escribe y pulsa Intro. Se devuelven hasta 10 fragmentos, cada uno con su archivo y página, su base de conocimiento y cómo se encontró: **por palabras**, **por significado**, o ambos, o **por texto exacto** para el texto exacto. Haz clic en uno para abrir el archivo.
+En la página de Conocimiento compartido, encima de las bases de conocimiento, un campo dice “Prueba una búsqueda, como los agentes: una pregunta, o “palabras exactas” entre comillas”. Escribe y pulsa Intro. Se devuelven hasta 10 pasajes, cada uno con su archivo y página, su base de conocimiento y cómo se encontró: **por palabras**, **por significado**, o ambos, o **por texto exacto** para el texto exacto. Haz clic en uno para abrir el archivo.
 
-En la página de Conocimiento compartido, busca lo que busca una sesión fuera de cualquier proyecto. En la parte Documentos de un proyecto (su pestaña **Memoria**), busca lo que busca una sesión de ese proyecto.
+En la página de Conocimiento compartido, este campo busca lo que busca una sesión fuera de cualquier proyecto. En un proyecto, el cuadro de búsqueda de su pestaña **Memoria** busca en las notas, la wiki y los documentos del proyecto a la vez, y nunca en el conocimiento compartido.
 
 ## Qué sesiones buscan en qué conocimiento
 

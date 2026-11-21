@@ -165,11 +165,11 @@ To add files from elsewhere in the app, use **Add to a project** on the Files pa
 
 ### Memory
 
-What the project remembers, in three parts, one at a time under a switch: **Notes**, **Wiki** and **Documents**. A link to a part opens the window on it, and so do the old Knowledge and LLM Wiki tabs' addresses.
+What the project remembers, in one list: its notes, its wiki's articles and its documents. A search box at the top looks through all three at once, **Add** puts in a note, files or a folder to keep up to date, and the chips **All**, **Notes**, **Wiki** and **Documents** narrow the list. Click a row to open it on the right (on a phone it takes the list's place). A link to a chip opens the window on it, and so do the old Knowledge and LLM Wiki tabs' addresses.
 
-- **Notes**: the memory notes agents kept about the project, as [Settings → Memory](/settings?s=memory) lists them, with **Add a note** and a search field. They are the short facts every session in the project starts with (see [Memory](/guide/memory)).
-- **Wiki**: the articles and sources of the project's wiki memory, to read, and **Recent updates** from new and changed documents. Agents write it; you read it here (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
-- **Documents**: the project's own documents, which only its sessions search, and whether they search the shared knowledge too. See [Give a project documents of its own](#give-a-project-documents-of-its-own). New and changed documents also update the project's notes and wiki while Wiki memory and **Learn from new documents** are on (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)). A project with more documents than its wiki reads (100 at first) has the wiki read the pinned ones, the ones agents used most and the newest, up to that number, and this part says so: "Its wiki reads 100 of its 240 documents: the pinned, the most used and the newest. Agents search all of them." A document's **More** menu in the list has **Read into wiki memory** to pin one (see [When a project has too many documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Notes**: the memory notes agents kept about the project, as [Settings → Memory](/settings?s=memory) lists them, with the project's profile first. They are the short facts every session in the project starts with (see [Memory](/guide/memory)).
+- **Wiki**: the articles and sources of the project's wiki memory, to read. Agents write it; you read it here. The **⋯** menu has its jobs and **Wiki updates…** (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
+- **Documents**: the project's own documents, which only its sessions search, and the folders it keeps up to date. See [Give a project documents of its own](#give-a-project-documents-of-its-own). New and changed documents also update the project's notes and wiki while Wiki memory and **Learn from new documents** are on (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)). A project with more documents than its wiki reads (100 at first) has the wiki read the pinned ones, the ones agents used most and the newest, up to that number, and the chip says so: "Its wiki reads 100 of its 240 documents: the pinned, the most used and the newest. Agents search all of them." Click a document and turn on **Read into wiki memory** to pin it (see [When a project has too many documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 
 ### Skills
 
@@ -293,7 +293,7 @@ A group is a project that brings several projects together, for work that spans 
 
 You can also turn an existing project into a group: on its **Settings** tab, pick projects under **The projects it brings together** and click **Save**. Change a group's projects the same way. Take all of them out and it is a plain project again.
 
-A group's **Memory** tab, under **Documents**, also shows **Also the documents of the projects it brings together**: each of its projects, with how many documents it has. Click one to open that project's documents. Its **Skills** tab shows **Also the skills of the projects it brings together** the same way.
+A group's **Memory** tab, under its **Documents** chip, also lists **Also searched:** each of the projects it brings together, with how many documents it has. Click one to open that project's documents. Its **Skills** tab shows **Also the skills of the projects it brings together** the same way.
 
 ### Limits
 
@@ -383,7 +383,7 @@ Each link is a long random code that opens one project for one person. A code th
 Agents can search documents you add once: contracts, manuals, notes, papers, a whole folder. They find passages by their words or by what they mean, and cite the file and page they read. Documents are kept in **knowledge bases**: named collections of files you dropped in and folders on this computer.
 
 - **Shared knowledge** ([the Shared knowledge page](/knowledge)): every session searches it, in a project too unless the project turns that off.
-- **A project's own knowledge**, on its **Memory** tab, under **Documents**: only that project's sessions search it, and the sessions of a group that brings the project in.
+- **A project's own knowledge**, on its **Memory** tab (the **Documents** chip): only that project's sessions search it, and the sessions of a group that brings the project in.
 
 Shared knowledge is a page of its own, with no column of projects beside it. To open it, click **Shared knowledge** in the text at the top of [Settings → Memory](/settings?s=memory), or type "shared knowledge" in the search box (Ctrl+K).
 
@@ -445,13 +445,14 @@ The ⋯ button (**More**) at the top right of a knowledge base opens its menu:
 
 ## Give a project documents of its own
 
-Open the project's details, go to its **Memory** tab and pick **Documents**.
+Open the project's details, go to its **Memory** tab and pick the **Documents** chip.
 
-- **Also search the shared knowledge** is a switch, on unless you turn it off. Turn it off and the project's sessions search only the project's own documents (and, in a group, those of its projects). The line under it says how many shared documents there are, with a **Shared knowledge** link.
-- With no documents yet, drop documents or a folder in the box, or choose them: a knowledge base named after the project is made for them. **Start with a folder on this computer instead** makes an empty one, named after the project, to add a folder to.
-- Once it has documents, the tab shows a search box (see [Try a search yourself](#try-a-search-yourself)), the project's knowledge bases with the same cards and menus as shared ones, and **New knowledge base** at the bottom.
+- Add documents with **Add** → **Files…**, or drop files or a folder anywhere on the tab: a knowledge base named after the project is made for them, and the documents join the list. **Add** → **A folder to keep up to date…** (or **Add a folder** under the chip) reads a folder on this computer where it is, as in [Add a folder on this computer](#add-a-folder-on-this-computer); a × beside a folder stops reading it, after asking. With no documents yet, the chip is a drop zone, with **Add a folder to keep up to date** under it.
+- Each document is a row ("Document · 12 passages · 2.1 MB · read yesterday"). Click it to see where it is from, its format, size and passages, when it was read, **Open**, **Remove** (for a file you added: this deletes the copy Hydor kept) and **Read into wiki memory**. **Read the documents again**, in the **⋯** menu, reads the files and folders again at once.
+- The search box above the list looks through the documents together with the project's notes and wiki (see [Try a search yourself](#try-a-search-yourself)).
+- Whether the project's sessions also search the shared knowledge is a switch on its **Settings** tab, **Also search the shared knowledge**, on unless you turn it off: turned off, they search only the project's own documents (and, in a group, those of its projects). The line under it says how many shared documents there are, with a **Shared knowledge** link.
 
-A shared knowledge base can be moved into a project from its menu (**Move to**), and back.
+A knowledge base can be moved into a project from its menu on the Shared knowledge page (**Move to**), and back. The wiki's own search index, a base called "Project wiki", is not listed among a project's documents.
 
 ## How agents search your documents
 
@@ -473,9 +474,9 @@ An agent searches by words and by meaning together unless it asks for one, and a
 
 ### Try a search yourself
 
-Above the knowledge bases, a field says "Try a search, as agents do: a question, or “exact words” in quotes". Type and press Enter. Up to 10 passages come back, each with its file and page, its knowledge base and how it was found: **by words**, **by meaning**, or both, or **by exact** for exact text. Click one to open the file.
+On the Shared knowledge page, above the knowledge bases, a field says "Try a search, as agents do: a question, or “exact words” in quotes". Type and press Enter. Up to 10 passages come back, each with its file and page, its knowledge base and how it was found: **by words**, **by meaning**, or both, or **by exact** for exact text. Click one to open the file.
 
-On the Shared knowledge page, it searches what a session outside any project searches. On a project's Documents part (its **Memory** tab), it searches what a session in that project searches.
+On the Shared knowledge page, this field searches what a session outside any project searches. In a project, the search box on its **Memory** tab searches the project's own notes, wiki and documents together, and never the shared knowledge.
 
 ## Which sessions search which knowledge
 

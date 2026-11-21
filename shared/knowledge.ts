@@ -33,6 +33,9 @@ export interface KnowledgeBase {
   /** Being read now: documents done of those found. */
   indexing?: { done: number; total: number };
   indexedAt?: number;
+  /** Hydor's own index of a wiki memory folder ("Project wiki", "Shared wiki"): how agents search the wiki, not
+   *  documents a person added, so a project's Memory tab lists its files as wiki articles, never as documents. */
+  wiki?: boolean;
 }
 
 export interface KnowledgeDoc {

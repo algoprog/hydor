@@ -10,9 +10,9 @@ Memory hat drei Teile, die zusammenarbeiten:
 
 - **Memory-Notizen**: kurze Fakten über dich, ein Projekt oder eine Sitzung, die jeder Agent beim Start erhält. Darum geht es im Großteil dieses Beitrags.
 - **Wiki-Memory**: längere Artikel mit Quellen, die Agenten für jedes Projekt sowie in einem gemeinsamen Wiki aus Dokumenten, Unterhaltungen und Commits schreiben; siehe [Wiki-Memory](/guide/wiki-memory). Agenten bekommen ohne Nachfrage eine Zeile zu den Artikeln, die zu deiner Anfrage passen, und die laufenden Pläne des Projekts.
-- **Dokumente**: die eigentlichen Dateien, die Agenten durchsuchen und zitieren und die sie nicht ungefragt erhalten. Sie liegen im [gemeinsamen Wissen](/knowledge) und im Projekt-Tab **Memory** unter **Dokumente**; siehe [Projekte und Wissen](/guide/projects).
+- **Dokumente**: die Dateien selbst, die Agenten durchsuchen und zitieren, aber nicht ungefragt erhalten. Sie liegen im [Gemeinsamen Wissen](/knowledge) und im Tab **Memory** jedes Projekts, zwischen seinen Notizen und Wiki-Artikeln (der Chip **Dokumente**; siehe [Projekte und Wissen](/guide/projects)).
 
-Im Tab **Memory** eines Projekts findest du alle drei Teile. Bei neuen oder geänderten Dokumenten liest das Hilfsmodell deren Inhalt, ergänzt einige Projektnotizen und aktualisiert das Wiki; siehe [Aus neuen Dokumenten lernen](/guide/wiki-memory#learn-from-new-documents).
+Der Tab **Memory** eines Projekts zeigt alle drei in einer Liste, mit einem Suchfeld darüber (siehe [Der Memory-Tab eines Projekts](/guide/wiki-memory#a-projects-memory-tab)). Wenn ein Dokument hinzugefügt oder geändert wird, liest das Hilfsmodell es, ergänzt ein paar Notizen im Memory des Projekts und aktualisiert dessen Wiki (siehe [Aus neuen Dokumenten lernen](/guide/wiki-memory#learn-from-new-documents)).
 
 Memory-Notizen sind kurz: ein oder zwei Sätze mit höchstens 500 Zeichen. Alle von der App ausgeführten Agenten teilen diese Notizen: Claude Code, Codex, Custom und ACP-Agenten wie Gemini CLI. Die eigenen Memory-Funktionen von Claude Code und Codex bleiben in App-Sitzungen ausgeschaltet. So gibt es einen gemeinsamen, einsehbaren und korrigierbaren Bestand. Jede Notiz gehört zu einem von drei Bereichen:
 

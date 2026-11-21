@@ -42,6 +42,10 @@ export interface WikiDocuments {
 export interface WikiItem {
   path: string;
   title: string;
+  /** When its file last changed (ms since 1970), for a list with the newest first. */
+  updated?: number;
+  /** Its frontmatter's `summary:` (what it is about in a line), at most 200 characters; none without one. */
+  summary?: string;
 }
 
 /** An area of a wiki: a group of articles about one lasting topic, with its hub (what it covers, its key facts, its articles). */

@@ -1,8 +1,7 @@
-// The Memory tab's Wiki part: the ⋯ menu beside its buttons (Update now, Rebuild from sources…, Restore the previous
-// wiki…), and the dialogs they open. What the wiki is doing is WikiJobProgress's.
-import { useEffect, useRef, useState } from 'react';
-import { Hammer, History, MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
-import { Button, Dialog, IconButton, MenuItem, Popover, Throbber } from '../../components/ui';
+// The dialogs of a project's wiki jobs, which the Memory tab's ⋯ menu and its build offer open: Build from history, Rebuild
+// from sources and Restore an earlier wiki. What the wiki is doing is WikiJobProgress's.
+import { useEffect, useState } from 'react';
+import { Button, Dialog, Throbber } from '../../components/ui';
 import { api, enc, post } from '../../lib/api';
 import { usd } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
@@ -27,7 +26,7 @@ interface Estimate {
 const when = (at: string) => new Date(at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
 /** What a build or rebuild reads, as pills' words: "38 conversations, 412 commits, 9 documents, 14 notes, README.md, docs/". */
-function readsLine(c: { sessions: number; commits: number; documents: number; notes: number; files: string[] }): string {
+export function readsLine(c: { sessions: number; commits: number; documents: number; notes: number; files: string[] }): string {
   const n = (k: number, one: string, many: string) => (k === 1 ? one : many);
   return [
     c.sessions ? n(c.sessions, tr('1 conversation'), tr(`${c.sessions.toLocaleString(LOCALE)} conversations`)) : '',
@@ -40,96 +39,7 @@ function readsLine(c: { sessions: number; commits: number; documents: number; no
     .join(', ');
 }
 
-const minutesText = (m: number) => (m >= 90 ? tr(`about ${Math.round(m / 60)} h`) : tr(`about ${Math.max(1, m)} min`));
-
-/** The ⋯ menu and its dialogs. `fresh`: the wiki is new (fewer than 10 articles, no build from history run yet), so it can be built from the project's history; after that it is rebuilt. */
-export function WikiActions({ id, job, refresh, fresh }: { id: string; job: WikiJob | null; refresh: () => void; fresh?: boolean }) {
-  const anchor = useRef<HTMLButtonElement>(null);
-  const [menu, setMenu] = useState(false);
-  const [rebuild, setRebuild] = useState(false);
-  const [restore, setRestore] = useState(false);
-  const [build, setBuild] = useState(false);
-  const running = job?.state === 'running';
-  const update = async () => {
-    setMenu(false);
-    try {
-      await post(`/api/projects/${enc(id)}/wiki/update`, {});
-      toast(tr('Updating the wiki now'));
-    } catch (e) {
-      toastError(e);
-    }
-    refresh();
-  };
-  return (
-    <>
-      <IconButton ref={anchor} label={tr('More for the wiki')} size="sm" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
-        <MoreHorizontal size={16} />
-      </IconButton>
-      <Popover anchor={anchor} open={menu} onClose={() => setMenu(false)} align="end" width={260}>
-        <MenuItem icon={<RefreshCw size={15} />} disabled={running} onClick={() => void update()}>
-          Update now
-        </MenuItem>
-        {fresh ? (
-          <MenuItem
-            icon={<Hammer size={15} />}
-            disabled={running}
-            onClick={() => {
-              setMenu(false);
-              setBuild(true);
-            }}
-          >
-            Build from history…
-          </MenuItem>
-        ) : (
-          <MenuItem
-            icon={<History size={15} />}
-            disabled={running}
-            onClick={() => {
-              setMenu(false);
-              setRebuild(true);
-            }}
-          >
-            Rebuild from sources…
-          </MenuItem>
-        )}
-        {!!job?.archives.length && (
-          <MenuItem
-            icon={<RotateCcw size={15} />}
-            disabled={running}
-            onClick={() => {
-              setMenu(false);
-              setRestore(true);
-            }}
-          >
-            Restore the previous wiki…
-          </MenuItem>
-        )}
-      </Popover>
-      {build && <BuildDialog id={id} onClose={() => setBuild(false)} onStarted={refresh} />}
-      {rebuild && <RebuildDialog id={id} onClose={() => setRebuild(false)} onStarted={refresh} />}
-      {restore && job && <RestoreDialog id={id} archives={job.archives} onClose={() => setRestore(false)} onDone={refresh} />}
-    </>
-  );
-}
-
-/**
- * A new wiki's way in (fewer than 10 articles, no build from history run yet, whatever it holds): when the project has something to
- * build its wiki from, a line saying what, and Build from history… (the same dialog as the ⋯ menu's). Nothing when there is nothing to
- * read, or while a job runs.
- */
-export function BuildFromHistoryPrompt({ id, offer, job, onStarted }: { id: string; offer: Offer | null; job: WikiJob | null; onStarted: () => void }) {
-  const [open, setOpen] = useState(false);
-  if (!offer?.worth || !offer.fresh || job?.state === 'running') return null;
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 min-[480px]:flex-row min-[480px]:items-center">
-      <p className="min-w-0 flex-1 text-[13px] leading-snug text-fg-2">{tr(`It can be built now from what the project already has: ${readsLine(offer.counts)}.`)}</p>
-      <Button variant="primary" size="sm" className="min-h-11 w-full min-[480px]:min-h-0 min-[480px]:w-auto" onClick={() => setOpen(true)}>
-        Build from history…
-      </Button>
-      {open && <BuildDialog id={id} onClose={() => setOpen(false)} onStarted={onStarted} />}
-    </div>
-  );
-}
+export const minutesText = (m: number) => (m >= 90 ? tr(`about ${Math.round(m / 60)} h`) : tr(`about ${Math.max(1, m)} min`));
 
 /** What a job costs, in words: the Claude plan on Automatic, else the price when the app has one. */
 function costLine(h: { model?: string; label: string; priced: boolean; usd?: number; usdMax?: number }): string {
@@ -138,7 +48,7 @@ function costLine(h: { model?: string; label: string; priced: boolean; usd?: num
   return h.usdMax != null && h.usdMax > (h.usd ?? 0) ? tr(`About ${usd(h.usd ?? 0)}, at most ${usd(h.usdMax)}, with ${h.label}.`) : tr(`About ${usd(h.usd ?? 0)} with ${h.label}.`);
 }
 
-function BuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => void; onStarted: () => void }) {
+export function BuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => void; onStarted: () => void }) {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -197,7 +107,7 @@ function BuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => vo
   );
 }
 
-function RebuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => void; onStarted: () => void }) {
+export function RebuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => void; onStarted: () => void }) {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -261,7 +171,7 @@ function RebuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => 
   );
 }
 
-function RestoreDialog({ id, archives, onClose, onDone }: { id: string; archives: WikiJob['archives']; onClose: () => void; onDone: () => void }) {
+export function RestoreDialog({ id, archives, onClose, onDone }: { id: string; archives: WikiJob['archives']; onClose: () => void; onDone: () => void }) {
   const [busy, setBusy] = useState('');
   const restore = async (at: string) => {
     setBusy(at);

@@ -10,6 +10,7 @@ import { areaArticles, membersByArea } from './areas/articles.ts';
 import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath } from './areas/registry.ts';
 import { listOf, readOrNull, splitFront } from './digest/write.ts';
 import { wikiFileActive } from './knowledge/bindings.ts';
+import { memorySearchRoutes } from './memory-search.ts';
 import { wikiMemoryOn, wikiRoot } from './roots.ts';
 
 /** The wiki's areas with their articles, for the Memory tab; undefined while it has none. */
@@ -70,5 +71,6 @@ export const wikiBrowse: Feature = {
         return doc;
       } catch { throw new HttpError(404, 'This wiki file is unavailable'); }
     });
+    memorySearchRoutes(d);
   },
 };

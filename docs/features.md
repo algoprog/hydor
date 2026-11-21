@@ -473,7 +473,7 @@ agents that speak ACP and take MCP servers.
   to three short notes to its memory; a newer source may replace what an article said, the helper giving a reason for each
   statement it removes (a rewrite keeps at least half, and the earlier text is kept as a snapshot, the 20 newest of each article), an
   article over 12,000 characters is first split into a hub and parts, anything with a secret is left out, and each outcome is
-  listed under Recent updates; documents already in a project's knowledge are
+  listed in Wiki updates (the Memory tab's ⋯ menu); documents already in a project's knowledge are
   read too, at the same pace (each project is checked every ten minutes for documents its wiki has not read yet, so a restart or a
   raised limit loses none; a document the helper could not read is tried again an hour later, up to three times, and when it changes). A large data file (CSV, TSV, a
   spreadsheet or JSON data, over 40,000 characters of text or 256 KB) is analysed with code instead: the helper writes Python that
@@ -481,7 +481,7 @@ agents that speak ACP and take MCP servers.
   findings become the source and go into the articles; without such a sandbox (macOS and Windows for now) these files are searched
   only, and agents in sessions can analyse them with code from their paths. A project with more documents than the most to read
   into the wiki (Settings, 100 at first, 0 to 100,000; a project's Settings tab can set a number of its own) has its wiki read only
-  that many: the pinned ones (a document's menu in the Documents list), then those agents used most, then the newest, with an
+  that many: the pinned ones (the Read into wiki memory switch in a document's pane on the Memory tab), then those agents used most, then the newest, with an
   overview article for each folder it does not read; agents search all of them, and its Memory tab says so. Each article keeps a
   summary, the files it names and the commit it was written at: once a day, one whose files changed is marked out of date (agents see
   that), and up to five a day are brought up to date from the change. Learn from the project's work (about once a day, when memory's Learn from conversations is on, nobody has written for ten
@@ -507,7 +507,7 @@ agents that speak ACP and take MCP servers.
   and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as an ordinary snapshot file with its checksum (it works on network drives too),
   the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
-  write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
+  write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates in its ⋯ menu (Wiki updates…).
   Areas: from ten articles a wiki's articles are grouped into areas, lasting topics (`areas:` in each article's front matter, the
   areas themselves in a hidden `.structure/areas.json`; no file moves), each with a hub kept by Hydor (`wiki/areas/<area>.md`: an
   overview, up to six key facts each checked against the article it cites, and the area's articles in reading order); `index.md`
@@ -517,16 +517,16 @@ agents that speak ACP and take MCP servers.
   or more, two levels at most and a third of the articles moved at most per pass. Event articles and duplicates it finds are merged
   later, two a day, under the revision rules, the merged one left as a redirect that `wiki_read` follows. Agents get a line naming
   the areas, and article lines say the area; an agent can be asked to reorganise now (`POST /api/projects/:id/wiki/reorganise`).
-  The Wiki part's ⋯ menu: **Update now** (the waiting documents, unread conversations and new commits read at once; up to ten
-  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Build from history…**
+  The Memory tab's ⋯ menu: **Update the wiki now** (the waiting documents, unread conversations and new commits read at once; up to ten
+  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Build the wiki from history…**
   while the wiki is new (fewer than 10 articles, no build from history run yet) (it reads what the project has that the wiki never read: its files, memory notes, up to 300 conversations
   by signal, the newest 1,200 commit messages and its unread documents, what matters most first so an agent can start early, then the
-  areas, hubs and merges; `/api/projects/:id/wiki/build`), **Rebuild from sources…** (an estimate of what it reads, minutes, helper
+  areas, hubs and merges; `/api/projects/:id/wiki/build`), **Rebuild the wiki…** (an estimate of what it reads, minutes, helper
   calls and cost first; the wiki archived, the last three kept and the first one always, then the files and the kept sources in
   `raw/` read again, commit messages fresh from the repository, the documents and conversations never read, the earlier articles no
   new one covers, the areas and hubs made anew, and old article paths redirected to the new articles; sources, plans and memory notes
-  untouched; it goes on after a restart) and **Restore the previous wiki…**. A build or rebuild reads several sources at once
-  (three on Automatic, four over an API, one on a local model) and goes as fast as they do; a panel shows its steps, what it reads now
+  untouched; it goes on after a restart) and **Restore an earlier wiki…**. A build or rebuild reads several sources at once
+  (three on Automatic, four over an API, one on a local model) and goes as fast as they do; a line under the tab's chips shows its steps (Details), what it reads now
   and the time left, with **Stop** (what was written stays), **Continue** and **Try again** (`…/wiki/stop`, `…/wiki/continue`); one
   job at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`). Agents are told of a wiki only
   once it has an article.
@@ -544,9 +544,8 @@ agents that speak ACP and take MCP servers.
   click outside closes it, and so does going to another page, such as opening a document from Files. Its Overview has
   its sessions (with what each is doing), its newest files (up to six tiles, with All files to open the Files tab) and
   what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents, skills and
-  assistant), who it is shared with, and a group's projects too; its Memory tab has its notes, its
-  wiki memory and its documents, one part at a time (`?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); its Settings tab sets its name,
-  colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch and the most documents its wiki reads (each saved at once) and its group, saved from a bar
+  assistant), who it is shared with, and a group's projects too; its Memory tab is one list of its notes, its wiki's articles and sources and its documents, newest first (the project's profile pinned at the top), with a search over all three at once (`GET /api/projects/:id/memory/search`: words, and meaning when search by meaning is on; it looks only in that project, and a note search inside a project now covers only that project's notes, which it could miss before), Add (a note, files, a folder kept up to date), a ⋯ menu (the wiki's jobs and Wiki updates…, Ask an agent to check the wiki, add a source or adopt a plan, Read the documents again, Open the wiki's folder, Memory settings, Deleted notes), chips All, Notes, Wiki and Documents with their counts (Notes: You said so, Not checked yet, Topics, Ends soon; Wiki: its areas, Sources, Plans; Documents: the folders it reads), and a pane that opens a note, a topic, an article or a document in place (`?part=notes`, `?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); files dropped anywhere on it join the project's documents; its Settings tab sets its name,
+  colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch, the most documents its wiki reads, whether its sessions also search the shared knowledge and whether other projects can search it (each saved at once) and its group, saved from a bar
   that shows once something changed. Its Files tab holds everything of the project that is a file or was kept in it
   (**Files in a project** below). Its Skills tab lists every skill its
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
@@ -633,8 +632,8 @@ agents that speak ACP and take MCP servers.
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
   kept up to date (of a text file over 4 MB, its first 4 MB). The page shows how far search by meaning has come,
   live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (a page of its own, from Settings → Memory or the search box) is searched by every session; a project's own
-  documents (its Memory tab, under Documents) by its sessions alone, which search the shared knowledge too unless the project
-  turns that off. A new or changed document also updates the project's notes and wiki memory (above), or the shared wiki for shared knowledge.
+  documents (its Memory tab, the Documents chip) by its sessions alone, which search the shared knowledge too unless the project
+  turns that off (a switch on its Settings tab). The wiki's own search index is not listed among a project's documents. A new or changed document also updates the project's notes and wiki memory (above), or the shared wiki for shared knowledge.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them (a PowerPoint file as its slides, drawn as the app's own viewer draws
   decks, with its pictures, shapes, tables, charts, backgrounds and speaker notes, a box's words made smaller where a

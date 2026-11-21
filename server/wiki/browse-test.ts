@@ -23,7 +23,7 @@ try {
   for (const folder of [path.join(wikiA, 'wiki', 'concepts'), path.join(wikiA, 'raw', 'articles'), projectB, projectC]) fs.mkdirSync(folder, { recursive: true });
   // An explicit project binding takes precedence over the configured default.
   fs.writeFileSync(path.join(projectA, 'AGENTS.md'), '- Wiki: `knowledge/custom/_index.md`\n');
-  fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'sky.md'), '---\ntitle: Sky\nsources:\n  - raw/articles/source.md\n---\n# Sky\n[Source](../../raw/articles/source.md)\n');
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'sky.md'), '---\ntitle: Sky\nsummary: "Why the sky is blue, in a line"\nsources:\n  - raw/articles/source.md\n---\n# Sky\n[Source](../../raw/articles/source.md)\n');
   fs.writeFileSync(path.join(wikiA, 'raw', 'articles', 'source.md'), '---\ntitle: Source\n---\nBlue sky evidence.\n');
   // Plans and their evidence use the existing project wiki and remain visible without archive contents.
   fs.mkdirSync(path.join(wikiA, 'output', 'projects', 'delivery'), { recursive: true });
@@ -77,7 +77,22 @@ try {
   assert.deepEqual(bodyA.articles.map((entry: { path: string }) => entry.path), ['wiki/concepts/sky.md']);
   assert.deepEqual(bodyA.sources.map((entry: { path: string }) => entry.path), ['raw/articles/source.md']);
   assert.deepEqual(bodyA.plans.map((entry: { path: string }) => entry.path), ['output/projects/delivery/plan.md']);
-  assert.deepEqual(bodyB.articles, [{ path: 'wiki/concepts/sky.md', title: "Bob's sky guide" }], 'a title keeps its apostrophe');
+  assert.equal(bodyB.articles.length, 1);
+  assert.deepEqual([bodyB.articles[0].path, bodyB.articles[0].title], ['wiki/concepts/sky.md', "Bob's sky guide"], 'a title keeps its apostrophe');
+  assert.equal('summary' in bodyB.articles[0], false, 'no summary line: none');
+  // Each entry says when its file last changed, and its summary line (unquoted, at most 200 characters).
+  assert.equal(bodyA.articles[0].summary, 'Why the sky is blue, in a line');
+  assert.equal(bodyA.articles[0].updated, Math.round(fs.statSync(path.join(wikiA, 'wiki', 'concepts', 'sky.md')).mtimeMs));
+  assert.equal(bodyA.sources[0].updated, Math.round(fs.statSync(path.join(wikiA, 'raw', 'articles', 'source.md')).mtimeMs));
+  assert.equal('summary' in bodyA.sources[0], false);
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'long.md'), `---\ntitle: Long\nsummary: ${'word '.repeat(80)}\n---\nText\n`);
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'empty.md'), '---\ntitle: Empty\nsummary:\n---\nText\n');
+  const more = (await list(a.id)).json().articles as { path: string; summary?: string }[];
+  const long = more.find((x) => x.path === 'wiki/concepts/long.md')!;
+  assert.ok(long.summary!.length <= 200 && long.summary!.startsWith('word word'));
+  assert.equal('summary' in more.find((x) => x.path === 'wiki/concepts/empty.md')!, false, 'an empty summary is left out');
+  fs.rmSync(path.join(wikiA, 'wiki', 'concepts', 'long.md'));
+  fs.rmSync(path.join(wikiA, 'wiki', 'concepts', 'empty.md'));
   assert.equal(bodyB.root, wikiB);
   assert.equal(bodyA.on, true);
   const article = await file(a.id, 'wiki/concepts/sky.md');
