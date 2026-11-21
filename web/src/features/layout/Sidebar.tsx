@@ -336,9 +336,11 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
       <ColumnScroll
         data-tour="sessions"
         onClick={(e) => {
-          // A tap on a button in the list itself; not in a session's menu, which opens over it (React passes its clicks on here).
-          const t = e.target as HTMLElement;
-          if (mobile && e.currentTarget.contains(t) && t.closest('button')) close();
+          // A tap on a button in the list itself closes the drawer, but not on one that folds or opens something there
+          // (a section's heading, a menu: aria-expanded or aria-haspopup), and not in a session's menu, which opens over
+          // it (React passes its clicks on here).
+          const b = (e.target as HTMLElement).closest('button');
+          if (mobile && b && e.currentTarget.contains(b) && !b.matches('[aria-expanded], [aria-haspopup]')) close();
         }}
       >
         <SessionList query="" />
