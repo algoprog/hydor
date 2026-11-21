@@ -18,6 +18,28 @@ type Draft = Omit<AppTemplate, 'agent' | 'tools' | 'limits'>;
 /** An Ask a person step's rule: the form's yes/no says to ask, and someone is there (the form, a test, or a session whose agent ran it). */
 const someoneThere = (field: string) => `{{${field}}} and {{run.source}} = web or {{${field}}} and {{run.source}} = test or {{${field}}} and {{run.source}} = session`;
 
+/** What a step says when the paper could not be read: how to give it another way, in a line the person reads. */
+const ANOTHER_WAY = 'Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.';
+
+/** The steps that stop a run clearly when the paper could not be read (read_paper failed, or it came back without a page): a line on it and on how to give it another way, not the tool's bare failure. */
+const unreadable = (what: string) => ({
+  id: 'unreadable',
+  title: what + ' could not be read',
+  do: 'code' as const,
+  language: 'javascript' as const,
+  with: { why: '{{error}}' },
+  code: 'const why = String(input.why || "").split("\\n")[0].replace(/^read_paper:\\s*/, "").trim();\nthrow new Error(' + JSON.stringify(ANOTHER_WAY) + ' + (why ? " (It said: " + why.slice(0, 200) + ")" : ""));',
+});
+const readable = (what: string) => ({
+  id: 'readable',
+  title: 'Check that ' + what.toLowerCase() + ' could be read',
+  do: 'code' as const,
+  language: 'javascript' as const,
+  with: { read: '{{paper_read.data}}' },
+  code: 'const r = input.read && typeof input.read === "object" ? input.read : {};\nif (!Array.isArray(r.parts) || !r.parts.length) {\n  const notes = Array.isArray(r.notes) ? r.notes.join(" ") : String(r.notes || "");\n  throw new Error(' + JSON.stringify(ANOTHER_WAY) + ' + (notes ? " (It said: " + notes.slice(0, 300) + ")" : ""));\n}\nreturn { ok: true };',
+  outputs: [{ id: 'ok', label: 'Could be read', type: 'yesno' as const }],
+});
+
 // ---- what the programs share ----------------------------------------------------------------------------------
 
 /** A value as a list: as it is, from the JSON an agent handed in, or from lines of text; rows: the objects in it. */
@@ -390,7 +412,7 @@ const LITERATURE_MATRIX: Draft = {
       placeholder: 'One a line: a title, a DOI, an arXiv id, a link or a PDF on this computer; or “my reading list, tag: retrieval”',
       help: 'From your Reading list too: “my reading list” with a tag, a project or a status',
     },
-    { id: 'columns', label: 'The columns', type: 'long', default: 'Task\nData\nMethod\nMetrics\nResults\nLimits', help: 'One a line: change them as you like' },
+    { id: 'columns', label: 'The columns', type: 'long', remember: true, default: 'Task\nData\nMethod\nMetrics\nResults\nLimits', help: 'One a line: change them as you like' },
     { id: 'project', label: 'Project', type: 'text', placeholder: 'e.g. Dense retrieval survey', help: 'Its spreadsheet goes in this project of yours; with “my reading list”, its papers of this project' },
   ],
   prompt: '',
@@ -705,7 +727,7 @@ const REPRODUCE: Draft = {
     { id: 'upload', label: 'Or upload it', type: 'file', help: 'Its PDF' },
     { id: 'code', label: 'Its code', type: 'text', placeholder: 'e.g. https://github.com/beir-cellar/beir', help: 'A link or a folder on this computer; looked for when you leave it empty' },
     { id: 'target', label: 'What to reproduce', type: 'long', required: true, placeholder: 'e.g. Table 2, the BM25 + monoT5 row on MS MARCO dev' },
-    { id: 'limits', label: 'Limits', type: 'text', default: 'At most 4 hours, 100 GB of disk and 1 GPU', help: 'Time, disk and GPUs it may use' },
+    { id: 'limits', label: 'Limits', type: 'text', remember: true, default: 'At most 4 hours, 100 GB of disk and 1 GPU', help: 'Time, disk and GPUs it may use' },
     { id: 'folder', label: 'Where to work', type: 'text', placeholder: '~/repro', help: 'A folder on this computer; a new one for this run when empty' },
   ],
   prompt: '',
@@ -830,6 +852,8 @@ Its code: {{#hints.repo}}{{hints.repo}}{{/hints.repo}}{{^hints.repo}}{{#pick.rep
 {{#hints.hf}}Hugging Face links in the paper:
 {{hints.hf}}
 {{/hints.hf}}Limits: {{limits}}. Stop and report when a limit would be passed.
+{{#me.compute}}What they can run on (from About you): {{me.compute}}. Choose what you run to fit it.
+{{/me.compute}}
 Work in {{#folder}}{{folder}}{{/folder}}{{^folder}}this run's folder{{/folder}}.
 
 The exact setting, as the paper gives it:
@@ -1053,14 +1077,15 @@ const REVIEWER_SIMULATOR: Draft = {
   fields: [
     { id: 'paper', label: 'Your paper', type: 'text', required: true, placeholder: 'e.g. ~/papers/draft/main.pdf, or the LaTeX project’s folder', help: 'A PDF, a .tex file or a LaTeX project’s folder on this computer, or a link' },
     { id: 'upload', label: 'Or upload it', type: 'file', help: 'Its PDF' },
-    { id: 'venue', label: 'The venue', type: 'choice', options: VENUE_NAMES, default: 'ACL Rolling Review', help: 'Each on its own review form (as of 2025: forms change a little each year)' },
+    { id: 'venue', label: 'The venue', type: 'choice', remember: true, options: VENUE_NAMES, default: 'ACL Rolling Review', help: 'Each on its own review form (as of 2025: forms change a little each year)' },
     { id: 'reviewers', label: 'How many reviewers', type: 'number', default: '3', help: '1 to 5' },
     { id: 'focus', label: 'Anything to focus on', type: 'long', placeholder: 'e.g. whether the baselines are strong enough' },
   ],
   prompt: '',
   flow: {
     steps: [
-      { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 90000 } },
+      { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 90000 }, failed: [unreadable('Your paper')] },
+      readable('Your paper'),
       {
         id: 'panel',
         title: 'Seat the reviewers',
@@ -1310,7 +1335,7 @@ const REBUTTAL: Draft = {
     { id: 'paper', label: 'Your paper', type: 'text', placeholder: 'e.g. ~/papers/draft/main.pdf', help: 'A PDF, a .tex file or a LaTeX project’s folder, or a link: to cite its sections' },
     { id: 'upload', label: 'Or upload it', type: 'file' },
     { id: 'limit', label: 'The limit', type: 'text', default: '2,500 characters per reviewer', help: 'As the venue sets it: characters or words, per reviewer, per point or in all' },
-    { id: 'tone', label: 'Tone', type: 'choice', options: ['Courteous and firm', 'Warm and grateful', 'Brief and to the point'], default: 'Courteous and firm' },
+    { id: 'tone', label: 'Tone', type: 'choice', remember: true, options: ['Courteous and firm', 'Warm and grateful', 'Brief and to the point'], default: 'Courteous and firm' },
   ],
   prompt: '',
   flow: {
@@ -1744,7 +1769,8 @@ const PAPER_TO_TALK: Draft = {
   prompt: '',
   flow: {
     steps: [
-      { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 120000 } },
+      { id: 'paper_read', title: 'Read your paper', do: 'tool', tool: 'read_paper', with: { paper: '{{paper}}', upload: '{{upload}}', max_chars: 120000 }, failed: [unreadable('Your paper')] },
+      readable('Your paper'),
       {
         id: 'check',
         title: 'Gather its figures',
@@ -1993,10 +2019,10 @@ const FIGURE_DOCTOR: Draft = {
   description: 'Plots fit for the paper: the column’s width, the paper’s font, colours colour-blind readers tell apart, vector PDFs with their fonts embedded, and one style file for them all.',
   fields: [
     { id: 'plots', label: 'Your plotting code', type: 'text', required: true, placeholder: 'e.g. ~/papers/colbert/plots', help: 'A script, a notebook or a folder of them on this computer (matplotlib, seaborn)' },
-    { id: 'venue', label: 'The venue’s template', type: 'choice', options: [...Object.keys(FIGURE_VENUES), 'Other (give the width)'], default: 'ACL, EMNLP, NAACL' },
+    { id: 'venue', label: 'The venue’s template', type: 'choice', remember: true, options: [...Object.keys(FIGURE_VENUES), 'Other (give the width)'], default: 'ACL, EMNLP, NAACL' },
     { id: 'span', label: 'Width', type: 'choice', options: ['One column', 'Both columns'], default: 'One column' },
-    { id: 'inches', label: 'Or the width in inches', type: 'number', help: 'For another template: its \\columnwidth (or \\textwidth) in inches' },
-    { id: 'font', label: 'The paper’s font', type: 'choice', options: ['As the template', 'Times New Roman', 'Computer Modern', 'Linux Libertine', 'Helvetica'], default: 'As the template' },
+    { id: 'inches', label: 'Or the width in inches', type: 'number', remember: true, help: 'For another template: its \\columnwidth (or \\textwidth) in inches' },
+    { id: 'font', label: 'The paper’s font', type: 'choice', remember: true, options: ['As the template', 'Times New Roman', 'Computer Modern', 'Linux Libertine', 'Helvetica'], default: 'As the template' },
   ],
   prompt: '',
   flow: {
