@@ -12,7 +12,7 @@ import type { AnswerField, AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { EXPLORE, EXPLORE_UI } from './explore.ts';
-import { MORE } from './templates-more.ts';
+import { BODY, MORE } from './templates-more.ts';
 import { LAB } from './templates-lab.ts';
 import { PAPERS } from './templates-papers.ts';
 import { RESEARCH } from './templates-research.ts';
@@ -157,6 +157,14 @@ const COMPARE_COLUMNS: AnswerField['columns'] = [
   { id: 'scores', label: 'How it scores', type: 'text', description: 'Its score on each thing that matters, one a line' },
   { id: 'link', label: 'Link', type: 'url' },
   { id: 'picture', label: 'Picture', type: 'image' },
+];
+
+/** What is on during the trip, as the research found it. */
+const TRIP_EVENTS: AnswerField['columns'] = [
+  { id: 'name', label: 'Event', type: 'text' },
+  { id: 'date', label: 'When', type: 'text' },
+  { id: 'where', label: 'Where', type: 'text' },
+  { id: 'note', label: 'Note', type: 'text' },
 ];
 
 const TRIP_STOPS: AnswerField['columns'] = [
@@ -892,13 +900,126 @@ Hand in one row of the itinerary per day, in order.`,
             { id: 'tips', label: 'Tips', type: 'list', description: 'Getting in from the airport or station, transport passes, money, safety, and what to pack for the weather' },
           ],
         },
+        {
+          id: 'lookups',
+          title: 'Look up the places and the rate',
+          do: 'parallel',
+          branches: [
+            [
+              {
+                id: 'geo',
+                title: 'Find where each day’s area is',
+                do: 'code',
+                language: 'javascript',
+                seconds: 60,
+                with: { stops: '{{plan.itinerary}}', destination: '{{destination}}' },
+                code:
+                  LIST +
+                  BODY +
+                  String.raw`// Each day's area looked up instead of taken from the model's memory: the destination first (to tell places of the
+// same name apart), then Open-Meteo's search for the area, taking the result nearest the destination, and when that
+// finds none, OpenStreetMap's search for "area, destination" (one a second, as it asks). A day whose area neither
+// finds is left out, and keeps the model's own latitude and longitude.
+const UA = 'Hydor (+https://github.com/algoprog/hydor)';
+const plain = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const km = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 111 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180));
+const good = (lat, lng) => isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0 && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+const dest = String(input.destination || '').trim();
+const meteo = async (name) => {
+  try {
+    const r = await ctx.tool('http_request', { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name=' + encodeURIComponent(name) }, { title: 'Look up ' + name });
+    return ((bodyOf(r) || {}).results || []).map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude), region: [p.admin1, p.admin2, p.country].filter(Boolean).join(' ') })).filter((p) => good(p.lat, p.lng));
+  } catch (e) {
+    return [];
+  }
+};
+// OpenStreetMap's search asks for one question a second: they wait their turn.
+let gate = Promise.resolve();
+const osm = (q) => {
+  const run = gate.then(async () => {
+    try {
+      const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(q), headers: { 'User-Agent': UA } }, { title: 'Look up ' + q });
+      const hit = (bodyOf(r) || [])[0];
+      return hit && good(Number(hit.lat), Number(hit.lon)) ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  gate = run.then(() => new Promise((done) => setTimeout(done, 1100)));
+  return run;
+};
+const after = plain(dest.split(',').slice(1).join(' ')).split(/[^a-z]+/).filter((w) => w.length > 2);
+const first = (await meteo(dest.split(',')[0].trim())).filter((p) => !after.length || after.some((w) => plain(p.region).includes(w)));
+const anchor = dest ? first[0] || (await osm(dest)) : null;
+const words = plain(dest).split(/[^a-z]+/).filter((w) => w.length > 3);
+const find = async (area) => {
+  const name = area.split(/\s*(?:&|\/|,|;| and | – | - )\s*/)[0] || area;
+  const found = await meteo(name);
+  if (anchor) {
+    const near = found.map((p) => Object.assign({ d: km(p, anchor) }, p)).filter((p) => p.d <= 250).sort((a, b) => a.d - b.d)[0];
+    if (near) return { lat: near.lat, lng: near.lng };
+  } else {
+    const hit = found.find((p) => words.some((w) => plain(p.region).includes(w)));
+    if (hit) return { lat: hit.lat, lng: hit.lng };
+  }
+  const o = await osm(name + (dest ? ', ' + dest : ''));
+  return o && (!anchor || km(o, anchor) <= 1000) ? o : null;
+};
+const stops = rows(input.stops).filter((r) => Number(r.day) > 0);
+const areas = [...new Set(stops.map((r) => String(r.area || '').trim()).filter(Boolean))].slice(0, 21);
+const where = new Map();
+for (let i = 0; i < areas.length; i += 3) await Promise.all(areas.slice(i, i + 3).map(async (a) => where.set(a, await find(a))));
+const places = stops.map((r) => {
+  const w = where.get(String(r.area || '').trim());
+  return { day: Number(r.day), area: String(r.area || ''), lat: w ? w.lat : null, lng: w ? w.lng : null, found: !!w };
+});
+return { places, found: places.filter((p) => p.found).length };`,
+                outputs: [
+                  { id: 'places', label: 'Where each day’s area is', type: 'table', columns: [{ id: 'day', label: 'Day', type: 'number' }, { id: 'area', label: 'Area', type: 'text' }, { id: 'lat', label: 'Latitude', type: 'number' }, { id: 'lng', label: 'Longitude', type: 'number' }, { id: 'found', label: 'Looked up', type: 'yesno' }] },
+                  { id: 'found', label: 'Found', type: 'number' },
+                ],
+                failed: 'skip',
+              },
+            ],
+            [
+              {
+                id: 'fx',
+                title: 'Get the exchange rate',
+                do: 'code',
+                language: 'javascript',
+                with: { currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
+                code:
+                  BODY +
+                  String.raw`// What one of the local currency is worth in the travelers' own, as today's rate from Frankfurter (the European
+// Central Bank's daily rates, free, no key) when the two currencies differ; else the figure the plan gave from memory.
+const from = String(input.currency || '').trim().toUpperCase();
+const to = String(input.home || '').trim().toUpperCase();
+const own = Number(input.rate);
+if (/^[A-Z]{3}$/.test(from) && /^[A-Z]{3}$/.test(to) && from !== to) {
+  try {
+    const b = bodyOf(await ctx.tool('http_request', { url: 'https://api.frankfurter.app/latest?from=' + from + '&to=' + to }, { title: 'Get the rate of ' + from + ' to ' + to }));
+    const v = b && b.rates ? Number(b.rates[to]) : NaN;
+    if (isFinite(v) && v > 0) return { rate: v, date: String(b.date || '').slice(0, 10), source: 'Frankfurter' };
+  } catch (e) {}
+}
+return { rate: isFinite(own) && own > 0 ? own : 0, date: '', source: isFinite(own) && own > 0 ? 'the plan' : '' };`,
+                outputs: [
+                  { id: 'rate', label: 'Rate', type: 'number' },
+                  { id: 'date', label: 'Its day', type: 'date' },
+                  { id: 'source', label: 'Where it is from', type: 'text' },
+                ],
+                failed: 'skip',
+              },
+            ],
+          ],
+        },
         { id: 'media', title: 'Find a picture for each day', do: 'tool', tool: 'find_media', with: { items: '{{plan.itinerary}}', name: 'sight', kind: 'in {{destination}}' }, failed: 'skip' },
         {
           id: 'assemble',
           title: 'Put the plan together',
           do: 'code',
           language: 'javascript',
-          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', media: '{{media.data}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
+          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', media: '{{media.data}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{fx.rate}}', rate_day: '{{fx.date}}', rate_from: '{{fx.source}}', geo: '{{geo.places}}' },
           code:
             LIST +
             String.raw`// The day-by-day table on the trip's own dates, each day with its main sight's picture, and the budget with its total
@@ -943,20 +1064,25 @@ const budget = rows(input.costs)
   });
 const rate = num(input.rate);
 const home = String(input.home || '').trim();
-if (budget.length) budget.push({ item: 'Total', estimate: range(low, high, cur) + (rate > 0 && home && home !== cur ? ' (about ' + range(low * rate, high * rate, home) + ')' : '') });
-// The days' areas on the map: those with a place on Earth, none far (over 400 km) from the others' middle.
+// Said with the rate and whose day it is, so a figure from a past day or from the plan's memory is not taken for today's.
+const rateIs = () => ' at 1 ' + cur + ' = ' + Math.round(rate * 10000) / 10000 + ' ' + home + (input.rate_from === 'Frankfurter' && input.rate_day ? ', the rate of ' + input.rate_day : ', the planner’s own figure, not a live rate');
+if (budget.length) budget.push({ item: 'Total', estimate: range(low, high, cur) + (rate > 0 && home && home !== cur ? ' (about ' + range(low * rate, high * rate, home) + rateIs() + ')' : '') });
+// The days' areas on the map: where the look-up found each (the model's own figure only where it found none), those
+// with a place on Earth; one is left out only when it is far (over 400 km) from every other, so a road trip, whose
+// stops are far from the middle but near each other, keeps them all.
+const geo = rows(input.geo);
 const at = days.map((d, i) => {
   const r = plan.find((x) => Number(x.day) === Number(d.day)) || plan[i] || {};
-  const lat = Number(r.lat);
-  const lng = Number(r.lng);
+  const g = geo.find((x) => Number(x.day) === Number(d.day) && x.found);
+  const lat = g ? Number(g.lat) : Number(r.lat);
+  const lng = g ? Number(g.lng) : Number(r.lng);
   return { day: d.day, date: d.date, area: d.area, lat, lng };
 }).filter((s) => r0(s.lat, 90) && r0(s.lng, 180));
 function r0(v, most) {
   return v !== 0 && isFinite(v) && Math.abs(v) <= most;
 }
-const mid = (k) => at.map((s) => s[k]).sort((a, b) => a - b)[Math.floor(at.length / 2)];
-const far = (s) => Math.hypot((s.lat - mid('lat')) * 111, (s.lng - mid('lng')) * 111 * Math.cos((s.lat * Math.PI) / 180)) > 400;
-return { days, budget, stops: at.filter((s) => !far(s)) };`,
+const apart = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 111 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180));
+return { days, budget, stops: at.filter((s) => at.length < 2 || at.some((o) => o !== s && apart(s, o) <= 400)) };`,
           outputs: [
             { id: 'days', label: 'Day by day', type: 'table', columns: TRIP_DAYS },
             { id: 'budget', label: 'Budget', type: 'table', columns: [{ id: 'item', label: 'Item', type: 'text' }, { id: 'estimate', label: 'Estimate', type: 'text' }] },
@@ -965,7 +1091,24 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
           failed: 'agent',
         },
       ],
-      outputs: { overview: '{{plan.overview}}', days: '{{assemble.days}}', book_ahead: '{{plan.book_ahead}}', budget: '{{assemble.budget}}', tips: '{{plan.tips}}', stops: '{{assemble.stops}}' },
+      // The research's own findings go straight from the early steps that make them, so each shows as soon as its step ends.
+      outputs: {
+        overview: '{{plan.overview}}',
+        days: '{{assemble.days}}',
+        book_ahead: '{{plan.book_ahead}}',
+        budget: '{{assemble.budget}}',
+        tips: '{{plan.tips}}',
+        stops: '{{assemble.stops}}',
+        weather: '{{weather.summary}}',
+        temperatures: '{{weather.temperatures}}',
+        rain: '{{weather.rain}}',
+        pack: '{{weather.pack}}',
+        events: '{{whats_on.events}}',
+        holidays: '{{whats_on.holidays}}',
+        closures: '{{whats_on.closures}}',
+        arrival: '{{transport.arrival}}',
+        around: '{{transport.around}}',
+      },
     },
     answer: [
       { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
@@ -982,9 +1125,18 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
       },
       { id: 'tips', label: 'Tips', type: 'list' },
       { id: 'stops', label: 'On the map', type: 'table', description: 'Each day’s area, with where it is', columns: TRIP_STOPS },
+      { id: 'weather', label: 'The weather', type: 'text', description: 'What to expect on the trip’s dates, in a sentence or two' },
+      { id: 'temperatures', label: 'Temperatures', type: 'text' },
+      { id: 'rain', label: 'Rain', type: 'text' },
+      { id: 'pack', label: 'What to pack', type: 'list' },
+      { id: 'events', label: 'What is on', type: 'table', description: 'Events and festivals within the dates, each with when', columns: TRIP_EVENTS },
+      { id: 'holidays', label: 'Public holidays', type: 'list' },
+      { id: 'closures', label: 'Closures and works', type: 'list' },
+      { id: 'arrival', label: 'Getting in', type: 'text' },
+      { id: 'around', label: 'Getting around', type: 'text', description: 'Passes, tickets and what they cost' },
     ],
     examples: [
-      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty', '{{media.data.pictures}} > 0'] },
+      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty', '{{answer.weather}} is not empty', '{{answer.around}} is not empty', '{{media.data.pictures}} > 0'] },
       { id: 'a-family-trip', name: 'A relaxed family trip', inputs: { destination: 'Copenhagen', start: '2027-07-05', days: 3, travelers: 'Two adults and a six-year-old', pace: 'Relaxed' }, checks: ['{{calendar.count}} = 3'] },
     ],
   },

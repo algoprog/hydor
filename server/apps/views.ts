@@ -47,7 +47,7 @@ const TRIP: AppUi = {
         { element: 'pace-switch' },
         { title: 'The plan', text: '{{result.overview}}', width: 'two-thirds' },
         { title: 'Day by day', element: 'day-row', data: 'result.days', each: true, width: 'third', empty: 'No days planned' },
-        { title: 'Good to know', element: 'tips', data: 'result.tips', if: 'result.tips' },
+        { title: 'Tips', element: 'tips', data: 'result.tips', if: 'result.tips' },
       ],
     },
     {
@@ -80,6 +80,17 @@ const TRIP: AppUi = {
       ],
     },
     {
+      id: 'know',
+      title: 'Good to know',
+      blocks: [
+        { element: 'know-weather', if: 'result.weather' },
+        { title: 'What is on', element: 'table', data: 'result.events', if: 'result.events', with: { columns: ['name', 'date', 'where', 'note'] } },
+        { title: 'Public holidays', element: 'list', data: 'result.holidays', if: 'result.holidays', width: 'half' },
+        { title: 'Closures and works', element: 'list', data: 'result.closures', if: 'result.closures', width: 'half' },
+        { element: 'know-around', if: 'result.around' },
+      ],
+    },
+    {
       id: 'budget',
       title: 'Budget',
       if: 'result.budget',
@@ -91,6 +102,33 @@ const TRIP: AppUi = {
     },
   ],
   elements: {
+    'know-weather': {
+      description: 'The weather to expect on the trip’s dates, and what to pack for it',
+      html: String.raw`<section class="k">
+  <h3>The weather</h3>
+  <p class="big">{{result.weather}}</p>
+  {{#result.temperatures}}<p><b>Temperatures</b> {{result.temperatures}}</p>{{/result.temperatures}}
+  {{#result.rain}}<p><b>Rain</b> {{result.rain}}</p>{{/result.rain}}
+  {{#result.pack|count}}<p class="pack"><b>Pack</b>{{#result.pack}}<span>{{.}}</span>{{/result.pack}}</p>{{/result.pack}}
+</section>`,
+      css: String.raw`
+.k { padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+h3 { margin: 0 0 6px; font-size: 13px; color: var(--n-muted); } p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.5; } .big { font-size: 16px; }
+.pack { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .pack span { padding: 2px 10px; border: 1px solid var(--n-line); border-radius: 999px; font-size: 13px; }
+`,
+    },
+    'know-around': {
+      description: 'How to get in and get around',
+      html: String.raw`<section class="k">
+  <h3>Getting there and around</h3>
+  {{#result.arrival}}<p><b>Getting in</b> {{result.arrival}}</p>{{/result.arrival}}
+  <p><b>Getting around</b> {{result.around}}</p>
+</section>`,
+      css: String.raw`
+.k { padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+h3 { margin: 0 0 6px; font-size: 13px; color: var(--n-muted); } p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.5; }
+`,
+    },
     'trip-hero': {
       description: 'Where and when, who goes, and the trip in three numbers',
       html: String.raw`<header class="hero">

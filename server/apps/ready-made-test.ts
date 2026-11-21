@@ -127,6 +127,96 @@ test('Meal plan: a vegetarian week in which the model picked a meat dish gets a 
   assert.equal(asked.length, 0);
 });
 
+// ---- Trip planner --------------------------------------------------------------------------------------------------
+
+const json = (url: string, body: unknown) => answer(url, JSON.stringify(body));
+const meteo = (...results: Record<string, unknown>[]) => ({ results });
+const place = (name: string, lat: number, lng: number, admin1: string, country: string) => ({ name, latitude: lat, longitude: lng, admin1, country });
+
+test('Trip planner: each day’s area is looked up (Open-Meteo near the destination, then OpenStreetMap a second apart), and what neither finds is left to the model', async () => {
+  const stamps: [string, number][] = [];
+  const tools = (tool: string, a: Record<string, unknown>) => {
+    assert.equal(tool, 'http_request');
+    const u = new URL(String(a.url));
+    if (u.host === 'geocoding-api.open-meteo.com') {
+      const name = u.searchParams.get('name');
+      stamps.push(['meteo ' + name, Date.now()]);
+      if (name === 'Lisbon') return json(String(a.url), meteo(place('Lisbon', 38.7167, -9.1333, 'Lisbon', 'Portugal'), place('Lisbon', 44.04, -70.1, 'Maine', 'United States')));
+      if (name === 'Alfama') return json(String(a.url), meteo(place('Alfama', 38.711, -9.13, 'Lisbon', 'Portugal')));
+      if (name === 'Baixa') return json(String(a.url), meteo(place('Baixa', -12.5, -40.2, 'Bahia', 'Brazil'), place('Baixa', 38.7105, -9.1393, 'Lisbon', 'Portugal')));
+      return json(String(a.url), {});
+    }
+    assert.equal(u.host, 'nominatim.openstreetmap.org');
+    assert.match(String((a.headers as Record<string, string>)['User-Agent']), /^Hydor/);
+    stamps.push(['osm ' + u.searchParams.get('q'), Date.now()]);
+    return u.searchParams.get('q') === 'Sintra, Lisbon' ? json(String(a.url), [{ lat: '38.8029', lon: '-9.3817', display_name: 'Sintra, Portugal' }]) : json(String(a.url), []);
+  };
+  const stops = [{ day: 1, area: 'Alfama', lat: 1, lng: 1 }, { day: 2, area: 'Baixa & Chiado' }, { day: 3, area: 'Sintra' }, { day: 4, area: 'Nowhereville' }, { day: 5, area: 'Alfama' }, { day: 6, area: '' }];
+  const v = await program('trip-planner', 'geo', { stops, destination: 'Lisbon' }, tools);
+  const at = (d: number) => (v.places as Record<string, unknown>[]).find((p) => p.day === d)!;
+  assert.deepEqual([at(1).lat, at(1).lng, at(1).found], [38.711, -9.13, true], 'Open-Meteo’s result, not the model’s figure');
+  assert.deepEqual([at(2).lat, at(2).lng], [38.7105, -9.1393], 'the Baixa near Lisbon, not the one in Bahia (the area’s first part is asked)');
+  assert.deepEqual([at(3).lat, at(3).lng, at(3).found], [38.8029, -9.3817, true], 'OpenStreetMap, asked with the destination, when Open-Meteo has none');
+  assert.deepEqual([at(4).lat, at(4).lng, at(4).found], [null, null, false], 'found by neither');
+  assert.deepEqual([at(5).lat, at(5).found], [38.711, true], 'the same area once');
+  assert.equal(at(6).found, false, 'a day with no area');
+  assert.equal(v.found, 4);
+  assert.equal(stamps.filter(([k]) => k === 'meteo Alfama').length, 1, 'an area is asked once');
+  const osm = stamps.filter(([k]) => k.startsWith('osm'));
+  assert.deepEqual(osm.map(([k]) => k), ['osm Sintra, Lisbon', 'osm Nowhereville, Lisbon']);
+  assert.ok(osm[1][1] - osm[0][1] >= 1000, 'OpenStreetMap is asked once a second');
+  // A destination that names its region tells places apart: Paris in Texas, not in France.
+  const paris = (name: string) =>
+    name === 'Paris' ? meteo(place('Paris', 48.85, 2.35, 'Île-de-France', 'France'), place('Paris', 33.66, -95.55, 'Texas', 'United States')) : name === 'Downtown' ? meteo(place('Downtown', 48.86, 2.34, 'Île-de-France', 'France'), place('Downtown', 33.67, -95.56, 'Texas', 'United States')) : {};
+  const tx = await program('trip-planner', 'geo', { stops: [{ day: 1, area: 'Downtown' }], destination: 'Paris, Texas' }, (_t, a) => json(String(a.url), paris(new URL(String(a.url)).searchParams.get('name') ?? '')));
+  assert.deepEqual([(tx.places as Record<string, unknown>[])[0].lat, (tx.places as Record<string, unknown>[])[0].lng], [33.67, -95.56]);
+  // Nothing answering at all: nothing found, and the step still gives its rows.
+  const down = await program('trip-planner', 'geo', { stops: [{ day: 1, area: 'Alfama' }], destination: 'Lisbon' }, () => new Error('HTTP 502'));
+  assert.deepEqual((down.places as Record<string, unknown>[]).map((p) => p.found), [false]);
+});
+
+test('Trip planner: the exchange rate comes from Frankfurter when the currencies differ, else from the plan, and the budget says whose day it is', async () => {
+  const asked: string[] = [];
+  const bank = (tool: string, a: Record<string, unknown>) => (asked.push(String(a.url)), json(String(a.url), { amount: 1, base: 'EUR', date: '2026-11-20', rates: { USD: 1.0812 } }));
+  const live = await program('trip-planner', 'fx', { currency: 'eur', home: 'USD', rate: 1.5 }, bank);
+  assert.deepEqual([live.rate, live.date, live.source], [1.0812, '2026-11-20', 'Frankfurter']);
+  assert.deepEqual(asked, ['https://api.frankfurter.app/latest?from=EUR&to=USD']);
+  asked.length = 0;
+  const same = await program('trip-planner', 'fx', { currency: 'EUR', home: 'EUR', rate: 1 }, bank);
+  assert.deepEqual([asked.length, same.source], [0, 'the plan']);
+  const none = await program('trip-planner', 'fx', { currency: 'EUR', home: '', rate: '' }, bank);
+  assert.deepEqual([asked.length, none.rate, none.source], [0, 0, '']);
+  const down = await program('trip-planner', 'fx', { currency: 'EUR', home: 'USD', rate: 1.05 }, () => new Error('HTTP 404'));
+  assert.deepEqual([down.rate, down.source], [1.05, 'the plan'], 'the model’s figure when the bank does not answer');
+  const base = { dates: dates(2), itinerary: [], costs: [{ item: 'Hotel', low: 100, high: 200 }], currency: 'EUR', home: 'USD' };
+  const a = await program('trip-planner', 'assemble', { ...base, rate: live.rate, rate_day: live.date, rate_from: live.source, geo: [] });
+  assert.deepEqual((a.budget as Record<string, string>[]).pop(), { item: 'Total', estimate: '100–200 EUR (about 108–216 USD at 1 EUR = 1.0812 USD, the rate of 2026-11-20)' });
+  const b = await program('trip-planner', 'assemble', { ...base, rate: 1.05, rate_day: '', rate_from: 'the plan', geo: [] });
+  assert.match((b.budget as Record<string, string>[]).pop()!.estimate, /at 1 EUR = 1.05 USD, the planner’s own figure, not a live rate\)$/);
+  const c = await program('trip-planner', 'assemble', { ...base, rate: 0, rate_day: '', rate_from: '', geo: [] });
+  assert.equal((c.budget as Record<string, string>[]).pop()!.estimate, '100–200 EUR');
+});
+
+test('Trip planner: the map uses the look-up’s places, then the model’s where none was found; a road trip keeps its stops, and only a stop far from every other is left out', async () => {
+  const dayRows = dates(5);
+  // A road trip: five stops 350 km apart, as the model gave them: each is far from the middle, none is far from its neighbour.
+  const road = dayRows.map((d, i) => ({ day: d.day, area: `Stop ${i + 1}`, lat: 36 + i * 3.15, lng: -5 }));
+  const run = (itinerary: Record<string, unknown>[], geo: Record<string, unknown>[] = []) => program('trip-planner', 'assemble', { dates: dayRows, itinerary, costs: [], currency: '', home: '', rate: 0, geo });
+  const kept = await run(road);
+  assert.deepEqual((kept.stops as Record<string, unknown>[]).map((s) => s.day), [1, 2, 3, 4, 5]);
+  // A stop on another continent (one the model got wrong) is dropped; one stop alone is kept.
+  const stray = await run(road.map((r, i) => (i === 4 ? { ...r, lat: 40.7, lng: -74 } : r)));
+  assert.deepEqual((stray.stops as Record<string, unknown>[]).map((s) => s.day), [1, 2, 3, 4]);
+  const one = await run([{ day: 1, area: 'Alfama', lat: 38.7, lng: -9.1 }]);
+  assert.equal((one.stops as unknown[]).length, 1);
+  // The look-up wins over the model's figure for a day; where it found none the model's stays; none anywhere: no stop.
+  const mixed = await run(
+    [{ day: 1, area: 'A', lat: 10, lng: 10 }, { day: 2, area: 'B', lat: 38.7, lng: -9.1 }, { day: 3, area: 'C' }],
+    [{ day: 1, area: 'A', lat: 38.71, lng: -9.13, found: true }, { day: 2, area: 'B', lat: null, lng: null, found: false }, { day: 3, area: 'C', lat: null, lng: null, found: false }],
+  );
+  assert.deepEqual((mixed.stops as Record<string, unknown>[]).map((s) => [s.day, s.lat, s.lng]), [[1, 38.71, -9.13], [2, 38.7, -9.1]]);
+});
+
 // ---- run -----------------------------------------------------------------------------------------------------------
 
 for (const [name, fn] of tests) {

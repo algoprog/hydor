@@ -42,7 +42,7 @@ function num(v) {
 `;
 
 /** The JSON an address answered with, from what http_request gives (its status and headers, a blank line, the body). */
-const BODY = String.raw`// The JSON an address answered with: http_request gives its status and headers, a blank line, then the body. An
+export const BODY = String.raw`// The JSON an address answered with: http_request gives its status and headers, a blank line, then the body. An
 // answer cut short (a long list) keeps the items that came whole.
 function bodyOf(r) {
   if (r && typeof r === 'object' && !Array.isArray(r)) {
