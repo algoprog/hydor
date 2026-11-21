@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
+import { answerSchema, APP_COLORS, APP_ICONS, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
 import { cardFieldProblems } from '../../shared/app-cards.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
@@ -171,6 +171,11 @@ function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: stri
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
+  // An icon or a colour it does not have is no mistake (it shows its usual one), but an agent that named it should hear
+  // which there are: the App builder gave a sketch the icon "waves" and learned of it only from the card.
+  const named = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 30) : '');
+  if (named(src.icon) && !(APP_ICONS as readonly string[]).includes(named(src.icon))) warnings.push(`It has no icon “${named(src.icon)}”, so it shows “${recipe.icon}”: its icons are ${APP_ICONS.join(', ')}`);
+  if (named(src.color) && !(named(src.color) in APP_COLORS)) warnings.push(`It has no colour “${named(src.color)}”, so it shows “${recipe.color}”: its colours are ${Object.keys(APP_COLORS).join(', ')}`);
   // Its view, against what its answer gives, its form asks, its flows and what it keeps.
   const viewed = checkUi(recipe);
   errors.push(...viewed.errors);

@@ -140,6 +140,11 @@ test('app_sketch: mistakes come back in words, as app_save says them, and no car
   assert.match(said, /at most three questions/);
   assert.match(said, /Question 1: give two to six choices/);
   assert.match(text(await tools.app_sketch.run({ name: 'Nothing', description: 'x', assumed: [] }, ctx)), /Say what it does/);
+  // An icon it does not have is no mistake: the card shows, and the answer says which icons there are.
+  const iconed = await tools.app_sketch.run({ ...draft, icon: 'waves', color: 'sea' }, ctx);
+  assert.ok(!failed(iconed));
+  assert.match(text(iconed), /It has no icon “waves”, so it shows “[a-z-]+”: its icons are .*\bsun\b/);
+  assert.match(text(iconed), /It has no colour “sea”/);
   // Its steps whole are checked as app_save checks them.
   const flowed = await tools.app_sketch.run({ ...draft, steps: undefined, flow: { steps: [{ id: 'x', do: 'tool', tool: 'bash' }] } }, ctx);
   assert.ok(failed(flowed));
