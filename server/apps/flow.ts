@@ -68,6 +68,9 @@ class Stopped extends Error {
   }
 }
 
+/** A step failed and its miss is kept: the steps it is inside (a Decide, At the same time) fail for it, and keep none of their own. */
+class StepFailed extends Error {}
+
 const db = () => runDeps().db;
 
 
@@ -263,7 +266,7 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
     }
     const msg = ((e as Error).message || 'It failed').slice(0, 2000);
     record(x, at, s, { status: 'failed', error: msg, endedAt: Date.now(), ...spent() });
-    return failed(x, s, scope, prefix, msg);
+    return failed(x, s, scope, prefix, msg, e instanceof StepFailed);
   }
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
@@ -271,15 +274,15 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
 }
 
 /** A step failed: its own steps for that run (then the flow goes on), it is skipped, an agent does its work, or the run stops. */
-async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string) {
+async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string, inside = false) {
   scope.steps[s.id] = {};
-  // A step that failed for a call inside it (a tool step, a program's ctx.tool, a step of a Repeat) has its miss already.
+  // A step that failed for one inside it, or for a call it made (a tool step, a program's ctx.tool, a Repeat's round), has its miss already.
   const at = `${prefix}${s.id}`;
-  if (![...x.missAt.keys()].some((p) => p === at || p.startsWith(`${at}/`) || p.startsWith(`${at}#`))) noteMiss(x, { step: titleOf(s), why: firstLine(msg), path: at });
+  if (!inside && ![...x.missAt.keys()].some((p) => p === at || p.startsWith(`${at}/`) || p.startsWith(`${at}#`))) noteMiss(x, { step: titleOf(s), why: firstLine(msg), path: at });
   if (s.failed === 'agent') return rescue(x, s, scope, prefix, msg);
   if (Array.isArray(s.failed)) return runList(x, s.failed, { inputs: scope.inputs, steps: scope.steps, vars: { ...scope.vars, error: msg } }, prefix);
   if (s.failed === 'skip') return;
-  throw new Error(`${titleOf(s)}: ${msg}`);
+  throw new StepFailed(`${titleOf(s)}: ${msg}`);
 }
 
 type Cost = { usd: number };
@@ -720,7 +723,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
     const why = done.status !== 'done' ? done.error || 'it did not finish' : `it did not hand in ${owed.map((f) => f.id).join(', ')}`;
     const all = `${msg} (and the agent in its place: ${why})`;
     record(x, at, s, { status: 'failed', error: all.slice(0, 2000), endedAt: Date.now() });
-    throw new Error(`${titleOf(s)}: ${all}`);
+    throw new StepFailed(`${titleOf(s)}: ${all}`);
   }
   const values: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(done.result ?? {})) {

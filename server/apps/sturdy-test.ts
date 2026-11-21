@@ -362,6 +362,21 @@ test('a call the program tries again itself and that then answers is no miss; a 
     failed.misses?.map((m) => [m.step, m.why]),
     [['Ask it', 'nothing is there (404)']],
   );
+  // Inside a Decide or At the same time, the step that failed has the miss, not the steps around it.
+  const c = app({
+    name: 'Nested',
+    flow: {
+      steps: [
+        { id: 'pick', do: 'decide', rule: '1 = 1', then: [{ id: 'both', do: 'parallel', branches: [[{ id: 'ask', title: 'Ask it here', do: 'tool', tool: 'http_request', with: { url: 'https://never.example/' } }], [{ id: 'fine', do: 'tool', tool: 'web_search', with: { query: 'fine' } }]] }] },
+      ],
+    },
+  });
+  const nested = await ended(startRun({ app: c.id, slug: c.slug, recipe: c, source: 'web', inputs: {} }).id);
+  assert.equal(nested.status, 'failed');
+  assert.deepEqual(
+    nested.misses?.map((m) => [m.step, m.why]),
+    [['Ask it here', 'nothing is there (404)']],
+  );
 });
 
 for (const [name, fn] of tests) {
