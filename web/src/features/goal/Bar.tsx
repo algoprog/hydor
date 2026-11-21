@@ -241,7 +241,7 @@ export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalS
         {g.contract.title || g.contract.objective}
       </div>
       {g.reason && (g.status === 'paused' || g.status === 'needs-you') && (
-        <div translate="no" className="mt-1 line-clamp-2 text-[12.5px] text-warn" title={g.reason}>
+        <div className="mt-1 line-clamp-2 text-[12.5px] text-warn" title={g.reason}>
           {g.reason}
         </div>
       )}

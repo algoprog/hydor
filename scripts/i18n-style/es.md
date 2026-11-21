@@ -88,3 +88,8 @@ Glossary (one translation per concept; keep these exactly):
 - Picture → imagen
 - Paper (scientific) → artículo
 - the rail (the column of icons along the app's left edge) → la barra de iconos
+
+Goal mode (the app's own sentences about a goal; keep these exactly):
+- goal → objetivo; round → ronda; check → comprobación (checks → comprobaciones); a check holds → se cumple; reviewer → revisor; limit → límite; kept → conservada; undone → deshecha; swarm → enjambre; member → miembro
+- When a sentence tells the person to press a button, quote the button's own label: Resume → «Reanudar», Stop all → «Detener todo», Give it more… → «Darle más…», Keep anyway… → «Conservar de todos modos…».
+- Words that are names in code (own, forks, every, keep, undo, from, checks, protect, limits, evidence, claim, run, read, slack, timeoutS, diff, files, usd, rounds, minutes) stay as they are.

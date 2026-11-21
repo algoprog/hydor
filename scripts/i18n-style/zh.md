@@ -98,3 +98,8 @@ Glossary (the app's own Chinese; keep these exactly):
 - Learn more → 了解更多
 - Picture → 图片
 - Paper → 论文
+
+Goal mode (the app's own sentences about a goal; keep these exactly):
+- goal → 目标; round → 轮 (第 N 轮); check → 检查项; a check holds → 成立; reviewer → 审查者; limit → 上限; kept → 保留; undone → 撤销; swarm → 集群; member → 成员
+- When a sentence tells the person to press a button, quote the button's own label: Resume → “继续”, Stop all → “全部停止”, Give it more… → “给它更多…”, Keep anyway… → “仍然保留…”.
+- Words that are names in code (own, forks, every, keep, undo, from, checks, protect, limits, evidence, claim, run, read, slack, timeoutS, diff, files, usd, rounds, minutes) stay as they are.

@@ -403,6 +403,64 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
   const js = transformSync(fs.readFileSync(path.join(ROOT, f), 'utf8'), { loader: 'ts', legalComments: 'none' }).code;
   for (const s of literals(js)) add(s, f);
 }
+// The goal loop's own sentences that people read on a screen (a goal's reason, a limit, a round's why and the report's
+// summary, the notices, and what a refused action says), from the files of server/goals. Not what goes to the agent (the
+// round messages in brief.ts, the tools' answers and descriptions in tools.ts, the reviewers' instructions in review.ts, what
+// the checks hand a reviewer) and not what a model wrote. A file is read line by line: `skip` drops a line (what it writes goes
+// to an agent or a log), `only` keeps just the lines that match (a file that is mostly agent-facing), `skipFunctions` leaves out
+// whole functions (to their closing brace at the line's start) whose sentence is built from clauses in an order only English has,
+// with commands in it: it stays in English as a whole rather than half translated. A sentence with a value in it (a number, a
+// name) comes out as a pattern with {0}, which the pages' translator matches (shared/translate.ts); a text of several
+// sentences is translated sentence by sentence, or not at all.
+const GOAL_LOOP = {
+  'server/goals/driver.ts': {
+    skip: /console\.|\.prepare\(|\bsendAsk\(|\bg\._\.note\b|\btext: ['`]|\{ ok: (true|false), text|\bconst (PAUSED|LEADS_GOAL|NO_GOAL) =|Fix these and call|\bconst about = |\bdropped\b/,
+    // The say refused for files changed outside the goal, and the sentence of a reset that did not finish: clauses and git commands.
+    skipFunctions: /^function (editedText|unfinishedText)\(/,
+    // Why a goal cannot be set: said whole as a refusal, and with its first letter lower after "The goal was not set: " (goalNotSetText).
+    lowered: /^(const (IN_PLAN|IN_SUBAGENT) =|export function (teamRefusal|refusal|goalStartRefusal)\()/,
+  },
+  'server/goals/verdict.ts': {},
+  'server/goals/validate.ts': {},
+  'server/goals/checks.ts': { only: /errorResult\(|\bSLOW_READ =|\br\.(failed|timedOut|code ===)/ },
+  'server/goals/review.ts': { only: /NO_LOCAL_REVIEWER =|gave no answer|could not answer|'It holds\.'|meets the goal/ },
+};
+for (const [f, { skip, only, skipFunctions, lowered }] of Object.entries(GOAL_LOOP)) {
+  let inSkipped = false;
+  // Inside a function whose sentences also come lower-cased (to its closing brace at the line's start), or on a one-line constant.
+  let inLowered = false;
+  for (const line of fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n')) {
+    if (inSkipped) {
+      inSkipped = line !== '}';
+      continue;
+    }
+    if (skipFunctions?.test(line)) {
+      inSkipped = true;
+      continue;
+    }
+    const t = line.trim();
+    if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || (skip && skip.test(line)) || (only && !only.test(line))) continue;
+    const shown = [];
+    if (lowered?.test(line)) inLowered = !/^const /.test(line) || false;
+    const lowerNow = (lowered?.test(line) || inLowered) && !t.startsWith('export function');
+    // A sentence with a choice of words in it (`The check ${past ? 'held' : 'holds'}`) also as each of its readings whole: the
+    // pages' translator takes a value for a phrase only when the dictionary has it as one, so "The check held" and "The check
+    // holds" are entries of their own, besides the pattern "The check {0}".
+    const readings = [line];
+    for (let k = 0; k < readings.length && readings.length < 5; k++) {
+      const m = /\$\{[^{}?]*\?\s*'([^'\\]+)'\s*:\s*'([^'\\]+)'\s*\}/.exec(readings[k]);
+      if (m && /[A-Za-z]{2}/.test(m[1] + m[2])) for (const w of [m[1], m[2]]) readings.push(readings[k].replace(m[0], w));
+    }
+    for (const r of readings.slice(1)) for (const s of literals(r)) add(s, f);
+    for (const s of literals(line, shown)) {
+      add(s, f);
+      // As the server lowers it: the first letter only, unless the second is a capital too (an acronym).
+      if (lowerNow && /^[A-Z](?![A-Z])/.test(s)) add(s[0].toLowerCase() + s.slice(1), f);
+    }
+    for (const s of shown) add(s, f, true);
+    if (inLowered && line === '}') inLowered = false;
+  }
+}
 // The names and lines of what ships, and of the choices the server offers (permission modes, the buttons of an approval).
 const NAMED = ['assistants/builtins', 'apps/templates', 'apps/templates-more', 'apps/templates-research', 'apps/templates-papers', 'apps/templates-lab', 'apps/explore', 'apps/draft', 'apps/screens', 'pages/latex-check', 'agents/claude', 'agents/codex', 'agents/elicit', 'agents/control', 'opinion/index', 'guide/form', 'guide/api', 'automations/account-watch'];
 for (const f of NAMED.map((x) => `server/${x}.ts`)) {

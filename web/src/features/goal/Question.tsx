@@ -60,7 +60,7 @@ function Note({ value, onChange, placeholder }: { value: string; onChange: (v: s
 
 function Context({ q }: { q: GoalQuestion }) {
   return q.context ? (
-    <p translate="no" className="text-[13.5px] leading-relaxed text-fg-2">
+    <p translate={q.kind === 'yours' ? undefined : 'no'} className="text-[13.5px] leading-relaxed text-fg-2">
       {q.context}
     </p>
   ) : null;
@@ -126,7 +126,7 @@ function Ways({ g, q }: { g: GoalState; q: GoalQuestion }) {
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     {numbered && <span className="text-[12px] text-fg-3 tnum">{i + 1}</span>}
-                    <span translate="no" className="text-[14px] font-semibold">
+                    <span translate={q.kind === 'yours' ? undefined : 'no'} className="text-[14px] font-semibold">
                       {w.name}
                     </span>
                     {i === q.pick && <Badge>Its pick</Badge>}

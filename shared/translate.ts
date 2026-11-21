@@ -56,6 +56,17 @@ interface Pattern {
 /** A lookup in one part of the app ("media::Speed"): see web/src/i18n/runtime.ts. */
 const PART = /^[a-z]+::/;
 
+/** The fixed letters (not counting spaces and marks) a pattern needs to take a value for one of the app's own phrases: about six words. */
+const PHRASE_LETTERS = 30;
+
+/** The fixed letters a pattern needs to be taken for a sentence of a text of several ("{0} stopped holding"): not "into your {0}". */
+const SENTENCE_LETTERS = 12;
+
+/** Where one sentence ends and the next begins: a full stop, "!" or "?", a space, and a capital (or an opening quote). */
+const SENTENCE_END = /[.!?]\s+[A-Z“‘]/;
+/** The same, to split at (the mark stays with its sentence). */
+const SENTENCE_SPLIT = /(?<=[.!?])\s+(?=[A-Z“‘])/;
+
 /** Marks of something technical rather than words: a path, a file or field name, code, an address, a flag. */
 const TECHNICAL = /[_/\\@#=<>`|{}[\]~^$]|[A-Za-z]\.[A-Za-z]|^--?[A-Za-z]/;
 
@@ -153,7 +164,14 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
   /** A value in a sentence: itself when it is one of the app's phrases or a list of them, or one with a number in it ("3m ago"). */
   const value = (v: string, depth: number) => {
     const t = v.trim();
-    const known = appWord(t) ?? list(t) ?? (depth < 2 && /\d/.test(t) && !TECHNICAL.test(t) ? match(t, depth + 1) : null);
+    // Also a longer phrase of the app's own with a name or a number in it, as a pattern with plenty of fixed words has it
+    // ("another session (“Fix the login”) was working in the folder"): too much fixed text for anything else to match it.
+    const phrase = (): string | null => {
+      if (depth >= 2 || t.length < 25 || TECHNICAL.test(t)) return null;
+      const hit = scored(t, depth + 1);
+      return hit && hit[1] >= PHRASE_LETTERS ? hit[0] : null;
+    };
+    const known = appWord(t) ?? list(t) ?? (depth < 2 && /\d/.test(t) && !TECHNICAL.test(t) ? match(t, depth + 1) : null) ?? phrase();
     return known == null ? v : `${/^\s*/.exec(v)![0]}${known}${/\s*$/.exec(v)![0]}`;
   };
 
@@ -166,9 +184,9 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
    * not "{0}, checked {1}"), then the one whose loose values take the least of the string ("in 2 h 28 min" is
    * "in {0} h{1}", not "{0} min").
    */
-  function scored(t: string, depth = 0): [string, number] | null {
+  function scored(t: string, depth = 0): [string, number, boolean] | null {
     const hit = exact.get(t);
-    if (hit != null) return [hit, Infinity];
+    if (hit != null) return [hit, Infinity, false];
     let best: { p: Pattern; m: RegExpExecArray; slack: number } | null = null;
     const small = t.toLowerCase();
     for (const p of patterns) {
@@ -185,7 +203,9 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
       const v = m[Number(i) + 1] ?? '';
       return p.endings.has(Number(i)) && /^(e?s)?$/i.test(v) ? '' : p.quoted.has(Number(i)) ? v : value(v, depth);
     });
-    return [cased(p.key[0]) && t[0] !== p.key[0] ? recase(out, t) : out, p.fixed];
+    // Whether a value took in the end of a sentence and the next one: see `line`.
+    const spans = [...m].slice(1).some((v) => SENTENCE_END.test(v ?? ''));
+    return [cased(p.key[0]) && t[0] !== p.key[0] ? recase(out, t) : out, p.fixed, spans];
   }
 
   /** Pieces translated one by one, joined again: lines, or facts joined by " · "; null when none is. */
@@ -201,7 +221,44 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     return dotted && (!plain || dotted[1] > plain[1]) ? dotted[0].replace(/^·\s*/, '') : (plain?.[0] ?? null);
   };
 
-  const line = (t: string, split: boolean): string | null => match(t) ?? (split && t.includes(' · ') ? pieces(t.split(' · '), ' · ', fact) : null);
+  /**
+   * A text of several sentences ("It was not undone: … . Your rules could not be checked."): each sentence on its own, and
+   * only when every one has a translation, so a text is never half in one language. A sentence the app writes without its
+   * full stop (the parts of a round's reason are joined with ". ") is found without it, and its stop put back.
+   */
+  const sentences = (t: string): string | null => {
+    const parts = t.split(SENTENCE_SPLIT);
+    if (parts.length < 2 && !t.endsWith('.')) return null;
+    const out: string[] = [];
+    // A sentence counts when it is a whole entry or a pattern with enough fixed words of its own: no weak pattern ("into
+    // your {0}") takes a piece of a sentence, which would leave the rest of it in English.
+    const sure = (x: string) => {
+      const r = scored(x);
+      return r && r[1] >= SENTENCE_LETTERS ? r[0] : null;
+    };
+    for (const x of parts) {
+      let hit = sure(x);
+      if (hit == null && x.endsWith('.')) {
+        const bare = sure(x.slice(0, -1));
+        // CJK writes its own full stop; the others keep the one the text had.
+        hit = bare == null ? null : /[.。!！?？…:：)）”」]$/.test(bare) ? bare : `${bare}${/[\u3000-\u9fff]$/.test(bare) ? '。' : '.'}`;
+      }
+      if (hit == null) return null;
+      out.push(hit);
+    }
+    return out.join(/[\u3000-\u9fff]$/.test(out[0]) ? '' : ' ');
+  };
+
+  // A pattern whose value took in the end of a sentence and the next one ("It broke a rule of yours: {0}", given two
+  // sentences) is set aside when each of the sentences has a translation of its own: they are translated one by one.
+  const line = (t: string, split: boolean): string | null => {
+    const hit = scored(t);
+    if (hit?.[2]) {
+      const each = sentences(t);
+      if (each != null) return each;
+    }
+    return hit?.[0] ?? (split && t.includes(' · ') ? pieces(t.split(' · '), ' · ', fact) : null) ?? sentences(t);
+  };
 
   /** `split`: a line of facts may go part by part (not for a sentence the page built from pieces, which go one by one then). */
   return (s, split = true) => {

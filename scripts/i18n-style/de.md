@@ -99,3 +99,8 @@ Glossary (the app's own German; keep these exactly):
 - Learn more → Mehr erfahren
 - Picture → Bild
 - Paper → Paper
+
+Goal mode (the app's own sentences about a goal; keep these exactly):
+- goal → Ziel; round → Runde; check → Prüfung (checks → Prüfungen); a check holds → erfüllt ("Alle 5 Prüfungen sind erfüllt"; never "trifft zu"); held → war erfüllt; reviewer → Prüfer; limit → Limit; kept → behalten; undone → rückgängig gemacht; swarm → Schwarm; member → Mitglied
+- When a sentence tells the person to press a button, quote the button's own label: Resume → „Fortsetzen“ ("Mit „Fortsetzen“ wird die Runde erneut geprüft"), Stop all → „Alle stoppen“, Give it more… → „Mehr geben …“, Keep anyway… → „Trotzdem behalten …“. Never "Setze fort".
+- Words that are names in code (own, forks, every, keep, undo, from, checks, protect, limits, evidence, claim, run, read, slack, timeoutS, diff, files, usd, rounds, minutes) stay as they are.
