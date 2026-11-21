@@ -365,7 +365,7 @@ const GAME_COLS = [
   { id: 'free', label: 'Free to play', type: 'yesno' as const },
   { id: 'price', label: 'Best price now, US$', type: 'number' as const },
   { id: 'lowest', label: 'Lowest ever, US$', type: 'number' as const },
-  { id: 'price_text', label: 'Best price now', type: 'text' as const, description: 'The price in US dollars as the person reads it, with its worth in their currency when that is another' },
+  { id: 'price_now', label: 'Best price now', type: 'text' as const, description: 'The price in US dollars as the person reads it, with its worth in their currency when that is another' },
   { id: 'store', label: 'Store', type: 'text' as const },
   { id: 'deal', label: 'Deal', type: 'url' as const },
   { id: 'picture', label: 'Picture', type: 'image' as const },
@@ -2523,7 +2523,7 @@ const money = (n) => {
     return String(n);
   }
 };
-for (const g of games) g.price_text = money(g.price);
+for (const g of games) g.price_now = money(g.price);
 const within = (g) => (input.budget === 'Free to play' ? g.free : input.budget === 'Under 20' ? g.free || g.coming || (g.price !== null && g.price < 20) : true);
 games.sort((a, b) => Number(within(b)) - Number(within(a)) || a.at - b.at);
 // The picks in their first sentence: what follows it is a model's notes on what the sources lacked.

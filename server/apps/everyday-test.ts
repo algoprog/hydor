@@ -312,11 +312,11 @@ test('Game finder: the price is in US dollars and, for a person whose currency i
   assert.equal(asked[0].url.href, 'https://api.frankfurter.dev/v2/rate/usd/eur');
   const g = rows(el.games)[0];
   assert.equal(g.price, 9.99);
-  assert.equal(String(g.price_text).replace(/\s/g, ' '), '9,99 US$ (≈ 9,19 €)');
-  assert.equal(rows(el.games)[1].price_text, '', 'no price, no text');
+  assert.equal(String(g.price_now).replace(/\s/g, ' '), '9,99 US$ (≈ 9,19 €)');
+  assert.equal(rows(el.games)[1].price_now, '', 'no price, no text');
   assert.match(String(el.rate), /^1 US\$ = 0,92\s*€ \(2026-11-20\)$/);
   const en = await program('game-finder', 'final', { games: GAMES, deals: DEALS, media: { items: [] }, budget: 'Any price', summary: 'Two games.' }, { ...EL, lang: 'en', language: 'English' });
-  assert.equal(rows(en.games)[0].price_text, 'US$9.99 (≈ €9.19)');
+  assert.equal(rows(en.games)[0].price_now, 'US$9.99 (≈ €9.19)');
 });
 
 test('Game finder: when the rate call fails the price is in dollars alone; for a person with dollars, or none, no call is made', async () => {
@@ -324,17 +324,17 @@ test('Game finder: when the rate call fails the price is in dollars alone; for a
   routes = [];
   const out = await program('game-finder', 'final', { games: GAMES, deals: DEALS, media: { items: [] }, budget: 'Any price', summary: 'Two games.' }, EL);
   assert.equal(asked.length, 1, 'tried once (the engine tries again)');
-  assert.match(String(rows(out.games)[0].price_text), /^9,99\sUS\$$/);
+  assert.match(String(rows(out.games)[0].price_now), /^9,99\sUS\$$/);
   assert.equal(out.rate, '');
   assert.ok(rows(out.games)[0].price > 0 && rows(out.games)[0].lowest > 0, 'the numbers are still there');
   asked.length = 0;
   routes = [host('api.frankfurter.dev', { rate: 1 })];
   const usd = await program('game-finder', 'final', { games: GAMES, deals: DEALS, media: { items: [] }, budget: 'Any price', summary: 'Two games.' }, { ...EL, lang: 'en', language: 'English', currency: 'USD' });
   assert.equal(asked.length, 0);
-  assert.equal(rows(usd.games)[0].price_text, '$9.99', 'a person with dollars sees plain dollars');
+  assert.equal(rows(usd.games)[0].price_now, '$9.99', 'a person with dollars sees plain dollars');
   const unknown = await program('game-finder', 'final', { games: GAMES, deals: DEALS, media: { items: [] }, budget: 'Any price', summary: 'Two games.' }, EN);
   assert.equal(asked.length, 0);
-  assert.equal(rows(unknown.games)[0].price_text, 'US$9.99');
+  assert.equal(rows(unknown.games)[0].price_now, 'US$9.99');
 });
 
 // ---- Chart my data -----------------------------------------------------------------------------------------------------------

@@ -781,7 +781,7 @@ const GAMES: AppUi = {
       blocks: [
         { title: 'Best price now, and lowest ever (US$)', element: 'plot', data: 'result.games', with: { kind: 'bar', x: 'title', y: ['price', 'lowest'], height: 260 } },
         { text: '{{result.rate}}', if: 'result.rate' },
-        { element: 'table', data: 'result.games', with: { columns: ['title', 'price_text', 'lowest', 'store'] } },
+        { element: 'table', data: 'result.games', with: { columns: ['title', 'price_now', 'lowest', 'store'] } },
       ],
     },
     { id: 'time', title: 'Time to finish', if: 'result.games|sum:hours', blocks: [{ title: 'Hours for the main part', element: 'plot', data: 'result.games', with: { kind: 'hbar', x: 'title', y: 'hours', height: 280 } }] },
@@ -800,7 +800,7 @@ const GAMES: AppUi = {
   <span class="tags"><span class="tag">{{genre}}</span>{{#coming}}<span class="tag soon">{{#out}}Coming {{out}}{{/out}}{{^out}}Coming soon{{/out}}</span>{{/coming}}</span><h3>{{title}}{{#year}} <small>{{year}}</small>{{/year}}</h3>
   <p>{{why}}</p>
   <p class="muted">{{platforms}}{{#hours}} · about {{hours}} h{{/hours}}</p>
-  <p class="price">{{#free}}<b>Free to play</b>{{/free}}{{^free}}{{#price}}<b>{{price_text}}</b> at {{store}}{{#lowest}} · lowest ever US&#36;{{lowest|number}}{{/lowest}}{{/price}}{{/free}}</p>
+  <p class="price">{{#free}}<b>Free to play</b>{{/free}}{{^free}}{{#price}}<b>{{price_now}}</b> at {{store}}{{#lowest}} · lowest ever US&#36;{{lowest|number}}{{/lowest}}{{/price}}{{/free}}</p>
 </button>`,
       css:
         CARD +
@@ -815,7 +815,7 @@ const GAMES: AppUi = {
       html: String.raw`<div class="dt">{{#picture}}<img class="pic" src="{{picture}}" alt="">{{/picture}}
   <p class="kicker">{{genre}}{{#year}} · {{year}}{{/year}}{{#coming}}{{#out}} · coming {{out}}{{/out}}{{^out}} · coming soon{{/out}}{{/coming}}</p><h2>{{title}}</h2><p>{{why}}</p>
   <p class="muted">Plays on {{platforms}}{{#hours}} · about {{hours}} hours{{/hours}}</p>
-  <div class="n-row">{{#deal}}<a class="n-btn n-primary" href="{{deal}}" target="_blank" rel="noopener noreferrer">{{price_text}} at {{store}} ↗</a>{{/deal}}<button type="button" class="n-btn" data-event="more">More like this</button></div>
+  <div class="n-row">{{#deal}}<a class="n-btn n-primary" href="{{deal}}" target="_blank" rel="noopener noreferrer">{{price_now}} at {{store}} ↗</a>{{/deal}}<button type="button" class="n-btn" data-event="more">More like this</button></div>
 </div>`,
       css: PIC + String.raw`.dt { max-width: 640px; } .dt .pic { width: auto; max-width: 100%; height: auto; max-height: 440px; aspect-ratio: auto; object-fit: contain; } .kicker { margin: 12px 0 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; } h2 { margin: 4px 0 8px !important; font-size: 24px !important; } p { font-size: 15px; line-height: 1.5; } .muted { color: var(--n-muted); font-size: 14px; }`,
     },
