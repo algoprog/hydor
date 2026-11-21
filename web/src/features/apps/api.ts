@@ -43,6 +43,8 @@ export interface AppKey {
 /** An app that opens on its own page: the answers it runs with from there, and whether (and when) it updates every day. */
 export interface HomeSettings {
   inputs: Record<string, string>;
+  /** The questions whose answer is what they start from (About you, the last answer), not one kept in its settings. */
+  started?: string[];
   /** Update automatically: on or off, the time, and the days of the week (0 is Sunday; unset: every day). */
   daily: { on: boolean; time: string; days?: number[] };
 }

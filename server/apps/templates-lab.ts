@@ -854,7 +854,7 @@ const SPRINT: Draft = {
   description: 'A question taken through hypotheses, code on a branch of its own, runs, an analysis notebook and a short report, with you approving each step.',
   fields: [
     { id: 'question', label: 'Your research question', type: 'long', required: true, placeholder: 'e.g. Does a curriculum from short to long queries help our dense retriever on long queries?' },
-    { id: 'repo', label: 'The repository', type: 'text', required: true, placeholder: '~/code/retriever', help: 'A Git repository on this computer: the sprint works on a new branch, in a worktree of its own, and leaves your checkout as it is' },
+    { id: 'repo', label: 'The repository', type: 'text', required: true, remember: true, placeholder: '~/code/retriever', help: 'A Git repository on this computer: the sprint works on a new branch, in a worktree of its own, and leaves your checkout as it is' },
     { id: 'context', label: 'What it should know', type: 'long', placeholder: 'The metric that matters, the baseline and its numbers, how to train and evaluate, what not to change' },
     { id: 'budget', label: 'GPU hours it may use', type: 'number', default: '8', help: 'All its runs together' },
     { id: 'count', label: 'How many hypotheses', type: 'number', default: '3', help: 'One to five' },
@@ -892,7 +892,7 @@ return { budget, count, group: 'sprint-' + id, tag: 'sprint:' + id, wait: Math.m
         id: 'propose',
         title: 'Propose hypotheses',
         do: 'model',
-        instructions: `You help a researcher plan a short research sprint on their own code. Propose {{brief.count}} hypotheses that would answer their question, each testable with a few runs of their code, all of them within {{brief.budget}} GPU hours in all.
+        instructions: `You help a researcher plan a short research sprint on their own code. Propose {{brief.count}} hypotheses that would answer their question, each testable with a few runs of their code, all of them within {{brief.budget}} GPU hours in all.{{#me.compute}} They run on {{me.compute}} (from About you): keep the runs within it.{{/me.compute}}
 
 The question: {{question}}
 {{#context}}What they know already: {{context}}
@@ -977,6 +977,9 @@ return { hypotheses: hyps, list: text, count: hyps.length };`,
 {{#context}}
 What the researcher told you: {{context}}
 {{/context}}
+{{#me.compute}}
+What they can run on (from About you): {{me.compute}}
+{{/me.compute}}
 The hypotheses to test:
 {{chosen.list}}
 
@@ -1290,7 +1293,7 @@ const SWEEP: Draft = {
   description: 'A hyperparameter sweep planned within a budget of runs or GPU hours, bad trials stopped early, and what mattered written up.',
   fields: [
     { id: 'command', label: 'The script or command', type: 'text', required: true, placeholder: 'python train.py --epochs 3' },
-    { id: 'folder', label: 'Its folder', type: 'text', required: true, placeholder: '~/code/my-model' },
+    { id: 'folder', label: 'Its folder', type: 'text', required: true, remember: true, placeholder: '~/code/my-model' },
     { id: 'metric', label: 'The metric', type: 'text', required: true, placeholder: 'val_loss', help: 'As the script prints or writes it (metric=value, or a line of JSON)' },
     { id: 'better', label: 'Which way is better', type: 'choice', options: ['Lower', 'Higher'], default: 'Lower' },
     { id: 'settings', label: 'Settings to tune', type: 'long', placeholder: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', help: 'One a line, with the values to try; leave it empty to have them found from the script’s arguments' },
@@ -1332,6 +1335,9 @@ The command: {{command}}
 Its folder: {{folder}}
 The metric: {{metric}} ({{better}} is better)
 The budget: {{budget}}
+{{#me.compute}}
+What they can run on (from About you): {{me.compute}}
+{{/me.compute}}
 {{#settings}}
 The settings to tune and their values, as the researcher gave them (keep them as they are):
 {{settings}}
@@ -1742,7 +1748,7 @@ const WEEKLY: Draft = {
   home: { time: '16:00', days: [5] },
   fields: [
     { id: 'audience', label: 'Who it is for', type: 'choice', options: ['Your advisor', 'Your team', 'A manager'], default: 'Your advisor' },
-    { id: 'projects', label: 'Projects', type: 'text', placeholder: 'All of them, or names between commas' },
+    { id: 'projects', label: 'Projects', type: 'text', remember: true, placeholder: 'All of them, or names between commas' },
     { id: 'include', label: 'What to include', type: 'text', placeholder: 'Everything, or say what: research only, no costs, the papers I read…' },
   ],
   prompt: '',
@@ -2133,8 +2139,10 @@ const NOTEBOOK: Draft = {
   category: 'Work',
   description: 'A dated entry for each day you worked: what was tried, found and decided, with links to the sessions, commits, runs and files; kept apart from memory, searchable, each with a link to cite.',
   sessions: false,
+  // The entries are the researcher's own notes: they follow their language.
+  language: 'person',
   home: { time: '21:00' },
-  fields: [{ id: 'projects', label: 'Projects', type: 'text', placeholder: 'All of them, or names between commas' }],
+  fields: [{ id: 'projects', label: 'Projects', type: 'text', remember: true, placeholder: 'All of them, or names between commas' }],
   prompt: '',
   flow: { steps: entrySteps(''), outputs: ENTRY_OUT },
   flows: {

@@ -26,6 +26,7 @@ export function appSchema(): Record<string, unknown> {
       default: str('The answer it starts with'),
       from: { enum: FROM_FIELDS.map((f) => `me.${f.id}`), description: 'A field of About you (the person’s own record) its answer starts from: the form shows it filled in (folded into one line when not required), and a run that leaves it unanswered takes it before default. Not for a file' },
       remember: { type: 'boolean', description: 'Its answer starts from the person’s last answer to it in this app (for what About you has no field for); not with from, not for a file' },
+      was: { type: 'array', items: { type: 'string' }, description: 'Its former ids, when you rename a question others may have answered (a schedule, its own page’s settings, a last answer): an answer under one of them counts as its own while it has none. Ids no other question has (≤5)' },
     },
     required: ['label'],
   };

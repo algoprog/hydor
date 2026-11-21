@@ -926,7 +926,8 @@ agents that speak ACP and take MCP servers.
   enjoy (half from your work, half from the rest of your life), finds each one's news of the past two weeks and long
   reads, reads the best pages side by side and lays them out as an edition with a cover line, a cover story and a
   section for each topic, each story with its picture, what it says and why it is there (opening one marks it read;
-  Dig deeper starts a research report on it). It opens on its own page rather than in chats, with Update and its
+  Dig deeper starts a research report on it; a story an edition showed is left out of the next ones for three weeks,
+  and the magazine is written in your language). It opens on its own page rather than in chats, with Update and its
   settings at the top: Update automatically (every day, on weekdays or once a week, at a time you pick: a scheduled task, off until you turn it on), how many sessions it reads,
   what to always cover and what to leave out. An app of your own whose view has pages for its own page gets the same
   Update and settings. Beside those come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
@@ -1460,12 +1461,14 @@ agents that speak ACP and take MCP servers.
   follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
   BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
   sentence, and whether it builds on, compares with or disputes your work; it says when the sentences could not be read and
-  tries them again at the next update), **New-model watch** (new Hugging Face
+  tries them again at the next update; it finds you by the id in About you), **New-model watch** (new Hugging Face
   models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
   those that beat your best), **Deadline radar** (your venues' deadlines from ccfddl and ai-deadlines, from AoE into your
   time zone, with reminders, page limits and templates; a venue neither list has is looked up on its website), **Living related work** (a page per topic that grows as papers
   appear, in themes, with a LaTeX related-work draft, its cite keys checked, and BibTeX) and **Gap finder** (project ideas from your papers and
-  this month's, each checked for prior work and sized to your compute).
+  this month's, each checked for prior work and sized to your compute). They start from About you (your fields, topics,
+  venues, author name and compute) and from your last answers, and write what only you read in your language; Hydor
+  itself keeps their calls to arXiv, OpenAlex and Semantic Scholar apart and asks again when one is busy.
 - **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
   link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
   to 30 papers into a kept spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
@@ -1494,7 +1497,9 @@ agents that speak ACP and take MCP servers.
   **Rebuttal workbench** (points grouped across reviews and sorted, replies drafted within the limit, experiments to tick
   off), **Paper to talk, poster and thread** (timed slides with the paper's own figures and notes, an A0 LaTeX poster,
   posts for X, Bluesky and LinkedIn, a project page) and a **Figure doctor** (column width, the paper's font,
-  colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in.
+  colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in. A paper
+  that cannot be read stops the run at once, saying how to give it another way; the venue, the limit and tone, and the
+  figures' template start from your last answers.
 - **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
   SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, hyperparameters,
   seed, environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it
@@ -1522,7 +1527,9 @@ agents that speak ACP and take MCP servers.
   with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis
   notebook and a report, with you approving each step), a **Sweep planner** (a sweep fitted to a budget of runs or GPU
   hours, reading the script only when the form leaves settings or a run's time open, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
-  **Lab notebook** with a dated entry for each day you worked, kept apart from memory and searchable.
+  **Lab notebook** with a dated entry for each day you worked, kept apart from memory, searchable and written in your
+  language. The sprint and the sweep start from the last repository or folder, and plan within what About you says you
+  can run on.
 - New skills for every agent: papers' peer review, reproducing a paper, and figures for papers.
 
 ## For engineers
