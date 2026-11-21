@@ -124,6 +124,8 @@ export interface GoalRound {
   reason?: string;
   /** What the round cost and how its files stood when it ended (a checkpoint commit, in a worktree). */
   usd: number;
+  /** In a session that leads a swarm: how many of its members worked in this round (left out when none did). */
+  members?: number;
   checkpoint?: string;
 }
 
