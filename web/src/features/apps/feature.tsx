@@ -12,10 +12,12 @@
 //
 // A run's session opens on the same result (SessionPane), with a switch to its conversation. An app an agent ran for
 // you in another session shows there as its card (InSession), under the turn that asked for it.
+import { useEffect, useState } from 'react';
 import { ClipboardCheck, LayoutGrid } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
+import type { AnswerField, AppRecipe } from '@shared/apps';
 import type { ToolItem } from '@shared/types';
-import { enc } from '../../lib/api';
+import { api, enc } from '../../lib/api';
 import { go, sessionPath } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import { MenuItem } from '../../components/ui';
@@ -54,6 +56,12 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
   const [loc] = useLocation();
   const t = item.tool;
   const input = t.input && typeof t.input === 'object' ? (t.input as Record<string, unknown>) : null;
+  // A card's data draws as its card only with the run's answer fields (which card it is): read once, when there is one.
+  const card = !!input && Object.values(input).some((v) => !!v && typeof v === 'object' && !Array.isArray(v));
+  const [answer, setAnswer] = useState<AnswerField[]>([]);
+  useEffect(() => {
+    if (run && card) api<{ recipe: AppRecipe }>(`/api/apps/runs/${enc(run)}`).then((r) => setAnswer(r.recipe.answer), () => {});
+  }, [run, card]);
   const failed = t.status === 'error';
   const running = t.status === 'running' || t.status === 'pending';
   return (
@@ -72,7 +80,7 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
           </button>
         )}
       </div>
-      {failed ? <div className="rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2">{(t.output ?? '').slice(0, 1200)}</div> : input && <ResultView answer={[]} result={input} />}
+      {failed ? <div className="rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2">{(t.output ?? '').slice(0, 1200)}</div> : input && <ResultView answer={answer} result={input} />}
     </div>
   );
 }

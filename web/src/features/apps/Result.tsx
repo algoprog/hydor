@@ -315,7 +315,13 @@ export function ResultView({
   demo?: boolean;
 }) {
   // Fields the recipe does not name (an agent's extra keys) are left out; a result from an older recipe shows by its keys.
-  const fields: AnswerField[] = answer.length ? answer : Object.keys(result).map((id) => ({ id, label: humanize(id), type: Array.isArray(result[id]) ? (typeof (result[id] as unknown[])[0] === 'object' ? 'table' : 'list') : 'text' }));
+  // An object there is a card's data, drawn by its card when the field names it, else laid out as it is.
+  const fields: AnswerField[] = answer.length
+    ? answer
+    : Object.keys(result).map((id) => {
+        const v = result[id];
+        return { id, label: humanize(id), type: Array.isArray(v) ? (typeof v[0] === 'object' ? 'table' : 'list') : v && typeof v === 'object' ? 'ui' : 'text' };
+      });
   const short = fields.filter((f) => SHORT.has(f.type) && !(typeof result[f.id] === 'string' && (result[f.id] as string).length > 160));
   const long = fields.filter((f) => !short.includes(f));
   return (
