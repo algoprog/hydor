@@ -45,7 +45,8 @@ const CLAIM_SYSTEM = [
   WHOLE,
   'A file shown whole (<file>) is its content now, given for you to read: being shown does not mean it changed.',
   ...RULES,
-  'Answer with JSON only: {"holds": true or false, "score": a number from 0 to 1 for how close it is to holding, "reason": "one or two sentences, quoting the evidence"}',
+  'When the claim does not hold only because the evidence lacks a file you must see to decide, add "needs": up to 5 paths, relative to the project’s folder, of the files you need. The app then shows you them and asks once more. Name a file only when you know its path from the evidence (a path in the change, a file another file refers to, a path the claim names): never guess a path, and leave "needs" out when the evidence is enough to say no, or when no path is known.',
+  'Answer with JSON only: {"holds": true or false, "score": a number from 0 to 1 for how close it is to holding, "reason": "one or two sentences, quoting the evidence", "needs": ["path", …] (only when it does not hold for lack of a file)}',
 ].join('\n');
 
 const RULES_SYSTEM = [
@@ -72,12 +73,34 @@ const FINAL_SYSTEM = [
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 const unit = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined);
 
-/** Whether a review check's claim holds in the evidence; a reply that cannot be read is an error (not holding). */
-export async function reviewClaim(d: Deps, key: string, claim: string, evidence: string): Promise<{ holds: boolean; score: number; reason: string } | { error: string }> {
+/** At most this many files a reviewer may ask for in one answer. */
+export const NEEDS_MAX = 5;
+
+/** The paths a reviewer asked for: strings of a plausible path, each once, at most NEEDS_MAX; none when anything else came. */
+function needsOf(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    if (typeof x !== 'string') continue;
+    const p = x.trim();
+    // A name that cannot be a path in a <file path="…"> block (quotes, angle brackets, line breaks) is not a path to read.
+    if (!p || p.length > 300 || /["<>\u0000-\u001f]/.test(p) || out.includes(p)) continue;
+    out.push(p);
+    if (out.length >= NEEDS_MAX) break;
+  }
+  return out;
+}
+
+/**
+ * Whether a review check's claim holds in the evidence; a reply that cannot be read is an error (not holding). A claim that
+ * does not hold for lack of a file may come with `needs`: the paths of the files the reviewer asks to see.
+ */
+export async function reviewClaim(d: Deps, key: string, claim: string, evidence: string): Promise<{ holds: boolean; score: number; reason: string; needs?: string[] } | { error: string }> {
   try {
     const v = await ask(d, key, { system: CLAIM_SYSTEM, prompt: `<claim>\n${claim}\n</claim>\n\n<evidence>\n${clipMiddle(evidence, EVIDENCE_MAX)}\n</evidence>\n\nYour JSON answer:`, timeoutMs: 180_000, maxTokens: 600, strong: true }, 'a review');
     if (typeof v.holds !== 'boolean') return { error: 'The reviewer gave no answer that could be read' };
-    return { holds: v.holds, score: unit(v.score) ?? (v.holds ? 1 : 0), reason: str(v.reason, 600) || (v.holds ? 'It holds.' : 'It does not hold.') };
+    const needs = v.holds ? [] : needsOf(v.needs);
+    return { holds: v.holds, score: unit(v.score) ?? (v.holds ? 1 : 0), reason: str(v.reason, 600) || (v.holds ? 'It holds.' : 'It does not hold.'), ...(needs.length ? { needs } : {}) };
   } catch (e) {
     return { error: str((e as Error).message, 300) || 'The reviewer could not answer' };
   }

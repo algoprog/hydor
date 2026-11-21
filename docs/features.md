@@ -72,7 +72,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
   agent first agree what done means as checks (a command that must pass, a measured number with a target, a sentence a
-  reviewer that did none of the work must find true, something only you confirm), the paths it may not change and limits
+  reviewer that did none of the work must find true, and may ask to see a file it needs, never one git ignores, something only you confirm), the paths it may not change and limits
   (rounds, money, time); the app measures where things stand, then after every round runs the checks itself, as the
   session's own commands would run (inside the sandbox in a confidential session, or where Custom's or Codex's mode keeps
   commands in one), and keeps the round when things got closer and nothing broke, or undoes it (the files go back to the

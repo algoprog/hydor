@@ -26,7 +26,7 @@ import { lastTurn, opensTurn } from '../opinion/turns.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { checkpoint as takeCheckpoint, restoreCheckpoint, restoreRefusal } from '../worktrees.ts';
 import { askMessage, draftMessage, draftNotes, reminderMessage, restartedMessage, roundMessage } from './brief.ts';
-import { changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
+import { addAsked, changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
 import { cleanContract, cleanSettings, topId } from './validate.ts';
@@ -714,6 +714,12 @@ function checkContext(d: Deps, g: StoredGoal, p: { cwd: string; w?: WorktreeInfo
     confirmed: g._.confirmed ?? {},
     diff: () => (diff ??= changeSinceStart(g, p.cwd, p.w, now)),
     review: (claim, evidence) => reviewClaim(d, g.key, claim, evidence),
+    asked: (id) => (fresh(d, g) ?? g)._.asked?.[id] ?? [],
+    askedMore: (id, added) =>
+      remember(d, g, (f) => {
+        const all = (f._.asked ??= {});
+        all[id] = addAsked(all[id] ?? [], added);
+      }),
   };
 }
 
