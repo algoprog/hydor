@@ -931,7 +931,11 @@ agents that speak ACP and take MCP servers.
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
   their lowest ever, for the game asked for and no other (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). Many
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). They start their questions from About you
+  (units, where you live, currency, diet, people at home, streaming services and country, the teams you follow) or from your last answer, and write in your
+  language: the sky in words, weekdays, months and money by Intl, Wikipedia in your language first and English when it has no page, a fridge list in
+  any language read as English ingredient names with your own words shown back, numbers with a decimal comma and dates in your language read in your own
+  data, and a game's US dollar price with its worth in your currency at the day's Frankfurter rate. Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
