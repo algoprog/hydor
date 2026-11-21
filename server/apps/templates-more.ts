@@ -1296,12 +1296,13 @@ const tally = [
   { who: 'Draw', wins: meetings.filter((m) => m.winner === 'Draw').length },
   { who: opp, wins: meetings.filter((m) => same(m.winner, opp)).length },
 ];
-return { chances, team_pct: a, draw_pct: d, opponent_pct: b, team_form: letters(input.team_form), opponent_form: letters(input.opponent_form), meetings, tally };`,
+return { chances, team_pct: a, draw_pct: d, opponent_pct: b, total_pct: a + d + b, team_form: letters(input.team_form), opponent_form: letters(input.opponent_form), meetings, tally };`,
           outputs: [
             { id: 'chances', label: 'Chances', type: 'table', columns: [{ id: 'outcome', label: 'Result', type: 'text' }, { id: 'pct', label: 'Chance, %', type: 'number' }] },
             { id: 'team_pct', label: 'Chance the team wins, %', type: 'number' },
             { id: 'draw_pct', label: 'Chance of a draw, %', type: 'number' },
             { id: 'opponent_pct', label: 'Chance the opponent wins, %', type: 'number' },
+            { id: 'total_pct', label: 'The chances added up, %', type: 'number', description: '100 when there are chances, for the examples to check' },
             { id: 'team_form', label: 'The team’s form', type: 'text' },
             { id: 'opponent_form', label: 'The opponent’s form', type: 'text' },
             { id: 'meetings', label: 'Last meetings', type: 'table', columns: MEETING_COLS },
@@ -1356,8 +1357,8 @@ return { chances, team_pct: a, draw_pct: d, opponent_pct: b, team_form: letters(
       { id: 'keys', label: 'What to watch', type: 'list' },
     ],
     examples: [
-      { id: 'a-league-match', name: 'A league match', inputs: { team: 'Arsenal', opponent: 'Chelsea', competition: 'Premier League' }, checks: ['{{answer.summary}} is not empty', '{{odds.team_pct}} >= 0'] },
-      { id: 'basketball-no-draws', name: 'Basketball, no draws', inputs: { team: 'Boston Celtics', opponent: 'New York Knicks', competition: 'NBA' }, checks: ['{{answer.draw_pct}} = 0'] },
+      { id: 'a-league-match', name: 'A league match', inputs: { team: 'Arsenal', opponent: 'Chelsea', competition: 'Premier League' }, checks: ['{{answer.summary}} is not empty', '{{answer.team_pct}} >= 0 and {{answer.team_pct}} <= 100 and {{answer.draw_pct}} >= 0 and {{answer.draw_pct}} <= 100 and {{answer.opponent_pct}} >= 0 and {{answer.opponent_pct}} <= 100', '{{odds.total_pct}} = 100'] },
+      { id: 'basketball-no-draws', name: 'Basketball, no draws', inputs: { team: 'Boston Celtics', opponent: 'New York Knicks', competition: 'NBA' }, checks: ['{{answer.draw_pct}} = 0', '{{odds.total_pct}} = 100'] },
     ],
   },
   // ---- food --------------------------------------------------------------------------------------------------------

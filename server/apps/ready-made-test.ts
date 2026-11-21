@@ -7,7 +7,7 @@
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/apps/ready-made-test.ts
 //   DATA_DIR=/tmp/hydor-test-ready node dist/dev/ready-made-test.js
 import assert from 'node:assert/strict';
-import { allSteps, type CodeStep } from '../../shared/app-manifest.ts';
+import { allSteps, evalRule, type CodeStep } from '../../shared/app-manifest.ts';
 import { runCode } from './code.ts';
 import { TEMPLATES, templateById } from './templates.ts';
 
@@ -282,6 +282,29 @@ test('News digest: with more topics than room (8 topics, the shortest length) ev
     reads: [{ what: 'w', date: '2026-01-01', this_week: false }], quiet: [], topics: [{ topic: 'Topic A' }], since: '2026-11-14', today: '2026-11-21', stories: 4,
   });
   assert.deepEqual(old.quiet, ['Topic A']);
+});
+
+// ---- Match preview's examples ----------------------------------------------------------------------------------------
+
+test('Match preview: its examples’ checks test the chances (each from 0 to 100, adding up to 100), so wrong ones fail', async () => {
+  const t = templateById('match-preview')!;
+  const checks = t.examples![0].checks!;
+  const odds = await program('match-preview', 'odds', { team: 'Arsenal', opponent: 'Chelsea', team_win: 45, draw: 25, opponent_win: 30, meetings: [], team_form: 'WWDLW', opponent_form: 'LDWWL' });
+  const scope = (o: Record<string, unknown>, answer: Record<string, unknown>) => ({ inputs: {}, steps: { odds: o, answer }, vars: { reply: '', today: '2026-11-21' } });
+  const good = { team_pct: odds.team_pct, draw_pct: odds.draw_pct, opponent_pct: odds.opponent_pct, summary: 'A close one.' };
+  assert.deepEqual([odds.team_pct, odds.draw_pct, odds.opponent_pct, odds.total_pct], [45, 25, 30, 100]);
+  for (const rule of checks) assert.equal(evalRule(rule, scope(odds, good)), true, rule);
+  // Chances that are off (here, a percentage over 100, and a total that is not 100) no longer pass.
+  const results = (o: Record<string, unknown>, a: Record<string, unknown>) => checks.map((rule) => evalRule(rule, scope(o, a)));
+  assert.deepEqual(results(odds, { ...good, team_pct: 120 }).slice(1, 2), [false]);
+  assert.deepEqual(results(odds, { ...good, draw_pct: -5 }).slice(1, 2), [false]);
+  assert.deepEqual(results({ ...odds, total_pct: 90 }, good), [true, true, false]);
+  const none = await program('match-preview', 'odds', { team: 'A', opponent: 'B', meetings: [] });
+  assert.equal(none.total_pct, 0, 'no chances at all: the check fails');
+  assert.equal(evalRule(checks[2], scope(none, good)), false);
+  // The basketball example has no draw: nothing in a draw, the rest adds up.
+  const nba = await program('match-preview', 'odds', { team: 'A', opponent: 'B', team_win: 60, draw: 0, opponent_win: 40, meetings: [] });
+  for (const rule of t.examples![1].checks!) assert.equal(evalRule(rule, scope(nba, { draw_pct: nba.draw_pct })), true, rule);
 });
 
 // ---- Tiers ---------------------------------------------------------------------------------------------------------

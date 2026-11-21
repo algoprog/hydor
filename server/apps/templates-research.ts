@@ -914,7 +914,7 @@ const CITATION_ALERTS: Draft = {
   description: 'Who cited your papers lately, with the sentence that cites you and whether it builds on, compares with or disputes your work.',
   sessions: false,
   fields: [
-    { id: 'me', label: 'You, as an author', type: 'text', required: true, placeholder: 'e.g. Chris Samarinas', help: 'Your name as your papers print it, or your Semantic Scholar id (digits) or OpenAlex id (A…)' },
+    { id: 'me', label: 'You, as an author', type: 'text', required: true, placeholder: 'e.g. Omar Khattab', help: 'Your name as your papers print it, or your Semantic Scholar id (digits) or OpenAlex id (A…)' },
     { id: 'papers', label: 'Only these papers', type: 'long', placeholder: 'One a line: a title, a DOI or an arXiv id', help: 'Empty: all your papers' },
   ],
   prompt: '',
@@ -1272,7 +1272,7 @@ return {
     { id: 'note', label: 'What did not answer', type: 'text' },
   ],
   examples: [
-    { id: 'by-name', name: 'An author by name', inputs: { me: 'Chris Samarinas' }, checks: ['{{answer.name}} contains Samarinas', '{{answer.papers}} is not empty'] },
+    { id: 'by-name', name: 'An author by name', inputs: { me: 'Omar Khattab' }, checks: ['{{answer.name}} contains Khattab', '{{answer.papers}} is not empty'] },
     { id: 'one-paper', name: 'One paper by its DOI', inputs: { me: 'Omar Khattab', papers: '10.1145/3397271.3401075' }, checks: ['{{answer.papers}} is not empty', '{{answer.total}} > 0'] },
   ],
 };
@@ -3044,7 +3044,7 @@ return {
     { id: 'month', label: 'Papers of the month read', type: 'number' },
   ],
   examples: [
-    { id: 'by-name', name: 'By your name, in an area', inputs: { papers: 'Chris Samarinas', area: 'retrieval-augmented generation', compute: 'one 24 GB GPU', ideas: '3' }, checks: ['{{answer.ideas}} is not empty', '{{answer.month}} > 0'] },
+    { id: 'by-name', name: 'By your name, in an area', inputs: { papers: 'Omar Khattab', area: 'retrieval-augmented generation', compute: 'one 24 GB GPU', ideas: '3' }, checks: ['{{answer.ideas}} is not empty', '{{answer.month}} > 0'] },
     { id: 'by-titles', name: 'By your papers’ titles, in a category', inputs: { papers: 'ProCIS: A Benchmark for Proactive Retrieval in Conversations\nRevisiting Open Domain Query Facet Extraction and Generation', area: 'cs.IR', compute: 'two 80 GB GPUs', ideas: '4' }, checks: ['{{answer.ideas}} is not empty', '{{answer.mine}} is not empty'] },
   ],
 };
