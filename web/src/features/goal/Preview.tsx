@@ -19,8 +19,8 @@ export default function GoalPreview() {
   const g = { ...pick.goal, key: KEY };
   const s = {
     key: KEY,
-    cwd: '/home/chris/code/shop-app',
-    worktree: g.undo ? { path: '/tmp/x', branch: 'goal/search-relevance', base: 'main', repo: '/home/chris/code/shop-app' } : undefined,
+    cwd: '/home/you/code/shop-app',
+    worktree: g.undo ? { path: '/tmp/x', branch: 'goal/search-relevance', base: 'main', repo: '/home/you/code/shop-app' } : undefined,
     goal: { objective: g.contract.objective, status: 'active', app: { state: g.status, round: g.round, rounds: g.contract.limits.rounds, holds: 3, of: g.contract.checks.length } },
   } as unknown as SessionSummary;
   showGoal(KEY, g);
