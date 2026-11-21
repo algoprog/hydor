@@ -498,7 +498,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
         {signInNeed && <SignInBanner need={signInNeed} className="mb-2" />}
         {limitAgent && <LimitBanner agent={limitAgent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />}
-        <GoalDock key={s.key} s={s} className="mb-2" />
+        {/* Its key is its own: the tray below is keyed by the session too, and two siblings with one key leave a stale copy of the
+            first behind at every render (React finds only one of them again), which stacked goal bars above the message box. */}
+        <GoalDock key={`goal:${s.key}`} s={s} className="mb-2" />
         <WorkTray key={key} s={s} />
         <QueueList s={s} />
         {move && (

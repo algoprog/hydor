@@ -81,7 +81,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   second time; elsewhere the next round is told what got worse). When every check holds the app runs them a second
   time and a reviewer reads the whole change: only then is the goal reached, and the agent cannot end it. How much it
   asks (Works on its own, Asks at turning points, Asks every round) with a clock (10 minutes, or waits) before it goes on with its pick;
-  you steer at any time with messages, Pause and Resume, **Add a rule…**, **Change the checks…** and your say on a round
+  you steer at any time with messages, Pause (after the round that runs has been checked) and Resume, **Add a rule…**, **Change the checks…** and your say on a round
   (**Keep anyway…**, **Undo**, **Another way from here**). A bar above the message box shows the checks and the
   rounds, a card asks the questions and shows the report, a goal that stopped at a limit can be given more (it goes on when no limit is hit any more), it never sits at work
   silently (a queue on hold, a turn cut by a restart or a usage limit, commands left running each have a reason or carry

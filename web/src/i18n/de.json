@@ -25903,5 +25903,8 @@
   "Conferences to look up on the web": "Konferenzen zum Nachschlagen im Web",
   "Look up the conferences the lists do not have": "Konferenzen nachschlagen, die in den Listen fehlen",
   "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "Die Seite der Website, von der die Deadline abgelesen wurde, bei einer Konferenz, die in keiner der beiden Listen steht; bei den Listen leer",
-  "the conference’s website": "die Website der Konferenz"
+  "the conference’s website": "die Website der Konferenz",
+  "It pauses once this round has been checked": "Pausiert, sobald diese Runde geprüft wurde",
+  "{0} · running the checks · pausing after this round": "{0} · Prüfungen laufen · Pause nach dieser Runde",
+  "{0} · working · pausing after this round": "{0} · arbeitet · Pause nach dieser Runde"
 }

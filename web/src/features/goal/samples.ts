@@ -177,6 +177,12 @@ export function samples(now = Date.now()): GoalSample[] {
         // The person changed a limit's neighbour while the round runs: a check's target and a protected path.
         g.pending = { checks: CHECKS.map((c) => (c.id === 'c4' ? { ...c, target: { op: '<=' as const, value: 250 } } : c)), protect: ['tests/', 'search-eval/', 'src/checkout/'] };
       }),
+      mk('working-pausing', 'Working, pausing after this round', undo, (g) => {
+        midRun(g);
+        g.status = 'working';
+        g.round = 7;
+        g.pausing = true;
+      }),
       mk('checking', 'Checking', undo, (g) => {
         midRun(g);
         g.status = 'checking';

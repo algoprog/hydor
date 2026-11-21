@@ -27125,5 +27125,8 @@
   "Conferences to look up on the web": "Συνέδρια προς αναζήτηση στο διαδίκτυο",
   "Look up the conferences the lists do not have": "Αναζήτηση των συνεδρίων που δεν υπάρχουν στις λίστες",
   "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "Η σελίδα του ιστότοπου του συνεδρίου από την οποία διαβάστηκε η προθεσμία, για συνέδριο που δεν υπάρχει σε καμία από τις δύο λίστες· κενό για τα συνέδρια των λιστών",
-  "the conference’s website": "ο ιστότοπος του συνεδρίου"
+  "the conference’s website": "ο ιστότοπος του συνεδρίου",
+  "It pauses once this round has been checked": "Θα γίνει παύση μόλις ολοκληρωθεί ο έλεγχος αυτού του γύρου",
+  "{0} · running the checks · pausing after this round": "{0} · εκτέλεση των ελέγχων · παύση μετά από αυτόν τον γύρο",
+  "{0} · working · pausing after this round": "{0} · σε εξέλιξη · παύση μετά από αυτόν τον γύρο"
 }

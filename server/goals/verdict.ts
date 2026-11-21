@@ -1,7 +1,7 @@
 // How a round of a goal went, by rules alone (no model, no files): each check's closeness from where it started, the
 // round's score, kept or undone and why, rounds without progress, and the limits. The driver (driver.ts) feeds it the
 // checks' results; the tests (verdict-test.ts) feed it made-up ones.
-import { closeness, GOAL_PATIENCE, tally, type GoalCheck, type GoalOutcome, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
+import { closeness, GOAL_PATIENCE, meets, tally, type GoalCheck, type GoalOutcome, type GoalResult, type GoalRound, type GoalState } from '../../shared/goals.ts';
 
 /** A round must raise the score by more than this to count as a gain. */
 export const NO_GAIN = 0.005;
@@ -17,8 +17,8 @@ export function num(v: number): string {
   return String(Number(v.toPrecision(4)));
 }
 
-/** "$5.04". */
-export const usd = (v: number): string => `$${v.toFixed(2)}`;
+/** "$5.04"; under five cents with a third decimal ("$0.006"), so that a small limit and what was spent of it do not both read "$0.00" or "$0.01". */
+export const usd = (v: number): string => `$${v > 0 && v < 0.05 ? v.toFixed(3) : v.toFixed(2)}`;
 
 /** "1 h 11 min", "45 min", "3 h", "under a minute". */
 export function duration(ms: number): string {
@@ -194,4 +194,27 @@ export function relaxed(g: Pick<GoalState, 'contract' | 'rounds'>, relax: Record
     return { ...r, results: scored(checks, results, start === r ? { results } : start), score: scoreOf(checks, results, start === r ? { results } : start) };
   });
   return { contract: { ...g.contract, checks }, rounds };
+}
+
+/**
+ * Measured checks whose target the person changed and nothing else they measure (P3): each stored value of theirs (the
+ * start, the best round, every round) is judged again against `checks`, as they are now (holds, closeness), and the
+ * rounds that hold one are scored again, as relaxed() does for a say. Nothing is measured; a result without a value (an
+ * error) stays as it is, and the rounds' outcomes and the best round stay what they were.
+ */
+export function rejudged(checks: GoalCheck[], rounds: GoalRound[], ids: string[]): GoalRound[] {
+  if (!ids.length) return rounds;
+  const start = rounds[0];
+  return rounds.map((r) => {
+    let changed = false;
+    const results = r.results.map((x) => {
+      const c = checks.find((y) => y.id === x.id);
+      if (!c || !ids.includes(c.id) || c.kind !== 'measure' || !c.target || x.value == null || x.error) return x;
+      changed = true;
+      return { ...x, holds: meets(c, x.value) };
+    });
+    if (!changed) return r;
+    const from = start === r ? { results } : start;
+    return { ...r, results: scored(checks, results, from), score: scoreOf(checks, results, from) };
+  });
 }

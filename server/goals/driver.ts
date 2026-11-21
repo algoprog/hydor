@@ -30,7 +30,7 @@ import { changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protec
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
 import { cleanContract, cleanSettings, topId } from './validate.ts';
-import { allButYouHold, duration, limitReason, reckon, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
+import { allButYouHold, duration, limitReason, reckon, rejudged, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
 
 export const NO_GOAL = 'This session has no goal.';
 const PAUSED = 'The user paused the goal: stop now and end your turn.';
@@ -77,6 +77,9 @@ function setStatus(g: StoredGoal, s: GoalStatus, now = Date.now()) {
   // mark left from it can never send the goal back to work later from a question (J3).
   g._.heldQueue = undefined;
   g._.heldFrom = undefined;
+  // Pause pressed while a round ran (pausesHere) holds only while that round runs or is checked: paused for any other
+  // reason, waiting on the person, over, it goes, and never outlives the round (P1).
+  if (s !== 'working' && s !== 'checking') g.pausing = undefined;
   if (goalOver(s)) {
     g.endedAt ??= now;
     g.round = undefined;
@@ -775,18 +778,57 @@ const canonical = (v: unknown): unknown =>
             .map(([k, x]) => [k, canonical(x)]),
         )
       : v;
-/** What of a check decides what the app measures: all of it but its name. */
-const measured = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+/**
+ * What of a check decides what the app measures: its kind, command, how its number is read, its claim and evidence. Its
+ * name, target, slack and unit only say how a value is named, judged or shown, and its time limit how long a run may take
+ * (P3): a check changed in those alone measures the same thing.
+ */
+const measured = ({ label: _label, target: _target, slack: _slack, unit: _unit, timeoutS: _timeoutS, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+/** All of a check but its name: whether it changed at all. */
+const defined = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
 
 /**
- * Checks that are new or whose definition differs from before: those are measured again, and the start then holds where
- * they stand now, not where they stood at the start (since). A check written with its keys in another order (what the
- * agent proposed and what a change sends are written differently) or only renamed is the same check: counted as changed,
- * every check lost its value at the start the first time the person changed any of them.
+ * Checks that are new or that measure something else than before (measured): those are measured again, and the start then
+ * holds where they stand now, not where they stood at the start (since). A check written with its keys in another order
+ * (what the agent proposed and what a change sends are written differently), only renamed, or changed only in how its
+ * value is judged (its target, slack, unit, time limit) is not: it keeps its values (retargeted, rejudged).
  */
 export function changedChecks(before: GoalCheck[], after: GoalCheck[]): string[] {
   const was = new Map(before.map((c) => [c.id, measured(c)]));
   return after.filter((c) => was.get(c.id) !== measured(c)).map((c) => c.id);
+}
+
+/** Checks that measure what they did and whose target changed: their stored values are judged again (rejudged), not measured. */
+export function retargeted(before: GoalCheck[], after: GoalCheck[]): string[] {
+  const was = new Map(before.map((c) => [c.id, c]));
+  return after
+    .filter((c) => {
+      const b = was.get(c.id);
+      return !!b && measured(b) === measured(c) && JSON.stringify(canonical(b.target)) !== JSON.stringify(canonical(c.target));
+    })
+    .map((c) => c.id);
+}
+
+/**
+ * Puts the person's checks in place of the goal's (a change, at once or once the round that runs is over, or at the
+ * agreement) and says which to measure again (P3). Those that measure something else, and any changed one the start holds
+ * no value of to judge again (it could not run there: a longer time limit is how that is put right), are measured again;
+ * one changed only in its target keeps its values, judged again against it wherever they are stored and those rounds
+ * scored again; a change of name, slack, unit or time limit alone changes nothing that was measured.
+ */
+function putChecks(g: StoredGoal, after: GoalCheck[]): string[] {
+  const before = g.contract.checks;
+  const start = g.rounds[0];
+  const valued = (id: string) => {
+    const r = start?.results.find((x) => x.id === id);
+    return !!r && !r.error;
+  };
+  const was = new Map(before.map((c) => [c.id, defined(c)]));
+  const measure = new Set(changedChecks(before, after));
+  for (const c of after) if (was.has(c.id) && was.get(c.id) !== defined(c) && start && !valued(c.id)) measure.add(c.id);
+  g.contract = { ...g.contract, checks: after };
+  g.rounds = rejudged(after, g.rounds, retargeted(before, after).filter((id) => !measure.has(id)));
+  return [...measure];
 }
 
 /**
@@ -798,8 +840,7 @@ function applyPending(g: StoredGoal) {
   if (!p) return;
   g.pending = undefined;
   if (p.checks) {
-    const changed = changedChecks(g.contract.checks, p.checks);
-    g.contract = { ...g.contract, checks: p.checks };
+    const changed = putChecks(g, p.checks);
     if (changed.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...changed])];
   }
   if (p.protect) g.contract = { ...g.contract, protect: p.protect };
@@ -814,6 +855,26 @@ function pause(d: Deps, g: StoredGoal, reason: string, o: { notice?: boolean } =
   commit(d, g);
   if (o.notice) notify(d, g.key, 'waiting', `Goal paused: ${reason}`);
 }
+
+/** Whether Pause, pressed now, waits for the round at work to be checked (P1): a round runs (not an ask turn), or it is checked. */
+const pausesAfterRound = (g: StoredGoal) => (g.status === 'working' && g.round != null && !g._.askTurn) || g.status === 'checking';
+
+/**
+ * P1: Pause was pressed while a round ran (pausing): the goal pauses here, with that round recorded, instead of going on
+ * (true: the caller stops). Called wherever the loop would go on after a round, each time after the last thing awaited
+ * before it acts: what comes after a round (afterRound: before the final check, after it, and before a limit, a
+ * question, an ask turn or the next round) and a round that starts (startRound: after its checkpoint). The two places
+ * that would send a round's message again after a restart (turnStep, quiet) pause instead.
+ */
+function pausesHere(d: Deps, g: StoredGoal): boolean {
+  if (!g.pausing) return false;
+  pause(d, g, 'Paused by you.');
+  return true;
+}
+
+/** P1: paused where a restart cut the round's turn (or its message never reached the agent): Resume checks what it did. */
+const cutWhilePausing = (g: StoredGoal, began: boolean) =>
+  began ? `Paused by you. A restart of the app cut round ${g.round}’s turn short: Resume to check what it did.` : `Paused by you. Round ${g.round}’s message did not reach the agent (the app restarted as it was sent): Resume to go on.`;
 
 function reach(d: Deps, g: StoredGoal, o: { summary: string; final?: GoalResult[]; review?: string }) {
   g.question = undefined;
@@ -974,6 +1035,10 @@ async function startRound(d: Deps, g: StoredGoal, o: { changeApproach?: boolean 
     const f = fresh(d, g);
     if (!f || f.status !== status) return;
     g = f;
+    // Hold: Pause pressed while its checkpoint was taken (the goal was checking), or before a restart that left it to start
+    // (the tick starts it again): paused before the round, which Resume starts (starting stays). The only await here; a
+    // goal without a worktree awaits nothing before its round goes out, and afterRound held before calling it.
+    if (pausesHere(d, g)) return;
   }
   g._.starting = undefined;
   const n = tally(g).rounds + 1;
@@ -1093,6 +1158,10 @@ async function finalCheck(d: Deps, g: StoredGoal): Promise<{ ok: boolean; reason
 
 /** After a round was checked (or when a goal goes on): done, at a limit, a question, asking which way, or the next round. */
 async function afterRound(d: Deps, g: StoredGoal) {
+  // P1: Pause pressed while the round ran (pausing): the round is recorded, and the goal pauses before anything that comes
+  // after a round (the final check, a limit, a question, an ask turn, the next round), at the first of the three holds
+  // below it reaches: each comes after the last thing awaited, so nothing can be sent between it and what it holds.
+  // Resume comes back here. (A goal with only its start, goOn, starts round 1: startRound holds.)
   if (g.rounds.length <= 1) return goOn(d, g);
   // Every check but the person's holds where the files stand (the best round): the final check judges those files, once.
   // What it found of the last few states of the files is kept (judged): files it already judged are not paid for twice
@@ -1107,6 +1176,8 @@ async function afterRound(d: Deps, g: StoredGoal) {
     let now = fresh(d, g);
     if (!now || now.status !== 'checking') return;
     g = now;
+    // Hold: before the final check, or what was found of these files before (no review is asked while it waits).
+    if (pausesHere(d, g)) return;
     const n = g.best ?? g.rounds[g.rounds.length - 1].n;
     const known = g._.judged?.find((j) => j.key === key);
     if (known?.ok && !known.notYet) {
@@ -1133,19 +1204,27 @@ async function afterRound(d: Deps, g: StoredGoal) {
       if (f.ok) {
         g._.fix = undefined;
         g._.final = { reran: f.reran, ...(f.review ? { review: f.review } : {}) };
+      } else {
+        // Not yet: why goes with the round it judged, and a check that held only once no longer holds where the files stand.
+        // From now on a round is kept when it changes the files and breaks nothing (the score can rise no more).
+        const lr = g.rounds.find((r) => r.n === n) ?? g.rounds[g.rounds.length - 1];
+        lr.why = [lr.why && bare(lr.why), `The final check: ${bare(f.reason)}`].filter(Boolean).join('. ');
+        if (f.flaky.length) mergeResults(g, f.flaky, [n]);
+        g._.afterFinal = true;
+        g._.fix = { by: 'final', reason: f.reason };
+      }
+      // Hold: Pause pressed while the final check ran. What it found is kept (judged): Resume does not pay for it again,
+      // and goes on from it (the person's check, reached, or on with the rounds).
+      if (pausesHere(d, g)) return;
+      if (f.ok) {
         const left = g.contract.checks.filter((c) => c.kind === 'you' && !g._.confirmed?.[c.id]);
         if (left.length) return askYours(d, g, left[0]);
-        return reach(d, g, { summary: reachedSummary(g, g._.final), final: f.results, ...(f.review ? { review: f.review } : {}) });
+        return reach(d, g, { summary: reachedSummary(g, g._.final!), final: f.results, ...(f.review ? { review: f.review } : {}) });
       }
-      // Not yet: why goes with the round it judged, and a check that held only once no longer holds where the files stand.
-      // From now on a round is kept when it changes the files and breaks nothing (the score can rise no more).
-      const lr = g.rounds.find((r) => r.n === n) ?? g.rounds[g.rounds.length - 1];
-      lr.why = [lr.why && bare(lr.why), `The final check: ${bare(f.reason)}`].filter(Boolean).join('. ');
-      if (f.flaky.length) mergeResults(g, f.flaky, [n]);
-      g._.afterFinal = true;
-      g._.fix = { by: 'final', reason: f.reason };
     }
   }
+  // Hold: what comes after a round that is not the final check (a limit, a question, an ask turn, the next round).
+  if (pausesHere(d, g)) return;
   const lim = limitReason(g, activeNow(g));
   if (lim) return atLimit(d, g, lim);
   if (g._.ask) return openQuestion(d, g);
@@ -1466,6 +1545,8 @@ async function turnStep(d: Deps, key: string, t: { endedAt: number; startedAt: n
   // Cut short by a restart of the app (Custom's turns stop at every restart, and nothing carries them on): the loop's
   // message goes again, once, saying why.
   if ((turn?.error ?? '').startsWith(CUT_BY_RESTART)) {
+    // Pause pressed while that round ran: no message goes again, the goal pauses (Resume checks what the round did).
+    if (g.pausing) return pause(d, g, cutWhilePausing(g, true), { notice: true });
     if (g._.lastMessage && g._.resent !== g._.sentAt) {
       g._.sentAt = Date.now();
       g._.resent = g._.sentAt;
@@ -1639,6 +1720,10 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
   const notOver = () => {
     if (over) throw new HttpError(409, 'The goal is over: set a new one');
   };
+  // P2: rules and settings also on a goal stopped at a limit, which Give it more… can still carry on: they count from then.
+  const notEnded = () => {
+    if (over && g.status !== 'limit') throw new HttpError(409, 'The goal is over: set a new one');
+  };
   switch (a.action) {
     case 'stop':
     case 'clear': {
@@ -1659,11 +1744,25 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
     }
     case 'pause': {
       notOver();
-      if (g.status !== 'paused') pause(d, g, 'Paused by you.');
+      // P1: a round at work (running, or its checks) is finished and checked first: the goal pauses after it (pausesHere).
+      // Anywhere else it pauses now.
+      if (g.status === 'paused' || g.pausing) break;
+      if (pausesAfterRound(g)) {
+        g.pausing = true;
+        commit(d, g);
+        break;
+      }
+      pause(d, g, 'Paused by you.');
       break;
     }
     case 'resume': {
       notOver();
+      // P1: before the round it waits for is checked, Resume takes the pause back: the goal goes on as if never paused.
+      if (g.status !== 'paused' && g.pausing) {
+        g.pausing = undefined;
+        commit(d, g);
+        break;
+      }
       if (g.status !== 'paused') throw new HttpError(409, 'The goal is not paused');
       const from = g._.pausedFrom;
       g.reason = undefined;
@@ -1729,10 +1828,9 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       if (g.status !== 'agreeing') throw new HttpError(409, g.status === 'measuring' ? 'The checks are still being measured' : 'The checks are not waiting for your agreement');
       const c = cleanContract(a.contract, g.contract, { title: true, ids: true, top: usedTop(g) });
       if (c.errors.length) throw new HttpError(400, c.errors[0]);
-      const before = g.contract.checks;
+      const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
       g._.topId = c.top;
-      const changed = c.contract.checks ? changedChecks(before, c.contract.checks) : [];
       g._.agreed = true;
       g.reason = undefined;
       // Measured now, with the person's agreement: every check without a value at the start, and those they changed.
@@ -1775,9 +1873,8 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
         commit(d, g);
         break;
       }
-      const before = g.contract.checks;
+      const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
-      const changed = c.contract.checks ? changedChecks(before, c.contract.checks) : [];
       if (changed.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...changed])];
       if (g.status === 'agreeing' && g.reason !== 'A check could not run') g.reason = agreeNote(d, g);
       // Waiting for the person's agreement: measured now, and back to the agreement, where the agent may run commands
@@ -1808,7 +1905,7 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       break;
     }
     case 'settings': {
-      notOver();
+      notEnded();
       g.settings = { ...g.settings, ...a.settings };
       const q = g.question;
       if (q?.kind === 'way' && a.settings.noAnswerMin !== undefined) {
@@ -1819,14 +1916,14 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       break;
     }
     case 'rule': {
-      notOver();
+      notEnded();
       if (g.rules.length >= GOAL_MAX_RULES) throw new HttpError(400, `At most ${GOAL_MAX_RULES} rules: remove one first`);
       g.rules.push({ id: `r${rid()}`, text: a.text, at: Date.now() });
       commit(d, g);
       break;
     }
     case 'unrule': {
-      notOver();
+      notEnded();
       g.rules = g.rules.filter((r) => r.id !== a.id);
       commit(d, g);
       break;
@@ -1896,6 +1993,8 @@ async function leaveHere(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, w: Worktree
 
 /** Why a say is refused (I4), in words that say what the person can do. */
 const SAY_AGENT_BUSY = 'This session’s agent is at work: wait for its turn to end, then try again.';
+/** P1: Pause was pressed while a round ran: the goal pauses once that round has been checked. */
+const SAY_PAUSING = 'The goal pauses once this round has been checked: give your say then.';
 /** A path or folder as a shell takes it: quoted when it has anything but plain characters. */
 const shellQuoted = (p: string) => (/^[\w./@+-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`);
 
@@ -1955,6 +2054,7 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
   // for an agent's turn or another session, put changes aside, move a commit to a branch. None depends on what happened
   // before: once the other session has ended and the files are the ones the goal left, the say goes.
   const later = 'Wait for the round to end, or pause the goal first';
+  if (g.pausing) throw new HttpError(409, SAY_PAUSING);
   if (g.status === 'working' || g.status === 'checking' || g.status === 'measuring') throw new HttpError(409, later);
   if (driving.has(key)) throw busyError();
   if (!idle(d, key)) throw new HttpError(409, SAY_AGENT_BUSY);
@@ -2003,6 +2103,8 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
     }
     f = fresh(d, g);
     if (!f) return;
+    // Paused while the files went back: the say is done, and the goal stays paused (Resume goes on from there).
+    const going = wasGoing && (f.status === 'asking' || f.status === 'needs-you');
     if (a.do === 'undo') {
       const prev = [...f.rounds].reverse().find((x) => x.n < round.n && (x.outcome === 'kept' || x.outcome === 'start') && x.checkpoint)!;
       const rr = f.rounds.find((x) => x.n === a.n)!;
@@ -2041,15 +2143,15 @@ async function sayOnRound(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAc
       // Measured first (after this step: it holds the goal's lock), then on: the next round where the goal was going on,
       // else back to where it stood (paused, or at its limit).
       f._.remeasure = f.contract.checks.map((c) => c.id);
-      f._.measureBack = wasGoing ? undefined : f.status;
+      f._.measureBack = going ? undefined : f.status;
       f._.agreed = true;
-      if (wasGoing) f.reason = undefined;
+      if (going) f.reason = undefined;
       setStatus(f, 'measuring');
       return commit(d, f);
     }
     // The goal was going on: as after a checked round (the final check first, when every check holds where the files
     // stand now and it has not judged them).
-    if (wasGoing) {
+    if (going) {
       f.reason = undefined;
       return afterRound(d, f);
     }
@@ -2329,6 +2431,8 @@ async function quiet(d: Deps, key: string, sentAt: number, now: number) {
     return checkStep(d, key);
   } else if (now - sentAt < UNSENT_MS) return;
   quietSince.delete(key);
+  // Pause pressed while that round ran: no message goes again, the goal pauses (Resume checks what the round did).
+  if (g.pausing) return pause(d, g, cutWhilePausing(g, began), { notice: true });
   if (g._.lastMessage && g._.resent !== sentAt) {
     g._.sentAt = Date.now();
     g._.resent = g._.sentAt;

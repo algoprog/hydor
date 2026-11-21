@@ -7,7 +7,7 @@
 //   DATA_DIR=/tmp/hydor-test-goal-verdict PRICES_URL= node dist/dev/verdict-test.js
 import assert from 'node:assert/strict';
 import type { GoalCheck, GoalResult, GoalRound, GoalState } from '../../shared/goals.ts';
-import { allButYouHold, duration, limitReason, num, reckon, relaxed, scoreOf, scored, stalled } from './verdict.ts';
+import { allButYouHold, duration, limitReason, num, reckon, rejudged, relaxed, scoreOf, scored, stalled, usd } from './verdict.ts';
 
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
@@ -227,7 +227,37 @@ test('new targets for measured checks: every round’s results are judged again'
   assert.equal(g.contract.checks[0].target!.value, 300);
 });
 
+test('P3: a target changed by the person: the stored values of that check are judged again, the rounds that hold one scored again, nothing else touched', () => {
+  const rounds = [
+    round(0, [res('c3', false, 900), res('c1', false)], 'start'),
+    round(1, [res('c3', false, 420), res('c1', true)], 'undone'),
+    round(2, [{ id: 'c3', holds: false, closeness: 0, error: 'It timed out', ms: 1 }, res('c1', true)], 'kept'),
+    round(3, [res('c1', true)], 'kept'),
+  ];
+  const checks = [{ ...SPEED, target: { op: '<=' as const, value: 450 } }, TESTS];
+  const r = rejudged(checks, rounds, ['c3']);
+  const c3 = (n: number) => r[n].results.find((x) => x.id === 'c3')!;
+  assert.deepEqual([c3(0).holds, c3(0).value, c3(0).closeness], [false, 900, 0], 'the start keeps its value, short of 450');
+  assert.deepEqual([c3(1).holds, c3(1).closeness], [true, 1]);
+  assert.equal(r[1].score, 1);
+  assert.equal(r[1].outcome, 'undone', 'outcomes stay');
+  assert.equal(r[2], rounds[2], 'a result without a value is left as it is');
+  assert.equal(r[3], rounds[3], 'a round without one is not scored again');
+  assert.equal(rounds[1].results[0].holds, false, 'the original is left as it was');
+  assert.equal(rejudged(checks, rounds, []), rounds);
+});
+
 // ---- run ---------------------------------------------------------------------------------------------
+
+test('money in the loop’s sentences: two decimals, a third under five cents', () => {
+  assert.equal(usd(5.04), '$5.04');
+  assert.equal(usd(0.5), '$0.50');
+  assert.equal(usd(0.05), '$0.05');
+  assert.equal(usd(0.00606), '$0.006');
+  assert.equal(usd(0.003), '$0.003');
+  assert.equal(usd(0), '$0.00');
+  assert.equal(limitReason({ contract: { objective: 'x', checks: [], protect: [], limits: { rounds: 5, usd: 0.003 } }, rounds: [], spentUsd: 0.00606 } as never, 0), 'It spent $0.006 of its $0.003');
+});
 
 for (const [name, fn] of tests) {
   try {

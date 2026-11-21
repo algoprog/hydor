@@ -25265,5 +25265,8 @@
   "Conferences to look up on the web": "Webで調べるカンファレンス",
   "Look up the conferences the lists do not have": "リストにないカンファレンスを調べる",
   "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "どちらのリストにもないカンファレンスについて、締め切りを読み取った公式サイトのページ。リストにあるものは空欄",
-  "the conference’s website": "カンファレンスのWebサイト"
+  "the conference’s website": "カンファレンスのWebサイト",
+  "It pauses once this round has been checked": "このラウンドのチェックが終わったら一時停止します",
+  "{0} · running the checks · pausing after this round": "{0} · チェックを実行中 · このラウンドの後に一時停止します",
+  "{0} · working · pausing after this round": "{0} · 作業中 · このラウンドの後に一時停止します"
 }

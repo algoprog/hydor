@@ -27,6 +27,10 @@ import {
   num,
   outcomeLabel,
   pillValue,
+  pauseButton,
+  pauseWait,
+  PAUSE_WAIT,
+  PAUSING_WAIT,
   pendingNote,
   placesOf,
   plural,
@@ -87,6 +91,21 @@ test('the status words say what the goal is doing', () => {
   assert.equal(statusWords(g('reached')), 'reached');
   assert.equal(statusWords(g('limit')), 'stopped at its limit');
   assert.equal(statusWords(g('stopped')), 'stopped');
+});
+
+test('a pause that waits for the round that runs is in the words, and its button takes the pause back', () => {
+  const w = g('working-pausing');
+  assert.equal(w.pausing, true);
+  assert.equal(statusWords(w), 'round 7 of 12 · working · pausing after this round');
+  assert.equal(statusWords({ ...w, status: 'checking' }), 'round 7 of 12 · running the checks · pausing after this round');
+  // Without a pause pressed the words are as they were; the flag means nothing once the goal is paused.
+  assert.equal(statusWords(g('working')), 'round 7 of 12 · working');
+  assert.equal(statusWords({ ...g('paused'), pausing: true }), 'round 7 of 12 · paused');
+  assert.deepEqual(pauseButton(g('working')), { label: 'Pause', action: 'pause' });
+  assert.deepEqual(pauseButton(w), { label: 'Resume', action: 'resume' });
+  assert.equal(pauseWait(g('working')), PAUSE_WAIT);
+  assert.equal(pauseWait(w), PAUSING_WAIT);
+  assert.equal(PAUSING_WAIT, 'It pauses once this round has been checked');
 });
 
 test('a goal paused before any round says only "paused"; the round in progress is the next number when none is set', () => {

@@ -27122,5 +27122,8 @@
   "Conferences to look up on the web": "需要在网络上查找的会议",
   "Look up the conferences the lists do not have": "查找两份列表中没有的会议",
   "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "截止日期所在的会议官网页面，适用于两份列表都没有的会议；列表中已有的会议则留空",
-  "the conference’s website": "会议官网"
+  "the conference’s website": "会议官网",
+  "It pauses once this round has been checked": "本轮检查完成后会暂停",
+  "{0} · running the checks · pausing after this round": "{0} · 正在运行检查 · 本轮结束后暂停",
+  "{0} · working · pausing after this round": "{0} · 工作中 · 本轮结束后暂停"
 }
