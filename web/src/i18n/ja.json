@@ -25252,5 +25252,13 @@
   "{0}: the {1} card ({2}). Its data:": "{0}：{1}カード（{2}）。データ：",
   "{0}… (cut)": "{0}…（省略）",
   "{topic}: a {minutes}-minute lesson": "{topic}：{minutes}分のレッスン",
-  "· lowest ever US&#36;{0}": "・過去最安値 US&#36;{0}"
+  "· lowest ever US&#36;{0}": "・過去最安値 US&#36;{0}",
+  "Forget what it showed a month ago": "1か月前に表示した内容を忘れる",
+  "Forget what it showed three weeks ago": "3週間前に表示した内容を忘れる",
+  "Keep what it showed": "表示した内容を保持する",
+  "Several areas, between commas, are searched together": "複数の分野はカンマで区切ると、まとめて検索されます",
+  "The addresses of the stories each edition showed, so a later one leaves them out": "各エディションが表示した記事のアドレス。次回以降のエディションでは除外されます",
+  "The papers each update showed, so none comes again": "各更新で表示した論文。同じ論文が再び表示されることはありません",
+  "What the last editions showed": "直近のエディションで表示した内容",
+  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "論文に記載されている名前、またはSemantic Scholar ID（数字）、OpenAlex ID（A…）、ORCID"
 }

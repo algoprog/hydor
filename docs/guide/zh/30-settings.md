@@ -305,7 +305,7 @@
 
 ### 应用
 
-[设置 → 应用](/settings?s=apps)：哪些应用智能体无需先询问就为你运行。详见[应用](/guide/apps)。
+[设置 → 应用](/settings?s=apps)：应用对你了解什么，以及哪些无需询问就能运行。详见[应用](/guide/apps)。
 
 - [**无需询问直接运行**](/settings?s=apps&find=Run%20without%20asking)：智能体无需先询问就为你运行的应用；移除某个应用后会再次询问。
 

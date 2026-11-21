@@ -305,7 +305,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Apps
 
-[Settings → Apps](/settings?s=apps): which apps agents run for you without asking first. More in [Apps](/guide/apps).
+[Settings → Apps](/settings?s=apps): what apps know about you, and which run without asking. More in [Apps](/guide/apps).
 
 - [**Run without asking**](/settings?s=apps&find=Run%20without%20asking): The apps agents run for you without asking first; remove one to be asked again.
 

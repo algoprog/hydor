@@ -305,7 +305,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 ### Apps
 
-[Paramètres → Apps](/settings?s=apps) : les apps que les agents exécutent pour vous sans demander d’abord. Pour en savoir plus : [Apps](/guide/apps).
+[Paramètres → Apps](/settings?s=apps) : ce que les apps savent de vous, et lesquelles s’exécutent sans rien demander. Pour en savoir plus : [Apps](/guide/apps).
 
 - [**Exécuter sans demander**](/settings?s=apps&find=Run%20without%20asking) : Les apps que les agents exécutent pour vous sans demander d’abord ; retirez-en une pour qu’on vous redemande.
 

@@ -25253,5 +25253,13 @@
   "{0}: the {1} card ({2}). Its data:": "{0} : la carte {1} ({2}). Ses données :",
   "{0}… (cut)": "{0}… (coupé)",
   "{topic}: a {minutes}-minute lesson": "{topic} : une leçon de {minutes} minutes",
-  "· lowest ever US&#36;{0}": "· plus bas prix jamais atteint : US&#36;{0}"
+  "· lowest ever US&#36;{0}": "· plus bas prix jamais atteint : US&#36;{0}",
+  "Forget what it showed a month ago": "Oublier ce qu’elle a affiché il y a un mois",
+  "Forget what it showed three weeks ago": "Oublier ce qu’elle a affiché il y a trois semaines",
+  "Keep what it showed": "Conserver ce qu’elle a affiché",
+  "Several areas, between commas, are searched together": "Plusieurs domaines, séparés par des virgules, sont recherchés ensemble",
+  "The addresses of the stories each edition showed, so a later one leaves them out": "Les adresses des articles affichés par chaque édition, pour qu’une édition suivante les écarte",
+  "The papers each update showed, so none comes again": "Les articles affichés par chaque mise à jour, pour qu’aucun ne revienne",
+  "What the last editions showed": "Ce que les dernières éditions ont affiché",
+  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "Votre nom tel que vos articles l’impriment, ou votre identifiant Semantic Scholar (chiffres), votre identifiant OpenAlex (A…) ou votre ORCID"
 }

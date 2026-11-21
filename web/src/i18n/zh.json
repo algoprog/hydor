@@ -27109,5 +27109,13 @@
   "{0}: the {1} card ({2}). Its data:": "{0}：{1} 卡片（{2}）。其数据：",
   "{0}… (cut)": "{0}…（已截断）",
   "{topic}: a {minutes}-minute lesson": "{topic}：{minutes} 分钟的课程",
-  "· lowest ever US&#36;{0}": "· 历史最低 US&#36;{0}"
+  "· lowest ever US&#36;{0}": "· 历史最低 US&#36;{0}",
+  "Forget what it showed a month ago": "忘记一个月前展示过的内容",
+  "Forget what it showed three weeks ago": "忘记三周前展示过的内容",
+  "Keep what it showed": "保留展示过的内容",
+  "Several areas, between commas, are searched together": "用逗号分隔多个领域，会同时搜索这些领域",
+  "The addresses of the stories each edition showed, so a later one leaves them out": "每期展示过的报道的地址，这样之后的期数就不会重复这些报道",
+  "The papers each update showed, so none comes again": "每次更新展示过的论文，这样同一篇论文不会再次出现",
+  "What the last editions showed": "最近几期展示过的内容",
+  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "你的名字（与论文上署的写法一致），或你的 Semantic Scholar ID（数字）、OpenAlex ID（A…）或 ORCID"
 }
