@@ -4223,6 +4223,66 @@ test('S1: while a goal is not over, turning on a campaign, a deep research or an
   assert.equal(goalTeamChange(db, X, { swarm: 'campaign' }), null, 'a goal that is over');
 });
 
+// ---- L1: limits already used up ------------------------------------------------------------------------------------
+
+/** What the session has spent, as the app reads it (its sessions row). */
+const spend = (key: string, usdNow: number) =>
+  db.prepare("insert into sessions (key, agent, id, path, cost_usd) values (?, 'claude', ?, '/nowhere', ?) on conflict(key) do update set cost_usd = excluded.cost_usd").run(key, key, usdNow);
+
+test('L1: the agreement refuses limits the goal has already used (what working out the checks cost), whether the person set them or the proposal did; nothing changes, and a limit above it goes', async () => {
+  const A1 = 'claude:goal-l1-agree';
+  const w = worktree();
+  sessions.add(A1, { cwd: w.path, worktree: w });
+  await act(A1, { action: 'set', objective: 'Score reaches 10 and done.txt exists', settings: { asks: 'own' } });
+  await turn(A1, async () => {
+    assert.equal((await tool(A1, 'goal_propose', { checks: CHECKS, protect: ['tests/'], limits: { rounds: 8, usd: 0.003 } })).isError, false);
+  });
+  await until('agreeing', () => goal(A1).status === 'agreeing');
+  // Working out the checks cost $0.006.
+  spend(A1, 0.006);
+  const n = sent(A1);
+  await rejects(act(A1, { action: 'agree' }), 409, /^It has spent \$0\.006: give it more than that\.$/);
+  await rejects(act(A1, { action: 'agree', contract: { limits: { rounds: 8, usd: 0.005 } } }), 409, /^It has spent \$0\.006: give it more than that\.$/);
+  let g = goal(A1);
+  assert.deepEqual([g.status, g.contract.limits, g.rounds.length, sent(A1)], ['agreeing', { rounds: 8, usd: 0.003 }, 0, n], 'nothing changed, nothing measured or sent');
+  assert.equal(loadGoal(db, A1)!._.agreed, false);
+  // Time: a goal that has worked longer than the minutes it is given.
+  remember(A1, (x) => (x.activeMs = 5 * 60_000));
+  await rejects(act(A1, { action: 'agree', contract: { limits: { rounds: 8, usd: 1, minutes: 3 } } }), 409, /^It has worked 5 min: give it more than that\.$/);
+  remember(A1, (x) => (x.activeMs = 0));
+  // Above what it used: it goes.
+  await act(A1, { action: 'agree', contract: { limits: { rounds: 8, usd: 1 } } });
+  await until('round 1', () => goal(A1).status !== 'measuring');
+  g = goal(A1);
+  assert.deepEqual([g.status, g.round, g.contract.limits.usd], ['working', 1, 1]);
+  db.prepare('delete from sessions where key = ?').run(A1);
+  await act(A1, { action: 'stop' });
+});
+
+test('L1: a change that lowers a limit below what the goal has used (money, time, rounds) is refused with the same sentence; nothing changes, and the goal does not stop a tick later', async () => {
+  const C1 = 'claude:goal-l1-change';
+  const w = worktree();
+  sessions.add(C1, { cwd: w.path, worktree: w });
+  await agreed(C1, { limits: { rounds: 8, usd: 5 }, settings: { asks: 'own' } });
+  await turn(C1, () => write(w.path, 'score.txt', '4\n'));
+  await turn(C1, () => write(w.path, 'score.txt', '6\n'));
+  assert.deepEqual([goal(C1).status, goal(C1).round], ['working', 3]);
+  spend(C1, 0.006);
+  const before = goal(C1).contract.limits;
+  await rejects(act(C1, { action: 'change', contract: { limits: { rounds: 8, usd: 0.004 } } }), 409, /^It has spent \$0\.006: give it more than that\.$/);
+  await rejects(act(C1, { action: 'change', contract: { limits: { rounds: 2 } } }), 409, /^It has run 2 rounds: give it more than that\.$/);
+  remember(C1, (x) => (x.activeMs = 5 * 60_000));
+  await rejects(act(C1, { action: 'change', contract: { limits: { rounds: 8, minutes: 4 } } }), 409, /^It has worked 5 min: give it more than that\.$/);
+  assert.deepEqual(goal(C1).contract.limits, before, 'nothing changed');
+  await tick(deps);
+  assert.equal(goal(C1).status, 'working', 'still at work');
+  // Above what it used: taken. And a change of checks alone is not asked about limits.
+  await act(C1, { action: 'change', contract: { limits: { rounds: 3, usd: 1, minutes: 30 } } });
+  assert.deepEqual(goal(C1).contract.limits, { rounds: 3, usd: 1, minutes: 30 });
+  db.prepare('delete from sessions where key = ?').run(C1);
+  await act(C1, { action: 'stop' });
+});
+
 // Last: the tick it starts looks at every goal.
 test('J5: the tick runs once as the feature starts: a reset a restart cut is dealt with at once, not a tick later', async () => {
   const J5 = 'claude:goal-j5';

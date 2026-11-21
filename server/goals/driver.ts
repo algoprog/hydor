@@ -1924,6 +1924,9 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       if (g.status !== 'agreeing') throw new HttpError(409, g.status === 'measuring' ? 'The checks are still being measured' : 'The checks are not waiting for your agreement');
       const c = cleanContract(a.contract, g.contract, { title: true, ids: true, top: usedTop(g) });
       if (c.errors.length) throw new HttpError(400, c.errors[0]);
+      // L1: limits the goal has already used up (what working out the checks cost, say) would stop it at once.
+      const spentAlready = usedUp(d, g, c.contract.limits ?? g.contract.limits);
+      if (spentAlready) throw new HttpError(409, spentAlready);
       const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
       g._.topId = c.top;
@@ -1962,6 +1965,9 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       const cur: Pick<GoalContract, 'checks' | 'limits'> = { checks: (later ? g.pending?.checks : undefined) ?? g.contract.checks, limits: g.contract.limits };
       const c = cleanContract(a.contract, cur, { ids: true, top: usedTop(g) });
       if (c.errors.length) throw new HttpError(400, c.errors[0]);
+      // L1: limits lowered below what the goal has used: refused, rather than the goal stopping a tick later.
+      const overUsed = c.contract.limits ? usedUp(d, g, c.contract.limits) : null;
+      if (overUsed) throw new HttpError(409, overUsed);
       g._.topId = c.top;
       if (c.contract.limits) g.contract = { ...g.contract, limits: c.contract.limits };
       if (later) {
@@ -2033,6 +2039,28 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
 }
 
 /**
+ * L1: what the goal has used already of `limits`, in a sentence the person can act on ("It has spent $0.006: give it more
+ * than that."), or null: its rounds, its money (read now, not as last saved) and its time at work. Limits already met
+ * would stop the goal the moment it went on: refused (409) wherever limits are set, at the agreement, by a change and by
+ * Give it more…, with nothing changed.
+ */
+function usedUp(d: Deps, g: StoredGoal, limits: GoalContract['limits']): string | null {
+  const ran = tally(g).rounds;
+  const now = g._.spendUnread ? null : spentNow(d, g.key);
+  const spent = now != null ? Math.max(0, now - g._.spentAtStart) : g.spentUsd;
+  const worked = activeNow(g);
+  const used =
+    ran >= limits.rounds
+      ? `It has run ${plural(ran, 'round', 'rounds')}`
+      : limits.usd != null && spent >= limits.usd
+        ? `It has spent ${usd(spent)}`
+        : limits.minutes != null && worked >= limits.minutes * 60_000
+          ? `It has worked ${duration(worked)}`
+          : null;
+  return used ? `${used}: give it more than that.` : null;
+}
+
+/**
  * More for a goal that stopped at a limit (Give it more… on its report): new limits re-open it when none is reached any
  * more, and it goes on exactly as after a checked round (a question it would ask, or the next round message), with the
  * files where they stand. Only a goal at a limit: one reached or stopped stays over.
@@ -2045,16 +2073,8 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
   if (c.errors.length) throw new HttpError(400, c.errors[0]);
   const limits = c.contract.limits!;
   // Still at a limit: what it has used of it, which the new limit must be above.
-  const ran = tally(g).rounds;
-  const used =
-    ran >= limits.rounds
-      ? `It has run ${plural(ran, 'round', 'rounds')}`
-      : limits.usd != null && g.spentUsd >= limits.usd
-        ? `It has spent ${usd(g.spentUsd)}`
-        : limits.minutes != null && g.activeMs >= limits.minutes * 60_000
-          ? `It has worked ${duration(g.activeMs)}`
-          : null;
-  if (used) throw new HttpError(409, `${used}: give it more than that.`);
+  const used = usedUp(d, g, limits);
+  if (used) throw new HttpError(409, used);
   await step(key, async () => {
     const f = fresh(d, g);
     if (!f || f.status !== 'limit') return;
