@@ -250,10 +250,29 @@ export interface AppRun {
   checks?: CheckResult[];
   /** The template's version it ran (none: a try of changes not saved, or a template as it was before versions). */
   version?: number;
+  /** What its flow could not have: calls that still failed after their tries, steps that failed (at most 30). */
+  misses?: RunMiss[];
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
 }
+
+/** Something a run's flow could not have: a call to a service that failed after its tries, or a step that failed. */
+export interface RunMiss {
+  /** The step's title. */
+  step: string;
+  /** What it wanted: a host or a shortened address, a search's words. */
+  what?: string;
+  /** Why, in plain words: "it limits requests", "it keeps programs out", "no answer in time". */
+  why: string;
+  /** Where in the flow (the step's path, "main/c4"). */
+  path?: string;
+  /** The same miss, more than once. */
+  times?: number;
+}
+
+/** Most misses a run keeps. */
+export const MAX_MISSES = 30;
 
 export type StepStatus = 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'stopped';
 

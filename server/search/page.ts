@@ -7,6 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { formatPage } from '../../shared/search.ts';
 import type { DocumentText } from '../documents/extract.ts';
+import type { ToolFailure } from '../features/types.ts';
+import { botWall, failureOf, retryAfterMs } from '../web/failure.ts';
 import { assertPublic, BlockedAddress, type FetchedPage } from '../web/fetch.ts';
 import type { PageArgs } from './args.ts';
 import { contextFilter, type Filtered } from './naget.ts';
@@ -30,6 +32,8 @@ export interface ReadDeps {
 export interface ReadResult {
   text: string;
   isError?: boolean;
+  /** Why it could not be read, for an app's flow (ToolOutput.failure). */
+  failure?: ToolFailure;
   /** What was read, for the turn's sources. */
   source?: { url: string; title?: string };
 }
@@ -100,7 +104,7 @@ export function nearest(text: string, question: string, max = 6000): string {
 }
 
 const cache = new Map<string, { at: number; page: Readable }>();
-const blocked = (url: string, e: Error): ReadResult => ({ text: `${url} cannot be read: ${e.message}. Only public web pages can be read.`, isError: true });
+const blocked = (url: string, e: Error): ReadResult => ({ text: `${url} cannot be read: ${e.message}. Only public web pages can be read.`, isError: true, failure: { kind: 'refused' } });
 
 /** A page's readable text: fetched once, then kept for ten minutes (so its next part comes at once). */
 async function load(url: string, d: ReadDeps): Promise<{ page: Readable } | { fail: ReadResult }> {
@@ -112,9 +116,14 @@ async function load(url: string, d: ReadDeps): Promise<{ page: Readable } | { fa
   } catch (e) {
     if (e instanceof BlockedAddress) return { fail: blocked(url, e) };
     const why = (e as Error)?.name === 'TimeoutError' ? 'it did not answer within 30 seconds' : ((e as Error)?.message ?? String(e));
-    return { fail: { text: `${url} could not be read: ${why}.`, isError: true } };
+    const failure = failureOf(e);
+    return { fail: { text: `${url} could not be read: ${why}.`, isError: true, ...(failure ? { failure } : {}) } };
   }
-  if (p.status >= 400) return { fail: { text: `The site answered ${p.status} for ${p.url}.${p.text.trim() ? `\n\n${p.text.trim().slice(0, 1500)}` : ''}`, isError: true } };
+  if (p.status >= 400) {
+    const waitMs = retryAfterMs(p.retryAfter);
+    const failure: ToolFailure = { status: p.status, ...(waitMs !== undefined ? { waitMs } : {}), ...(botWall(p.text, p.title) ? { kind: 'botwall' as const } : {}) };
+    return { fail: { text: `The site answered ${p.status} for ${p.url}.${p.text.trim() ? `\n\n${p.text.trim().slice(0, 1500)}` : ''}`, isError: true, failure } };
+  }
   let page: Readable;
   if ((/pdf/i.test(p.contentType) || p.body?.subarray(0, 5).toString() === '%PDF-') && p.body) {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'naget-page-'));

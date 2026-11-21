@@ -8,7 +8,7 @@ import type { ChildProcess } from 'node:child_process';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { Cdp, CdpSession } from '../browser/cdp.ts';
-import { launchChrome, pickRunnableChrome } from '../browser/chrome.ts';
+import { launchChrome, pickRunnableChrome, plainUserAgent } from '../browser/chrome.ts';
 import { captureJpeg } from '../browser/jpeg.ts';
 import { browserSettings } from '../browser/settings.ts';
 
@@ -52,6 +52,8 @@ export interface CaptureOpts {
   colorScheme?: 'light' | 'dark';
   /** A script to run in the page before any of its own (to add a stylesheet, say). */
   firstScript?: string;
+  /** Tell sites the browser's user agent without "HeadlessChrome" in it, which many turn away (a page read for an app's flow). */
+  plainAgent?: boolean;
 }
 
 export interface Captured {
@@ -171,7 +173,7 @@ export interface Tab {
   evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
 }
 
-type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline' | 'colorScheme' | 'firstScript'>;
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline' | 'colorScheme' | 'firstScript' | 'plainAgent'>;
 
 /** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
 async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
@@ -187,6 +189,10 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
     await s.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => {});
     if (o.colorScheme) await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: o.colorScheme }] });
     if (o.firstScript) await s.send('Page.addScriptToEvaluateOnNewDocument', { source: o.firstScript });
+    if (o.plainAgent) {
+      const v = await c.send('Browser.getVersion');
+      await s.send('Emulation.setUserAgentOverride', { userAgent: plainUserAgent(String(v.userAgent ?? '')) });
+    }
     if (o.html !== undefined || o.blockPrivate || o.offline) {
       const html = o.html;
       s.on('Fetch.requestPaused', (p) => {
