@@ -441,7 +441,7 @@ async function appContext(epoch = 0, lean = false, o: { window?: number; query?:
     const d: any = r.ok ? await r.json() : {};
     const parts = Array.isArray(d.parts) ? d.parts.map((x: any) => ({ id: String(x?.id ?? ''), text: String(x?.text ?? '') })) : undefined;
     const guides = Array.isArray(d.guides) ? d.guides.map((g: any) => ({ tools: Array.isArray(g?.tools) ? g.tools.map(String) : [], text: String(g?.text ?? '') })) : undefined;
-    return { parts, guides, text: parts ? undefined : String(d.text ?? ''), now: d.now ? String(d.now) : undefined, turn: typeof d.turn === 'string' && d.turn.trim() ? d.turn.trim() : undefined };
+    return { parts, guides, text: parts ? undefined : String(d.text ?? ''), now: d.now ? String(d.now) : undefined, turn: typeof d.turn === 'string' && d.turn.trim() ? d.turn.trim() : undefined, goal: d.goal === true };
   } catch {
     return {};
   }
@@ -597,7 +597,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
         ((t.name !== 'bash_output' && t.name !== 'bash_kill') || runningOf(s.id).length > 0 || (s.activeTools ?? []).includes(t.name)) &&
         (t.name !== 'multi_edit' || !small),
     );
-    const o = offer(shown, { window: w, active: s.activeTools ?? [], small, builtin: BUILTIN });
+    const o = offer(shown, { window: w, active: s.activeTools ?? [], small, builtin: BUILTIN, goal: app.goal });
     const schemas = o.visible.map(schemaOf);
     // The instructions stay the same through the turn (servers reuse what they computed for the same start), unless the tools change.
     const key = `${m.id}|${textMode}|${o.visible.map((t) => t.name).join(',')}`;

@@ -13,6 +13,13 @@ import type { Tool } from './tools.ts';
 const PINNED = new Set(['web_search', 'read_page', 'show_html', 'remember', 'recall', 'submit_result']);
 const PINNED_SMALL = new Set(['web_search', 'read_page', 'remember', 'recall', 'submit_result']);
 
+/**
+ * The goal loop's tools (server/goals/tools.ts): its messages tell the agent to call them, so while the session has a goal
+ * that is not over they are always offered in full, not found first with find_tools (a small model often does not, and the
+ * goal waits for checks that are never proposed).
+ */
+export const GOAL_TOOLS = ['goal_propose', 'goal_report', 'goal_ask', 'goal_note'];
+
 export interface Offer {
   /** Tools whose schemas the model gets. */
   visible: Tool[];
@@ -29,13 +36,13 @@ const summary = (t: Tool) => {
 };
 
 /** What to show: everything when it fits, else the built-ins, pinned and found tools, and a catalog of the rest. */
-export function offer(all: Tool[], o: { window: number; active: string[]; small: boolean; builtin: Set<string> }): Offer {
+export function offer(all: Tool[], o: { window: number; active: string[]; small: boolean; builtin: Set<string>; goal?: boolean }): Offer {
   const extra = all.filter((t) => !o.builtin.has(t.name));
   const size = extra.reduce((n, t) => n + t.name.length + t.description.length + JSON.stringify(t.parameters ?? {}).length, 0);
   const crowded = extra.length > (o.small ? 8 : 20) || size > o.window * 4 * (o.small ? 0.06 : 0.1);
   if (!crowded) return { visible: all.filter((t) => t.name !== 'find_tools'), deferred: [], catalog: '' };
   const pinned = o.small ? PINNED_SMALL : PINNED;
-  const keep = (t: Tool) => o.builtin.has(t.name) || pinned.has(t.name) || o.active.includes(t.name);
+  const keep = (t: Tool) => o.builtin.has(t.name) || pinned.has(t.name) || o.active.includes(t.name) || (!!o.goal && GOAL_TOOLS.includes(t.name));
   const visible = all.filter(keep);
   const deferred = all.filter((t) => !keep(t));
   if (!deferred.length) return { visible: visible.filter((t) => t.name !== 'find_tools'), deferred, catalog: '' };

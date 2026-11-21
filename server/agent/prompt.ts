@@ -227,6 +227,8 @@ export interface AppContext {
   now?: string;
   /** What goes with the message that starts the turn (memory newly relevant to it), not in the instructions. */
   turn?: string;
+  /** The session has a goal of the app's loop that is not over: the goal's tools are always offered. */
+  goal?: boolean;
 }
 
 export interface PromptOptions {

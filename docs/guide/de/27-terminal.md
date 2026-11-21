@@ -198,7 +198,7 @@ So funktionieren alle:
 
 | Befehl | Was er tut |
 | --- | --- |
-| `hydor sessions` | Deine neuesten Sitzungen, jede mit einer Markierung: ● arbeitet, ● braucht dich, ✓ fertig, ✗ Fehler. Seine Verben tun, was das Menü einer Sitzung tut: `search`, `rename`, `archive` und `unarchive`, `pin` und `unpin`, `read`, `snooze`, `move` in ein Projekt, `fork`, `goal` (ein Ziel in Worten setzen, oder mit `--pause`, `--resume` und `--clear` anhalten, fortsetzen und löschen: Der Agent schlägt die Prüfungen vor, und nichts startet, bis du in der App auf seiner Karte **Starten** drückst), `share` (ein schreibgeschützter Link), `changes` (die Dateien, die er geändert hat), `commands` (die Befehle, die er ausgeführt hat), `queue` (die wartenden Nachrichten, sowie `queue clear` und `queue remove`), `show`, `export` (die Unterhaltung als Markdown-Datei, `-o -` zum Ausgeben, oder `--library` als Dokument im Projekt der Sitzung), `send`, `stop` und `delete`. |
+| `hydor sessions` | Deine neuesten Sitzungen, jede mit einer Markierung: ● arbeitet, ● braucht dich, ✓ fertig, ✗ Fehler. Seine Verben tun, was das Menü einer Sitzung tut: `search`, `rename`, `archive` und `unarchive`, `pin` und `unpin`, `read`, `snooze`, `move` in ein Projekt, `fork`, `goal` (ohne Worte zeigt es das Ziel: seinen Stand, die Runde, jede Prüfung, was es gekostet hat und eine offene Frage; mit Worten setzt es ein Ziel, und der Agent schlägt die Prüfungen vor; `--start` drückt **Starten** dafür, `--answer 1,3` beantwortet seine Frage mit den angezeigten Nummern (dazu passen `--other "ein eigener Weg"` und `--note`), `--wait` hält die Frage an, `--more rounds=8,usd=5,minutes=60` gibt ihm mehr, `--rule "…"` fügt eine Regel hinzu, und `--pause`, `--resume` und `--clear` steuern es: eine Aktion pro Aufruf, und nichts startet, bis du **Starten** drückst, hier oder in der App), `share` (ein schreibgeschützter Link), `changes` (die Dateien, die er geändert hat), `commands` (die Befehle, die er ausgeführt hat), `queue` (die wartenden Nachrichten, sowie `queue clear` und `queue remove`), `show`, `export` (die Unterhaltung als Markdown-Datei, `-o -` zum Ausgeben, oder `--library` als Dokument im Projekt der Sitzung), `send`, `stop` und `delete`. |
 | `hydor inbox` | Was auf dich wartet (Genehmigungen, Fragen, ein Key, den ein Agent angefragt hat, ein Skill zur Prüfung): `list`, und `show` für einen Eintrag, mit dem Ort, an dem du ihn beantwortest. |
 | `hydor outbox` | Aufrufe, die auf dein OK warten (die Tools eines verbundenen Kontos auf „Zuerst fragen“): `list`, `show` für einen mit seiner Eingabe, `send` (unverändert oder mit `--set NAME=value`, um ein Feld zu ändern) und `drop`. |
 | `hydor away` | Was seit deinem letzten Besuch passiert ist, wie es **Während du weg warst** auf der Startseite zeigt: was auf dich wartet, Sitzungen, die fertig wurden oder fehlgeschlagen sind, was von selbst lief, mit seinen Kosten, und was heute als Nächstes läuft. `hydor away seen` markiert alles als gesehen. |
@@ -210,6 +210,11 @@ hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
+hydor sessions goal 6f1e "all tests pass and the PR is open"  # ein Ziel setzen: der Agent schlägt die Prüfungen vor
+hydor sessions goal 6f1e                  # ansehen: Stand, Runde, Prüfungen, Kosten, seine Frage
+hydor sessions goal 6f1e --start          # Starten drücken: die Runden beginnen
+hydor sessions goal 6f1e --answer 1,3    # seine Frage beantworten: Wege 1 und 3, in dieser Reihenfolge
+hydor sessions goal 6f1e --more rounds=20,usd=10  # ihm mehr geben, auch an einer Grenze
 hydor inbox
 hydor away                           # what happened while you were away
 ```

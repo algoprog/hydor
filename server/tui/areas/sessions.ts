@@ -1,7 +1,9 @@
 // `hydor sessions <verb>`: what the sidebar and a session's menu do. With no verb, `hydor sessions` lists as it always
 // has (the command's own code in commands.ts); `show`, `send` and `stop` stay top-level commands too. Naming a session:
 // its id or the start of it as `hydor sessions` shows it, its full key, or its title (any case, when only one fits).
+import type { GoalCheck, GoalResult, GoalState, GoalStatus } from '../../../shared/goals.ts';
 import type { SessionSummary, LiveState } from '../../../shared/types.ts';
+import { usd } from '../../goals/verdict.ts';
 import { enc } from '../client.ts';
 import { tildify, timeAgo, truncate } from '../term.ts';
 import { choose, fields, mark, pickOne, flag, num, str, table, UsageError, type Area, type Ctx } from './kit.ts';
@@ -31,6 +33,85 @@ export async function findSession(ctx: Ctx, given: string | undefined, o: { arch
     label: (s) => truncate(titleOf(s), 60),
     detail: (s) => `${tildify(s.cwd, ctx.look.home)} · ${timeAgo(s.updatedAt)}`,
   });
+}
+
+/** `1,3`: the ways of a question ticked, by the numbers it shows (from 1), as the indexes the API takes, in that order. */
+export function answerWays(text: string | undefined): number[] {
+  const t = (text ?? '').trim();
+  if (!t) return [];
+  return t.split(/[\s,]+/).filter(Boolean).map((x) => {
+    const n = Number(x);
+    if (!Number.isInteger(n) || n < 1) throw new UsageError(`--answer takes the numbers of the ways, from 1: 1,3 (it was “${x}”)`);
+    return n - 1;
+  });
+}
+
+/** `rounds=8,usd=5,minutes=60` (any of them): the limits the API takes. */
+export function moreLimits(text: string): { rounds?: number; usd?: number; minutes?: number } {
+  const out: Record<string, number> = {};
+  for (const part of text.split(',').map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(rounds|usd|minutes)\s*[=:]\s*(\S+)$/.exec(part);
+    const n = m ? Number(m[2].replace(/^\$/, '')) : NaN;
+    if (!m || !Number.isFinite(n) || n < 0) throw new UsageError(`--more takes limits like rounds=8,usd=5,minutes=60 (it had “${part}”)`);
+    out[m[1]] = n;
+  }
+  if (!Object.keys(out).length) throw new UsageError('--more takes limits like rounds=8,usd=5,minutes=60');
+  return out;
+}
+
+const GOAL_STATE: Record<GoalStatus, string> = {
+  drafting: 'the agent is working out the checks',
+  agreeing: 'the checks wait for your Start (--start)',
+  measuring: 'measuring where things stand',
+  working: 'a round is running',
+  checking: 'checking the round',
+  asking: 'a question waits for you',
+  paused: 'paused',
+  'needs-you': 'it cannot go on without you',
+  reached: 'reached: every check holds',
+  stopped: 'stopped',
+  limit: 'stopped at a limit',
+};
+
+const minutesOf = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`);
+const numberOf = (n: number) => String(Math.round(n * 1000) / 1000);
+
+/** One check as the goal stands: whether it holds, and its value against its target. */
+function checkLine(ctx: Pick<Ctx, 'look'>, c: GoalCheck, r: GoalResult | undefined): string {
+  const { p } = ctx.look;
+  const state = !r ? 'not measured yet' : r.holds ? 'holds' : r.error ? 'not yet (could not be checked)' : 'not yet';
+  const value = r?.value !== undefined ? `${numberOf(r.value)}${c.unit ? ` ${c.unit}` : ''}` : '';
+  const target = c.target ? `target ${c.target.op} ${numberOf(c.target.value)}${c.unit ? ` ${c.unit}` : ''}` : '';
+  const more = [value && `value ${value}`, target].filter(Boolean).join(', ');
+  return `${r?.holds ? mark(p, 'done') : mark(p, 'off')} ${c.label}: ${state}${more ? ` (${more})` : ''}`;
+}
+
+/** The app's goal in words: its state, round, checks, spending against its limits, an open question, and its report once it is over. */
+export function goalLines(ctx: Pick<Ctx, 'look'>, g: GoalState, now = Date.now()): string[] {
+  const l = g.contract.limits;
+  const ran = g.rounds.filter((r) => r.n > 0).at(-1)?.n ?? 0;
+  const latest = g.rounds.at(-1);
+  const out = fields(ctx, [
+    ['Goal', g.contract.title && g.contract.title !== g.contract.objective ? `${g.contract.title}\n${g.contract.objective}` : g.contract.objective],
+    ['State', `${GOAL_STATE[g.status] ?? g.status}${g.pausing ? ' (it pauses once this round has been checked)' : ''}`],
+    ['Why', g.reason],
+    ['Round', g.round ? `round ${g.round} of ${l.rounds}` : ran ? `${ran} of ${l.rounds} rounds run` : `none yet, up to ${l.rounds}`],
+    ['Spent', `${usd(g.spentUsd)}${l.usd != null ? ` of its ${usd(l.usd)}` : ''}`],
+    ['Worked', `${minutesOf(g.activeMs)}${l.minutes != null ? ` of its ${l.minutes} min` : ''}`],
+    ['Rules', g.rules.length ? g.rules.map((r, i) => `${i + 1}. ${r.text}`).join('\n') : undefined],
+  ]);
+  if (g.contract.checks.length) {
+    out.push('', ctx.look.p.dim('Checks'), ...g.contract.checks.map((c) => `  ${checkLine(ctx, c, latest?.results.find((r) => r.id === c.id))}`));
+  }
+  const q = g.question;
+  if (q) {
+    out.push('', ctx.look.p.dim('Question'), `  ${q.question}`);
+    if (q.context) out.push(`  ${q.context}`);
+    q.ways.forEach((w, i) => out.push(`  ${i + 1}. ${w.name}${i === q.pick ? ' (its pick)' : ''}${[w.why, w.expects, w.cost].filter(Boolean).map((x) => `\n     ${x}`).join('')}`));
+    out.push(`  ${q.expiresAt ? `It goes on with its pick in ${Math.max(0, Math.round((q.expiresAt - now) / 60_000))} min unless you answer (--answer 1,3) or hold it (--wait).` : 'It waits for you: --answer 1,3, with --other "a way of your own" if none fits.'}`);
+  }
+  if (g.report?.summary) out.push('', ctx.look.p.dim('Report'), ...g.report.summary.split('\n').map((x) => `  ${x}`));
+  return out;
 }
 
 const name = (s: SessionSummary) => `“${truncate(titleOf(s), 60)}”`;
@@ -228,18 +309,39 @@ export const sessions: Area = {
       name: 'goal',
       args: [session, { name: 'goal', kind: 'text', rest: true, optional: true }],
       options: {
+        start: { type: 'boolean', desc: 'Press Start: begin the rounds with the proposed checks' },
+        answer: { type: 'string', value: '<1,3>', desc: 'Answer the question: the ways by their numbers, in order' },
+        other: { type: 'string', value: '<text>', desc: 'Answer with a way of your own (also beside --answer)' },
+        note: { type: 'string', value: '<text>', desc: 'A note for the agent, with --answer or --other' },
+        wait: { type: 'boolean', desc: 'Hold the question instead of going on with its pick' },
+        more: { type: 'string', value: 'rounds=8,usd=5,minutes=60', desc: 'Set limits (give it more, also at a limit)' },
+        rule: { type: 'string', value: '<text>', desc: 'Add a rule that holds for every round' },
         clear: { type: 'boolean', desc: 'Stop the goal (a goal that is over is dismissed)' },
         pause: { type: 'boolean', desc: 'Pause it (not a Claude Code /goal)' },
         resume: { type: 'boolean', desc: 'Go on with a paused goal' },
       },
-      summary: 'See, set, pause or clear a session’s goal',
-      help: 'A goal is what the agent keeps working towards, round after round, until checks you agree hold: say what “done” looks like. The agent first proposes the checks and the app measures where things stand; nothing starts before you press Start on the goal’s card in the app (the terminal only sets, shows, pauses and stops it). It keeps an agent working (and spending) until its checks hold or a limit is reached, so it is set only when you give the words.',
-      examples: ['hydor sessions goal 3f9a', 'hydor sessions goal 3f9a "all tests pass and the PR is open"', 'hydor sessions goal 3f9a --clear'],
+      summary: 'Show, set, steer or clear a session’s goal',
+      help: 'A goal is what the agent keeps working towards, round after round, until checks you agree hold: say what “done” looks like. The agent first proposes the checks and the app measures where things stand; nothing starts before you press Start: --start does that here, as the button does in the app. With no words and no flag the command shows the goal: its state, the round, each check and whether it holds, what it has spent against its limits, a question that waits (its ways numbered from 1, the agent’s pick marked) and, once it is over, its report. One action a call: --answer 1,3 takes those ways in that order (--other adds a way of your own, --note a word for the agent), --wait holds the question instead of letting the agent’s pick go ahead, --more rounds=8,usd=5,minutes=60 changes the limits (what “Give it more…” does when it stopped at one), --rule adds a rule for every round, and --pause, --resume and --clear steer it. It keeps an agent working (and spending) until its checks hold or a limit is reached, so it is set only when you give the words. The app’s refusals (a goal not in a state for it) are printed as they are.',
+      examples: [
+        'hydor sessions goal 3f9a',
+        'hydor sessions goal 3f9a "all tests pass and the PR is open"',
+        'hydor sessions goal 3f9a --start',
+        'hydor sessions goal 3f9a --answer 1,3 --note "keep the API as it is"',
+        'hydor sessions goal 3f9a --more rounds=20,usd=10',
+        'hydor sessions goal 3f9a --rule "never touch the migrations"',
+        'hydor sessions goal 3f9a --clear',
+      ],
       async run(ctx, [given, ...words], v) {
         const s = await findSession(ctx, given);
-        const acts = (['clear', 'pause', 'resume'] as const).filter((a) => flag(v, a));
-        if (acts.length > 1 || (acts.length && words.length)) throw new UsageError(`Pick one: a goal in words, --clear, --pause or --resume: ${ctx.usage}`);
-        if (!acts.length && !words.length) {
+        const acts = (['start', 'wait', 'clear', 'pause', 'resume'] as const).filter((a) => flag(v, a));
+        const answering = str(v, 'answer') !== undefined || str(v, 'other') !== undefined;
+        if (str(v, 'note') !== undefined && !answering) throw new UsageError(`--note goes with --answer or --other: ${ctx.usage}`);
+        const count = acts.length + (answering ? 1 : 0) + (str(v, 'more') !== undefined ? 1 : 0) + (str(v, 'rule') !== undefined ? 1 : 0) + (words.length ? 1 : 0);
+        if (count > 1) throw new UsageError(`Pick one: a goal in words, --start, --answer, --wait, --more, --rule, --clear, --pause or --resume: ${ctx.usage}`);
+        if (!count) {
+          // The app's own goal loop first; else what the program keeps (Claude Code's or Codex's /goal).
+          const app = (await ctx.conn.api<{ goal: GoalState | null }>('GET', `/api/goals/${enc(s.key)}`)).goal;
+          if (app) return ctx.o.json ? ctx.json({ goal: app }) : ctx.out(goalLines(ctx, app));
           const live = (await sessionOf(ctx, s.key)).live;
           if (ctx.o.json) return ctx.json({ goal: live?.goal ?? null });
           const g = live?.goal;
@@ -253,10 +355,26 @@ export const sessions: Area = {
             ]),
           );
         }
-        const body = words.length ? { action: 'set', objective: words.join(' ') } : { action: acts[0] };
-        await ctx.conn.api('POST', `/api/sessions/${enc(s.key)}/goal`, body);
-        if (ctx.o.json) return ctx.json({ ok: true });
-        ctx.out(words.length ? `Goal set for ${name(s)}.` : acts[0] === 'clear' ? `Goal cleared for ${name(s)}.` : `Goal ${acts[0] === 'pause' ? 'paused' : 'resumed'} for ${name(s)}.`);
+        let body: Record<string, unknown>;
+        let done: string;
+        if (words.length) (body = { action: 'set', objective: words.join(' ') }), (done = `Goal set for ${name(s)}. The agent proposes the checks first; press Start with --start.`);
+        else if (acts[0] === 'start') (body = { action: 'agree' }), (done = `Goal started for ${name(s)}.`);
+        else if (acts[0] === 'wait') (body = { action: 'wait' }), (done = `The question for ${name(s)} waits for you.`);
+        else if (answering) {
+          const ways = answerWays(str(v, 'answer'));
+          const other = str(v, 'other')?.trim();
+          const note = str(v, 'note')?.trim();
+          body = { action: 'answer', ways, ...(other ? { other } : {}), ...(note ? { note } : {}) };
+          done = `Answered for ${name(s)}.`;
+        } else if (str(v, 'more') !== undefined) (body = { action: 'change', contract: { limits: moreLimits(str(v, 'more')!) } }), (done = `Limits changed for ${name(s)}.`);
+        else if (str(v, 'rule') !== undefined) {
+          const text = str(v, 'rule')!.trim();
+          if (!text) throw new UsageError(`--rule takes the rule in words: ${ctx.usage}`);
+          (body = { action: 'rule', text }), (done = `Rule added for ${name(s)}.`);
+        } else (body = { action: acts[0] }), (done = acts[0] === 'clear' ? `Goal cleared for ${name(s)}.` : `Goal ${acts[0] === 'pause' ? 'paused' : 'resumed'} for ${name(s)}.`);
+        const r = await ctx.conn.api<{ goal?: GoalState | null }>('POST', `/api/sessions/${enc(s.key)}/goal`, body);
+        if (ctx.o.json) return ctx.json(body.action === 'set' || body.action === 'clear' || body.action === 'pause' || body.action === 'resume' ? { ok: true } : (r ?? { ok: true }));
+        ctx.out(done);
       },
     },
     {

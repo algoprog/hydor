@@ -100,6 +100,8 @@ import { claimSessions, syncFoundProjects } from './spaces/found.ts';
 import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
 import { parseGoalAction } from './goals/validate.ts';
+import { loadGoal } from './goals/store.ts';
+import { goalOver } from '../shared/goals.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
 
@@ -2147,7 +2149,8 @@ app.put('/api/me/timezone', async (req) => {
  * `epoch` counts the times it condensed its conversation: memory's block stays the same within one. `lean=1`: its
  * model has a small context, and `window` its size in tokens. Each capability's part comes apart, and its tools'
  * guides, which Custom adds while one of their tools is offered. With `q`, the message that starts the turn, `turn` is
- * what goes with that message (memory newly relevant to it), '' for nothing.
+ * what goes with that message (memory newly relevant to it), '' for nothing. `goal` is true while the session has a goal of
+ * the app's loop that is not over: Custom then always shows the goal's four tools, which the loop's messages tell it to call.
  */
 app.get('/agent/run/:token/context', async (req, reply) => {
   const runId = runOf((req.params as { token: string }).token);
@@ -2167,7 +2170,8 @@ app.get('/agent/run/:token/context', async (req, reply) => {
     query,
   });
   // `text` for a Custom from before the parts: everything, as it was.
-  return { text: [...parts.map((p) => p.text), ...guides.map((g) => g.text)].join('\n\n'), parts, guides, turn: turn.map((t) => t.text).join('\n\n'), now: localNow(db), tz: userTimezone(db) };
+  const goal = loadGoal(db, live.key);
+  return { text: [...parts.map((p) => p.text), ...guides.map((g) => g.text)].join('\n\n'), parts, guides, turn: turn.map((t) => t.text).join('\n\n'), now: localNow(db), tz: userTimezone(db), goal: !!goal && !goalOver(goal.status) };
 });
 
 // Custom's tools and Claude Code's hook: the notes about the files they read or change (server/memory/deliver.ts).

@@ -198,7 +198,7 @@ hydor completion install
 
 | コマンド | 内容 |
 | --- | --- |
-| `hydor sessions` | 最新のセッションを、状態を示す印付きで表示します。● 作業中、● 対応待ち、✓ 完了、✗ エラー。動詞はセッションのメニューと同じ操作を行います：`search`、`rename`、`archive` と `unarchive`、`pin` と `unpin`、`read`、`snooze`、プロジェクトへの `move`、`fork`、`goal`（ゴールを文章で設定、または `--pause`、`--resume`、`--clear` で操作します。エージェントがチェックを提案し、アプリ内のカードで**開始**を押すまで何も始まりません）、`share`（読み取り専用リンク）、`changes`（変更されたファイル）、`commands`（実行されたコマンド）、`queue`（待機中のメッセージ。`queue clear` と `queue remove` もあります）、`show`、`export`（会話をMarkdownファイルに出力します。`-o -` で画面に表示、`--library` でセッションのプロジェクトにドキュメントとして保存）、`send`、`stop`、`delete`。 |
+| `hydor sessions` | 最新のセッションを、状態を示す印付きで表示します。● 作業中、● 対応待ち、✓ 完了、✗ エラー。動詞はセッションのメニューと同じ操作を行います：`search`、`rename`、`archive` と `unarchive`、`pin` と `unpin`、`read`、`snooze`、プロジェクトへの `move`、`fork`、`goal`（文章なしで実行するとゴールを表示します。状態、ラウンド、各チェック、これまでの支出、待っている質問です。文章を付けるとゴールを設定し、エージェントがチェックを提案します。`--start` はそのチェックに対して**開始**を押し、`--answer 1,3` は表示された番号で質問に答え（`--other "自分の案"` と `--note` も付けられます）、`--wait` は質問を保留にし、`--more rounds=8,usd=5,minutes=60` は上限を増やし、`--rule "…"` はルールを追加し、`--pause`、`--resume`、`--clear` で操作します。1回の呼び出しで操作は1つだけで、ここかアプリで**開始**を押すまで何も始まりません）、`share`（読み取り専用リンク）、`changes`（変更されたファイル）、`commands`（実行されたコマンド）、`queue`（待機中のメッセージ。`queue clear` と `queue remove` もあります）、`show`、`export`（会話をMarkdownファイルに出力します。`-o -` で画面に表示、`--library` でセッションのプロジェクトにドキュメントとして保存）、`send`、`stop`、`delete`。 |
 | `hydor inbox` | 対応待ちの項目（承認、質問、エージェントが求めたキー、確認するスキル）：`list`、および1件を表示して回答先を示す `show`。 |
 | `hydor outbox` | 承認待ちで保留されている呼び出し（確認が必要な設定の接続済みアカウントのツール）：`list`、入力内容付きで1件を表示する `show`、`send`（そのまま、または `--set NAME=value` で項目を変更して送信）、`drop`。 |
 | `hydor away` | 前回の訪問以降の出来事を、スタートページの**不在中の出来事**と同じ形で表示します。対応待ちの項目、完了または失敗したセッション、自動で実行されたものとその費用、今日これから実行されるもの。`hydor away seen` はすべてを確認済みにします。 |
@@ -210,6 +210,11 @@ hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
+hydor sessions goal 6f1e "all tests pass and the PR is open"  # ゴールを設定：エージェントがチェックを提案
+hydor sessions goal 6f1e                  # 見る：状態、ラウンド、チェック、支出、質問
+hydor sessions goal 6f1e --start          # 開始を押す：ラウンドが始まる
+hydor sessions goal 6f1e --answer 1,3    # 質問に答える：案1と案3をこの順で
+hydor sessions goal 6f1e --more rounds=20,usd=10  # 上限に達した場合も含め、増やす
 hydor inbox
 hydor away                           # what happened while you were away
 ```

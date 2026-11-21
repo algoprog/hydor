@@ -114,6 +114,27 @@ assert.ok(!small.catalog.includes('- t0:'), 'the small model’s catalog has no 
 const active = offer(all, { window: 131072, active: ['t5'], small: false, builtin });
 assert.ok(names(active.visible).includes('t5'), 'an active tool is visible');
 
+// A session with a goal of the app's loop that is not over always sees its four tools; without one, as above.
+const goalTools = ['goal_propose', 'goal_report', 'goal_ask', 'goal_note'];
+const withGoalTools: Tool[] = [...all, ...goalTools.map((n) => fake(n, `The goal's tool ${n}. More words.`))];
+for (const sm of [false, true]) {
+  const win = sm ? 32768 : 131072;
+  const noGoal = offer(withGoalTools, { window: win, active: [], small: sm, builtin });
+  const goal = offer(withGoalTools, { window: win, active: [], small: sm, builtin, goal: true });
+  const over = offer(withGoalTools, { window: win, active: [], small: sm, builtin, goal: false });
+  for (const n of goalTools) {
+    assert.ok(!names(noGoal.visible).includes(n), `${n} waits in the catalog without a goal (small ${sm})`);
+    assert.ok(names(noGoal.deferred).includes(n), `${n} is findable without a goal (small ${sm})`);
+    assert.ok(names(goal.visible).includes(n), `${n} is visible while the session has a goal (small ${sm})`);
+    assert.ok(!names(goal.deferred).includes(n) && !goal.catalog.includes(n), `${n} is out of the catalog with a goal (small ${sm})`);
+    assert.ok(!names(over.visible).includes(n), `${n} waits when the goal is over (small ${sm})`);
+  }
+  assert.ok(names(goal.deferred).includes('t0'), 'the other tools still wait with a goal');
+  assert.deepEqual(names(over.visible), names(noGoal.visible), 'a goal that is over changes nothing');
+}
+// A session that is not crowded shows everything either way.
+assert.ok(goalTools.every((n) => names(offer([fake('read_file', 'Read.'), ...goalTools.map((g) => fake(g, 'x.'))], { window: 131072, active: [], small: false, builtin }).visible).includes(n)), 'uncrowded: all visible');
+
 // 7. The skill tool: loads a skill by name, finds skills by a query, and says when it cannot.
 const skillTool = TOOLS.find((t) => t.name === 'skill');
 assert.ok(skillTool, 'the skill tool is in TOOLS');

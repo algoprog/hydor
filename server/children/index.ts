@@ -23,7 +23,7 @@ import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, turnAt, turnsOf, type Turn } from '../opinion/turns.ts';
-import { childKeys, FROM_LEAD, parentOf, stillRunning } from './family.ts';
+import { childKeys, FROM_LEAD, parentOf, stillAtWork, stillRunning } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
@@ -724,8 +724,9 @@ const LIMIT = /\b(hit|reached) (your|its|the)\b.{0,24}\blimit\b|\busage limit\b/
 
 const JUDGE = [
   'You check the work a subagent did for the agent that gave it the job. Answer with one JSON object and nothing else:',
-  '{"pass": true or false, "why": "one short sentence"}. Fail it only when its reply plainly does not do the job: it says it could',
-  'not or gave up, does another job, leaves out a part the brief asked for, or is plainly wrong. Pass anything that does the job, even briefly.',
+  '{"pass": true or false, "why": "one short sentence"}. Fail it only when its reply plainly does not do the job: it says a part of the',
+  'job was not done, could not be done or was given up, it does another job, or it is plainly wrong. A reply is a report of work done in',
+  'files: a part it does not mention is no failure, since it has not thereby left it undone. Pass anything that does the job, even briefly.',
 ].join(' ');
 
 /** Why a subagent's reply fails its brief, by the helper model; empty when it does the job, or when the helper model cannot say. */
@@ -766,6 +767,16 @@ async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Pro
   if (turn.status === 'interrupted' || capReached(d.db, key)) return null;
   const parent = parentOf(d.db, key);
   if (parent && findAssistant(d.db, sessionExtra(d.db, parent).assistant)?.stepUp === false) return null;
+  // A turn that ends while the subagent has work of its own running (its program's subagents, background commands: "the
+  // translations are still running, I will check them when they finish") is not an answer to judge: running the brief
+  // again beside the first, still at work in the same folder, was seen twice. It counts as the judged turn, so no later
+  // turn is judged against the brief either; its lead can still step it up (step_up_child).
+  const s = d.sessions.summary(key);
+  const work = s ? stillAtWork(s) : null;
+  if (work && work.subagents + work.background > 0) {
+    if (!sessionExtra(d.db, key).stepJudged && turn.prompt?.id) setSessionExtra(d.db, key, { stepJudged: turn.prompt.id });
+    return null;
+  }
   // Only the turn that answers the brief is checked against it: a later turn answers a message (its lead's or the
   // user's: open the page, one more fix), and judging that by the whole brief would run all the work again.
   const judged = sessionExtra(d.db, key).stepJudged;
