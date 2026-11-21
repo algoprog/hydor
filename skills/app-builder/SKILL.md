@@ -17,9 +17,23 @@ project in a session instead.
 An app is what it asks (a form), what it does (one agent's task, or steps), what it gives back
 (answer fields), how its answer looks (a view: pages, elements, events), what it keeps (lists of records, a
 memory), its own page (a screen, or view pages for it), when it runs (its form, a schedule, a webhook, a watcher)
-and examples to try it with. Build them with app_get, app_save, app_try,
-app_screen and app_data (its records: start it off with some, or see what its runs kept); app_guide's apps
-topic says what each part does, and its API topic gives the format.
+and examples to try it with. Build them with app_get, app_sketch, app_save, app_try,
+app_screen and app_data (its records: start it off with some, or see what its runs kept), and app_services for
+the free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format.
+
+## 0. Learn from the ready-made apps, then sketch
+
+- Before you design, app_get with `like` (what the app does, in a few words) gives the three closest ready-made
+  apps; read the one or two nearest whole (`app: "tpl:<id>"`) and build the way they do: their steps, their
+  views, how they call services and handle what fails. `ready: true` lists them all.
+- For data, look in app_services (forecasts, places, encyclopedia pages, exchange rates…) before you call an
+  address from memory; for a service it does not list, read its documentation (read_page) first.
+- A new app: your first reply is one app_sketch, and nothing is saved until the user says to build it. The sketch
+  is the draft as app_save takes it (its steps may still be words: `steps: [{ title, kind }]`), what you assumed
+  (`assumed`, a short line each), and at most three `questions`, only those whose answers change the design, each
+  with its likely answers as `choices` (the one you assumed first). The user sees it as a card with **Build it**,
+  which sends "Build it" and the choices they picked, and **Change it…**. End your turn and wait for that.
+- A change to an existing app, or a user who says to just build it: no sketch, build.
 
 ## 1. Pin down the job
 
@@ -107,8 +121,11 @@ not a plain card. The format is in app_guide's API topic (Apps: views).
   one more day, a more formal letter, new questions); start another app on part of it (`start`). `ask` (a
   follow-up to the agent) works only for one-task apps; with steps, use `again` or a flow (`run`, with `as` to
   show its answer).
-- Save, then app_try a run and read its `view`: the names it uses that the answer did not give show empty. Send
-  the user the run's link (the view opens there) and say what its buttons do.
+- Save, then app_try a run with `look: true` and look at the pictures (a computer in the dark and in the light, a
+  phone in the dark): fix what reads badly or breaks (text cut off or overlapping, empty blocks, colours that vanish
+  in one theme, a phone layout that does not fit), and the names its `view` says the answer did not give (they show
+  empty). Look again after each change to the view. Send the user the run's link (the view opens there) and say
+  what its buttons do.
 
 ## 5. Safe and cheap
 
