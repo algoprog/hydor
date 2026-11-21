@@ -7616,6 +7616,7 @@
 "Text near the price":"价格附近的文字",
 "Text on accent":"强调色上的文字",
 "Text size":"文字大小",
+"textsize::Larger":"更大",
 "Text styles":"文字样式",
 "text to speech tts read replies voice speak":"文字转语音 TTS 朗读 回复 语音 说话",
 "Text too":"也输出文字",
@@ -26471,5 +26472,8 @@
   "{0} finished on other machines": "其他机器上有 {0} 个已完成",
   "{0} kept file": "{0} 个保留的文件",
   "{0} kept files": "{0} 个保留的文件",
-  "{0} messages in the last 4 weeks": "过去 4 周有 {0} 条消息"
+  "{0} messages in the last 4 weeks": "过去 4 周有 {0} 条消息",
+  "Messages, Help pages and the box you type in, on this device": "此设备上的消息、帮助页面和输入框",
+  "How big messages, Help pages and the box you type in are on this device: default, large or larger": "此设备上消息、帮助页面和输入框的文字大小：默认、较大或更大",
+  "text size font size bigger larger smaller zoom read readability phone eyes accessibility": "文字大小 字体大小 字号 text size font size 放大 变大 更大 缩小 变小 缩放 zoom 阅读 易读性 readability 手机 眼睛 视力 无障碍 accessibility"
 }

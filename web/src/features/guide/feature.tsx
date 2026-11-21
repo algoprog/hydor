@@ -63,6 +63,7 @@ interface DeviceSettings {
   theme?: 'dark' | 'light' | 'system';
   themeName?: string;
   motion?: 'full' | 'calm' | 'off';
+  textSize?: 'default' | 'large' | 'larger';
   language?: string;
   sound?: boolean;
   enter?: 'join' | 'queue';
@@ -83,6 +84,7 @@ onFeatureEvent('guide', (e) => {
   }
   if (d.theme || d.themeName) applyTheme();
   if (d.motion) ui.set({ motion: d.motion });
+  if (d.textSize) ui.set({ textSize: d.textSize });
   if (d.sound !== undefined) setNotifyPrefs({ sound: d.sound });
   if (d.enter)
     try {

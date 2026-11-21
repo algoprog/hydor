@@ -24608,5 +24608,9 @@
   "{0} finished on other machines": "{0} terminadas en otras máquinas",
   "{0} kept file": "{0} archivo guardado",
   "{0} kept files": "{0} archivos guardados",
-  "{0} messages in the last 4 weeks": "{0} mensajes en las últimas 4 semanas"
+  "{0} messages in the last 4 weeks": "{0} mensajes en las últimas 4 semanas",
+  "Messages, Help pages and the box you type in, on this device": "Mensajes, páginas de Ayuda y el cuadro donde escribes, en este dispositivo",
+  "How big messages, Help pages and the box you type in are on this device: default, large or larger": "Tamaño de los mensajes, las páginas de Ayuda y el cuadro donde escribes en este dispositivo: predeterminado, grande o más grande",
+  "text size font size bigger larger smaller zoom read readability phone eyes accessibility": "tamaño del texto tamaño de letra fuente más grande mayor más pequeño menor zoom leer lectura legibilidad teléfono ojos accesibilidad text size font size",
+  "textsize::Larger": "Más grande"
 }

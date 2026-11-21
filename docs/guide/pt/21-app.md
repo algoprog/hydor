@@ -99,6 +99,10 @@ Os agentes escrevem para você no idioma que você escolher: eles são instruíd
 
 Cada movimento dura cerca de um décimo a um quarto de segundo, nunca atrasa o que você abre e nunca se repete, exceto o trabalho em andamento. A configuração **Reduzir movimento** do seu dispositivo sempre prevalece: com ela ativada, o app age como se **Desativada** estivesse escolhida, seja qual for a opção aqui. A escolha fica salva neste navegador. No celular, os deslizes da barra lateral e das colunas e as transições entre páginas não acontecem, mas as janelas ainda sobem da parte de baixo.
 
+## Aumentar o texto
+
+Se o texto está pequeno para ler, por exemplo no celular, [Configurações → App → Geral → Aparência → Tamanho do texto](/settings?s=general&find=Text%20size) o aumenta neste dispositivo: **Padrão**, **Grande** (um sétimo maior) ou **Maior** (um terço maior). Ele aumenta o que você lê e escreve: as mensagens de uma conversa (as respostas do agente e as suas), as páginas da Ajuda e a caixa onde você digita. Os menus, a barra lateral, os editores e os cartões que um agente mostra mantêm o tamanho. A escolha fica guardada neste navegador, então o celular e o computador podem ser diferentes.
+
 ## Decidir o que o Enter faz enquanto um agente trabalha
 
 No grupo **Sessões**, [**Enviar enquanto um agente trabalha**](/settings?s=general&find=Sending%20while%20an%20agent%20works) decide o que acontece quando você envia uma mensagem enquanto o agente está no meio de um turno:
@@ -266,6 +270,7 @@ Algumas escolhas pertencem ao navegador em que você as faz, então cada disposi
 - o modo (escuro, claro ou do sistema) e qual tema escuro e qual tema claro aparecem;
 - o idioma;
 - quanto as coisas se movem (**Movimento**);
+- o tamanho do texto (**Tamanho do texto**);
 - o que a tecla Enter faz enquanto um agente trabalha;
 - as sugestões do terminal, o som de notificação e se este dispositivo recebe notificações;
 - a pasta da página Arquivos, os arquivos abertos, os arquivos recentes e como as pastas aparecem (lista ou blocos, e a ordem delas); as pastas fixadas ficam guardadas no servidor, iguais em todos os dispositivos;
@@ -286,3 +291,4 @@ O restante é guardado pelo app e é igual em todos os dispositivos: os temas qu
 - "Ative a retomada de sessões após limites de uso."
 - "Reative as dicas e mostre todas de novo desde o início."
 - "Defina Movimento como Calmo." ou "Desative as animações neste dispositivo."
+- "Aumente o texto neste dispositivo." ou "Defina Tamanho do texto como Maior."

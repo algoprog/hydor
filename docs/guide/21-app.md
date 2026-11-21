@@ -99,6 +99,10 @@ Agents write to you in the language you pick: they are asked to, unless you writ
 
 Each motion lasts about a tenth to a quarter of a second, never holds back what you open, and never repeats except work in progress. Your device's **Reduce motion** setting always wins: with it on, the app acts as if **Off** were picked, whatever it says here. The choice is kept in this browser. On a phone the slides of the sidebar and columns and the cross-fades of pages don't play, but windows still rise from the bottom.
 
+## Make the text bigger
+
+If the text is small to read, for instance on a phone, [Settings → App → General → Appearance → Text size](/settings?s=general&find=Text%20size) makes it bigger on this device: **Default**, **Large** (a seventh larger) or **Larger** (a third larger). It enlarges what you read and write: the messages in a conversation (the agent's replies and your own), the Help pages and the box you type in. The menus, the sidebar, the editors and the cards an agent shows keep their size. The choice is kept in this browser, so your phone and your computer can differ.
+
 ## Decide what Enter does while an agent works
 
 In the **Sessions** group, [**Sending while an agent works**](/settings?s=general&find=Sending%20while%20an%20agent%20works) decides what happens when you send a message while the agent is in the middle of a turn:
@@ -266,6 +270,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 - the mode (dark, light or system) and which dark and light theme show;
 - the language;
 - how much moves (**Motion**);
+- how big the text is (**Text size**);
 - what Enter does while an agent works;
 - terminal suggestions, the notification sound, and whether this device gets notifications;
 - the Files page's folder, open files, recent files, and how folders show (a list or tiles, and their order); pinned folders are kept on the server, the same on every device;
@@ -286,3 +291,4 @@ The rest is kept by the app and is the same on every device: themes you made, **
 - "Turn on resuming sessions after usage limits."
 - "Turn the tips back on, and show them all again from the start."
 - "Set Motion to Calm." or "Turn off the animations on this device."
+- "Make the text bigger on this device." or "Set Text size to Larger."

@@ -15697,6 +15697,7 @@
   "Text on accent": "アクセント上の文字",
   "Text on the page": "ページ上のテキスト",
   "Text size": "文字サイズ",
+  "textsize::Larger": "さらに大きく",
   "Text starts with": "テキストの先頭が次",
   "Text styles": "テキストスタイル",
   "Text the model read that was not in its provider's cache": "プロバイダーのキャッシュになく、モデルが読み取ったテキスト",
@@ -24608,5 +24609,8 @@
   "{0} finished on other machines": "他のマシンで{0}件完了",
   "{0} kept file": "保存したファイル：{0}件",
   "{0} kept files": "保存したファイル：{0}件",
-  "{0} messages in the last 4 weeks": "直近4週間のメッセージ：{0}件"
+  "{0} messages in the last 4 weeks": "直近4週間のメッセージ：{0}件",
+  "Messages, Help pages and the box you type in, on this device": "メッセージ、ヘルプページ、入力ボックス（このデバイス上）",
+  "How big messages, Help pages and the box you type in are on this device: default, large or larger": "この端末でのメッセージ、ヘルプページ、入力ボックスの文字の大きさ：標準、大、特大",
+  "text size font size bigger larger smaller zoom read readability phone eyes accessibility": "文字サイズ フォントサイズ 文字の大きさ 大きく 小さく 拡大 縮小 ズーム 読みやすさ 見やすさ スマホ 目 アクセシビリティ text size font size zoom"
 }

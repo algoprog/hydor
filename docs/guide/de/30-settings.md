@@ -19,6 +19,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Importieren**](/settings?s=general&find=Import): Geteiltes Design hinzufügen.
 - [**Sprache**](/settings?s=general&find=Language): Die Sprache der App und der Agenten.
 - [**Bewegung**](/settings?s=general&find=Motion): Wie viel sich in der App bewegt: voll, ruhig (beim Öffnen einer Seite oder eines Fensters gleitet oder blendet nichts) oder gar nicht.
+- [**Textgröße**](/settings?s=general&find=Text%20size): Wie groß Nachrichten, Hilfeseiten und das Eingabefeld auf diesem Gerät dargestellt werden: Standard, groß oder größer.
 - [**Senden, während ein Agent arbeitet**](/settings?s=general&find=Sending%20while%20an%20agent%20works): Enter sendet in den laufenden Durchgang oder reiht die Nachricht bis zu dessen Ende ein.
 - [**Terminalvorschläge**](/settings?s=general&find=Terminal%20suggestions): Graue Vervollständigungen nach dem Cursor in Terminals.
 - [**Nach dem Zurücksetzen von Nutzungslimits fortsetzen**](/settings?s=general&find=Resume%20after%20usage%20limits): Setzt eine Sitzung eine Minute nach dem Zurücksetzen des Limits eines Plans fort.

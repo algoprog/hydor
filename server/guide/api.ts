@@ -9,6 +9,7 @@
 // Settings kept on each device (theme, language…) go to the pages showing the session.
 import crypto from 'node:crypto';
 import { formContent, formFields } from '../../shared/forms.ts';
+import { isLang, LANGS } from '../../shared/i18n.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -267,7 +268,8 @@ const DEVICE: Record<string, (v: unknown) => unknown> = {
   theme: (v) => (v === 'dark' || v === 'light' || v === 'system' ? v : undefined),
   themeName: (v) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 60) : undefined),
   motion: (v) => (v === 'full' || v === 'calm' || v === 'off' ? v : undefined),
-  language: (v) => (v === 'en' || v === 'de' || v === 'zh' || v === 'el' ? v : undefined),
+  textSize: (v) => (v === 'default' || v === 'large' || v === 'larger' ? v : undefined),
+  language: (v) => (isLang(v) ? v : undefined),
   sound: (v) => (typeof v === 'boolean' ? v : undefined),
   enter: (v) => (v === 'join' || v === 'queue' ? v : undefined),
   terminalSuggestions: (v) => (typeof v === 'boolean' ? v : undefined),
@@ -286,7 +288,7 @@ function device(ctx: RunCtx, method: string, body: Json, mode: Mode): ToolOutput
     if (ok === undefined) bad.push(k);
     else set[k] = ok;
   }
-  if (bad.length) return { text: `Not a device setting, or not a value it takes: ${bad.join(', ')}. They are theme (dark, light, system), themeName (a theme's name), motion (full, calm, off), language (en, de, zh, el), sound, enter (join, queue), terminalSuggestions, sidebar, groupSessions (true/false).`, isError: true };
+  if (bad.length) return { text: `Not a device setting, or not a value it takes: ${bad.join(', ')}. They are theme (dark, light, system), themeName (a theme's name), motion (full, calm, off), textSize (default, large, larger), language (${LANGS.map((l) => l.id).join(', ')}), sound, enter (join, queue), terminalSuggestions, sidebar, groupSessions (true/false).`, isError: true };
   if (!Object.keys(set).length) return { text: 'Nothing to change.', isError: true };
   ctx.deps.toSubscribers(ctx.key, { t: 'feature', id: 'guide', key: ctx.key, data: { device: set } });
   return { text: `Sent to the pages showing this session, which switch now (${Object.keys(set).join(', ')}). Other devices keep their own settings until changed there.` };

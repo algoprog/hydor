@@ -104,6 +104,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Import', 'import share theme', 'Add a theme someone shared', 'Import a theme'],
   ['general', 'Language', 'language translate translation english german deutsch spanish español french français portuguese português brasil greek ελληνικά japanese 日本語 chinese 中文 简体', 'The language the app is shown in, and agents write in'],
   ['general', 'Motion', 'animation animations reduce motion calm full off transitions movement fade slide', 'How much of the app moves: full, calm (nothing slides or fades as you open a page or a window), or none'],
+  ['general', 'Text size', 'text size font size bigger larger smaller zoom read readability phone eyes accessibility', 'How big messages, Help pages and the box you type in are on this device: default, large or larger'],
   ['general', 'Sending while an agent works', 'enter join turn queue wait steer message', 'Enter joins the running turn, or waits for it to end'],
   ['general', 'Terminal suggestions', 'autocomplete completion shell commands', 'Grey completions after the cursor in terminals'],
   ['general', 'Resume after usage limits', 'limit reset continue automatically plan', 'Continues a session a minute after a plan’s limit resets'],

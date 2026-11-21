@@ -26474,5 +26474,9 @@
   "{0} finished on other machines": "{0} ολοκληρώθηκαν σε άλλα μηχανήματα",
   "{0} kept file": "{0} αρχείο που φυλάσσεται",
   "{0} kept files": "{0} αρχεία που φυλάσσονται",
-  "{0} messages in the last 4 weeks": "{0} μηνύματα τις τελευταίες 4 εβδομάδες"
+  "{0} messages in the last 4 weeks": "{0} μηνύματα τις τελευταίες 4 εβδομάδες",
+  "Messages, Help pages and the box you type in, on this device": "Μηνύματα, σελίδες Βοήθειας και το πλαίσιο πληκτρολόγησης, σε αυτή τη συσκευή",
+  "How big messages, Help pages and the box you type in are on this device: default, large or larger": "Το μέγεθος των μηνυμάτων, των σελίδων Βοήθειας και του πλαισίου πληκτρολόγησης σε αυτή τη συσκευή: προεπιλογή, μεγάλο ή μεγαλύτερο",
+  "text size font size bigger larger smaller zoom read readability phone eyes accessibility": "μέγεθος κειμένου μέγεθος γραμματοσειράς text size font size μεγαλύτερο μικρότερο ζουμ ανάγνωση αναγνωσιμότητα κινητό μάτια προσβασιμότητα accessibility zoom",
+  "textsize::Larger": "Μεγαλύτερο"
 }

@@ -99,6 +99,10 @@ Unter [Einstellungen → App → Allgemein → Darstellung → Bewegung](/settin
 
 Jede Bewegung dauert etwa eine Zehntel- bis eine Viertelsekunde, hält nie auf, was du öffnest, und wiederholt sich nie, außer bei laufender Arbeit. Die Einstellung **Bewegung reduzieren** deines Geräts hat immer Vorrang: Ist sie aktiv, verhält sich die App, als wäre **Aus** gewählt, was auch hier steht. Die Wahl gilt für diesen Browser. Auf dem Handy laufen das Gleiten der Seitenleiste und der Spalten und die Überblendungen der Seiten nicht, aber Fenster steigen weiterhin vom unteren Rand auf.
 
+## Den Text größer machen
+
+Ist dir der Text zu klein, etwa auf dem Handy, machst du ihn unter [Einstellungen → App → Allgemein → Darstellung → Textgröße](/settings?s=general&find=Text%20size) auf diesem Gerät größer: **Standard**, **Groß** (ein Siebtel größer) oder **Größer** (ein Drittel größer). Das vergrößert, was du liest und schreibst: die Nachrichten einer Unterhaltung (die Antworten des Agenten und deine eigenen), die Hilfeseiten und das Eingabefeld. Menüs, Seitenleiste, Editoren und die Karten, die ein Agent zeigt, behalten ihre Größe. Die Auswahl wird in diesem Browser gespeichert, Handy und Computer können also verschieden sein.
+
 ## Enter während der Agentenarbeit festlegen
 
 Unter **Sitzungen** bestimmt [**Senden, während ein Agent arbeitet**](/settings?s=general&find=Sending%20while%20an%20agent%20works), was eine Nachricht während eines laufenden Durchlaufs bewirkt:
@@ -266,6 +270,7 @@ Einige Einstellungen gelten pro Browser und können sich je Gerät unterscheiden
 - Hell-, Dunkel- oder Systemmodus und die jeweiligen Designs;
 - Sprache;
 - wie viel sich bewegt (**Bewegung**);
+- wie groß der Text ist (**Textgröße**);
 - Enter-Verhalten während der Agentenarbeit;
 - Terminalvorschläge, der Benachrichtigungston und ob dieses Gerät Benachrichtigungen bekommt;
 - aktueller Ordner, offene und zuletzt verwendete Dateien sowie Listen- oder Kachelansicht und Sortierung. Angeheftete Ordner liegen serverseitig und sind überall gleich;
@@ -286,3 +291,4 @@ Der Rest wird von der App gespeichert und ist auf jedem Gerät gleich: Designs, 
 - „Aktiviere die automatische Fortsetzung nach Nutzungslimits.“
 - „Schalte die Tipps wieder ein und zeige mir alle noch einmal von Anfang an.“
 - „Stell die Bewegung auf Ruhig.“ oder „Schalte die Animationen auf diesem Gerät aus.“
+- „Mach den Text auf diesem Gerät größer.“ oder „Stell die Textgröße auf Größer.“

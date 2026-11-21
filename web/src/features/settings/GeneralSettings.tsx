@@ -7,7 +7,7 @@ import type { KeepAwakeMode, KeepAwakeState, RetentionSettings, StartupState, Up
 import { api, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toast, toastError, useApp, useUI, type Motion } from '../../lib/store';
+import { toast, toastError, useApp, useUI, type Motion, type TextSize } from '../../lib/store';
 import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
@@ -35,6 +35,7 @@ export function GeneralSettings() {
         <ThemePicker />
         <Row label="Language" hint="Shown in the app; agents write to you in it too" control={<LanguageSelect />} />
         <MotionSetting />
+        <TextSizeSetting />
       </Group>
       <Group title="Sessions">
         <Row
@@ -110,6 +111,32 @@ function MotionSetting() {
               { value: 'full', label: 'Full' },
               { value: 'calm', label: 'Calm' },
               { value: 'off', label: 'Off' },
+            ]}
+          />
+        </span>
+      }
+    />
+  );
+}
+
+/** How big reading text is on this device: messages, the Help pages and the message box. Menus and editors keep their size. */
+function TextSizeSetting() {
+  const textSize = useUI((s) => s.textSize);
+  return (
+    <Row
+      label="Text size"
+      hint="Messages, Help pages and the box you type in, on this device"
+      control={
+        // The sizes are their own entries in the dictionaries ("textsize::Default": not the default of a setting).
+        <span data-i18n="textsize">
+          <Segmented<TextSize>
+            size="sm"
+            value={textSize}
+            onChange={(t) => useUI.getState().set({ textSize: t })}
+            options={[
+              { value: 'default', label: 'Default' },
+              { value: 'large', label: 'Large' },
+              { value: 'larger', label: 'Larger' },
             ]}
           />
         </span>

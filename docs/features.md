@@ -1911,7 +1911,10 @@ programs shows each program's version and what is out, with Check now, Update no
   in the session and in Settings; the agent pressing Escape itself does not. Each step shows in the conversation with
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
-  can be changed.
+  can be changed. Text size, set per device in Settings → General → Appearance (Default, Large or Larger: a seventh or a
+  third bigger), enlarges what is read and typed: the messages in a conversation (the agent's replies and your own), the
+  Help pages and the message box; menus, the sidebar, editors and answer cards keep their size, and on a phone the message
+  box never goes below 16 px.
 - Small, quiet motion, set per device in Settings → General → Appearance → Motion (Full, Calm or Off; the system's
   Reduce motion always means Off). Full: buttons, rail tiles, session rows and chips dip to 97% while pressed; a copy turns into a check that draws itself, holds for a moment and turns back; switches spring;
   the rail's accent bar glides to the page you open; a session's dot turns green with one ring when work finishes and

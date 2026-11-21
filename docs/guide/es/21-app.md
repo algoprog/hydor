@@ -99,6 +99,10 @@ Los agentes te escriben en el idioma que elijas: se les pide que lo hagan, salvo
 
 Cada movimiento dura entre una décima y un cuarto de segundo, nunca retrasa lo que abres y nunca se repite, salvo el trabajo en curso. El ajuste **Reducir movimiento** de tu dispositivo siempre gana: con él activado, la app actúa como si estuviera elegido **Desactivado**, diga lo que diga aquí. La elección se guarda en este navegador. En un teléfono no se reproducen los deslizamientos de la barra lateral y las columnas ni los fundidos de las páginas, pero las ventanas siguen subiendo desde abajo.
 
+## Hacer el texto más grande
+
+Si el texto se te hace pequeño, por ejemplo en el móvil, [Configuración → App → General → Apariencia → Tamaño del texto](/settings?s=general&find=Text%20size) lo agranda en este dispositivo: **Predeterminado**, **Grande** (un séptimo más grande) o **Más grande** (un tercio más grande). Agranda lo que lees y escribes: los mensajes de una conversación (las respuestas del agente y los tuyos), las páginas de Ayuda y el cuadro donde escribes. Los menús, la barra lateral, los editores y las tarjetas que muestra un agente mantienen su tamaño. La elección se guarda en este navegador, así que el móvil y el ordenador pueden ser distintos.
+
 ## Decidir qué hace Enter mientras un agente trabaja
 
 En el grupo **Sesiones**, [**Enviar mientras un agente trabaja**](/settings?s=general&find=Sending%20while%20an%20agent%20works) decide qué ocurre cuando envías un mensaje mientras el agente está en medio de un turno:
@@ -266,6 +270,7 @@ Algunas opciones pertenecen al navegador en el que las eliges, así que cada dis
 - el modo (oscuro, claro o del sistema) y qué temas oscuro y claro se muestran;
 - el idioma;
 - cuánto se mueve la interfaz (**Movimiento**);
+- el tamaño del texto (**Tamaño del texto**);
 - qué hace Enter mientras un agente trabaja;
 - las sugerencias de la terminal, el sonido de las notificaciones y si este dispositivo recibe notificaciones;
 - la carpeta de la página Archivos, los archivos abiertos, los archivos recientes y cómo se muestran las carpetas (lista o mosaicos, y su orden); las carpetas fijadas se guardan en el servidor y son las mismas en todos los dispositivos;
@@ -286,3 +291,4 @@ El resto lo guarda la app y es igual en todos los dispositivos: los temas que cr
 - "Activa la reanudación de sesiones tras los límites de uso."
 - "Vuelve a activar los consejos y muéstramelos todos otra vez desde el principio."
 - "Pon Movimiento en Calmado." o "Desactiva las animaciones en este dispositivo."
+- "Haz el texto más grande en este dispositivo." o "Pon Tamaño del texto en Más grande."
