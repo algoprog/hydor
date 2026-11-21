@@ -1360,7 +1360,7 @@ const REBUTTAL: Draft = {
     { id: 'reviews', label: 'The reviews', type: 'long', required: true, placeholder: 'Paste them all, each with its reviewer (Reviewer 1, R2, Reviewer xYz1…)' },
     { id: 'paper', label: 'Your paper', type: 'text', placeholder: 'e.g. ~/papers/draft/main.pdf', help: 'A PDF, a .tex file or a LaTeX project’s folder, or a link: to cite its sections' },
     { id: 'upload', label: 'Or upload it', type: 'file' },
-    { id: 'limit', label: 'The limit', type: 'text', default: '2,500 characters per reviewer', help: 'As the venue sets it: characters or words, per reviewer, per point or in all' },
+    { id: 'limit', label: 'The limit', type: 'text', remember: true, default: '2,500 characters per reviewer', help: 'As the venue sets it: characters or words, per reviewer, per point or in all' },
     { id: 'tone', label: 'Tone', type: 'choice', remember: true, options: ['Courteous and firm', 'Warm and grateful', 'Brief and to the point'], default: 'Courteous and firm' },
   ],
   prompt: '',

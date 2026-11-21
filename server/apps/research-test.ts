@@ -1018,6 +1018,7 @@ const STARTS: [string, string, string][] = [
   ['literature-matrix', 'columns', 'remember'],
   ['reproduce-paper', 'limits', 'remember'],
   ['reviewer-simulator', 'venue', 'remember'],
+  ['rebuttal-workbench', 'limit', 'remember'],
   ['rebuttal-workbench', 'tone', 'remember'],
   ['figure-doctor', 'venue', 'remember'],
   ['figure-doctor', 'inches', 'remember'],
