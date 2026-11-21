@@ -619,6 +619,8 @@ export interface CardRules {
   name: (ui: string) => string | undefined;
   /** What does not fit the UI's type in the data, in words ("items is missing"). */
   check: (ui: string, data: Record<string, unknown>) => string[];
+  /** Whether the data reads its numbers from a spreadsheet or a file (its `from` names one) rather than holding them. */
+  ref: (ui: string, data: Record<string, unknown>) => boolean;
 }
 let cardRules: CardRules | null = null;
 export const setCardRules = (r: CardRules) => void (cardRules = r);
@@ -639,7 +641,7 @@ function cardValue(f: AnswerField, v: unknown): { v: Record<string, unknown> } |
   const d = Array.isArray(v) ? { items: v } : v;
   if (!d || typeof d !== 'object' || Array.isArray(d)) return { e: [`should be the ${f.ui ?? 'card'} card's data: one JSON object`] };
   const data = d as Record<string, unknown>;
-  if (data.from !== undefined && data.from !== null) return { e: ['a card in an app holds its values itself: give them in place of from (cards that read a spreadsheet or a file are not offered in apps)'] };
+  if (cardRules && f.ui && cardRules.ref(f.ui, data)) return { e: ['a card in an app holds its values itself: give them in place of from (cards that read a spreadsheet or a file are not offered in apps)'] };
   const bad = cardRules && f.ui ? cardRules.check(f.ui, data) : [];
   if (bad.length) return { e: [`its data does not fit the ${f.ui} card: ${bad.slice(0, 4).join('; ')} (its type is in your instructions)`] };
   return { v: data };

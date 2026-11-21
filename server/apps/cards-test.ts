@@ -123,9 +123,12 @@ test('checkAnswer: a good card passes as it is (its JSON text too), a bad one sa
   // Needed: an empty object is no card; not needed, it is left empty.
   assert.match((checkAnswer([card], { compare: {} }) as { errors: string[] }).errors[0], /compare: missing \(a card\)/);
   assert.deepEqual(checkAnswer([{ ...card, required: undefined }], {}), { ok: true, value: { compare: null } });
-  // A card that reads a spreadsheet is not offered in apps.
+  // A card that reads a spreadsheet is not offered in apps; a card whose own data has a from (a flight's) is.
   const ref = checkAnswer([{ id: 'c', label: 'C', type: 'ui', ui: 'chart' }], { c: { from: { sheet: 'Shop' }, x: 'Month', y: 'Sales' } });
   assert.ok(!ref.ok && /holds its values itself/.test(ref.errors[0]));
+  const flights = answerUi('flights')!;
+  assert.ok(JSON.stringify(flights.example).includes('"from"'), 'the flights card has a from of its own');
+  assert.ok(checkAnswer([{ id: 'f', label: 'F', type: 'ui', ui: 'flights' }], { f: flights.example }).ok);
 });
 
 test('what the agent is told: the card field in the list, then its type, a short example and that pictures must be real', () => {

@@ -5,6 +5,7 @@
 // cannot draw it (a CSV cell, another agent's tool, a chat's agent). The pages load it only where a card is drawn or
 // picked, never at once.
 import { answerUi, type AnswerUiSpec } from './answer-ui/index.ts';
+import { isDataRef, REF_UIS } from './answer-ui/data-ref.ts';
 import { answerMarkdown, answerText } from './answer-ui/text.ts';
 import { dataProblems } from './boards.ts';
 import { fieldId, setCardRules, type AnswerField } from './apps.ts';
@@ -14,6 +15,11 @@ setCardRules({
   check: (ui, data) => {
     const spec = answerUi(ui);
     return spec ? dataProblems(spec, data) : [`there is no card called “${ui}”`];
+  },
+  // As the pages tell one (components/answer/AnswerUi.tsx): only the UIs that can read a source, with a `from` that names one.
+  ref: (ui, data) => {
+    const id = answerUi(ui)?.id;
+    return !!id && REF_UIS.has(id) && isDataRef(data);
   },
 });
 
