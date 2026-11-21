@@ -2672,10 +2672,11 @@ return { questions, count: questions.length };`,
     description: 'Books you are likely to love, from the ones you did: covers, pages, ratings and why each fits, checked against Open Library.',
     fields: [
       { id: 'likes', label: 'Books you loved, or what you’re after', type: 'long', required: true, placeholder: 'e.g. The Martian, Project Hail Mary; or a cozy mystery set in Japan' },
-      { id: 'kind', label: 'Fiction or not', type: 'choice', options: ['Either', 'Fiction', 'Non-fiction'], default: 'Either' },
-      { id: 'length', label: 'Length', type: 'choice', options: ['Any length', 'Short (under 250 pages)', 'Long (over 400 pages)'], default: 'Any length' },
+      { id: 'kind', label: 'Fiction or not', type: 'choice', options: ['Either', 'Fiction', 'Non-fiction'], default: 'Either', remember: true },
+      { id: 'length', label: 'Length', type: 'choice', options: ['Any length', 'Short (under 250 pages)', 'Long (over 400 pages)'], default: 'Any length', remember: true },
       { id: 'read', label: 'Read already', type: 'long', placeholder: 'Titles to leave out' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2765,11 +2766,12 @@ return { books: books.map(({ at, fits, found, ...b }) => b), checked: books.filt
     category: 'Planning',
     description: 'Things to do in a city on the days you pick: concerts, markets, exhibitions and family outings, by day and on a map, with the weather for each day.',
     fields: [
-      { id: 'city', label: 'City or town', type: 'text', required: true, placeholder: 'e.g. Lisbon' },
+      { id: 'city', label: 'City or town', type: 'text', required: true, placeholder: 'e.g. Lisbon', from: 'me.home' },
       { id: 'from', label: 'From', type: 'date', help: 'The coming weekend, unless you say' },
       { id: 'to', label: 'To', type: 'date' },
-      { id: 'likes', label: 'What you like', type: 'text', placeholder: 'e.g. Live music, food markets, things for kids' },
+      { id: 'likes', label: 'What you like', type: 'text', placeholder: 'e.g. Live music, food markets, things for kids', remember: true },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2783,6 +2785,7 @@ return { books: books.map(({ at, fits, found, ...b }) => b), checked: books.filt
 const iso = (d) => d.toISOString().slice(0, 10);
 const today = new Date(String(input.today || '').slice(0, 10) + 'T00:00:00Z');
 let from = /^\d{4}-\d{2}-\d{2}$/.test(String(input.from || '')) ? new Date(input.from + 'T00:00:00Z') : null;
+const asked = !!from;
 let to = /^\d{4}-\d{2}-\d{2}$/.test(String(input.to || '')) ? new Date(input.to + 'T00:00:00Z') : null;
 if (!from) {
   const dow = today.getUTCDay();
@@ -2791,14 +2794,23 @@ if (!from) {
 }
 if (!to || to < from) to = from;
 if (to.getTime() - from.getTime() > 6 * 86400000) to = new Date(from.getTime() + 6 * 86400000);
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const label = from.getUTCDate() + ' ' + MONTHS[from.getUTCMonth()] + (iso(to) !== iso(from) ? ' to ' + to.getUTCDate() + ' ' + MONTHS[to.getUTCMonth()] : '') + ' ' + to.getUTCFullYear();
-return { from: iso(from), to: iso(to), label, month: MONTHS[from.getUTCMonth()] + ' ' + from.getUTCFullYear(), soon: Math.round((to - today) / 86400000) <= 15 };`,
+// The days in words, in the person's language ("20 November to 22 November 2026" in English; the language's own way
+// of writing a range in others), and "this weekend" for the default, which is what the searches for listings say.
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const tag = lang === 'en' ? 'en-GB' : lang;
+const dayMonth = new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'long', timeZone: 'UTC' });
+const full = new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+const monthYear = new Intl.DateTimeFormat(tag, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const several = iso(to) !== iso(from);
+const label = lang === 'en' ? dayMonth.format(from) + (several ? ' to ' + dayMonth.format(to) : '') + ' ' + to.getUTCFullYear() : several ? full.formatRange(from, to) : full.format(from);
+const month = monthYear.format(from);
+return { from: iso(from), to: iso(to), label, month, when: asked ? label : 'this weekend ' + month, soon: Math.round((to - today) / 86400000) <= 15 };`,
           outputs: [
             { id: 'from', label: 'From', type: 'date' },
             { id: 'to', label: 'To', type: 'date' },
             { id: 'label', label: 'The days', type: 'text' },
             { id: 'month', label: 'Month', type: 'text' },
+            { id: 'when', label: 'What to search for', type: 'text', description: '"this weekend" and its month, or the days asked for' },
             { id: 'soon', label: 'Soon enough for a forecast', type: 'yesno' },
           ],
           failed: 'agent',
@@ -2835,7 +2847,7 @@ return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, at: p.lat + ',' +
           do: 'parallel',
           branches: [
             [{ id: 'events_search', title: 'Search for events', do: 'tool', tool: 'web_search', with: { query: 'events in {{spot.name}} {{dates.label}} {{likes}}', k: 10 }, failed: 'skip' }],
-            [{ id: 'guide_search', title: 'Search for listings', do: 'tool', tool: 'web_search', with: { query: 'what’s on in {{spot.name}} this weekend {{dates.month}} things to do', k: 8 }, failed: 'skip' }],
+            [{ id: 'guide_search', title: 'Search for listings', do: 'tool', tool: 'web_search', with: { query: 'what’s on in {{spot.name}} {{dates.when}} things to do', k: 8 }, failed: 'skip' }],
             [{ id: 'weather', title: 'Get the forecast', do: 'tool', tool: 'http_request', if: '{{spot.url}} is not empty', with: { url: '{{spot.url}}' }, failed: 'skip' }],
           ],
         },
@@ -2964,9 +2976,10 @@ return { events, days, mapped: events.filter((e) => e.lat !== null).length };`,
       { id: 'by', label: 'By when', type: 'date', required: true },
       { id: 'saved', label: 'Saved already', type: 'number', default: '0' },
       { id: 'monthly', label: 'You can put aside each month', type: 'number', help: 'Leave it empty to see what it takes' },
-      { id: 'rate', label: 'Interest a year, %', type: 'number', default: '3' },
-      { id: 'currency', label: 'Currency', type: 'text', placeholder: 'e.g. €, $, £' },
+      { id: 'rate', label: 'Interest a year, %', type: 'number', default: '3', remember: true },
+      { id: 'currency', label: 'Currency', type: 'text', placeholder: 'e.g. €, $, £', from: 'me.currency' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -2975,7 +2988,7 @@ return { events, days, mapped: events.filter((e) => e.lat !== null).length };`,
           title: 'Work out the plan',
           do: 'code',
           language: 'javascript',
-          with: { target: '{{target}}', by: '{{by}}', saved: '{{saved}}', monthly: '{{monthly}}', rate: '{{rate}}', today: '{{today}}' },
+          with: { target: '{{target}}', by: '{{by}}', saved: '{{saved}}', monthly: '{{monthly}}', rate: '{{rate}}', currency: '{{currency}}', today: '{{today}}' },
           code: String.raw`// The months to the date, what it takes each month to get there with the interest added monthly, and the balance month
 // by month at what you put aside (or at what it takes); when you would get there at 20% less, as planned and 20% more;
 // and the months you pass a quarter, half and three quarters of the goal.
@@ -3014,17 +3027,33 @@ const reach = (m) => {
   }
   return '';
 };
-const scenarios = [0.8, 1, 1.2].map((f) => ({ plan: f === 1 ? 'As planned' : f < 1 ? '20% less' : '20% more', monthly: round(plan * f), reach: plan * f > 0 ? reach(plan * f) : '' }));
+// Money as the person's language writes it: "€20,000" or "20.000 €", by the currency they gave as a code or a symbol.
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const SYMBOLS = { '€': 'EUR', $: 'USD', '£': 'GBP', '¥': 'JPY', '₹': 'INR', '₩': 'KRW', '₽': 'RUB', '₺': 'TRY', '₪': 'ILS', '₫': 'VND', '฿': 'THB', zł: 'PLN', Kč: 'CZK', R$: 'BRL', A$: 'AUD', C$: 'CAD' };
+const said = String(input.currency || '').trim();
+const code = /^[A-Za-z]{3}$/.test(said) ? said.toUpperCase() : SYMBOLS[said] || '';
+const money = (n) => {
+  const whole = Number.isInteger(n);
+  try {
+    if (code) return new Intl.NumberFormat(lang, { style: 'currency', currency: code, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}) }).format(n);
+  } catch (e) {}
+  const num = new Intl.NumberFormat(lang, { maximumFractionDigits: 2 }).format(n);
+  return !said ? num : lang === 'en' ? said + num : num + ' ' + said;
+};
+const scenarios = [0.8, 1, 1.2].map((f) => ({ plan: f === 1 ? 'As planned' : f < 1 ? '20% less' : '20% more', monthly: round(plan * f), monthly_text: money(round(plan * f)), reach: plan * f > 0 ? reach(plan * f) : '' }));
 const milestones = [25, 50, 75, 100].map((p) => ({ pct: p, month: (rows.find((x) => x.balance >= (target * p) / 100) || {}).month || '' }));
-return { months, needed: round(needed), plan: round(plan), final: round(bal), short: round(Math.max(0, target - bal)), rows, scenarios, milestones, reach: reach(plan) || '' };`,
+return { months, needed: round(needed), plan: round(plan), final: round(bal), short: round(Math.max(0, target - bal)), target_text: money(target), needed_text: money(round(needed)), plan_text: money(round(plan)), rows, scenarios, milestones, reach: reach(plan) || '' };`,
           outputs: [
             { id: 'months', label: 'Months to go', type: 'number' },
             { id: 'needed', label: 'It takes a month', type: 'number' },
             { id: 'plan', label: 'Put aside a month', type: 'number' },
             { id: 'final', label: 'At the date', type: 'number' },
             { id: 'short', label: 'Short of the goal', type: 'number' },
+            { id: 'target_text', label: 'The goal, written out', type: 'text' },
+            { id: 'needed_text', label: 'It takes a month, written out', type: 'text' },
+            { id: 'plan_text', label: 'Put aside a month, written out', type: 'text' },
             { id: 'rows', label: 'Month by month', type: 'table', columns: SAVING_COLS },
-            { id: 'scenarios', label: 'If you save more or less', type: 'table', columns: [{ id: 'plan', label: 'Plan', type: 'text' }, { id: 'monthly', label: 'A month', type: 'number' }, { id: 'reach', label: 'Goal reached', type: 'text' }] },
+            { id: 'scenarios', label: 'If you save more or less', type: 'table', columns: [{ id: 'plan', label: 'Plan', type: 'text' }, { id: 'monthly', label: 'A month', type: 'number' }, { id: 'monthly_text', label: 'A month, written out', type: 'text' }, { id: 'reach', label: 'Goal reached', type: 'text' }] },
             { id: 'milestones', label: 'Milestones', type: 'table', columns: [{ id: 'pct', label: 'Of the goal, %', type: 'number' }, { id: 'month', label: 'Month', type: 'text' }] },
             { id: 'reach', label: 'Goal reached', type: 'text' },
           ],
@@ -3045,7 +3074,7 @@ Saving more or less: {{project.scenarios}}
           outputs: [{ id: 'summary', label: 'In short', type: 'markdown', required: true }, { id: 'tips', label: 'Tips', type: 'list' }],
         },
       ],
-      outputs: { summary: '{{advice.summary}}', needed: '{{project.needed}}', plan: '{{project.plan}}', months: '{{project.months}}', final: '{{project.final}}', reach: '{{project.reach}}', rows: '{{project.rows}}', scenarios: '{{project.scenarios}}', milestones: '{{project.milestones}}', tips: '{{advice.tips}}' },
+      outputs: { summary: '{{advice.summary}}', needed: '{{project.needed}}', plan: '{{project.plan}}', target_text: '{{project.target_text}}', needed_text: '{{project.needed_text}}', plan_text: '{{project.plan_text}}', months: '{{project.months}}', final: '{{project.final}}', reach: '{{project.reach}}', rows: '{{project.rows}}', scenarios: '{{project.scenarios}}', milestones: '{{project.milestones}}', tips: '{{advice.tips}}' },
     },
     answer: [
       { id: 'summary', label: 'In short', type: 'markdown', required: true },
@@ -3053,9 +3082,12 @@ Saving more or less: {{project.scenarios}}
       { id: 'plan', label: 'Put aside a month', type: 'number' },
       { id: 'months', label: 'Months to go', type: 'number' },
       { id: 'final', label: 'At the date', type: 'number' },
+      { id: 'target_text', label: 'The goal, written out', type: 'text', description: 'The amount to reach with its currency, as the person’s language writes money' },
+      { id: 'needed_text', label: 'It takes a month, written out', type: 'text' },
+      { id: 'plan_text', label: 'Put aside a month, written out', type: 'text' },
       { id: 'reach', label: 'Goal reached', type: 'text', description: 'The month the goal is reached, as YYYY-MM' },
       { id: 'rows', label: 'Month by month', type: 'table', columns: SAVING_COLS },
-      { id: 'scenarios', label: 'If you save more or less', type: 'table', columns: [{ id: 'plan', label: 'Plan', type: 'text' }, { id: 'monthly', label: 'A month', type: 'number' }, { id: 'reach', label: 'Goal reached', type: 'text' }] },
+      { id: 'scenarios', label: 'If you save more or less', type: 'table', columns: [{ id: 'plan', label: 'Plan', type: 'text' }, { id: 'monthly', label: 'A month', type: 'number' }, { id: 'monthly_text', label: 'A month, written out', type: 'text' }, { id: 'reach', label: 'Goal reached', type: 'text' }] },
       { id: 'milestones', label: 'Milestones', type: 'table', columns: [{ id: 'pct', label: 'Of the goal, %', type: 'number' }, { id: 'month', label: 'Month', type: 'text' }] },
       { id: 'tips', label: 'Tips', type: 'list' },
     ],
@@ -3077,6 +3109,7 @@ Saving more or less: {{project.scenarios}}
       { id: 'data', label: 'Or paste the numbers', type: 'long', placeholder: 'e.g. Month, Sales, Costs\nJan, 120, 80\nFeb, 135, 82' },
       { id: 'question', label: 'What you want to see', type: 'text', placeholder: 'e.g. How sales changed by month and region' },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -3111,22 +3144,72 @@ if (md.length >= 2) {
 table = table.filter((r) => r.some((c) => c !== ''));
 if (table.length < 2) throw new Error('Give a table with at least two rows: attach a spreadsheet, or paste the numbers');
 const width = Math.max(...table.map((r) => r.length));
-const asNum = (v) => {
-  const t = String(v || '').trim().replace(/[$€£¥%\s]/g, '').replace(/,(?=\d{3}(\D|$))/g, '');
+// A number as its column writes it: "12,5" (a decimal comma), "1.234,56", "1,234.56", "1 234,5", "12.5", with a currency
+// sign or a percent. A mark that stands alone ("1,234": a thousand or one and a bit?) is read the way the rest of its
+// column writes it (decimalOf), else as thousands.
+const cleaned = (v) => String(v === undefined || v === null ? '' : v).trim().replace(/[$€£¥%]/g, '').replace(/[\s  ']/g, '');
+const markOf = (t) => {
+  const c = t.lastIndexOf(',');
+  const d = t.lastIndexOf('.');
+  if (c >= 0 && d >= 0) return c > d ? ',' : '.';
+  if (c >= 0) return t.split(',').length > 2 || t.length - c - 1 === 3 ? '.' : ',';
+  return d >= 0 && t.split('.').length > 2 ? ',' : '.';
+};
+const decimalOf = (vals) => {
+  let comma = 0;
+  let dot = 0;
+  for (const v of vals) {
+    const t = cleaned(v);
+    if (!/^[-+]?[\d.,]*\d[\d.,]*$/.test(t)) continue;
+    const c = t.lastIndexOf(',');
+    const d = t.lastIndexOf('.');
+    if (c >= 0 && d >= 0) c > d ? comma++ : dot++;
+    else if (c >= 0 && (t.split(',').length > 2 || t.length - c - 1 !== 3)) t.split(',').length > 2 ? dot++ : comma++;
+    else if (d >= 0 && (t.split('.').length > 2 || t.length - d - 1 !== 3)) t.split('.').length > 2 ? comma++ : dot++;
+  }
+  return comma > dot ? ',' : '.';
+};
+const asNum = (v, dec) => {
+  let t = cleaned(v);
+  if (!/^[-+]?[\d.,]*\d[\d.,]*(e[-+]?\d+)?$/i.test(t)) return null;
+  const c = t.lastIndexOf(',');
+  const d = t.lastIndexOf('.');
+  let mark = markOf(t);
+  if (dec && (c >= 0) !== (d >= 0) && t.split(c >= 0 ? ',' : '.').length === 2) {
+    const sole = c >= 0 ? ',' : '.';
+    mark = sole === dec ? sole : t.length - Math.max(c, d) - 1 === 3 ? dec : sole === ',' ? '.' : ',';
+  }
+  t = t.split(mark === ',' ? '.' : ',').join('').replace(mark, '.');
   return /^[-+]?\d*\.?\d+(e[-+]?\d+)?$/i.test(t) ? Number(t) : null;
 };
-const isDate = (v) => /^\d{4}-\d{2}(-\d{2})?$|^\d{1,2}\/\d{1,2}\/\d{2,4}$|^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?( \d{2,4})?$|^(q[1-4]|h[12])( \d{4})?$|^(19|20)\d{2}$/i.test(String(v || '').trim());
+// Dates as written in the person's language: month names in it and in English (with or without a day and a year, the
+// day before or after), numbers in any order with / . or -, quarters and years.
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const flat = (x) => String(x).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\.$/, '').trim();
+const monthNames = new Set();
+for (const l of new Set([lang, 'en']))
+  for (let k = 0; k < 12; k++)
+    for (const o of [{ month: 'long' }, { month: 'short' }, { day: 'numeric', month: 'long' }, { day: 'numeric', month: 'short' }])
+      for (const p of new Intl.DateTimeFormat(l, { ...o, timeZone: 'UTC' }).formatToParts(new Date(Date.UTC(2024, k, 15)))) if (p.type === 'month') monthNames.add(flat(p.value));
+const named = new RegExp('^(?:\\d{1,2}[ .-]?)?(?:' + [...monthNames].filter(Boolean).map((n) => n.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')).join('|') + ')\\.?(?:[ ,.-]+\\d{1,4})?(?:[ ,.-]+\\d{2,4})?$');
+const isDate = (v) => {
+  const t = String(v || '').trim();
+  return /^\d{4}-\d{2}(-\d{2})?$|^\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}$|^\d{4}\/\d{1,2}$|^\d{4}年\d{1,2}月(\d{1,2}日)?$|^(q[1-4]|h[12])( \d{4})?$|^(19|20)\d{2}$/i.test(t) || named.test(flat(t));
+};
 const head = table[0].every((c) => asNum(c) === null) ? table[0] : table[0].map((_c, i) => 'Column ' + (i + 1));
 const body = (table[0] === head ? table.slice(1) : table).slice(0, 2000);
 const names = Array.from({ length: width }, (_v, i) => String(head[i] || 'Column ' + (i + 1)).trim() || 'Column ' + (i + 1));
+const decs = [];
 const columns = names.map((name, i) => {
   const vals = body.map((r) => r[i]).filter((v) => v !== undefined && String(v).trim() !== '');
-  const nums = vals.map(asNum).filter((n) => n !== null);
+  const dec = decimalOf(vals);
+  decs[i] = dec;
+  const nums = vals.map((v) => asNum(v, dec)).filter((n) => n !== null);
   const kind = vals.length && vals.every(isDate) ? 'date' : nums.length >= vals.length * 0.8 && nums.length ? 'number' : 'text';
   const sum = nums.reduce((a, b) => a + b, 0);
   return { name, kind, filled: vals.length, distinct: new Set(vals).size, min: kind === 'number' ? Math.min(...nums) : null, max: kind === 'number' ? Math.max(...nums) : null, mean: kind === 'number' ? Math.round((sum / nums.length) * 100) / 100 : null, total: kind === 'number' ? Math.round(sum * 100) / 100 : null };
 });
-const records = body.map((r) => Object.fromEntries(names.map((n, i) => [n, columns[i].kind === 'number' ? asNum(r[i]) : String(r[i] === undefined ? '' : r[i]).trim()])));
+const records = body.map((r) => Object.fromEntries(names.map((n, i) => [n, columns[i].kind === 'number' ? asNum(r[i], decs[i]) : String(r[i] === undefined ? '' : r[i]).trim()])));
 const preview = ['| ' + names.join(' | ') + ' |', '|' + ' --- |'.repeat(names.length), ...body.slice(0, 25).map((r) => '| ' + names.map((_n, i) => String(r[i] === undefined ? '' : r[i]).replace(/\|/g, '/')).join(' | ') + ' |')].join('\n');
 return { columns, records, preview, rows: body.length };`,
           outputs: [
@@ -3149,7 +3232,7 @@ Its columns (kind, how many filled, smallest, largest, average, total):
 Its first rows (of {{parse.rows}}):
 {{parse.preview}}
 
-- charts: each its kind (line for change over time, bar to compare, pie for shares of a whole with few parts, scatter for two measures), a title, the column for the x axis (or a pie's labels), the column of numbers (y), a column to split it into series when that helps (else empty), and how to add up rows that share an x (sum, average or none).
+- charts: each its kind (exactly one of the words line, bar, pie or scatter: line for change over time, bar to compare, pie for shares of a whole with few parts, scatter for two measures), a title, the column for the x axis (or a pie's labels), the column of numbers (y), each column named exactly as in the list above, a column to split it into series when that helps (else empty), and how to add up rows that share an x (exactly one of the words sum, average or none).
 - summary: what the data shows, in two or three sentences.
 - findings: three to five findings, with the numbers: totals, the biggest and smallest, trends, anything that stands out.`,
           outputs: [
@@ -3353,9 +3436,10 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
     description: 'What is around any place, on a map: the kinds of place you name (dog parks, cafés, playgrounds…) from OpenStreetMap, and sights, museums, parks and landmarks from Wikipedia and Wikidata, with pictures and a line on each, the best for you picked out and put in walking order.',
     fields: [
       { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Alfama, Lisbon, or the Colosseum' },
-      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, views, or kinds of place on OpenStreetMap: dog parks, cafés, playgrounds' },
-      { id: 'radius', label: 'How far around', type: 'choice', options: ['A short walk (1 km)', 'Nearby (3 km)', 'The wider area (10 km)'], default: 'Nearby (3 km)' },
+      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, views, or kinds of place on OpenStreetMap: dog parks, cafés, playgrounds', remember: true },
+      { id: 'radius', label: 'How far around', type: 'choice', options: ['A short walk (1 km)', 'Nearby (3 km)', 'The wider area (10 km)'], default: 'Nearby (3 km)', remember: true },
     ],
+    language: 'person',
     prompt: '',
     flow: {
       steps: [
@@ -3373,7 +3457,7 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
 // little-known hit (a name a building site somewhere shares) gives way to Open-Meteo's towns.
 let p = null;
 try {
-  const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(String(input.place || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look it up on OpenStreetMap' });
+  const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=' + encodeURIComponent((ctx.locale && ctx.locale.lang) || 'en') + '&q=' + encodeURIComponent(String(input.place || '')), headers: { 'User-Agent': '${UA}' } }, { title: 'Look it up on OpenStreetMap' });
   const hit = (bodyOf(r) || [])[0];
   if (hit && isFinite(Number(hit.lat)) && isFinite(Number(hit.lon)) && Number(hit.importance) >= 0.4) {
     const parts = String(hit.display_name || '').split(', ');
@@ -3389,10 +3473,14 @@ const m = /(\d+) km/.exec(String(input.radius || ''));
 const km = Math.min(10, m ? Number(m[1]) : 3);
 // The best known hundred first, then pictures, articles and names for those alone: quick in a big city too. A work held
 // in a collection (a painting, a statue in a museum) is marked, to leave out.
-const q = 'SELECT ?item ?itemLabel ?itemDescription ?loc ?links ?image ?article ?held WHERE { { SELECT ?item ?loc ?links WHERE { SERVICE wikibase:around { ?item wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(' + p.lng + ' ' + p.lat + ')"^^geo:wktLiteral . bd:serviceParam wikibase:radius "' + km + '" . } ?item wikibase:sitelinks ?links . FILTER(?links >= 2) } ORDER BY DESC(?links) LIMIT 100 } OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> } BIND(EXISTS { ?item wdt:P195 [] } AS ?held) SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul" . } } ORDER BY DESC(?links)';
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
+const local = lang !== 'en';
+const q = 'SELECT ?item ?itemLabel ?itemDescription ' + (local ? '?descEn ' : '') + '?loc ?links ?image ?article ?held WHERE { { SELECT ?item ?loc ?links WHERE { SERVICE wikibase:around { ?item wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(' + p.lng + ' ' + p.lat + ')"^^geo:wktLiteral . bd:serviceParam wikibase:radius "' + km + '" . } ?item wikibase:sitelinks ?links . FILTER(?links >= 2) } ORDER BY DESC(?links) LIMIT 100 } OPTIONAL { ?item wdt:P18 ?image } ' + (local ? 'OPTIONAL { ?articleLocal schema:about ?item ; schema:isPartOf <https://' + lang + '.wikipedia.org/> } OPTIONAL { ?articleEn schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> } BIND(COALESCE(?articleLocal, ?articleEn) AS ?article) OPTIONAL { ?item schema:description ?descEn . FILTER(LANG(?descEn) = "en") } ' : 'OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> } ') + 'BIND(EXISTS { ?item wdt:P195 [] } AS ?held) SERVICE wikibase:label { bd:serviceParam wikibase:language "' + (local ? lang + ',en,mul' : 'en,mul') + '" . } } ORDER BY DESC(?links)';
 const wikidata = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q);
-const url = 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggslimit=200&ggsradius=' + km * 1000 + '&ggscoord=' + p.lat + '|' + p.lng + '&prop=coordinates|pageimages|description|info&colimit=max&coprop=type&pilimit=max&piprop=thumbnail&pithumbsize=500&inprop=url';
-return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, km, at: p.lat + ',' + p.lng, wikidata, url };`,
+// The articles around it: at the person's Wikipedia, with each one's Wikidata number (to read its English description,
+// which the program sorts by); the English one when that has none (url_en).
+const around = (l) => 'https://' + l + '.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggslimit=200&ggsradius=' + km * 1000 + '&ggscoord=' + p.lat + '|' + p.lng + '&prop=coordinates|pageimages|description|info|pageprops&ppprop=wikibase_item&colimit=max&coprop=type&pilimit=max&piprop=thumbnail&pithumbsize=500&inprop=url';
+return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, km, at: p.lat + ',' + p.lng, wikidata, url: around(lang), url_en: local ? around('en') : '' };`,
           outputs: [
             { id: 'label', label: 'Place', type: 'text' },
             { id: 'name', label: 'Its name', type: 'text' },
@@ -3402,6 +3490,7 @@ return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, km, at: p.lat + '
             { id: 'at', label: 'Where on a map', type: 'text' },
             { id: 'wikidata', label: 'What is best known around it', type: 'url' },
             { id: 'url', label: 'What is around it', type: 'url' },
+            { id: 'url_en', label: 'What is around it, at the English Wikipedia', type: 'text', description: 'Empty when the person reads English' },
           ],
           failed: 'agent',
         },
@@ -3507,7 +3596,7 @@ return { found };`,
           title: 'Sort what is there',
           do: 'code',
           language: 'javascript',
-          with: { famous: '{{famous}}', found: '{{nearby}}', osm: '{{osm.found}}', name: '{{spot.name}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
+          with: { famous: '{{famous}}', found: '{{nearby}}', found_en: '{{spot.url_en}}', osm: '{{osm.found}}', name: '{{spot.name}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
           code:
             BODY +
             LIST +
@@ -3515,7 +3604,9 @@ return { found };`,
 // the best known: Wikidata's, by how many Wikipedias write about each, and Wikipedia's articles there, by how much each
 // says (either alone when the other did not answer). What is no place to go (the place
 // itself and other towns and areas, events, states, institutions, languages) is left out; schools, firms, stations,
-// roads and a World Heritage listing of many sites go lower.
+// roads and a World Heritage listing of many sites go lower. In the person's language the places come with their names
+// and descriptions in it, but what is a place and what is not is read from the English description (Wikidata's own).
+const lang = (ctx.locale && ctx.locale.lang) || 'en';
 const lat0 = Number(input.lat);
 const lng0 = Number(input.lng);
 const away = (lat, lng) => Math.round(Math.hypot((lat - lat0) * 111.2, (lng - lng0) * 111.2 * Math.cos((lat0 * Math.PI) / 180)) * 10) / 10;
@@ -3531,7 +3622,7 @@ const AREA = /^(?:\S+\s+){0,2}(?:city|town|village|hamlet|suburb|municipality|mu
 const EVENT = /\b(?:siege|battle|massacre|conflagration|festival|exhibition|conference|congress|summit|earthquake|riot|treaty|agreement|election|referendum|uprising|revolt|revolution|pogrom|bombing|terrorist|attacks?|incident|accident|disaster|olympi\w*|championships?|tournament|crusader|empire|kingdom|dynasty|principality|regime|republic|legislature|parliament|agency|government|ministry|council|political party|intergovernmental|meeting|scandal|affair|stock exchange|(?:rapid )?(?:transit|transport) system|metro system|tram system|bus network|administrative (?:districts?|divisions?|units?|regions?)|language|dialect|ethnic group|diocese|archdiocese|vicariate|eparchy|bishopric|military unit|regiment)\b/i;
 // A work of art kept in a museum (a painting, a sculpture) is seen in that museum, not where it was found.
 const ART = /\b(?:sculpture|painting|fresco|statue|artwork|manuscript|tapestry)\b.*\b(?:in|at) the\b.*\b(?:museums?|museo|mus[ée]e|galleries|gallery|collection|vatican|louvre)\b/i;
-const GROUP = (r) => /world heritage/i.test(r.about) && /\b(?:monuments|sites|churches|buildings|works|ensembles?)\b/i.test(r.name);
+const GROUP = (r) => /world heritage/i.test(r.aboutEn) && /\b(?:monuments|sites|churches|buildings|works|ensembles?)\b/i.test(r.name);
 // An event's description starts with its year ("2019 church fire", "1894–1906 political scandal").
 const DATED = /^\d{3,4}(?:[–-]\d{2,4})?\b(?!s)/;
 const TOPIC = /^(?:siege|battle|kingdom|empire|treaty|massacre|great fire|history|list|timeline|demographics|economy|culture|politics|geography|transport|education|religion)\b/i;
@@ -3545,6 +3636,7 @@ const titleOf = (u) => {
 };
 const own = String(input.name || '').trim();
 const plain = (s) => (own ? String(s).replace(new RegExp('(?:, ' + own.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '| \\(' + own.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '\\))$', 'i'), '') : String(s));
+const hostOf = (u) => (/^https?:\/\/([^/]+)\//.exec(String(u || '')) || [])[1] || '';
 const all = new Map();
 const add = (key, row) => {
   const had = all.get(key);
@@ -3558,17 +3650,34 @@ for (const b of ((bodyOf(input.famous) || {}).results || {}).bindings || []) {
   const name = v('itemLabel');
   if (!at || !name || /^Q\d+$/.test(name) || v('held') === 'true') continue;
   const links = Number(v('links')) || 0;
-  add(titleOf(v('article')) || v('item'), { qid: v('item').split('/').pop(), name: plain(name), about: v('itemDescription'), lat: Number(at[2]), lng: Number(at[1]), fame: links, langs: links, picture: v('image') ? v('image').replace(/^http:/, 'https:') + '?width=330' : null, link: v('article') || v('item').replace(/^http:/, 'https:') });
+  add(titleOf(v('article')) || v('item'), { qid: v('item').split('/').pop(), name: plain(name), about: v('itemDescription'), aboutEn: v('descEn') || v('itemDescription'), lat: Number(at[2]), lng: Number(at[1]), fame: links, langs: links, picture: v('image') ? v('image').replace(/^http:/, 'https:') + '?width=330' : null, link: v('article') || v('item').replace(/^http:/, 'https:') });
 }
-for (const p of ((bodyOf(input.found) || {}).query || {}).pages || []) {
+let pages = ((bodyOf(input.found) || {}).query || {}).pages || [];
+let edition = lang;
+// The person's Wikipedia has nothing around it (a small one): the English one's articles.
+if (!pages.length && lang !== 'en' && input.found_en) {
+  try {
+    pages = ((bodyOf(await ctx.tool('http_request', { url: input.found_en, headers: { 'User-Agent': '${UA}' } }, { title: 'Try the English Wikipedia' })) || {}).query || {}).pages || [];
+    edition = 'en';
+  } catch (e) {}
+}
+// English descriptions for articles that came without one (Wikidata has the same description in each language).
+const english = {};
+const wanted = edition === 'en' ? [] : [...new Set(pages.map((p) => p.pageprops && p.pageprops.wikibase_item).filter(Boolean))];
+for (let i = 0; i < wanted.length && i < 200; i += 50)
+  try {
+    const d = bodyOf(await ctx.tool('http_request', { url: 'https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=descriptions&languages=en&ids=' + wanted.slice(i, i + 50).join('|'), headers: { 'User-Agent': '${UA}' } }, { title: 'Read their English descriptions' })) || {};
+    for (const [id, e] of Object.entries(d.entities || {})) if (e && e.descriptions && e.descriptions.en) english[id] = String(e.descriptions.en.value || '');
+  } catch (e) {}
+for (const p of pages) {
   const c = p.coordinates && p.coordinates[0];
   if (!c || /^(?:event|country|adm)/.test(String(c.type || ''))) continue;
-  add(p.title, { name: plain(p.title), about: String(p.description || ''), lat: c.lat, lng: c.lon, fame: Math.min(40, (Number(p.length) || 0) / 2500), langs: null, picture: p.thumbnail ? p.thumbnail.source : null, link: p.fullurl || null });
+  add(p.title, { name: plain(p.title), about: String(p.description || ''), aboutEn: edition === 'en' ? String(p.description || '') : english[p.pageprops && p.pageprops.wikibase_item] || String(p.description || ''), lat: c.lat, lng: c.lon, fame: Math.min(40, (Number(p.length) || 0) / 2500), langs: null, picture: p.thumbnail ? p.thumbnail.source : null, link: p.fullurl || null });
 }
 const wiki = [...all.values()]
-  .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && !AREA.test(r.about) && !EVENT.test(r.about) && !DATED.test(r.about) && !ART.test(r.about) && !TOPIC.test(r.name))
+  .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && !AREA.test(r.aboutEn) && !EVENT.test(r.aboutEn) && !DATED.test(r.aboutEn) && !ART.test(r.aboutEn) && !TOPIC.test(r.name))
   .map((r) => {
-    const text = r.name + ' ' + r.about;
+    const text = r.name + ' ' + r.aboutEn;
     const kind = (KINDS.find(([, re]) => re.test(text)) || ['Other'])[0];
     return { qid: r.qid || '', name: r.name, kind, about: r.about, km: away(r.lat, r.lng), lat: r.lat, lng: r.lng, picture: r.picture, link: r.link, langs: r.langs, fame: r.fame * (LESS.test(text) || GROUP(r) ? 0.3 : 1) };
   })
@@ -3620,16 +3729,18 @@ asked.sort((a, b) => a.km - b.km);
 const places = asked.slice(0, 20).concat(wiki.map((r) => ({ ...r, asked: false }))).slice(0, 40);
 if (!places.length) throw new Error('Nothing around it is on Wikipedia, Wikidata or OpenStreetMap: try a larger area, or a nearby town');
 // Pictures for those without one, from their Wikipedia articles (all at once).
-const need = places.filter((r) => !r.picture && /en\.wikipedia\.org\/wiki\//.test(String(r.link || '')));
-if (need.length)
+const need = places.filter((r) => !r.picture && /^[a-z-]{2,8}\.wikipedia\.org$/.test(hostOf(r.link)) && /\/wiki\//.test(String(r.link || '')));
+for (const host of [...new Set(need.map((x) => hostOf(x.link)))]) {
+  const group = need.filter((x) => hostOf(x.link) === host);
   try {
-    const r = await ctx.tool('http_request', { url: 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=pageimages&piprop=thumbnail&pithumbsize=500&pilimit=max&titles=' + encodeURIComponent(need.map((x) => titleOf(x.link)).join('|')), headers: { 'User-Agent': '${UA}' } }, { title: 'Find their pictures' });
+    const r = await ctx.tool('http_request', { url: 'https://' + host + '/w/api.php?action=query&format=json&formatversion=2&prop=pageimages&piprop=thumbnail&pithumbsize=500&pilimit=max&titles=' + encodeURIComponent(group.map((x) => titleOf(x.link)).join('|')), headers: { 'User-Agent': '${UA}' } }, { title: 'Find their pictures' });
     const got = {};
     for (const pg of ((bodyOf(r) || {}).query || {}).pages || []) if (pg.thumbnail) got[pg.title] = pg.thumbnail.source;
-    for (const x of need) x.picture = got[titleOf(x.link)] || null;
+    for (const x of group) x.picture = got[titleOf(x.link)] || null;
   } catch (e) {}
+}
 return {
-  places: places.map(({ fame, langs, asked, qid, ...p }) => p),
+  places: places.map(({ fame, langs, asked, qid, aboutEn, ...p }) => p),
   list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kind + (p.about ? ', ' + p.about : '') + '; ' + p.km + ' km from the centre' + (p.asked ? '; what they asked for' : '') + (p.langs ? '; in ' + p.langs + ' Wikipedias' : '') + ')').join('\n'),
 };`,
           outputs: [

@@ -1047,9 +1047,9 @@ const SAVINGS: AppUi = {
       description: 'The goal, and what it takes each month',
       html: String.raw`<header class="hero">
   <p class="kicker">Savings plan{{#inputs.goal}} · {{inputs.goal}}{{/inputs.goal}}</p>
-  <h1>{{inputs.currency}}{{inputs.target|number}} by {{inputs.by|longdate}}</h1>
+  <h1>{{result.target_text}} by {{inputs.by|longdate}}</h1>
   <div class="stats">
-    <div class="stat"><b>{{inputs.currency}}{{result.needed|number}}</b><span>it takes a month</span></div>
+    <div class="stat"><b>{{result.needed_text}}</b><span>it takes a month</span></div>
     <div class="stat"><b>{{result.months}}</b><span>months to go</span></div>
     <div class="stat"><b>{{result.reach|or:—}}</b><span>goal reached</span></div>
   </div>
@@ -1060,7 +1060,7 @@ const SAVINGS: AppUi = {
     },
     'sv-case': {
       description: 'Saving more or less: what it puts aside, and when it gets there',
-      html: String.raw`<div class="c"><span class="tag">{{plan}}</span><h3>{{inputs.currency}}{{monthly|number}} a month</h3><p class="muted">{{#reach}}Goal reached {{reach}}{{/reach}}{{^reach}}Does not get there{{/reach}}</p></div>`,
+      html: String.raw`<div class="c"><span class="tag">{{plan}}</span><h3>{{monthly_text}} a month</h3><p class="muted">{{#reach}}Goal reached {{reach}}{{/reach}}{{^reach}}Does not get there{{/reach}}</p></div>`,
       css: CARD,
     },
     'sv-mile': {
