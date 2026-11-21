@@ -275,13 +275,26 @@ Ready-made apps have no Runs tab: find their runs under **Latest runs** on the A
 There are four ways to start:
 
 - **From scratch**: **New app** → **Start from scratch** on the Apps page, the **Make an app** tile under your own apps, or go to [/apps/new](/apps/new).
-- **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** and press **Make it**. A session starts as the **App builder** ([Agents](/guide/agents)), which makes the app, tries it and hands it over.
+- **By describing it**: on the Apps page (or the New app page), write what it should do under **Describe an app, and an agent makes it** (a box of two lines that grows as you write; Enter makes it, Shift+Enter starts a new line) and press **Make it**. A session starts at once as the **App builder** ([Agents](/guide/agents)) and opens, with your words as its first message, on the program and permissions you picked last; the App builder thinks with **Best** (see [Tiers](/settings?s=models&find=Tiers)). **No app does that yet**, when a search on the Apps page finds nothing, starts one the same way with what you searched for. **New app** → **Describe it to an agent** opens the start page with the App builder picked, for you to write the message there. Before it makes anything, the App builder reads the ready-made apps closest to yours and shows a sketch of the app (see [The sketch](#the-sketch)); once you say to build it, it makes the app, tries it and hands it over.
 - **From a ready-made app**: open it and press **Make it mine** (on a phone, **Edit**).
 - **From a session that went well**: in the session's menu (⋯), choose **More** → **Save as an app**. The page says "Drafting an app from the session…" while the helper model turns the session's first request into a form, a task and answer fields, from what you asked and what the agent replied. The parts that would change from one use to the next become questions. The draft keeps the session's program, model, effort, mode and agent. When the agent called tools a step can call by itself (it read a page, searched the web), the draft has steps too: those calls as tool steps, with the form's answers where they go, then a model or agent step for the rest. Steps that do not check out are left out, and the task for one agent stays; check the steps and try it before you save it. If the helper model can't draft it, you get the request as it was, in one **Request** question, with a note saying why; the helper model is set in [Settings → Agents → Models](/settings?s=models&find=Helper%20model).
 
 You can also ask an agent in any session to make an app for you (see [Ask an agent](#ask-an-agent)). Agents that build apps have them think with a tier, the lowest that does the job well: **Quick** for short, clear jobs (a summary, formatting, a look-up), **Standard** for most, **Best** for research and hard reasoning, and **Max** rarely; you can change it under **Who does it** (see [Who does it](#who-does-it)).
 
 The builder opens under the title **New app**: its icon, name and description on top (click the name or the description to change it), then its parts as tabs, **What it does** first, then **Form**, **Answer**, **Design**, **Examples** and **Settings** (who does it, its tools, its limits, what it keeps, whether it is a block, and, once saved, its folder and versions, each folded to a line that says how it is set until you open it). Every tab is as wide as the others; on a computer the tabs stay at the top as you scroll, and on a phone they show in two rows. On a wide screen, **Form** and **Answer** have a **Preview** beside them that changes as you type: the form as the app's page asks it, and a made-up answer as a run shows it. Fill them in, try it with **Test run**, then press **Create**. The app's page opens, ready to run.
+
+### The sketch
+
+A new app's first answer from the App builder is a card in the conversation, a sketch of the app before anything is made:
+
+- its icon, name and description, marked "A sketch: nothing is made yet";
+- **What it asks**: its form, as the app's page will ask it;
+- **What it does**: its steps in order, in words, each with its kind's icon (**Use a tool**, **Ask a model**, **Ask an agent**…), and a line such as "A run takes about 1–3 min and costs about $0.10–0.40", a rough guess from those steps (see [What a run costs](#what-a-run-costs));
+- **What you get**: a made-up answer in the view it will have, or as the plain card;
+- **Keys it needs**, when it calls a service that needs one: you give them before its first run;
+- **What it assumed**, a line each, and at most three questions whose answers change the design, each with its likely answers to click.
+
+**Build it** sends "Build it." and the answers you clicked as your message, and the App builder builds it; what you leave unclicked stays as it assumed. **Change it…** puts the cursor in the message box, to say what to change: it sketches it again. Once you answered, the card stays in the conversation without its buttons. When you ask it to change an app you have, or to just build it, it builds without a sketch.
 
 ### Name, description and icon
 
@@ -307,13 +320,13 @@ A question's **⋯** menu has **Move up**, **Move down** and **Remove**. Under e
 
 What the agent is asked to do, with the answers put in (up to 30,000 characters; needed). Write it as you would ask the agent yourself, and say how to work, not only what to make.
 
-- **What it does** shows the app's work as **One task** (this box), a **List** of steps or a **Graph** of them; see [Apps with steps](#apps-with-steps).
+- **What it does** shows the app's work as **One task** (this box), a **List** of steps or a **Graph** of them; see [Apps with steps](#apps-with-steps). A quiet line says what a run takes and costs, roughly (see [What a run costs](#what-a-run-costs)).
 - The **Insert** chips put a question's placeholder where the cursor is. Questions the task doesn't use yet are highlighted. **today**, **now** and **weekday** put in the date, the date and time, and the day of the week where you are.
 - `{{question}}` is replaced by its answer.
 - Text between `{{#question}}` and `{{/question}}` stays only when the question was answered (and not with No). Text between `{{^question}}` and `{{/question}}` stays only when it was left empty.
-- **Preview**, at the end of the row of **Insert** chips, shows the task with each question's default, or its name in brackets, filled in. **Edit** goes back.
+- **Preview**, at the end of the row of **Insert** chips, shows the task with each question's default, or its name in brackets, filled in, and **today**, **now** and **weekday** as they are now. **Edit** goes back.
 
-Warnings under the box tell you when a placeholder names no question (it stays as written) and when a needed question is never used in the task.
+Warnings under the box tell you when a placeholder names no question (it stays as written; the built-in values `{{today}}`, `{{now}}`, `{{weekday}}` and `{{timezone}}` fill themselves in) and when a needed question is never used in the task.
 
 ### The answer
 
@@ -466,6 +479,8 @@ An app can run by itself: at a time of day, every so often, once, when another s
 
 Each run's cost shows on its page once it ends, and in the **Runs** list. It is the figure the agent reports, or its use priced at API rates (for Custom, estimated from what it read and wrote); models running on this computer cost $0.
 
+Before an app has run, its **What it does** (and the App builder's sketch) says what a run should take and cost, roughly, from its steps: a tool, code, a worked-out value or what it keeps take a second or three and cost nothing; a quick question to a model a few seconds and next to nothing; an agent by its tier (**Quick** about 30 seconds to a minute and cents, **Standard** about 1–3 minutes and $0.10–0.40, **Best** about 3–6 minutes and $0.50–2); a **Repeat** goes round its most rounds (5 unless set), a few at a time; steps side by side take as long as the longest and cost all together. A step that asks you waits for your answer as well. Once the app has finished runs, the line gives the middle of those (up to its last 30) instead; point at it to see which it is.
+
 Before you run a CSV, Hydor estimates the whole batch: "About $… for … rows", from the middle cost of the app's last finished runs (up to 30). With a cap per run, it adds the most the rows could spend. When the app has never finished a run, it says "Run the app once to see what a run costs."
 
 To keep costs in hand, set **Most one run may spend (US$)** and **Runs a day (from anywhere)** under the app's **Limits**, and, for a public page, its daily budget. See [Usage, limits and costs](/guide/usage) for what all sessions spend.
@@ -482,7 +497,7 @@ You can build in the graph too (on a computer; a phone keeps the list). It shows
 
 **Collapse to a block**, among the graph's buttons when steps are picked (Shift-click several that follow one another), makes them an app of their own, a block, which a **Call an app** step runs in their place: what they used from outside (the form's answers, the values of the steps before them) becomes its form, which the call gives, and what the steps after them used of theirs becomes its answer. Other apps can call the block too, and a change to it is a change for all of them. Steps that keep data stay in the app, since a block keeps data of its own, and lists and tables reach a block as text.
 
-Or ask an agent: "Make an app that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them, and you can change them in **Edit** after. Agents have tools of their own for this, in any session: they read your apps, save one (checked first, its mistakes said in words; a whole app, a few parts of it, or one step), try its examples and wait for how they went, give it a screen, and read the records it keeps or add some (changing or removing them is up to you, on its screen, or asked of you first); before handing an app over, they say what a run costs.
+Or ask an agent: "Make an app that reads each link I give it, sums it up with a quick model, and keeps it in a reading list." The agent writes the steps, checks them and tries them, and you can change them in **Edit** after. Agents have tools of their own for this, in any session: they read your apps and the ready-made ones (the closest to what they build, to build the way they do), show you a sketch before they make a new one (see [The sketch](#the-sketch)), save one (checked first, its mistakes said in words; a whole app, a few parts of it, or one step), try its examples and wait for how they went, look at pictures of its view (see [Design how it looks](#design-how-it-looks)), give it a screen, read the records it keeps or add some (changing or removing them is up to you, on its screen, or asked of you first), and look up the free data services the ready-made apps use (forecasts, places, encyclopedia pages, exchange rates) rather than call an address from memory; before handing an app over, they say what a run costs.
 
 In the conversation, each app the agent saves shows as a card, and on a wide screen the app opens beside the conversation as it is built (**Open beside** on the card opens it again, **Open its page** its own page). What you change and save there reaches the agent with your next message, so it builds on your version: an agent that saves after you changed it reads your version first. When the agent saves while you have changes of your own on screen, a note offers **Load it** or **Keep mine**. In the steps' **⋯** menu there, **Ask the agent about it** starts a message about that step in the conversation's message box.
 
@@ -508,7 +523,7 @@ Once a run with steps has ended, each of its steps has **Run again from here** (
 
 ### Firm it up
 
-Over the steps in **Edit**, an app's latest runs tell you two things. A step that failed and had an agent do its work says in how many runs that happened, and why it failed the last time; **Ask an agent to fix it** asks the agent beside it (when the app is open beside a conversation) or starts a session with the **App builder**. An agent step that did the same in each of its last runs (it read the page it was given, then answered, say) offers **Firm it up**: fixed steps that could do it for less, a tool step for each call the agent made, with the values it made them with, then a model step with its instructions and what the tools gave. **Try them on its examples** (or **Try them**, with the answers of those runs, when it has no examples) runs them first and shows what a run takes and costs with its agent and with the steps; **Use these steps** puts them in its place on screen, and **Save** keeps them. The tool steps it makes have an agent do their work if they fail, so a run that worked before still works.
+Over the steps in **Edit**, an app's latest runs tell you two things. A step that failed and had an agent do its work says in how many runs that happened, and why it failed the last time; **Ask an agent to fix it** asks the agent beside it (when the app is open beside a conversation) or starts a session with the **App builder** at once. An agent step that did the same in each of its last runs (it read the page it was given, then answered, say) offers **Firm it up**: fixed steps that could do it for less, a tool step for each call the agent made, with the values it made them with, then a model step with its instructions and what the tools gave. **Try them on its examples** (or **Try them**, with the answers of those runs, when it has no examples) runs them first and shows what a run takes and costs with its agent and with the steps; **Use these steps** puts them in its place on screen, and **Save** keeps them. The tool steps it makes have an agent do their work if they fail, so a run that worked before still works.
 
 Agents that build an app see the same, with the steps to try.
 
@@ -536,7 +551,7 @@ An app's view is how its answer looks: pages (tabs, and pages a click opens), el
 
 In an app's **Edit**, the **Design** tab shows its view with its latest run's answer; **Made-up answer** shows one in its shape instead, and what to fix in it is listed under it. In the preview, a click goes to pages and ticks things off; what reaches the app (asking its agent, running it again) works on a run's page.
 
-- **Ask an agent to design it** (once the app is saved): a session starts as the **App builder** with a message about it, or, with the app open beside a conversation, the message goes to that agent. It writes the view, tries it with a run and fixes what does not fit.
+- **Ask an agent to design it** (once the app is saved): a session starts at once as the **App builder** with a message about it, or, with the app open beside a conversation, the message goes to that agent. It writes the view, tries it with a run, looks at pictures of that run's answer in it (on a computer in the dark and in the light, and on a phone in the dark, drawn by the Chromium Hydor takes pictures with: [Settings → Capabilities → Browser](/settings?s=browser) can download one) and fixes what does not fit or reads badly.
 - **Start from its answer**: a page with a block for each answer field, to change from there.
 - **Ask an agent to change it**: as above, for a view it has.
 - **Change it as code**: the view as JSON, its pages, elements (HTML with values such as `{{result.days}}`, and CSS) and events, as the guide's API topic describes them ([Apps: views](/guide/api#apps-views)); the preview follows what you type.
@@ -584,6 +599,7 @@ A ready-made app's file says which app it is: where you uninstalled that app, in
 Agents in Hydor can make and run apps for you through its API, with your OK on a card. For example:
 
 - "Make an app called Weekly report that asks for a project and a date range, and answers with a summary and a table of what changed."
+- "Make me an app that tells me the best beach days this week near a town I name." (the App builder shows a sketch first, and builds it when you say so)
 - "Turn this session into an app I can run again."
 - "Pin the Trip planner and my Weekly report to the top of the Apps page, the report first."
 - "Which apps did I use lately, and how did their last runs go?"
