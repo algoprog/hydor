@@ -30,6 +30,8 @@ export function failureOf(e: unknown): ToolFailure | undefined {
   if (SLOW.has(code)) return { kind: 'timeout' };
   if (DROPPED.has(code)) return { kind: 'dropped' };
   if (UNREACHABLE.has(code)) return { kind: 'unreachable' };
+  // The name is not known at all: not a failure that passes.
+  if (code === 'ENOTFOUND') return { kind: 'nohost' };
   return undefined;
 }
 

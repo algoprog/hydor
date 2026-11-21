@@ -43,7 +43,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { goalHead, goalMessageOf, holding, type GoalAction, type GoalState } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, holding, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { asked as userAsked } from '../custom/review.ts';
 import { kvSet } from '../db.ts';
@@ -55,7 +55,7 @@ import type { Deps, RunCtx, SpawnAdditions, SpawnInfo } from '../features/types.
 import { setSessionExtra } from '../sessionExtra.ts';
 import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees.ts';
 import { RESTARTED } from './brief.ts';
-import { BACKGROUND_GRACE_MS, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -957,6 +957,12 @@ test('rules for every round: a round that broke one is undone; rules and unrule'
   assert.equal(goal(U).rounds[1].why, 'It broke a rule of yours: “No new files”: It added a dependency.');
   assert.equal(goal(U).rounds[1].cause, 'rule');
   assert.ok(asked.some((a) => a.system.includes('broke a rule') && a.prompt.includes('1. No new files') && a.prompt.includes('extra.txt')));
+  // The rules' reviewer is told which round it is and what was kept before it (a rule about order, "first this, that only
+  // later", cannot be judged from one round's change: on a real goal a later round doing the later part was undone for it),
+  // gets the change with its files named first, and is the stronger reviewer.
+  const ruleAsk = asked.find((a) => a.system.includes('broke a rule'))!;
+  assert.match(ruleAsk.prompt, /<round>\nThis is round 1\. No round was kept before it\.\n<\/round>\n\n<change>\nEvery file that changed \(/);
+  assert.equal(ruleAsk.strong, true);
   assert.match(last(U), /From the user \(follow these first\):\n- No new files/);
   reviewer.broke = false;
   await act(U, { action: 'unrule', id });
@@ -1529,7 +1535,15 @@ test('I4: the person’s say is refused (409, saying why) unless this session is
   await act(S2, { action: 'pause' });
   // While paused, the agent changed something in a turn of its own, or the person by hand: edits made outside the goal.
   await turn(S2, () => write(w.path, 'notes.txt', 'by the agent\n'));
-  await rejects(act(S2, { action: 'round', n: 2, do: 'keep' }), 409, new RegExp(`^This file changed outside the goal since it last left the files: notes\\.txt\\. To put your change aside in a stash, run this in ${w.path} \\(the worktree’s top folder: the paths are relative to it\\): git stash push --include-untracked -- notes\\.txt\\. Then try again\\.$`));
+  // The goal was paused while round 3 ran: the sentence says so (that round's unchecked work, most likely), names Resume first, and gives the same commands.
+  assert.equal(goal(S2).round, 3);
+  await rejects(
+    act(S2, { action: 'round', n: 2, do: 'keep' }),
+    409,
+    new RegExp(
+      `^Round 3 was under way when the goal was paused, and the app has not checked it yet: this file holds its work \\(or a change of your own\\): notes\\.txt\\. Resume the goal to have that round checked\\. To give your say now instead, first set that change aside in a stash: run this in ${w.path} \\(the worktree’s top folder: the paths are relative to it\\): git stash push --include-untracked -- notes\\.txt\\. Then try again\\.$`,
+    ),
+  );
   assert.equal(file(w.path, 'notes.txt'), 'by the agent\n');
   assert.equal(goal(S2).best, 1, 'nothing of the say was done');
   fs.rmSync(path.join(w.path, 'notes.txt'));
@@ -2435,6 +2449,19 @@ test('a message to the agent waits while the files are being put back', async ()
   }
   assert.equal(file(w.path, 'score.txt'), '6\n');
   await act(F13, { action: 'stop' });
+});
+
+test('a check written with its keys in another order, or only renamed, is not a changed check', () => {
+  // As the agent's proposal keeps it (its id last) and as a change keeps it (its id after its name): the same check.
+  const proposed = { kind: 'measure', label: 'Score', timeoutS: 30, run: 'npm run eval', target: { op: '>=', value: 1 }, read: 'score: ([0-9.]+)', id: 'c1' } as GoalCheck;
+  const sent = { kind: 'measure', label: 'Score, renamed', id: 'c1', timeoutS: 30, run: 'npm run eval', target: { value: 1, op: '>=' }, read: 'score: ([0-9.]+)' } as GoalCheck;
+  assert.deepEqual(changedChecks([proposed], [sent]), [], 'nothing to measure again: the start keeps its value');
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, run: 'npm run eval:all' }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [sent, { kind: 'command', label: 'New', run: 'true', id: 'c2' }]), ['c2'], 'a new check is measured');
+  const review = { kind: 'review', label: 'Reads well', claim: 'Every error says what to do', evidence: { diff: true, files: ['a.md', 'b.md'] }, id: 'c3' } as GoalCheck;
+  assert.deepEqual(changedChecks([review], [{ id: 'c3', evidence: { files: ['a.md', 'b.md'], diff: true }, claim: 'Every error says what to do', label: 'Reads well', kind: 'review' }]), []);
+  assert.deepEqual(changedChecks([review], [{ ...review, evidence: { diff: true, files: ['b.md', 'a.md'] } }]), ['c3'], 'the order of a list counts');
 });
 
 test('the files a round changed that git cannot list: a check that could not run, never “nothing changed”', async () => {

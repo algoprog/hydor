@@ -20,6 +20,8 @@ export interface ApiAnswer {
   steps?: { step: string; title: string; status: string; error?: string }[];
   /** What its steps could not have (a site that keeps programs out, a service limiting requests). */
   misses?: RunMiss[];
+  /** A run with steps at work: the answer fields its steps have given so far (gone once it ends, when result has them all). */
+  partial?: Record<string, unknown>;
 }
 
 export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: RunStepView[]): ApiAnswer {
@@ -33,6 +35,7 @@ export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: R
     ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
     ...(steps ? { steps: steps.filter((x) => x.kind !== 'round').map((x) => ({ step: x.path, title: x.title, status: x.status, ...(x.error ? { error: x.error } : {}) })) } : {}),
     ...(r.misses?.length ? { misses: r.misses } : {}),
+    ...(r.partial ? { partial: r.partial } : {}),
   };
 }
 

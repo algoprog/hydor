@@ -3,9 +3,10 @@
 // then keeps the reply, the result and what it spent. Public runs use Custom with no shell and no files
 // (publicRun.ts), in a fresh folder under the system's temporary folder, deleted when they end.
 // After that, follow-ups refine it: a message to the run's session (from the run's page or the session
-// itself) opens the run again until that turn ends, and the agent hands in the whole updated result.
+// itself) opens the run again until that turn ends, and the agent hands in what changed in the result.
 // An app with steps runs its flow instead (flow.ts, through useFlows): each agent step is a run of this
-// kind of its own, with the flow's run as its parent.
+// kind of its own, with the flow's run as its parent. A flow's run has no session while it works; the first
+// change asked of it once it is done starts one (askRun), and from then on it takes follow-ups as above.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -34,7 +35,8 @@ import { aboutMe, keepAnswers, runLanguage, startsFor } from './me.ts';
 import { refMedia } from './media.ts';
 import { needSecrets } from './secrets.ts';
 import { addModels, modelStates, needModels } from './models.ts';
-import { getRun, insertRun, listRuns, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
+import { getApp, getRun, insertRun, listRuns, listSteps, reuseSteps, runIdByKey, runView, updateRun, type RunRecord } from './store.ts';
+import { titleOf } from '../../shared/app-manifest.ts';
 
 /** Where an app's runs keep their files when the app names no folder: outside the app's data, which Custom treats as private. */
 export const WORK_DIR =
@@ -50,6 +52,8 @@ export interface AppMark {
   /** A public page's run: Custom without shell or files, the web only when `web`. */
   public?: boolean;
   web?: boolean;
+  /** A run with steps whose session for changes took over from an earlier one (deleted): what the earlier ones spent. */
+  spentBefore?: number;
 }
 
 export const markOf = (extra: SessionExtra | undefined): AppMark | null => {
@@ -70,12 +74,19 @@ export interface FlowRunner {
   resume(r: RunRecord): void;
   stop(id: string): void;
   progress(r: RunRecord, publicView: boolean): Promise<RunProgress>;
+  /** What its steps spent. */
+  spent(r: RunRecord): number;
+  /** Its reply as its steps gave it. */
+  reply(r: RunRecord): string | undefined;
 }
 let flows: FlowRunner | null = null;
 export const useFlows = (f: FlowRunner) => (flows = f);
 
 /** Whether a run follows a flow (rather than one agent doing the task in its prompt): its main one, or another by name. */
 export const isFlowRun = (r: Pick<RunRecord, 'recipe' | 'source' | 'flow'>) => r.source !== 'step' && (r.flow ? !!r.recipe.flows?.[r.flow] : !!r.recipe.flow?.steps.length);
+
+/** A flow at work on its steps (a flow's run with a session is at a change asked of it once it was done). */
+const stepsAtWork = (r: RunRecord) => isFlowRun(r) && !r.key;
 
 /** The agent process (its run id) behind each app run, from the moment it starts. */
 const byAgentRun = new Map<string, string>();
@@ -102,7 +113,9 @@ export const onFinished = (fn: (r: RunRecord) => void) => finishedHooks.push(fn)
 
 function changed(r: RunRecord | null) {
   if (!r) return;
-  d().broadcast({ t: 'feature', id: 'apps', data: { run: runView(r) } });
+  // Not the answer so far: it changes with each step and may be long; the run's page reads it.
+  const { partial: _p, ...run } = runView(r);
+  d().broadcast({ t: 'feature', id: 'apps', data: { run } });
 }
 
 /** A template was saved: its editor, open anywhere, takes the new version (or asks first, while it has changes of its own). */
@@ -353,9 +366,17 @@ export function fieldLine(f: AnswerField): string {
 }
 
 /** What the agent is told about the run: the answer fields to hand in, to finish without asking, and how follow-ups refine it. */
-export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'> & { data?: AppRecipe['data']; memory?: boolean }): string {
+export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appName'> & { flow?: string; data?: AppRecipe['data']; memory?: boolean }): string {
+  // A run with steps has a session only for the changes asked of it once it was done (askRun).
+  const changes = isFlowRun(r);
   const lines = [
-    r.source === 'chat'
+    changes
+      ? [
+          `This session changes the result of a finished run of the app "${r.appName}" (Hydor Apps). The app did its work in steps and put the result together; now the person asks for changes to it, a message at a time. The first message says where to find what the app does, the answers its form was given, the result as it is and what each step gave (files in your folder): read what a request needs.`,
+          'Most requests change a part of the result: another order, shorter, warmer, without something, with something added, a detail corrected. Some need a look-up with your tools. Change what is asked and leave the rest as it is.',
+          "When a request is really another question for the app (other answers to its form: another place, other dates, another topic), don't redo the run here: say so in a line, and tell the person to use Run again with those answers. Don't start runs yourself.",
+        ].join('\n')
+      : r.source === 'chat'
       ? `This session is a conversation on the screen of the app "${r.appName}" (Hydor Apps): the person talks to you there, a message at a time. Help them with what the app is for, with its records (app_data) and its flows (app_run, which runs one and waits for what it gives), and answer in a few plain sentences.`
       : r.source === 'step'
         ? `This session does one step ("${r.appName}") of an app that runs on its own (Hydor Apps): nobody watches it live, and what you hand in goes on to its next steps. Do the task in the first message from start to finish. Don't stop to ask questions: make sensible assumptions and say what they were.`
@@ -373,7 +394,15 @@ export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appNam
   // A public page's visitor sends no follow-ups.
   const later = r.source !== 'public';
   const a = r.recipe.answer;
-  if (a.length) {
+  if (a.length && changes)
+    lines.push(
+      'When you have changed the result, call the submit_result tool (on the hydor server) with the fields that changed, each one whole (a list or a table with all its items): the fields you leave out stay as they are. Its fields:',
+      ...a.map(fieldLine),
+      ...cardLines(a),
+      'If it answers with problems, fix them and call it again. Then say in a sentence or two what changed; the person sees the result as a card, so there is no need to repeat it. A message that changes nothing in it (thanks, a question about it) just gets its answer.',
+    );
+  else if (changes) lines.push("The app's answer is its reply (reply.md in your folder): for a change, reply with the whole updated answer, not only what changed.");
+  else if (a.length) {
     lines.push(
       'When you have the result, call the submit_result tool (on the hydor server) with these fields:',
       ...a.map(fieldLine),
@@ -382,7 +411,7 @@ export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appNam
     );
     if (later)
       lines.push(
-        'Later messages may ask you to change the result. For each one that changes it, do the work, call submit_result again with the whole updated result (every field, not only what changed), then say in a sentence or two what changed. A message that changes nothing in it (thanks, a question about it) just gets its answer.',
+        'Later messages may ask you to change the result. For each one that changes it, do the work, call submit_result again with the fields that changed, each one whole (the fields you leave out stay as they are), then say in a sentence or two what changed. A message that changes nothing in it (thanks, a question about it) just gets its answer.',
       );
   } else if (r.source !== 'chat') {
     lines.push('Your last reply is the result the person sees: make it complete.');
@@ -488,7 +517,7 @@ const isReminder = (text: string) => [NUDGE, RENUDGE].some((p) => text.trimStart
 
 const nudgeText = (r: Pick<RunRecord, 'recipe'>) =>
   `${NUDGE} Call submit_result now with the fields it asks for (${r.recipe.answer.map((f) => f.id).join(', ')}), from what you found. Where something could not be found, say so in that field rather than leaving it out.`;
-const renudgeText = () => `${RENUDGE} If your reply changed anything in the result, call submit_result now with the whole updated result (every field), so the person sees it. If nothing in it changed, just say so.`;
+const renudgeText = () => `${RENUDGE} If your reply changed anything in the result, call submit_result now with the fields that changed (the ones you leave out stay as they are), so the person sees it. If nothing in it changed, just say so.`;
 
 type UserItem = Extract<TimelineItem, { kind: 'user' }>;
 const SUBMIT = /^mcp__(?:hydor|naget-agent|agent-console)__submit_result$/;
@@ -633,10 +662,123 @@ export async function followUpsOf(r: RunRecord): Promise<{ asks: RunAsk[]; first
   const sent = items.filter((i): i is UserItem => i.kind === 'user');
   const landed = (i: TimelineItem) => ids.has(i.id) || (i.kind === 'user' && sent.some((u) => u.text === i.text && Math.abs((u.ts ?? 0) - (i.ts ?? 0)) < 120_000));
   const turns = turnsOf([...items, ...live.overlay.items.filter((i) => !landed(i))]);
+  // A flow's run: each turn of its session is a change asked of it (the first after what the app wrote of the run), and its own reply is its steps'.
+  const flow = isFlowRun(r);
   return {
-    first: turns[0] ? replyIn(turns[0].said) : undefined,
-    asks: turns.slice(1).map((x) => ({ id: x.ask.id, text: x.ask.text.slice(0, 20_000), at: x.ask.ts, reply: replyIn(x.said)?.slice(0, 20_000), updated: x.submitted })),
+    first: flow ? flows?.reply(r) : turns[0] ? replyIn(turns[0].said) : undefined,
+    asks: (flow ? turns : turns.slice(1)).map((x, i) => ({ id: x.ask.id, text: (flow && i === 0 ? personsPart(x.ask.text) : x.ask.text).slice(0, 20_000), at: x.ask.ts, reply: replyIn(x.said)?.slice(0, 20_000), updated: x.submitted })),
   };
+}
+
+// ---- changes asked of a run ------------------------------------------------------------------------------
+
+/** Why a run takes no follow-ups now, or nothing when it does. */
+export function whyNoAsks(r: RunRecord): string | undefined {
+  if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
+  const s = r.key ? d().sessions.summary(r.key) : null;
+  // A flow's run has a session once a change was asked of it (a new one when that one was deleted).
+  if (isFlowRun(r) && !s) {
+    if (r.flow) return 'A run of another of its flows takes no follow-ups.';
+    if (r.status === 'done') return undefined;
+    return isActive(r.status) ? 'Once it is done, you can ask for changes to its result.' : 'A run that did not finish takes no follow-ups: run it again.';
+  }
+  if (!s) return r.key ? 'Its session is gone.' : undefined;
+  if (s.external && (!s.live || s.live.status === 'exited')) return `Its session is open in ${s.external.client}: continue it there.`;
+  return undefined;
+}
+
+/** Sends a change asked of a run to its session (after the turn running now, if one is); a flow's run gets its session with the first. */
+export async function askRun(r: RunRecord, text: string) {
+  const { sessions } = d();
+  if (isFlowRun(r) && (!r.key || !sessions.summary(r.key))) return changeFlowRun(r, text);
+  if (!r.key) throw new HttpError(409, 'It has not started yet: ask once it has.');
+  await sessions.deliverOrQueue(r.key, text);
+  // Sent: its turn has begun (a queued one opens the run when it goes out).
+  if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
+}
+
+/** What a flow's run spent besides its session for changes now: its steps, and the sessions for changes before it. */
+const stepsSpent = (r: RunRecord) => (flows?.spent(r) ?? 0) + (r.key ? (markOf(sessionExtra(d().db, r.key))?.spentBefore ?? 0) : 0);
+
+/** Where the first message to a flow's session for changes says the person's own words begin (the pages show only those). */
+const ASKED = '\n\n---\nThe person asks:\n';
+const personsPart = (text: string) => (text.includes(ASKED) ? text.slice(text.indexOf(ASKED) + ASKED.length) : text);
+
+/** Runs whose session for changes is being started (a second ask waits for it). */
+const startingAsks = new Set<string>();
+
+/** The address a run's folder goes by: its app's, a ready-made app's id, or "test". */
+const slugOf = (r: RunRecord) => (r.app.startsWith('tpl:') ? r.app.slice(4) : (getApp(d().db, r.app)?.slug ?? 'test'));
+
+/**
+ * The first change asked of a finished flow's run: a session for it, as the app's own agent would run (its program, its
+ * model or tier, Standard when it names neither; its tools; the run's folder; what is left of its spending cap), which
+ * the run then follows as a one-task run's. What the app did goes in files of the folder, named in the first message.
+ */
+async function changeFlowRun(r: RunRecord, text: string) {
+  const { db, sessions } = d();
+  if (startingAsks.has(r.id)) throw new HttpError(409, 'Its agent is starting: send that again in a moment.');
+  startingAsks.add(r.id);
+  try {
+    const recipe = r.recipe;
+    const slug = slugOf(r);
+    const cwd = runFolder(r, slug);
+    if (recipe.cwd && !fs.existsSync(cwd)) throw new HttpError(409, `The app’s folder is not there: ${cwd}`);
+    // The files go where its steps worked, or beside the app's own folder (not into it).
+    const dir = recipe.cwd ? path.join(WORK_DIR, slug, `run-${r.id}`) : cwd;
+    fs.mkdirSync(path.join(dir, 'steps'), { recursive: true, mode: 0o700 });
+    const write = (name: string, v: unknown) => fs.writeFileSync(path.join(dir, name), typeof v === 'string' ? v : JSON.stringify(v, null, 2), { mode: 0o600 });
+    write('answers.json', recipe.fields.map((f) => ({ id: f.id, question: f.label, answer: r.inputs[f.id] ?? '' })));
+    if (r.result) write('result.json', r.result);
+    if (r.reply) write('reply.md', r.reply);
+    // What each step gave (a Repeat's rounds are in its items).
+    const steps = listSteps(db, r.id).filter((st) => st.kind !== 'round' && !st.path.includes('#'));
+    const files: string[] = [];
+    for (const st of steps) {
+      const name = `${st.path.replace(/[^\w-]+/g, '-')}.json`;
+      write(path.join('steps', name), { title: st.title, kind: st.kind, status: st.status, ...(st.outputs ? { gave: st.outputs } : {}), ...(st.error ? { error: st.error } : {}) });
+      files.push(name);
+    }
+    const titles = (recipe.flow?.steps ?? []).map((s, i) => `${i + 1}. ${titleOf(s)}`);
+    const about = [
+      `The person wants a change to the result of a run of the app “${recipe.name}”.${recipe.description?.trim() ? `\nWhat the app gives: ${recipe.description.trim()}` : ''}`,
+      titles.length ? `Its steps, in order:\n${titles.join('\n')}` : '',
+      `In ${dir}:\n- answers.json: the answers its form was given\n${r.result ? '- result.json: its result as it is now' : '- reply.md: its answer as it is now'}${files.length ? `\n- steps/: what each step gave (${files.slice(0, 12).join(', ')}${files.length > 12 ? `, and ${files.length - 12} more` : ''})` : ''}`,
+      // An app that answers in the person's language: its changes are written in the run's, as its steps were.
+      recipe.language === 'person' ? languageLine(r.lang) : '',
+    ].filter(Boolean);
+    // As its own agent would run: its program, its model or tier (Standard when it names neither), within what is left of its cap.
+    const agent = recipe.agent;
+    const acpAgent = agent === 'acp' ? recipe.acpAgent || CONSOLE_ID : undefined;
+    const tier = recipe.model ? undefined : (recipe.tier ?? 'standard');
+    const pick = tier ? tierPick(db, tier, agent, acpAgent) : null;
+    const cap = recipe.limits.capUsd;
+    const spent = r.costUsd ?? flows?.spent(r) ?? 0;
+    // A session that takes over from a deleted one: what that one spent stays in the run's cost.
+    const before = r.key ? Math.round(Math.max(0, spent - (flows?.spent(r) ?? 0)) * 10000) / 10000 : 0;
+    const extra: SessionExtra = { app: { id: r.app, run: r.id, name: recipe.name, ...(before ? { spentBefore: before } : {}) } satisfies AppMark };
+    if (recipe.assistant) extra.assistant = recipe.assistant;
+    if (cap) extra.capUsd = Math.max(0.01, Math.round((cap - spent) * 100) / 100);
+    const line = inputsLine(recipe.fields, r.inputs, 50);
+    const key = await sessions.create({
+      agent,
+      acpAgent,
+      cwd,
+      prompt: `${about.join('\n\n')}${ASKED}${text}`,
+      model: recipe.model ?? pick?.model,
+      effort: recipe.effort ?? pick?.effort,
+      mode: modeFor(agent, acpAgent, recipe.mode),
+      title: `${recipe.name}${line ? ` · ${line}` : ''}`,
+      remember: false,
+      extra,
+    });
+    updateRun(db, r.id, { key });
+    runOfKey.set(key, { at: Date.now(), id: r.id });
+    if (r.source !== 'web' && r.source !== 'test') sessions.setFlags(key, { archived: true });
+    reopen(r.id);
+  } finally {
+    startingAsks.delete(r.id);
+  }
 }
 
 function customModel(id?: string): AgentModel | undefined {
@@ -707,13 +849,15 @@ export function finish(id: string, status: RunStatus, error?: string, got?: { re
       const items = tl?.parser.items ?? [];
       reply = replyOf(items);
       cost = runCost(r, sessions.summary(r.key), items);
+      // A flow's run: what its session spent on the changes asked of it, on top of what its steps (and earlier sessions for changes) spent.
+      if (cost !== undefined && isFlowRun(r)) cost += stepsSpent(r);
     }
     // An agent done with nothing to show is a failure, said plainly (a flow may end with nothing to say).
     if (status === 'done' && !reply && !getRun(db, id)?.result && !got?.result && r.key) {
       status = 'failed';
       error ??= 'The agent ended without an answer';
     }
-    updateRun(db, id, { status, endedAt: Date.now(), ...(got?.result ? { result: got.result } : {}), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
+    updateRun(db, id, { status, endedAt: Date.now(), partial: null, ...(got?.result ? { result: got.result } : {}), ...(reply ? { reply } : {}), ...(cost !== undefined ? { costUsd: Math.round(cost * 10000) / 10000 } : {}), ...(error ? { error } : {}) });
     // The files its answer shows stay while the run does (a flow's come from its steps' runs).
     if (got?.result) refMedia(db, `run:${id}`, got.result);
     ending.delete(id);
@@ -723,7 +867,8 @@ export function finish(id: string, status: RunStatus, error?: string, got?: { re
     // The transcript's last lines reach the index a little later: what the caps count then wins.
     if (next.key)
       setTimeout(() => {
-        const later = indexedSpend(next.key);
+        let later = indexedSpend(next.key);
+        if (later !== null && isFlowRun(next)) later += stepsSpent(next);
         if (later !== null && later !== getRun(db, id)?.costUsd) updateRun(db, id, { costUsd: Math.round(later * 10000) / 10000 });
       }, 30_000).unref();
     changed(next);
@@ -774,7 +919,7 @@ export async function stopRun(id: string) {
     for (const h of finishedHooks) h(next);
     return;
   }
-  if (isFlowRun(r)) return flows ? flows.stop(id) : finish(id, 'stopped');
+  if (stepsAtWork(r)) return flows ? flows.stop(id) : finish(id, 'stopped');
   const t = followed.get(id) ?? { idleSince: 0 };
   t.stopping = true;
   followed.set(id, t);
@@ -813,7 +958,7 @@ export function stepTitle(t: { name: string; category?: string; title: string; l
 
 /** How a run is getting on: the latest steps and what the agent said last. */
 export async function progressOf(r: RunRecord, publicView: boolean): Promise<RunProgress> {
-  if (isFlowRun(r) && flows && r.status !== 'queued') return flows.progress(r, publicView);
+  if (stepsAtWork(r) && flows && r.status !== 'queued') return flows.progress(r, publicView);
   if (!r.key || r.status === 'queued') return { steps: [] };
   const { sessions } = d();
   const tl = await sessions.timeline(r.key).catch(() => null);
@@ -841,7 +986,7 @@ export function startRuns(dd: Deps) {
   deps = dd;
   const { db, sessions } = dd;
   for (const r of listRuns(db, { status: ACTIVE.filter((s) => s !== 'queued'), limit: 2000, steps: true })) {
-    if (isFlowRun(r)) flows?.resume(r);
+    if (stepsAtWork(r)) flows?.resume(r);
     else if (!r.key) finish(r.id, 'failed', 'The server restarted before the run started');
     else followed.set(r.id, { idleSince: 0 });
   }

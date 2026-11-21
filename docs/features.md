@@ -897,7 +897,8 @@ agents that speak ACP and take MCP servers.
   run, or added under Settings → Capabilities → Apps → Run without asking (remove it there to be asked again), shows its
   card only when it needs details your message left out, and a scheduled task's own session runs apps without asking.
   Its run and its view show in the conversation, and when its answer does not fit and the agent answers itself, the
-  card is taken out so there is one answer. Each app's Agents can
+  card is taken out so there is one answer; a change you then ask of what it gave (another order, shorter, one
+  thing for another) goes to the app's run, and its card moves under the reply with the new answer. Each app's Agents can
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. About you
   (Settings → Apps) is one short record apps read instead of asking every run: where you live, country, language,
   units, currency, diet, people at home, streaming services, teams, research fields, topics, venues, you as an author
@@ -914,7 +915,12 @@ agents that speak ACP and take MCP servers.
   country, time zone, currency, units) with Intl's data for every language. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
-  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Explore, one
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). The ten first ready-made tasks
+  start from About you and from your last answers (Compare products' and the news digest's region from your country; a
+  cover letter's background, a tone, a depth, a pace, a lesson's learners are remembered), write in your language
+  (a cover letter in the posting's, meeting notes and their email in the notes', a lesson in the one it is taught in),
+  and keep no English-only logic: Intl for weekdays and money, Intl.Segmenter to find passages in Japanese or Chinese,
+  clauses by § and Άρθρο as well as Article, and the shops, testers and established sources of many countries. Explore, one
   click from the top right of the start page, is a magazine made for you: it reads your profile, memory's notes about
   you and the titles of up to 1,000 of your latest sessions, has the helper model pick about six topics you would
   enjoy (half from your work, half from the rest of your life), finds each one's news of the past two weeks and long
@@ -931,7 +937,11 @@ agents that speak ACP and take MCP servers.
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
   their lowest ever, for the game asked for and no other (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). Many
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). They start their questions from About you
+  (units, where you live, currency, diet, people at home, streaming services and country, the teams you follow) or from your last answer, and write in your
+  language: the sky in words, weekdays, months and money by Intl, Wikipedia in your language first and English when it has no page, a fridge list in
+  any language read as English ingredient names with your own words shown back, numbers with a decimal comma and dates in your language read in your own
+  data, and a game's US dollar price with its worth in your currency at the day's Frankfurter rate. Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
@@ -963,7 +973,10 @@ agents that speak ACP and take MCP servers.
   in its file. An app names the keys it needs (API keys, tokens) and never their values: they are asked for on
   its form, on its install card or on its card in a session when an agent runs it, and kept in the vault, where
   its runs use them by name; a run without one does not start. Follow-ups refine a run's
-  result, asked on its page or in its session, which opens on that result with a switch to the conversation.
+  result, asked on its page, in its session (which opens on that result with a switch to the conversation) or by
+  its view's buttons: the agent hands in what changed and the rest stays. A finished run with steps takes them too:
+  the first starts a session for it with the app's agent, told what the app did, with the form's answers, the
+  result and what each step gave as files in the run's folder, and what it spends adds to the run's cost.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
   to you that it waits for (a short form whose choices can be what the run found, to tick one or several),
@@ -983,7 +996,10 @@ agents that speak ACP and take MCP servers.
   called in their place, which other apps can call too; Add a step offers these blocks, yours and ready-made
   ones to sum up a page, translate, answer from the web, sort into kinds or pull out facts) or by an agent, shown
   step by step on the run's page, run again from any step there (the steps before it giving what they gave, also
-  from a test run in its Edit) and resumed after a restart; keep records between runs that its steps, its agents
+  from a test run in its Edit) and resumed after a restart, its result filling in under the status card as its
+  steps end (a view draws the parts whose answer is there, the rest when it is, opens on a page with something
+  to show and holds its buttons that would start another run until it is done; on its page, in a conversation
+  and on its public page); keep records between runs that its steps, its agents
   and the API share (lists named in its Edit, with the fields their records hold); remember across runs in a
   memory of its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers
   with checks on what a run gives) try it as it is on screen, each saying how its last try went. Each save that

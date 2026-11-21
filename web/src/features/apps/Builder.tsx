@@ -647,6 +647,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
           {run.steps && (
             <RunSteps
               steps={run.steps}
+              misses={run.run.misses}
               onAgain={
                 isActive(run.run.status)
                   ? undefined

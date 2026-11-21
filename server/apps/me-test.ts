@@ -212,6 +212,10 @@ test('a question: from names a field of About you (not the language, not for a f
   assert.equal(startFrom({ type: 'choice', options: ['°C', '°F'] }, 'units', me), undefined, 'nothing it can take');
   assert.equal(startFrom({ type: 'choice', multi: true, options: ['Netflix', 'Disney+', 'Mubi'] }, 'services', me), 'Netflix\nMubi');
   assert.equal(startFrom({ type: 'text' }, 'services', me), 'Netflix, Mubi');
+  // The country reads as its name in a form (its code stays for {{me.country}}); a choice may offer either.
+  assert.equal(startFrom({ type: 'text' }, 'country', { country: 'GR' }), 'Greece');
+  assert.equal(startFrom({ type: 'choice', options: ['Greece', 'Germany'] }, 'country', { country: 'GR' }), 'Greece');
+  assert.equal(startFrom({ type: 'choice', options: ['GR', 'DE'] }, 'country', { country: 'GR' }), 'GR');
   assert.equal(startFrom({ type: 'number' }, 'household', me), '2');
   assert.equal(startFrom({ type: 'text' }, 'author', me), 'Ada');
   assert.equal(startFrom({ type: 'date' }, 'household', me), undefined);

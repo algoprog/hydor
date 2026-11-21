@@ -87,8 +87,8 @@ export function FollowUps({ d }: { d: RunDetail }) {
 
 /** The run page's box for the next follow-up; the draft is the session's own, so it carries over there. */
 export function AskBox({ d, onSent }: { d: RunDetail; onSent: () => void }) {
-  const key = d.run.key!;
-  const draft = `wa.draft.${key}`;
+  // The session's own draft; a run with steps has none until its first change (then the draft starts in the session's).
+  const draft = `wa.draft.${d.run.key ?? `run:${d.run.id}`}`;
   const [text, setText] = useState(() => {
     try {
       return localStorage.getItem(draft) ?? '';

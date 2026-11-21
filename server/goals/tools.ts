@@ -22,16 +22,16 @@ const str = (v: unknown, n: number) => (typeof v === 'string' ? v.trim().slice(0
 const CHECK = {
   type: 'object',
   properties: {
-    kind: { type: 'string', enum: ['command', 'measure', 'review', 'you'], description: 'command: a shell command that must end without an error; measure: a command that prints a number that must reach a target; review: a sentence a reviewer must find true in what it is shown; you: something only the user can confirm.' },
+    kind: { type: 'string', enum: ['command', 'measure', 'review', 'you'], description: 'command: a shell command that must end without an error; measure: a command that prints a number that must reach a target; review: a sentence a reviewer must find true in what it is shown, for what no command can decide (what a command can decide, such as files left unchanged or a build that passes, is a command); you: something only the user can confirm.' },
     label: { type: 'string', description: 'What it says, in plain words: "Tests pass", "Search p95 latency", "The settings page has a dark mode".' },
     run: { type: 'string', description: 'command, measure: the shell command the app runs with bash in the session’s folder (the project’s own test, type-check, build or benchmark command).' },
     read: { type: 'string', description: 'measure: a regular expression whose first group is the number (its last match counts). Leave it out to read the last number printed.' },
     target: { type: 'object', properties: { op: { type: 'string', enum: ['>=', '<='] }, value: { type: 'number' } }, required: ['op', 'value'], description: 'measure: what the number must reach.' },
     unit: { type: 'string', description: 'measure: shown after the number ("ms").' },
-    claim: { type: 'string', description: 'review: the sentence the reviewer must find true.' },
+    claim: { type: 'string', description: 'review: the sentence the reviewer must find true. It judges from the evidence alone and says no when unsure, so write the sentence about what that evidence can show, and name in evidence the files it needs to see.' },
     evidence: {
       type: 'object',
-      properties: { diff: { type: 'boolean', description: 'What changed since the goal started.' }, files: { type: 'array', items: { type: 'string' }, description: 'Files of the folder (the first 8000 characters of each).' }, run: { type: 'string', description: 'A command whose output it reads.' } },
+      properties: { diff: { type: 'boolean', description: 'The whole change since the goal started, with every file that changed named first.' }, files: { type: 'array', items: { type: 'string' }, description: 'Files of the folder (the first 8000 characters of each).' }, run: { type: 'string', description: 'A command whose output it reads.' } },
       description: 'review: what the reviewer looks at (the change since the goal started unless set).',
     },
     timeoutS: { type: 'number', description: 'The most seconds the command may take (600 unless set, 3600 at most).' },

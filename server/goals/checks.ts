@@ -382,6 +382,22 @@ export async function diffText(cwd: string, from: string, to?: string, o: { here
 }
 
 /**
+ * The files a change's text names, in a line to put before it. A reviewer then knows the list is whole: a file that is
+ * not in it did not change, also when the middle of a long change is left out (clipMiddle keeps the start). Without it
+ * a reviewer shown only a diff would not say that anything else is unchanged.
+ */
+export function changedFilesLine(text: string): string {
+  // A file moved or renamed is two changes: where it is now, and where it no longer is (named so, a reviewer would
+  // otherwise take the folder it left for unchanged).
+  const files = [...new Set([...[...text.matchAll(/^diff --git .* "?b\/(.+?)"?$/gm)].map((m) => m[1]), ...[...text.matchAll(/^rename from "?(.+?)"?$/gm)].map((m) => m[1])])];
+  const untracked = /^\(New files not tracked by git: /m.test(text);
+  if (!files.length) return untracked ? 'No file git tracks changed; the new files it does not track are named below, and nothing else changed.' : '';
+  const shown = files.slice(0, 200).join(', ');
+  const more = files.length > 200 ? ` and ${files.length - 200} more` : '';
+  return `Every file that changed (${files.length}): ${shown}${more}.${untracked ? ' New files git does not track are named at the end.' : ''} No other file changed.`;
+}
+
+/**
  * The new files git does not track yet in `cwd`, each with a hash of its content (at most 500): a diff names them only,
  * so a change to what is in them would otherwise read as no change.
  */
@@ -469,6 +485,9 @@ function cannotRun(r: Ran, timeoutS: number): string | null {
 
 const timeoutOf = (c: GoalCheck) => Math.min(Math.max(1, Math.round(c.timeoutS ?? DEFAULT_TIMEOUT_S)), MAX_TIMEOUT_S);
 
+/** A change's text with the line that names every file in it first (changedFilesLine). */
+export const withFiles = (text: string) => [changedFilesLine(text), text].filter(Boolean).join('\n\n');
+
 /** Runs one check. Results come back with closeness 0 or 1; verdict.ts counts it from where the check started. */
 export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult> {
   const t0 = Date.now();
@@ -499,7 +518,7 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
   if (ev.run?.trim() && env.noRun) return errorResult(c.id, env.noRun, 0);
   if (ev.diff) {
     const d = await env.diff().then(
-      (text) => (text.trim() ? `<change since the goal started>\n${text}\n</change since the goal started>` : '(Nothing changed since the goal started.)'),
+      (text) => (text.trim() ? `<change since the goal started>\n${withFiles(text)}\n</change since the goal started>` : '(Nothing changed since the goal started.)'),
       (e) => `(The change since the goal started could not be read: ${(e as Error).message}.)`,
     );
     parts.push(d);

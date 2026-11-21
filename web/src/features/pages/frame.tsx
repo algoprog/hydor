@@ -95,6 +95,7 @@ const uiLabels = () => ({
   no: tr('No'),
   back: tr('Back'),
   loading: tr('Loading…'),
+  working: tr('Still working on this part…'),
   cannot: tr('This can’t be done here.'),
   ownPage: tr('This shows on the app’s own page.'),
   noElement: tr('No element'),

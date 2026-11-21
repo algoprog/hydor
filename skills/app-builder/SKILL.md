@@ -123,8 +123,8 @@ pages made for it. The format is in app_guide's API topic (Apps: views).
   tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
   `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,
   one more day, a more formal letter, new questions); start another app on part of it (`start`). `ask` (a
-  follow-up to the agent) works only for one-task apps; with steps, use `again` or a flow (`run`, with `as` to
-  show its answer).
+  follow-up that changes the result) works with steps too, once a run is done; for other answers use `again`, or
+  a flow (`run`, with `as` to show its answer).
 - Save, then app_try a run with `look: true` and look at the pictures (a computer in the dark and in the light, a
   phone in the dark): fix what reads badly or breaks (text cut off or overlapping, empty blocks, colours that vanish
   in one theme, a phone layout that does not fit), and the names its `view` says the answer did not give (they show

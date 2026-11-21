@@ -269,6 +269,8 @@ export interface AppRun {
   misses?: RunMiss[];
   /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
   lang?: string;
+  /** While a run with steps works: the answer fields its steps have given so far (each one that fits); gone once it ends. */
+  partial?: Record<string, unknown>;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -1138,10 +1140,11 @@ export function questionLine(md: string, max = 200): string {
 
 /**
  * The message a session gets when an app run its agent started ends after the call stopped waiting
- * ("[Trip planner finished] The run you started for the user…", then the run as JSON): its run's id, or null for any
+ * ("[Trip planner finished] The run you started for the user…", then the run as JSON), or a change it asked of the
+ * run does ("[Trip planner changed] The change you asked of it for the user…"): its run's id, or null for any
  * other message. The conversation shows no bubble for it, and the run's card moves under the reply it brings.
  */
 export function runEndedNotice(text: string): string | null {
-  if (!/^\[[^\]\n]+ (?:finished|was stopped|failed)\] The run you started for the user /.test(text)) return null;
+  if (!/^\[[^\]\n]+ (?:finished|changed|was stopped|failed)\] The (?:run you started|change you asked of it) for the user /.test(text)) return null;
   return text.match(/"run":\s*"([^"]+)"/)?.[1] ?? '';
 }

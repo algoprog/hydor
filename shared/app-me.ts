@@ -178,6 +178,18 @@ export function langOf(v: unknown): string | undefined {
 }
 
 /** A language's English name ("el" → "Greek"): the app's own names for its languages, else Intl's; the tag when neither knows it. */
+/** A country's English name for its two letters ("GR" → "Greece"); undefined for what is no country code. */
+export function countryName(code: string | undefined): string | undefined {
+  const c = String(code ?? '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return undefined;
+  try {
+    const name = new Intl.DisplayNames('en', { type: 'region' }).of(c);
+    return name && name !== c ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function languageName(tag: string | undefined): string {
   const t = cleanLang(tag) ?? 'en';
   const own = LANGS.find((l) => l.id === t);
@@ -390,11 +402,14 @@ export function fromField(from: unknown): MeId | undefined {
 export function startFrom(f: { type: string; options?: string[]; multi?: boolean }, id: MeId, values: AboutMe): string | undefined {
   const v = values[id];
   if (v === undefined || v === null || f.type === 'file' || f.type === 'date' || f.type === 'yesno') return undefined;
-  const items = Array.isArray(v) ? v : [typeof v === 'object' ? v.name : String(v)];
+  // The country by its name ("Greece"): what a person reads in a form and a search takes; its code stays for {{me.country}}.
+  const named = id === 'country' && typeof v === 'string' ? countryName(v) : undefined;
+  const items = Array.isArray(v) ? v : [named ?? (typeof v === 'object' ? v.name : String(v))];
   if (!items.length) return undefined;
   if (f.type === 'choice') {
     const opts = f.options ?? [];
-    const hit = (x: string) => opts.find((o) => o.toLowerCase() === x.toLowerCase());
+    // A choice of countries may offer names or codes.
+    const hit = (x: string) => opts.find((o) => o.toLowerCase() === x.toLowerCase()) ?? (named && x === named ? opts.find((o) => o.toLowerCase() === String(v).toLowerCase()) : undefined);
     if (f.multi) {
       const picked = opts.filter((o) => items.some((x) => hit(x) === o));
       return picked.length ? picked.join('\n') : undefined;

@@ -54,6 +54,7 @@ export function readFailure(out: ToolOutput | string | undefined, error?: unknow
   if (/timed? ?out|did not answer (within|in time)/i.test(head)) return { ...f, kind: 'timeout' };
   if (/ECONNRESET|socket hang up|other side closed/i.test(head)) return { ...f, kind: 'dropped' };
   if (/ECONNREFUSED|EAI_AGAIN|EHOSTUNREACH/i.test(head)) return { ...f, kind: 'unreachable' };
+  if (/ENOTFOUND/.test(head)) return { ...f, kind: 'nohost' };
   return f;
 }
 
@@ -325,6 +326,7 @@ export function whyOf(tool: string, f: Failure, optional: (key: string) => boole
   if (f.kind === 'down') return 'no search service could answer';
   if (f.kind === 'dropped') return 'the connection dropped';
   if (f.kind === 'unreachable') return 'it could not be reached';
+  if (f.kind === 'nohost') return 'there is no such address';
   if (f.status === 403) return tool === 'read_page' ? 'it keeps programs out' : 'it refused the request (403)';
   if (f.status === 401) return 'it needs a key or a sign-in (401)';
   if (f.status === 404 || f.status === 410) return `nothing is there (${f.status})`;
