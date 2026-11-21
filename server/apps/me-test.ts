@@ -489,6 +489,8 @@ test('the folded line: a short fact as it is (a place, a unit, a few names), a f
     { label: 'What you eat', value: 'vegetarian' },
     { label: 'Notes', value: `${'x'.repeat(24)}…` },
   ]);
+  // One fact alone goes with its question's label: a bare “For Metric” does not say what it is.
+  assert.deepEqual(foldedParts([{ id: 'units', label: 'Units', from: 'me.units' }], { units: 'Metric' }), { facts: [], texts: [{ label: 'Units', value: 'Metric' }] });
   // A long list of names is still names; past 60 characters it is named by its question too.
   assert.deepEqual(foldedParts([{ id: 'v', label: 'Your venues', from: 'me.venues' }], { v: 'SIGIR, ACL, EMNLP, NAACL, ICLR, NeurIPS, ICML, KDD, WSDM, CIKM' }).texts[0], { label: 'Your venues', value: 'SIGIR, ACL, EMNLP…' });
 });

@@ -437,14 +437,16 @@ function cutWords(s: string, max: number): string {
  * as its question's label with its start ("The compute you have: A laptop and one 24 GB…"). Empty answers are left out.
  */
 export function foldedParts(fields: { id: string; label: string; from?: string }[], values: Record<string, string | undefined>): { facts: string[]; texts: { label: string; value: string }[] } {
-  const facts: string[] = [];
+  const facts: { label: string; value: string }[] = [];
   const texts: { label: string; value: string }[] = [];
   for (const f of fields) {
     const v = String(values[f.id] ?? '').replace(/\s+/g, ' ').trim();
     if (!v) continue;
     const me = ME_FIELDS.find((m) => m.id === fromField(f.from));
     if (me?.free || v.length > 60) texts.push({ label: f.label, value: cutWords(v, 24) });
-    else facts.push(v);
+    else facts.push({ label: f.label, value: v });
   }
-  return { facts, texts };
+  // One fact alone does not say what it is ("For Metric"): it goes with its question's label ("Units: Metric").
+  if (facts.length === 1 && !texts.length) return { facts: [], texts: facts };
+  return { facts: facts.map((x) => x.value), texts };
 }
