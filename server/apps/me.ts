@@ -3,7 +3,7 @@
 // from them. Neither is ever written by an agent on its own: the record changes from Settings → Apps (or an agent's
 // call the person confirms on a card), and from "Remember for all apps" on a form; the last answers from the person's
 // own runs (their form, or an app an agent ran for them in a session).
-import type { AppField, RunSource } from '../../shared/apps.ts';
+import { answerOf, type AppField, type RunSource } from '../../shared/apps.ts';
 import { changeMe, cleanMe, langOf, fromField, meOf, startFrom, type AboutMe, type MeId, type MeSource } from '../../shared/app-me.ts';
 import { userLang } from '../language/index.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
@@ -76,7 +76,9 @@ export function startsFor(db: DB, fields: AppField[], app: string, values: About
   const last = fields.some((f) => f.remember) ? lastAnswers(db, app) : {};
   for (const f of fields) {
     const id = fromField(f.from);
-    const v = id ? startFrom(f, id, values) : f.remember ? last[f.id] : undefined;
+    // A last answer kept under a former id (the question was renamed since) counts as its own.
+    const kept = f.remember ? answerOf(f, last) : undefined;
+    const v = id ? startFrom(f, id, values) : typeof kept === 'string' ? kept : undefined;
     if (v !== undefined && v !== '') out[f.id] = v;
   }
   return out;

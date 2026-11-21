@@ -1117,6 +1117,30 @@ test('Citation alerts: the id About you holds finds you where a name might find 
   await assert.rejects(program('citation-alerts', 'who', { me: 'Nobody Known', id: 'A99999999', recorded: 'Nobody Known', papers: '' }), /No author called Nobody Known \(nor the id A99999999\) was found/);
 });
 
+test('Gap finder: the id About you holds finds your papers on OpenAlex where a name might find a namesake; another name is looked up by name; the step is given {{me.author_id}}', async () => {
+  const yours = allSteps(templateById('gap-finder')!.flow!.steps).find((s) => s.id === 'yours') as CodeStep;
+  assert.deepEqual([yours.with?.id, yours.with?.recorded], ['{{me.author_id}}', '{{me.author}}']);
+  routes = [s2Route, oaById, oaWorks];
+  busy = false;
+  asked.length = 0;
+  const byId = await program('gap-finder', 'yours', { mine: 'Chris Samarinas', id: 'A5012345678', recorded: 'Chris Samarinas' });
+  assert.deepEqual((byId.papers as Record<string, unknown>[]).map((p) => p.title), ['A paper of mine']);
+  assert.ok(asked.some((u) => u.endsWith('/authors/A5012345678')));
+  assert.ok(asked.some((u) => decodeURIComponent(u).includes('/works?filter=author.id:A5012345678')));
+  assert.ok(!asked.some((u) => u.includes('author/search')), 'no search by name');
+  asked.length = 0;
+  const orcid = await program('gap-finder', 'yours', { mine: 'chris samarinas', id: '0000-0002-1825-0097', recorded: 'Chris Samarinas' });
+  assert.equal((orcid.papers as unknown[]).length, 1);
+  assert.ok(asked.some((u) => decodeURIComponent(u).endsWith('/authors/orcid:0000-0002-1825-0097')));
+  // Another name than the recorded one, or no id: by name, as before.
+  for (const input of [{ mine: 'Gerard Salton', id: 'A5012345678', recorded: 'Chris Samarinas' }, { mine: 'Chris Samarinas', id: '', recorded: '' }]) {
+    asked.length = 0;
+    await program('gap-finder', 'yours', input);
+    assert.ok(asked.some((u) => u.includes('author/search')), `by name: ${input.mine}`);
+    assert.ok(!asked.some((u) => u.endsWith('/authors/A5012345678')));
+  }
+});
+
 test('Citation alerts, whole: the id in About you reaches the program as {{me.author_id}} (the question is called author, not me), and only while the name is the recorded one', async () => {
   changeAboutMe(db, { author: { name: 'Chris Samarinas', id: 'A5012345678' } });
   forgetAll(); // look-ups are kept for five minutes: ask afresh

@@ -45,6 +45,8 @@ export interface MeField {
   /** A choice's values (the pages name countries, languages and currencies in the reader's language). */
   options?: string[];
   placeholder?: string;
+  /** A free text ("What you eat", "What you can run on"), not a short fact: a form's folded line names it by its question. */
+  free?: boolean;
 }
 
 /** Where a value that was not set came from. */
@@ -219,7 +221,7 @@ export const ME_FIELDS: MeField[] = [
   { id: 'language', label: 'Language', kind: 'choice', group: 'You', options: LANGUAGE_OPTIONS },
   { id: 'units', label: 'Units', kind: 'choice', group: 'You', options: ['metric', 'imperial'] },
   { id: 'currency', label: 'Currency', kind: 'choice', group: 'You', options: currencyOptions() },
-  { id: 'diet', label: 'What you eat', kind: 'text', group: 'Home life', placeholder: 'Vegetarian, no nuts' },
+  { id: 'diet', label: 'What you eat', kind: 'text', group: 'Home life', placeholder: 'Vegetarian, no nuts', free: true },
   { id: 'household', label: 'People at home', kind: 'number', group: 'Home life' },
   { id: 'services', label: 'Streaming services', kind: 'list', group: 'Home life', placeholder: 'Netflix, Disney+' },
   { id: 'teams', label: 'Teams you follow', kind: 'list', group: 'Home life', placeholder: 'Real Madrid, Boston Celtics' },
@@ -227,7 +229,7 @@ export const ME_FIELDS: MeField[] = [
   { id: 'topics', label: 'Topics you follow', kind: 'list', group: 'Research', placeholder: 'Retrieval-augmented generation' },
   { id: 'venues', label: 'Venues you read', kind: 'list', group: 'Research', placeholder: 'SIGIR, ACL, TOIS' },
   { id: 'author', label: 'You as an author', kind: 'text', group: 'Research', placeholder: 'Your name as on your papers' },
-  { id: 'compute', label: 'What you can run on', kind: 'text', group: 'Research', placeholder: 'A laptop and one 24 GB GPU' },
+  { id: 'compute', label: 'What you can run on', kind: 'text', group: 'Research', placeholder: 'A laptop and one 24 GB GPU', free: true },
 ];
 
 export const ME_GROUPS: MeGroup[] = ['You', 'Home life', 'Research'];
@@ -418,4 +420,31 @@ export function startFrom(f: { type: string; options?: string[]; multi?: boolean
   }
   if (f.type === 'number') return typeof v === 'number' ? String(v) : undefined;
   return items.join(', ');
+}
+
+/** A text cut to at most `max` characters at a word, with an ellipsis when it was cut. */
+function cutWords(s: string, max: number): string {
+  if (s.length <= max) return s;
+  // At the last space within it (one just after it too); a single long word is cut where it is.
+  const head = s.slice(0, max + 1);
+  const at = (/\s/.test(head) ? head.replace(/\s+\S*$/, '') : '') || s.slice(0, max);
+  return `${at.replace(/[\s,;:.·-]+$/, '')}…`;
+}
+
+/**
+ * What the quiet line under a form says of the questions filled in from About you and folded away: a short fact as it
+ * is (a place, a unit, a currency, a few names), and a free text (what you eat, what you can run on) or any long value
+ * as its question's label with its start ("The compute you have: A laptop and one 24 GB…"). Empty answers are left out.
+ */
+export function foldedParts(fields: { id: string; label: string; from?: string }[], values: Record<string, string | undefined>): { facts: string[]; texts: { label: string; value: string }[] } {
+  const facts: string[] = [];
+  const texts: { label: string; value: string }[] = [];
+  for (const f of fields) {
+    const v = String(values[f.id] ?? '').replace(/\s+/g, ' ').trim();
+    if (!v) continue;
+    const me = ME_FIELDS.find((m) => m.id === fromField(f.from));
+    if (me?.free || v.length > 60) texts.push({ label: f.label, value: cutWords(v, 24) });
+    else facts.push(v);
+  }
+  return { facts, texts };
 }

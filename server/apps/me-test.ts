@@ -16,9 +16,10 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { checkInputs, cleanFields, cleanRecipe, fillTemplate, isActive, placeholders, TASK_VALUES } from '../../shared/apps.ts';
-import { changeMe, cleanMe, countryOfTimezone, currencyOfCountry, fromField, langOf, languageLine, languageName, meOf, meVars, startFrom, unitsOfCountry } from '../../shared/app-me.ts';
+import { changeMe, cleanMe, countryOfTimezone, currencyOfCountry, foldedParts, fromField, langOf, languageLine, languageName, meOf, meVars, startFrom, unitsOfCountry } from '../../shared/app-me.ts';
 import { checkFlow, lookup } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
+import { vaultTables } from '../connections/vault.ts';
 import { kvSet, openDb } from '../db.ts';
 import type { SessionManager } from '../sessions.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -28,8 +29,9 @@ import { sandboxAvailable } from '../agent/sandbox.ts';
 import { Scheduler } from '../scheduler.ts';
 import { allowApp } from './allowed.ts';
 import { apps } from './index.ts';
-import { lastAnswers } from './me.ts';
-import { startRun, startRuns, waitFor } from './runs.ts';
+import { lastAnswers, startsFor } from './me.ts';
+import { checkedInputs, startRun, startRuns, waitFor } from './runs.ts';
+import { templateById } from './templates.ts';
 import * as store from './store.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.HYDOR_APPS_DIR?.startsWith('/tmp/')) {
@@ -40,6 +42,8 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/') || !process.env.HYDOR_APPS_DIR?.s
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-me-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
 store.ensureTables(db);
+// The vault's tables: a ready-made app's page says which keys it has.
+vaultTables(db);
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
 const test = (name: string, fn: () => void | Promise<void>) => tests.push([name, fn]);
@@ -466,6 +470,85 @@ test('a code step gets ctx.locale: the run’s language and where the person is 
   const pjs = store.listSteps(db, pub.id).find((s) => s.id === 'js')!.outputs as Record<string, unknown>;
   assert.deepEqual([pjs.lang, pjs.country, pjs.timeZone, pjs.currency], ['ja', '', 'UTC', '']);
   store.deleteApp(db, a.id);
+});
+
+test('the folded line: a short fact as it is (a place, a unit, a few names), a free text or a long value by its question and its start, empty answers left out', () => {
+  const qs = [
+    { id: 'home', label: 'Where', from: 'me.home' },
+    { id: 'units', label: 'Units', from: 'me.units' },
+    { id: 'compute', label: 'The compute you have', from: 'me.compute' },
+    { id: 'area', label: 'The area', from: 'me.fields' },
+    { id: 'diet', label: 'What you eat', from: 'me.diet' },
+    { id: 'note', label: 'Notes' },
+    { id: 'none', label: 'Nothing', from: 'me.teams' },
+  ];
+  const p = foldedParts(qs, { home: 'Thessaloniki, Greece', units: 'metric', compute: 'A laptop and one 24 GB GPU', area: 'Information retrieval, NLP', diet: 'vegetarian', note: 'x'.repeat(80), none: ' ' });
+  assert.deepEqual(p.facts, ['Thessaloniki, Greece', 'metric', 'Information retrieval, NLP']);
+  assert.deepEqual(p.texts, [
+    { label: 'The compute you have', value: 'A laptop and one 24 GB…' },
+    { label: 'What you eat', value: 'vegetarian' },
+    { label: 'Notes', value: `${'x'.repeat(24)}…` },
+  ]);
+  // A long list of names is still names; past 60 characters it is named by its question too.
+  assert.deepEqual(foldedParts([{ id: 'v', label: 'Your venues', from: 'me.venues' }], { v: 'SIGIR, ACL, EMNLP, NAACL, ICLR, NeurIPS, ICML, KDD, WSDM, CIKM' }).texts[0], { label: 'Your venues', value: 'SIGIR, ACL, EMNLP…' });
+});
+
+test('a renamed question: its former ids are kept (not its own, nor another question’s); an answer under one counts while it has none of its own, in a run’s inputs and a last answer', () => {
+  const qs = cleanFields([
+    { id: 'author', label: 'You, as an author', was: ['me', 'author', 'papers', 'not an id', 'me'] },
+    { id: 'papers', label: 'Only these papers' },
+    { id: 'tone', label: 'Tone', remember: true, was: ['voice'] },
+  ]);
+  assert.deepEqual(qs[0].was, ['me']);
+  assert.equal(qs[1].was, undefined);
+  assert.equal(checkInputs(qs, { me: 'Ada Lovelace' }).values.author, 'Ada Lovelace', 'a schedule made before the rename');
+  assert.equal(checkInputs(qs, { me: 'Ada Lovelace', author: 'Grace Hopper' }).values.author, 'Grace Hopper', 'its own answer wins');
+  assert.equal(checkInputs(qs, { me: 'Ada Lovelace', author: '' }).values.author, '', 'even an empty one');
+  assert.equal(checkInputs([qs[0]], {}, { starts: { author: 'From About you' } }).values.author, 'From About you');
+  kvSet(db, 'apps.last.renamed-app', JSON.stringify({ voice: 'Warm' }));
+  assert.deepEqual(startsFor(db, qs, 'renamed-app'), { tone: 'Warm' }, 'a last answer kept under its former id');
+  db.prepare('delete from kv where k = ?').run('apps.last.renamed-app');
+});
+
+test('an app on its own page: its settings and first page start from About you; an answer saved as About you has it keeps following it, one changed is its own; settings kept before (empty answers, a former id) still count; Update automatically’s task leaves About you’s for each run', async () => {
+  await call('PUT', '/api/apps/me', { fields: ['Information retrieval', 'NLP'], topics: ['dense retrieval'], author: { name: 'Ada Lovelace', id: 'A5012345678' } });
+  try {
+    // Nothing kept yet: Paper radar's fields and topics are About you's, and say so.
+    let page = (await call('GET', '/api/apps/tpl:paper-radar')).body;
+    assert.deepEqual([page.home.inputs.fields, page.home.inputs.topics, page.home.inputs.count], ['Information retrieval, NLP', 'dense retrieval', '15']);
+    assert.deepEqual([...page.home.started].sort(), ['fields', 'topics']);
+    // Its settings saved as the page sends them (every answer): one the same as About you's is not kept as its own.
+    let home = (await call('PUT', '/api/apps/tpl:paper-radar/home', { inputs: { ...page.home.inputs, topics: 'query performance prediction', count: '20' } })).body.home;
+    assert.deepEqual([home.inputs.fields, home.inputs.topics, home.inputs.count, home.started], ['Information retrieval, NLP', 'query performance prediction', '20', ['fields']]);
+    // About you changes: the answer left as About you's follows it; the one changed stays.
+    await call('PUT', '/api/apps/me', { fields: ['Computation and Language'] });
+    home = (await call('GET', '/api/apps/tpl:paper-radar')).body.home;
+    assert.deepEqual([home.inputs.fields, home.inputs.topics], ['Computation and Language', 'query performance prediction']);
+    // Settings kept before questions started from About you held every question, the empty ones too: those take About you's.
+    kvSet(db, 'apps.home.tpl:paper-radar', JSON.stringify({ inputs: { fields: '', topics: '', people: 'Hamed Zamani', count: '15' } }));
+    home = (await call('GET', '/api/apps/tpl:paper-radar')).body.home;
+    assert.deepEqual([home.inputs.fields, home.inputs.topics, home.inputs.people], ['Computation and Language', 'dense retrieval', 'Hamed Zamani']);
+    // Citation alerts set up before its question was renamed: the name kept under "me" is its answer, its own.
+    kvSet(db, 'apps.home.tpl:citation-alerts', JSON.stringify({ inputs: { me: 'Gerard Salton', papers: '' } }));
+    home = (await call('GET', '/api/apps/tpl:citation-alerts')).body.home;
+    assert.deepEqual([home.inputs.author, home.started], ['Gerard Salton', undefined]);
+    // Its first page with nothing kept: the needed author is About you's, filled in (and it may update by itself).
+    kvSet(db, 'apps.home.tpl:citation-alerts', '{}');
+    home = (await call('GET', '/api/apps/tpl:citation-alerts')).body.home;
+    assert.deepEqual([home.inputs.author, home.started], ['Ada Lovelace', ['author']]);
+    home = (await call('PUT', '/api/apps/tpl:citation-alerts/home', { daily: { on: true } })).body.home;
+    assert.equal(home.daily.on, true);
+    const task = scheduler.list().find((t) => t.origin === 'daily:tpl:citation-alerts')!;
+    assert.ok(task.app && !('author' in task.app.inputs), 'the task leaves the author to each run');
+    const ca = templateById('citation-alerts')!;
+    assert.equal(checkedInputs(ca, task.app!.inputs, false, {}, undefined, 'tpl:citation-alerts').values.author, 'Ada Lovelace', 'each run takes About you’s');
+    assert.equal(checkedInputs(ca, { me: 'Gerard Salton', papers: '' }, false, {}, undefined, 'tpl:citation-alerts').values.author, 'Gerard Salton', 'a schedule from before the rename');
+    await call('PUT', '/api/apps/tpl:citation-alerts/home', { daily: { on: false } });
+  } finally {
+    kvSet(db, 'apps.home.tpl:paper-radar', '{}');
+    kvSet(db, 'apps.home.tpl:citation-alerts', '{}');
+    await call('PUT', '/api/apps/me', { fields: null, topics: null, author: null });
+  }
 });
 
 // ---- run them ----------------------------------------------------------------------------------------------

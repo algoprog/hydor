@@ -25,7 +25,7 @@ import { AppKeys, AppKeysCard, emptyKeys, keysBody, keysFor, keysMissing, type K
 import { appPath, money, runPath, SOURCE_LABEL, useRunDetail, useRunEvents, type AppDetail, type HomeSettings, type RunDetail } from './api';
 import { AppIcon } from './AppIcon';
 import { BatchTab } from './Batch';
-import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
+import { AppForm, FoldedLine, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { statusBadge } from './Gallery';
 import { FlowList } from './FlowStrip';
 import { PinMenuItem } from './Pinned';
@@ -250,16 +250,7 @@ function RunTab({ id, recipe, template, again, given, agents, secrets, starts = 
               }
             />
             {/* What it took from About you, in a line: Change shows those questions, filled in. */}
-            {folded.length > 0 && (
-              <div className="mt-4 flex min-w-0 items-center gap-2 text-[12.5px] text-fg-3">
-                <span className="min-w-0 truncate">
-                  For <span translate="no">{folded.map((f) => values[f.id]).filter(Boolean).join(' · ')}</span>
-                </span>
-                <button type="button" onClick={() => setUnfolded(true)} className="shrink-0 font-medium text-accent hover:underline">
-                  Change
-                </button>
-              </div>
-            )}
+            {folded.length > 0 && <FoldedLine fields={folded} values={values} onChange={() => setUnfolded(true)} className="mt-4" />}
           </div>
           {keyStates.length > 0 && (
             <AppKeys
@@ -619,18 +610,31 @@ function firstLine(recipe: AppDef | AppTemplate, r: AppRun): string {
 function HomeView({ id, recipe, template, view, home, own, onHome }: { id: string; recipe: AppDef | AppTemplate; template: boolean; view?: Record<string, unknown>; home?: HomeSettings; own: OwnPage; onHome: (h: HomeSettings) => void }) {
   const info = useMemo(() => appInfo(id, recipe), [id, recipe]);
   const [starting, setStarting] = useState(false);
-  // Before the first one: the questions it cannot do without that its settings leave empty (your venues, your name), asked here.
-  const needs = recipe.fields.filter((f) => f.required && f.type !== 'file' && !String(home?.inputs[f.id] ?? '').trim());
-  const [values, setValues] = useState<FormValues>(() => initialValues(needs));
+  // Before the first one, its questions as an ordinary app's form has them: those it cannot do without that its settings
+  // leave empty (your venues, your name), and those filled in from About you or your last answer that are needed, to see
+  // (a needed one stays in the form, filled in); the others filled in from About you fold into one line until Change.
+  const started = new Set(home?.started ?? []);
+  const filled = (f: AppField) => !!String(home?.inputs[f.id] ?? '').trim();
+  const needs = recipe.fields.filter((f) => f.required && f.type !== 'file' && (!filled(f) || started.has(f.id)));
+  const fromAbout = recipe.fields.filter((f) => f.from && !f.required && f.type !== 'file' && started.has(f.id) && filled(f));
+  const [unfolded, setUnfolded] = useState(false);
+  const asked = recipe.fields.filter((f) => needs.includes(f) || (unfolded && fromAbout.includes(f)));
+  const [values, setValues] = useState<FormValues>(() => ({ ...initialValues(recipe.fields), ...home?.inputs }));
+  // Its settings may come after the page: what they hold fills in what was not typed yet.
+  const typed = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (home) setValues((v) => ({ ...v, ...Object.fromEntries(Object.entries(home.inputs).filter(([k]) => !typed.current.has(k))) }));
+  }, [home]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const first = async () => {
     let settings = home;
-    if (needs.length) {
-      const errs = formErrors(needs, values, {});
+    if (asked.length) {
+      const errs = formErrors(asked, values, {});
       setErrors(errs);
       if (Object.keys(errs).length) return;
       try {
-        settings = (await put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { inputs: Object.fromEntries(needs.map((f) => [f.id, String(values[f.id] ?? '')])) })).home;
+        // Kept as its settings; an answer that is what it started from keeps following About you (the server leaves it out).
+        settings = (await put<{ home: HomeSettings }>(`/api/apps/${enc(id)}/home`, { inputs: Object.fromEntries(asked.map((f) => [f.id, String(values[f.id] ?? '')])) })).home;
         onHome(settings);
       } catch (e) {
         return toastError(e);
@@ -695,9 +699,10 @@ function HomeView({ id, recipe, template, view, home, own, onHome }: { id: strin
             <p className="mt-1.5 text-[14.5px] leading-relaxed text-fg-2" translate={template ? undefined : 'no'}>
               {recipe.description}
             </p>
-            {needs.length > 0 && (
+            {(asked.length > 0 || fromAbout.length > 0) && (
               <div className="mt-6 w-full rounded-2xl border border-line bg-panel px-5 py-4 text-left">
-                <AppForm fields={needs} values={values} files={{}} errors={errors} disabled={starting} onChange={(k, v) => (setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))} onFile={() => {}} />
+                {asked.length > 0 && <AppForm fields={asked} values={values} files={{}} errors={errors} disabled={starting} onChange={(k, v) => (typed.current.add(k), setValues((x) => ({ ...x, [k]: v })), errors[k] && setErrors((e) => ({ ...e, [k]: '' })))} onFile={() => {}} />}
+                {!unfolded && <FoldedLine fields={fromAbout} values={values} onChange={() => setUnfolded(true)} className={asked.length ? 'mt-4' : undefined} />}
               </div>
             )}
             <Button variant="primary" icon={starting ? <Throbber /> : <Play size={14} fill="currentColor" />} disabled={starting} className="mt-6 h-10 px-5" onClick={() => void first()}>

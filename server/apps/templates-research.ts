@@ -892,8 +892,9 @@ const CITATION_ALERTS: Draft = {
   // What each citing sentence says of your work is for you alone: it follows your language (the four kinds stay as written).
   language: 'person',
   fields: [
-    // Not called "me": a question of that name would stand in the way of About you's {{me.author_id}}.
-    { id: 'author', label: 'You, as an author', type: 'text', required: true, from: 'me.author', placeholder: 'e.g. Gerard Salton', help: 'Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID' },
+    // Not called "me": a question of that name would stand in the way of About you's {{me.author_id}}. It was called so
+    // until then: what settings and schedules kept under that name is its answer still.
+    { id: 'author', label: 'You, as an author', type: 'text', required: true, from: 'me.author', was: ['me'], placeholder: 'e.g. Gerard Salton', help: 'Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID' },
     { id: 'papers', label: 'Only these papers', type: 'long', placeholder: 'One a line: a title, a DOI or an arXiv id', help: 'Empty: all your papers' },
   ],
   prompt: '',
@@ -2732,20 +2733,40 @@ const GAP_FINDER: Draft = {
               do: 'code',
               language: 'javascript',
               seconds: 30,
-              with: { mine: '{{papers}}' },
+              // The id About you holds for you finds you exactly, where a name may find a namesake: while the question holds the name About you has.
+              with: { mine: '{{papers}}', id: '{{me.author_id}}', recorded: '{{me.author}}' },
               code:
                 LIST +
                 HTTP +
                 PAPERS +
                 ARXIV +
                 S2 +
-                String.raw`// Your papers with their abstracts: by your name (the author of that name with the most citations: their latest and
-// most cited), or each title or arXiv id given.
+                String.raw`// Your papers with their abstracts: by your name (by the id About you holds for you, an OpenAlex id or an ORCID,
+// while the name is the one it holds; else the author of that name with the most citations: their latest and most
+// cited), or each title or arXiv id given.
 const given = lines(input.mine).slice(0, 10);
 const plain = (s) => plainTitle(s);
 const out = [];
 const one = given.length === 1 && !/\d{4}\.\d{4,5}/.test(given[0]) && given[0].split(/\s+/).length <= 4;
-if (one) {
+const kept = String(input.id || '').trim();
+const oaId = (/A\d{5,}/i.exec(kept) || [])[0];
+const orcid = (/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/.exec(kept) || [])[0];
+if (one && (oaId || orcid) && plain(given[0]) === plain(input.recorded)) {
+  try {
+    const a = bodyOf(await keyed('https://api.openalex.org/authors/' + (oaId ? oaId.toUpperCase() : 'orcid:' + orcid), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
+    const aid = String((a && a.id) || '').replace(/^https?:\/\/openalex\.org\//, '');
+    if (aid) {
+      const works = async (sort, n, title) => rows((bodyOf(await keyed('https://api.openalex.org/works?filter=author.id:' + aid + '&sort=' + sort + '&per-page=' + n + '&select=id,doi,title,publication_date,publication_year,authorships,primary_location,abstract_inverted_index,type', 'OPENALEX_API_KEY', { title: title })) || {}).results);
+      const most = await works('cited_by_count:desc', 4, 'Read your most cited papers');
+      const latest = (await works('publication_date:desc', 8, 'Read your latest papers')).filter((w) => !most.some((m) => m.id === w.id)).slice(0, 4);
+      for (const w of latest.concat(most)) {
+        const p = fromOpenAlex(w);
+        if (p.title) out.push(p);
+      }
+    }
+  } catch (e) {}
+}
+if (one && !out.length) {
   try {
     const found = await s2('author/search?query=' + encodeURIComponent(given[0]) + '&fields=name,citationCount&limit=10', 'Look you up on Semantic Scholar');
     const all = rows(found && found.data);

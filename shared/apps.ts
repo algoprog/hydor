@@ -33,6 +33,20 @@ export interface AppField {
   from?: string;
   /** It starts from the person's last answer to it in this app (not for a file), kept on the server: for what About you has no field for. */
   remember?: boolean;
+  /**
+   * Its former ids, when it was renamed: an answer given or kept under one of them (a schedule's, an app page's
+   * settings, a last answer) counts as its own while it has none of its own.
+   */
+  was?: string[];
+}
+
+/** A question's answer among answers kept by id: under its own id, else under a former one (`was`); undefined when neither has one. */
+export function answerOf(f: Pick<AppField, 'id' | 'was'>, given: Record<string, unknown> | undefined | null): unknown {
+  if (!given) return undefined;
+  const own = given[f.id];
+  if (own !== undefined && own !== null) return own;
+  for (const w of f.was ?? []) if (given[w] !== undefined && given[w] !== null) return given[w];
+  return undefined;
 }
 
 export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media' | 'ui';
@@ -610,7 +624,8 @@ export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o:
   const maxText = o.maxText ?? 2000;
   const maxLong = o.maxLong ?? 60_000;
   for (const f of fields) {
-    let v: unknown = raw?.[f.id];
+    // Its answer, or one given under a former id (a schedule made before it was renamed).
+    let v: unknown = answerOf(f, raw);
     // Left unanswered: what it starts from (About you, the last answer), else its default.
     if (v === undefined || v === null) v = o.starts?.[f.id] ?? f.default ?? '';
     if (f.type === 'choice' && f.multi) {
@@ -976,6 +991,9 @@ export function cleanFields(raw: unknown): AppField[] {
     // It starts from About you, or from the last answer (one or the other; never a file).
     const from = type === 'file' ? undefined : fromField(x.from);
     const remember = !from && type !== 'file' && x.remember === true;
+    // Its former ids: ids as a question's would be, none its own, nor another question's own id.
+    const ids = (Array.isArray(raw) ? raw : []).map((y: any) => (y && typeof y === 'object' ? str(y.id, 40) : ''));
+    const was = [...new Set<string>((Array.isArray(x.was) ? x.was : []).map((w: unknown) => str(w, 40)).filter((w: string) => /^[A-Za-z_][\w-]*$/.test(w) && w !== id && !ids.includes(w)))].slice(0, 5);
     return [
       {
         id,
@@ -989,6 +1007,7 @@ export function cleanFields(raw: unknown): AppField[] {
         default: opt(x.default, 4000),
         ...(from ? { from: `me.${from}` } : {}),
         ...(remember ? { remember: true } : {}),
+        ...(was.length ? { was } : {}),
       },
     ];
   });

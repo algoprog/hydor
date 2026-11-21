@@ -4,16 +4,27 @@
 // a day of your choice (the days a "daily" schedule keeps). The task shows in Settings → Scheduled tasks like any
 // other; turning it off removes it. A ready-made app may say when it starts updating (`home` on its recipe: the weekly
 // report on Fridays at 16:00). Ready-made apps and your own alike.
+//
+// A question its settings were never given an answer for starts as it does on a form: from About you (from:
+// "me.…") or the person's last answer (remember), else its default; such an answer is not kept as the settings' own,
+// so it follows About you when that changes, and the scheduled task leaves it for the run to take afresh. An answer
+// kept under a question's former id (`was`, a question renamed since) counts as its own.
 import type { AppField, AppRecipe } from '../../shared/apps.ts';
-import { cleanDays, TIME_OF_DAY } from '../../shared/apps.ts';
+import { answerOf, cleanDays, TIME_OF_DAY } from '../../shared/apps.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Scheduler } from '../scheduler.ts';
+import { startsFor } from './me.ts';
 
 export interface HomeSettings {
   /** The answers its runs from its page, and its automatic runs, take: each question's, as text. */
   inputs: Record<string, string>;
+  /**
+   * The questions whose answer here is what they start from (About you, the last answer), not one kept in these
+   * settings: they follow it as it changes. Its first page shows the needed ones filled in, and folds the others.
+   */
+  started?: string[];
   /**
    * Update automatically: whether it is on, at what time where you are (HH:MM), and on which days of the week (0 is
    * Sunday; unset: every day). Off, the time and days are what it would start with.
@@ -26,10 +37,29 @@ export const DAILY_TIME = '07:00';
 const kvKey = (id: string) => `apps.home.${id}`;
 const origin = (id: string) => `daily:${id}`;
 
-/** Its form's answers: those kept, else each question's default (files are never kept). */
-function answers(fields: AppField[], kept: Record<string, unknown> | undefined): Record<string, string> {
-  return Object.fromEntries(fields.filter((f) => f.type !== 'file').map((f) => [f.id, typeof kept?.[f.id] === 'string' ? (kept[f.id] as string) : (f.default ?? '')]));
+/**
+ * Its form's answers: those kept (under a question's id or a former one), else what it starts from, else its default
+ * (files are never kept). A question that starts from something and was kept empty takes that too: settings saved
+ * before questions started from About you kept every question, the empty ones as well.
+ */
+function answers(fields: AppField[], kept: Record<string, unknown> | undefined, starts: Record<string, string>): { inputs: Record<string, string>; started: string[] } {
+  const inputs: Record<string, string> = {};
+  const started: string[] = [];
+  for (const f of fields) {
+    if (f.type === 'file') continue;
+    const k = answerOf(f, kept);
+    const own = typeof k === 'string' ? k : undefined;
+    const start = starts[f.id];
+    if (start !== undefined && (own === undefined || !own.trim())) {
+      inputs[f.id] = start;
+      started.push(f.id);
+    } else inputs[f.id] = own ?? f.default ?? '';
+  }
+  return { inputs, started };
 }
+
+/** What a page's questions start from (About you, the last answers), when any starts from something. */
+const startsOf = (db: DB, id: string, fields: AppField[]) => (fields.some((f) => f.from || f.remember) ? startsFor(db, fields, id) : {});
 
 /** The task that updates it by itself, when there is one. */
 export const dailyTask = (scheduler: Scheduler | undefined, id: string): ScheduledTask | undefined => scheduler?.list().find((t) => t.origin === origin(id));
@@ -52,7 +82,8 @@ export function homeOf(db: DB, scheduler: Scheduler | undefined, id: string, rec
   const picked = kept.when && typeof kept.when.time === 'string' && TIME_OF_DAY.test(kept.when.time) ? { time: kept.when.time, days: cleanDays(kept.when.days) } : null;
   const time = s ? s.time : (picked?.time ?? recipe.home?.time ?? DAILY_TIME);
   const days = s ? cleanDays(s.days) : picked ? picked.days : cleanDays(recipe.home?.days);
-  return { inputs: answers(recipe.fields, kept.inputs), daily: { on: !!t?.enabled, time, ...(days ? { days } : {}) } };
+  const { inputs, started } = answers(recipe.fields, kept.inputs, startsOf(db, id, recipe.fields));
+  return { inputs, ...(started.length ? { started } : {}), daily: { on: !!t?.enabled, time, ...(days ? { days } : {}) } };
 }
 
 /**
@@ -79,7 +110,17 @@ export function saveHome(db: DB, scheduler: Scheduler | undefined, id: string, r
   if (daily.on && missing.length) throw new HttpError(400, `Fill in ${missing.map((f) => `“${f.label}”`).join(', ')} first: each update needs it`);
   if (daily.on && recipe.fields.some((f) => f.required && f.type === 'file')) throw new HttpError(400, 'It needs a file each time, so it cannot update by itself');
   if (daily.on && !scheduler) throw new HttpError(503, 'Scheduled tasks are not on here');
-  kvSet(db, kvKey(id), JSON.stringify({ inputs, when: { time: daily.time, ...(daily.days ? { days: daily.days } : {}) } }));
+  // Kept as its own: each answer but one that is what its question starts from (or left empty where it starts from
+  // something), which follows About you or the last answer instead; the task leaves those for its runs to take afresh.
+  const starts = startsOf(db, id, recipe.fields);
+  const own: Record<string, string> = {};
+  for (const f of recipe.fields) {
+    if (f.type === 'file') continue;
+    const v = inputs[f.id] ?? '';
+    if (starts[f.id] !== undefined && (v === starts[f.id] || !v.trim())) continue;
+    own[f.id] = v;
+  }
+  kvSet(db, kvKey(id), JSON.stringify({ inputs: own, when: { time: daily.time, ...(daily.days ? { days: daily.days } : {}) } }));
   // The task follows: made, changed (its time, its days, its answers) or removed.
   const t = dailyTask(scheduler, id);
   if (daily.on) {
@@ -91,7 +132,7 @@ export function saveHome(db: DB, scheduler: Scheduler | undefined, id: string, r
         agent: 'claude',
         cwd: '~',
         schedule: { kind: 'daily', time: daily.time, ...(daily.days ? { days: daily.days } : {}) },
-        app: { id, inputs },
+        app: { id, inputs: own },
         enabled: true,
         ...(t?.failLimit !== undefined ? { failLimit: t.failLimit } : {}),
       },
