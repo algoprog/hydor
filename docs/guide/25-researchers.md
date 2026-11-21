@@ -290,7 +290,7 @@ Two ready-made apps, under **Work** on the [Apps](/apps) page, write up what you
 
 - "Set up Paper radar to follow cs.IR and cs.CL, with dense retrieval and query performance prediction as topics, and have it update every day at 7:30."
 - "What did Paper radar find for me today? Which papers touch my Hydor project?"
-- "Turn on Citation alerts for my papers (I publish as Omar Khattab) and tell me who cited ColBERT lately."
+- "Turn on Citation alerts for my papers (I publish as Gerard Salton) and tell me who cited "A vector space model for automatic indexing" lately."
 - "Add SIGIR, ACL and EMNLP to Deadline radar and remind me 21, 7 and 2 days before each deadline."
 - "Watch Hugging Face for new rerankers under 1B parameters with an Apache or MIT licence, and run my evaluation on each: python eval.py --model {model} in ~/rerank-eval, ndcg@10, my best is 0.512."
 - "Start a living related work on learned sparse retrieval, seeded with SPLADE and ColBERT, and draft its related-work section."
