@@ -10,8 +10,9 @@ export const plural = (n: number, one: string, many = one + 's') => `${n.toLocal
 /** How long, for a round or a goal's time so far, as the app writes durations everywhere (lib/format.ts). */
 export const spanText = (ms: number): string => {
   const secs = Math.max(0, Math.round(ms / 1000));
-  // The app's own way of writing a duration (lib/format.ts), in whole seconds at least: where it would say "400 ms", this says "0.0 s".
-  return secs === 0 ? '0.0 s' : duration(secs * 1000);
+  // Whole seconds under a minute ("0 s", "45 s": a clock that ticks needs no tenths), then the app's own way of writing a
+  // duration (lib/format.ts).
+  return secs < 60 ? `${secs} s` : duration(secs * 1000);
 };
 
 /** The time a goal has been at work, as the bar shows it: the server's count was true when the page got it, and runs on from then while a round runs or its checks do. */
