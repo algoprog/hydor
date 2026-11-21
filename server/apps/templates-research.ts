@@ -1264,8 +1264,8 @@ return {
     { id: 'note', label: 'What did not answer', type: 'text' },
   ],
   examples: [
-    { id: 'by-name', name: 'An author by name', inputs: { me: 'Gerard Salton' }, checks: ['{{answer.name}} contains Salton', '{{answer.papers}} is not empty'] },
-    { id: 'one-paper', name: 'One paper by its DOI', inputs: { me: 'Gerard Salton', papers: '10.1145/361219.361220' }, checks: ['{{answer.papers}} is not empty', '{{answer.total}} > 0'] },
+    { id: 'by-name', name: 'An author by name', inputs: { author: 'Gerard Salton' }, checks: ['{{answer.name}} contains Salton', '{{answer.papers}} is not empty'] },
+    { id: 'one-paper', name: 'One paper by its DOI', inputs: { author: 'Gerard Salton', papers: '10.1145/361219.361220' }, checks: ['{{answer.papers}} is not empty', '{{answer.total}} > 0'] },
   ],
 };
 

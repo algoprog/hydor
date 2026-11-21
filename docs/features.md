@@ -1444,12 +1444,14 @@ agents that speak ACP and take MCP servers.
   follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
   BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
   sentence, and whether it builds on, compares with or disputes your work; it says when the sentences could not be read and
-  tries them again at the next update), **New-model watch** (new Hugging Face
+  tries them again at the next update; it finds you by the id in About you), **New-model watch** (new Hugging Face
   models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
   those that beat your best), **Deadline radar** (your venues' deadlines from ccfddl and ai-deadlines, from AoE into your
   time zone, with reminders, page limits and templates; a venue neither list has is looked up on its website), **Living related work** (a page per topic that grows as papers
   appear, in themes, with a LaTeX related-work draft, its cite keys checked, and BibTeX) and **Gap finder** (project ideas from your papers and
-  this month's, each checked for prior work and sized to your compute).
+  this month's, each checked for prior work and sized to your compute). They start from About you (your fields, topics,
+  venues, author name and compute) and from your last answers, and write what only you read in your language; Hydor
+  itself keeps their calls to arXiv, OpenAlex and Semantic Scholar apart and asks again when one is busy.
 - **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
   link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
   to 30 papers into a kept spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
