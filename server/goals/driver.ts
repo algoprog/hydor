@@ -1682,6 +1682,10 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
   const notOver = () => {
     if (over) throw new HttpError(409, 'The goal is over: set a new one');
   };
+  // P2: rules and settings also on a goal stopped at a limit, which Give it more… can still carry on: they count from then.
+  const notEnded = () => {
+    if (over && g.status !== 'limit') throw new HttpError(409, 'The goal is over: set a new one');
+  };
   switch (a.action) {
     case 'stop':
     case 'clear': {
@@ -1865,7 +1869,7 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       break;
     }
     case 'settings': {
-      notOver();
+      notEnded();
       g.settings = { ...g.settings, ...a.settings };
       const q = g.question;
       if (q?.kind === 'way' && a.settings.noAnswerMin !== undefined) {
@@ -1876,14 +1880,14 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       break;
     }
     case 'rule': {
-      notOver();
+      notEnded();
       if (g.rules.length >= GOAL_MAX_RULES) throw new HttpError(400, `At most ${GOAL_MAX_RULES} rules: remove one first`);
       g.rules.push({ id: `r${rid()}`, text: a.text, at: Date.now() });
       commit(d, g);
       break;
     }
     case 'unrule': {
-      notOver();
+      notEnded();
       g.rules = g.rules.filter((r) => r.id !== a.id);
       commit(d, g);
       break;

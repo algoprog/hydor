@@ -2095,6 +2095,42 @@ test('a goal stopped at its limit can be given more: it goes on as after a check
   await rejects(act(C26, { action: 'change', contract: { limits: { rounds: 9 } } }), 409, /The goal is over: set a new one/);
 });
 
+test('P2: a goal stopped at its limit takes rules and settings, which count once Give it more carries it on; a goal reached or stopped refuses them', async () => {
+  const P2L = 'claude:goal-p2-limit';
+  const w = worktree();
+  sessions.add(P2L, { cwd: w.path, worktree: w });
+  await agreed(P2L, { limits: { rounds: 1 }, settings: { asks: 'own' } });
+  await turn(P2L, () => write(w.path, 'score.txt', '5\n'));
+  assert.equal(goal(P2L).status, 'limit');
+  await act(P2L, { action: 'rule', text: 'Keep the public API as it is' });
+  await act(P2L, { action: 'rule', text: 'No new dependencies' });
+  let g = goal(P2L);
+  assert.deepEqual(g.rules.map((r) => r.text), ['Keep the public API as it is', 'No new dependencies']);
+  assert.equal(g.status, 'limit', 'still stopped at its limit');
+  await act(P2L, { action: 'unrule', id: g.rules[1].id });
+  assert.deepEqual(goal(P2L).rules.map((r) => r.text), ['Keep the public API as it is']);
+  await act(P2L, { action: 'settings', settings: { asks: 'every', noAnswerMin: 0 } });
+  g = goal(P2L);
+  assert.deepEqual(g.settings, { asks: 'every', noAnswerMin: 0 });
+  assert.equal(g.status, 'limit');
+  // Given more: the next turn is asked which way (the new setting), with the rule in its message.
+  await act(P2L, { action: 'change', contract: { limits: { rounds: 3 } } });
+  assert.equal(headOf(P2L), 'which way next');
+  assert.match(last(P2L), /From the user \(for every round\):\n- Keep the public API as it is/);
+  assert.doesNotMatch(last(P2L), /No new dependencies/);
+  // Reached or stopped: refused.
+  await act(P2L, { action: 'stop' });
+  await rejects(act(P2L, { action: 'rule', text: 'Too late' }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'unrule', id: goal(P2L).rules[0].id }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'settings', settings: { asks: 'own' } }), 409, /^The goal is over: set a new one$/);
+  assert.equal(goal(P2L).status, 'stopped');
+  remember(P2L, (x) => (x.status = 'reached'));
+  await rejects(act(P2L, { action: 'rule', text: 'Too late' }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'unrule', id: goal(P2L).rules[0].id }), 409, /^The goal is over: set a new one$/);
+  await rejects(act(P2L, { action: 'settings', settings: { asks: 'own' } }), 409, /^The goal is over: set a new one$/);
+  assert.deepEqual(goal(P2L).rules.map((r) => r.text), ['Keep the public API as it is']);
+});
+
 // ---- the end-to-end run's rough edges ---------------------------------------------------------------------------------
 
 test('minutes without an answer are whole minutes: a fraction is refused wherever settings come in, never taken for 0 (wait for the person)', async () => {
