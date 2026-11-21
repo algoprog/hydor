@@ -914,7 +914,12 @@ agents that speak ACP and take MCP servers.
   country, time zone, currency, units) with Intl's data for every language. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
-  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Explore, one
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). The ten first ready-made tasks
+  start from About you and from your last answers (Compare products' and the news digest's region from your country; a
+  cover letter's background, a tone, a depth, a pace, a lesson's learners are remembered), write in your language
+  (a cover letter in the posting's, meeting notes and their email in the notes', a lesson in the one it is taught in),
+  and keep no English-only logic: Intl for weekdays and money, Intl.Segmenter to find passages in Japanese or Chinese,
+  clauses by § and Άρθρο as well as Article, and the shops, testers and established sources of many countries. Explore, one
   click from the top right of the start page, is a magazine made for you: it reads your profile, memory's notes about
   you and the titles of up to 1,000 of your latest sessions, has the helper model pick about six topics you would
   enjoy (half from your work, half from the rest of your life), finds each one's news of the past two weeks and long
