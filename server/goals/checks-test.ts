@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { GoalCheck } from '../../shared/goals.ts';
 import { netCutAvailable, sandboxShell } from '../agent/sandbox.ts';
-import { changedPaths, clipMiddle, diffText, evidenceFile, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
+import { changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
 import { cleanProtect, MAX_WILDCARDS } from './validate.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -126,6 +126,23 @@ test('a measured check holds when it meets its target; no number is an error; a 
   assert.match(crashed.detail ?? '', /exit code 2/);
 });
 
+test('a change is given to a reviewer with every file in it named first', () => {
+  const two = 'diff --git a/src/a.ts b/src/a.ts\nindex 1..2 100644\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-one\n+two\ndiff --git a/docs/my notes.md b/docs/my notes.md\nnew file mode 100644\n';
+  assert.equal(changedFilesLine(two), 'Every file that changed (2): src/a.ts, docs/my notes.md. No other file changed.');
+  // A file named twice (a mode change and a content change) counts once; git quotes a path with special characters.
+  assert.equal(changedFilesLine(`${two}diff --git "a/caf\\303\\251.txt" "b/caf\\303\\251.txt"\ndiff --git a/src/a.ts b/src/a.ts\n`), 'Every file that changed (3): src/a.ts, docs/my notes.md, caf\\303\\251.txt. No other file changed.');
+  assert.equal(changedFilesLine(`${two}\n(New files not tracked by git: notes.txt)\n`), 'Every file that changed (2): src/a.ts, docs/my notes.md. New files git does not track are named at the end. No other file changed.');
+  assert.equal(changedFilesLine('\n(New files not tracked by git: notes.txt)\n'), 'No file git tracks changed; the new files it does not track are named below, and nothing else changed.');
+  assert.equal(changedFilesLine(''), '');
+  // A file moved out of a folder is named where it was too: that folder did change.
+  assert.equal(
+    changedFilesLine('diff --git a/test/a.test.js b/src/a.js\nsimilarity index 100%\nrename from test/a.test.js\nrename to src/a.js\n'),
+    'Every file that changed (2): src/a.js, test/a.test.js. No other file changed.',
+  );
+  const many = Array.from({ length: 203 }, (_, i) => `diff --git a/f${i} b/f${i}`).join('\n');
+  assert.match(changedFilesLine(many), /^Every file that changed \(203\): f0, f1, .*f199 and 3 more\. No other file changed\.$/);
+});
+
 test('a person’s check holds only once they confirmed it, and nothing runs', async () => {
   const c: GoalCheck = { id: 'c9', kind: 'you', label: 'It reads well' };
   assert.equal((await runCheck(c, env())).holds, false);
@@ -140,7 +157,8 @@ test('a review: the reviewer gets the claim and the evidence named (the change, 
   assert.equal(r.detail, 'It quotes “changed line”.');
   const ev = reviewed[0].evidence;
   assert.equal(reviewed[0].claim, 'Every error says what to do');
-  assert.match(ev, /<change since the goal started>\ndiff --git/);
+  // The files that changed are named first, so the reviewer knows the list is whole (a file not in it did not change).
+  assert.match(ev, /<change since the goal started>\nEvery file that changed \(1\): [^\n]+\. No other file changed\.\n\ndiff --git/);
   assert.match(ev, /<file path="notes.md">\n# Notes/);
   assert.match(ev, /the rest left out/, 'a file is cut at 8000 characters');
   assert.match(ev, /<file path="gone.md">\n\(Left out: it does not exist\.\)/);
