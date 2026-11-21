@@ -307,6 +307,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 [Configurações → Apps](/settings?s=apps): o que os apps sabem sobre você e quais são executados sem perguntar. Mais em [Apps](/guide/apps).
 
+- [**Sobre você**](/settings?s=apps&find=About%20you): De onde os apps partem para fazer suas perguntas, para não perguntarem toda vez.
 - [**Executar sem perguntar**](/settings?s=apps&find=Run%20without%20asking): Os apps que os agentes executam por você sem perguntar antes; remova um para voltar a ser perguntado.
 
 ### Custom

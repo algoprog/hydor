@@ -287,12 +287,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Apps
-  [
-    'apps',
-    'About you',
-    'profile personal details preferences me myself where I live home city country language units metric imperial currency diet vegetarian allergies household family people at home streaming services netflix teams sports research fields topics venues conferences journals author orcid openalex compute gpu',
-    'What apps start their questions from, so they don’t ask every time',
-  ],
+  ['apps', 'About you', 'profile personal details preferences me myself where I live home city country language units metric imperial currency diet vegetarian allergies household family people at home streaming services netflix teams sports research fields topics venues conferences journals author orcid openalex compute gpu', 'What apps start their questions from, so they don’t ask every time'],
   ['apps', 'Run without asking', 'auto approve allow always permission ask before agent runs app trust', 'The apps agents run for you without asking first; remove one to be asked again'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
