@@ -9,11 +9,11 @@ import type { AppUi } from '@shared/app-ui';
 import { checkUi, cleanUi, defaultUi, pagesFor } from '@shared/app-ui';
 import { api, enc } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
-import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { Button, cx, Segmented, useConfirm } from '../../components/ui';
 import { AppView } from './View';
 import { sampleResult } from './sample';
+import { useStartBuilder } from './startBuilder';
 
 export { sampleResult } from './sample';
 
@@ -31,6 +31,7 @@ export function DesignEditor({ recipe, appId, template, session, onChange }: { r
   const [code, setCode] = useState<string | null>(null);
   const [codeErr, setCodeErr] = useState('');
   const [ask, confirmNode] = useConfirm();
+  const startBuilder = useStartBuilder();
   // Its latest finished run of the main flow with an answer: what the preview shows first.
   useEffect(() => {
     const id = appId ?? (template ? `tpl:${template}` : null);
@@ -49,7 +50,7 @@ export function DesignEditor({ recipe, appId, template, session, onChange }: { r
       ? tr(`Change the view of my app “${recipe.name}” (${appId}): `)
       : tr(`Design a view for my app “${recipe.name}” (${appId}): pages for its answer, with elements of its own that show it well, and events for what I can do there.`);
     if (session) composeInsert(text, session);
-    else go(`/?assistant=app-builder&prompt=${enc(text)}`);
+    else startBuilder(text);
   };
   const openCode = () => {
     setCode(JSON.stringify(ui ?? defaultUi(recipe), null, 2));

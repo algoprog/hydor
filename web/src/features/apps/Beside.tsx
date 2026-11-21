@@ -1,7 +1,7 @@
 // A template an agent builds, beside its conversation: each save leaves a card in the conversation, and on
 // a wide screen the newest opens the template's editor beside it (as a page being written opens), where it
-// changes as the agent saves and what you save reaches the agent with your next message. app_try leaves how
-// each try went; app_screen, the screen it gave.
+// changes as the agent saves and what you save reaches the agent with your next message. app_sketch leaves the
+// sketch of a new app before it is made (Sketch.tsx); app_try leaves how each try went; app_screen, the screen it gave.
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { ExternalLink, FlaskConical, LayoutGrid, PanelRight, X } from 'lucide-react';
@@ -13,6 +13,7 @@ import { closeCanvas, Grip } from '../pages/Canvas';
 import { CANVAS_MEDIA, useCanvas } from '../pages/state';
 import { appPath, money, runPath } from './api';
 import { BuilderPage } from './Builder';
+import { SketchRow } from './Sketch';
 
 /** Wide enough for the editor beside the conversation (as for pages). */
 const WIDE = CANVAS_MEDIA;
@@ -185,6 +186,7 @@ function ScreenRow({ item }: { item: ToolItem; sessionKey: string }) {
 }
 
 export const BUILDER_VIEWS = {
+  app_sketch: { place: 'answer' as const, Row: SketchRow },
   app_save: { place: 'answer' as const, Row: SavedRow },
   app_try: { place: 'answer' as const, Row: TriedRow },
   app_screen: { place: 'answer' as const, Row: ScreenRow },

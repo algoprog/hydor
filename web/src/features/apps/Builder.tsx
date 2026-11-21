@@ -9,7 +9,7 @@ import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
-import { allSteps, titleOf } from '@shared/app-manifest';
+import { allSteps, BUILTIN_ROOTS, momentOf, titleOf } from '@shared/app-manifest';
 import { tierLabel, tierProgram } from '@shared/tiers';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
@@ -40,6 +40,8 @@ import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
 import { FilesEditor, SecretsEditor } from './Needs';
+import { useStartBuilder } from './startBuilder';
+import { EstimateLine } from './Estimate';
 
 // The cards to pick from load with the catalog and its views, the first time A card… is picked.
 const CardPicker = lazy(() => import('./CardPicker'));
@@ -150,16 +152,17 @@ function PreviewBox({ note, children }: { note: ReactNode; children: ReactNode }
   );
 }
 
-/** The form as the app's page asks it, as it is on screen: a change shows at once. */
-function FormPreview({ fields }: { fields: AppField[] }) {
+/** The form as the app's page asks it, as it is on screen: a change shows at once. `bare`: without its box (a sketch's card has its own). */
+export function FormPreview({ fields, bare }: { fields: AppField[]; bare?: boolean }) {
   const shown = fields.filter((f) => f.label.trim());
   const [values, setValues] = useState<FormValues>(() => initialValues(shown));
   const [files, setFiles] = useState<FormFiles>({});
   // A question added or its kind, choices or first answer changed: the form starts again.
   const shape = JSON.stringify(shown.map((f) => [f.id, f.type, f.default ?? '', f.options ?? []]));
   useEffect(() => setValues(initialValues(shown)), [shape]);
+  const Box = bare ? BareBox : PreviewBox;
   return (
-    <PreviewBox note="As its page asks it">
+    <Box note="As its page asks it">
       {shown.length ? (
         <AppForm
           fields={shown}
@@ -178,9 +181,11 @@ function FormPreview({ fields }: { fields: AppField[] }) {
       ) : (
         <p className="text-[13px] leading-relaxed text-fg-3">No questions: it runs at once, without asking anything.</p>
       )}
-    </PreviewBox>
+    </Box>
   );
 }
+
+const BareBox = ({ children }: { note: ReactNode; children: ReactNode }) => <>{children}</>;
 
 /** A run's answer as a card, with made-up values in its shape (a card field: its card's example). */
 function AnswerPreview({ recipe }: { recipe: AppRecipe }) {
@@ -497,9 +502,11 @@ function AnswerRow({ f, n, onChange, ...nav }: { f: AnswerField; n: number; onCh
   );
 }
 
-/** A new app in words: the App builder makes it, in a session of its own. Or one from a file. */
+/** A new app in words: the App builder makes it, in a session of its own that starts at once. Or one from a file. */
 function Describe() {
   const [ask, setAsk] = useState('');
+  const start = useStartBuilder();
+  const make = () => ask.trim() && start(`${tr('Make me an app: ')}${ask.trim()}`);
   return (
     // On a phone the way to install a file goes under the box, so the title keeps its line.
     <section className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-2xl border border-accent/25 bg-accent-soft px-4 py-3.5 sm:px-5 sm:py-4">
@@ -511,14 +518,27 @@ function Describe() {
         <InstallFromFile />
       </span>
       <form
-        className="order-3 flex w-full gap-2"
+        className="order-3 flex w-full items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!ask.trim()) return;
-          go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
+          make();
         }}
       >
-        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls.replace('bg-bg-1', 'bg-panel'), 'min-w-0 flex-1')} />
+        {/* Two lines at first, growing with what is written; Enter makes it, Shift+Enter starts a new line. */}
+        <Grow
+          value={ask}
+          aria-label="Describe an app"
+          onChange={(e) => setAsk(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              make();
+            }
+          }}
+          placeholder="Keeps the links I send, sums each up, and lists the unread ones"
+          base={inputCls.replace('bg-bg-1', 'bg-panel')}
+          className="max-h-[132px] min-h-[62px] min-w-0 flex-1 leading-snug"
+        />
         <Button type="submit" variant="primary" disabled={!ask.trim()}>
           Make it
         </Button>
@@ -729,7 +749,8 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
     );
 
   const ids = recipe.fields.map((f) => f.id);
-  const unknown = [...used].filter((p) => p !== 'today' && !ids.includes(p));
+  // The built-in values (today, now, weekday…) are no questions: they fill themselves in.
+  const unknown = [...used].filter((p) => !BUILTIN_ROOTS.has(p) && !ids.includes(p));
   const unusedNeeded = recipe.fields.filter((f) => f.required && !used.has(f.id));
 
   const insert = (text: string) => {
@@ -928,6 +949,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
               <Section title="What it does" sub="Its steps: each can use the form’s answers, the built-in values (today, now…) and what the steps before it gave." actions={modeSwitch}>
                 <div className="space-y-3">
                   {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
+                  <EstimateLine recipe={recipe} appId={saved?.id ?? null} />
                   <StepsEditor
                     view={mode === 'graph' ? 'graph' : 'list'}
                     onPart={setPart}
@@ -968,7 +990,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
                     </button>
                   </div>
                   {preview ? (
-                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids }) || <span className="text-fg-3">Nothing yet.</span>}</div>
+                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids, moment: momentOf(Intl.DateTimeFormat().resolvedOptions().timeZone) }) || <span className="text-fg-3">Nothing yet.</span>}</div>
                   ) : (
                     <textarea
                       ref={prompt}
@@ -981,6 +1003,7 @@ export function BuilderPage({ id, template, from, turn, embedded, session }: { i
                     />
                   )}
                 </div>
+                <EstimateLine recipe={recipe} appId={saved?.id ?? null} className="mt-2.5" />
                 <div className="mt-2.5 space-y-1 text-[12px] leading-snug text-fg-3">
                   <div>
                     <code className="font-mono">{'{{question}}'}</code> is replaced by its answer. Text between <code className="font-mono">{'{{#question}}'}</code> and <code className="font-mono">{'{{/question}}'}</code> stays only when it was answered (and not with No).

@@ -139,13 +139,18 @@ For a big question that needs many searches, see deep research in [Deep research
 
 ### App builder
 
-"Makes your own apps: a form, steps, data and a screen" (see [Apps](/guide/apps)).
+"Makes your own apps: small tools for one job, with a form, steps and a view of their answer" (see [Apps](/guide/apps)).
 
-- It pins down what goes in, what comes out and what a good run looks like, asks only what changes the design, and says what it assumed.
-- It builds the app with tools of its own, picking the cheapest step for each part (a tool, a quick model answer, a rule, code) and an agent where judgement is needed.
+- It thinks with **Best**, the model [Settings → Models → Tiers](/settings?s=models&find=Tiers) names for the program it runs on: picking it on the start page picks that model, and the sessions the Apps page starts use it.
+- It pins down what goes in, what comes out and what a good run looks like, and reads the one or two ready-made apps closest to yours, to build the way they do.
+- For a new app, its first answer is a sketch, with nothing made yet: what the app asks, what it does, a made-up answer, what a run takes and costs, what it assumed, and at most three questions whose answers change the design, as choices to click. It builds the app when you press **Build it** (see [The sketch](/guide/apps#the-sketch)). For a change to an app you have, or when you say to just build it, it builds at once.
+- It builds the app with tools of its own, picking the cheapest step for each part (a tool, a quick model answer, a rule, code) and an agent where judgement is needed. For data, it calls the free services the ready-made apps use, or reads a service's documentation first, rather than an address from memory.
+- After it designs or changes the app's view, it looks at pictures of it (on a computer in the dark and in the light, and on a phone) and fixes what looks wrong.
 - It gives the app two to four examples with checks, tries them, and fixes what fails before handing it over, saying what a run costs and how long it takes.
 - When you change the app yourself, it builds on your change.
 - It uses the app-builder skill.
+
+The Apps page starts its sessions for you: **Make it** under **Describe an app, and an agent makes it**, **Describe it to an agent** when no app does what you searched for, and **Ask an agent to design it** or **Ask an agent to fix it** in an app's **Edit** each start one at once, with your words (see [Make your own app](/guide/apps#make-your-own-app)).
 
 ## Make an agent
 

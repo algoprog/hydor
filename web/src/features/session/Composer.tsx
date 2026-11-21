@@ -216,7 +216,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     const on = (e: Event) => {
       const d = (e as CustomEvent<Omit<ComposeDetail, 'files'> & { files?: Attachment[] }>).detail;
       // Taken already by another box of this session (it shows in two places): it goes once.
-      if (!d || d.result || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
+      if (!d || d.result || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length && !d.focus)) return;
       const n = now.current;
       // A card's Send button goes at once, as if its words were typed and sent, and what is being written stays in the
       // box; a follow-up's button (send: 'empty') goes at once into an empty box and otherwise joins what is written.

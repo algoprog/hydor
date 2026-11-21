@@ -297,7 +297,7 @@ export async function draftFromSession(d: Deps, key: string, turn?: number): Pro
     if (!raw.flow || !said) return { recipe: cleanRecipe({ ...recipe, flow: undefined }), parts };
     // Steps that do not check out are left out: the task, for one agent, stays.
     const problems = recipe.flow ? [...cleanFlow(raw.flow).errors, ...checkFlow(recipe).errors] : ['no steps'];
-    if (problems.length) return { recipe: cleanRecipe({ ...recipe, flow: undefined }), parts, note: `Its steps could not be drafted (${problems[0]}), so it is the task for one agent: Work in steps, beside The task, starts steps from it.` };
+    if (problems.length) return { recipe: cleanRecipe({ ...recipe, flow: undefined }), parts, note: `Its steps could not be drafted (${problems[0]}), so it is the task for one agent: under What it does, List or Graph turns it into steps.` };
     return { recipe, parts, note: 'Its steps come from the tools the session called: check them, and try it before you save it.' };
   } catch (e) {
     // Plain but usable: the request of the reply's turn as it was, its wording in one field to change.

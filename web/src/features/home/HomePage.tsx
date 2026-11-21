@@ -323,7 +323,9 @@ function StartComposer({
   }, [confidential, agent, acpId, cat, local, model]);
   // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides); in a place
   // where nothing was picked yet, so does the agent it opens with (the project's own), and so does an agent picked
-  // elsewhere that chose this place (`suggest`). What an agent the box set by itself suggests never undoes a pick.
+  // elsewhere that chose this place (`suggest`) or that a link names (New app's Describe it to an agent opens the App
+  // builder, which thinks with Best), unless the link names a model. What an agent the box set by itself suggests
+  // never undoes a pick.
   const pendingAcp = useRef<string | null>(null);
   const quiet = () => agentAuto.current && touched.current;
   useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, {
@@ -334,7 +336,7 @@ function StartComposer({
     setAcpId: (id) => void (pendingAcp.current = id),
     setModel: (m) => void (quiet() || (setModel(m), keepRun({ model: m }))),
     setMode: (m) => void (quiet() || (setMode(m), keepRun({ mode: m }))),
-    applyFirst: !!suggest || (!recorded && !link?.agent && !link?.model),
+    applyFirst: !!suggest || (!!link?.assistant && !link?.agent && !link?.model) || (!recorded && !link?.agent && !link?.model),
   });
 
   /** What the box shows, as this place's picks (with what each other program last ran with here; its agent if picked). */

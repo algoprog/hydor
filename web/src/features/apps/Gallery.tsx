@@ -41,6 +41,7 @@ import { PinMenuItem, PinnedRow } from './Pinned';
 import { gotPins, usePins } from './pins';
 import { isNew, RecentlyUsed, StartWith } from './Recent';
 import { statusBadge } from './status';
+import { useStartBuilder } from './startBuilder';
 
 export { statusBadge };
 
@@ -382,6 +383,7 @@ const GUIDE = '/guide/apps#what-an-app-is';
 export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) {
   const [g, setG] = useState<Gallery | null>(null);
   const [find, setFind] = useState('');
+  const startBuilder = useStartBuilder();
   // On a computer the page has its column (as on the other pages); narrower, the page header, its tabs and the kinds as chips.
   const wide = useMediaQuery('(min-width: 1024px)');
   const [blocksOpen, setBlocksOpen] = useState(false);
@@ -773,7 +775,7 @@ export function GalleryPage({ tab = 'agent' }: { tab?: 'agent' | 'connected' }) 
                   <Empty icon={<LayoutGrid size={20} />} title={own.length + ready.length ? 'No app does that yet' : 'Your apps will be here'}>
                     <span className="block">{own.length + ready.length ? 'Describe it, and an agent makes a small app for it: a form, the steps, and a view of the answer.' : 'Describe one, or use More → Save as an app in a session’s menu.'}</span>
                     <span className="mt-3 inline-flex">
-                      <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={() => go(`/?assistant=app-builder${finding ? `&prompt=${encodeURIComponent(`${tr('Make me an app: ')}${find.trim()}`)}` : ''}`)}>
+                      <Button size="sm" variant="secondary" icon={<Sparkles size={14} />} onClick={() => (finding ? startBuilder(`${tr('Make me an app: ')}${find.trim()}`) : go('/?assistant=app-builder'))}>
                         Describe it to an agent
                       </Button>
                     </span>

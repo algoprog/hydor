@@ -974,8 +974,17 @@ agents that speak ACP and take MCP servers.
   brought back, and each run keeps the version it ran. An app can live as a folder of files too (app.json,
   each step's instructions, code steps as functions, its screens, with a schema for editors), changed in any
   editor or by a coding agent, each saved change coming back as a version. The command line's app commands make a
-  app and its folder, try its examples as you save, and export and import it. Describe one on the New
-  app page and the App builder assistant makes it. Do this again… under the last reply of a turn that used a tool or showed a card
+  app and its folder, try its examples as you save, and export and import it. Describe one on the Apps or New
+  app page (a box that grows, Make it), or search for what no app does yet and press Describe it to an agent, and
+  a session with the App builder starts at once on your words, thinking with Best on the program and permissions you
+  picked last (Ask an agent to design it and Ask an agent to fix it start one too). The App builder reads the
+  ready-made apps closest to yours first, then shows a sketch before it makes anything: a card in the conversation
+  with the app's face, What it asks (its form), What it does (its steps in words, with their kinds' icons), What
+  you get (a made-up answer in its view or the plain card), a rough time and cost a run, the keys it needs, what it
+  assumed and up to three questions to click, with Build it (which sends your picks) and Change it. Before an app
+  has run, its What it does says what a run takes and costs, roughly, from its steps (by kind, and an agent's by its
+  tier; a repeat by its rounds, steps side by side by the longest); once it has finished runs, from the middle of
+  those. Do this again… under the last reply of a turn that used a tool or showed a card
   (or Save as an app in a session's menu, for its latest turn) turns that turn into an app: the helper model finds the
   message the work began with, the corrections after it ("in euros", "shorter") become the task's standing
   instructions, the reply's cards its card fields (its words beside them a Summary), this request's answers its first
@@ -983,9 +992,13 @@ agents that speak ACP and take MCP servers.
   words as a chip (a click keeps them as they are; selected words become a new question); steps are drafted from the
   tools it called (read a page, search the web) when they check out. Its Run it every… opens a new scheduled task
   with the turn's request. Agents build
-  apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step; its view too),
-  app_try (its examples or a set of answers, waited for, with the names its view uses that a try did not give),
-  app_screen and app_data (the records it keeps: read, or added to). A
+  apps with tools of their own: app_get (the user's apps, and the ready-made ones as worked examples: all in a line
+  each, the three closest to a description, or one whole with its code steps cut short), app_sketch (a new app's
+  sketch for the user, checked as a save is and saving nothing), app_save (checked first; whole, a patch or one
+  step; its view too), app_try (its examples or a set of answers, waited for, with the names its view uses that a
+  try did not give, and with look pictures of its view on a computer in the dark and the light and on a phone, drawn
+  by the capture browser), app_screen, app_data (the records it keeps: read, or added to) and app_services (the
+  free data services the ready-made apps use, each with a request to start from). A
   app an agent saves opens beside its conversation, where what you change and save reaches the agent with
   your next message (its next save reads your version first). A tool, model, code, data or app step that fails
   can have an agent do its work, so the run goes on; Edit shows the steps that had to, with Ask an agent to fix

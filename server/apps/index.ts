@@ -1245,7 +1245,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
+  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get (the ready-made ones too, to build like them: ready, like, tpl:<id>), app_sketch (a new app's sketch for the user, before anything is made), app_save (its view is its ui) and app_try (try its examples before you hand it over, look: true to see its view, and say what a run costs), app_screen for a screen, app_data for the records it keeps, and app_services for free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',
@@ -1278,7 +1278,7 @@ export const apps: Feature = {
     if (!mark)
       return {
         guides: [
-          { tools: ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data'], text: BUILDER_NOTE },
+          { tools: ['app_get', 'app_sketch', 'app_save', 'app_try', 'app_screen', 'app_data', 'app_services'], text: BUILDER_NOTE },
           ...[useNote(d.db)].filter((x): x is string => !!x).map((text) => ({ tools: ['use_app', 'find_apps'], text })),
         ],
       };
