@@ -95,6 +95,13 @@ export interface GoalPrivate {
   final?: { reran: number; review?: string };
   /** The status it had when the person paused it. */
   pausedFrom?: GoalState['status'];
+  /** When it was last paused (M1: news for its lead from work begun before then waits in the lead's held queue). */
+  pausedAt?: number;
+  /**
+   * M7b: when the stop of its team at a limit began (its subagents at work stopped, the lead marked as stopped): set until
+   * that is done, so a restart that cuts it has the tick finish it.
+   */
+  teamStop?: number;
 }
 
 /**

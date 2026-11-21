@@ -10,21 +10,21 @@
 // folder) could have written since the loop last looked at them: putBack is the one way it restores.
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { GOAL_MAX_RULES, GOAL_PATIENCE, GOAL_SETTINGS, goalOver, standing, tally, type GoalAction, type GoalCheck, type GoalContract, type GoalQuestion, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '../../shared/goals.ts';
+import { GOAL_MAX_RULES, GOAL_PATIENCE, GOAL_SETTINGS, goalMessageOf, goalOver, standing, tally, type GoalAction, type GoalCheck, type GoalContract, type GoalQuestion, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '../../shared/goals.ts';
 import type { NotifyEvent, SessionSummary, WorktreeInfo } from '../../shared/types.ts';
 import { netCutAvailable, sandboxAvailable, sandboxShell, type Shell } from '../agent/sandbox.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { spending } from '../budget/spend.ts';
-import { childKeys, parentOf as parentSession, reportOnItsWay, stillAtWork } from '../children/family.ts';
+import { ancestorsOf, betweenAgents, childKeys, parentOf as parentSession, reportOnItsWay, stillAtWork } from '../children/family.ts';
 import { modeFamily, neverAsks } from '../children/modes.ts';
 import { confidentialKey } from '../confidential/index.ts';
 import { customSettings } from '../custom/settings.ts';
 import type { DB } from '../db.ts';
 import type { Deps, TurnInfo } from '../features/types.ts';
 import { lastTurn, opensTurn } from '../opinion/turns.ts';
-import { sessionExtra } from '../sessionExtra.ts';
-import { boardNow, boardWaits, members as swarmMembers, stopMember } from '../swarm/index.ts';
+import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
+import { boardNow, boardWaits, members as swarmMembers } from '../swarm/index.ts';
 import { checkpoint as takeCheckpoint, restoreCheckpoint, restoreRefusal } from '../worktrees.ts';
 import { askMessage, draftMessage, draftNotes, reminderMessage, restartedMessage, roundMessage } from './brief.ts';
 import { changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
@@ -218,7 +218,8 @@ const leadsSwarm = (d: Pick<Deps, 'db'>, key: string) => sessionExtra(d.db, key)
  */
 export function goalTeamChange(db: DB, key: string, patch: Record<string, unknown>): string | null {
   const g = loadGoal(db, key);
-  if (!g || goalOver(g.status)) return null;
+  // A goal at its limit is not over for this (M6): Give it more… can still carry it on.
+  if (!g || (goalOver(g.status) && g.status !== 'limit')) return null;
   const on = (v: unknown) => v != null && v !== false && v !== '';
   if (patch.swarm === 'campaign' || on(patch.research) || on(patch.arena)) return 'This session has a goal: stop the goal first, or lead a swarm with it.';
   return null;
@@ -293,11 +294,23 @@ export function idle(d: Deps, key: string, now = Date.now(), o: { heldQueue?: bo
  * as those, commands its turn started that still run after it (Codex: openCommands; a dev server left running is waited
  * for no longer than a background task). Not what waits in its queue.
  */
-function atWork(d: Deps, s: SessionSummary, now = Date.now()): boolean {
+function atWork(d: Deps, s: SessionSummary, now = Date.now(), seen = new Set<string>()): boolean {
   if (liveBusy(s) || d.sessions.delivering?.(s.key)) return true;
-  const left = stillAtWork(s);
-  if (left.subagents) return true;
-  return (!!left.background || !!s.live?.openCommands) && now - (s.endedAt ?? now) < BACKGROUND_GRACE_MS;
+  seen.add(s.key);
+  // Its program's own subagents; its Hydor subagents by their own work (M2): one in a turn, starting, waiting or being
+  // stopped (SessionManager.stop's stopping, which the running children leave out) is at work; one whose only work left
+  // is background commands gets the same grace as the session's own, from its last turn's end, or a dev server one of
+  // them left running would hold the round for ever (the session manager counts it among the running children as long as
+  // it runs). For every session with a goal (M5).
+  const own = stillAtWork({ ...s, helpers: 0 });
+  if (own.subagents) return true;
+  const kids = childKeys(d.db, s.key);
+  if (!kids.length && s.helpers) return true;
+  for (const k of kids) {
+    const c = seen.has(k) ? null : d.sessions.summary(k);
+    if (c && atWork(d, c, now, seen)) return true;
+  }
+  return (!!own.background || !!s.live?.openCommands) && now - (s.endedAt ?? now) < BACKGROUND_GRACE_MS;
 }
 
 /** L2: how many commands the session's agent started still run (Codex keeps an interrupted turn's commands running). */
@@ -481,11 +494,8 @@ async function workedSince(d: Deps, s: SessionSummary, at: number): Promise<bool
  * confidential subagent of a session that is not, must not hold the goal for ever).
  */
 export async function reportsPending(d: Deps, key: string, now = Date.now()): Promise<boolean> {
-  // A swarm's lead (S2.1) also waits for a member being stopped (stopping is not counted among its running children).
-  const team = leadsSwarm(d, key);
   for (const k of childKeys(d.db, key)) {
     const s = d.sessions.summary(k);
-    if (team && s?.live?.status === 'stopping') return true;
     if (!s) continue;
     if (confidentialKey(d.db, k) && !confidentialKey(d.db, key)) continue;
     if (reportOnItsWay(k)) return true;
@@ -557,12 +567,14 @@ function holdsNow(d: Deps, key: string, w: WorktreeInfo, since: Since): Hold | n
 const restoring = new Map<string, Promise<unknown>>();
 
 /**
- * Waits for a restore of the session's files in progress, if any, so no message starts its agent halfway through one.
- * It holds only messages to this session (another session in the folder is caught by the looks before the reset), and
- * not for long: the reset's four git steps give up after two minutes each.
+ * Waits for a restore of the session's files in progress, if any, so no message starts its agent halfway through one:
+ * its own, or (M8) that of the session that started it, and so on up, whose folder its Hydor subagents work in (a
+ * member woken during the reset would write in a folder being reset, and what it wrote could be wiped, not saved).
+ * Another session in the folder is caught by the looks before the reset. Not for long: the reset's four git steps give
+ * up after two minutes each.
  */
-export async function restoreSettled(key: string) {
-  await restoring.get(key)?.catch(() => {});
+export async function restoreSettled(key: string, db?: DB) {
+  for (const k of [key, ...(db ? ancestorsOf(db, key) : [])]) await restoring.get(k)?.catch(() => {});
 }
 
 /** How the loop saves the folder in a checkpoint; tests do something while it runs (null puts it back). */
@@ -895,7 +907,10 @@ function applyPending(g: StoredGoal) {
 // ---- where it goes next ---------------------------------------------------------------------------------------
 
 function pause(d: Deps, g: StoredGoal, reason: string, o: { notice?: boolean } = {}) {
-  if (g.status !== 'paused') g._.pausedFrom = g.status;
+  if (g.status !== 'paused') {
+    g._.pausedFrom = g.status;
+    g._.pausedAt = Date.now();
+  }
   setStatus(g, 'paused');
   g.reason = reason;
   commit(d, g);
@@ -990,16 +1005,17 @@ function halfWithout(g: StoredGoal): number | undefined {
 }
 
 /** The checkpoint of a round a limit stopped midway, taken once its agent was told to stop: Keep anyway on it brings its work back. */
-async function halfRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, n: number, o: { memberAtWork?: boolean; commandRunning?: boolean } = {}) {
+async function halfRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, n: number, o: { late?: string[]; swarm?: boolean; commandRunning?: boolean } = {}) {
   const f = fresh(d, g);
-  // S4.2: a swarm's member still at work after the wait: the report says so (what it writes after is not the round's).
+  // S4.2, M3: a subagent still at work after the wait: the report names it (what it writes after is not the round's).
   // L2: a command the agent started still running then: the round and the report say so, so nobody takes the folder for final.
-  if (f && (o.memberAtWork || o.commandRunning)) {
+  const late = o.late ?? [];
+  if (f && (late.length || o.commandRunning)) {
     if (o.commandRunning) {
       const r = f.rounds.find((y) => y.n === n);
       if (r?.why === HALF) r.why = HALF_RUNNING;
     }
-    if (f.report) f.report = { ...f.report, summary: [f.report.summary, o.memberAtWork ? MEMBER_LATE(n) : '', o.commandRunning ? COMMAND_LATE(n) : ''].filter(Boolean).join(' ') };
+    if (f.report) f.report = { ...f.report, summary: [f.report.summary, late.length ? TEAM_LATE(n, late, !!o.swarm) : '', o.commandRunning ? COMMAND_LATE(n) : ''].filter(Boolean).join(' ') };
     commit(d, f);
   }
   const w = f?.undo ? place(d, f.key, f)?.w : undefined;
@@ -1019,8 +1035,14 @@ const HALF_RUNNING = 'Stopped at the limit midway; a command the agent started w
 /** L2: and the limit report's sentence for it. */
 const COMMAND_LATE = (n: number) => `A command the agent started was still running when round ${n}’s files were saved: what it writes after that is in the folder but not in the round.`;
 
-/** The limit report's sentence when a swarm's member was still at work as a half round's files were saved. */
-const MEMBER_LATE = (n: number) => `A member of the swarm was still at work when round ${n}’s files were saved: what it wrote after that is in the folder but not in the round.`;
+/** The limit report's sentence naming the subagents (a swarm's members) still at work as a half round's files were saved. */
+const TEAM_LATE = (n: number, titles: string[], swarm: boolean) => {
+  const one = titles.length === 1;
+  const names = titles.map((t) => `“${clip(t, 60)}”`);
+  const list = one ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  const who = swarm ? `The swarm’s ${one ? 'member' : 'members'}` : `The ${one ? 'subagent' : 'subagents'}`;
+  return `${who} ${list} ${one ? 'was' : 'were'} still at work when round ${n}’s files were saved: what ${one ? 'it writes' : 'they write'} after that is in the folder but not in the round.`;
+};
 
 /** S2.5: how many of the lead's members worked since `since` (began or ended a turn). */
 async function membersWorked(d: Deps, key: string, since: number): Promise<number> {
@@ -1034,18 +1056,69 @@ async function membersWorked(d: Deps, key: string, since: number): Promise<numbe
 
 /** S5.2: why the goal of a swarm's lead paused when the person stopped the whole team (Stop all). */
 export const STOPPED_SWARM = 'You stopped the swarm. Resume checks what it did.';
+/** M5: the same for a session that has Hydor subagents and does not lead a swarm. */
+export const STOPPED_TEAM = 'You stopped the agent and its subagents. Resume checks what they did.';
 
 /**
- * S5.2: the person stopped a swarm's lead and its members (the session's Stop all, or the board's while a round is at
- * work): the goal pauses as when they stop the agent, whether the lead was in a turn or waiting for its members (then no
- * turn of its ends to say so, and the round would be checked and the next one sent). Resume checks what the round did.
- * Only for a session that leads a swarm and while a round is at work.
+ * S5.2, M5: the person stopped a session and its Hydor subagents (the session's Stop all, or a swarm board's while a round
+ * is at work): the goal pauses as when they stop the agent, whether the session was in a turn or waiting for its
+ * subagents (then no turn of its ends to say so, and the round would be checked and the next one sent). Resume checks
+ * what the round did. For every session with a goal that has Hydor subagents (a swarm's lead, or one that started them
+ * itself: the swarm turned off mid-round is still a team), while a round is at work.
  */
 export function goalStopAll(d: Deps, key: string) {
-  if (!leadsSwarm(d, key)) return;
+  const swarm = leadsSwarm(d, key);
+  if (!swarm && !childKeys(d.db, key).length) return;
   const g = loadGoal(d.db, key);
   if (!g || (g.status !== 'working' && g.status !== 'checking')) return;
-  pause(d, g, STOPPED_SWARM);
+  pause(d, g, swarm ? STOPPED_SWARM : STOPPED_TEAM);
+}
+
+/**
+ * M3: the session's Hydor subagents at work in any sense: in a turn or starting, between turns with background tasks or
+ * commands still running, or waiting to carry on after their plan's usage limit (a resume scheduled).
+ */
+function childrenAtWork(d: Deps, key: string): string[] {
+  return childKeys(d.db, key).filter((k) => {
+    const s = d.sessions.summary(k);
+    if (!s) return false;
+    const left = stillAtWork(s);
+    return liveBusy(s) || !!left.subagents || !!left.background || !!s.live?.openCommands || !!s.resumeAt || !!d.sessions.delivering?.(k);
+  });
+}
+
+/**
+ * M3: one subagent stopped at its lead's limit, as Stop all stops it: marked as stopped with its parent (its cut turn is
+ * reported to nobody), and a swarm's member as stopped (messages no longer wake it), its scheduled resume after a usage
+ * limit cancelled, and then its turn, its background tasks and its own subagents stopped (SessionManager.stopAll).
+ */
+async function stopChild(d: Deps, k: string, swarm: boolean) {
+  const now = Date.now();
+  setSessionExtra(d.db, k, { stoppedWithParent: now, ...(swarm ? { swarmStopped: now } : {}) });
+  d.sessions.emit('resumeCancelled', k);
+  await d.sessions.stopAll(k).catch(() => {});
+}
+
+/**
+ * M1, M3, M7b: a limit stops the session's team: the session marked as Stop all marks it (news of its subagents' work
+ * from before now waits in its held queue instead of waking it), its turn interrupted, and every subagent at work stopped
+ * (stopChild), those that appear meanwhile too (a start_child_session in flight: `again` looks for them). The goal is
+ * marked while this is under way (teamStop), so a restart that cuts it has the tick finish it.
+ */
+async function stopTeam(d: Deps, key: string, stopped = new Set<string>()) {
+  const swarm = leadsSwarm(d, key);
+  setSessionExtra(d.db, key, { stoppedAll: Date.now() });
+  const st = d.sessions.summary(key)?.live?.status;
+  if (st === 'working' || st === 'waiting' || st === 'starting') await d.sessions.interrupt(key).catch(() => {});
+  const again = async () => {
+    for (const k of childrenAtWork(d, key))
+      if (!stopped.has(k)) {
+        stopped.add(k);
+        await stopChild(d, k, swarm);
+      }
+  };
+  await again();
+  return again;
 }
 
 /** Stops a goal for a reason of the app's (its session archived or replaced): the files stay as they are. */
@@ -1707,6 +1780,9 @@ async function turnStep(d: Deps, key: string, t: { endedAt: number; startedAt: n
   // S2.1: the round of a swarm is not over while its board has posts the lead has not had: they go to it now, once (not
   // when their timer says: progress alone would hold the round five minutes), and its next turn's end comes back here.
   if (await boardFirst(d, g)) return;
+  // M4: looked at again with nothing awaited from here to the checks' start: a board batch (its own 2 s timer) or a
+  // message may have woken the session while the transcript was read. Its next turn's end comes back here.
+  if (!idle(d, key, now)) return;
   setStatus(g, 'checking');
   commit(d, g);
   await checkStep(d, key);
@@ -1892,6 +1968,8 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       await step(key, async () => {
         const f = fresh(d, g);
         if (!f || f.status !== 'paused') return;
+        // M1: what its subagents and board held for the session while the goal was paused or stopped goes first.
+        releaseHeldNews(d, key);
         f.reason = undefined;
         f._.pausedFrom = undefined;
         // After a reset that did not finish (I2), the round it was for is already recorded as it stands and "where the loop
@@ -2087,6 +2165,9 @@ function usedUp(d: Deps, g: StoredGoal, limits: GoalContract['limits']): string 
  */
 async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction, { action: 'change' }>) {
   if (g.status !== 'limit') throw new HttpError(409, 'The goal is over: set a new one');
+  // M6: the session may have become a team a goal does not go with since it stopped.
+  const team = teamRefusal(sessionExtra(d.db, key));
+  if (team) throw new HttpError(409, team);
   const sent = (a.contract ?? {}) as Record<string, unknown>;
   if (sent.limits == null || sent.checks !== undefined || sent.protect !== undefined) throw new HttpError(409, 'The goal stopped at its limit: only its limits can change, to give it more');
   const c = cleanContract({ limits: sent.limits }, g.contract, {});
@@ -2098,6 +2179,8 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
   await step(key, async () => {
     const f = fresh(d, g);
     if (!f || f.status !== 'limit') return;
+    // M1: what its subagents and board held for the session since the limit goes first.
+    releaseHeldNews(d, key);
     // J2: a half round whose checkpoint a restart kept from being taken gets it below (where the files are left as well).
     const half = halfWithout(f);
     f.contract = { ...f.contract, limits };
@@ -2116,6 +2199,18 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
     const h = fresh(d, f);
     if (h?.status === 'checking') await afterRound(d, h);
   });
+}
+
+/**
+ * M1: the goal goes on (Resume, Give it more…): the session's queue, held while it was stopped or the goal paused or over
+ * (children/family.ts holdsNewsFor), goes now when it holds nothing but what agents sent it (its subagents' reports, its
+ * board's batches) or the loop's own messages; one with something the person wrote waits for them to press Resume there.
+ */
+function releaseHeldNews(d: Deps, key: string) {
+  const s = d.sessions.summary(key);
+  if (!s?.queueHeld || !s.queue?.length) return;
+  if (!s.queue.every((m) => betweenAgents(m.text) || !!goalMessageOf(m.text))) return;
+  d.sessions.resumeQueue(key);
 }
 
 /** Where the loop leaves the files, from the folder as it is. */
@@ -2386,7 +2481,7 @@ export async function tick(d: Deps, now = Date.now()) {
   const sweep = now - swept >= SWEEP_MS;
   if (sweep) swept = now;
   for (const g of allGoals(d.db)) {
-    if (goalOver(g.status) && !g._.restoreTo && !sweep) continue;
+    if (goalOver(g.status) && !g._.restoreTo && !g._.teamStop && !sweep) continue;
     try {
       tickOne(d, g, now);
     } catch (e) {
@@ -2414,6 +2509,21 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
         const f = fresh(d, g);
         const w = f?.undo ? place(d, key, f)?.w : undefined;
         if (f?._.restoreTo) await (w ? unfinished(d, f, w) : Promise.resolve(remember(d, f, (x) => (x._.restoreTo = undefined))));
+      }),
+    );
+    return;
+  }
+  // M7b: a restart cut the stop of its team at a limit: it is done now (the half round's missing checkpoint is taken by
+  // the person's next say or Give it more…, J2).
+  if (g._.teamStop) {
+    launch(
+      key,
+      drive(key, async () => {
+        const f = fresh(d, g);
+        if (!f?._.teamStop) return;
+        const again = await stopTeam(d, key);
+        await again();
+        remember(d, f, (x) => (x._.teamStop = undefined));
       }),
     );
     return;
@@ -2462,23 +2572,27 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
           if (f?.status !== 'working') return;
           const mid = f.round;
           atLimit(d, f, lim);
-          const st = d.sessions.summary(key)?.live?.status;
-          if (st === 'working' || st === 'waiting' || st === 'starting') await d.sessions.interrupt(key).catch(() => {});
-          // S4.2: a swarm's members at work stop too, so none goes on spending after the goal stopped. Stopped as the lead's
-          // swarm_stop does: their cut turns wake nobody with a report, and messages no longer wake them (message_child
-          // gives one more to do).
-          const crew = leadsSwarm(d, key) ? childKeys(d.db, key).filter((k) => liveBusyKey(d, k)) : [];
-          for (const k of crew) await stopMember(d, k).catch(() => {});
-          // The round stopped midway stays as the team left it: its checkpoint once the agent (and its members) stopped, a
-          // while at most; a member still at work then is said in the report.
+          // S4.2, M1, M3: the session's team stops with it (stopTeam), so none of it goes on spending or writing after the
+          // goal stopped, and news of it wakes the session no more (held); what does not stop when told (a subagent slow to
+          // answer, a command Codex runs on) is waited for, then named in the report. Marked in the goal until done (M7b).
+          remember(d, f, (x) => (x._.teamStop = Date.now()));
+          const again = await stopTeam(d, key);
+          // The round stopped midway stays as the team left it: its checkpoint once the agent and its subagents stopped, a
+          // while at most. One still at work then is named in the report.
           // L2: and once the commands its turn started have ended too (Codex runs them on after an interrupt, and nothing
           // can stop them from here): at most two minutes for those; still running then, the round and the report say so.
           if (mid != null) {
-            const teamBusy = () => liveBusyKey(d, key) || crew.some((k) => liveBusyKey(d, k));
+            const teamBusy = () => liveBusyKey(d, key) || childrenAtWork(d, key).length > 0;
             const open = () => openCommands(d, key) > 0;
             for (let i = 0; i < LIMIT_LOOKS_COMMANDS && (open() || (i < LIMIT_LOOKS && teamBusy())); i++) await new Promise((r) => setTimeout(r, limitWaitStep));
-            await halfRound(d, f, mid, { memberAtWork: crew.some((k) => liveBusyKey(d, k)), commandRunning: open() });
           }
+          // And one more look: a subagent that appeared while the stop was applied (a start_child_session in flight).
+          await again();
+          if (mid != null) {
+            const late = childrenAtWork(d, key).map((k) => d.sessions.summary(k)?.title || k);
+            await halfRound(d, f, mid, { late, swarm: leadsSwarm(d, key), commandRunning: openCommands(d, key) > 0 });
+          }
+          remember(d, f, (x) => (x._.teamStop = undefined));
         }),
       );
       return;
@@ -2582,6 +2696,7 @@ async function quiet(d: Deps, key: string, sentAt: number, now: number) {
     if (now - seen.at < UNSENT_MS) return;
   } else if (handled >= sentAt && g.status === 'working' && g.round != null && !g._.askTurn) {
     quietSince.delete(key);
+    // (Idle was looked at above with nothing awaited since: boardFirst awaits nothing when the board has nothing.)
     if (await boardFirst(d, g)) return;
     setStatus(g, 'checking');
     commit(d, g);
