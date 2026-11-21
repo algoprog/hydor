@@ -82,6 +82,8 @@ interface Fake {
   model?: string;
   mode?: string;
   live?: LiveState['status'];
+  /** Background tasks of its own that are running (kind: local_bash, local_agent…). */
+  tasks?: { id: string; description: string; kind: string; status: string }[];
   /** Run by another app (a terminal, another copy of Hydor on this computer). */
   external?: ExternalState;
   items: TimelineItem[];
@@ -113,7 +115,7 @@ class Sessions extends EventEmitter {
       acpName: f.acpAgent === 'console' ? 'Custom' : undefined,
       model: f.model,
       stats: {} as any,
-      live: f.live ? { status: f.live, startedAt: 1, pendingApprovals: 0, mode: f.mode, model: f.model } : null,
+      live: f.live ? { status: f.live, startedAt: 1, pendingApprovals: 0, mode: f.mode, model: f.model, backgroundTasks: f.tasks } : null,
       external: f.external ?? null,
       extra: extra ? JSON.parse(extra) : undefined,
       updatedAt: Date.now(),
@@ -840,6 +842,33 @@ test('a helper whose turn a restart of the app cut is not run again a tier up; o
   const m = sessions.created.length;
   await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
   assert.equal(sessions.created.length, m + 1, 'a helper started again, a tier up');
+});
+
+test('a helper whose first turn ends with work of its own still running is not judged, nor are its later turns; one with nothing running is judged as before', async () => {
+  const k = leadKey('bg1');
+  await call(k, 'start_child_session', { brief: 'Translate the docs into seven languages.', tier: 'quick', title: 'Translations' });
+  const a = newest();
+  verdict = '{"pass": false, "why": "it says the translations are not finished"}';
+  sessions.all.get(a)!.tasks = [{ id: 't1', description: 'npm run i18n:translate', kind: 'local_bash', status: 'running' }];
+  finish(a, 'The translations are still running, I will check them when they finish.');
+  const n = sessions.created.length;
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n, 'not run again beside itself');
+  assert.ok(sessionExtra(db, a).stepJudged, 'marked as judged');
+  assert.match(sessions.delivered.at(-1)!.text, /still running/);
+  // Its next turn, once the command has ended, answers a message and is not judged by the brief either.
+  sessions.all.get(a)!.tasks = [];
+  finish(a, 'I could not finish the Greek one.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n, 'its next turn is not judged either');
+  // Nothing running: judged as before.
+  await call(k, 'start_child_session', { brief: 'Translate the docs into seven languages.', tier: 'quick', title: 'Translations 2' });
+  const b = newest();
+  finish(b, 'I gave up on the Greek one.');
+  const m = sessions.created.length;
+  await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, m + 1, 'judged, and run again a tier up');
+  verdict = '{"pass": true, "why": "it does the job"}';
 });
 
 test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {
