@@ -228,6 +228,24 @@ function checksOf(answer: AnswerField[], cards: { id: string; data: Record<strin
   return out.filter((r) => !('error' in readRule(r))).slice(0, 10);
 }
 
+/** How often the helper is asked for a draft before the plain one is given instead. */
+const DRAFT_TRIES = 3;
+
+/**
+ * The helper's draft as JSON, asked again when its answer was no JSON: a small model slips now and then (on the live
+ * app about one answer in three, when the helper work had moved to a cheaper model), and the next answer usually
+ * holds. Anything else (no model to reach, a stop) is not asked again.
+ */
+async function helperDraft(db: Deps['db'], q: Parameters<typeof helperJson>[1]): Promise<Record<string, unknown>> {
+  for (let n = 1; ; n++) {
+    try {
+      return await helperJson<Record<string, unknown>>(db, q, 'an app');
+    } catch (e) {
+      if (n >= DRAFT_TRIES || q.signal?.aborted || !(e instanceof HttpError && e.status === 502 && /did not answer with/.test(e.message))) throw e;
+    }
+  }
+}
+
 export async function draftFromSession(d: Deps, key: string, turn?: number): Promise<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }> {
   const s = d.sessions.summary(key);
   if (!s) throw new HttpError(404, 'No such session');
@@ -266,7 +284,7 @@ export async function draftFromSession(d: Deps, key: string, turn?: number): Pro
   const messages = t.messages.map((m, i) => `<message n="${i + 1}">\n${m.length > (i === t.messages.length - 1 ? REQUEST_MAX : MESSAGE_MAX) ? `${m.slice(0, i === t.messages.length - 1 ? REQUEST_MAX : MESSAGE_MAX)}… (cut)` : m}\n</message>`).join('\n');
   const fieldsSaid = fixed.map((f) => `- ${f.id}: ${f.type === 'ui' ? `the ${f.ui} card (“${f.label}”)` : 'markdown: the words beside the cards'}`).join('\n');
   try {
-    const raw = await helperJson<Record<string, unknown>>(
+    const raw = await helperDraft(
       d.db,
       {
         system:
@@ -277,7 +295,6 @@ export async function draftFromSession(d: Deps, key: string, turn?: number): Pro
         maxTokens: said ? 6000 : 4000,
         timeoutMs: 100_000,
       },
-      'an app',
     );
     // The request: the message the helper says the task began with (else the latest); the ones after it, its corrections.
     const n = Number(raw.request);
