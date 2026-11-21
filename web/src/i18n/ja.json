@@ -24875,6 +24875,7 @@
   "{0}: try again in a moment": "{0}：しばらくしてからもう一度お試しください",
   "{0}: wait for it to finish first": "{0}：先に完了するまでお待ちください",
   "goal::Goal": "ゴール",
+  "goal::Goals": "ゴール",
   "goal::You": "あなた",
   "goal::Needs": "必要な値",
   "goal::Goal reached": "ゴール達成",

@@ -24875,6 +24875,7 @@
   "{0}: try again in a moment": "{0} : réessayez dans un instant",
   "{0}: wait for it to finish first": "{0} : attendez d’abord qu’il soit terminé",
   "goal::Goal": "Objectif",
+  "goal::Goals": "Objectifs",
   "goal::Start": "Démarrer",
   "goal::Kept": "Gardé",
   "goal::Undone": "Annulé",

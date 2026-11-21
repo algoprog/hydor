@@ -84,6 +84,8 @@ export interface FeatureSection {
   /** One line under the title. */
   sub: string;
   Body: ComponentType;
+  /** The part of the app whose words the label is in (data-i18n): the dictionaries may tell its word from the same word elsewhere ("goal::Goals"). */
+  part?: string;
 }
 
 /** A start option changed; `how.auto` when it set itself rather than being picked. */

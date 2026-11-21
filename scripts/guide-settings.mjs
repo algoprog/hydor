@@ -19,6 +19,8 @@ function rows(name) {
     .map((l) => [...l.matchAll(/'([^']*)'/g)].map((m) => m[1]));
 }
 const SECTIONS = rows('SECTIONS'); // [id, label, tab, sub]
+/** A section whose label is the words of one part of the app (data-i18n in the page): the dictionary may hold its own entry ("goal::Goals"). */
+const SECTION_PART = { goals: 'goal' };
 const OPTIONS = rows('OPTIONS'); // [section, words, keywords, text, title?]
 
 /** The guide topic that explains each section (SECTION_TOPIC in shared/find-catalog.ts, which the sections' "Learn more" opens too). */
@@ -204,8 +206,9 @@ for (const lang of Object.keys(TEXT)) {
       if (group !== tab) continue;
       const topic = TOPIC[id];
       if (!topic) throw new Error(`No guide topic for the Settings section "${id}": add it to TOPIC in scripts/guide-settings.mjs`);
-      out.push(`### ${tr(label)}`, '');
-      out.push(`[${tr('Settings')} → ${tr(label)}](/settings?s=${id})${t.colon}${lower(tr(sub), lang)}${t.stop}${t.gap}${t.more}${t.gap}[${topicTitle(lang, topic)}](/guide/${topic})${t.stop}`, '');
+      const name = (SECTION_PART[id] && dict[`${SECTION_PART[id]}::${label}`]) || tr(label);
+      out.push(`### ${name}`, '');
+      out.push(`[${tr('Settings')} → ${name}](/settings?s=${id})${t.colon}${lower(tr(sub), lang)}${t.stop}${t.gap}${t.more}${t.gap}[${topicTitle(lang, topic)}](/guide/${topic})${t.stop}`, '');
       for (const [sid, words, , text] of OPTIONS) {
         if (sid !== id) continue;
         const x = tr(text).replace(/[.。]$/, '');

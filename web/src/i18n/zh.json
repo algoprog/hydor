@@ -26737,6 +26737,7 @@
   "{0}: try again in a moment": "{0}：请稍后再试",
   "{0}: wait for it to finish first": "{0}：请先等它运行完毕",
   "goal::Goal": "目标",
+  "goal::Goals": "目标",
   "goal::Needs": "需要达到",
   "goal::Target": "目标值",
   "goal::Reviewer": "审查者",
