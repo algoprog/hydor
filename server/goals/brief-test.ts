@@ -246,7 +246,7 @@ test('S2.3, S2.4: a swarm lead’s round message ends with the swarm’s paragra
         ...Array.from({ length: MEMBERS_NAMED - 3 }, (_, i) => `- “Angle ${i + 4}” (waiting for you)`),
         '- and 2 more',
       ].join('\n'),
-      'The round is over when you have called goal_report (what the swarm did, what remains) and every member’s turn has ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
+      'Call goal_report (what the swarm did, what remains) once your members have reported, not when you start them. The round is over when every member’s turn and yours have ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
       GOAL_FOOT,
     ].join('\n\n'),
   );

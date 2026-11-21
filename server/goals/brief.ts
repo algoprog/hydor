@@ -176,7 +176,7 @@ function swarmClose(g: Pick<GoalState, 'rounds'>, team: NonNullable<RoundBrief['
     'You lead a swarm in this goal. Put your members on what does not hold yet: one angle or one check each, and tell each which files are its own, because they all work in this folder (give none a worktree or folder of its own: the app checks this folder, and can only undo a round whose work is all here). Pass on what the user asked for above and what must not change.',
     `${undone}Members from earlier rounds are still there and remember their work: give them their next step with message_child, start a new member only for a new angle, and stop one whose angle is used up with swarm_stop.`,
     now,
-    'The round is over when you have called goal_report (what the swarm did, what remains) and every member’s turn has ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
+    'Call goal_report (what the swarm did, what remains) once your members have reported, not when you start them. The round is over when every member’s turn and yours have ended: then the app runs the checks on this folder. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do.',
   ]);
 }
 
