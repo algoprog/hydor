@@ -57,11 +57,12 @@ export interface ToolFailure {
   /** How long it asked to be left alone (Retry-After, a search provider resting), in milliseconds. */
   waitMs?: number;
   /**
-   * timeout: no answer in time; dropped: the connection broke; unreachable: it could not be reached; botwall: a page that
+   * timeout: no answer in time; dropped: the connection broke; unreachable: it could not be reached; nohost: there is no
+   * such address (its name is not known: trying again does not help); botwall: a page that
    * keeps programs out; key: a key it needs is not in the vault (`key` names it); limit, down: a search service limiting
    * requests or failing; refused: the request itself was refused (an address or argument it may not have).
    */
-  kind?: 'timeout' | 'dropped' | 'unreachable' | 'botwall' | 'key' | 'limit' | 'down' | 'refused';
+  kind?: 'timeout' | 'dropped' | 'unreachable' | 'nohost' | 'botwall' | 'key' | 'limit' | 'down' | 'refused';
   key?: string;
 }
 

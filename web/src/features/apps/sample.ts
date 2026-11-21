@@ -38,7 +38,7 @@ export function sampleResult(answer: AnswerField[], assets: AppRecipe['assets'] 
         : f.type === 'list'
           ? [1, 2, 3].map((n) => `${f.label} ${n}`)
           : f.type === 'markdown'
-            ? `**${f.label}**: a few sentences of it, as a run would give them.\n\n- One point\n- Another point`
+            ? 'A few sentences here, as a run would give them.\n\n- One point\n- Another point'
             : f.type === 'media'
               ? files.slice(0, 4).map(([n, a]) => ({ src: `asset:${n}`, caption: a.caption ?? n, kind: mediaKind(n, a.mime) }))
               : f.type === 'ui'

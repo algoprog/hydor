@@ -563,7 +563,7 @@ In **Settings**, **Answers in the person’s language** (on for every new app) h
 
 A step can run only when a rule holds, and say what happens when it fails: other steps instead, carry on without it, or (for a tool, model, code, data or app step) **An agent does its work**: an agent gets what the step was given and why it failed, hands in the values the steps after it use, and the run goes on. The run's page then says **An agent did its work** beside the step, with why it failed.
 
-While a run works, its page lists the steps as they go. Once it ends, **Steps** shows each one with how it went, how long it took and what it cost; the session button opens an agent step's conversation. Once it is done, you can ask for changes to its result (see [Ask for changes to the result](#ask-for-changes-to-the-result)), or change the answers and run it again.
+While a run works, its page lists the steps as they go. Once it ends, **Steps** shows each one with how it went, how long it took and what it cost; the session button opens an agent step's conversation. A step that failed while the run went on (it was skipped, or other steps ran in its place) reads **The run went on without it**, with why in plain words. Once it is done, you can ask for changes to its result (see [Ask for changes to the result](#ask-for-changes-to-the-result)), or change the answers and run it again.
 
 Once a run with steps has ended, each of its steps has **Run again from here** (↺): a new run with the same answers, in which the steps before that one give what they gave this time (marked **From the last run**, at no cost) and the rest run as the app is now. A **Test run** in **Edit** has it too, with what is on screen: change a later step and try it again without running the first ones.
 

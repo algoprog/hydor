@@ -117,6 +117,10 @@ test('a failure read from what the tool said: its own structured failure, else i
   assert.equal(readFailure(undefined, Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })).kind, 'timeout');
   assert.equal(readFailure(undefined, Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNRESET' } })).kind, 'dropped');
   assert.equal(failureOf(Object.assign(new Error('x'), { code: 'ECONNREFUSED' }))?.kind, 'unreachable');
+  // A name that is not known is its own kind, read from the error or from the tool's words, and is never tried again.
+  assert.equal(failureOf(Object.assign(new Error('fetch failed'), { cause: { code: 'ENOTFOUND' } }))?.kind, 'nohost');
+  assert.equal(readFailure({ text: 'The request failed: getaddrinfo ENOTFOUND rates.down.example', isError: true }).kind, 'nohost');
+  assert.equal(retryWait({ kind: 'nohost' }, { tries: 1, waited: 0, safe: true }), null);
   assert.equal(retryAfterMs('2'), 2000);
   assert.equal(retryAfterMs(new Date(Date.now() + 5000).toUTCString(), Date.now())! > 3000, true);
   assert.equal(retryAfterMs('soon'), undefined);
@@ -134,6 +138,7 @@ test('what was missed, in plain words: what it wanted and why', () => {
   assert.equal(whyOf('read_page', f({ status: 403 })), 'it keeps programs out');
   assert.equal(whyOf('read_page', f({ kind: 'botwall' })), 'it keeps programs out');
   assert.equal(whyOf('http_request', f({ kind: 'timeout' })), 'no answer in time');
+  assert.equal(whyOf('http_request', f({ kind: 'nohost' })), 'there is no such address');
   assert.equal(whyOf('http_request', f({ status: 503 })), 'it had a problem (503)');
   assert.equal(whyOf('http_request', f({ kind: 'key', key: 'SEMANTIC_SCHOLAR_API_KEY' })), 'it needs the key SEMANTIC_SCHOLAR_API_KEY');
   assert.equal(whyOf('http_request', f({ kind: 'key', key: 'S2' }), (k) => k === 'S2'), 'it would do more with the key S2 (optional)');

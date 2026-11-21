@@ -141,6 +141,7 @@ export function RunView({ d, statusExtra, onAsked }: { d: RunDetail; statusExtra
       {d.steps && (
         <RunSteps
           steps={d.steps}
+          misses={r.misses}
           onAgain={
             !isActive(r.status) && r.source !== 'public' && r.source !== 'step' && r.source !== 'app'
               ? (step) =>
