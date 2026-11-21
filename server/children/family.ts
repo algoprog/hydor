@@ -1,4 +1,5 @@
 // Who started whom: a child session keeps its parent's key in its settings (extra.parent).
+import type { SessionExtra } from '../../shared/features.ts';
 import type { BackgroundTask, LiveState, SessionSummary } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
 import { parseExtra, sessionExtra } from '../sessionExtra.ts';
@@ -19,6 +20,28 @@ export function childKeys(db: DB, key: string): string[] {
 const RUNNING_STATUSES = new Set(['starting', 'working', 'waiting']);
 
 export const isRunningStatus = (status: string | undefined) => !!status && RUNNING_STATUSES.has(status);
+
+/** How a lead's message to its Hydor subagent begins (message_child). */
+export const FROM_LEAD = 'Message from the session that started you:';
+
+/**
+ * Whether a message is one agents send each other through the app: a lead's to its Hydor subagent (message_child), or
+ * a Hydor subagent's report to its lead (its reply, how it stopped, its step up a tier).
+ */
+export const betweenAgents = (text: string) => text.startsWith(`${FROM_LEAD}\n`) || /^\[(Reply from the|The) Hydor subagent "/.test(text);
+
+/**
+ * Whether the queue of a session still at work when the app restarted goes out when its turn ends, as it would have
+ * without the restart, instead of waiting for Resume like every other queue then: only when it holds nothing but what
+ * agents sent each other (no attachments) and no Stop all came after any of it was queued. Nobody watches those queues
+ * to press Resume: on 2026-11-21 a restart held a lead's next request to its subagent, which finished its turn, and the
+ * two sat idle, each waiting for the other.
+ */
+export function queueGoesOn(queue: { text: string; at: number; attachments: number }[], extra: SessionExtra): boolean {
+  if (!queue.length || !queue.every((m) => betweenAgents(m.text) && !m.attachments)) return false;
+  const stopped = Math.max(Number(extra.stoppedAll) || 0, Number(extra.stoppedWithParent) || 0);
+  return queue.every((m) => m.at > stopped);
+}
 
 type LiveWork = Pick<LiveState, 'status' | 'backgroundTasks'>;
 

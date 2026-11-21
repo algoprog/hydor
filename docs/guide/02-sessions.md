@@ -298,7 +298,7 @@ Queued messages wait above the message box, numbered in the order they go out; o
 - **Send now** (the arrow): sends it at once, into the running turn.
 - **Edit** (the pencil): change its text, take attachments off, or add more (**Attach**, or paste or drop files). Enter saves, Esc cancels.
 - **Remove** (the bin): takes it off the queue; its attachments are deleted.
-- When you stop the agent, or the app restarts, the queue pauses: "The queue is paused (the agent was stopped, or the server restarted)." **Resume** lets the messages go out again as the agent becomes free. A spending cap that is reached holds the queue too; raising the cap lets it go on.
+- When you stop the agent, or the app restarts, the queue pauses: "The queue is paused (the agent was stopped, or the server restarted)." **Resume** lets the messages go out again as the agent becomes free. Messages that agents send each other (a session's messages to its Hydor subagents, and their replies) don't pause for a restart: if the agent they wait for is still at work, they go out when its turn ends. A spending cap that is reached holds the queue too; raising the cap lets it go on.
 
 ## Change the agent, model, effort or permissions
 

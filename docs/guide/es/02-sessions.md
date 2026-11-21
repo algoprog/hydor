@@ -298,7 +298,7 @@ Los mensajes en cola esperan sobre el cuadro de mensaje, numerados en el orden e
 - **Enviar ahora** (la flecha): lo envía de inmediato, al turno en curso.
 - **Editar** (el lápiz): cambia su texto, quita adjuntos o añade más (**Adjuntar**, o pega o suelta archivos). Enter guarda, Esc cancela.
 - **Quitar** (la papelera): lo saca de la cola; sus adjuntos se eliminan.
-- Cuando detienes al agente, o la app se reinicia, la cola se pausa: «La cola está en pausa (se detuvo el agente o se reinició el servidor)». **Reanudar** deja que los mensajes salgan de nuevo a medida que el agente queda libre. Un límite de gasto alcanzado también retiene la cola; al subir el límite continúa.
+- Cuando detienes al agente, o la app se reinicia, la cola se pausa: «La cola está en pausa (se detuvo el agente o se reinició el servidor)». **Reanudar** deja que los mensajes salgan de nuevo a medida que el agente queda libre. Los mensajes que los agentes se envían entre sí (los de una sesión a sus subagentes de Hydor y las respuestas de estos) no se pausan con un reinicio: si el agente al que esperan sigue trabajando, salen cuando termina su turno. Un límite de gasto alcanzado también retiene la cola; al subir el límite continúa.
 
 ## Cambiar el agente, el modelo, el esfuerzo o los permisos
 

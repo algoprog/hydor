@@ -298,7 +298,7 @@ As mensagens na fila esperam acima da caixa de mensagem, numeradas na ordem em q
 - **Enviar agora** (a seta): envia na hora, para dentro do turno em andamento.
 - **Editar** (o lápis): mude o texto, retire anexos ou adicione outros (**Anexar**, ou cole ou solte arquivos). Enter salva, Esc cancela.
 - **Remover** (a lixeira): tira da fila; os anexos dela são excluídos.
-- Quando você interrompe o agente, ou o app reinicia, a fila é pausada: "A fila está pausada (o agente foi interrompido, ou o servidor reiniciou)." **Retomar** deixa as mensagens saírem de novo conforme o agente fica livre. Um limite de gastos atingido também retém a fila; aumentar o limite faz ela continuar.
+- Quando você interrompe o agente, ou o app reinicia, a fila é pausada: "A fila está pausada (o agente foi interrompido, ou o servidor reiniciou)." **Retomar** deixa as mensagens saírem de novo conforme o agente fica livre. As mensagens que os agentes enviam uns aos outros (as de uma sessão para seus subagentes do Hydor e as respostas deles) não são pausadas por um reinício: se o agente que elas esperam ainda estiver trabalhando, elas saem quando o turno dele terminar. Um limite de gastos atingido também retém a fila; aumentar o limite faz ela continuar.
 
 ## Mudar o agente, o modelo, o esforço ou as permissões
 

@@ -56,7 +56,7 @@ import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/t
 import { opensTurn } from './opinion/turns.ts';
 import { filesOf, sessionEnd } from '../shared/ending.ts';
 import { recordEnding } from './away/index.ts';
-import { ancestorsOf, isRunningStatus, runningBelow, runningChildren, workStatus } from './children/family.ts';
+import { ancestorsOf, isRunningStatus, queueGoesOn, runningBelow, runningChildren, workStatus } from './children/family.ts';
 import { hubDir, wikiMemoryOn, wikiSpaceOfSession } from './wiki/roots.ts';
 import { sessionMemoryOn } from './memory/store.ts';
 import { sessionCaptureEnabled } from './wiki/session/store.ts';
@@ -495,6 +495,8 @@ export class SessionManager extends EventEmitter {
       this.attach({ key: k, agent: meta.agent, cwd: meta.cwd, adapter, runner, account: opts.account || undefined, apiCredit: !!opts.apiCredit || undefined });
       if (adapter instanceof AcpLive) adapter.restored();
       console.log(`[restore] reattached ${k} (${adapter.state.status})`);
+      // Still at work: what agents queued for it goes out when its turn ends, as it would have without the restart.
+      if (isRunningStatus(adapter.state.status)) this.keepQueueGoing(k);
     }
     await this.resumeGates();
   }
@@ -3016,6 +3018,18 @@ export class SessionManager extends EventEmitter {
     this.held.delete(key);
     this.queueSummary(key);
     this.dispatchQueued(key);
+  }
+
+  /**
+   * After a restart every queue waits for Resume (loadQueues), except that of a session still at work which holds only
+   * what agents sent each other (a lead's messages, its Hydor subagents' reports): that goes out when the turn ends, as it
+   * would have without the restart (queueGoesOn says why).
+   */
+  private keepQueueGoing(key: string) {
+    this.loadQueues();
+    const q = this.queues.get(key);
+    const queue = (q ?? []).map((m) => ({ text: m.text, at: m.at, attachments: m.images.length + m.files.length }));
+    if (queueGoesOn(queue, sessionExtra(this.db, key)) && this.held.delete(key)) this.queueSummary(key);
   }
 
   private saveImages(images: ImageInput[]): ImageInput[] {

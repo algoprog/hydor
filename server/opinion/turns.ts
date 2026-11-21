@@ -79,6 +79,18 @@ export function lastTurn(items: TimelineItem[]): Turn | undefined {
   return undefined;
 }
 
+/**
+ * The turn that was going at `at`: the latest that began by then (the latest of all when no time is given). A message
+ * queued for after a turn goes out as that turn ends, so by the time the turn that ended is read, its transcript may
+ * already hold the next one.
+ */
+export function turnAt(items: TimelineItem[], at?: number): Turn | undefined {
+  if (at === undefined) return lastTurn(items);
+  return turnsOf(items)
+    .filter((t) => t.prompt && (t.prompt.ts ?? 0) <= at)
+    .at(-1);
+}
+
 /** A turn by the id of its message; the latest finished one when none is given. */
 export function findTurn(items: TimelineItem[], id?: string, running = false): Turn | undefined {
   const list = turnsOf(items).filter((t) => t.prompt);

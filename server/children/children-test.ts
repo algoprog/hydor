@@ -29,7 +29,7 @@ import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.
 import { sessionExtra } from '../sessionExtra.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
-import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
+import { ancestorsOf, betweenAgents, childKeys, FROM_LEAD, parentOf, queueGoesOn, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
 import { childMode } from './modes.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -1115,6 +1115,68 @@ test('at a start, a helper another app runs is left to it: its turn is neither j
   await catchUp(deps);
   assert.deepEqual(mine(), { created: before.created, told: before.told + 1 });
   assert.match(sessions.delivered.filter((m) => m.key === k).at(-1)!.text, /the new dataset is built\.$/);
+});
+
+test('the turn that ended is reported, not the next one its waiting message began as it ended; that one is reported when it ends', async () => {
+  // As on 2026-11-21: the lead's message waited in the queue and went out as the turn ended, before the turn was read, so
+  // the report took the new turn's first words and its own reply was later dropped as already sent.
+  const began = Date.now() - 60_000;
+  const at = (text: string, ts: number): TimelineItem => ({ ...user(text), ts });
+  sessions.add('claude:qp', { agent: 'claude', live: 'idle', title: 'Lead', items: [user('Build the server half')] });
+  sessions.add('claude:qc', {
+    agent: 'claude',
+    live: 'working',
+    title: 'Server half',
+    items: [at('Do the four additions.', began), step('npm test'), said('All four additions are done.'), end(), at(`${FROM_LEAD}\n\nNow items 5 and 6.`, began + 50_000), said('Starting items 5 and 6.')],
+  });
+  setSessionExtra(db, 'claude:qc', { parent: 'claude:qp' });
+  const n = sessions.delivered.length;
+  await reportTurn(deps, { key: 'claude:qc', startedAt: began, endedAt: began + 49_700, external: false });
+  assert.equal(sessions.delivered.length, n + 1);
+  assert.equal(
+    sessions.delivered.at(-1)!.text,
+    '[Reply from the Hydor subagent "Server half" (claude:qc, Claude Code)]\n(It is at work again, on the next message it was sent; its reply to that comes to you too.)\n\nAll four additions are done.',
+  );
+  // The whole of that reply, while the next turn runs (a summary of a long one points there).
+  assert.equal(await call('claude:qp', 'child_sessions', { key: 'claude:qc' }), 'Latest reply of claude:qc (it is at work on its next turn now):\n\nAll four additions are done.');
+  // The next turn ends: it is reported in turn, not taken for one already sent.
+  const f = sessions.all.get('claude:qc')!;
+  f.items.push(step('npm test'), said('Items 5 and 6 are done.'), end());
+  f.live = 'idle';
+  await reportTurn(deps, { key: 'claude:qc', startedAt: began + 50_000, endedAt: Date.now(), external: false });
+  assert.equal(sessions.delivered.length, n + 2);
+  assert.equal(sessions.delivered.at(-1)!.text, '[Reply from the Hydor subagent "Server half" (claude:qc, Claude Code)]\n\nItems 5 and 6 are done.');
+  assert.equal(await call('claude:qp', 'child_sessions', { key: 'claude:qc' }), 'Latest reply of claude:qc:\n\nItems 5 and 6 are done.');
+  // Once only, and a turn that ended while the app was down (no end time) is still the latest.
+  await reportTurn(deps, { key: 'claude:qc', startedAt: began + 50_000, endedAt: Date.now(), external: false });
+  await catchUp(deps);
+  assert.equal(sessions.delivered.length, n + 2);
+});
+
+test('after a restart, a queue of what agents sent each other goes out for a session still at work; anything a person wrote, an attachment, or a Stop all after it keeps it for Resume', () => {
+  const base = { key: 'acp:x', title: 'T', label: 'Custom · M', link: 'L' };
+  const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
+  // What the app sends between agents: a lead's message_child, each kind of report back, a step up.
+  for (const text of [
+    `${FROM_LEAD}\n\nOne more for the same reply.`,
+    resultMessage({ ...base, turn: t({ status: 'completed', reply: 'Done.' }) }),
+    resultMessage({ ...base, turn: t({ status: 'interrupted' }) }),
+    resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'boom' }),
+    resultMessage({ ...base, turn: t({}), after: { goes: 'resume', at: Date.now() + 3600_000 } as LimitAfter }),
+    '[The Hydor subagent "T" (acp:x) on Standard fell short: it wrote no reply. It runs again on Best.]\nStarted …',
+  ])
+    assert.equal(betweenAgents(text), true, text);
+  assert.equal(betweenAgents('Message from the session that started you: (typed by hand, all on one line)'), false);
+  assert.equal(betweenAgents('Also fix the README'), false);
+  const lead = { text: `${FROM_LEAD}\n\nOne more for the same reply.`, at: 2000, attachments: 0 };
+  const report = { text: '[Reply from the Hydor subagent "T" (acp:x, Custom · M)]\n\nDone.', at: 2500, attachments: 0 };
+  assert.equal(queueGoesOn([lead], {}), true);
+  assert.equal(queueGoesOn([lead, report], { stoppedAll: 1000 }), true, 'a Stop all before any of it');
+  assert.equal(queueGoesOn([], {}), false);
+  assert.equal(queueGoesOn([lead, { text: 'Also fix the README', at: 3000, attachments: 0 }], {}), false);
+  assert.equal(queueGoesOn([{ ...lead, attachments: 1 }], {}), false);
+  assert.equal(queueGoesOn([lead, report], { stoppedAll: 2000 }), false);
+  assert.equal(queueGoesOn([report], { stoppedWithParent: 2600 }), false);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

@@ -298,7 +298,7 @@ Les messages en file d’attente patientent au-dessus de la zone de message, num
 - **Envoyer maintenant** (la flèche) : l’envoie tout de suite, dans le tour en cours.
 - **Modifier** (le crayon) : change son texte, retire des pièces jointes ou en ajoute (**Joindre**, ou collez ou déposez des fichiers). Entrée enregistre, Échap annule.
 - **Retirer** (la corbeille) : le retire de la file d’attente ; ses pièces jointes sont supprimées.
-- Lorsque vous arrêtez l’agent, ou que l’app redémarre, la file d’attente se met en pause : « La file d’attente est en pause (l’agent a été arrêté, ou le serveur a redémarré). » **Reprendre** permet aux messages de repartir dès que l’agent est libre. Un plafond de dépenses atteint bloque aussi la file d’attente ; relever le plafond lui permet de continuer.
+- Lorsque vous arrêtez l’agent, ou que l’app redémarre, la file d’attente se met en pause : « La file d’attente est en pause (l’agent a été arrêté, ou le serveur a redémarré). » **Reprendre** permet aux messages de repartir dès que l’agent est libre. Les messages que les agents s’envoient entre eux (ceux d’une session à ses sous-agents Hydor, et leurs réponses) ne se mettent pas en pause lors d’un redémarrage : si l’agent qu’ils attendent est encore au travail, ils partent à la fin de son tour. Un plafond de dépenses atteint bloque aussi la file d’attente ; relever le plafond lui permet de continuer.
 
 ## Changer l’agent, le modèle, l’effort ou les autorisations
 

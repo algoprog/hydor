@@ -22,8 +22,8 @@ import type { LimitAfter } from '../sessions.ts';
 import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
-import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
-import { childKeys, parentOf, stillRunning } from './family.ts';
+import { lastTurn, opensTurn, turnAt, turnsOf, type Turn } from '../opinion/turns.ts';
+import { childKeys, FROM_LEAD, parentOf, stillRunning } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
@@ -462,8 +462,12 @@ const LIST: RunTool = {
     const want = String(a.key ?? '').trim();
     if (want) {
       if (!keys.includes(want)) throw new Error('That is not one of your Hydor subagents.');
-      const t = lastTurn((await d.sessions.timeline(want)).parser.items);
-      return t?.reply ? `Latest reply of ${want}:\n\n${t.reply}` : 'It has not replied yet.';
+      const turns = turnsOf((await d.sessions.timeline(want)).parser.items).filter((t) => t.prompt);
+      // At work on a turn that has not ended: its latest reply is the turn's before (a report points here for the whole of
+      // that one, and the message that waited for it may have begun the next as it ended).
+      const working = busy(d.sessions.summary(want)) && !turns.at(-1)?.status && turns.length > 1;
+      const t = working ? turns.at(-2) : turns.at(-1);
+      return t?.reply ? `Latest reply of ${want}${working ? ' (it is at work on its next turn now)' : ''}:\n\n${t.reply}` : 'It has not replied yet.';
     }
     if (!keys.length) return 'You have no Hydor subagents yet. start_child_session starts one.';
     const lines: string[] = [];
@@ -493,7 +497,7 @@ const MESSAGE: RunTool = {
     if (!text) throw new Error('The text is empty.');
     if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your Hydor subagents: child_sessions lists them.');
     const queued = busy(d.sessions.summary(key));
-    await d.sessions.deliverOrQueue(key, `Message from the session that started you:\n\n${text}`);
+    await d.sessions.deliverOrQueue(key, `${FROM_LEAD}\n\n${text}`);
     return queued ? 'Queued: it goes to the Hydor subagent when its current turn ends. Its reply comes to you as a message.' : 'Sent. Its reply comes to you as a message when its turn ends.';
   },
 };
@@ -505,9 +509,10 @@ const MESSAGE: RunTool = {
  * stopped, after which the child carries on (`after`: with another account, on API credit, or once the limit lifts),
  * says so instead of an error: its reply comes when it finishes, so the parent neither starts the work again nor waits
  * for nothing. `still`: what it started that still runs ("1 background task it started is still running"), so the
- * parent knows it is not finished.
+ * parent knows it is not finished. `goneOn`: it is at its next turn already (a message that waited for this one went
+ * out as it ended), so the parent knows a reply to that comes too.
  */
-export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter; still?: string }, now = Date.now()): string {
+export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter; still?: string; goneOn?: boolean }, now = Date.now()): string {
   const who = `Hydor subagent "${o.title}" (${o.key}, ${o.label})`;
   if (o.after)
     return `[The ${who} ${o.after.goes === 'account' && o.after.signedOut ? 'found its account signed out' : 'reached a usage limit'} and carries on${goesOn(o.after, now)}.]\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
@@ -518,7 +523,11 @@ export function resultMessage(o: { key: string; title: string; label: string; li
       : o.error
         ? `[The ${who} stopped with an error: ${firstLine(o.error, 300)}]`
         : `[Reply from the ${who}]`;
-  const more = o.still ? `\n(It is still working: ${o.still}; it goes on afterwards, and its next reply comes to you too.)` : '';
+  const more = o.still
+    ? `\n(It is still working: ${o.still}; it goes on afterwards, and its next reply comes to you too.)`
+    : o.goneOn
+      ? '\n(It is at work again, on the next message it was sent; its reply to that comes to you too.)'
+      : '';
   if (!reply) return `${head}${more}\n(It wrote no reply. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
   if (o.summary) return `${head}${more}\nIts reply is long (${reply.length.toLocaleString('en-US')} characters), so here is a summary. child_sessions with key "${o.key}" gives the whole of it; the user can open it at ${o.link}.\n\n${o.summary.trim()}`;
   return `${head}${more}\n\n${reply}`;
@@ -637,22 +646,31 @@ export async function catchUp(d: Deps) {
   }
 }
 
-/** A child's turn ended: its reply goes to the parent. */
-export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'external'>) {
+/**
+ * A child's turn ended: its reply goes to the parent. `endedAt` (when the app saw it end) picks that turn out: without it
+ * (a turn that ended while the app was down, catchUp), the latest.
+ */
+export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'external'> & { endedAt?: number }) {
   if (t.external) return;
   const parent = parentOf(d.db, t.key);
   if (!parent || !d.sessions.summary(parent)) return;
   // A confidential child's words go to a confidential parent only (server/confidential).
   if (confidentialKey(d.db, t.key) && !confidentialKey(d.db, parent)) return;
   const tl = await d.sessions.timeline(t.key);
-  let turn = lastTurn(tl.parser.items);
+  // The turn that ended, not the latest one: a message queued for after it (its lead's message_child) goes out as it ends,
+  // so its transcript may already hold the next turn, begun after endedAt. Taking that one sent the lead its first words
+  // or "It wrote no reply" and marked it reported, so its own reply was dropped as already sent when it ended: on
+  // 2026-11-21 a lead waited for a subagent that had finished long before.
+  let turn = turnAt(tl.parser.items, t.endedAt);
   // The transcript's last lines may land a moment late.
   for (let i = 0; i < 3 && (!turn || (turn.prompt?.ts ?? 0) < t.startedAt - 15_000 || (!turn.status && !turn.reply)); i++) {
     await new Promise((r) => setTimeout(r, 1500));
     await tl.readMore().catch(() => {});
-    turn = lastTurn(tl.parser.items);
+    turn = turnAt(tl.parser.items, t.endedAt);
   }
   if (!turn?.prompt) return;
+  // A later turn already going: the message that waited for this one went out as it ended.
+  const latest = lastTurn(tl.parser.items);
   const id = `${t.key}|${turn.prompt.id}`;
   if (reported.has(id) || reportedTurn(d, t.key) === turn.prompt.id) return;
   reported.add(id);
@@ -694,6 +712,7 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
     summary: !after && turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
     after: after ?? undefined,
     still: (s && stillRunning(s)) || undefined,
+    goneOn: (!!latest?.prompt && latest.prompt.id !== turn.prompt.id) || undefined,
   });
   await tellParent(d, parent, t.startedAt, msg);
 }

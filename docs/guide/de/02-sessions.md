@@ -298,7 +298,7 @@ Wartende Nachrichten stehen nummeriert in ihrer Sendereihenfolge über dem Einga
 - **Jetzt senden**, der Pfeil, sendet sie sofort in den laufenden Durchlauf.
 - **Bearbeiten**, der Stift, ändert Text und Anhänge. Entferne Anhänge oder füge über **Anhängen**, Einfügen oder Ziehen weitere hinzu. Enter speichert, Esc bricht ab.
 - **Entfernen**, der Papierkorb, nimmt die Nachricht aus der Warteschlange und löscht ihre Anhänge.
-- Wenn du den Agenten stoppst oder die App neu startet, pausiert die Warteschlange mit dem Hinweis „Die Warteschlange ist pausiert, weil der Agent gestoppt oder der Server neu gestartet wurde.“ **Fortsetzen** gibt sie wieder frei, sobald der Agent bereit ist. Ein erreichtes Ausgabenlimit hält die Warteschlange ebenfalls an; eine Erhöhung setzt sie fort.
+- Wenn du den Agenten stoppst oder die App neu startet, pausiert die Warteschlange mit dem Hinweis „Die Warteschlange ist pausiert, weil der Agent gestoppt oder der Server neu gestartet wurde.“ **Fortsetzen** gibt sie wieder frei, sobald der Agent bereit ist. Nachrichten, die Agenten einander schicken (die einer Sitzung an ihre Hydor-Subagenten und deren Antworten), pausieren bei einem Neustart nicht: Arbeitet der Agent, auf den sie warten, noch, gehen sie raus, sobald sein Durchlauf endet. Ein erreichtes Ausgabenlimit hält die Warteschlange ebenfalls an; eine Erhöhung setzt sie fort.
 
 ## Agent, Modell, Denkaufwand oder Berechtigungen ändern
 
