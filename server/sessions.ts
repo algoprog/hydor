@@ -1639,6 +1639,18 @@ export class SessionManager extends EventEmitter {
     const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent }) : null;
     if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort, extra: { ...o.extra, auto: true } };
     if (o.agent === 'claude') await ensureClaude();
+    // A Codex session with no model (the API, a Hydor subagent) would start on Codex's own default, which on an account
+    // signed in with ChatGPT can be a model its plan does not have ("The 'gpt-6-astra' model is not supported…"). The start
+    // page always sends the model the catalog marks as default: so does this, when the catalog knows one. Only for the
+    // start: what is remembered as the default for the next session stays what was picked, here nothing.
+    const pickedModel = o.model;
+    if (o.agent === 'codex' && !o.model && !wantAuto) {
+      const models = await Promise.resolve()
+        .then(() => this.controlFor('codex', o.account).models())
+        .catch(() => []);
+      const dflt = models.find((m) => m.isDefault)?.value;
+      if (dflt) o = { ...o, model: dflt };
+    }
     // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
     // a confidential one only from a helper model on this computer, else from its first words.
     const request = (splitHandoff(o.prompt ?? '')?.request ?? o.prompt ?? '').trim();
@@ -1707,7 +1719,7 @@ export class SessionManager extends EventEmitter {
       console.warn(`[goal] ${l.key}: not set at its start: ${goalOff}`);
       this.notify({ key: l.key, kind: 'waiting', title: this.summary(l.key)?.title || o.title?.trim() || request.slice(0, 80) || 'New session', agent: o.agent, at: Date.now(), body: goalNotSetText(goalOff) });
     }
-    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
+    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : pickedModel, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
     // Do this here: the tab moves to the session's browser now, and its first message says the page is open there.

@@ -543,7 +543,7 @@ test('the real manager listens to the wiki jobs: essentials reached, a job that 
 });
 
 /** create() with a stand-in for the agent's start: what it does with the first message of a person's session. */
-async function created(o: Record<string, unknown>) {
+async function created(o: Record<string, unknown>, over: Record<string, unknown> = {}) {
   const h = manager();
   saveGates(db, new Map());
   // What the tests before left of the choices and the jobs is not this one's.
@@ -561,6 +561,7 @@ async function created(o: Record<string, unknown>) {
     queueAncestors: () => {},
     autoSwitch: () => false,
     freeAccount: async () => null,
+    ...over,
   });
   const k = await h.m.create({ agent: 'codex', cwd: folder, prompt: 'Fix the checkout tests', ...o });
   return { ...h, key: k, spawned };
@@ -583,6 +584,33 @@ test('create(): the project is found from the folder when the page does not say 
   buildApi.offer = async () => offer;
   const h = await created({ askMemory: true });
   assert.equal(h.m.gates.get(h.key)?.project, space.id);
+});
+
+test('create(): a Codex session with no model starts on the catalog’s default model, which is not remembered as the picked one', async () => {
+  buildApi.offer = async () => null as any;
+  const models = [
+    { value: 'gpt-6-astra', label: 'GPT-6 Astra' },
+    { value: 'gpt-5.5', label: 'GPT-5.5', isDefault: true },
+  ];
+  const saved: any[] = [];
+  const over = { controlFor: () => ({ models: async () => models }), savePrefs: (_agent: string, p: any) => saved.push(p) };
+  // None named: the catalog's default starts it, and its row says so; the remembered model stays unnamed.
+  let h = await created({}, over);
+  assert.equal(h.spawned[0].model, 'gpt-5.5');
+  assert.equal((db.prepare('select model from app_sessions where key = ?').get(h.key) as any).model, 'gpt-5.5');
+  assert.equal(saved.at(-1).model, undefined, 'not remembered as the user’s pick');
+  // One named: as it is, and remembered.
+  h = await created({ model: 'gpt-6-astra' }, over);
+  assert.equal(h.spawned[0].model, 'gpt-6-astra');
+  assert.equal(saved.at(-1).model, 'gpt-6-astra');
+  // Automatic has its own rule: the default is not put in.
+  h = await created({ model: 'auto' }, over);
+  assert.equal(h.spawned[0].model, undefined);
+  // A catalog with no default, or that cannot be read: as before (Codex picks).
+  h = await created({}, { ...over, controlFor: () => ({ models: async () => [models[0]] }) });
+  assert.equal(h.spawned[0].model, undefined);
+  h = await created({}, { ...over, controlFor: () => ({ models: async () => Promise.reject(new Error('codex did not start')) }) });
+  assert.equal(h.spawned[0].model, undefined);
 });
 
 test('create(): it sends at once when it does not ask: started by something else, not a person’s prompt, a handoff, memory off, no job to read', async () => {
