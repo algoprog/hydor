@@ -42,6 +42,7 @@ import {
   roundName,
   roundNo,
   sinceTitle,
+  activeNow,
   spanText,
   startCellText,
   startResultText,
@@ -109,6 +110,17 @@ test('a pause that waits for the round that runs is in the words, and its button
   assert.equal(pauseWait(g('working')), PAUSE_WAIT);
   assert.equal(pauseWait(w), PAUSING_WAIT);
   assert.equal(PAUSING_WAIT, 'It pauses once this round has been checked');
+});
+
+test('the bar’s time runs on from when the page got the goal while a round runs or its checks do', () => {
+  const t0 = 1_000_000;
+  const w = { ...g('working'), activeMs: 58 * 60000 };
+  assert.equal(activeNow(w, t0 + 7000, t0), 58 * 60000 + 7000);
+  assert.equal(activeNow({ ...w, status: 'checking' }, t0 + 7000, t0), 58 * 60000 + 7000);
+  for (const status of ['paused', 'asking', 'needs-you', 'agreeing', 'drafting', 'measuring', 'reached', 'stopped', 'limit'] as const) assert.equal(activeNow({ ...w, status }, t0 + 7000, t0), 58 * 60000, status);
+  // A clock that went back never takes time away; a fresh goal at its start reads "0 s".
+  assert.equal(activeNow(w, t0 - 5000, t0), 58 * 60000);
+  assert.equal(timeText({ ...g('working'), activeMs: 0 }, activeNow({ ...g('working'), activeMs: 0 }, t0, t0)), '0 s of 3h 0m');
 });
 
 test('a goal paused before any round says only "paused"; the round in progress is the next number when none is set', () => {
@@ -198,6 +210,12 @@ test('the tally and what holds, as the bar and the report say them', () => {
 
 test('durations, money and limits', () => {
   assert.equal(spanText(45000), '45 s');
+  // Whole seconds at least: no milliseconds, no decimals.
+  assert.equal(spanText(0), '0 s');
+  assert.equal(spanText(400), '0 s');
+  assert.equal(spanText(5000), '5 s');
+  assert.equal(spanText(59600), '1m 0s');
+  assert.equal(timeText({ ...g('working'), activeMs: 0 }), '0 s of 3h 0m');
   assert.equal(spanText(8 * 60000), '8m 0s');
   assert.equal(spanText(71 * 60000), '1h 11m');
   assert.equal(spanText(180 * 60000), '3h 0m');

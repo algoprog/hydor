@@ -8,7 +8,15 @@ import { duration, usd } from '../../lib/format';
 export const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 /** How long, for a round or a goal's time so far, as the app writes durations everywhere (lib/format.ts). */
-export const spanText = (ms: number): string => duration(Math.max(0, Math.round(ms / 1000) * 1000));
+export const spanText = (ms: number): string => {
+  const secs = Math.max(0, Math.round(ms / 1000));
+  // Whole seconds at least: never "0 ms", never "5.0 s".
+  return secs < 60 ? `${secs} s` : duration(secs * 1000);
+};
+
+/** The time a goal has been at work, as the bar shows it: the server's count was true when the page got it, and runs on from then while a round runs or its checks do. */
+export const activeNow = (g: Pick<GoalState, 'status' | 'activeMs'>, now: number, arrivedAt: number): number =>
+  g.status === 'working' || g.status === 'checking' ? g.activeMs + Math.max(0, now - arrivedAt) : g.activeMs;
 
 /** "3 hours", "90 minutes": a limit of time, as a pill says it. */
 export function limitMinutes(min: number): string {
@@ -359,8 +367,8 @@ export function pillValue(c: GoalCheck, r: GoalResult): string {
 export const moneyText = (g: Pick<GoalState, 'spentUsd' | 'contract'>): string => (g.contract.limits.usd ? `${usd(g.spentUsd)} of ${usd(g.contract.limits.usd)}` : usd(g.spentUsd));
 
 /** "1 h 11 min of 3 h", or the time alone without a limit. */
-export const timeText = (g: Pick<GoalState, 'activeMs' | 'contract'>): string =>
-  g.contract.limits.minutes ? `${spanText(g.activeMs)} of ${spanText(g.contract.limits.minutes * 60000)}` : spanText(g.activeMs);
+export const timeText = (g: Pick<GoalState, 'activeMs' | 'contract'>, activeMs = g.activeMs): string =>
+  g.contract.limits.minutes ? `${spanText(activeMs)} of ${spanText(g.contract.limits.minutes * 60000)}` : spanText(activeMs);
 
 /** "At most $10.00 and 3 hours" for the agreement's footer; nothing when only the rounds are limited. */
 export function atMost(g: Pick<GoalState, 'contract'>): string {

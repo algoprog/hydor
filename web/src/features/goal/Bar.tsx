@@ -10,7 +10,7 @@ import { Button, cx, Dialog, IconButton, MenuItem, Popover, useConfirm, inputCls
 import { AsksControls } from './Asks';
 import { say } from './Say';
 import { ChecksEditor, DraftButtons, draftChanges, draftOf, draftProblem, type ContractDraft } from './ChecksEditor';
-import { useAct } from './state';
+import { useAct, useActiveMs } from './state';
 import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText, type Team } from './words';
 
 /** One check where the files stand: a tick, a measured value with its meter, a hollow dot, or an amber mark. */
@@ -195,6 +195,7 @@ export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalS
   const res = standing(g);
   const t = tally(g);
   const l = g.contract.limits;
+  const active = useActiveMs(g);
   const pause = pauseButton(g);
   const live = g.status === 'working' || g.status === 'checking' || g.status === 'asking' || g.status === 'measuring';
   const stop = async () => {
@@ -255,7 +256,7 @@ export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalS
       <RulesRow g={g} className="mt-2" />
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         <Use text={moneyText(g)} used={g.spentUsd} limit={l.usd} />
-        <Use text={timeText(g)} used={g.activeMs} limit={l.minutes ? l.minutes * 60000 : undefined} />
+        <Use text={timeText(g, active)} used={active} limit={l.minutes ? l.minutes * 60000 : undefined} />
         {t.rounds > 0 && (
           <button
             type="button"
