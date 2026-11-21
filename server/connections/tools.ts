@@ -5,6 +5,7 @@
 import { cleanDomains, fieldKey, SECRET_LIKE, SECRET_NAME, secretName, type SecretField, type SecretView } from '../../shared/connections.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { failureOf, retryAfterMs } from '../web/failure.ts';
 import { connections, isRemote, onFor, toolOn } from './apps.ts';
 import { httpCall, RefusedRequest } from './http.ts';
 import { listNames, runWithSecrets } from './run.ts';
@@ -196,7 +197,7 @@ const HTTP_REQUEST: RunTool = {
     if (a.auth) {
       const name = secretName(String(a.auth));
       const s = readSecret(db, name);
-      if (!s) return { text: `There is no key named ${name} in the vault. Ask the user for it with request_secret.`, isError: true };
+      if (!s) return { text: `There is no key named ${name} in the vault. Ask the user for it with request_secret.`, isError: true, failure: { kind: 'key', key: name } };
       used.push({ name, value: s.value });
       const header = a.auth_header ? String(a.auth_header) : a.auth_query ? undefined : s.view.header;
       auth = {
@@ -231,7 +232,7 @@ const HTTP_REQUEST: RunTool = {
     const bound: { name: string; value: string; domains: string[] }[] = [];
     for (const n of named) {
       const s = readSecret(db, n);
-      if (!s) return { text: `There is no key named ${n} in the vault. Ask the user for it with request_secret.`, isError: true };
+      if (!s) return { text: `There is no key named ${n} in the vault. Ask the user for it with request_secret.`, isError: true, failure: { kind: 'key', key: n } };
       bound.push({ name: n, value: s.value, domains: s.view.domains });
       used.push({ name: n, value: s.value });
     }
@@ -270,10 +271,13 @@ const HTTP_REQUEST: RunTool = {
         lines.push(text || '(empty)');
         if (r.truncated) lines.push('(The answer was longer than 2 MB; the rest was not read.)');
       }
-      return { text: clean(lines.join('\n')), isError: r.status >= 400 };
+      if (r.status < 400) return { text: clean(lines.join('\n')), isError: false };
+      const waitMs = retryAfterMs(r.headers['retry-after']);
+      return { text: clean(lines.join('\n')), isError: true, failure: { status: r.status, ...(waitMs !== undefined ? { waitMs } : {}) } };
     } catch (e) {
       const m = e instanceof RefusedRequest ? e.message : `The request failed: ${(e as Error).message}`;
-      return { text: clean(m), isError: true };
+      const failure = e instanceof RefusedRequest ? { kind: 'refused' as const } : failureOf(e);
+      return { text: clean(m), isError: true, ...(failure ? { failure } : {}) };
     }
   },
 };

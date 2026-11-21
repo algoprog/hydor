@@ -13,14 +13,17 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
-import { cleanRecipe, isActive, questionLine } from '../../shared/apps.ts';
+import { cleanRecipe, isActive, questionLine, runEndedNotice } from '../../shared/apps.ts';
+import { languageLine } from '../../shared/app-me.ts';
 import { formatSearch } from '../../shared/search.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, collapseSteps, evalRule, fillRefs, flowOf, readRule, valueOf, type Collapsed, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
 import { automations } from '../automations/index.ts';
 import { listRuns as listTaskRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
-import { setTiers } from '../assistants/tiers.ts';
+import { setTiers, tierPick } from '../assistants/tiers.ts';
+import { addNote, notesOf } from '../notes.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { registerFeatures } from '../features/registry.ts';
@@ -66,10 +69,15 @@ class FakeSessions extends EventEmitter {
   items = new Map<string, unknown[]>();
   archived = new Set<string>();
   interrupted: string[] = [];
+  /** What each session spent, as its agent reports it; the messages sent to sessions after their first. */
+  costs = new Map<string, number>();
+  sent: { key: string; text: string }[] = [];
   async create(o: any) {
     const key = `acp:fake-${this.made.length + 1}-${Math.random().toString(36).slice(2, 8)}`;
     this.made.push({ key, o });
     this.status.set(key, 'working');
+    // As the session manager keeps a session's settings.
+    if (o.extra && Object.keys(o.extra).length) setSessionExtra(db, key, o.extra);
     return key;
   }
   setFlags(key: string, f: { archived?: boolean }) {
@@ -77,7 +85,7 @@ class FakeSessions extends EventEmitter {
   }
   summary(key: string) {
     const st = this.status.get(key);
-    return st ? ({ key, agent: 'acp', stats: { tokensIn: 0, tokensOut: 0, tokensCached: 0 }, live: { status: st } } as any) : null;
+    return st ? ({ key, agent: 'acp', stats: { tokensIn: 0, tokensOut: 0, tokensCached: 0, ...(this.costs.has(key) ? { costUsd: this.costs.get(key) } : {}) }, live: { status: st } } as any) : null;
   }
   async timeline(key: string) {
     const said = this.replies.get(key) ?? [];
@@ -91,7 +99,8 @@ class FakeSessions extends EventEmitter {
     this.status.set(key, 'idle');
     this.emit('live', key);
   }
-  async deliverOrQueue(key: string) {
+  async deliverOrQueue(key: string, text: string) {
+    this.sent.push({ key, text });
     this.status.set(key, 'working');
   }
   end(key: string, reply = 'All done.') {
@@ -376,7 +385,8 @@ test('a flow from the API: a model step, then an agent step that uses its values
   assert.equal(page.steps[1].session, child.key);
   assert.equal(page.steps[0].values.angle, 'Throughput on one GPU');
   assert.equal(page.steps[0].costUsd, 0.001);
-  assert.match(page.noAsks, /takes no follow-ups/);
+  // Done: it takes changes asked of its result (its first starts a session for them).
+  assert.equal(page.noAsks, undefined);
   // The template's runs: one, as is its count for the day; its agent step's run is part of it.
   const runs = (await http.inject({ method: 'GET', url: `/api/apps/${a.id}/runs` })).json().runs;
   assert.deepEqual(runs.map((r: any) => r.id), [runId]);
@@ -908,7 +918,8 @@ test('scheduled tasks run a template: its answers set or filled from a webhook c
 test('run again from a step: the steps before it give what they gave, the rest run as the template is now (or as the builder sends it)', async () => {
   const flow = (prefix: string) => ({
     steps: [
-      { id: 'search', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } },
+      // Not kept: run again from the start, the search is made again.
+      { id: 'search', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' }, cache: false },
       { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: `${prefix}{{search.data.results[0].title}}` } },
     ],
     outputs: { note: '{{keep.record.title}}' },
@@ -1295,6 +1306,94 @@ test('Deep research, as it comes: its questions planned, searched three at a tim
   }
 });
 
+test('Deep research and Compare products in Greek: the writers are told the language, the stand-in models answer in Greek, no program breaks on it, and the report’s sources have a heading in Greek', async () => {
+  // ---- Deep research
+  searchAs = (a) => {
+    const q = String(a.query);
+    const n = /\d/.exec(q)?.[0] ?? '0';
+    return formatSearch({ query: q, provider: 'Test', hits: [{ title: `Μελέτη ${n}`, url: `https://www.statistics${n}.gov.gr/meleti`, date: '2025-03-01', snippet: 'Μια μελέτη.' }, { title: `Ειδήσεις ${n}`, url: `https://www.ertnews.gr/anafora-${n}`, date: '2026-02-01', snippet: 'Μια αναφορά.' }] });
+  };
+  model.answer = (_system, user) => {
+    if (user.startsWith('Plan web research')) return JSON.stringify({ questions: [1, 2].map((n) => ({ question: `Ερώτηση ${n};`, query: `ερώτηση ${n}`, other: `άλλη ερώτηση ${n}` })) });
+    if (user.startsWith('Pull out of the page')) return JSON.stringify({ facts: [`Η σελίδα λέει ${/^The page: .*?, (https:\S+)/m.exec(user)![1]}`], publisher: 'Εκδότης', date: '2026', useful: true });
+    return '{}';
+  };
+  const first = model.calls.length;
+  try {
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:deep-research/runs', payload: { inputs: { topic: 'Πόσο καλά δουλεύουν οι αντλίες θερμότητας;', depth: 'Quick overview' }, lang: 'el' } });
+    assert.equal(res.statusCode, 200, res.body);
+    const runId = res.json().run.id;
+    const write = await agentAnswers(runId, 'write', {
+      summary: 'Δουλεύουν καλά [1].',
+      key_findings: ['Το κρύο δεν είναι πρόβλημα [2]'],
+      report: 'Εισαγωγή [1]. Περισσότερα [2].\n\n## Ανοιχτά ερωτήματα\n\nΤο κόστος διαφέρει.',
+      confidence: 'Μέτρια: λίγες πηγές',
+      sources_heading: 'Πηγές',
+      extra_sources: [],
+    });
+    const prompt = sessions.made.find((m) => m.key === write.key)!.o.prompt as string;
+    assert.match(prompt, /Write everything people will read in Greek\./, 'its writer is told the language');
+    assert.match(prompt, /headed "Open questions" in the language of the report/);
+    const done = await ended(runId, 60_000);
+    assert.equal(done.status, 'done', done.error);
+    const result = done.result as any;
+    assert.match(result.report, /\n\n## Πηγές\n\n1\. /, 'the list of sources is headed in Greek');
+    assert.doesNotMatch(result.report, /## Sources/);
+    assert.equal(result.confidence, 'Μέτρια: λίγες πηγές');
+    const st = Object.fromEntries(store.listSteps(db, runId).map((s) => [s.path, s.status]));
+    for (const id of ['budget', 'queries', 'rank', 'coverage', 'evidence', 'finish']) assert.equal(st[id], 'done', `its program ${id} ran on Greek`);
+    const planned = model.calls.slice(first).filter((c) => c.user.startsWith('Plan web research'));
+    assert.ok(planned.length === 1 && planned.every((c) => /Write everything people will read in Greek\./.test(c.user)), 'its planner too');
+  } finally {
+    searchAs = null;
+  }
+  // ---- Compare products
+  const PHONES = ['Samsung Galaxy S26 Ultra', 'Google Pixel 11 Pro'];
+  searchAs = (a) => {
+    const q = String(a.query);
+    const hits = q.includes('review')
+      ? [{ title: `${q.split(' review')[0]} κριτική`, url: `https://www.insomnia.gr/reviews/${encodeURIComponent(q.split(' ')[0])}`, date: '2026-10-01', snippet: 'Δοκιμή.' }]
+      : [{ title: `${q} τιμή`, url: 'https://www.plaisio.gr/p/1', date: '2026-11-01', snippet: '1.299 €' }];
+    return formatSearch({ query: q, provider: 'Test', hits });
+  };
+  model.answer = (_system, user) => {
+    if (user.startsWith('Someone wants help choosing')) {
+      return JSON.stringify({ named: true, products: PHONES, kind: 'phone', criteria: [{ criterion: 'Κάμερα', weight: 5, good: 'Άριστη' }, { criterion: 'Μπαταρία', weight: 3, good: 'Μια μέρα' }], market: 'Ελλάδα', market_code: 'GR', currency: 'EUR' });
+    }
+    if (user.startsWith('Sum up')) {
+      const product = /^Sum up (.*?) for someone/.exec(user)![1];
+      return JSON.stringify({ found: true, product, price: '1.299 €', shop: 'Plaisio, 1 Νοε 2026', link: 'https://www.plaisio.gr/p/1', strengths: 'Εξαιρετική κάμερα', weaknesses: 'Βαρύ', problems: '', status: 'Σε πώληση', best_for: 'Φωτογράφους', scores: [{ criterion: 'Κάμερα', score: 5, why: 'Άριστη' }, { criterion: 'Μπαταρία', score: product.startsWith('Google') ? 3 : 4, why: 'Καλή' }] });
+    }
+    if (user.startsWith('Write the call')) return JSON.stringify({ recommendation: 'Το Samsung Galaxy S26 Ultra για φωτογραφία.', why: 'Κερδίζει στην κάμερα και στην μπαταρία.', runner_up_why: 'Για όσους θέλουν καθαρό Android', watch_out: ['Η τιμή αλλάζει'] });
+    return '{}';
+  };
+  try {
+    const res = await http.inject({ method: 'POST', url: '/api/apps/tpl:compare-products/runs', payload: { inputs: { products: PHONES.join('\n'), needs: 'Καλή κάμερα και μπαταρία', region: 'GR' }, lang: 'el' } });
+    assert.equal(res.statusCode, 200, res.body);
+    const done = await ended(res.json().run.id, 60_000);
+    assert.equal(done.status, 'done', done.error);
+    const understand = model.calls.slice(first).find((c) => c.user.startsWith('Someone wants help choosing'))!;
+    assert.match(understand.user, /Buying in: GR\n/, 'the country of About you is what the model is told');
+    assert.match(understand.user, /Write everything people will read in Greek\./);
+    const verdict = model.calls.find((c) => c.user.startsWith('Write the call'))!;
+    assert.match(verdict.user, /Write everything people will read in Greek\./);
+    assert.match(verdict.user, /\| Προϊόν \| Κάμερα \(×5\) \| Μπαταρία \(×3\) \| Βαθμός \|/, 'the scores are laid out in Greek for the writer');
+    const result = done.result as any;
+    assert.equal(result.pick, 'Samsung Galaxy S26 Ultra');
+    assert.equal(result.runner_up, 'Google Pixel 11 Pro');
+    assert.equal(result.comparison.length, 2);
+    assert.match(result.recommendation, /Samsung/);
+    assert.match(result.comparison[0].scores, /^Κάμερα: 5\/5 — Άριστη/);
+    const st = Object.fromEntries(store.listSteps(db, done.id).map((x) => [x.path, x.status]));
+    for (const id of ['shortlist', 'score']) assert.equal(st[id], 'done', `its program ${id} ran on Greek`);
+    assert.equal(st['each#1/best'], 'done');
+    const pricesAsked = toolCalls.filter((c) => c.tool === 'web_search' && String(c.args.query).includes('Samsung') && !String(c.args.query).includes('review')).map((c) => c.args.query);
+    assert.ok(pricesAsked.some((q) => /price Ελλάδα/.test(String(q))), 'prices are asked for in the buyer’s country');
+  } finally {
+    searchAs = null;
+  }
+});
+
 test('Trip planner, as it comes: its dates worked out, four branches of research side by side (the forecast only for a trip that is near), the plan on the trip’s own dates and its budget added up; it asks what you would like only when you are there', async () => {
   const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
   model.answer = (_system, user) => {
@@ -1338,11 +1437,18 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
     { item: 'Total', estimate: '450–650 EUR' },
   ]);
   assert.equal(result.overview, 'Three easy days.');
+  // What the research found reaches the answer, each field straight from the step that found it.
+  assert.deepEqual([result.weather, result.temperatures, result.rain, result.pack], ['Sunny, by the forecast', '14–20 °C', 'Some', ['A light jacket']]);
+  assert.deepEqual(result.events.map((e: any) => [e.name, e.date, e.where]), [['Jazz festival', 'Saturday', 'Belém']]);
+  assert.deepEqual([result.holidays, result.closures], [[], ['The castle closes on Mondays']]);
+  assert.deepEqual([result.arrival, result.around], ['The metro from the airport', 'A Viva Viagem card']);
   const st = store.listSteps(db, r.id);
   const status = Object.fromEntries(st.map((s) => [s.path, s.status]));
   assert.equal(status.choices, 'skipped', 'not asked: the run came from the API');
-  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'assemble']) assert.equal(status[id], 'done', id);
+  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'lookups', 'geo', 'fx', 'assemble']) assert.equal(status[id], 'done', id);
   const at = Object.fromEntries(st.map((s) => [s.id, s]));
+  // The app's own tier goes to its agent's session: the plan is standard work.
+  assert.equal(store.getRun(db, at.plan.childRun!)!.recipe.tier, 'standard');
   const started = Math.max(...['events_search', 'climate_search', 'sights_search', 'transport_search'].map((id) => at[id].startedAt!));
   const ended1 = Math.min(...['whats_on', 'weather', 'places', 'transport'].map((id) => at[id].endedAt!));
   assert.ok(started <= ended1, 'the four branches ran side by side');
@@ -1726,9 +1832,9 @@ test('a tier in place of a model: running a ready-made app with a tier replaces 
   const model = await run({ agent: 'claude', model: 'named-model', tier: 'best' });
   assert.deepEqual([model.tier, model.model], [undefined, 'named-model']);
   const neither = await run({});
-  assert.deepEqual([neither.tier, neither.model], [undefined, undefined]);
+  assert.deepEqual([neither.tier, neither.model], ['best', undefined], 'the app’s own tier: Deep research report is research work');
   const huge = await run({ tier: 'huge' });
-  assert.equal(huge.tier, undefined);
+  assert.equal(huge.tier, 'best', 'a tier that is none is ignored: the app’s own stays');
 });
 
 // ---- memory -------------------------------------------------------------------------------------------------
@@ -2155,6 +2261,282 @@ test('saving checks a flow: what must change refuses it in words, what may surpr
   assert.match(ok.json().warnings.join('\n'), /empty when the decision “d” goes the other way/);
   const checked = (await http.inject({ method: 'POST', url: '/api/apps/check', payload: { recipe: { name: 'C', flow: [{ id: 'a', do: 'repeat', steps: [] }] } } })).json();
   assert.ok(checked.errors.some((e: string) => /what to go through/.test(e)), checked.errors.join('\n'));
+});
+
+// ---- the answer so far, and changes asked of a finished run -------------------------------------------------
+
+/** A transcript's lines: the person's message, the answer handed in, the agent's words. */
+const said = (kind: 'user' | 'assistant', text: string) => ({ kind, id: `${kind[0]}-${Math.random().toString(36).slice(2, 8)}`, seq: 0, ts: Date.now(), text });
+const handedIn = () => ({ kind: 'tool', id: `t-${Math.random().toString(36).slice(2, 8)}`, seq: 0, tool: { name: 'mcp__hydor__submit_result', category: 'other', title: 'submit_result', status: 'ok' } });
+/** Ends a session's turn with these lines in its transcript (the stand-in's replies would land after all of them). */
+function turnEnds(key: string, ...lines: unknown[]) {
+  sessions.items.set(key, [...(sessions.items.get(key) ?? []), ...lines]);
+  sessions.status.set(key, 'idle');
+  sessions.emit('live', key);
+}
+
+/** An app whose last step is a slow agent: its weather, link and pictures come first. */
+const filling = (p: Record<string, unknown> = {}) =>
+  app({
+    name: 'Filling',
+    ...p,
+    answer: [
+      { id: 'weather', label: 'Weather', type: 'text', required: true },
+      { id: 'link', label: 'Link', type: 'url' },
+      { id: 'value', label: 'How many', type: 'number' },
+      { id: 'pics', label: 'Pictures', type: 'media' },
+      { id: 'files', label: 'Files', type: 'media' },
+      { id: 'plan', label: 'Plan', type: 'markdown', required: true },
+    ],
+    flow: {
+      steps: [
+        { id: 'find', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } },
+        { id: 'shots', do: 'value', of: '{{find.data.results}}', op: 'pick', arg: 'url' },
+        // A value by the name of an answer field that does not fit it (a list for a number): it waits.
+        { id: 'early', do: 'value', of: '{{find.data.results}}', op: 'pick', arg: 'title' },
+        { id: 'sky', do: 'model', instructions: 'The weather for {{topic}}', outputs: { weather: 'text' } },
+        { id: 'write', do: 'agent', instructions: 'Plan {{topic}}', outputs: { plan: 'long' } },
+        { id: 'n', do: 'value', of: '{{find.data.results}}', op: 'count' },
+      ],
+      outputs: { link: '{{find.data.results[0].url}}', pics: '{{shots.value}}', files: '{{find.data.results[0].file}}' },
+    },
+    flows: {
+      other: { title: 'Another', inputs: [{ id: 'topic', label: 'Topic', type: 'text' }], steps: [{ id: 'look', do: 'tool', tool: 'web_search', with: { query: '{{topic}}' } }, { id: 'think', do: 'agent', instructions: 'Think', outputs: { weather: 'text' } }], outputs: { weather: '{{think.weather}}' } },
+    },
+  });
+
+let filledRun = '';
+
+test('the answer so far: as steps end, the fields they fill show while the last step works; a value that does not fit, or a file here, waits; gone at the end', async () => {
+  model.answer = (_system, user) => (/weather/i.test(user) ? JSON.stringify({ weather: 'Sunny, 24°' }) : '{}');
+  searchAs = (a) => JSON.stringify({ results: [{ title: `About ${a.query}`, url: 'https://example.com/1', file: '/tmp/nowhere-apps-e.png' }] });
+  try {
+    const a = filling();
+    const run = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'Lisbon' } });
+    filledRun = run.id;
+    let child: store.RunRecord | undefined;
+    for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: run.id }).find((r) => r.step === 'write' && r.key)); i++) await sleep(25);
+    assert.ok(child, 'the slow step is at work');
+    const now = store.getRun(db, run.id)!;
+    assert.ok(isActive(now.status));
+    assert.deepEqual(Object.keys(now.partial ?? {}).sort(), ['link', 'pics', 'weather']);
+    assert.equal(now.partial!.weather, 'Sunny, 24°');
+    assert.equal(now.partial!.link, 'https://example.com/1');
+    assert.equal((now.partial!.pics as { src: string }[])[0].src, 'https://example.com/1');
+    // The run's page and the API's answer give it while it works.
+    const page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json();
+    assert.equal(page.run.partial.weather, 'Sunny, 24°');
+    assert.match(page.noAsks, /Once it is done/);
+    // A flow beside the main one gives back its outputs at its end, and nothing before.
+    const other = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'screen', inputs: { topic: 'Porto' }, flow: 'other' });
+    let thinker: store.RunRecord | undefined;
+    for (let i = 0; i < 200 && !(thinker = store.listRuns(db, { parent: other.id }).find((r) => r.step === 'think' && r.key)); i++) await sleep(25);
+    assert.ok(thinker);
+    assert.equal(store.getRun(db, other.id)!.partial, undefined);
+    assert.equal(db.prepare('select partial from app_runs where id = ?').pluck().get(other.id), null);
+    await agentAnswers(other.id, 'think', { weather: 'Rain' });
+    const o = await ended(other.id);
+    assert.deepEqual(o.result, { weather: 'Rain' });
+    // The slow step ends: the whole answer, and no answer so far.
+    await agentAnswers(run.id, 'write', { plan: 'Day 1: the river.' });
+    const r = await ended(run.id);
+    assert.equal(r.status, 'done', r.error);
+    assert.equal(r.result!.plan, 'Day 1: the river.');
+    assert.equal(r.result!.value, 1);
+    assert.equal(r.result!.weather, 'Sunny, 24°');
+    assert.equal(r.partial, undefined);
+    assert.equal(db.prepare('select partial from app_runs where id = ?').pluck().get(run.id), null);
+    assert.equal((await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json().run.partial, undefined);
+  } finally {
+    searchAs = null;
+  }
+});
+
+test('changes to a finished run with steps: the first starts a session as the app’s agent, with what the app did in files; the fields it leaves out stay; the next goes to the same session', async () => {
+  const r0 = store.getRun(db, filledRun)!;
+  const a = store.getApp(db, r0.app)!;
+  const folder = runFolder(r0, a.slug);
+  const before = sessions.made.length;
+  const res = await http.inject({ method: 'POST', url: `/api/apps/runs/${r0.id}/ask`, payload: { text: 'Make the plan shorter' } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal(sessions.made.length, before + 1);
+  const made = sessions.made.at(-1)!;
+  const r1 = store.getRun(db, r0.id)!;
+  assert.equal(r1.key, made.key);
+  assert.equal(r1.status, 'running');
+  // As the app's own agent: its program, Standard (it names no tier), the run's folder, the run as its app mark.
+  assert.equal(made.o.agent, 'claude');
+  assert.equal(made.o.model, tierPick(db, 'standard', 'claude')?.model);
+  assert.equal(made.o.cwd, folder);
+  assert.equal(made.o.extra.app.run, r0.id);
+  // What the app did, in files the first message names; the person's words last.
+  assert.match(made.o.prompt, /“Filling”/);
+  assert.match(made.o.prompt, /1\. .*\n2\. .*\n3\. /);
+  assert.match(made.o.prompt, /answers\.json/);
+  assert.match(made.o.prompt, /result\.json: its result as it is now/);
+  assert.match(made.o.prompt, /steps\/: what each step gave \(find\.json, shots\.json/);
+  assert.ok(made.o.prompt.endsWith('\n\n---\nThe person asks:\nMake the plan shorter'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(folder, 'result.json'), 'utf8')), r0.result);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(folder, 'answers.json'), 'utf8'))[0], { id: 'topic', question: 'Topic', answer: 'Lisbon' });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(folder, 'steps', 'sky.json'), 'utf8')).gave.weather, 'Sunny, 24°');
+  // What it is told: it changes a finished run's result, hands in what changed, and sends another question to Run again.
+  const add = await apps.spawn!({ agent: 'claude', key: made.key, cwd: folder, runId: 'agent-fu-flow', resume: false, extra: made.o.extra }, deps);
+  assert.match(add!.instructions![0], /changes the result of a finished run of the app "Filling"/);
+  assert.match(add!.instructions![0], /the fields you leave out stay as they are/);
+  assert.match(add!.instructions![0], /Run again with those answers/);
+  assert.match(add!.instructions![0], /- plan \(text, Markdown, required\)/);
+  const ctx: RunCtx = { runId: 'agent-fu-flow', key: made.key, agent: 'claude', cwd: folder, deps };
+  const submit = apps.tools!(ctx).find((t) => t.name === 'submit_result')!;
+  assert.deepEqual((submit.inputSchema as { required: string[] }).required, [], 'a change needs only what changes');
+  const bad = await submit.run({ link: 'javascript:alert(1)' }, ctx);
+  assert.ok(typeof bad === 'object' && bad.isError && /link/.test(bad.text));
+  assert.deepEqual(store.getRun(db, r0.id)!.result, r0.result, 'nothing changed by what did not fit');
+  assert.match(String(await submit.run({ plan: 'Walk.' }, ctx)), /Saved/);
+  assert.deepEqual(store.getRun(db, r0.id)!.result, { ...r0.result, plan: 'Walk.' });
+  sessions.costs.set(made.key, 0.02);
+  turnEnds(made.key, said('user', made.o.prompt), handedIn(), said('assistant', 'The plan is one line now.'));
+  const r2 = await ended(r0.id);
+  assert.equal(r2.status, 'done', r2.error);
+  assert.equal(r2.reply, 'The plan is one line now.');
+  assert.equal(r2.costUsd, Math.round(((r0.costUsd ?? 0) + 0.02) * 10000) / 10000, 'its steps and its changes');
+  let page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${r0.id}` })).json();
+  assert.equal(page.first, r0.reply, 'the reply its steps gave');
+  assert.deepEqual(
+    page.asks.map((x: { text: string; updated: boolean; reply?: string }) => [x.text, x.updated, x.reply]),
+    [['Make the plan shorter', true, 'The plan is one line now.']],
+  );
+  assert.equal(page.noAsks, undefined);
+  // A second change: the same session, and its turn followed.
+  const res2 = await http.inject({ method: 'POST', url: `/api/apps/runs/${r0.id}/ask`, payload: { text: 'And warmer' } });
+  assert.equal(res2.statusCode, 200, res2.body);
+  assert.equal(sessions.made.length, before + 1);
+  assert.deepEqual(sessions.sent.at(-1), { key: made.key, text: 'And warmer' });
+  assert.equal(store.getRun(db, r0.id)!.status, 'running');
+  turnEnds(made.key, said('user', 'And warmer'), said('assistant', 'Warmer now.'));
+  assert.equal((await ended(r0.id)).status, 'done');
+  page = (await http.inject({ method: 'GET', url: `/api/apps/runs/${r0.id}` })).json();
+  assert.deepEqual(
+    page.asks.map((x: { text: string; updated: boolean }) => [x.text, x.updated]),
+    [
+      ['Make the plan shorter', true],
+      ['And warmer', false],
+    ],
+  );
+});
+
+test('changes asked of a run with steps: refused for a public page’s run, a run of another flow, one at work or one that did not finish', async () => {
+  const a = store.listApps(db).find((x) => x.name === 'Filling')!;
+  const ask = async (id: string) => http.inject({ method: 'POST', url: `/api/apps/runs/${id}/ask`, payload: { text: 'Shorter' } });
+  const pub = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'public', inputs: {}, status: 'done' });
+  let res = await ask(pub.id);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.json().error, /public page/);
+  const other = store.listRuns(db, { app: a.id, source: 'screen', limit: 1 })[0];
+  assert.equal(other.flow, 'other');
+  res = await ask(other.id);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.json().error, /another of its flows/);
+  const failed = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: {}, status: 'failed' });
+  assert.match((await ask(failed.id)).json().error, /did not finish/);
+  const going = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: {}, status: 'running' });
+  assert.match((await ask(going.id)).json().error, /Once it is done/);
+  store.updateRun(db, going.id, { status: 'stopped' });
+  // The view's ask, and the run page's box, follow what the run's page says.
+  assert.ok(!store.listRuns(db, { app: a.id, limit: 50 }).some((r) => [pub.id, other.id, failed.id].includes(r.id) && r.key), 'no session was started for them');
+});
+
+test('use_app with run and change: the change goes to the run the session started, its card moves under this turn, and the call gives back the updated answer', async () => {
+  const a = store.listApps(db).find((x) => x.name === 'Filling')!;
+  const key = 'claude:asker-flow';
+  const ctx: RunCtx = { runId: `run-${key}`, key, agent: 'claude', cwd: tmp, deps };
+  const use = apps.tools!(ctx).find((t) => t.name === 'use_app')!;
+  assert.match(use.description, /run \(the run’s id\) and change/);
+  model.answer = (_system, user) => (/weather/i.test(user) ? JSON.stringify({ weather: 'Mild' }) : '{}');
+  const run = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'session', inputs: { topic: 'Crete' }, askedBy: key });
+  addNote(db, { key, kind: 'app-run', anchor: 'u-old', data: { run: run.id, app: a.id, name: a.name, icon: a.icon, color: a.color } });
+  await agentAnswers(run.id, 'write', { plan: 'Day 1: Knossos. Day 2: beach.' });
+  const done = await ended(run.id);
+  assert.equal(done.status, 'done', done.error);
+  // Another session's run is not this one's to change.
+  assert.match(JSON.stringify(await use.run({ run: run.id, change: 'Swap the days' }, { ...ctx, key: 'claude:other' })), /No run with that id/);
+  const before = sessions.made.length;
+  const pending = use.run({ run: run.id, change: 'Swap the days', wait: 30 }, ctx);
+  let made: (typeof sessions.made)[number] | undefined;
+  for (let i = 0; i < 200 && !(made = sessions.made.slice(before)[0]); i++) await sleep(25);
+  assert.ok(made, 'the change started the run’s session');
+  assert.match(made!.o.prompt, /The person asks:\nSwap the days$/);
+  const fctx: RunCtx = { runId: 'agent-fu-chat', key: made!.key, agent: 'claude', cwd: tmp, deps };
+  await apps.spawn!({ agent: 'claude', key: made!.key, cwd: tmp, runId: 'agent-fu-chat', resume: false, extra: made!.o.extra }, deps);
+  await apps.tools!(fctx).find((t) => t.name === 'submit_result')!.run({ plan: 'Day 1: beach. Day 2: Knossos.' }, fctx);
+  turnEnds(made!.key, said('user', made!.o.prompt), handedIn(), said('assistant', 'Swapped the two days.'));
+  const text = String(await pending);
+  assert.match(text, /changed its answer as asked/);
+  assert.match(text, /What its agent said: Swapped the two days\./);
+  assert.match(text, /Day 1: beach\. Day 2: Knossos\./);
+  assert.match(text, /Mild/, 'the fields it left out are there as they were');
+  const r = store.getRun(db, run.id)!;
+  assert.equal(r.told, true);
+  // Its card is under this turn now, once.
+  const cards = notesOf(db, key, 'app-run').filter((n) => (n.data as { run: string }).run === run.id);
+  assert.equal(cards.length, 1);
+  assert.notEqual(cards[0].anchor, 'u-old');
+  // Another question is not a change: its agent says so, and the call says the answer did not change.
+  const again = use.run({ run: run.id, change: 'Plan Porto instead', wait: 30 }, ctx);
+  for (let i = 0; i < 200 && store.getRun(db, run.id)!.status !== 'running'; i++) await sleep(25);
+  assert.deepEqual(sessions.sent.at(-1), { key: made!.key, text: 'Plan Porto instead' });
+  turnEnds(made!.key, said('user', 'Plan Porto instead'), said('assistant', 'That is another trip: use Run again with Porto.'));
+  const text2 = String(await again);
+  assert.match(text2, /did not change its answer/);
+  assert.match(text2, /Run again with Porto/);
+  assert.equal(sessions.made.length, before + 1, 'one session for its changes');
+});
+
+test('changes to a run with steps: in the run’s language when its app writes in the person’s; an earlier session’s spending stays in the cost; a change that outlasts use_app is told as a change', async () => {
+  model.answer = (_system, user) => (/weather/i.test(user) ? JSON.stringify({ weather: 'Ζέστη' }) : '{}');
+  const a = filling({ name: 'Filling in Greek', language: 'person' });
+  assert.equal(a.language, 'person');
+  const key = 'claude:asker-greek';
+  const ctx: RunCtx = { runId: `run-${key}`, key, agent: 'claude', cwd: tmp, deps };
+  const run = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'session', inputs: { topic: 'Κρήτη' }, askedBy: key, lang: 'el' });
+  addNote(db, { key, kind: 'app-run', data: { run: run.id, app: a.id, name: a.name, icon: a.icon, color: a.color } });
+  await agentAnswers(run.id, 'write', { plan: 'Μέρα 1: Κνωσός.' });
+  const r0 = await ended(run.id);
+  assert.equal(r0.status, 'done', r0.error);
+  const steps = r0.costUsd ?? 0;
+  // The change's session hears the run's language, ahead of the person's words (which the page lists alone).
+  let before = sessions.made.length;
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: 'Πιο σύντομο' } })).statusCode, 200);
+  const first = sessions.made[before];
+  assert.ok(first.o.prompt.includes(`${languageLine('el')}\n\n---\nThe person asks:\nΠιο σύντομο`), first.o.prompt);
+  sessions.costs.set(first.key, 0.03);
+  turnEnds(first.key, said('user', first.o.prompt), said('assistant', 'Έγινε.'));
+  assert.equal((await ended(run.id)).costUsd, Math.round((steps + 0.03) * 10000) / 10000);
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json().asks.map((x: { text: string }) => x.text), ['Πιο σύντομο']);
+  // Its session deleted: the next change starts another, and what the first spent stays in the run's cost.
+  sessions.status.delete(first.key);
+  before = sessions.made.length;
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: 'Και πιο ζεστό' } })).statusCode, 200);
+  const second = sessions.made[before];
+  assert.notEqual(second.key, first.key);
+  assert.equal(second.o.extra.app.spentBefore, 0.03);
+  sessions.costs.set(second.key, 0.01);
+  turnEnds(second.key, said('user', second.o.prompt), said('assistant', 'Έγινε κι αυτό.'));
+  assert.equal((await ended(run.id)).costUsd, Math.round((steps + 0.04) * 10000) / 10000);
+  // A change asked through use_app that outlasts the call: the session hears later that the change is done.
+  const use = apps.tools!(ctx).find((t) => t.name === 'use_app')!;
+  const sent = sessions.sent.length;
+  assert.match(String(await use.run({ run: run.id, change: 'Swap the days', wait: 1 }, ctx)), /still making the change/);
+  assert.equal(store.getRun(db, run.id)!.status, 'running');
+  turnEnds(second.key, said('user', 'Swap the days'), said('assistant', 'Swapped.'));
+  await ended(run.id);
+  let told: { key: string; text: string } | undefined;
+  for (let i = 0; i < 100 && !(told = sessions.sent.slice(sent).find((m) => m.key === key)); i++) await sleep(25);
+  assert.ok(told, 'the asking session hears of it');
+  assert.match(told!.text, /^\[Filling in Greek changed\] The change you asked of it for the user \(“Swap the days”\) is done/);
+  assert.match(told!.text, /What its agent said: Swapped\./);
+  assert.equal(runEndedNotice(told!.text), run.id, 'the conversation hides it and moves the card under the reply');
+  assert.equal((notesOf(db, key, 'app-run')[0].data as { change?: string }).change, undefined, 'told once');
+  assert.equal(store.getRun(db, run.id)!.told, true);
 });
 
 for (const [name, fn] of tests) {

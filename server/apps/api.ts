@@ -1,6 +1,6 @@
 // What programs get back from an app run (the API, MCP), and the daily limit every way of starting
 // a run checks first.
-import type { AppDef, AppRecipe, RunStatus, RunStepView } from '../../shared/apps.ts';
+import type { AppDef, AppRecipe, RunMiss, RunStatus, RunStepView } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { dayStart, usageSince, type RunRecord } from './store.ts';
@@ -18,6 +18,10 @@ export interface ApiAnswer {
   costUsd?: number;
   /** A run with steps: each step and how it went. */
   steps?: { step: string; title: string; status: string; error?: string }[];
+  /** What its steps could not have (a site that keeps programs out, a service limiting requests). */
+  misses?: RunMiss[];
+  /** A run with steps at work: the answer fields its steps have given so far (gone once it ends, when result has them all). */
+  partial?: Record<string, unknown>;
 }
 
 export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: RunStepView[]): ApiAnswer {
@@ -30,6 +34,8 @@ export function apiAnswer(r: RunRecord, link: (key: string) => string, steps?: R
     ...(r.error ? { error: r.error } : {}),
     ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
     ...(steps ? { steps: steps.filter((x) => x.kind !== 'round').map((x) => ({ step: x.path, title: x.title, status: x.status, ...(x.error ? { error: x.error } : {}) })) } : {}),
+    ...(r.misses?.length ? { misses: r.misses } : {}),
+    ...(r.partial ? { partial: r.partial } : {}),
   };
 }
 

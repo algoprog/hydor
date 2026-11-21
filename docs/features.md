@@ -877,8 +877,11 @@ agents that speak ACP and take MCP servers.
   by name (Edit → Who does it, a step's What it thinks with, or Change beside a ready-made app's "runs with": the
   Model menu lists Quick, Standard, Best and Max first, each with the model it means now for that program, then the
   models by name; a tier follows Settings → Models → Tiers and works whichever program runs the app, a model by name
-  wins, an agent step's own pick replaces the app's, and the last pick is remembered); the agents that build apps pick
-  the lowest tier that does the job well. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
+  wins, an agent step's own pick replaces the app's; a ready-made app's page remembers the program and mode for all of them,
+  and the model, tier and effort for each app on its own, only once changed there); the agents that build apps pick
+  the lowest tier that does the job well, and so do the ready-made apps with an agent step (Best for Deep research
+  report, Reproduce a paper and Research sprint, Standard for most, Quick for Document Q&A's look; no step names a tier,
+  so what you pick on the page reaches all of an app's agents). Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
   that says in plain words what it asks, gives and does. A session is told of the few apps pinned or run most with
   what they do (the pinned ones first) and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
   form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
@@ -894,31 +897,55 @@ agents that speak ACP and take MCP servers.
   run, or added under Settings → Capabilities → Apps → Run without asking (remove it there to be asked again), shows its
   card only when it needs details your message left out, and a scheduled task's own session runs apps without asking.
   Its run and its view show in the conversation, and when its answer does not fit and the agent answers itself, the
-  card is taken out so there is one answer. Each app's Agents can
-  use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
+  card is taken out so there is one answer; a change you then ask of what it gave (another order, shorter, one
+  thing for another) goes to the app's run, and its card moves under the reply with the new answer. Each app's Agents can
+  use it switch keeps agents from running it, and blocks and apps made for their own page stay out. About you
+  (Settings → Apps) is one short record apps read instead of asking every run: where you live, country, language,
+  units, currency, diet, people at home, streaming services, teams, research fields, topics, venues, you as an author
+  (with an ORCID or OpenAlex id) and what you can run on; what is left empty is worked out where it can be (the country
+  from the time zone, units and currency from the country, the language from the app's) and shown greyed with where
+  it came from. Only you change it (an agent asks first, each time), and public pages never see it. A question can
+  start from a field of it (Filled in from), and those not needed fold into one line under the form ("For Thessaloniki
+  · metric · EUR", with Change); one About you has nothing for offers Remember for all apps; another can start from
+  your last answer to it in that app (Remember the last answer, kept on the server for every device). Runs from the
+  API, rows of a CSV, schedules and agents take those starting values for what they leave out. Each run writes in a
+  language: the page's, a public visitor's, the one you write to an agent in, else About you's, else English, kept
+  for Run again from here; an app with Answers in the person’s language (on for new apps) has its models and agents
+  write in it, steps read {{language}}, {{lang}} and {{me.units}}…, and code steps get ctx.locale (language,
+  country, time zone, currency, units) with Intl's data for every language. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
-  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). Explore, one
+  sources in code, reads the best in parallel, searches again for gaps and writes a cited report). The ten first ready-made tasks
+  start from About you and from your last answers (Compare products' and the news digest's region from your country; a
+  cover letter's background, a tone, a depth, a pace, a lesson's learners are remembered), write in your language
+  (a cover letter in the posting's, meeting notes and their email in the notes', a lesson in the one it is taught in),
+  and keep no English-only logic: Intl for weekdays and money, Intl.Segmenter to find passages in Japanese or Chinese,
+  clauses by § and Άρθρο as well as Article, and the shops, testers and established sources of many countries. Explore, one
   click from the top right of the start page, is a magazine made for you: it reads your profile, memory's notes about
   you and the titles of up to 1,000 of your latest sessions, has the helper model pick about six topics you would
   enjoy (half from your work, half from the rest of your life), finds each one's news of the past two weeks and long
   reads, reads the best pages side by side and lays them out as an edition with a cover line, a cover story and a
   section for each topic, each story with its picture, what it says and why it is there (opening one marks it read;
-  Dig deeper starts a research report on it). It opens on its own page rather than in chats, with Update and its
+  Dig deeper starts a research report on it; a story an edition showed is left out of the next ones for three weeks,
+  and the magazine is written in your language). It opens on its own page rather than in chats, with Update and its
   settings at the top: Update automatically (every day, on weekdays or once a week, at a time you pick: a scheduled task, off until you turn it on), how many sessions it reads,
   what to always cover and what to leave out. An app of your own whose view has pages for its own page gets the same
   Update and settings. Beside those come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
   as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
-  match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners with one
-  shopping list by aisle (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
+  match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners (swapped for the diet where one does not fit) with one
+  shopping list by aisle, its amounts scaled to the people (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
-  their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
+  their lowest ever, for the game asked for and no other (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). Many
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). They start their questions from About you
+  (units, where you live, currency, diet, people at home, streaming services and country, the teams you follow) or from your last answer, and write in your
+  language: the sky in words, weekdays, months and money by Intl, Wikipedia in your language first and English when it has no page, a fridge list in
+  any language read as English ingredient names with your own words shown back, numbers with a decimal comma and dates in your language read in your own
+  data, and a game's US dollar price with its worth in your currency at the day's Frankfurter rate. Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
-  off, a page for each day, a map of the days, a list to book and a budget chart; Compare products' pick, and the products side by side with their scores on a chart;
+  off, a page for each day, a map of the days with each area looked up, a Good to know page with the weather, what is on and getting around, a list to book and a budget chart at the day's Frankfurter rate; Compare products' pick, and the products side by side with their scores on a chart;
   the news digest's stories by topic), with buttons that run it again with a change (a slower pace, one more day,
   a more formal letter, new questions about the same document) or start another app on part of it (research a
   story, a finding or a product). An app's view is part of it: elements (HTML templates its values fill, each
@@ -933,14 +960,23 @@ agents that speak ACP and take MCP servers.
   joined in order) and plots in 2D and 3D (Plotly: lines, stacked bars, areas, scatter, pies, histograms, boxes,
   heatmaps, 3D points, lines and surfaces); and widgets, elements drawn by a script of their own that imports
   npm packages at exact versions from jsDelivr (a 3D scene with three.js, a chart library, a game), reaching the
-  app only through the view's events. An answer can hold pictures, videos and files (a media field, a picture
-  column): what an agent hands in from this computer, a picture it found on the web or one it drew is kept as a
+  app only through the view's events. An answer field can be a card too (A card… in its Answer tab: any of the
+  answer UIs a conversation shows, picked from the catalog with each drawn small, its Preview drawn with the card's
+  example; ui(<name>) as a step's output): its agent or model is told the card's type and an example and must give
+  real pictures, what it hands in is checked as save_board checks a card, and the card shows wherever the answer
+  does, as in a conversation (Copy as text, Full screen, Pin to a board from the run), the API giving its data and a
+  CSV of rows, the tool other agents call and a chat's agent its text; so an app of short fields and cards looks as
+  good as an answer in a chat without a view (a view cannot place a card yet: Plain answer shows it). An answer can
+  hold pictures, videos and files (a media field, a picture column): what an agent hands in from this computer, a picture it found on the web or one it drew is kept as a
   copy, served at an address nobody can guess that never runs as a page of the app. An app has files of its own
   too (pictures, videos, data, added in its Design tab or by app_save), shown by name in its view and travelling
   in its file. An app names the keys it needs (API keys, tokens) and never their values: they are asked for on
   its form, on its install card or on its card in a session when an agent runs it, and kept in the vault, where
   its runs use them by name; a run without one does not start. Follow-ups refine a run's
-  result, asked on its page or in its session, which opens on that result with a switch to the conversation.
+  result, asked on its page, in its session (which opens on that result with a switch to the conversation) or by
+  its view's buttons: the agent hands in what changed and the rest stays. A finished run with steps takes them too:
+  the first starts a session for it with the app's agent, told what the app did, with the form's answers, the
+  result and what each step gave as files in the run's folder, and what it spends adds to the run's cost.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
   to you that it waits for (a short form whose choices can be what the run found, to tick one or several),
@@ -960,7 +996,10 @@ agents that speak ACP and take MCP servers.
   called in their place, which other apps can call too; Add a step offers these blocks, yours and ready-made
   ones to sum up a page, translate, answer from the web, sort into kinds or pull out facts) or by an agent, shown
   step by step on the run's page, run again from any step there (the steps before it giving what they gave, also
-  from a test run in its Edit) and resumed after a restart; keep records between runs that its steps, its agents
+  from a test run in its Edit) and resumed after a restart, its result filling in under the status card as its
+  steps end (a view draws the parts whose answer is there, the rest when it is, opens on a page with something
+  to show and holds its buttons that would start another run until it is done; on its page, in a conversation
+  and on its public page); keep records between runs that its steps, its agents
   and the API share (lists named in its Edit, with the fields their records hold); remember across runs in a
   memory of its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers
   with checks on what a run gives) try it as it is on screen, each saying how its last try went. Each save that
@@ -968,19 +1007,46 @@ agents that speak ACP and take MCP servers.
   brought back, and each run keeps the version it ran. An app can live as a folder of files too (app.json,
   each step's instructions, code steps as functions, its screens, with a schema for editors), changed in any
   editor or by a coding agent, each saved change coming back as a version. The command line's app commands make a
-  app and its folder, try its examples as you save, and export and import it. Describe one on the New
-  app page and the App builder assistant makes it. Save as an app turns a session that went well into one,
-  with steps drafted from the tools it called (read a page, search the web) when they check out. Agents build
-  apps with tools of their own: app_get, app_save (checked first; whole, a patch or one step; its view too),
-  app_try (its examples or a set of answers, waited for, with the names its view uses that a try did not give),
-  app_screen and app_data (the records it keeps: read, or added to). A
+  app and its folder, try its examples as you save, and export and import it. Describe one on the Apps or New
+  app page (a box that grows, Make it), or search for what no app does yet and press Describe it to an agent, and
+  a session with the App builder starts at once on your words, thinking with Best on the program and permissions you
+  picked last (Ask an agent to design it and Ask an agent to fix it start one too). The App builder reads the
+  ready-made apps closest to yours first, then shows a sketch before it makes anything: a card in the conversation
+  with the app's face, What it asks (its form), What it does (its steps in words, with their kinds' icons), What
+  you get (a made-up answer in its view or the plain card), a rough time and cost a run, the keys it needs, what it
+  assumed and up to three questions to click, with Build it (which sends your picks) and Change it. Before an app
+  has run, its What it does says what a run takes and costs, roughly, from its steps (by kind, and an agent's by its
+  tier; a repeat by its rounds, steps side by side by the longest); once it has finished runs, from the middle of
+  those. Do this again… under the last reply of a turn that used a tool or showed a card
+  (or Save as an app in a session's menu, for its latest turn) turns that turn into an app: the helper model finds the
+  message the work began with, the corrections after it ("in euros", "shorter") become the task's standing
+  instructions, the reply's cards its card fields (its words beside them a Summary), this request's answers its first
+  example with checks from the reply, and What changes each time? on top shows the request with each question's
+  words as a chip (a click keeps them as they are; selected words become a new question); steps are drafted from the
+  tools it called (read a page, search the web) when they check out. Its Run it every… opens a new scheduled task
+  with the turn's request. Agents build
+  apps with tools of their own: app_get (the user's apps, and the ready-made ones as worked examples: all in a line
+  each, the three closest to a description, or one whole with its code steps cut short), app_sketch (a new app's
+  sketch for the user, checked as a save is and saving nothing), app_save (checked first; whole, a patch or one
+  step; its view too), app_try (its examples or a set of answers, waited for, with the names its view uses that a
+  try did not give, and with look pictures of its view on a computer in the dark and the light and on a phone, drawn
+  by the capture browser), app_screen, app_data (the records it keeps: read, or added to) and app_services (the
+  free data services the ready-made apps use, each with a request to start from). A
   app an agent saves opens beside its conversation, where what you change and save reaches the agent with
   your next message (its next save reads your version first). A tool, model, code, data or app step that fails
   can have an agent do its work, so the run goes on; Edit shows the steps that had to, with Ask an agent to fix
   it, and offers Firm it up for an agent step that did the same in each of its last runs: fixed steps in its
   place (the tools it called, with the values it called them with, then a model step), tried on its examples
   first, with what a run takes and costs either way. Beside a conversation, a step's menu has Ask the agent about
-  it. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
+  it. When the web lets a step down, its tool calls (and a program's ctx.tool) are tried again while the failure
+  may pass (a service limiting requests, one down or slow for a moment, a dropped connection: three tries, after
+  the wait it asks for, else about 1 s and 3 s, at most 20 s a call), spaced per service for every run (Semantic
+  Scholar and Nominatim once a second, arXiv every 3 s; a service that says wait holds every caller), look-ups kept
+  for five minutes (a day for places and encyclopedias; a tool step's cache: false or seconds), and a page that
+  keeps programs out read once in the computer's own headless browser; what still could not be had shows on the
+  run's page as one folded line (3 things could not be had: each step, what it wanted and why, such as "it needs
+  the key …" or "it would do more with the key … (optional)"), reaches its view (run.misses, run.missed), the API,
+  and the agent that ran it in a session. Its steps, its agents and programs search its records by words and by meaning, as knowledge bases are
   searched. An app can have a screen of its own in place of its form: a page made from its parts (its form,
   its answer, a table for each list it keeps, its earlier runs) that runs it and changes as its records do,
   edited in the app's page editor (whose Add has an App tab with those parts) or by an agent, with buttons for its other
@@ -1394,12 +1460,15 @@ agents that speak ACP and take MCP servers.
   **Paper radar** (each morning, new arXiv and OpenAlex papers in your fields, on your topics and by the people you
   follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
   BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
-  sentence, and whether it builds on, compares with or disputes your work), **New-model watch** (new Hugging Face
+  sentence, and whether it builds on, compares with or disputes your work; it says when the sentences could not be read and
+  tries them again at the next update; it finds you by the id in About you), **New-model watch** (new Hugging Face
   models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
   those that beat your best), **Deadline radar** (your venues' deadlines from ccfddl and ai-deadlines, from AoE into your
-  time zone, with reminders, page limits and templates), **Living related work** (a page per topic that grows as papers
-  appear, in themes, with a LaTeX related-work draft and BibTeX) and **Gap finder** (project ideas from your papers and
-  this month's, each checked for prior work and sized to your compute).
+  time zone, with reminders, page limits and templates; a venue neither list has is looked up on its website), **Living related work** (a page per topic that grows as papers
+  appear, in themes, with a LaTeX related-work draft, its cite keys checked, and BibTeX) and **Gap finder** (project ideas from your papers and
+  this month's, each checked for prior work and sized to your compute). They start from About you (your fields, topics,
+  venues, author name and compute) and from your last answers, and write what only you read in your language; Hydor
+  itself keeps their calls to arXiv, OpenAlex and Semantic Scholar apart and asks again when one is busy.
 - **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
   link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
   to 30 papers into a kept spreadsheet, each cell citing its page; **Reproduce a paper** (finds the code, builds a clean
@@ -1428,7 +1497,9 @@ agents that speak ACP and take MCP servers.
   **Rebuttal workbench** (points grouped across reviews and sorted, replies drafted within the limit, experiments to tick
   off), **Paper to talk, poster and thread** (timed slides with the paper's own figures and notes, an A0 LaTeX poster,
   posts for X, Bluesky and LinkedIn, a project page) and a **Figure doctor** (column width, the paper's font,
-  colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in.
+  colour-blind-safe colours, embedded fonts, one style file). The LaTeX editor opens them with your paper filled in. A paper
+  that cannot be read stops the run at once, saying how to give it another way; the venue, the limit and tone, and the
+  figures' template start from your last answers.
 - **Experiments** (System → Experiments): jobs wait for a GPU with enough free memory on any of your machines (or a
   SLURM cluster's queue over SSH), run in tmux and are kept as records: the commit and its changes, hyperparameters,
   seed, environment, log and metrics (what it prints again and again drawn as curves, the most telling first; what it
@@ -1455,8 +1526,10 @@ agents that speak ACP and take MCP servers.
   model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
   with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis
   notebook and a report, with you approving each step), a **Sweep planner** (a sweep fitted to a budget of runs or GPU
-  hours, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
-  **Lab notebook** with a dated entry for each day you worked, kept apart from memory and searchable.
+  hours, reading the script only when the form leaves settings or a run's time open, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
+  **Lab notebook** with a dated entry for each day you worked, kept apart from memory, searchable and written in your
+  language. The sprint and the sweep start from the last repository or folder, and plan within what About you says you
+  can run on.
 - New skills for every agent: papers' peer review, reproducing a paper, and figures for papers.
 
 ## For engineers

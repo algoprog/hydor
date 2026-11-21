@@ -11,11 +11,12 @@ import type { AppAdvice, AppDef, AppRecipe, AppRun, FirmUp, RescuedStep, RunStep
 import { inputsLine, isActive } from '@shared/apps';
 import { api, enc, post } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
-import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, Dialog, Throbber } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
+import { currentLang } from '../../i18n/locale';
 import { money, useRunEvents, type RunDetail } from './api';
+import { useStartBuilder } from './startBuilder';
 
 /** Small amounts as they are (a model step costs a fraction of a cent). */
 const usd = (n: number) => (n > 0 && n < 0.01 ? `$${n.toFixed(3)}` : money(n));
@@ -38,6 +39,7 @@ function Note({ icon, children, detail, action }: { icon: React.ReactNode; child
 export function Advice({ app, recipe, onChange, session }: { app: AppDef; recipe: AppRecipe; onChange: (p: Partial<AppRecipe>) => void; session?: string }) {
   const [advice, setAdvice] = useState<AppAdvice | null>(null);
   const [firming, setFirming] = useState<FirmUp | null>(null);
+  const startBuilder = useStartBuilder();
   useEffect(() => {
     api<AppAdvice>(`/api/apps/${enc(app.id)}/advice`).then(setAdvice, () => {});
   }, [app.id, app.updatedAt]);
@@ -50,7 +52,7 @@ export function Advice({ app, recipe, onChange, session }: { app: AppDef; recipe
   const fix = (x: RescuedStep) => {
     const text = tr(`Fix the step “${x.title}” (${x.step}) of my app “${app.name}” (${app.id}): it failed in ${x.runs} of its last ${x.of} runs, and an agent did its work instead. The last time (run ${x.run}) it said: ${x.error}`);
     if (session) composeInsert(text, session);
-    else go(`/?assistant=app-builder&prompt=${enc(text)}`);
+    else startBuilder(text);
   };
   return (
     <div className="space-y-2">
@@ -170,7 +172,7 @@ function FirmUpDialog({ app, recipe, firm, onClose, onUse }: { app: AppDef; reci
         if (bad) toastError(new Error(bad.error));
         setTries(r.runs.filter((x) => x.run).map((x) => ({ label: examples.find((e) => e.id === x.example)?.name || inputsLine(recipe.fields, x.run!.inputs) || x.example, run: x.run! })));
       } else {
-        const runs = await Promise.all(firm.inputs.map((inputs) => post<{ run: AppRun }>(`/api/apps/${enc(app.id)}/runs`, { recipe: changed, inputs, source: 'test' })));
+        const runs = await Promise.all(firm.inputs.map((inputs) => post<{ run: AppRun }>(`/api/apps/${enc(app.id)}/runs`, { recipe: changed, inputs, source: 'test', lang: currentLang() })));
         setTries(runs.map((r, i) => ({ label: inputsLine(recipe.fields, firm.inputs[i]) || tr('A try'), run: r.run })));
       }
     } catch (e) {

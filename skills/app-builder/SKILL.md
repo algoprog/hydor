@@ -17,9 +17,23 @@ project in a session instead.
 An app is what it asks (a form), what it does (one agent's task, or steps), what it gives back
 (answer fields), how its answer looks (a view: pages, elements, events), what it keeps (lists of records, a
 memory), its own page (a screen, or view pages for it), when it runs (its form, a schedule, a webhook, a watcher)
-and examples to try it with. Build them with app_get, app_save, app_try,
-app_screen and app_data (its records: start it off with some, or see what its runs kept); app_guide's apps
-topic says what each part does, and its API topic gives the format.
+and examples to try it with. Build them with app_get, app_sketch, app_save, app_try,
+app_screen and app_data (its records: start it off with some, or see what its runs kept), and app_services for
+the free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format.
+
+## 0. Learn from the ready-made apps, then sketch
+
+- Before you design, app_get with `like` (what the app does, in a few words) gives the three closest ready-made
+  apps; read the one or two nearest whole (`app: "tpl:<id>"`) and build the way they do: their steps, their
+  views, how they call services and handle what fails. `ready: true` lists them all.
+- For data, look in app_services (forecasts, places, encyclopedia pages, exchange rates…) before you call an
+  address from memory; for a service it does not list, read its documentation (read_page) first.
+- A new app: your first reply is one app_sketch, and nothing is saved until the user says to build it. The sketch
+  is the draft as app_save takes it (its steps may still be words: `steps: [{ title, kind }]`), what you assumed
+  (`assumed`, a short line each), and at most three `questions`, only those whose answers change the design, each
+  with its likely answers as `choices` (the one you assumed first). The user sees it as a card with **Build it**,
+  which sends "Build it" and the choices they picked, and **Change it…**. End your turn and wait for that.
+- A change to an existing app, or a user who says to just build it: no sketch, build.
 
 ## 1. Pin down the job
 
@@ -66,6 +80,7 @@ topic says what each part does, and its API topic gives the format.
   item `{{item}}`, and the built-in values `{{today}}`, `{{now}}`, `{{weekday}}`, `{{timezone}}` (the user's) and
   `{{run.source}}` (web, api, task, batch…: guard an Ask a person step with it, so runs nobody watches never wait).
   Fill the answer fields from the steps (`flow.outputs`), or let them come by name.
+- Set `language: "person"` on every new app, so its models and agents write in the user's language; a question about the user (units, currency, country, diet, research fields) says `from: "me.units"` and fills itself from About you, and steps read `{{me.units}}`, `{{language}}`, and code `ctx.locale`.
 
 ## 3. Examples, then try
 
@@ -79,8 +94,11 @@ topic says what each part does, and its API topic gives the format.
 
 ## 4. Design how its answer looks
 
-Give every app people will read a view (`ui`, saved with app_save): its answer then opens in pages made for it,
-not a plain card. The format is in app_guide's API topic (Apps: views).
+Prefer card fields: an answer field `{ id, label, type: "ui", ui: "<card>" }` (a step's output `ui(<card>)`) is one
+of the answer UIs a chat shows (find_ui gives their names and data), filled in by the app's agent and drawn as in a
+chat, with no view to write; a comparison, an itinerary, a recipe or a chart look right at once. Write a view only
+for what no card draws (a view cannot place a card yet), as `ui`, saved with app_save: its answer then opens in
+pages made for it. The format is in app_guide's API topic (Apps: views).
 
 - **Pages** are tabs, one for each thing a person comes back to (the trip, the days, what to book, the budget),
   at most four or five; a detail page (`tab: false`) opens from a click on an item (a day, a product).
@@ -105,14 +123,20 @@ not a plain card. The format is in app_guide's API topic (Apps: views).
   tick something off and keep it (`toggle`, `name: "done.@key"`, `keep: true`); filter with `set` and a block's
   `where`; copy the part people paste elsewhere; run it again with one answer changed (`again`: a slower pace,
   one more day, a more formal letter, new questions); start another app on part of it (`start`). `ask` (a
-  follow-up to the agent) works only for one-task apps; with steps, use `again` or a flow (`run`, with `as` to
-  show its answer).
-- Save, then app_try a run and read its `view`: the names it uses that the answer did not give show empty. Send
-  the user the run's link (the view opens there) and say what its buttons do.
+  follow-up that changes the result) works with steps too, once a run is done; for other answers use `again`, or
+  a flow (`run`, with `as` to show its answer).
+- Save, then app_try a run with `look: true` and look at the pictures (a computer in the dark and in the light, a
+  phone in the dark): fix what reads badly or breaks (text cut off or overlapping, empty blocks, colours that vanish
+  in one theme, a phone layout that does not fit), and the names its `view` says the answer did not give (they show
+  empty). Look again after each change to the view. Send the user the run's link (the view opens there) and say
+  what its buttons do.
 
 ## 5. Safe and cheap
 
 - Limits: runs a day and the most a run may spend. Tools: only those it needs.
+- No waits or retry loops of your own around a service, in a step or a program: the app tries a failed call
+  again, spaces the calls to one service and keeps look-ups for a while by itself (a tool step's `cache: false`
+  when an answer must be fresh). What a run could not get shows on its page and in `{{run.misses}}`.
 - A step that may fail says what happens then (If it fails…: go on without it, other steps, or `failed: "agent"`:
   an agent does a tool, model, code, data or app step's work with what it was given, and the run goes on).
 - Nothing reaches outside data and private data and sends things out in one step without an Ask a person first.

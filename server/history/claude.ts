@@ -1,4 +1,6 @@
 // Claude Code transcript (~/.claude/projects/<project>/<session>.jsonl) -> timeline items.
+import type { DB } from '../db.ts';
+import { costOf } from '../prices.ts';
 import type { BackgroundTask, FileChange, GoalInfo, Question, SessionStats, SubagentReply, TimelineItem, TodoEntry, ToolInfo, ToolItem, ToolSubagent } from '../../shared/types.ts';
 import {
   ActivityLog,
@@ -86,6 +88,21 @@ interface TurnAcc {
 
 type Json = Record<string, any>;
 
+const tokensNow = (st: SessionStats) => ({ tokensIn: st.tokensIn, tokensCached: st.tokensCached, tokensOut: st.tokensOut });
+
+/**
+ * What a Claude Code transcript has cost, as the indexer stores it in cost_usd: its highest saved total plus the tokens
+ * counted since that total was set, at the model's price (spend.ts reads a row's cost_usd as the whole cost, so the model
+ * calls after the last total must be in it). Null with no total, and the tokens are priced from the row then. Tokens with
+ * no known price add nothing.
+ */
+export function claudeCost(db: DB, st: SessionStats, model: string | undefined): number | null {
+  if (st.costUsd == null) return null;
+  const at = st.costTokens ?? tokensNow(st);
+  const since = { tokensIn: Math.max(0, st.tokensIn - at.tokensIn), tokensCached: Math.max(0, st.tokensCached - at.tokensCached), tokensOut: Math.max(0, st.tokensOut - at.tokensOut) };
+  return st.costUsd + (since.tokensIn || since.tokensCached || since.tokensOut ? (costOf(db, model, since) ?? 0) : 0);
+}
+
 export class ClaudeParser {
   items: TimelineItem[] = [];
   private index = new Map<string, number>();
@@ -120,6 +137,8 @@ export class ClaudeParser {
   static fromState(s: ClaudeState, opts: ParserOptions): ClaudeParser {
     const p = new ClaudeParser(opts);
     p.stats = s.stats;
+    // A state saved before the tokens were carried: what it had counted is already in its total.
+    if (p.stats.costUsd != null && !p.stats.costTokens) p.stats.costTokens = tokensNow(p.stats);
     p.summary = s.summary;
     p.files = s.files;
     p.lastMsgId = s.lastMsgId;
@@ -258,7 +277,12 @@ export class ClaudeParser {
         if (m.lastPrompt) this.summary.lastPrompt = firstLine(String(m.lastPrompt), 300);
         break;
       case 'cost-state':
-        if (typeof m.totalCostUSD === 'number') this.stats.costUsd = m.totalCostUSD;
+        // Claude Code writes its total now and then, and a later one can be lower (a restart counts from less): keep the
+        // highest, with the tokens counted by then, so the ones after it can be priced on top (claudeCost).
+        if (typeof m.totalCostUSD === 'number' && (this.stats.costUsd == null || m.totalCostUSD > this.stats.costUsd)) {
+          this.stats.costUsd = m.totalCostUSD;
+          this.stats.costTokens = tokensNow(this.stats);
+        }
         break;
     }
   }

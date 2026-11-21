@@ -1,8 +1,9 @@
 // An app's form: each field as the right control (text, a long text that grows, number, date, a choice
 // as chips or a list, yes/no, a file), with its help line and what to fix under it. Used by the app's
 // page, the builder's test run and the public page.
-import { useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, FileUp, X } from 'lucide-react';
+import { foldedParts } from '@shared/app-me';
 import type { AppField } from '@shared/apps';
 import { bytes } from '../../lib/format';
 import { cx, inputCls, Switch } from '../../components/ui';
@@ -178,6 +179,7 @@ export function AppForm({
   errors,
   disabled,
   maxMb,
+  below,
 }: {
   fields: AppField[];
   values: FormValues;
@@ -187,6 +189,8 @@ export function AppForm({
   errors?: Record<string, string>;
   disabled?: boolean;
   maxMb?: number;
+  /** What shows under a question besides its help (the app's page: Remember for all apps). */
+  below?: (f: AppField) => ReactNode;
 }) {
   if (!fields.length) return <div className="text-[13.5px] text-fg-3">No questions to answer: press Run.</div>;
   return (
@@ -203,8 +207,39 @@ export function AppForm({
           </label>
           <FieldInput f={f} value={values[f.id] ?? ''} onChange={(v) => onChange(f.id, v)} file={files[f.id]} onFile={(v) => onFile(f.id, v)} disabled={disabled} maxMb={maxMb} />
           {errors?.[f.id] ? <div className="mt-1 text-[12px] text-err">{errors[f.id]}</div> : f.help && <div className="mt-1 text-[12px] text-fg-3">{f.help}</div>}
+          {below?.(f)}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The questions filled in from About you that are folded away, in one quiet line of at most two lines, with Change: a
+ * short fact as it is ("For Thessaloniki · metric · EUR"), a free text by its question and its start ("The compute you
+ * have: A laptop and one 24 GB…"). What people wrote stays as written (translate="no").
+ */
+export function FoldedLine({ fields, values, onChange, className }: { fields: AppField[]; values: FormValues; onChange: () => void; className?: string }) {
+  const { facts, texts } = foldedParts(fields, values);
+  if (!facts.length && !texts.length) return null;
+  return (
+    <div className={cx('flex min-w-0 items-start gap-2 text-[12.5px] leading-snug text-fg-3', className)}>
+      <span className="line-clamp-2 min-w-0">
+        {facts.length > 0 && (
+          <>
+            For <span translate="no">{facts.join(' · ')}</span>
+          </>
+        )}
+        {texts.map((t, i) => (
+          <Fragment key={t.label}>
+            {facts.length > 0 || i > 0 ? ' · ' : ''}
+            {t.label}: <span translate="no">{t.value}</span>
+          </Fragment>
+        ))}
+      </span>
+      <button type="button" onClick={onChange} className="shrink-0 font-medium text-accent hover:underline">
+        Change
+      </button>
     </div>
   );
 }

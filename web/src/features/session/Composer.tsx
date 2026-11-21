@@ -216,7 +216,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     const on = (e: Event) => {
       const d = (e as CustomEvent<Omit<ComposeDetail, 'files'> & { files?: Attachment[] }>).detail;
       // Taken already by another box of this session (it shows in two places): it goes once.
-      if (!d || d.result || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
+      if (!d || d.result || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length && !d.focus)) return;
       const n = now.current;
       // A card's Send button goes at once, as if its words were typed and sent, and what is being written stays in the
       // box; a follow-up's button (send: 'empty') goes at once into an empty box and otherwise joins what is written.
@@ -498,7 +498,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
         {signInNeed && <SignInBanner need={signInNeed} className="mb-2" />}
         {limitAgent && <LimitBanner agent={limitAgent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />}
-        <GoalDock key={s.key} s={s} className="mb-2" />
+        {/* Its key is its own: the tray below is keyed by the session too, and two siblings with one key leave a stale copy of the
+            first behind at every render (React finds only one of them again), which stacked goal bars above the message box. */}
+        <GoalDock key={`goal:${s.key}`} s={s} className="mb-2" />
         <WorkTray key={key} s={s} />
         <QueueList s={s} />
         {move && (

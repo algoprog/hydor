@@ -21,6 +21,7 @@ import { mu } from '../../lib/machine';
 import { toast } from '../../lib/store';
 import { openLightbox } from '../Lightbox';
 import { CopyButton, replyPicture } from '../Markdown';
+import { pictureAddress } from './picture';
 import { normalizeMath } from '../markdown-math';
 import { cx } from '../ui';
 
@@ -41,6 +42,8 @@ export interface AuiInfo {
   demo?: boolean;
   /** The board (a kept page) it is pinned to, when it is drawn on one: what a card reading a source may read. */
   board?: string;
+  /** An app's public page: its pictures load straight from their https addresses, and nothing else shows (picture.ts). */
+  webPictures?: boolean;
 }
 
 export const AuiCtx = createContext<AuiInfo>({ done: true, keep: '' });
@@ -256,9 +259,9 @@ export const Md = memo(function Md({ text, inline, className }: { text: unknown;
 
 /** Where a picture loads from here (the web through this server, a file of this computer); null when it may not. */
 export function usePicUrl(src: unknown): string | null {
-  const { cwd, offline } = useAui();
+  const { cwd, offline, webPictures } = useAui();
   const from = str(src).trim();
-  return useMemo(() => (!from || (offline && /^https?:\/\//i.test(from)) ? null : replyPicture(from, cwd)), [from, cwd, offline]);
+  return useMemo(() => pictureAddress(from, { cwd, offline, webOnly: webPictures }, replyPicture), [from, cwd, offline, webPictures]);
 }
 
 /**
@@ -291,12 +294,10 @@ const watchFailing = (f: () => void) => {
  * back by itself if the retry works. It is true while a picture is still loading.
  */
 export function usePicsOk(srcs: unknown[]): boolean[] {
-  const { cwd, offline } = useAui();
+  const { cwd, offline, webPictures } = useAui();
   useSyncExternalStore(watchFailing, () => failRev);
   return srcs.map((s) => {
-    const from = str(s).trim();
-    if (!from || (offline && /^https?:\/\//i.test(from))) return false;
-    const url = replyPicture(from, cwd);
+    const url = pictureAddress(str(s), { cwd, offline, webOnly: webPictures }, replyPicture);
     return !!url && !failing.has(url);
   });
 }
@@ -327,7 +328,7 @@ export function WithPic({ src, as: Tag = 'div', keep, className, children, ...re
  * what is laid out around it must not depend on it being there (usePicOk, WithPic).
  */
 export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: { src: unknown; alt?: string; className?: string; group?: unknown[]; fit?: 'cover' | 'contain'; zoom?: boolean }) {
-  const { cwd, offline } = useAui();
+  const { cwd, offline, webPictures } = useAui();
   const base = usePicUrl(src);
   // Each try has an address of its own, so the browser does not answer it with the failure it remembers.
   const [tries, setTries] = useState(0);
@@ -352,7 +353,7 @@ export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: 
   const url = base && tries ? `${base}${base.includes('?') ? '&' : '?'}try=${tries}` : base;
   if (!url || failed) return null;
   const open = () => {
-    const list = (group?.length ? group : [src]).map((s) => ({ from: str(s), url: offline && /^https?:/i.test(str(s)) ? null : replyPicture(str(s), cwd) })).filter((x): x is { from: string; url: string } => !!x.url);
+    const list = (group?.length ? group : [src]).map((s) => ({ from: str(s), url: pictureAddress(str(s), { cwd, offline, webOnly: webPictures }, replyPicture) })).filter((x): x is { from: string; url: string } => !!x.url);
     const at = Math.max(0, list.findIndex((x) => x.url === base));
     openLightbox(
       list.map((x) => ({ src: x.url, name: alt || undefined, href: /^https?:\/\//i.test(x.from) ? x.from : undefined })),

@@ -1,17 +1,19 @@
 // Making or changing an app: its face, the questions of its form, the task with the answers put in (or
 // its steps, once it works in steps), the answer fields of its result, what it keeps between runs, who
 // does it (agent, model, mode, assistant, folder), which tools it may use, its limits, and a test run of
-// what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
-// session.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
+// what is on screen before saving. "Save as an app" in a session's menu, and Do this again… under a reply, open it
+// with a draft from that session (from that reply's turn), What changes each time? on top.
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Languages, Palette, Plus, Puzzle, Settings2, Shapes, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
+import { FROM_FIELDS, fromField, languageName, meVars, type AboutMe } from '@shared/app-me';
 import { tr } from '../../i18n/runtime';
+import { currentLang } from '../../i18n/locale';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
 import type { Flow } from '@shared/app-manifest';
-import { allSteps, titleOf } from '@shared/app-manifest';
+import { allSteps, BUILTIN_VALUES, momentOf, titleOf } from '@shared/app-manifest';
 import { tierLabel, tierProgram } from '@shared/tiers';
-import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders } from '@shared/apps';
+import { ANSWER_TYPES, APP_COLORS, APP_ICONS, COLUMN_TYPES, fieldId, FIELD_TYPES, fillTemplate, isActive, placeholders, TASK_VALUES } from '@shared/apps';
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert, useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
@@ -25,7 +27,11 @@ import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { ResultView, RunBody } from './Result';
-import { DesignEditor, sampleResult } from './Design';
+import { DesignEditor } from './Design';
+import { sampleResult } from './sample';
+import { exampleOf, useCardCatalog } from './cards';
+import { Changes } from './Changes';
+import type { DraftPart } from './requestParts';
 import { AppView } from './View';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
@@ -36,6 +42,11 @@ import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
 import { FilesEditor, SecretsEditor } from './Needs';
+import { useStartBuilder } from './startBuilder';
+import { EstimateLine } from './Estimate';
+
+// The cards to pick from load with the catalog and its views, the first time A card… is picked.
+const CardPicker = lazy(() => import('./CardPicker'));
 
 /** A flow that is only the task (one agent step, as Work in steps makes it): its instructions, to go back to one task. */
 const oneTask = (flow: Flow): string | null => {
@@ -143,16 +154,17 @@ function PreviewBox({ note, children }: { note: ReactNode; children: ReactNode }
   );
 }
 
-/** The form as the app's page asks it, as it is on screen: a change shows at once. */
-function FormPreview({ fields }: { fields: AppField[] }) {
+/** The form as the app's page asks it, as it is on screen: a change shows at once. `bare`: without its box (a sketch's card has its own). */
+export function FormPreview({ fields, bare }: { fields: AppField[]; bare?: boolean }) {
   const shown = fields.filter((f) => f.label.trim());
   const [values, setValues] = useState<FormValues>(() => initialValues(shown));
   const [files, setFiles] = useState<FormFiles>({});
   // A question added or its kind, choices or first answer changed: the form starts again.
   const shape = JSON.stringify(shown.map((f) => [f.id, f.type, f.default ?? '', f.options ?? []]));
   useEffect(() => setValues(initialValues(shown)), [shape]);
+  const Box = bare ? BareBox : PreviewBox;
   return (
-    <PreviewBox note="As its page asks it">
+    <Box note="As its page asks it">
       {shown.length ? (
         <AppForm
           fields={shown}
@@ -171,18 +183,21 @@ function FormPreview({ fields }: { fields: AppField[] }) {
       ) : (
         <p className="text-[13px] leading-relaxed text-fg-3">No questions: it runs at once, without asking anything.</p>
       )}
-    </PreviewBox>
+    </Box>
   );
 }
 
-/** A run's answer as a card, with made-up values in its shape. */
+const BareBox = ({ children }: { note: ReactNode; children: ReactNode }) => <>{children}</>;
+
+/** A run's answer as a card, with made-up values in its shape (a card field: its card's example). */
 function AnswerPreview({ recipe }: { recipe: AppRecipe }) {
   const fields = recipe.answer.filter((a) => a.label.trim());
   const shape = JSON.stringify(fields);
-  const result = useMemo(() => sampleResult(fields, recipe.assets), [shape, recipe.assets]);
+  const cards = useCardCatalog(fields.some((f) => f.type === 'ui'));
+  const result = useMemo(() => sampleResult(fields, recipe.assets, cards ? exampleOf(cards) : undefined), [shape, recipe.assets, cards]);
   return (
     <PreviewBox note={recipe.ui ? 'As a plain card; its view, under Design, shows it its own way' : 'A made-up answer, as a run shows it'}>
-      {fields.length ? <ResultView answer={fields} result={result} name={recipe.name} assets={recipe.assets} /> : <p className="text-[13px] leading-relaxed text-fg-3">No answer fields: the agent’s reply is the answer.</p>}
+      {fields.length ? <ResultView answer={fields} result={result} name={recipe.name} assets={recipe.assets} demo /> : <p className="text-[13px] leading-relaxed text-fg-3">No answer fields: the agent’s reply is the answer.</p>}
     </PreviewBox>
   );
 }
@@ -198,12 +213,14 @@ const BLANK: AppRecipe = {
   answer: [],
   tools: null,
   limits: {},
+  // A new app answers in the person's language.
+  language: 'person',
 };
 
 // Every part of the recipe, so a save keeps what this page does not show yet (its data, memory, needs, other flows).
 const recipeOf = (a: AppDef | AppTemplate): AppRecipe => {
-  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions } = a;
-  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions };
+  const { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language } = a;
+  return { name, icon, color, description, category, assistant, agent, acpAgent, model, effort, mode, cwd, prompt, fields, answer, tools, limits, flow, data, memory, requires, secrets, assets, flows, screens, ui, examples, graph, block, sessions, language };
 };
 
 /** A text box that grows with what is written in it, and with how narrow it is. `base`: its look, the kit's field unless given. */
@@ -353,6 +370,7 @@ function Needed({ on, onChange }: { on: boolean; onChange: (on: boolean) => void
 
 function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; auto: boolean; onChange: (f: AppField, id?: string) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const [more, setMore] = useState(!f.label);
+  const from = fromField(f.from);
   return (
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
@@ -387,6 +405,7 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
           {more ? 'Fewer details' : 'Help text, example, default…'}
           <ChevronDown size={12} className={cx('transition-transform', more && 'rotate-180')} />
         </button>
+        {!more && (from || f.remember) && <span>{from ? tr(`From About you: ${tr(FROM_FIELDS.find((x) => x.id === from)!.label)}`) : 'Remembers the last answer'}</span>}
       </div>
       {more && (
         <div className="grid gap-2 @xl:grid-cols-3">
@@ -399,6 +418,25 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
           <Labeled label="Filled in at first">
             <input className={small} placeholder="Optional" value={f.default ?? ''} onChange={(e) => onChange({ ...f, default: e.target.value || undefined })} />
           </Labeled>
+          {/* What it starts from instead: About you (the person's own record), or their last answer here. Not for a file. */}
+          {f.type !== 'file' && (
+            <>
+              <Labeled label="Filled in from">
+                <select className={small} value={from ?? ''} onChange={(e) => onChange({ ...f, from: e.target.value ? `me.${e.target.value}` : undefined, remember: e.target.value ? undefined : f.remember })}>
+                  <option value="">Nothing</option>
+                  {FROM_FIELDS.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {tr(`About you: ${tr(x.label)}`)}
+                    </option>
+                  ))}
+                </select>
+              </Labeled>
+              <label className="flex h-8.5 cursor-pointer items-center gap-2 self-end text-[13px] text-fg-2 @xl:col-span-2">
+                <Switch on={!!f.remember} onChange={(on) => onChange({ ...f, remember: on || undefined, from: on ? undefined : f.from })} label="Remember the last answer" />
+                Remember the last answer
+              </label>
+            </>
+          )}
         </div>
       )}
     </Row>
@@ -407,19 +445,55 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
 
 function AnswerRow({ f, n, onChange, ...nav }: { f: AnswerField; n: number; onChange: (f: AnswerField) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const cols = f.columns ?? [];
+  // A card: picked from the catalog (A card… in the kind menu, or Change), which loads when it is needed.
+  const [picking, setPicking] = useState(false);
+  const cards = useCardCatalog(f.type === 'ui');
+  const card = f.type === 'ui' && f.ui ? cards?.answerUi(f.ui) : undefined;
   return (
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
         <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="A heading, e.g. Recommendation" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AnswerField['type'], columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined })}>
+        <select
+          className={cx(smallFit, 'min-w-[130px] flex-1')}
+          aria-label="Its kind"
+          value={f.type}
+          onChange={(e) => {
+            if (e.target.value === 'ui') return setPicking(true);
+            onChange({ ...f, type: e.target.value as AnswerField['type'], ui: undefined, columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined });
+          }}
+        >
           {ANSWER_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
-              {t.label}
+              {t.value === 'ui' ? 'A card…' : t.label}
             </option>
           ))}
         </select>
         <Needed on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} />
       </div>
+      {f.type === 'ui' && (
+        <div className="flex items-center gap-2 text-[13px]">
+          <Shapes size={14} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-fg-3">Card: </span>
+            <span className="font-medium">{card ? tr(card.title) : (f.ui ?? '')}</span>
+          </span>
+          <button type="button" className="shrink-0 text-[12.5px] text-accent hover:underline" onClick={() => setPicking(true)}>
+            Change
+          </button>
+        </div>
+      )}
+      {picking && (
+        <Suspense fallback={null}>
+          <CardPicker
+            current={f.type === 'ui' ? f.ui : undefined}
+            onClose={() => setPicking(false)}
+            onPick={(s) => {
+              setPicking(false);
+              onChange({ ...f, type: 'ui', ui: s.id, columns: undefined, label: f.label.trim() ? f.label : s.title });
+            }}
+          />
+        </Suspense>
+      )}
       <input className={small} placeholder="What goes here, for the agent (optional)" value={f.description ?? ''} onChange={(e) => onChange({ ...f, description: e.target.value || undefined })} />
       {f.type === 'table' && (
         <div className="space-y-1.5 rounded-lg border border-line bg-panel p-2.5">
@@ -453,9 +527,11 @@ function AnswerRow({ f, n, onChange, ...nav }: { f: AnswerField; n: number; onCh
   );
 }
 
-/** A new app in words: the App builder makes it, in a session of its own. Or one from a file. */
+/** A new app in words: the App builder makes it, in a session of its own that starts at once. Or one from a file. */
 function Describe() {
   const [ask, setAsk] = useState('');
+  const start = useStartBuilder();
+  const make = () => ask.trim() && start(`${tr('Make me an app: ')}${ask.trim()}`);
   return (
     // On a phone the way to install a file goes under the box, so the title keeps its line.
     <section className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-2xl border border-accent/25 bg-accent-soft px-4 py-3.5 sm:px-5 sm:py-4">
@@ -467,14 +543,27 @@ function Describe() {
         <InstallFromFile />
       </span>
       <form
-        className="order-3 flex w-full gap-2"
+        className="order-3 flex w-full items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!ask.trim()) return;
-          go(`/?assistant=app-builder&prompt=${enc(`${tr('Make me an app: ')}${ask.trim()}`)}`);
+          make();
         }}
       >
-        <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Keeps the links I send, sums each up, and lists the unread ones" className={cx(inputCls.replace('bg-bg-1', 'bg-panel'), 'min-w-0 flex-1')} />
+        {/* Two lines at first, growing with what is written; Enter makes it, Shift+Enter starts a new line. */}
+        <Grow
+          value={ask}
+          aria-label="Describe an app"
+          onChange={(e) => setAsk(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              make();
+            }
+          }}
+          placeholder="Keeps the links I send, sums each up, and lists the unread ones"
+          base={inputCls.replace('bg-bg-1', 'bg-panel')}
+          className="max-h-[132px] min-h-[62px] min-w-0 flex-1 leading-snug"
+        />
         <Button type="submit" variant="primary" disabled={!ask.trim()}>
           Make it
         </Button>
@@ -504,7 +593,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
     if (Object.keys(errs).length) return toast(`Fill in ${Object.keys(errs).map((k) => recipe.fields.find((f) => f.id === k)?.label).join(', ')}`, 'error');
     setBusy(true);
     try {
-      const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId ?? 'test')}/runs`, { recipe, source: 'test', inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])) });
+      const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId ?? 'test')}/runs`, { recipe, source: 'test', inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), lang: currentLang() });
       setRun({ run: r.run });
     } catch (e) {
       toastError(e);
@@ -558,6 +647,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
           {run.steps && (
             <RunSteps
               steps={run.steps}
+              misses={run.run.misses}
               onAgain={
                 isActive(run.run.status)
                   ? undefined
@@ -599,7 +689,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
 }
 
 /** `embedded`: beside a session's conversation (`session`), where an agent builds it: no way back, a save stays here, and a step can be asked about there. */
-export function BuilderPage({ id, template, from, embedded, session }: { id?: string; template?: string; from?: string; embedded?: boolean; session?: string }) {
+export function BuilderPage({ id, template, from, turn, embedded, session }: { id?: string; template?: string; from?: string; turn?: string; embedded?: boolean; session?: string }) {
   const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
   const [saved, setSaved] = useState<AppDef | null>(null);
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
@@ -614,6 +704,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     setNewer(null);
   };
   const [note, setNote] = useState('');
+  // A draft from a session: its request in pieces, each question's words marked (What changes each time?).
+  const [parts, setParts] = useState<DraftPart[] | null>(null);
   // What the next save says it did, when it is not what the changes say (a version brought back).
   const why = useRef<string | undefined>(undefined);
   const noteBox = useRef<HTMLDivElement>(null);
@@ -641,10 +733,12 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => load(r.app), (e) => (toastError(e), embedded || go('/apps')));
     else if (template) api<{ template: AppTemplate }>(`/api/apps/tpl:${enc(template)}`).then((r) => setRecipe(recipeOf(r.template)), (e) => (toastError(e), setRecipe(BLANK)));
     else if (from)
-      post<{ recipe: AppRecipe; note?: string }>('/api/apps/draft', { key: from }).then(
+      post<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }>('/api/apps/draft', { key: from, ...(turn ? { turn: Number(turn) } : {}) }).then(
         (r) => {
-          setRecipe(r.recipe);
+          // A new app answers in the person's language.
+          setRecipe({ ...r.recipe, language: r.recipe.language ?? 'person' });
           if (r.note) setNote(r.note);
+          if (r.parts?.length) setParts(r.parts);
         },
         (e) => (toastError(e), setRecipe(BLANK)),
       );
@@ -655,7 +749,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       (r) => setAssistants((Array.isArray(r) ? r : (r.assistants ?? [])).filter((a) => a && typeof a.id === 'string')),
       () => {},
     );
-  }, [id, template, from]);
+  }, [id, template, from, turn]);
 
   const set = (p: Partial<AppRecipe>) => setRecipe((r) => (r ? { ...r, ...p } : r));
   // Another save (an agent's, or this template open elsewhere): taken at once, or offered while there are changes here.
@@ -672,6 +766,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     }, () => {});
   });
   const used = useMemo(() => new Set(placeholders(recipe?.prompt ?? '')), [recipe?.prompt]);
+  // What the person keeps in About you, for the task's Preview.
+  const [me, setMe] = useState<AboutMe>({});
+  useEffect(() => {
+    api<{ values: AboutMe }>('/api/apps/me').then((r) => setMe(r.values), () => {});
+  }, []);
 
   if (!recipe)
     return (
@@ -682,7 +781,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     );
 
   const ids = recipe.fields.map((f) => f.id);
-  const unknown = [...used].filter((p) => p !== 'today' && !ids.includes(p));
+  // The built-in values (today, now, weekday, the language, About you…) are no questions: they fill themselves in.
+  const unknown = [...used].filter((p) => !TASK_VALUES.includes(p) && !ids.includes(p));
   const unusedNeeded = recipe.fields.filter((f) => f.required && !used.has(f.id));
 
   const insert = (text: string) => {
@@ -754,6 +854,12 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
   const inSteps = () => set({ flow: { steps: [{ id: 'task', title: 'Do the task', do: 'agent', instructions: recipe.prompt, ...(recipe.answer.length ? { outputs: cleanAnswer() } : {}) }] }, prompt: '' });
 
   const sample = Object.fromEntries(recipe.fields.map((f) => [f.id, f.default || `[${f.label || f.id}]`]));
+  // About you as the person keeps it (what is empty by its name in brackets), and the language of this page.
+  const previewVars: Record<string, unknown> = {
+    language: languageName(currentLang()),
+    lang: currentLang(),
+    ...Object.fromEntries(Object.entries(meVars(me)).map(([k, v]) => [`me.${k}`, (Array.isArray(v) ? v.length : v !== '') ? v : `[${tr(BUILTIN_VALUES.find((b) => b.ref === `me.${k}`)?.label ?? k)}]`])),
+  };
   const back = saved ? appPath(saved.id) : template ? appPath(`tpl:${template}`) : '/apps';
 
   // What it does, as one task, a list of steps or a graph of them (on a computer): a task becomes a first step.
@@ -828,6 +934,16 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           )}
           {!saved && !template && !from && <Describe />}
+          {parts && !saved && (
+            <Changes
+              parts={parts}
+              recipe={recipe}
+              onChange={(p, r) => {
+                setParts(p);
+                setRecipe(r);
+              }}
+            />
+          )}
           <section className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4 sm:gap-4 sm:p-5">
             <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
             <div className="-mt-1 min-w-0 flex-1 space-y-0.5">
@@ -871,6 +987,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
               <Section title="What it does" sub="Its steps: each can use the form’s answers, the built-in values (today, now…) and what the steps before it gave." actions={modeSwitch}>
                 <div className="space-y-3">
                   {saved && <Advice app={saved} recipe={recipe} onChange={set} session={session} />}
+                  <EstimateLine recipe={recipe} appId={saved?.id ?? null} />
                   <StepsEditor
                     view={mode === 'graph' ? 'graph' : 'list'}
                     onPart={setPart}
@@ -904,6 +1021,21 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                         {b}
                       </button>
                     ))}
+                    {/* The run's language and what the person keeps in About you, in a menu. */}
+                    <select
+                      aria-label="Insert a value about the person"
+                      disabled={preview}
+                      value=""
+                      onChange={(e) => e.target.value && insert(`{{${e.target.value}}}`)}
+                      className="h-6.5 max-w-[9rem] rounded-md bg-bg-2 px-1.5 text-[12px] text-fg-3 ring-1 ring-line ring-inset hover:text-fg disabled:opacity-50"
+                    >
+                      <option value="">About you…</option>
+                      {BUILTIN_VALUES.filter((b) => b.group || b.ref === 'language').map((b) => (
+                        <option key={b.ref} value={b.ref}>
+                          {tr(b.label)}
+                        </option>
+                      ))}
+                    </select>
                     <span className="flex-1" />
                     <button type="button" onClick={() => setPreview((p) => !p)} aria-pressed={preview} className={cx('inline-flex h-6.5 items-center gap-1.5 rounded-md px-2 text-[12.5px] transition-colors', preview ? 'bg-bg-3 text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}>
                       <Eye size={13} />
@@ -911,7 +1043,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                     </button>
                   </div>
                   {preview ? (
-                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids }) || <span className="text-fg-3">Nothing yet.</span>}</div>
+                    <div className="max-h-[480px] min-h-[240px] overflow-y-auto px-3.5 py-3 text-[14px] leading-relaxed whitespace-pre-wrap">{fillTemplate(recipe.prompt, sample, { known: ids, moment: momentOf(Intl.DateTimeFormat().resolvedOptions().timeZone), vars: previewVars }) || <span className="text-fg-3">Nothing yet.</span>}</div>
                   ) : (
                     <textarea
                       ref={prompt}
@@ -924,6 +1056,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
                     />
                   )}
                 </div>
+                <EstimateLine recipe={recipe} appId={saved?.id ?? null} className="mt-2.5" />
                 <div className="mt-2.5 space-y-1 text-[12px] leading-snug text-fg-3">
                   <div>
                     <code className="font-mono">{'{{question}}'}</code> is replaced by its answer. Text between <code className="font-mono">{'{{#question}}'}</code> and <code className="font-mono">{'{{/question}}'}</code> stays only when it was answered (and not with No).
@@ -1086,6 +1219,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           </Fold>
 
+          <SwitchRow icon={<Languages size={16} />} title="Answers in the person’s language" sub="Its models and agents write what people read in the language the run was started in (the page’s, or the one they write to an agent in)." on={recipe.language === 'person'} onChange={(on) => set({ language: on ? 'person' : undefined })} />
           <SwitchRow icon={<Puzzle size={16} />} title="A block" sub="Offered when other apps add a step: its form is what it is given, its answer what it gives." on={!!recipe.block} onChange={(on) => set({ block: on || undefined })} />
           </div>
 

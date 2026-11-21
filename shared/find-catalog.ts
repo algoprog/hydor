@@ -89,7 +89,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
-  ['apps', 'Apps', 'Capabilities', 'Which apps agents run for you without asking first'],
+  ['apps', 'Apps', 'Capabilities', 'What apps know about you, and which run without asking'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
 ];
 
@@ -287,6 +287,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Apps
+  ['apps', 'About you', 'profile personal details preferences me myself where I live home city country language units metric imperial currency diet vegetarian allergies household family people at home streaming services netflix teams sports research fields topics venues conferences journals author orcid openalex compute gpu', 'What apps start their questions from, so they don’t ask every time'],
   ['apps', 'Run without asking', 'auto approve allow always permission ask before agent runs app trust', 'The apps agents run for you without asking first; remove one to be asked again'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],

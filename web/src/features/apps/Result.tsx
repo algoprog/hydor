@@ -1,9 +1,10 @@
 // A run as its person sees it: where it stands (with the latest steps while it works), the structured
-// result (short fields as a card, long text, lists, and tables, which on a phone become a card a row
-// when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+// result (short fields as a card, long text, lists, cards drawn as a chat draws them, and tables, which on a
+// phone become a card a row when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, ExternalLink, FileDown, Hand, PanelsTopLeft, Play, Square, Table2 } from 'lucide-react';
-import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
+import type { AnswerColumn, AnswerField, AppRun, RunMiss, RunProgress } from '@shared/apps';
+import type { CardSource } from '@shared/boards';
 import { cellText, isActive, toCsv } from '@shared/apps';
 import { mediaKind, mediaSrc, videoEmbed, type AppAsset, type MediaItem } from '@shared/app-media';
 import { openLightbox, openVideo } from '../../components/Lightbox';
@@ -11,6 +12,7 @@ import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import { money } from './api';
+import { CardField } from './CardField';
 import { LOCALE } from '../../i18n/locale';
 
 const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ');
@@ -290,10 +292,36 @@ export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
 
 const SHORT = new Set(['text', 'number', 'yesno', 'date', 'url']);
 
-/** The answer fields: short ones together as a card, the rest each under its heading. */
-export function ResultView({ answer, result, name, assets }: { answer: AnswerField[]; result: Record<string, unknown>; name?: string; assets?: Record<string, Pick<AppAsset, 'sha'>> }) {
+/**
+ * The answer fields: short ones together as a card, the rest each under its heading, in the app's order; a card field
+ * drawn by its answer UI, as wide as the rest, under its heading unless the card has a title of its own. `cardFrom`:
+ * the run its cards are pinned from; `publicView`: a public page (nothing pinned or kept); `demo`: a made-up answer.
+ */
+export function ResultView({
+  answer,
+  result,
+  name,
+  assets,
+  cardFrom,
+  publicView,
+  demo,
+}: {
+  answer: AnswerField[];
+  result: Record<string, unknown>;
+  name?: string;
+  assets?: Record<string, Pick<AppAsset, 'sha'>>;
+  cardFrom?: CardSource;
+  publicView?: boolean;
+  demo?: boolean;
+}) {
   // Fields the recipe does not name (an agent's extra keys) are left out; a result from an older recipe shows by its keys.
-  const fields: AnswerField[] = answer.length ? answer : Object.keys(result).map((id) => ({ id, label: humanize(id), type: Array.isArray(result[id]) ? (typeof (result[id] as unknown[])[0] === 'object' ? 'table' : 'list') : 'text' }));
+  // An object there is a card's data, drawn by its card when the field names it, else laid out as it is.
+  const fields: AnswerField[] = answer.length
+    ? answer
+    : Object.keys(result).map((id) => {
+        const v = result[id];
+        return { id, label: humanize(id), type: Array.isArray(v) ? (typeof v[0] === 'object' ? 'table' : 'list') : v && typeof v === 'object' ? 'ui' : 'text' };
+      });
   const short = fields.filter((f) => SHORT.has(f.type) && !(typeof result[f.id] === 'string' && (result[f.id] as string).length > 160));
   const long = fields.filter((f) => !short.includes(f));
   return (
@@ -312,6 +340,16 @@ export function ResultView({ answer, result, name, assets }: { answer: AnswerFie
       )}
       {long.map((f) => {
         const v = result[f.id];
+        if (f.type === 'ui') {
+          if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+          const titled = typeof (v as { title?: unknown }).title === 'string' && !!(v as { title: string }).title.trim();
+          return (
+            <section key={f.id}>
+              {!titled && <h3 className="mb-2 px-1 text-[13.5px] font-semibold">{f.label}</h3>}
+              <CardField ui={f.ui ?? ''} data={v} from={cardFrom} publicView={publicView} demo={demo} />
+            </section>
+          );
+        }
         const rows = Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
         return (
           <section key={f.id} className="rounded-2xl border border-line bg-panel px-4 pt-3 pb-3.5">
@@ -407,6 +445,7 @@ export function RunStatusCard({ run, progress, publicView, children, followUp }:
         {children}
       </div>
       {run.error && (run.status === 'failed' || run.status === 'stopped' || run.status === 'done') && <div className={cx('mt-1.5 pl-8 text-[13px] leading-snug', run.status === 'done' ? 'text-fg-3' : 'text-err')}>{run.error}</div>}
+      {!publicView && !!run.misses?.length && <Misses misses={run.misses} />}
       {active && progress && (progress.steps.length > 0 || progress.said) && (
         <div className="mt-2.5 space-y-1 border-t border-line pt-2.5 pl-8">
           {progress.steps.map((s, i) => (
@@ -419,6 +458,33 @@ export function RunStatusCard({ run, progress, publicView, children, followUp }:
           ))}
           {progress.said && <div className="line-clamp-2 pt-1 text-[12.5px] leading-snug text-fg-3 italic">“{progress.said}”</div>}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** What the run's steps could not have (a site that keeps programs out, a service limiting requests): one quiet line, opened to the list. */
+function Misses({ misses }: { misses: RunMiss[] }) {
+  const [open, setOpen] = useState(false);
+  const n = misses.reduce((a, m) => a + (m.times ?? 1), 0);
+  return (
+    <div className="mt-1.5 pl-8">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-left text-[12.5px] text-fg-3 hover:text-fg-2">
+        <ChevronRight size={13} className={cx('shrink-0 transition-transform', open && 'rotate-90')} />
+        {n === 1 ? '1 thing could not be had' : `${n} things could not be had`}
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 pl-[17px] text-[12.5px] leading-snug text-fg-3">
+          {misses.map((m, i) => (
+            <li key={i}>
+              <span className="text-fg-2" translate="no">
+                {m.step}
+              </span>
+              {m.what && <span translate="no"> · {m.what}</span>}: {m.why}
+              {(m.times ?? 1) > 1 && ` (${m.times} times)`}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -478,9 +544,14 @@ export function RunBody({
   /** Leave out the agent's reply when there is a result (in a session, whose agent says what came of it). */
   noReply?: boolean;
 }) {
-  const hasResult = !!run.result && Object.keys(run.result).length > 0;
+  // A run with steps at work: the answer so far, with what its steps have given, until the whole one comes.
+  const partial = !run.result && isActive(run.status) && run.partial && Object.keys(run.partial).length > 0 ? run.partial : null;
+  const result = run.result ?? partial;
+  const hasResult = !!result && Object.keys(result).length > 0;
   const text = reply ?? run.reply;
   const [plain, setPlain] = useState(false);
+  // A card pinned to a board from here says it came from this run.
+  const cardFrom = useMemo<CardSource>(() => ({ run: run.id, title: run.appName, ...(run.key ? { session: run.key } : {}) }), [run.id, run.appName, run.key]);
   const inView = !!view && hasResult && !plain;
   return (
     <div className="space-y-3">
@@ -493,7 +564,7 @@ export function RunBody({
           </button>
         )}
       </RunStatusCard>
-      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} />)}
+      {hasResult && (inView ? view : <ResultView answer={partial ? answer.filter((f) => f.id in partial) : answer} result={result!} name={name} assets={assets} cardFrom={cardFrom} publicView={publicView} />)}
       {text && !(noReply && hasResult) && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );

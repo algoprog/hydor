@@ -19,7 +19,8 @@ import { isTier, type Tier } from './tiers.ts';
 import type { AnswerField, AppField, AppRecipe } from './apps.ts';
 import type { AppSummary } from './app-summary.ts';
 import type { AppSecretState } from './app-secrets.ts';
-import { ANSWER_TYPES, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
+import { ANSWER_TYPES, cardName, cleanAnswer, cleanFields, readDate, readNumber } from './apps.ts';
+import { ME_FIELDS, ME_REFS } from './app-me.ts';
 
 // ---- the format ---------------------------------------------------------------------------------------
 
@@ -88,7 +89,16 @@ export interface ToolStep extends StepCommon {
   tool: string;
   /** Its inputs: values, or text with {{values}} in it. */
   with?: Record<string, unknown>;
+  /**
+   * How long its answer is kept for the same call (read_page, web_search, http_request GET): false never, else seconds
+   * (unset: five minutes, a day for places and encyclopedias). A view's run-again buttons repeat the same look-ups, and
+   * the services limit them.
+   */
+  cache?: false | number;
 }
+
+/** The longest a tool step may keep an answer (cache), in seconds: a week. */
+export const MOST_CACHE_SECONDS = 7 * 24 * 3600;
 
 /** One path or the other: by a rule, or by a question in words that the helper model answers ({{id.yes}}). */
 export interface DecideStep extends StepCommon {
@@ -435,20 +445,47 @@ export const STEP_TOOLS = [
  */
 export const STEP_ONLY_TOOLS = ['user_profile', 'rank_by_interest', 'work_log', 'experiment_wait', 'read_paper', 'reading_list', 'zotero_sync'];
 
+/** What each {{me.…}} holds, for the pickers and the graph. */
+const ME_HINTS: Record<(typeof ME_REFS)[number], string> = {
+  home: 'As they wrote it: Thessaloniki, Greece',
+  country: 'Two letters, as GR',
+  units: 'metric or imperial',
+  currency: 'Three letters, as EUR',
+  diet: 'As they wrote it: vegetarian, no nuts',
+  household: 'How many people, a number',
+  services: 'A list: Netflix, Disney+',
+  teams: 'A list of teams',
+  fields: 'A list of research fields',
+  topics: 'A list of topics',
+  venues: 'A list: SIGIR, ACL',
+  author: 'Their name as on their papers',
+  author_id: 'Their ORCID or OpenAlex id, when they gave one',
+  compute: 'What they can run things on, in a line',
+};
+
 /**
  * Values every step can use beside the form's answers and the steps' values: the moment, in the user's time
- * zone, and the run (what started it). A flow fills them when it starts.
+ * zone, the run (what started it) and the language it writes in, and what the person keeps in About you
+ * (group "About you"; empty in a run from a public page). A flow fills them when it starts.
  */
-export const BUILTIN_VALUES = [
+export const BUILTIN_VALUES: readonly { ref: string; label: string; hint: string; group?: 'About you' }[] = [
   { ref: 'today', label: 'Today', hint: 'The date, as 2026-11-02' },
   { ref: 'now', label: 'Now', hint: 'The date and time, as 2026-11-02 14:30' },
   { ref: 'weekday', label: 'The day of the week', hint: 'Monday, Tuesday…' },
   { ref: 'timezone', label: 'The time zone', hint: 'Where those are, as Europe/Athens' },
   { ref: 'run.source', label: 'What started the run', hint: 'web (its form), test, api, mcp, public, batch, task, screen, chat, app, session (an agent ran it for you in a session)' },
   { ref: 'run.id', label: 'The run', hint: 'Its id, as its page has it' },
-] as const;
+  { ref: 'language', label: 'The language to write in', hint: 'Its English name, as Greek: the one the run was started in, else English' },
+  { ref: 'lang', label: 'Its language code', hint: 'As el, de or en' },
+  ...ME_REFS.map((r) => ({ ref: `me.${r}`, label: r === 'author_id' ? 'Your author id' : ME_FIELDS.find((f) => f.id === r)!.label, hint: ME_HINTS[r], group: 'About you' as const })),
+];
 /** The names those values go by. */
-export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run']);
+export const BUILTIN_ROOTS = new Set(['today', 'now', 'weekday', 'timezone', 'run', 'language', 'lang', 'me']);
+/**
+ * Of those, the names added after apps had steps and questions of their own: an app's step or question by that name
+ * (the step "me" that reads the person's profile, Translate's question "language") still means its own.
+ */
+export const OWN_FIRST = new Set(['language', 'lang', 'me']);
 
 /** The moment's values in a time zone (an IANA name; UTC when it is not one). */
 export function momentOf(timeZone = 'UTC', at = Date.now()): { today: string; now: string; weekday: string; timezone: string } {
@@ -567,7 +604,7 @@ export function collapseSteps(r: { fields: AppField[]; answer: AnswerField[]; fl
   let body = JSON.stringify(picked);
   for (const ref of refsIn(picked)) {
     const root = rootOf(ref);
-    if (inside.has(root) || BUILTIN_ROOTS.has(root)) continue;
+    if (inside.has(root) || (BUILTIN_ROOTS.has(root) && !(OWN_FIRST.has(root) && (form.has(root) || everyStep.some((s) => s.id === root))))) continue;
     const own = root === 'inputs' ? segOf(ref) : form.has(root) ? root : undefined;
     if (own && form.has(own)) {
       // The template's own questions are its block's too, by the same names.
@@ -667,15 +704,22 @@ const KIND_NAMES: Record<string, string> = {
   url: 'url', link: 'url',
   list: 'list',
   table: 'table',
+  ui: 'ui', card: 'ui',
 };
 const COLUMN_KINDS = new Set(['text', 'number', 'yesno', 'date', 'url']);
-const KINDS_SAID = 'text, long, number, yesno, date, url, list, table(column: kind, …)';
+const KINDS_SAID = 'text, long, number, yesno, date, url, list, table(column: kind, …), ui(card name)';
 
-/** "table(name: text, price: number)", "list(text)", "long" → an answer field's kind (and a table's columns). */
-export function readKind(s: string): { type: string; columns?: { id: string; label: string; type: string }[] } | { error: string } {
+/** "table(name: text, price: number)", "list(text)", "long", "ui(comparison)" → an answer field's kind (and a table's columns, a card's name). */
+export function readKind(s: string): { type: string; columns?: { id: string; label: string; type: string }[]; ui?: string } | { error: string } {
   const m = /^\s*([A-Za-z]+)\s*(?:\((.*)\))?\s*$/s.exec(String(s ?? ''));
   const type = m ? KIND_NAMES[m[1].toLowerCase()] : undefined;
   if (!m || !type) return { error: `“${String(s).slice(0, 40)}” is not a kind of value (${KINDS_SAID})` };
+  if (type === 'ui') {
+    const asked = (m[2] ?? '').trim();
+    if (!asked) return { error: 'a card needs its name: ui(comparison), as find_ui names them' };
+    const ui = cardName(asked);
+    return ui ? { type, ui } : { error: `there is no card called “${asked.slice(0, 40)}” (find_ui finds the one that fits)` };
+  }
   if (type !== 'table') return { type };
   const columns: { id: string; label: string; type: string }[] = [];
   for (const part of (m[2] ?? '').split(',').map((x) => x.trim()).filter(Boolean)) {
@@ -704,13 +748,19 @@ export function cleanOutputs(raw: unknown, errors: string[], where: string): Ans
   const fields = list.flatMap((x: any) => {
     if (!x || typeof x !== 'object') return [];
     const said = typeof x.kind === 'string' ? x.kind : typeof x.type === 'string' && !ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : null;
-    if (said === null) return [{ ...x, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    if (said === null) {
+      if (x.type === 'ui' && !cardName(x.ui)) {
+        errors.push(`${where}, output ${x.id ?? x.label ?? '?'}: ${x.ui ? `there is no card called “${String(x.ui).slice(0, 40)}” (find_ui finds the one that fits)` : 'a card needs its name (ui: "comparison")'}`);
+        return [];
+      }
+      return [{ ...x, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    }
     const k = readKind(said);
     if ('error' in k) {
       errors.push(`${where}, output ${x.id ?? x.label ?? '?'}: ${k.error}`);
       return [];
     }
-    return [{ ...x, type: k.type, columns: k.columns ?? x.columns, label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
+    return [{ ...x, type: k.type, columns: k.columns ?? x.columns, ...(k.ui ? { ui: k.ui } : {}), label: x.label ?? (typeof x.id === 'string' ? labelOf(x.id) : undefined) }];
   });
   const out = cleanAnswer(fields);
   return out.length ? out : undefined;
@@ -854,7 +904,11 @@ function cleanStep(x: any, t: Tidy, depth: number): Step | null {
       const tool = short(x.tool, 80);
       if (!tool) t.errors.push(`${where}: name the tool it uses`);
       const w = cleanWith(x.with, t.errors, where);
-      return { ...common, do: 'tool', tool, ...(w ? { with: w } : {}) };
+      let cache: false | number | undefined;
+      if (x.cache === false || x.cache === 0) cache = false;
+      else if (typeof x.cache === 'number' && Number.isFinite(x.cache) && x.cache > 0) cache = Math.min(Math.round(x.cache), MOST_CACHE_SECONDS);
+      else if (x.cache !== undefined && x.cache !== null && x.cache !== true) t.errors.push(`${where}: "cache" is false (never keep its answer) or how many seconds to keep it`);
+      return { ...common, do: 'tool', tool, ...(w ? { with: w } : {}), ...(cache !== undefined ? { cache } : {}) };
     }
     case 'decide': {
       const rule2 = text(x.rule, 2000);
@@ -1157,11 +1211,15 @@ export function lookup(path: string, s: Scope): { found: boolean; value: unknown
   if (!parts) return { found: false, value: undefined };
   const [root, ...rest] = parts as [string, ...(string | number)[]];
   let v: unknown;
+  const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
   if (root === 'inputs') v = s.inputs;
-  else if (Object.prototype.hasOwnProperty.call(s.vars, root)) v = s.vars[root];
-  else if (Object.prototype.hasOwnProperty.call(s.steps, root)) v = s.steps[root] ?? {};
-  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' ? {} : momentOf()[root as 'today'];
-  else if (Object.prototype.hasOwnProperty.call(s.inputs, root)) v = s.inputs[root];
+  else if (has(s.vars, root) && !OWN_FIRST.has(root)) v = s.vars[root];
+  else if (has(s.steps, root)) v = s.steps[root] ?? {};
+  // A question of the app's own by one of the later built-in names is its own.
+  else if (OWN_FIRST.has(root) && has(s.inputs, root)) v = s.inputs[root];
+  else if (has(s.vars, root)) v = s.vars[root];
+  else if (BUILTIN_ROOTS.has(root)) v = root === 'run' || root === 'me' ? {} : root === 'language' ? 'English' : root === 'lang' ? 'en' : momentOf()[root as 'today'];
+  else if (has(s.inputs, root)) v = s.inputs[root];
   else return { found: false, value: undefined };
   for (const k of rest) {
     if (v === null || v === undefined) break;
@@ -1549,7 +1607,13 @@ export function checkFlow(r: { fields: AppField[]; answer: AnswerField[]; flow?:
         if (field && field !== 'id' && field !== 'source') note(errors, `${where} uses {{${p}}}: a run gives id and source`);
         continue;
       }
-      if (BUILTIN_ROOTS.has(root) || names.has(root)) continue;
+      // About you, the language: unless the app has a step or a question of that name, which is its own.
+      if (OWN_FIRST.has(root) && !byId.has(root) && !fieldIds.has(root) && !names.has(root)) {
+        if (root === 'me' && field && !(ME_REFS as readonly string[]).includes(field)) note(errors, `${where} uses {{${p}}}: About you gives ${ME_REFS.join(', ')}`);
+        else if (root === 'me' && !field) note(warnings, `${where} uses {{me}} alone: name a field of About you, as {{me.units}}`);
+        continue;
+      }
+      if ((BUILTIN_ROOTS.has(root) && !OWN_FIRST.has(root)) || names.has(root)) continue;
       const at = seen.get(root);
       if (at) {
         const gives = givesOf(at.step);

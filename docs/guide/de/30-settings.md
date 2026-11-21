@@ -305,8 +305,9 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Apps
 
-[Einstellungen → Apps](/settings?s=apps): Welche Apps Agenten ohne vorherige Rückfrage für dich ausführen. Mehr dazu unter [Apps](/guide/apps).
+[Einstellungen → Apps](/settings?s=apps): Was Apps über dich wissen und welche ohne Nachfrage laufen. Mehr dazu unter [Apps](/guide/apps).
 
+- [**Über dich**](/settings?s=apps&find=About%20you): Wovon Apps ihre Fragen ausgehen, damit sie nicht jedes Mal fragen.
 - [**Ohne Rückfrage ausführen**](/settings?s=apps&find=Run%20without%20asking): Apps, die Agenten ohne vorherige Rückfrage für dich ausführen. Entferne eine App, damit wieder gefragt wird.
 
 ### Custom

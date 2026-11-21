@@ -4,6 +4,7 @@
 // Stopping ends the rows still waiting and interrupts the rest.
 import type { AppBatch, AppRecipe } from '../../shared/apps.ts';
 import { cellText, isActive, resultHeader, toCsv } from '../../shared/apps.ts';
+import { cardText } from '../../shared/app-cards.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { checkedInputs, launchQueued, onFinished, startRun, stopRun } from './runs.ts';
@@ -23,7 +24,8 @@ export function startBatch(db: DB, o: { app: string; slug: string; recipe: AppRe
   const id = insertBatch(db, { app: o.app, name: o.name?.slice(0, 120), concurrency, total: rows.length });
   slugs.set(id, o.slug);
   rows.forEach((row, i) => {
-    const { errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false);
+    // A question the row leaves out takes what it starts from (About you, its last answer), as the run will.
+    const { errors } = checkedInputs(o.recipe, row && typeof row === 'object' ? row : {}, false, {}, undefined, o.app);
     if (errors.length) {
       const r = insertRun(db, { app: o.app, appName: o.recipe.name, recipe: o.recipe, source: 'batch', inputs: Object.fromEntries(Object.entries(row ?? {}).map(([k, v]) => [k, cellText(v)])), status: 'failed', batch: id, row: i + 1 });
       updateRun(db, r.id, { error: errors.join('; '), endedAt: Date.now() });
@@ -62,7 +64,8 @@ export function batchCsv(db: DB, id: string, recipe: AppRecipe, link: (key: stri
   const rows = runs.map((r) => [
     r.row ?? '',
     ...fields.map((f) => r.inputs[f.id] ?? ''),
-    ...answer.map((a) => cellText(r.result?.[a.id])),
+    // A card's cell is its text, as its Copy gives it, not its data.
+    ...recipe.answer.map((a) => (a.type === 'ui' && r.result?.[a.id] && typeof r.result[a.id] === 'object' ? cardText(a.ui, r.result[a.id]) : cellText(r.result?.[a.id]))),
     ...(recipe.answer.length ? [] : [r.reply ?? '']),
     r.status,
     r.error ?? '',

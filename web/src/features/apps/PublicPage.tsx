@@ -97,7 +97,8 @@ export default function PublicAppPage({ slug }: { slug: string }) {
     setBusy(true);
     setSendErr('');
     try {
-      const r = await call<{ run: AppRun }>(`${base}/run`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])) });
+      // The run writes in the visitor's own language (their browser's, any of them).
+      const r = await call<{ run: AppRun }>(`${base}/run`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), lang: navigator.language });
       setRuns((l) => [r.run, ...l]);
       setShown({ run: r.run });
       requestAnimationFrame(() => document.getElementById('the-run')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));

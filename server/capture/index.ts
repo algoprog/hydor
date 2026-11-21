@@ -8,7 +8,7 @@ import type { ChildProcess } from 'node:child_process';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { Cdp, CdpSession } from '../browser/cdp.ts';
-import { launchChrome, pickRunnableChrome } from '../browser/chrome.ts';
+import { launchChrome, pickRunnableChrome, plainUserAgent } from '../browser/chrome.ts';
 import { captureJpeg } from '../browser/jpeg.ts';
 import { browserSettings } from '../browser/settings.ts';
 
@@ -44,6 +44,8 @@ export interface CaptureOpts {
   settleMs?: number;
   /** Refuse requests to this machine and private networks (for pages the app did not write). */
   blockPrivate?: boolean;
+  /** Addresses on this machine that may still be reached while private ones are refused, by their start (the app's own media). */
+  allowPrivate?: string[];
   /** Refuse every request but the document itself: a confidential session's page, which may reach nowhere (server/confidential). */
   offline?: boolean;
   /** A second picture of the same page, as it is (another size or format): Captured.alt. */
@@ -52,6 +54,8 @@ export interface CaptureOpts {
   colorScheme?: 'light' | 'dark';
   /** A script to run in the page before any of its own (to add a stylesheet, say). */
   firstScript?: string;
+  /** Tell sites the browser's user agent without "HeadlessChrome" in it, which many turn away (a page read for an app's flow). */
+  plainAgent?: boolean;
 }
 
 export interface Captured {
@@ -171,7 +175,7 @@ export interface Tab {
   evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
 }
 
-type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline' | 'colorScheme' | 'firstScript'>;
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'allowPrivate' | 'offline' | 'colorScheme' | 'firstScript' | 'plainAgent'>;
 
 /** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
 async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
@@ -187,6 +191,10 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
     await s.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => {});
     if (o.colorScheme) await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: o.colorScheme }] });
     if (o.firstScript) await s.send('Page.addScriptToEvaluateOnNewDocument', { source: o.firstScript });
+    if (o.plainAgent) {
+      const v = await c.send('Browser.getVersion');
+      await s.send('Emulation.setUserAgentOverride', { userAgent: plainUserAgent(String(v.userAgent ?? '')) });
+    }
     if (o.html !== undefined || o.blockPrivate || o.offline) {
       const html = o.html;
       s.on('Fetch.requestPaused', (p) => {
@@ -203,7 +211,7 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
               body: Buffer.from(html, 'utf8').toString('base64'),
             })
             .catch(() => {});
-        } else if (o.offline || (o.blockPrivate && isPrivate(String(p.request?.url ?? '')))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
+        } else if (o.offline || (o.blockPrivate && isPrivate(String(p.request?.url ?? '')) && !o.allowPrivate?.some((a) => String(p.request?.url ?? '').startsWith(a)))) void s.send('Fetch.failRequest', { requestId: id, errorReason: 'BlockedByClient' }).catch(() => {});
         else void s.send('Fetch.continueRequest', { requestId: id }).catch(() => {});
       });
       await s.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });

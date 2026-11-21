@@ -12,7 +12,7 @@ import type { AnswerField, AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
 import type { Step } from '../../shared/app-manifest.ts';
 import { EXPLORE, EXPLORE_UI } from './explore.ts';
-import { MORE } from './templates-more.ts';
+import { BODY, MORE } from './templates-more.ts';
 import { LAB } from './templates-lab.ts';
 import { PAPERS } from './templates-papers.ts';
 import { RESEARCH } from './templates-research.ts';
@@ -94,13 +94,44 @@ function keyOf(url) {
 
 /** How much a site counts as a source. */
 const QUALITY = String.raw`// How much a site counts as a source: official and scholarly first, then established reporting; social media,
-// shops and video least.
+// shops and video least. Other countries' governments, universities, public broadcasters and news agencies count as
+// established by the shape of their domains (.gov.gr, .gouv.fr, .gob.es, .go.jp, .ac.uk, .edu.au, uni-…, univ-…),
+// not by a list of sites.
 function quality(site) {
-  if (/(^|\.)(gov|edu|int|mil)(\.[a-z]{2})?$|(^|\.)(gov|gouv|gob|go|ac|edu)\.[a-z]{2}$|(^|\.)(europa\.eu|who\.int|oecd\.org|worldbank\.org|imf\.org|un\.org|nature\.com|science\.org|sciencedirect\.com|springer\.com|wiley\.com|thelancet\.com|bmj\.com|nejm\.org|jamanetwork\.com|plos\.org|arxiv\.org|ssrn\.com|nber\.org|ieee\.org|acm\.org|iea\.org|ipcc\.ch|ourworldindata\.org)$/.test(site)) return 6;
-  if (/(^|\.)(reuters\.com|apnews\.com|bbc\.co\.uk|bbc\.com|ft\.com|economist\.com|nytimes\.com|theguardian\.com|washingtonpost\.com|wsj\.com|bloomberg\.com|npr\.org|scientificamerican\.com|newscientist\.com|wikipedia\.org)$/.test(site)) return 3;
+  if (/(^|\.)(gov|edu|int|mil)(\.[a-z]{2})?$|(^|\.)(gov|gouv|gob|go|gv|ac|edu|govt|gub|gc)\.[a-z]{2}$|(^|\.)(admin\.ch|bund\.de|gc\.ca|canada\.ca|gov\.uk|gouvernement\.fr|service-public\.fr|overheid\.nl|rijksoverheid\.nl|moncloa\.gob\.es|palazzochigi\.it|kantei\.go\.jp)$|(^|\.)(uni-[a-z0-9-]+|univ-[a-z0-9-]+|universit[a-z0-9-]*|universidad[a-z0-9-]*|universidade[a-z0-9-]*|hochschule[a-z0-9-]*)\.[a-z]{2}$|(^|\.)(ethz\.ch|epfl\.ch|sorbonne-universite\.fr|cnrs\.fr|inserm\.fr|insee\.fr|rki\.de|destatis\.de|eurostat\.eu|ecb\.europa\.eu|europa\.eu|who\.int|oecd\.org|worldbank\.org|imf\.org|un\.org|nature\.com|science\.org|sciencedirect\.com|springer\.com|wiley\.com|thelancet\.com|bmj\.com|nejm\.org|jamanetwork\.com|plos\.org|arxiv\.org|ssrn\.com|nber\.org|ieee\.org|acm\.org|iea\.org|ipcc\.ch|ourworldindata\.org)$/.test(site)) return 6;
+  if (/(^|\.)(reuters\.com|apnews\.com|bbc\.co\.uk|bbc\.com|ft\.com|economist\.com|nytimes\.com|theguardian\.com|washingtonpost\.com|wsj\.com|bloomberg\.com|npr\.org|scientificamerican\.com|newscientist\.com|wikipedia\.org)$|(^|\.)(afp\.com|dpa\.com|dpa-international\.com|efe\.com|ansa\.it|kyodonews\.net|kyodonews\.jp|jiji\.com|xinhuanet\.com|aa\.com\.tr|pap\.pl|apa\.at|ana-mpa\.gr|tanjug\.rs|tass\.com|yna\.co\.kr|pti\.news)$|(^|\.)(nhk\.or\.jp|nhk\.jp|ard\.de|tagesschau\.de|zdf\.de|deutschlandfunk\.de|dw\.com|orf\.at|srf\.ch|rtve\.es|rai\.it|raiplay\.it|francetvinfo\.fr|franceinfo\.fr|radiofrance\.fr|rfi\.fr|france24\.com|nos\.nl|npo\.nl|vrt\.be|rtbf\.be|ert\.gr|ertnews\.gr|rte\.ie|dr\.dk|svt\.se|nrk\.no|yle\.fi|rtp\.pt|tvp\.info|polskieradio\.pl|cbc\.ca|abc\.net\.au|sbs\.com\.au|rnz\.co\.nz|pbs\.org|aljazeera\.com|kbs\.co\.kr|cctv\.com|cgtn\.com|ebu\.ch)$/.test(site)) return 3;
   if (/(^|\.)(pinterest\.[a-z.]+|facebook\.com|instagram\.com|tiktok\.com|x\.com|twitter\.com|quora\.com|youtube\.com|amazon\.[a-z.]+|ebay\.[a-z.]+|linkedin\.com)$/.test(site)) return -8;
   return 0;
 }
+`;
+
+/** The words a program writes itself, in the run's language (a model writes the rest): say({ en: …, el: … }). */
+const SAY = String.raw`// The few words a program writes itself, in the run's language (a model writes the rest): English where it has none.
+const lang = String((ctx.locale && ctx.locale.lang) || 'en').toLowerCase().split(/[-_]/)[0];
+const say = (t) => t[lang] || t.en;
+const fill = (t, v) => t.replace(/\{(\w+)\}/g, (all, k) => (k in v ? v[k] : all));
+`;
+
+/** Words of any script: runs of letters and digits, and in scripts written without spaces (Japanese, Chinese, Thai…) the words Intl.Segmenter finds in them. */
+const TOKENS = String.raw`// A text as words: runs of letters and digits; a run in a script written without spaces (Japanese, Chinese, Thai,
+// Khmer…) is cut into its words by Intl.Segmenter, with the particles of one kana left out.
+const NOSPACE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+const segmenter = (() => {
+  try {
+    return new Intl.Segmenter(undefined, { granularity: 'word' });
+  } catch (e) {
+    return null;
+  }
+})();
+const tokens = (text) => {
+  const out = [];
+  for (const run of String(text).toLowerCase().match(/[\p{L}\p{N}\p{M}]+/gu) || []) {
+    if (segmenter && NOSPACE.test(run)) {
+      for (const part of segmenter.segment(run)) if (part.isWordLike && !(part.segment.length === 1 && /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(part.segment))) out.push(part.segment);
+    } else out.push(run);
+  }
+  return out;
+};
 `;
 
 // ---- Deep research: its reading steps, the same for the first pages and for those found again ------------------
@@ -159,6 +190,14 @@ const COMPARE_COLUMNS: AnswerField['columns'] = [
   { id: 'picture', label: 'Picture', type: 'image' },
 ];
 
+/** What is on during the trip, as the research found it. */
+const TRIP_EVENTS: AnswerField['columns'] = [
+  { id: 'name', label: 'Event', type: 'text' },
+  { id: 'date', label: 'When', type: 'text' },
+  { id: 'where', label: 'Where', type: 'text' },
+  { id: 'note', label: 'Note', type: 'text' },
+];
+
 const TRIP_STOPS: AnswerField['columns'] = [
   { id: 'day', label: 'Day', type: 'number' },
   { id: 'date', label: 'Date', type: 'date' },
@@ -179,6 +218,39 @@ const STORY_COLS: AnswerField['columns'] = [
   { id: 'picture', label: 'Picture', type: 'image' },
 ];
 
+/** The words the Lesson plan's programs write themselves (its parts, its headings, its table): a model gives them in the language the lesson is taught in; these are the English ones. */
+const LESSON_WORDS: Record<string, string> = {
+  hook: 'Hook',
+  teaching: 'Teaching',
+  guided: 'Guided practice',
+  independent: 'Independent practice',
+  wrapup: 'Wrap-up and check',
+  pause: 'Break',
+  objectives: 'Objectives',
+  success: 'Success criteria',
+  timeline: 'Timeline',
+  materials: 'Materials',
+  handouts: 'Handouts',
+  misconceptions: 'Misconceptions to expect',
+  support: 'Support and stretch',
+  checking: 'Checking understanding',
+  facts: 'Facts, as checked',
+  time: 'Time',
+  activity: 'Activity',
+  teacher: 'Teacher',
+  learners: 'Learners',
+  min: 'min',
+  title: '{topic}: a {minutes}-minute lesson',
+  for: 'For {learners} · {setting}',
+  setting_classroom: 'Classroom',
+  setting_online: 'Online',
+  setting_one_to_one: 'One-to-one',
+  setting_home_school: 'Home school',
+};
+
+/** The line that has a lesson's model steps write in the language it is taught in (the person's, unless the form says). */
+const LESSON_IN = `Write it in {{#taught_in}}{{taught_in}}{{/taught_in}}{{^taught_in}}{{language}}{{/taught_in}}, the language the lesson is taught in, keeping the names of fields as written.`;
+
 const T: Draft[] = [
   {
     id: 'deep-research',
@@ -186,13 +258,16 @@ const T: Draft[] = [
     icon: 'telescope',
     color: 'violet',
     category: 'Research',
+    tier: 'best',
+    // The report is read by the person: it is written in their language, headings and list of sources included.
+    language: 'person',
     description: 'A sourced report on any question: the web searched, facts cross-checked, every claim cited.',
     fields: [
       { id: 'topic', label: 'What should be researched?', type: 'long', required: true, placeholder: 'e.g. How well do heat pumps work in cold climates, and what do they cost to run compared with gas?' },
       { id: 'focus', label: 'Focus on, or leave out', type: 'text', placeholder: 'e.g. Only studies from the last five years' },
-      { id: 'depth', label: 'Depth', type: 'choice', options: ['Quick overview', 'Thorough', 'Exhaustive'], default: 'Thorough' },
-      { id: 'audience', label: 'Written for', type: 'choice', options: ['Anyone', 'Experts', 'Decision makers'], default: 'Anyone' },
-      { id: 'review', label: 'Let me check the questions first', type: 'yesno', help: 'The run waits for you to keep or change the questions it will research' },
+      { id: 'depth', label: 'Depth', type: 'choice', options: ['Quick overview', 'Thorough', 'Exhaustive'], default: 'Thorough', remember: true },
+      { id: 'audience', label: 'Written for', type: 'choice', options: ['Anyone', 'Experts', 'Decision makers'], default: 'Anyone', remember: true },
+      { id: 'review', label: 'Let me check the questions first', type: 'yesno', help: 'The run waits for you to keep or change the questions it will research', remember: true },
     ],
     prompt: '',
     flow: {
@@ -224,7 +299,7 @@ return depths[input.depth] || depths.Thorough;`,
           id: 'plan',
           title: 'Plan the questions',
           do: 'model',
-          instructions: `Plan web research on the topic below. Break it into exactly {{budget.questions}} questions a careful researcher would need answered to cover it, the most important first. For each, write a web search query likely to find primary sources (official statistics, papers, filings, documentation) or recent, reputable reporting, and a second query in other words.
+          instructions: `Plan web research on the topic below. Break it into exactly {{budget.questions}} questions a careful researcher would need answered to cover it, the most important first. For each, write a web search query likely to find primary sources (official statistics, papers, filings, documentation) or recent, reputable reporting, and a second query in other words. Write the queries in the language that finds the best sources on the topic (English for most science, technology and finance; the local language for a local matter), whatever language the questions themselves are in.
 
 Topic: {{topic}}
 {{#focus}}Focus on, or leave out: {{focus}}
@@ -536,13 +611,14 @@ Nothing was found yet on these questions; search the web and read for them yours
 How to write it:
 - Rely on the evidence, and check a source yourself when a fact looks doubtful or two sources disagree; say which is more credible and why.
 - Cite the sources by their numbers in brackets, like [3], after the claims they support. A page you read yourself takes the next number after the list and goes in extra_sources, in that order.
-- The report, in Markdown: the answer in three to five sentences, then one section per question, then "Open questions": what stays uncertain, disputed or unknown. Don't add a list of sources: it is added after.
+- The report, in Markdown: the answer in three to five sentences, then one section per question, then a section on the open questions (what stays uncertain, disputed or unknown) headed "Open questions" in the language of the report. Don't add a list of sources: it is added after, under the heading you give as sources_heading.
 - Be concrete (numbers, dates, names) and leave out filler.`,
           outputs: [
             { id: 'summary', label: 'Summary', type: 'markdown', required: true, description: 'The answer in three to five sentences, with citations' },
             { id: 'key_findings', label: 'Key findings', type: 'list', required: true, description: 'The most important findings, one sentence each, with citations' },
             { id: 'report', label: 'Report', type: 'markdown', required: true, description: 'The full report in Markdown, with numbered citations and no list of sources' },
             { id: 'confidence', label: 'Confidence', type: 'text', description: 'High, medium or low, with the reason in one sentence' },
+            { id: 'sources_heading', label: 'Heading of the sources', type: 'text', description: 'The word for "Sources", as a heading in the language of the report (a word or two)' },
             {
               id: 'extra_sources',
               label: 'Sources you added',
@@ -557,11 +633,13 @@ How to write it:
           title: 'Number the citations',
           do: 'code',
           language: 'javascript',
-          with: { report: '{{write.report}}', summary: '{{write.summary}}', findings: '{{write.key_findings}}', sources: '{{evidence.sources}}', extra: '{{write.extra_sources}}' },
+          with: { report: '{{write.report}}', summary: '{{write.summary}}', findings: '{{write.key_findings}}', sources: '{{evidence.sources}}', extra: '{{write.extra_sources}}', heading: '{{write.sources_heading}}' },
           code:
             LIST +
             String.raw`// The sources numbered in the order the report first cites them, its citations renumbered to match, and their
-// list added at its end; the sources it cites make the table (all of them, when it cites none).
+// list added at its end, under the heading the writer gave in the report's language ("Sources" without one); the
+// sources it cites make the table (all of them, when it cites none).
+const heading = /^[^\n#]{1,40}$/.test(String(input.heading || '').trim()) ? String(input.heading).trim().replace(/[:：]$/, '') : 'Sources';
 const sources = rows(input.sources).concat(rows(input.extra));
 const report = String(input.report || '');
 const summary = String(input.summary || '');
@@ -587,7 +665,7 @@ const renumber = (t) =>
 const used = order.length ? order.map((n) => sources[n - 1]) : sources;
 const line = (s, i) => i + 1 + '. ' + [s.title, s.publisher, s.date].filter(Boolean).join(', ') + (s.url ? ' — ' + s.url : '');
 return {
-  report: renumber(report).trim() + (used.length ? '\n\n## Sources\n\n' + used.map(line).join('\n') : ''),
+  report: renumber(report).trim() + (used.length ? '\n\n## ' + heading + '\n\n' + used.map(line).join('\n') : ''),
   summary: renumber(summary),
   key_findings: findings.map(renumber),
   sources: used.map((s) => ({ title: s.title || '', publisher: s.publisher || '', date: s.date || '', url: /^https?:\/\/\S+$/.test(String(s.url || '')) ? s.url : null })),
@@ -636,16 +714,19 @@ return {
     icon: 'plane',
     color: 'indigo',
     category: 'Planning',
+    tier: 'standard',
+    // What people read (the plan, the weather, the budget) is in their language; the searches stay in English.
+    language: 'person',
     description: 'A day-by-day plan checked against your dates: opening hours, events, travel times, budget and what to book.',
     fields: [
       { id: 'destination', label: 'Where to', type: 'text', required: true, placeholder: 'e.g. Lisbon, or the west coast of Ireland' },
       { id: 'start', label: 'First day', type: 'date', required: true },
       { id: 'days', label: 'How many days', type: 'number', required: true, default: '4' },
-      { id: 'travelers', label: 'Who’s going', type: 'text', placeholder: 'e.g. Two adults and a six-year-old' },
+      { id: 'travelers', label: 'Who’s going', type: 'text', placeholder: 'e.g. Two adults and a six-year-old', remember: true },
       { id: 'budget', label: 'Budget', type: 'text', placeholder: 'e.g. About €1,500 without flights' },
-      { id: 'interests', label: 'What you enjoy', type: 'long', placeholder: 'Food markets, easy hikes, museums, no nightlife…' },
-      { id: 'pace', label: 'Pace', type: 'choice', options: ['Relaxed', 'Balanced', 'Packed'], default: 'Balanced' },
-      { id: 'choose', label: 'Let me choose before it plans', type: 'yesno', help: 'The run waits for you to say where to stay and what must be in the plan' },
+      { id: 'interests', label: 'What you enjoy', type: 'long', placeholder: 'Food markets, easy hikes, museums, no nightlife…', remember: true },
+      { id: 'pace', label: 'Pace', type: 'choice', options: ['Relaxed', 'Balanced', 'Packed'], default: 'Balanced', remember: true },
+      { id: 'choose', label: 'Let me choose before it plans', type: 'yesno', help: 'The run waits for you to say where to stay and what must be in the plan', remember: true },
     ],
     prompt: '',
     flow: {
@@ -656,20 +737,28 @@ return {
           do: 'code',
           language: 'javascript',
           with: { start: '{{start}}', days: '{{days}}', today: '{{today}}' },
-          code: String.raw`// The days of the trip, each with its date and weekday (three weeks at most), the months it falls in, and how many
-// days from today it starts.
+          code: String.raw`// The days of the trip, each with its date and weekday (three weeks at most, the weekday in the run's language), the
+// months it falls in (in English: they only go into searches), and how many days from today it starts.
 const start = new Date(String(input.start || '').slice(0, 10) + 'T00:00:00Z');
 if (isNaN(start.getTime())) throw new Error('The first day should be a date, like 2026-11-20');
 const count = Math.min(21, Math.max(1, Math.round(Number(input.days) || 1)));
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const tag = (ctx.locale && ctx.locale.lang) || 'en';
+const names = (l, o) => {
+  try {
+    return new Intl.DateTimeFormat(l, Object.assign({ timeZone: 'UTC' }, o));
+  } catch (e) {
+    return new Intl.DateTimeFormat('en', Object.assign({ timeZone: 'UTC' }, o));
+  }
+};
+const weekdayOf = names(tag, { weekday: 'long' });
+const monthOf = names('en', { month: 'long' });
 const dates = [];
 for (let i = 0; i < count; i++) {
   const d = new Date(start.getTime() + i * 86400000);
-  dates.push({ day: i + 1, date: d.toISOString().slice(0, 10), weekday: WEEKDAYS[d.getUTCDay()] });
+  dates.push({ day: i + 1, date: d.toISOString().slice(0, 10), weekday: weekdayOf.format(d) });
 }
 const today = new Date(String(input.today || '').slice(0, 10) + 'T00:00:00Z');
-const months = [...new Set(dates.map((d) => MONTHS[Number(d.date.slice(5, 7)) - 1]))];
+const months = [...new Set(dates.map((d) => monthOf.format(new Date(d.date + 'T00:00:00Z'))))];
 return {
   dates,
   first: dates[0].date,
@@ -741,7 +830,9 @@ The usual weather:
 {{#forecast_search.text}}
 The forecast:
 {{forecast_search.text}}
-{{/forecast_search.text}}`,
+{{/forecast_search.text}}{{#me.units}}
+Give temperatures in {{me.units}} units.
+{{/me.units}}`,
                 outputs: [
                   { id: 'summary', label: 'In short', type: 'text', description: 'The weather in a sentence or two' },
                   { id: 'temperatures', label: 'Temperatures', type: 'text', description: 'Highs and lows, with the unit' },
@@ -791,7 +882,7 @@ Where to stay:
                 id: 'transport',
                 title: 'Getting there and around',
                 do: 'model',
-                instructions: `From the search results below, say how visitors get from the airport or the main station into {{destination}}, how they get around (passes, tickets, what they cost), and the local currency.
+                instructions: `From the search results below, say how visitors get from the airport or the main station into {{destination}}, how they get around (passes, tickets, what they cost), and the local currency.{{#me.home}} The travelers set off from {{me.home}}.{{/me.home}}
 
 {{transport_search.text}}`,
                 outputs: [
@@ -828,7 +919,9 @@ The days:
 
 {{#travelers}}Travelers: {{travelers}}
 {{/travelers}}{{#budget}}Budget: {{budget}}
-{{/budget}}{{#interests}}What they enjoy: {{interests}}
+{{/budget}}{{#me.currency}}Their own currency, where the budget names none: {{me.currency}}
+{{/me.currency}}{{#me.units}}Units: {{me.units}}
+{{/me.units}}{{#interests}}What they enjoy: {{interests}}
 {{/interests}}Pace: {{pace}}
 {{#choices.stay}}Where they want to stay: {{choices.stay}}
 {{/choices.stay}}{{#choices.must}}Must be in the plan: {{choices.must}}
@@ -857,6 +950,7 @@ How to plan:
 - Match the pace: relaxed means two or three things a day with time to wander; packed fits more in. Suit it to the travelers (children, mobility, interests).
 - Say what should be booked ahead, and how far ahead.
 - Estimate the costs in the local currency as numbers (a low and a high for each item); the total is added up after.
+- Give the travelers' own currency as home (the one the budget is in, else their own above) when it is not the local one, with the rate.
 - Give each day's area its latitude and longitude (its centre, as a map gives them), for the trip's map.
 - Name each day's main sight by its own name (or its area, on a day without one), for the day's picture.
 Hand in one row of the itinerary per day, in order.`,
@@ -892,17 +986,125 @@ Hand in one row of the itinerary per day, in order.`,
             { id: 'tips', label: 'Tips', type: 'list', description: 'Getting in from the airport or station, transport passes, money, safety, and what to pack for the weather' },
           ],
         },
+        {
+          id: 'lookups',
+          title: 'Look up the places and the rate',
+          do: 'parallel',
+          branches: [
+            [
+              {
+                id: 'geo',
+                title: 'Find where each day’s area is',
+                do: 'code',
+                language: 'javascript',
+                seconds: 60,
+                with: { stops: '{{plan.itinerary}}', destination: '{{destination}}' },
+                code:
+                  LIST +
+                  BODY +
+                  String.raw`// Each day's area looked up instead of taken from the model's memory: the destination first (to tell places of the
+// same name apart), then Open-Meteo's search for the area, taking the result nearest the destination, and when that
+// finds none, OpenStreetMap's search for "area, destination" (the engine spaces those calls as OpenStreetMap asks).
+// A day whose area neither finds is left out, and keeps the model's own latitude and longitude.
+const UA = 'Hydor (+https://github.com/algoprog/hydor)';
+const plain = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const km = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 111 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180));
+const good = (lat, lng) => isFinite(lat) && isFinite(lng) && lat !== 0 && lng !== 0 && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+const dest = String(input.destination || '').trim();
+const meteo = async (name) => {
+  try {
+    const r = await ctx.tool('http_request', { url: 'https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name=' + encodeURIComponent(name) }, { title: 'Look up ' + name });
+    return ((bodyOf(r) || {}).results || []).map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude), region: [p.admin1, p.admin2, p.country].filter(Boolean).join(' ') })).filter((p) => good(p.lat, p.lng));
+  } catch (e) {
+    return [];
+  }
+};
+const osm = async (q) => {
+  try {
+    const r = await ctx.tool('http_request', { url: 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=en&q=' + encodeURIComponent(q), headers: { 'User-Agent': UA } }, { title: 'Look up ' + q });
+    const hit = (bodyOf(r) || [])[0];
+    return hit && good(Number(hit.lat), Number(hit.lon)) ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
+  } catch (e) {
+    return null;
+  }
+};
+const after = plain(dest.split(',').slice(1).join(' ')).split(/[^a-z]+/).filter((w) => w.length > 2);
+const first = (await meteo(dest.split(',')[0].trim())).filter((p) => !after.length || after.some((w) => plain(p.region).includes(w)));
+const anchor = dest ? first[0] || (await osm(dest)) : null;
+const words = plain(dest).split(/[^a-z]+/).filter((w) => w.length > 3);
+const find = async (area) => {
+  const name = area.split(/\s*(?:&|\/|,|;| and | – | - )\s*/)[0] || area;
+  const found = await meteo(name);
+  if (anchor) {
+    const near = found.map((p) => Object.assign({ d: km(p, anchor) }, p)).filter((p) => p.d <= 250).sort((a, b) => a.d - b.d)[0];
+    if (near) return { lat: near.lat, lng: near.lng };
+  } else {
+    const hit = found.find((p) => words.some((w) => plain(p.region).includes(w)));
+    if (hit) return { lat: hit.lat, lng: hit.lng };
+  }
+  const o = await osm(name + (dest ? ', ' + dest : ''));
+  return o && (!anchor || km(o, anchor) <= 1000) ? o : null;
+};
+const stops = rows(input.stops).filter((r) => Number(r.day) > 0);
+const areas = [...new Set(stops.map((r) => String(r.area || '').trim()).filter(Boolean))].slice(0, 21);
+const where = new Map();
+for (let i = 0; i < areas.length; i += 3) await Promise.all(areas.slice(i, i + 3).map(async (a) => where.set(a, await find(a))));
+const places = stops.map((r) => {
+  const w = where.get(String(r.area || '').trim());
+  return { day: Number(r.day), area: String(r.area || ''), lat: w ? w.lat : null, lng: w ? w.lng : null, found: !!w };
+});
+return { places, found: places.filter((p) => p.found).length };`,
+                outputs: [
+                  { id: 'places', label: 'Where each day’s area is', type: 'table', columns: [{ id: 'day', label: 'Day', type: 'number' }, { id: 'area', label: 'Area', type: 'text' }, { id: 'lat', label: 'Latitude', type: 'number' }, { id: 'lng', label: 'Longitude', type: 'number' }, { id: 'found', label: 'Looked up', type: 'yesno' }] },
+                  { id: 'found', label: 'Found', type: 'number' },
+                ],
+                failed: 'agent',
+              },
+            ],
+            [
+              {
+                id: 'fx',
+                title: 'Get the exchange rate',
+                do: 'code',
+                language: 'javascript',
+                with: { currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
+                code:
+                  BODY +
+                  String.raw`// What one of the local currency is worth in the travelers' own, as today's rate from Frankfurter (the European
+// Central Bank's daily rates, free, no key) when the two currencies differ; else the figure the plan gave from memory.
+const from = String(input.currency || '').trim().toUpperCase();
+const to = String(input.home || '').trim().toUpperCase();
+const own = Number(input.rate);
+if (/^[A-Z]{3}$/.test(from) && /^[A-Z]{3}$/.test(to) && from !== to) {
+  try {
+    const b = bodyOf(await ctx.tool('http_request', { url: 'https://api.frankfurter.dev/v2/rate/' + from.toLowerCase() + '/' + to.toLowerCase() }, { title: 'Get the rate of ' + from + ' to ' + to }));
+    const v = b ? Number(b.rate) : NaN;
+    if (isFinite(v) && v > 0) return { rate: v, date: String(b.date || '').slice(0, 10), source: 'Frankfurter' };
+  } catch (e) {}
+}
+return { rate: isFinite(own) && own > 0 ? own : 0, date: '', source: isFinite(own) && own > 0 ? 'the plan' : '' };`,
+                outputs: [
+                  { id: 'rate', label: 'Rate', type: 'number' },
+                  { id: 'date', label: 'Its day', type: 'date' },
+                  { id: 'source', label: 'Where it is from', type: 'text' },
+                ],
+                failed: 'agent',
+              },
+            ],
+          ],
+        },
         { id: 'media', title: 'Find a picture for each day', do: 'tool', tool: 'find_media', with: { items: '{{plan.itinerary}}', name: 'sight', kind: 'in {{destination}}' }, failed: 'skip' },
         {
           id: 'assemble',
           title: 'Put the plan together',
           do: 'code',
           language: 'javascript',
-          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', media: '{{media.data}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{plan.rate}}' },
+          with: { dates: '{{calendar.dates}}', itinerary: '{{plan.itinerary}}', media: '{{media.data}}', costs: '{{plan.costs}}', currency: '{{plan.currency}}', home: '{{plan.home}}', rate: '{{fx.rate}}', rate_day: '{{fx.date}}', rate_from: '{{fx.source}}', geo: '{{geo.places}}' },
           code:
             LIST +
+            SAY +
             String.raw`// The day-by-day table on the trip's own dates, each day with its main sight's picture, and the budget with its total
-// added up (in the travelers' own currency too, when the plan gives a rate).
+// added up (in the travelers' own currency too, when the plan gives a rate); numbers and words in the run's language.
 const dates = rows(input.dates);
 // The pictures came in the order of the itinerary's rows, as it was handed in.
 const all = list(input.itinerary);
@@ -927,7 +1129,14 @@ const num = (v) => {
   const n = Number(String(v === null || v === undefined ? '' : v).replace(/[^\d.\-]/g, ''));
   return isFinite(n) ? n : 0;
 };
-const money = (n, c) => Math.round(n).toLocaleString('en-US') + (c ? ' ' + c : '');
+const nf = (() => {
+  try {
+    return new Intl.NumberFormat((ctx.locale && ctx.locale.lang) || 'en');
+  } catch (e) {
+    return new Intl.NumberFormat('en-US');
+  }
+})();
+const money = (n, c) => nf.format(Math.round(n)) + (c ? ' ' + c : '');
 const range = (a, b, c) => (b > a ? money(a, '') + '–' + money(b, c) : money(a, c));
 const cur = String(input.currency || '').trim();
 let low = 0;
@@ -943,20 +1152,29 @@ const budget = rows(input.costs)
   });
 const rate = num(input.rate);
 const home = String(input.home || '').trim();
-if (budget.length) budget.push({ item: 'Total', estimate: range(low, high, cur) + (rate > 0 && home && home !== cur ? ' (about ' + range(low * rate, high * rate, home) + ')' : '') });
-// The days' areas on the map: those with a place on Earth, none far (over 400 km) from the others' middle.
+// Said with the rate and whose day it is, so a figure from a past day or from the plan's memory is not taken for today's.
+const TOTAL = { en: 'Total', de: 'Gesamt', es: 'Total', fr: 'Total', pt: 'Total', el: 'Σύνολο', ja: '合計', zh: '合计' };
+const ABOUT = { en: 'about', de: 'etwa', es: 'unos', fr: 'environ', pt: 'cerca de', el: 'περίπου', ja: '約', zh: '约' };
+const LIVE = { en: ' at 1 {c} = {r} {h}, the rate of {d}', de: ' bei 1 {c} = {r} {h}, Kurs vom {d}', es: ' a 1 {c} = {r} {h}, el cambio del {d}', fr: ' à 1 {c} = {r} {h}, le taux du {d}', pt: ' a 1 {c} = {r} {h}, a cotação de {d}', el: ' με 1 {c} = {r} {h}, η ισοτιμία της {d}', ja: ' 1 {c} = {r} {h}、{d}のレート', zh: ' 按 1 {c} = {r} {h}，{d} 的汇率' };
+const OWN = { en: ' at 1 {c} = {r} {h}, the planner’s own figure, not a live rate', de: ' bei 1 {c} = {r} {h}, ein eigener Schätzwert des Planers, kein aktueller Kurs', es: ' a 1 {c} = {r} {h}, una cifra propia del planificador, no un cambio en vivo', fr: ' à 1 {c} = {r} {h}, une estimation du planificateur, pas un taux en direct', pt: ' a 1 {c} = {r} {h}, um valor do próprio planejador, não uma cotação ao vivo', el: ' με 1 {c} = {r} {h}, εκτίμηση του προγραμματιστή, όχι ισοτιμία πραγματικού χρόνου', ja: ' 1 {c} = {r} {h}、プランナー自身の推定値で、実際のレートではありません', zh: ' 按 1 {c} = {r} {h}，规划器自己的估算，并非实时汇率' };
+const rateIs = () => fill(say(input.rate_from === 'Frankfurter' && input.rate_day ? LIVE : OWN), { c: cur, r: new Intl.NumberFormat(lang, { maximumFractionDigits: 4 }).format(rate), h: home, d: input.rate_day });
+if (budget.length) budget.push({ item: say(TOTAL), estimate: range(low, high, cur) + (rate > 0 && home && home !== cur ? ' (' + say(ABOUT) + ' ' + range(low * rate, high * rate, home) + rateIs() + ')' : '') });
+// The days' areas on the map: where the look-up found each (the model's own figure only where it found none), those
+// with a place on Earth; one is left out only when it is far (over 400 km) from every other, so a road trip, whose
+// stops are far from the middle but near each other, keeps them all.
+const geo = rows(input.geo);
 const at = days.map((d, i) => {
   const r = plan.find((x) => Number(x.day) === Number(d.day)) || plan[i] || {};
-  const lat = Number(r.lat);
-  const lng = Number(r.lng);
+  const g = geo.find((x) => Number(x.day) === Number(d.day) && x.found);
+  const lat = g ? Number(g.lat) : Number(r.lat);
+  const lng = g ? Number(g.lng) : Number(r.lng);
   return { day: d.day, date: d.date, area: d.area, lat, lng };
 }).filter((s) => r0(s.lat, 90) && r0(s.lng, 180));
 function r0(v, most) {
   return v !== 0 && isFinite(v) && Math.abs(v) <= most;
 }
-const mid = (k) => at.map((s) => s[k]).sort((a, b) => a - b)[Math.floor(at.length / 2)];
-const far = (s) => Math.hypot((s.lat - mid('lat')) * 111, (s.lng - mid('lng')) * 111 * Math.cos((s.lat * Math.PI) / 180)) > 400;
-return { days, budget, stops: at.filter((s) => !far(s)) };`,
+const apart = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 111 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180));
+return { days, budget, stops: at.filter((s) => at.length < 2 || at.some((o) => o !== s && apart(s, o) <= 400)) };`,
           outputs: [
             { id: 'days', label: 'Day by day', type: 'table', columns: TRIP_DAYS },
             { id: 'budget', label: 'Budget', type: 'table', columns: [{ id: 'item', label: 'Item', type: 'text' }, { id: 'estimate', label: 'Estimate', type: 'text' }] },
@@ -965,7 +1183,24 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
           failed: 'agent',
         },
       ],
-      outputs: { overview: '{{plan.overview}}', days: '{{assemble.days}}', book_ahead: '{{plan.book_ahead}}', budget: '{{assemble.budget}}', tips: '{{plan.tips}}', stops: '{{assemble.stops}}' },
+      // The research's own findings go straight from the early steps that make them, so each shows as soon as its step ends.
+      outputs: {
+        overview: '{{plan.overview}}',
+        days: '{{assemble.days}}',
+        book_ahead: '{{plan.book_ahead}}',
+        budget: '{{assemble.budget}}',
+        tips: '{{plan.tips}}',
+        stops: '{{assemble.stops}}',
+        weather: '{{weather.summary}}',
+        temperatures: '{{weather.temperatures}}',
+        rain: '{{weather.rain}}',
+        pack: '{{weather.pack}}',
+        events: '{{whats_on.events}}',
+        holidays: '{{whats_on.holidays}}',
+        closures: '{{whats_on.closures}}',
+        arrival: '{{transport.arrival}}',
+        around: '{{transport.around}}',
+      },
     },
     answer: [
       { id: 'overview', label: 'Overview', type: 'markdown', required: true, description: 'The trip in a few sentences: the idea of the plan, where to stay, the weather to expect' },
@@ -982,9 +1217,18 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
       },
       { id: 'tips', label: 'Tips', type: 'list' },
       { id: 'stops', label: 'On the map', type: 'table', description: 'Each day’s area, with where it is', columns: TRIP_STOPS },
+      { id: 'weather', label: 'The weather', type: 'text', description: 'What to expect on the trip’s dates, in a sentence or two' },
+      { id: 'temperatures', label: 'Temperatures', type: 'text' },
+      { id: 'rain', label: 'Rain', type: 'text' },
+      { id: 'pack', label: 'What to pack', type: 'list' },
+      { id: 'events', label: 'What is on', type: 'table', description: 'Events and festivals within the dates, each with when', columns: TRIP_EVENTS },
+      { id: 'holidays', label: 'Public holidays', type: 'list' },
+      { id: 'closures', label: 'Closures and works', type: 'list' },
+      { id: 'arrival', label: 'Getting in', type: 'text' },
+      { id: 'around', label: 'Getting around', type: 'text', description: 'Passes, tickets and what they cost' },
     ],
     examples: [
-      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty', '{{media.data.pictures}} > 0'] },
+      { id: 'lisbon-in-spring', name: 'Lisbon in spring', inputs: { destination: 'Lisbon', start: '2027-04-12', days: 4, travelers: 'Two adults', interests: 'Food markets, viewpoints, tiles' }, checks: ['{{answer.days}} is not empty', '{{answer.budget}} is not empty', '{{answer.weather}} is not empty', '{{answer.around}} is not empty', '{{media.data.pictures}} > 0'] },
       { id: 'a-family-trip', name: 'A relaxed family trip', inputs: { destination: 'Copenhagen', start: '2027-07-05', days: 3, travelers: 'Two adults and a six-year-old', pace: 'Relaxed' }, checks: ['{{calendar.count}} = 3'] },
     ],
   },
@@ -994,13 +1238,15 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
     icon: 'scale',
     color: 'orange',
     category: 'Shopping',
+    // The comparison is read by the person: in their language (the product names, prices and links stay as the shops write them).
+    language: 'person',
     description: 'Current prices, independent reviews and known problems, weighed against what matters to you, with a clear pick.',
     fields: [
       { id: 'products', label: 'What to compare', type: 'long', required: true, placeholder: 'Name the products, one per line, or describe what you need: e.g. a quiet dishwasher under $900' },
       { id: 'needs', label: 'What matters to you', type: 'long', required: true, placeholder: 'e.g. Quiet, reliable, fits a 60 cm space, enough for a family of four' },
       { id: 'budget', label: 'Budget', type: 'text' },
-      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. Germany, or online in the US', help: 'Prices come from shops there, in its currency; left empty, from the country of your time zone' },
-      { id: 'choose', label: 'Let me pick which ones to compare', type: 'yesno', help: 'When you describe a need, the run waits for you to pick from the options it finds' },
+      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. Germany, or online in the US', help: 'Prices come from shops there, in its currency; left empty, from the country of your time zone', from: 'me.country' },
+      { id: 'choose', label: 'Let me pick which ones to compare', type: 'yesno', help: 'When you describe a need, the run waits for you to pick from the options it finds', remember: true },
     ],
     prompt: '',
     flow: {
@@ -1019,11 +1265,12 @@ What matters to them: {{needs}}
 
 - named: yes when they named the products to compare (brand and model), no when they described a need or a kind of product instead ("the best phones", "a quiet dishwasher under €900").
 - products: the products they named, each as exactly as it can be told apart (brand and model); none when they described a need.
-- kind: what kind of product they are, in a word or two (headphones, a dishwasher), for their pictures.
+- kind: what kind of product they are, in a word or two in English (headphones, a dishwasher): it only finds their pictures.
 - criteria: one criterion for each thing that matters to them, as they name it (one to six), each weighted from 1 (nice to have) to 5 (a must), with what a good score looks like. Add none they did not ask for, except value for money within their budget when they gave one.
-- market: the country they will buy in: the one they gave; else one their words show (a currency, a shop, a city); else the country of their time zone; empty when none of these tells.
+- market: the country they will buy in: the one they gave (a two-letter code such as GR or DE is a country's ISO code: write its name); else one their words show (a currency, a shop, a city); else the country of their time zone; empty when none of these tells.
+- market_code: that country's two-letter ISO code (GR, DE, JP); empty when there is no market.
 - currency: that country's currency, as its code (USD, EUR, GBP).
-- query: when they described a need, a web search query for the strongest current options, as reviewers who test them rate them; today is {{today}}, so put the year in it, and keep the brands or kinds they mention.`,
+- query: when they described a need, a web search query for the strongest current options, as reviewers who test them rate them, in the language those reviews are written in (English for products sold worldwide, the country's own language for local ones); today is {{today}}, so put the year in it, and keep the brands or kinds they mention.`,
           outputs: [
             { id: 'named', label: 'Products named', type: 'yesno', required: true },
             { id: 'products', label: 'Products', type: 'list' },
@@ -1036,6 +1283,7 @@ What matters to them: {{needs}}
               columns: [{ id: 'criterion', label: 'Criterion', type: 'text' }, { id: 'weight', label: 'Weight', type: 'number' }, { id: 'good', label: 'What good looks like', type: 'text' }],
             },
             { id: 'market', label: 'Where they’ll buy', type: 'text', description: 'A country, or empty' },
+            { id: 'market_code', label: 'Its country code', type: 'text', description: 'Two letters: GR, DE, JP; or empty' },
             { id: 'currency', label: 'Currency', type: 'text', description: 'Its code: USD, EUR, GBP' },
             { id: 'query', label: 'Search for options', type: 'text' },
           ],
@@ -1173,17 +1421,33 @@ return { items, count: items.length };`,
               title: 'Pick an independent review',
               do: 'code',
               language: 'javascript',
-              with: { product: '{{product}}', reviews: '{{reviews}}', prices: '{{prices}}' },
+              with: { product: '{{product}}', reviews: '{{reviews}}', prices: '{{prices}}', country: '{{understand.market_code}}' },
               code:
                 HITS +
                 String.raw`// The most independent review of this very model among the results (testers' and owners' reports before shops, and
 // before the maker's own site; a page whose title or address names the model before one about something else), and
-// the price results as lines.
+// the price results as lines, the shops of the buyer's own country (their domain ends as the country's) first.
 const name = String(input.product || '').toLowerCase();
 const brand = name.split(/\s+/)[0] || '';
 const words = name.split(/[^\p{L}\p{N}+]+/u).filter((w, i) => w && !(i === 0 && w === brand));
-const SHOPS = /(^|\.)(amazon|ebay|walmart|bestbuy|target|argos|currys|johnlewis|mediamarkt|saturn|otto|fnac|darty|boulanger|elgiganten|bol|coolblue|newegg|bhphotovideo|costco|homedepot|lowes|aliexpress|temu|idealo|pricerunner)\.[a-z.]+$/;
-const TESTERS = /(^|\.)(rtings\.com|which\.co\.uk|consumerreports\.org|nytimes\.com|techradar\.com|tomsguide\.com|cnet\.com|theverge\.com|engadget\.com|pcmag\.com|notebookcheck\.net|dpreview\.com|soundguys\.com|whathifi\.com|choice\.com\.au|test\.de|tweakers\.net|quechoisir\.org|consumentenbond\.nl|goodhousekeeping\.com|reviewed\.com|gsmarena\.com|phonearena\.com|androidauthority\.com|androidcentral\.com|dxomark\.com|trustedreviews\.com|expertreviews\.co\.uk|techadvisor\.com|digitaltrends\.com|zdnet\.com|wired\.com|arstechnica\.com|tomshardware\.com|9to5google\.com|9to5mac\.com|stuff\.tv|t3\.com)$/;
+// Shops and price-comparison sites (by their name, under any domain) and testers (by domain), of many countries: a
+// local shop must not be taken for an independent review.
+const SHOPS = new RegExp('(^|\\.)(' + ['amazon', 'ebay', 'walmart', 'bestbuy', 'target', 'argos', 'currys', 'johnlewis', 'mediamarkt', 'saturn', 'otto', 'fnac', 'darty', 'boulanger', 'elgiganten', 'bol', 'coolblue', 'newegg', 'bhphotovideo', 'costco', 'homedepot', 'lowes', 'aliexpress', 'temu', 'idealo', 'pricerunner',
+  'geizhals', 'notebooksbilliger', 'alternate', 'cyberport', 'kaufland', 'galaxus', 'cdiscount', 'ldlc', 'rueducommerce', 'materiel', 'laptopsdirect', 'overclockers', 'very', 'tesco', 'flipkart', 'croma', 'jbhifi', 'harveynorman', 'kogan', 'officeworks', 'komplett', 'elkjop', 'prisjakt', 'kelkoo',
+  'skroutz', 'bestprice', 'plaisio', 'kotsovolos', 'shopflix', 'rakuten', 'kakaku', 'yodobashi', 'biccamera', 'joshin', 'nojima', 'edion', 'ksdenki', 'pccomponentes', 'elcorteingles', 'carrefour', 'worten', 'miravia',
+  'unieuro', 'eprice', 'trovaprezzi', 'euronics', 'mediaworld', 'monclick', 'kieskeurig', 'azerty', 'megekko', 'wehkamp', 'beslist', 'marktplaats', 'allegro', 'ceneo', 'morele', 'x-kom', 'komputronik', 'mediaexpert', 'neonet', 'skapiec', 'olx',
+  'mercadolivre', 'mercadolibre', 'magazineluiza', 'magalu', 'americanas', 'casasbahia', 'kabum', 'buscape', 'pontofrio', 'submarino', 'shoptime', 'falabella', 'hepsiburada', 'trendyol', 'akakce', 'heureka', 'alza', 'czc', 'coupang', 'danawa', 'gmarket', 'lazada', 'shopee', 'jumia', 'noon', 'takealot'].join('|') + ')\\.[a-z.]+$');
+const hostsOf = (list) => new RegExp('(^|\\.)(' + list.map((d) => d.replace(/\./g, '\\.')).join('|') + ')$');
+const TESTERS = hostsOf(['rtings.com', 'which.co.uk', 'consumerreports.org', 'nytimes.com', 'techradar.com', 'tomsguide.com', 'cnet.com', 'theverge.com', 'engadget.com', 'pcmag.com', 'notebookcheck.net', 'dpreview.com', 'soundguys.com', 'whathifi.com', 'choice.com.au', 'test.de', 'tweakers.net', 'quechoisir.org', 'consumentenbond.nl', 'goodhousekeeping.com', 'reviewed.com', 'gsmarena.com', 'phonearena.com', 'androidauthority.com', 'androidcentral.com', 'dxomark.com', 'trustedreviews.com', 'expertreviews.co.uk', 'techadvisor.com', 'digitaltrends.com', 'zdnet.com', 'wired.com', 'arstechnica.com', 'tomshardware.com', '9to5google.com', '9to5mac.com', 'stuff.tv', 't3.com',
+  'computerbase.de', 'chip.de', 'heise.de', 'golem.de', 'netzwelt.de', 'pcgameshardware.de', 'oekotest.de', 'frandroid.com', 'numerama.com', '01net.com', 'lesnumeriques.com', 'clubic.com', '60millions-mag.com', 'generation-nt.com',
+  'insomnia.gr', 'techblog.gr', 'kepka.org', 'ekpizo.gr', 'ascii.jp', 'impress.co.jp', 'itmedia.co.jp', 'gizmodo.jp', 'mynavi.jp', 'phileweb.com', 'kakakumag.com', 'dime.jp',
+  'xataka.com', 'genbeta.com', 'hardzone.es', 'adslzone.net', 'andro4all.com', 'ocu.org', 'computerhoy.com', 'hdblog.it', 'hwupgrade.it', 'tomshw.it', 'dday.it', 'altroconsumo.it', 'tuttotech.net', 'punto-informatico.it', 'smartworld.it',
+  'hardware.info', 'androidplanet.nl', 'computertotaal.nl', 'pcmweb.nl', 'benchmark.pl', 'purepc.pl', 'komputerswiat.pl', 'dobreprogramy.pl', 'chip.pl', 'spidersweb.pl', 'antyweb.pl', 'telepolis.pl',
+  'tecmundo.com.br', 'canaltech.com.br', 'tecnoblog.net', 'olhardigital.com.br', 'adrenaline.com.br', 'proteste.org.br', 'techtudo.com.br', 'showmetech.com.br', 'hardware.com.br',
+  'tek.no', 'sweclockers.com', 'gadgets360.com', '91mobiles.com', 'techguide.com.au']);
+// The buyer's own country: its shops end their domain as it does (.gr, .co.jp, .com.br; the UK's is .uk).
+const cc = String(input.country || '').trim().toLowerCase().replace(/^gb$/, 'uk');
+const local = (h) => /^[a-z]{2}$/.test(cc) && siteOf(h.url).endsWith('.' + cc);
 const about = (h) => {
   const t = (h.title + ' ' + h.url).toLowerCase();
   return words.length ? words.filter((w) => t.includes(w)).length / words.length : 0;
@@ -1194,6 +1458,7 @@ const score = (h) => {
 };
 const best = hitsOf(input.reviews).sort((a, b) => score(b) - score(a))[0];
 const shops = hitsOf(input.prices)
+  .sort((a, b) => (local(b) ? 1 : 0) - (local(a) ? 1 : 0) || a.rank - b.rank)
   .slice(0, 8)
   .map((h) => '- ' + h.title + ' (' + siteOf(h.url) + ', ' + h.url + (h.date ? ', ' + h.date : '') + ')' + (h.snippet ? ': ' + h.snippet : ''))
   .join('\n');
@@ -1219,7 +1484,7 @@ return { url: best ? best.url : '', title: best ? best.title : '', shops };`,
 What matters to them, with weights:
 {{understand.criteria}}
 
-Prices{{#understand.market}} in {{understand.market}}{{/understand.market}}:
+Prices{{#understand.market}} in {{understand.market}}{{/understand.market}} (the shops of that country come first):
 {{best.shops}}
 
 {{#review.text}}A review ({{best.url}}):
@@ -1268,6 +1533,7 @@ Prices{{#understand.market}} in {{understand.market}}{{/understand.market}}:
           with: { criteria: '{{understand.criteria}}', facts: '{{each.items}}', products: '{{shortlist.items}}', media: '{{media.data}}', budget: '{{budget}}' },
           code:
             LIST +
+            SAY +
             String.raw`// Each product the research found against what matters: its score out of 100 by the criteria's weights; the pick
 // (within the budget when one was given); a runner-up for another priority (cheaper and nearly as good, when one
 // is); and the table to compare them by, best first, each with its picture and its score on each criterion. Those
@@ -1353,12 +1619,18 @@ const cheaper = ranked
   .sort((a, b) => a.amount - b.amount)[0];
 const runner = cheaper || next;
 const cell = (t) => String(t).replace(/\|/g, '/').replace(/\s*\n\s*/g, ' ');
+const PRODUCT = { en: 'Product', de: 'Produkt', es: 'Producto', fr: 'Produit', pt: 'Produto', el: 'Προϊόν', ja: '製品', zh: '产品' };
+const SCORE = { en: 'Score', de: 'Punkte', es: 'Puntuación', fr: 'Note', pt: 'Pontuação', el: 'Βαθμός', ja: 'スコア', zh: '得分' };
+const UNKNOWN = { en: '? Not found: counted as the middle of the others’ scores.', de: '? Nicht gefunden: zählt als Mittelwert der anderen Bewertungen.', es: '? No encontrado: cuenta como el punto medio de las demás puntuaciones.', fr: '? Introuvable : compté comme le milieu des autres notes.', pt: '? Não encontrado: conta como o meio das outras pontuações.', el: '? Δεν βρέθηκε: λογίζεται ως το μέσο των βαθμών των άλλων.', ja: '? 見つからず：他の評価の中間として計算しています。', zh: '? 未找到：按其他产品得分的中间值计算。' };
+const OVER = { en: 'Over your budget', de: 'Über deinem Budget', es: 'Por encima de tu presupuesto', fr: 'Au-dessus de votre budget', pt: 'Acima do seu orçamento', el: 'Πάνω από τον προϋπολογισμό σας', ja: '予算オーバー', zh: '超出预算' };
+const PROBLEM = { en: 'Known problem', de: 'Bekanntes Problem', es: 'Problema conocido', fr: 'Problème connu', pt: 'Problema conhecido', el: 'Γνωστό πρόβλημα', ja: '既知の問題', zh: '已知问题' };
+const MISSING = { en: 'not found', de: 'nicht gefunden', es: 'no encontrado', fr: 'introuvable', pt: 'não encontrado', el: 'δεν βρέθηκε', ja: '見つからず', zh: '未找到' };
 const matrix = criteria.length
   ? [
-      '| Product | ' + criteria.map((c) => cell(c.criterion) + ' (×' + weight(c) + ')').join(' | ') + ' | Score |',
+      '| ' + say(PRODUCT) + ' | ' + criteria.map((c) => cell(c.criterion) + ' (×' + weight(c) + ')').join(' | ') + ' | ' + say(SCORE) + ' |',
       '|' + ' --- |'.repeat(criteria.length + 2),
       ...ranked.map((r) => '| ' + cell(r.product) + ' | ' + r.cells.map((c) => (c.v === null ? '?' : c.v)).join(' | ') + ' | ' + r.total + ' |'),
-    ].join('\n') + (ranked.some((r) => r.cells.some((c) => c.v === null)) ? '\n\n? Not found: counted as the middle of the others’ scores.' : '')
+    ].join('\n') + (ranked.some((r) => r.cells.some((c) => c.v === null)) ? '\n\n' + say(UNKNOWN) : '')
   : '';
 const link = (v) => {
   const s = String(v || '').trim();
@@ -1371,9 +1643,9 @@ const comparison = ranked.map((r) => ({
   price: shortPrice(r.price),
   shop: String(r.f.shop || '').trim(),
   strengths: lines(r.f.strengths).join('\n'),
-  weaknesses: [...(r.over ? ['Over your budget'] : []), ...lines(r.f.weaknesses), ...lines(r.f.problems).map((p) => 'Known problem: ' + p)].join('\n'),
+  weaknesses: [...(r.over ? [say(OVER)] : []), ...lines(r.f.weaknesses), ...lines(r.f.problems).map((p) => say(PROBLEM) + ': ' + p)].join('\n'),
   best_for: String(r.f.best_for || '').trim(),
-  scores: criteria.map((c, j) => c.criterion + ': ' + (r.cells[j].v === null ? 'not found' : r.cells[j].v + '/5') + (r.cells[j].why ? ' — ' + r.cells[j].why : '')).join('\n'),
+  scores: criteria.map((c, j) => c.criterion + ': ' + (r.cells[j].v === null ? say(MISSING) : r.cells[j].v + '/5') + (r.cells[j].why ? ' — ' + r.cells[j].why : '')).join('\n'),
   link: link(r.f.link),
   picture: link(r.m.picture),
 }));
@@ -1466,6 +1738,9 @@ Too little was found to compare these: {{score.missing}}.
     icon: 'file-search',
     color: 'teal',
     category: 'Work',
+    tier: 'quick',
+    // Answers are in the language of the question (the person's own, unless they write it in another); the quotes stay as the document writes them.
+    language: 'person',
     description: 'Answers from a document you give it, each with the exact passage and where it is.',
     fields: [
       { id: 'document', label: 'Document', type: 'file', required: true, help: 'A PDF, Word document, spreadsheet or text file' },
@@ -1512,9 +1787,11 @@ return { items, count: items.length, lines: head ? Number(head[3]) : null };`,
           with: { first: '{{read.text}}', rest: '{{more.items}}', questions: '{{questions}}' },
           code:
             LIST +
+            TOKENS +
             String.raw`// The document in passages of about a thousand characters, each with where it is (its page, sheet, slide or
 // section, and its lines); and for each question the passages that share the most telling words with it, in the
-// document's order (all of them, for a short document).
+// document's order (all of them, for a short document). Words are found in any script (Japanese and Chinese are cut
+// into words by Intl.Segmenter); the English stop list and suffix stripper are used only on words of Latin letters.
 const texts = [input.first, ...list(input.rest).map((r) => r && r.text)].filter(Boolean).map(String);
 const lines = [];
 const seen = new Set();
@@ -1554,10 +1831,14 @@ flush();
 const where = (p) => [p.page, p.section ? '“' + p.section.slice(0, 60) + '”' : '', 'lines ' + p.from + (p.to > p.from ? '–' + p.to : '')].filter(Boolean).join(', ');
 const show = (p) => '[' + where(p) + ']\n' + p.text;
 let questions = String(input.questions || '').split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
-if (questions.length === 1 && (questions[0].match(/\?/g) || []).length > 1) questions = questions[0].split(/(?<=\?)\s+/).filter(Boolean);
+if (questions.length === 1 && (questions[0].match(/[?？]/g) || []).length > 1) questions = questions[0].split(/(?<=[?？])\s*/).filter(Boolean);
 questions = questions.slice(0, 15);
 const STOP = new Set('the a an and or of to in on for with by at from as is are was were be been it its this that these those what which who whom whose when where why how does do did can could should would will shall may might must not no yes you we they he she them our your their there here than then so if about into over under also only any each other all more most some such'.split(' '));
-const words = (t) => (String(t).toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(ing|ed|es|s)$/, '') || w);
+const words = (t) =>
+  tokens(t)
+    .map((w) => w.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+    .filter((w) => (/^[a-z0-9]+$/.test(w) ? w.length > 2 && !STOP.has(w) : w.length > 1 || /\p{Script=Han}/u.test(w)))
+    .map((w) => (/^[a-z0-9]+$/.test(w) ? w.replace(/(ing|ed|es|s)$/, '') || w : w));
 const docs = passages.map((p) => words(p.section + ' ' + p.text));
 const df = {};
 for (const d of docs) for (const w of new Set(d)) df[w] = (df[w] || 0) + 1;
@@ -1607,7 +1888,7 @@ return { items, outline, count: passages.length };`,
                     id: 'one',
                     title: 'Answer it from the passages',
                     do: 'model',
-                    instructions: `Answer the question from these parts of a document alone, plainly and briefly. Quote the sentence or passage the answer rests on word for word, as it is written, and say where it is (its page, section or clause, and lines, as given in brackets before each part). If these parts do not answer it, say so (found: false) and leave the quote empty; don't fill the gap with outside knowledge or guesses.
+                    instructions: `Answer the question from these parts of a document alone, plainly and briefly, in the language the question is asked in (even when the document is in another). Quote the sentence or passage the answer rests on word for word, as it is written (in the document's own language: never translate a quote), and say where it is (its page, section or clause, and lines, as given in brackets before each part). If these parts do not answer it, say so (found: false) and leave the quote empty; don't fill the gap with outside knowledge or guesses.
 
 Question: {{q.question}}
 
@@ -1682,7 +1963,7 @@ return { answers, items, count: items.length };`,
               id: 'look',
               title: 'Look through all of it',
               do: 'agent',
-              instructions: `Some questions about the document {{document}} were not answered from the passages picked for them by their words. Read the whole document (all pages, tables and appendices) and answer each from it alone: plainly and briefly, quoting the passage the answer rests on word for word, and saying where it is (page, section or clause). If the document does not answer one, say so; don't fill the gap with outside knowledge or guesses.
+              instructions: `Some questions about the document {{document}} were not answered from the passages picked for them by their words. Read the whole document (all pages, tables and appendices) and answer each from it alone: plainly and briefly, in the language the question is asked in, quoting the passage the answer rests on word for word, and saying where it is (page, section or clause). If the document does not answer one, say so; don't fill the gap with outside knowledge or guesses.
 
 The questions:
 {{tally.items}}`,
@@ -1711,11 +1992,14 @@ The questions:
           with: { answers: '{{tally.answers}}', missing: '{{tally.items}}', again: '{{look.answers}}' },
           code:
             LIST +
+            SAY +
+            TOKENS +
             String.raw`// The answers, in the questions' order: the agent's for those it looked for again, each found by the words of its
 // question (or by its place, when the agent answered them all).
+const SAYS = { en: 'The document does not say.', de: 'Das Dokument sagt dazu nichts.', es: 'El documento no lo dice.', fr: 'Le document ne le dit pas.', pt: 'O documento não diz.', el: 'Το έγγραφο δεν το αναφέρει.', ja: '文書には書かれていません。', zh: '文件中没有说明。' };
 const again = rows(input.again);
 const missing = list(input.missing).map(String);
-const words = (t) => new Set(String(t || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+const words = (t) => new Set(tokens(t || ''));
 const like = (a, b) => {
   const x = words(a);
   const y = words(b);
@@ -1740,7 +2024,7 @@ const answers = rows(input.answers).map((r) => {
   if (r.found) return { question: r.question, answer: r.answer, quote: r.quote, location: r.location };
   const a = theirs(r.question);
   if (a) return { question: r.question, answer: a.answer || '', quote: a.quote || '', location: a.location || '' };
-  return { question: r.question, answer: r.answer || 'The document does not say.', quote: '', location: '' };
+  return { question: r.question, answer: r.answer || say(SAYS), quote: '', location: '' };
 });
 return { answers };`,
           outputs: [
@@ -1791,8 +2075,8 @@ return { answers };`,
       { id: 'notes', label: 'Notes or transcript', type: 'long', required: true, placeholder: 'Paste them here' },
       { id: 'meeting', label: 'Meeting', type: 'text', placeholder: 'e.g. Weekly product sync' },
       { id: 'date', label: 'Date', type: 'date' },
-      { id: 'attendees', label: 'Who was there', type: 'text' },
-      { id: 'ask_owners', label: 'Ask me who takes what nobody took', type: 'yesno', help: 'The run waits for you to name owners for the actions the notes leave without one' },
+      { id: 'attendees', label: 'Who was there', type: 'text', remember: true },
+      { id: 'ask_owners', label: 'Ask me who takes what nobody took', type: 'yesno', help: 'The run waits for you to name owners for the actions the notes leave without one', remember: true },
     ],
     prompt: '',
     flow: {
@@ -1802,8 +2086,12 @@ return { answers };`,
           title: 'Split the notes',
           do: 'code',
           language: 'javascript',
-          with: { notes: '{{notes}}' },
+          with: { notes: '{{notes}}', date: '{{date}}', today: '{{today}}' },
           code: String.raw`// The notes in parts a model reads whole (about 12,000 characters each), split between lines; short notes are one part.
+// And the day the meeting was (its date, else today) with its weekday, for the model to count due dates from.
+const day = /^\d{4}-\d{2}-\d{2}/.exec(String(input.date || '')) || /^\d{4}-\d{2}-\d{2}/.exec(String(input.today || ''));
+const base = day ? day[0] : '';
+const weekday = base ? new Intl.DateTimeFormat('en', { weekday: 'long', timeZone: 'UTC' }).format(new Date(base + 'T00:00:00Z')) : '';
 const parts = [];
 let cur = '';
 const add = (piece) => {
@@ -1815,10 +2103,12 @@ const add = (piece) => {
 };
 for (const l of String(input.notes || '').replace(/\r\n/g, '\n').split('\n')) for (let i = 0; i < Math.max(1, l.length); i += 12000) add(l.slice(i, i + 12000));
 if (cur.trim()) parts.push(cur);
-return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + (i + 1) + ' of ' + parts.length + ')' : '', text })), count: parts.length };`,
+return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + (i + 1) + ' of ' + parts.length + ')' : '', text })), count: parts.length, base, weekday };`,
           outputs: [
             { id: 'items', label: 'Parts', type: 'table', columns: [{ id: 'where', label: 'Which part', type: 'text' }, { id: 'text', label: 'Text', type: 'text' }] },
             { id: 'count', label: 'How many', type: 'number' },
+            { id: 'base', label: 'The meeting’s day', type: 'date' },
+            { id: 'weekday', label: 'Its weekday', type: 'text' },
           ],
           failed: 'agent',
         },
@@ -1834,7 +2124,7 @@ return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + 
               id: 'pull',
               title: 'Read a part',
               do: 'model',
-              instructions: `Turn these meeting notes{{part.where}} into decisions and actions. Be faithful to the notes: add nothing that was not said.
+              instructions: `Turn these meeting notes{{part.where}} into decisions and actions. Be faithful to the notes: add nothing that was not said. Write the summary, the decisions, the tasks and the open questions in the language of the notes, whatever language you are asked in.
 {{#meeting}}Meeting: {{meeting}}
 {{/meeting}}{{#attendees}}Attendees: {{attendees}}
 {{/attendees}}
@@ -1842,7 +2132,7 @@ return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + 
 
 - summary: what this part of the meeting covered, in a few sentences.
 - decisions: each decision that was made, one sentence each.
-- actions: each action item: the task; who owns it, only when the notes say or clearly imply who (otherwise leave it empty); when it is due, in the notes' own words ("next Friday", "by the 15th"), or empty when they don't say; and notes.
+- actions: each action item: the task; who owns it, only when the notes say or clearly imply who (otherwise leave it empty); when it is due, in the notes' own words ("next Friday", "by the 15th"), or empty when they don't say; due: that date worked out as YYYY-MM-DD when the notes say or clearly imply one, counted from the day of the meeting{{#parts.base}} ({{parts.base}}, a {{parts.weekday}}){{/parts.base}}, empty when there is no date; and notes.
 - open_questions: the open questions, and anything left unresolved.`,
               outputs: [
                 { id: 'summary', label: 'Summary', type: 'markdown' },
@@ -1855,6 +2145,7 @@ return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + 
                     { id: 'task', label: 'Task', type: 'text' },
                     { id: 'owner', label: 'Owner', type: 'text' },
                     { id: 'when', label: 'When, as said', type: 'text' },
+                    { id: 'due', label: 'Due date', type: 'text', description: 'YYYY-MM-DD, or empty' },
                     { id: 'notes', label: 'Notes', type: 'text' },
                   ],
                 },
@@ -1870,8 +2161,9 @@ return { items: parts.map((text, i) => ({ where: parts.length > 1 ? ' (part ' + 
           language: 'python',
           with: { parts: '{{extract.items}}', date: '{{date}}', today: '{{today}}' },
           code: String.raw`# Brings the parts' findings together, each once, and turns when each action is due, in the notes' own words, into a
-# date: counted from the meeting's date, or from today when it has none. "Friday" or "by Friday" is the coming one,
-# "next Friday" the one in the week after; words it cannot read stay in the action's notes.
+# date: the date the model worked out from the meeting's day (YYYY-MM-DD) when it gave one, else read from the notes'
+# own English words, counted from the meeting's date, or from today when it has none. "Friday" or "by Friday" is the
+# coming one, "next Friday" the one in the week after; words it cannot read stay in the action's notes.
 import json
 import re
 from datetime import date, timedelta
@@ -1959,6 +2251,11 @@ def due(words):
             return None
     return None
 
+try:
+    LANG = str(ctx.locale.lang).lower().split('-')[0]
+except Exception:
+    LANG = 'en'
+DUE = {'en': 'Due', 'de': 'Fällig', 'es': 'Plazo', 'fr': 'Échéance', 'pt': 'Prazo', 'el': 'Προθεσμία', 'ja': '期限', 'zh': '截止'}.get(LANG, 'Due')
 NOBODY = {'', 'unknown', 'tbd', 'tba', 'n/a', 'none', 'nobody', 'unassigned', '-', '?'}
 seen = set()
 summaries, decisions, actions, questions = [], [], [], []
@@ -1980,11 +2277,11 @@ for p in items(input.get('parts')):
             continue
         seen.add('a' + key(a.get('task')))
         said = str(a.get('when') or '').strip()
-        when = due(said)
+        when = due(a.get('due')) or due(said)
         owner = str(a.get('owner') or '').strip()
         notes = str(a.get('notes') or '').strip()
         if said and not when:
-            notes = (notes + ' ' if notes else '') + '(Due: ' + said + ')'
+            notes = (notes + ' ' if notes else '') + '(' + DUE + ': ' + said + ')'
         actions.append({'task': str(a['task']).strip(), 'owner': '' if owner.lower() in NOBODY else owner, 'due': when.isoformat() if when else None, 'notes': notes})
 nobody = [a['task'] for a in actions if not a['owner']]
 return {'summary': '\n\n'.join(summaries), 'decisions': decisions, 'actions': actions, 'open_questions': questions, 'unowned': len(nobody), 'nobody': nobody, 'from': base.isoformat()}`,
@@ -2102,13 +2399,15 @@ Open questions:
     icon: 'pen-line',
     color: 'pink',
     category: 'Writing',
+    // What the person reads (how they match, the gaps) is in their language; the letter, which goes to the company, is in the posting's.
+    language: 'person',
     description: 'A letter for one job, built on real evidence from your background, with the gaps named honestly.',
     fields: [
       { id: 'job', label: 'The job', type: 'long', required: true, placeholder: 'Paste the posting, or its address' },
-      { id: 'background', label: 'Your background', type: 'long', required: true, placeholder: 'Paste your CV, or a few lines about your experience' },
+      { id: 'background', label: 'Your background', type: 'long', required: true, placeholder: 'Paste your CV, or a few lines about your experience', remember: true },
       { id: 'company', label: 'What you know about the company', type: 'long' },
-      { id: 'tone', label: 'Tone', type: 'choice', options: ['Warm', 'Confident', 'Formal'], default: 'Confident' },
-      { id: 'length', label: 'Length', type: 'choice', options: ['Short', 'Standard'], default: 'Standard', help: 'Short is about 200 words, standard about 350' },
+      { id: 'tone', label: 'Tone', type: 'choice', options: ['Warm', 'Confident', 'Formal'], default: 'Confident', remember: true },
+      { id: 'length', label: 'Length', type: 'choice', options: ['Short', 'Standard'], default: 'Standard', help: 'Short is about 200 words, standard about 350', remember: true },
     ],
     prompt: '',
     flow: {
@@ -2141,7 +2440,9 @@ return { url: m ? m[1] : '', text: m ? '' : t, words: input.length === 'Short' ?
 
 - company and role: as the posting names them.
 - requirements: the requirements that matter most for this role, most important first (at most six), each in a few words, with how much it matters (a must, a strong plus, nice to have).
-- about: what the posting says about the company, its mission or the team, in two sentences.`,
+- about: what the posting says about the company, its mission or the team, in two sentences.
+- language: the language the posting is written in, as its English name (English, Greek, Japanese…).
+- company_forms: the ways the company's name is written, one a line: as the posting writes it, and in the other script or spelling it is also known by (Latin and Greek letters, Japanese and Latin…); only the posting's own when there is no other.`,
           outputs: [
             { id: 'company', label: 'Company', type: 'text' },
             { id: 'role', label: 'Role', type: 'text' },
@@ -2153,6 +2454,8 @@ return { url: m ? m[1] : '', text: m ? '' : t, words: input.length === 'Short' ?
               columns: [{ id: 'requirement', label: 'Requirement', type: 'text' }, { id: 'weight', label: 'How much it matters', type: 'text' }],
             },
             { id: 'about', label: 'About the company', type: 'text' },
+            { id: 'language', label: 'Language of the posting', type: 'text', description: 'Its English name: English, Greek, Japanese' },
+            { id: 'company_forms', label: 'Ways the company is written', type: 'list' },
           ],
         },
         {
@@ -2204,6 +2507,8 @@ Background:
           do: 'model',
           instructions: `Write a cover letter for the role of {{role.role}} at {{role.company}}. Tone: {{tone}}. About {{source.words}} words.
 
+Write the letter and its subject line in {{#role.language}}{{role.language}}{{/role.language}}{{^role.language}}the language of the posting{{/role.language}}: the company reads them, so this holds whatever other language you are asked to write in.
+
 - An opening specific to this company and role (not "I am writing to express my interest"){{#angle.angle}}, drawing on why it matters now: {{angle.angle}}{{/angle.angle}}.
 - One or two paragraphs of evidence: the three or four strongest matches below, with their numbers. Claim nothing else of the background.
 - A short close that asks for a conversation.
@@ -2222,20 +2527,35 @@ How the applicant matches:
           title: 'Check it, and revise until it passes',
           do: 'code',
           language: 'javascript',
-          with: { letter: '{{write.letter}}', words: '{{source.words}}', company: '{{role.company}}' },
-          code: String.raw`// Checks the letter (its length, an opening of its own, no clichés or placeholders, the company named) and has a model
-// revise it until it passes, twice at most.
+          with: { letter: '{{write.letter}}', words: '{{source.words}}', company: '{{role.company}}', forms: '{{role.company_forms}}' },
+          code:
+            LIST +
+            TOKENS +
+            String.raw`// Checks the letter (its length, an opening of its own, no clichés or placeholders, the company named) and has a model
+// revise it until it passes, twice at most. Words are counted in any script (Intl.Segmenter for Japanese, Chinese,
+// Thai…); the cliché list is English, so it is used only on a letter in English; the company may be named in any of
+// the forms its name is written in.
 const target = Number(input.words) || 350;
 const company = String(input.company || '').trim();
+const count = (t) => {
+  if (!segmenter || !NOSPACE.test(t)) return t.split(/\s+/).filter(Boolean).length;
+  let n = 0;
+  for (const p of segmenter.segment(t)) if (p.isWordLike) n++;
+  return n;
+};
+const english = (t) => (t.toLowerCase().match(/\b(the|and|of|with|for|my|that)\b/g) || []).length >= 4;
+const flat = (t) => String(t).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/株式会社|有限会社|\(株\)/g, '').replace(/\b(inc|ltd|llc|gmbh|plc|corp|corporation|co)\b/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const names = [company].concat(list(input.forms).map(String)).map(flat).filter(Boolean);
 const CLICHES = ['i am writing to express', 'i am writing to apply', 'to whom it may concern', 'dear sir or madam', 'team player', 'hard-working', 'hardworking', 'go-getter', 'think outside the box', 'hit the ground running', 'passionate about', 'synergy', 'results-driven', 'self-starter', 'perfect fit'];
 const problems = (letter) => {
   const out = [];
-  const words = letter.split(/\s+/).filter(Boolean).length;
+  const words = count(letter);
   if (words < target * 0.8 || words > target * 1.2) out.push('It is ' + words + ' words long: make it about ' + target + '.');
   const low = letter.toLowerCase();
-  for (const c of CLICHES) if (low.includes(c)) out.push('Say it without "' + c + '".');
+  if (english(letter)) for (const c of CLICHES) if (low.includes(c)) out.push('Say it without "' + c + '".');
   if (/\[[^\]\n]{2,40}\]|\{\{|lorem ipsum/i.test(letter)) out.push('Fill in or take out the placeholders in brackets.');
-  if (company && !low.includes(company.toLowerCase())) out.push('Name the company, ' + company + '.');
+  const plain = flat(letter);
+  if (names.length && !names.some((n) => plain.includes(n))) out.push('Name the company, ' + company + '.');
   return out;
 };
 let letter = String(input.letter || '');
@@ -2243,7 +2563,7 @@ let left = problems(letter);
 let rounds = 0;
 while (left.length && rounds < 2) {
   rounds++;
-  const r = await ctx.model('Revise this cover letter to fix the problems listed, and change nothing else: keep its facts, its tone and its structure.\n\nProblems:\n{{problems}}\n\nThe letter:\n{{letter}}', {
+  const r = await ctx.model('Revise this cover letter to fix the problems listed, and change nothing else: keep its facts, its tone, its structure and the language it is written in.\n\nProblems:\n{{problems}}\n\nThe letter:\n{{letter}}', {
     with: { problems: left.map((p) => '- ' + p).join('\n'), letter },
     outputs: { letter: 'long' },
     title: 'Revise the letter',
@@ -2286,24 +2606,40 @@ return { letter, rounds, left };`,
     icon: 'graduation-cap',
     color: 'amber',
     category: 'Learning',
+    // No language: 'person': the plan is in the language the lesson is taught in (the person's, unless "Taught in" says), which each model step is told, so the words of its programs follow the same.
     description: 'A timed lesson planned back from its goals: activities, checks for understanding, support and stretch.',
     fields: [
       { id: 'topic', label: 'Topic', type: 'text', required: true },
-      { id: 'learners', label: 'Learners', type: 'text', required: true, placeholder: 'e.g. Year 7, or adult beginners' },
-      { id: 'minutes', label: 'Length in minutes', type: 'number', required: true, default: '50' },
+      { id: 'learners', label: 'Learners', type: 'text', required: true, placeholder: 'e.g. Year 7, or adult beginners', remember: true },
+      { id: 'minutes', label: 'Length in minutes', type: 'number', required: true, default: '50', remember: true },
       { id: 'goals', label: 'What they should be able to do afterwards', type: 'long' },
-      { id: 'setting', label: 'Setting', type: 'choice', options: ['Classroom', 'Online', 'One-to-one', 'Home school'], default: 'Classroom' },
-      { id: 'materials', label: 'What you have to work with', type: 'text', placeholder: 'e.g. A projector, mini whiteboards, no devices' },
+      { id: 'setting', label: 'Setting', type: 'choice', options: ['Classroom', 'Online', 'One-to-one', 'Home school'], default: 'Classroom', remember: true },
+      { id: 'materials', label: 'What you have to work with', type: 'text', placeholder: 'e.g. A projector, mini whiteboards, no devices', remember: true },
+      { id: 'taught_in', label: 'Taught in', type: 'text', placeholder: 'e.g. Spanish', help: 'The language of the lesson and its handouts; left empty, your own language', remember: true },
     ],
     prompt: '',
     flow: {
       steps: [
         {
+          id: 'terms',
+          title: 'The words of the plan',
+          do: 'model',
+          if: '{{taught_in}} is not empty or {{lang}} != en',
+          instructions: `A lesson plan's programs write a few words themselves: the names of its parts, its headings and its table's columns. Give each below in {{#taught_in}}{{taught_in}}{{/taught_in}}{{^taught_in}}{{language}}{{/taught_in}}, as a teacher there would write it, short. Keep each key as written, and where {topic}, {minutes}, {learners} or {setting} stands in a phrase, keep it there exactly as written.
+
+${Object.entries(LESSON_WORDS)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join('\n')}`,
+          outputs: [{ id: 'words', label: 'Words', type: 'table', columns: [{ id: 'key', label: 'Key', type: 'text' }, { id: 'text', label: 'Text', type: 'text' }] }],
+          failed: 'skip',
+        },
+        {
           id: 'aims',
           title: 'Plan back from the goals',
           do: 'model',
-          instructions: `Plan the aims of a {{minutes}}-minute lesson on {{topic}} for {{learners}}. Setting: {{setting}}.
-{{#goals}}By the end, they should be able to: {{goals}}
+          instructions: `Plan the aims of a {{minutes}}-minute lesson on {{topic}} for {{learners}}. Setting: {{setting}}. ${LESSON_IN}
+{{#me.country}}The teacher is in {{me.country}} (a two-letter country code): use its school levels and curriculum where that matters.
+{{/me.country}}{{#goals}}By the end, they should be able to: {{goals}}
 {{/goals}}
 - objectives: two or three learning objectives, each something a learner can show, not "understand".
 - success: the success criteria: how you will know they got there.
@@ -2331,7 +2667,7 @@ return { letter, rounds, left };`,
               id: 'verdict',
               title: 'Right or not?',
               do: 'model',
-              instructions: `Is this statement right, by the search results below? If it is wrong, or needs care when taught, give it as it should be taught.
+              instructions: `Is this statement right, by the search results below? If it is wrong, or needs care when taught, give it as it should be taught. ${LESSON_IN}
 
 The statement: {{fact}}
 
@@ -2350,16 +2686,30 @@ The statement: {{fact}}
           title: 'Share out the minutes',
           do: 'code',
           language: 'python',
-          with: { minutes: '{{minutes}}', setting: '{{setting}}' },
-          code: String.raw`# The lesson's parts and their minutes, adding up to exactly its length: a hook, teaching, guided and independent
+          with: { minutes: '{{minutes}}', setting: '{{setting}}', words: '{{terms.words}}' },
+          code:
+            'WORDS = ' +
+            JSON.stringify(LESSON_WORDS) +
+            '\n' +
+            String.raw`# The lesson's parts and their minutes, adding up to exactly its length: a hook, teaching, guided and independent
 # practice, and a wrap-up with a check; a short break in a lesson over 75 minutes. One-to-one lessons give more time to
 # guided practice, online ones to checking in.
+import json
 total = max(10, min(480, int(round(float(input.get('minutes') or 50)))))
 shares = {
     'One-to-one': [10, 20, 35, 20, 15],
     'Online': [10, 20, 25, 25, 20],
 }.get(input.get('setting'), [10, 25, 25, 25, 15])
-names = ['Hook', 'Teaching', 'Guided practice', 'Independent practice', 'Wrap-up and check']
+# Their names in the language the lesson is taught in, when the words step gave them (else the English ones).
+given = input.get('words')
+if isinstance(given, str) and given.strip().startswith('['):
+    try:
+        given = json.loads(given)
+    except ValueError:
+        given = []
+given = {str(w.get('key')): str(w.get('text') or '').strip() for w in given if isinstance(w, dict)} if isinstance(given, list) else {}
+word = lambda k: given.get(k) or WORDS[k]
+names = [word(k) for k in ['hook', 'teaching', 'guided', 'independent', 'wrapup']]
 pause = 0 if total <= 75 else 5 if total <= 120 else 10
 left = total - pause
 exact = [left * s / 100 for s in shares]
@@ -2369,7 +2719,7 @@ for i in sorted(range(5), key=lambda i: exact[i] - minutes[i], reverse=True)[: l
     minutes[i] += 1
 parts = [[n, m] for n, m in zip(names, minutes)]
 if pause:
-    parts.insert(3, ['Break', pause])
+    parts.insert(3, [word('pause'), pause])
 phases, at = [], 0
 for name, m in parts:
     phases.append({'phase': name, 'minutes': m, 'start': at, 'end': at + m})
@@ -2395,8 +2745,9 @@ return {'phases': phases, 'total': at}`,
           id: 'activities',
           title: 'Plan the activities',
           do: 'model',
-          instructions: `Plan the activities of a {{minutes}}-minute lesson on {{topic}} for {{learners}}. Setting: {{setting}}.
-{{#materials}}Available: {{materials}}
+          instructions: `Plan the activities of a {{minutes}}-minute lesson on {{topic}} for {{learners}}. Setting: {{setting}}. ${LESSON_IN}
+{{#me.country}}The teacher is in {{me.country}} (a two-letter country code).
+{{/me.country}}{{#materials}}Available: {{materials}}
 {{/materials}}
 Objectives:
 {{aims.objectives}}
@@ -2458,11 +2809,19 @@ Keep it practical and pitched to the learners' age and level.`,
             handouts: '{{activities.handouts}}',
             differentiation: '{{activities.differentiation}}',
             assessment: '{{activities.assessment}}',
+            words: '{{terms.words}}',
           },
           code:
             LIST +
+            SAY +
+            'const WORDS = ' +
+            JSON.stringify(LESSON_WORDS) +
+            ';\n' +
             String.raw`// The timeline on the minutes of the lesson's parts, so that it adds up to the lesson's length (rows that do not
-// match the parts keep their own minutes, scaled to fit), and the whole plan in Markdown, ready to print.
+// match the parts keep their own minutes, scaled to fit), and the whole plan in Markdown, ready to print, its
+// headings in the language the lesson is taught in (the words step gave them; the English ones without).
+const given = rows(input.words);
+const w = (k) => String((given.find((x) => x.key === k) || {}).text || '').trim() || WORDS[k];
 const phases = rows(input.phases);
 const plan = rows(input.timeline);
 const total = Number(input.minutes) || phases.reduce((a, p) => a + (Number(p.minutes) || 0), 0);
@@ -2480,22 +2839,23 @@ const timeline = plan.map((r, i) => ({ minutes: minutes[i], activity: r.activity
 const cell = (t) => String(t || '').replace(/\|/g, '/').replace(/\s*\n\s*/g, ' ');
 const points = (v) => list(v).map((x) => '- ' + String(x)).join('\n');
 let at = 0;
-const table = ['| Time | Activity | Teacher | Learners |', '| --- | --- | --- | --- |'].concat(timeline.map((r) => '| ' + at + '–' + (at += r.minutes) + ' min | ' + cell(r.activity) + ' | ' + cell(r.teacher) + ' | ' + cell(r.learners) + ' |')).join('\n');
+const table = ['| ' + w('time') + ' | ' + w('activity') + ' | ' + w('teacher') + ' | ' + w('learners') + ' |', '| --- | --- | --- | --- |'].concat(timeline.map((r) => '| ' + at + '–' + (at += r.minutes) + ' ' + w('min') + ' | ' + cell(r.activity) + ' | ' + cell(r.teacher) + ' | ' + cell(r.learners) + ' |')).join('\n');
 const facts = rows(input.facts).filter((f) => f.correct || f.fact).map((f) => '- ' + (f.correct || f.fact) + (f.source ? ' (' + f.source + ')' : '')).join('\n');
 // Headings inside a part sit under its own.
 const part = (title, body) => (String(body || '').trim() ? '## ' + title + '\n\n' + String(body).trim().replace(/^#{1,2}\s/gm, '### ') : '');
+const settingWord = 'setting_' + String(input.setting || '').toLowerCase().replace(/[^a-z]+/g, '_');
 const out = [
-  '# ' + input.topic + ': a ' + total + '-minute lesson',
-  'For ' + input.learners + ' · ' + input.setting,
-  part('Objectives', points(input.objectives)),
-  part('Success criteria', points(input.success)),
-  part('Timeline', table),
-  part('Materials', points(input.materials)),
-  part('Handouts', input.handouts),
-  part('Misconceptions to expect', points(input.misconceptions)),
-  part('Support and stretch', input.differentiation),
-  part('Checking understanding', input.assessment),
-  part('Facts, as checked', facts),
+  '# ' + fill(w('title'), { topic: input.topic, minutes: total }),
+  fill(w('for'), { learners: input.learners, setting: WORDS[settingWord] ? w(settingWord) : input.setting }),
+  part(w('objectives'), points(input.objectives)),
+  part(w('success'), points(input.success)),
+  part(w('timeline'), table),
+  part(w('materials'), points(input.materials)),
+  part(w('handouts'), input.handouts),
+  part(w('misconceptions'), points(input.misconceptions)),
+  part(w('support'), input.differentiation),
+  part(w('checking'), input.assessment),
+  part(w('facts'), facts),
 ];
 return { timeline, plan: out.filter(Boolean).join('\n\n'), minutes: at };`,
           outputs: [
@@ -2554,12 +2914,14 @@ return { timeline, plan: out.filter(Boolean).join('\n\n'), minutes: at };`,
     icon: 'newspaper',
     color: 'blue',
     category: 'Research',
+    // The digest is read by the person: in their language, and (when it is not English) searched in it and in English.
+    language: 'person',
     description: 'The past week on the topics you follow: original reporting only, duplicates merged, why each story matters.',
     fields: [
-      { id: 'topics', label: 'Topics', type: 'long', required: true, placeholder: 'One per line, e.g. battery technology, EU AI rules, our competitors Acme and Globex' },
-      { id: 'region', label: 'Region or language', type: 'text' },
-      { id: 'skip', label: 'Leave out', type: 'text', placeholder: 'Subjects or sources to skip' },
-      { id: 'length', label: 'Length', type: 'choice', options: ['Brief', 'Standard', 'Detailed'], default: 'Standard' },
+      { id: 'topics', label: 'Topics', type: 'long', required: true, placeholder: 'One per line, e.g. battery technology, EU AI rules, our competitors Acme and Globex', remember: true },
+      { id: 'region', label: 'Region or language', type: 'text', from: 'me.country' },
+      { id: 'skip', label: 'Leave out', type: 'text', placeholder: 'Subjects or sources to skip', remember: true },
+      { id: 'length', label: 'Length', type: 'choice', options: ['Brief', 'Standard', 'Detailed'], default: 'Standard', remember: true },
     ],
     prompt: '',
     flow: {
@@ -2571,16 +2933,26 @@ return { timeline, plan: out.filter(Boolean).join('\n\n'), minutes: at };`,
           do: 'code',
           language: 'javascript',
           with: { topics: '{{topics}}', region: '{{region}}', length: '{{length}}' },
-          code: String.raw`// The topics (one a line, or between commas on one line), eight at most, each a search (with the region, when one is
-// given), and how many stories the digest's length has room for.
+          code:
+            SAY +
+            String.raw`// The topics (one a line, or between commas on one line), eight at most, each a search (with the region, when one is
+// given: a country as its two-letter code is written as its name in the run's language), the languages to search in
+// (the run's and English, when the run is not in English), and how many stories the digest's length has room for.
 let topics = String(input.topics || '').split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
 if (topics.length === 1 && topics[0].includes(',')) topics = topics[0].split(',').map((t) => t.trim()).filter(Boolean);
 topics = topics.slice(0, 8);
 if (!topics.length) throw new Error('Give the topics to follow, one a line');
-const region = String(input.region || '').trim();
-return { items: topics.map((topic) => ({ topic, query: region ? topic + ' ' + region : topic })), stories: { Brief: 4, Standard: 8, Detailed: 15 }[input.length] || 8, count: topics.length };`,
+let region = String(input.region || '').trim();
+if (/^[A-Za-z]{2}$/.test(region)) {
+  try {
+    const name = new Intl.DisplayNames([lang], { type: 'region' }).of(region.toUpperCase());
+    if (name && name !== region.toUpperCase()) region = name;
+  } catch (e) {}
+}
+const languages = lang === 'en' ? '' : lang + ',en';
+return { items: topics.map((topic) => ({ topic, query: region ? topic + ' ' + region : topic, languages })), stories: { Brief: 4, Standard: 8, Detailed: 15 }[input.length] || 8, count: topics.length };`,
           outputs: [
-            { id: 'items', label: 'Topics', type: 'table', columns: [{ id: 'topic', label: 'Topic', type: 'text' }, { id: 'query', label: 'Search', type: 'text' }] },
+            { id: 'items', label: 'Topics', type: 'table', columns: [{ id: 'topic', label: 'Topic', type: 'text' }, { id: 'query', label: 'Search', type: 'text' }, { id: 'languages', label: 'Languages to search in', type: 'text' }] },
             { id: 'stories', label: 'Room for stories', type: 'number' },
             { id: 'count', label: 'How many', type: 'number' },
           ],
@@ -2593,7 +2965,7 @@ return { items: topics.map((topic) => ({ topic, query: region ? topic + ' ' + re
           over: '{{topic_list.items}}',
           atOnce: 3,
           as: 'topic',
-          steps: [{ id: 'news', title: 'Search the news', do: 'tool', tool: 'web_search', with: { query: '{{topic.query}}', from: '{{since.value}}', to: '{{today}}', categories: ['news'], k: 12 }, failed: 'skip' }],
+          steps: [{ id: 'news', title: 'Search the news', do: 'tool', tool: 'web_search', with: { query: '{{topic.query}}', from: '{{since.value}}', to: '{{today}}', categories: ['news'], languages: '{{topic.languages}}', k: 12 }, failed: 'skip' }],
         },
         {
           id: 'group',
@@ -2604,6 +2976,7 @@ return { items: topics.map((topic) => ({ topic, query: region ? topic + ' ' + re
           code:
             LIST +
             HITS +
+            TOKENS +
             String.raw`// Every result once; of the past week, when it is dated; none from what to leave out; the same story told by several
 // outlets as one, its original reporting first (wires, official sources, the company's own news) and aggregators last;
 // then the biggest stories of each topic, in turns, as many as the digest has room for and a few more in case some
@@ -2613,10 +2986,13 @@ const searches = list(input.searches);
 const since = String(input.since || '');
 const today = String(input.today || '');
 const skip = String(input.skip || '').toLowerCase().split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
-const ORIGINAL = /(^|\.)(reuters\.com|apnews\.com|afp\.com|bloomberg\.com|ft\.com|wsj\.com|nytimes\.com|bbc\.co\.uk|bbc\.com|theguardian\.com|europa\.eu|prnewswire\.com|businesswire\.com|globenewswire\.com)$|(^|\.)(gov|int)(\.[a-z]{2})?$|(^|\.)gov\.[a-z]{2}$/;
-const AGGREGATOR = /(^|\.)(msn\.com|yahoo\.com|news\.google\.com|flipboard\.com|newsbreak\.com|ground\.news|inkl\.com|headtopics\.com|newsnow\.co\.uk|biztoc\.com|muckrack\.com)$/;
+// Only a preference, never a verdict: a site on neither list is simply neither (an outlet of another country is not
+// "not original" for being absent). Original: wires, official sources, public broadcasters and agencies of many
+// countries, and any government's own domain (.gov.xx, .gouv.fr, .gob.es, .go.jp…).
+const ORIGINAL = /(^|\.)(reuters\.com|apnews\.com|afp\.com|bloomberg\.com|ft\.com|wsj\.com|nytimes\.com|bbc\.co\.uk|bbc\.com|theguardian\.com|europa\.eu|prnewswire\.com|businesswire\.com|globenewswire\.com|dpa\.com|dpa-international\.com|efe\.com|ansa\.it|kyodonews\.net|jiji\.com|xinhuanet\.com|aa\.com\.tr|pap\.pl|apa\.at|ana-mpa\.gr|nhk\.or\.jp|tagesschau\.de|zdf\.de|dw\.com|rtve\.es|rai\.it|franceinfo\.fr|francetvinfo\.fr|nos\.nl|ert\.gr|ertnews\.gr|srf\.ch|orf\.at|vrt\.be|rte\.ie|dr\.dk|svt\.se|nrk\.no|yle\.fi|tvp\.info|cbc\.ca|abc\.net\.au|pbs\.org|npr\.org)$|(^|\.)(gov|int)(\.[a-z]{2})?$|(^|\.)(gov|gouv|gob|go|gv|govt)\.[a-z]{2}$/;
+const AGGREGATOR = /(^|\.)(msn|yahoo|flipboard|newsbreak|inkl|headtopics|newsnow|biztoc|muckrack|smartnews|dailyhunt|upday|newsbreak)\.[a-z.]+$|(^|\.)ground\.news$|^news\.google\.[a-z.]+$/;
 const STOP = new Set('the and for with from that this its are was were has have had will new says said after over into amid about than more'.split(' '));
-const words = (t) => new Set((String(t).toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((w) => w.length > 2 && !STOP.has(w)));
+const words = (t) => new Set(tokens(t).filter((w) => (/^[a-z0-9]+$/.test(w) ? w.length > 2 && !STOP.has(w) : w.length > 1 || /\p{Script=Han}/u.test(w))));
 const like = (a, b) => {
   let n = 0;
   for (const w of a) if (b.has(w)) n++;
@@ -2642,8 +3018,10 @@ searches.forEach((s, i) => {
   }
 });
 const lead = (g) => g.items.slice().sort((a, b) => b.original - a.original || a.aggregator - b.aggregator || a.rank - b.rank)[0];
-const room = Math.max(1, Number(input.stories) || 8);
 const per = topics.map((t) => groups.filter((g) => g.topic === t.topic).sort((a, b) => b.items.length - a.items.length || lead(a).rank - lead(b).rank));
+// Room for the digest's length, and for at least one story of every topic that has one (twelve at most), so a topic
+// with news is not left out for want of room.
+const room = Math.max(Math.max(1, Number(input.stories) || 8), Math.min(12, per.filter((p) => p.length).length));
 const items = [];
 for (let turn = 0; items.length < Math.ceil(room * 1.5) && per.some((p) => p.length > turn); turn++)
   per.forEach((p, i) => {
@@ -2719,11 +3097,11 @@ The article: {{story.title}}, {{story.url}} ({{story.site}}{{#story.date}}, {{st
           with: { candidates: '{{group.items}}', reads: '{{read.items}}', quiet: '{{group.quiet}}', topics: '{{topic_list.items}}', since: '{{since.value}}', today: '{{today}}', stories: '{{topic_list.stories}}' },
           code:
             LIST +
+            SAY +
             String.raw`// The stories that held up (read, and of the past week), original reporting and the most covered first, in turns
 // across the topics until the digest is full, with their dates and links checked; a topic without one says so.
 const since = String(input.since || '');
 const today = String(input.today || '');
-const room = Math.max(1, Number(input.stories) || 8);
 const reads = list(input.reads);
 const day = (v) => (/\d{4}-\d{2}-\d{2}/.exec(String(v || '')) || [''])[0];
 const link = (v) => (/^https?:\/\/\S+$/.test(String(v || '').trim()) ? String(v).trim() : null);
@@ -2737,11 +3115,14 @@ rows(input.candidates).forEach((c, i) => {
 });
 const topics = rows(input.topics).map((t) => t.topic);
 const per = topics.map((t) => kept.filter((s) => s.topic === t).sort((a, b) => b.weight - a.weight));
+// As many as the digest's length, and at least one for every topic that has a story (twelve at most): a topic is quiet
+// only when it had none that held up, never for want of room.
+const room = Math.max(Math.max(1, Number(input.stories) || 8), Math.min(12, per.filter((p) => p.length).length));
 const chosen = [];
 for (let turn = 0; chosen.length < room && per.some((p) => p.length > turn); turn++) per.forEach((p) => p[turn] && chosen.length < room && chosen.push(p[turn]));
 const stories = topics.flatMap((t) => chosen.filter((s) => s.topic === t)).map(({ weight, ...s }) => s);
 const quiet = topics.filter((t) => !stories.some((s) => s.topic === t));
-const NONE = 'No real news this week';
+const NONE = say({ en: 'No real news this week', de: 'Diese Woche keine echten Neuigkeiten', es: 'Sin noticias reales esta semana', fr: 'Pas de véritable actualité cette semaine', pt: 'Sem notícias reais esta semana', el: 'Καμία πραγματική είδηση αυτή την εβδομάδα', ja: '今週は特筆すべきニュースはありません', zh: '本周没有真正的新闻' });
 const none = quiet.map((topic) => ({ topic, title: NONE, summary: '', why: '', date: null, source: '', url: null }));
 // The real stories, by their headlines and pages, for their pictures (in the same order, before the quiet topics).
 const look = stories.map((s) => ({ name: s.title, page: s.url }));
@@ -2816,11 +3197,14 @@ return { stories };`,
     icon: 'scroll-text',
     color: 'slate',
     category: 'Work',
+    tier: 'standard',
+    // Explained in the person's language, whatever language the contract is written in; its quotes stay as written.
+    language: 'person',
     description: 'What an agreement really says, in plain words: key terms, dates, what is unusual, and what to ask before signing.',
     fields: [
       { id: 'contract', label: 'The contract', type: 'file', help: 'A PDF, Word document or text file' },
       { id: 'text', label: 'Or paste it here', type: 'long' },
-      { id: 'side', label: 'Your side', type: 'text', placeholder: 'e.g. The tenant, the freelancer, the buyer' },
+      { id: 'side', label: 'Your side', type: 'text', placeholder: 'e.g. The tenant, the freelancer, the buyer', remember: true },
       { id: 'concerns', label: 'Anything you’re worried about', type: 'long' },
     ],
     prompt: '',
@@ -2833,7 +3217,9 @@ return { stories };`,
           do: 'code',
           language: 'javascript',
           with: { file: '{{read.text}}', pasted: '{{text}}' },
-          code: String.raw`// The contract's text (from the file, or as pasted) in parts of whole clauses that a model reads at once (about
+          code:
+            SAY +
+            String.raw`// The contract's text (from the file, or as pasted) in parts of whole clauses that a model reads at once (about
 // 10,000 characters each, ten at most), and its opening, which says who the parties are.
 const fromFile = String(input.file || '')
   .split('\n')
@@ -2843,7 +3229,8 @@ const fromFile = String(input.file || '')
   .trim();
 const text = fromFile || String(input.pasted || '').trim();
 if (!text) throw new Error('Attach the contract, or paste its text');
-const HEAD = /^\s*(?:(?:section|clause|article|schedule|appendix|annex|exhibit|part)\s+[\dIVXLC]+|\d{1,2}(?:\.\d{1,2})*[.)]?\s+\S)/i;
+// A clause starts a line as "Section 4", "Article 5", "Artikel 7", "Artículo 3", "Άρθρο 2", "§ 12", "第5条", "5." or "5.1 ".
+const HEAD = /^\s*(?:§+\s*\d|第\s*[\d一二三四五六七八九十百〇零]+\s*[条條章節节]|(?:section|clause|article|artikel|art|art[íi]culo|articolo|artigo|schedule|appendix|annex|exhibit|part|abschnitt|kapitel|chapter|cap[íi]tulo|chapitre|cl[áa]usula|clausola|klausel|άρθρο|αρθρο|παράρτημα|κεφάλαιο|ενότητα|όρος)(?:\s+|\s*\.\s*)[\dIVXLC]+(?![\p{L}])|\d{1,2}(?:\.\d{1,2})*[.)]?\s+\S)/iu;
 const blocks = [];
 let cur = '';
 for (const l of text.split('\n')) {
@@ -2866,13 +3253,25 @@ for (const b of blocks) {
 }
 if (part.trim()) parts.push(part);
 const kept = parts.slice(0, 10);
-return { items: kept.map((t, i) => ({ part: i + 1, of: kept.length, text: t })), opening: text.slice(0, 6000), whole: text, count: kept.length, cut: parts.length > kept.length };`,
+const NOTE = {
+  en: 'Only the first {n} of {m} parts of this contract were read: the rest is too long to read whole.',
+  de: 'Nur die ersten {n} von {m} Teilen dieses Vertrags wurden gelesen: der Rest ist zu lang, um ihn ganz zu lesen.',
+  es: 'Solo se leyeron las primeras {n} de {m} partes de este contrato: el resto es demasiado largo para leerlo entero.',
+  fr: 'Seules les {n} premières parties sur {m} de ce contrat ont été lues : le reste est trop long pour être lu en entier.',
+  pt: 'Só foram lidas as primeiras {n} de {m} partes deste contrato: o resto é longo demais para ser lido por inteiro.',
+  el: 'Διαβάστηκαν μόνο τα πρώτα {n} από {m} μέρη αυτής της σύμβασης: το υπόλοιπο είναι πολύ μεγάλο για να διαβαστεί ολόκληρο.',
+  ja: 'この契約書は長すぎるため、{m} 部分のうち最初の {n} 部分だけを読みました。',
+  zh: '这份合同太长，无法全部阅读：{m} 部分中只读了前 {n} 部分。',
+};
+const cut = parts.length > kept.length;
+return { items: kept.map((t, i) => ({ part: i + 1, of: kept.length, text: t })), opening: text.slice(0, 6000), whole: text, count: kept.length, cut, cut_note: cut ? fill(say(NOTE), { n: kept.length, m: parts.length }) : '' };`,
           outputs: [
             { id: 'items', label: 'Parts', type: 'table', columns: [{ id: 'part', label: 'Part', type: 'number' }, { id: 'of', label: 'Of', type: 'number' }, { id: 'text', label: 'Text', type: 'text' }] },
             { id: 'opening', label: 'Its opening', type: 'markdown' },
             { id: 'whole', label: 'The whole text', type: 'markdown' },
             { id: 'count', label: 'Parts', type: 'number' },
             { id: 'cut', label: 'Too long to read whole', type: 'yesno' },
+            { id: 'cut_note', label: 'Said to the reader', type: 'text', description: 'Says, in the run’s language, how much was read when the contract was too long; empty otherwise' },
           ],
           failed: 'agent',
         },
@@ -2910,9 +3309,9 @@ return { items: kept.map((t, i) => ({ part: i + 1, of: kept.length, text: t })),
 
 {{part.text}}
 
-- terms: the terms that matter in it: how long it runs and how it renews; money (amounts, when, penalties, increases); ending it (notice, fees); liability and indemnities; confidentiality; intellectual property; non-compete or exclusivity; how disputes are settled; anything else that binds. For each, its topic (term, money, ending, liability, confidentiality, ip, exclusivity, disputes or other), the term in a few words, what it means in practice for the reader, and its clause number.
+- terms: the terms that matter in it: how long it runs and how it renews; money (amounts, when, penalties, increases); ending it (notice, fees); liability and indemnities; confidentiality; intellectual property; non-compete or exclusivity; how disputes are settled; anything else that binds. For each, its topic (exactly one of these words, in English as written: term, money, ending, liability, confidentiality, ip, exclusivity, disputes, other), the term in a few words, what it means in practice for the reader, and its clause number as the contract writes it.
 - dates: every date or deadline, and what happens then, with its clause.
-- flags: anything unusual, one-sided or risky compared with what is typical for this kind of agreement: the clause, the issue (quote the exact words where they matter), how serious it is (high, medium or low), and what to ask to change.`,
+- flags: anything unusual, one-sided or risky compared with what is typical for this kind of agreement: the clause, the issue (quote the exact words where they matter, in the contract's own language), how serious it is (exactly high, medium or low, in English as written), and what to ask to change.`,
                     outputs: [
                       {
                         id: 'terms',
@@ -2957,11 +3356,12 @@ return { items: kept.map((t, i) => ({ part: i + 1, of: kept.length, text: t })),
           with: { parts: '{{read_parts.items}}' },
           code:
             LIST +
+            SAY +
             String.raw`// All the parts' findings in one: each term once, by topic in the usual order and then by clause; the dates in
 // order (those with a day first); what to watch out for, the most serious first; and the usual topics it says nothing on.
 const TOPICS = ['term', 'money', 'ending', 'liability', 'confidentiality', 'ip', 'exclusivity', 'disputes', 'other'];
 const NAMES = { term: 'How long it runs and how it renews', money: 'Money', ending: 'Ending it', liability: 'Liability and indemnities', confidentiality: 'Confidentiality', ip: 'Intellectual property', disputes: 'How disputes are settled' };
-const key = (t) => String(t || '').toLowerCase().replace(/\W+/g, ' ').trim();
+const key = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const WORDS = [
   ['ending', /terminat|notice|cancel/],
   ['ip', /intellect|copyright|licen/],
@@ -2995,7 +3395,7 @@ dates.sort((a, b) => (iso(a) ? 0 : 1) - (iso(b) ? 0 : 1) || iso(a).localeCompare
 flags.sort((a, b) => level(a.severity) - level(b.severity) || clause(a.clause).localeCompare(clause(b.clause)));
 return {
   terms: terms.map((t) => ({ term: t.term, meaning: t.meaning || '', clause: t.clause || '' })),
-  dates: dates.map((d) => ({ when: d.when, what: (d.what || '') + (d.clause ? ' (clause ' + d.clause + ')' : '') })),
+  dates: dates.map((d) => ({ when: d.when, what: (d.what || '') + (d.clause ? ' (' + say({ en: 'clause', de: 'Klausel', es: 'cláusula', fr: 'clause', pt: 'cláusula', el: 'όρος', ja: '条項', zh: '条款' }) + ' ' + d.clause + ')' : '') })),
   flags: flags.map((f) => ({ clause: f.clause || '', issue: f.issue, severity: ['High', 'Medium', 'Low'][level(f.severity)], ask: f.ask || '' })),
   high: flags.filter((f) => level(f.severity) === 0).length,
   missing: Object.keys(NAMES).filter((t) => !terms.some((x) => topicOf(x) === t)).map((t) => NAMES[t]),
@@ -3034,7 +3434,7 @@ return {
               id: 'second_look',
               title: 'Take a second look',
               do: 'agent',
-              instructions: `Some clauses of a contract look serious for {{#side}}{{side}}{{/side}}{{^side}}the reader{{/side}}, who is not a lawyer. Take a second look at each serious one: what is typical for this kind of agreement ({{overview.kind}}), whether such a clause usually holds where it applies (search the web where the law or common practice matters), how serious it really is, and what to ask for instead. Quote the contract's exact words.{{#concerns}} What the reader is worried about: {{concerns}}{{/concerns}}
+              instructions: `Some clauses of a contract look serious for {{#side}}{{side}}{{/side}}{{^side}}the reader{{/side}}, who is not a lawyer. Take a second look at each serious one: what is typical for this kind of agreement ({{overview.kind}}), whether such a clause usually holds where it applies (search the web where the law or common practice matters), how serious it really is, and what to ask for instead. Quote the contract's exact words, in its own language. Give how serious each is as exactly High, Medium or Low, in English as written.{{#me.country}} The reader lives in {{me.country}} (a two-letter country code): say where the law of another country would matter.{{/me.country}}{{#concerns}} What the reader is worried about: {{concerns}}{{/concerns}}
 
 What to watch out for, as the first reading found it:
 {{merge.flags}}
@@ -3068,9 +3468,11 @@ Hand in the whole list of what to watch out for: the serious ones as you now see
           with: { found: '{{merge.flags}}', again: '{{second_look.flags}}' },
           code:
             LIST +
-            String.raw`// What to watch out for: the second look's list when it took one, else as the parts found it.
+            String.raw`// What to watch out for: the second look's list when it took one, else as the parts found it; how serious each is
+// as High, Medium or Low (the view's filter and colours go by those words).
 const again = rows(input.again).filter((f) => f.issue);
-return { red_flags: again.length ? again : rows(input.found) };`,
+const level = (s) => (/high|serious|severe/i.test(String(s)) ? 0 : /med/i.test(String(s)) ? 1 : 2);
+return { red_flags: (again.length ? again : rows(input.found)).map((f) => ({ ...f, severity: ['High', 'Medium', 'Low'][level(f.severity)] })) };`,
           outputs: [
             {
               id: 'red_flags',
@@ -3120,10 +3522,11 @@ The contract was too long to read whole: only its first part was gone through.
           ],
         },
       ],
-      outputs: { summary: '{{explain.summary}}', terms: '{{merge.terms}}', dates: '{{merge.dates}}', red_flags: '{{flags.red_flags}}', questions: '{{explain.questions}}' },
+      outputs: { summary: '{{explain.summary}}', cut_note: '{{clauses.cut_note}}', terms: '{{merge.terms}}', dates: '{{merge.dates}}', red_flags: '{{flags.red_flags}}', questions: '{{explain.questions}}' },
     },
     answer: [
       { id: 'summary', label: 'In short', type: 'markdown', required: true },
+      { id: 'cut_note', label: 'Not all of it was read', type: 'text', description: 'Says how much was read when the contract was too long to read whole; empty otherwise' },
       {
         id: 'terms',
         label: 'Key terms',
@@ -3167,13 +3570,16 @@ The contract was too long to read whole: only its first part was gone through.
     icon: 'app-window',
     color: 'cyan',
     category: 'Build',
+    tier: 'standard',
+    // The app's own words (its buttons, labels and README) are in the person's language.
+    language: 'person',
     description: 'A working app from a description: plain HTML, CSS and JavaScript that opens from a file, tested before it is handed over.',
     fields: [
       { id: 'idea', label: 'What should it do?', type: 'long', required: true, placeholder: 'e.g. A tracker for my plants: when I watered each one, and which are due' },
-      { id: 'users', label: 'Who it’s for', type: 'text' },
+      { id: 'users', label: 'Who it’s for', type: 'text', remember: true },
       { id: 'features', label: 'Must-haves', type: 'long' },
-      { id: 'style', label: 'Look and feel', type: 'text', placeholder: 'e.g. Calm and minimal, big buttons for a phone' },
-      { id: 'review', label: 'Let me check the plan before it is built', type: 'yesno', help: 'The run waits for you to keep or change its screens and features' },
+      { id: 'style', label: 'Look and feel', type: 'text', placeholder: 'e.g. Calm and minimal, big buttons for a phone', remember: true },
+      { id: 'review', label: 'Let me check the plan before it is built', type: 'yesno', help: 'The run waits for you to keep or change its screens and features', remember: true },
     ],
     prompt: '',
     flow: {
@@ -3240,7 +3646,7 @@ Requirements:
 - A static app that opens straight from index.html: plain HTML, CSS and JavaScript in a few files (index.html, style.css, app.js), no build step, nothing loaded from other sites.
 - Works well on a phone and on a computer, in light and dark mode, and with the keyboard.
 - Keeps its data in the browser (localStorage), with a way to export it to a file and import it back.
-- Clear, friendly wording, sensible empty states, and no placeholder text left in.
+- Clear, friendly wording, sensible empty states, and no placeholder text left in. Its own words (buttons, labels, messages, the README) are in the language you are asked to write in, unless the description above is written in another one.
 - A README.md that says what the app does and how to open it.
 Try it as you go. It is tested after you, against these checks:
 {{spec.checks}}`,

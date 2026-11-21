@@ -268,7 +268,9 @@ test('templates: forty-five tasks in steps, each checking out as a save checks i
         assert.equal(p.status, 0, `${t.id}: ${s.id} reads as Python: ${p.stderr}`);
       } else assert.doesNotThrow(() => new AsyncFunction('input', 'ctx', s.code), `${t.id}: ${s.id} reads as JavaScript`);
       // Where the sandbox cannot run, an agent does a program's work (one inside a round may go without instead).
-      assert.ok(s.failed === 'agent' || (s.failed === 'skip' && steps.some((r) => r.do === 'repeat' && allSteps(r.steps).includes(s))), `${t.id}: ${s.id} says what happens when it cannot run`);
+      // The steps that say a paper could not be read end the run on purpose, with a line the person reads: an agent in their place would go on without the paper.
+      const stops = s.id === 'unreadable' || s.id === 'unreadable_text';
+      assert.ok(s.failed === 'agent' || stops || (s.failed === 'skip' && steps.some((r) => r.do === 'repeat' && allSteps(r.steps).includes(s))), `${t.id}: ${s.id} says what happens when it cannot run`);
     }
   }
 });
@@ -371,7 +373,7 @@ test('submit_result: only on an app run, checks the fields, saves the result; to
   assert.equal(apps.allowTool!('read_session', ctx), false);
   assert.equal(apps.allowTool!('read_session', { ...ctx, runId: 'other', key: 'claude:someone-else' }), true);
   // Another session hands in nothing: it gets what templates are built with.
-  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data', 'find_apps', 'use_app']);
+  assert.deepEqual(apps.tools!({ ...ctx, runId: 'other', key: 'claude:someone-else' }).map((t) => t.name), ['app_get', 'app_sketch', 'app_save', 'app_try', 'app_screen', 'app_data', 'app_services', 'find_apps', 'use_app']);
   sessions.end(key, 'Here is the plan.');
   await sleep(2000);
   const done = store.getRun(db, run.id)!;
@@ -447,6 +449,30 @@ test('follow-ups: one from the run’s page opens the run again; its new result 
   );
   assert.equal(page.noAsks, undefined);
   assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: ' ' } })).statusCode, 400);
+});
+
+test('follow-ups: a change hands in only the fields that change; those left out stay, one sent empty is emptied, and what comes in is still checked', async () => {
+  const app = store.saveApp(db, { recipe: recipe({ name: 'Partly changed' }) });
+  const run = startRun({ app: app.id, slug: app.slug, recipe: app, source: 'web', inputs: { city: 'Chania' } });
+  await sleep(50);
+  const key = store.getRun(db, run.id)!.key!;
+  const mark = sessions.made.find((m) => m.key === key)!.o.extra.app;
+  const add = await apps.spawn!({ agent: 'claude', key, cwd: tmp, runId: 'agent-run-part', resume: false, extra: { app: mark } }, deps);
+  assert.match(add!.instructions![0], /the fields you leave out stay as they are/);
+  const ctx: RunCtx = { runId: 'agent-run-part', key, agent: 'claude', cwd: tmp, deps };
+  const tool = () => apps.tools!(ctx).find((t) => t.name === 'submit_result')!;
+  assert.deepEqual((tool().inputSchema as { required: string[] }).required, ['summary', 'days'], 'the first hands in every field it needs');
+  await tool().run({ summary: 'Two days', cost: 120, days: [{ day: 1, plan: 'Old town' }, { day: 2, plan: 'Balos' }] }, ctx);
+  const first = store.getRun(db, run.id)!.result!;
+  assert.deepEqual((tool().inputSchema as { required: string[] }).required, [], 'then only what changes');
+  assert.match(String(await tool().run({ summary: 'Two easy days', cost: null }, ctx)), /Saved/);
+  assert.deepEqual(store.getRun(db, run.id)!.result, { summary: 'Two easy days', cost: null, days: first.days });
+  const bad = await tool().run({ days: 'not rows', summary: '' }, ctx);
+  assert.ok(typeof bad === 'object' && bad.isError && /days: should be a list of rows/.test(bad.text) && /summary: missing/.test(bad.text) && !/with all the fields/.test(bad.text));
+  assert.equal(store.getRun(db, run.id)!.result!.summary, 'Two easy days');
+  sessions.end(key, 'Done.');
+  await sleep(2100);
+  assert.equal(store.getRun(db, run.id)!.status, 'done');
 });
 
 test('follow-ups: one typed in the session opens the run too; a change only written out is reminded once, thanks are not', async () => {

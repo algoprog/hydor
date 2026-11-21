@@ -46,6 +46,8 @@ export function publicRun(r: RunRecord): Omit<AppRun, 'key' | 'costUsd' | 'agent
     status: r.status,
     inputs: r.inputs,
     result: r.result,
+    // What its steps have given so far, while it works.
+    ...(r.partial ? { partial: r.partial } : {}),
     reply: r.reply,
     error: r.status === 'failed' ? 'Something went wrong with this run. Try again in a while.' : r.status === 'stopped' ? 'This run was stopped.' : undefined,
     createdAt: r.createdAt,
@@ -116,7 +118,7 @@ export function publicRoutes(d: Deps) {
       limiter.undo(mine);
       throw new HttpError(429, 'Too many runs from here. Try again later.');
     }
-    const b = (req.body ?? {}) as { inputs?: Record<string, unknown>; files?: Record<string, { name: string; data: string }> };
+    const b = (req.body ?? {}) as { inputs?: Record<string, unknown>; files?: Record<string, { name: string; data: string }>; lang?: unknown };
     try {
       const r = startRun({
         app: a.id,
@@ -128,6 +130,8 @@ export function publicRoutes(d: Deps) {
         public: { model: p.model!, web: p.web, capUsd: Math.max(0.01, p.spendPerDay - today.spent) },
         visitor: v,
         ip,
+        // The visitor's language, which the run writes in (it knows nothing of the owner: no About you).
+        lang: typeof b.lang === 'string' ? b.lang : undefined,
       });
       return { run: publicRun(r) };
     } catch (e) {

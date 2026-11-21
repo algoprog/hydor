@@ -8,7 +8,8 @@
 // the session as a message when it ends. Which apps: those installed whose page lets agents use them, made for it.
 // There may be very many: agents are told of the few the user pinned to the top of the Apps page or runs most, and
 // find the others with find_apps (search.ts: the best twenty for a few words on what the user wants, by words and by
-// meaning; pins.ts: the pinned ones first, then those used lately).
+// meaning; pins.ts: the pinned ones first, then those used lately). A change the user then asks of what an app gave
+// (another order, shorter, one thing for another) goes to that run (use_app with run and change), whose card updates.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,21 +17,23 @@ import path from 'node:path';
 import type { AppField, AppRecipe } from '../../shared/apps.ts';
 import { checkInputs, isActive, madeForSessions } from '../../shared/apps.ts';
 import { titleOf } from '../../shared/app-manifest.ts';
+import { cardsAsText } from '../../shared/app-cards.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
 import { openRunIn } from '../automations/runs.ts';
-import { addNote, notesOf, removeNote } from '../notes.ts';
+import { addNote, notesOf, removeNote, updateNote } from '../notes.ts';
 import { opensTurn } from '../opinion/turns.ts';
 import { allowApp, allowedApps } from './allowed.ts';
 import { checkDaily } from './api.ts';
 import { builtinsForAgents } from './builtins.ts';
-import { startRun, waitFor } from './runs.ts';
+import { askRun, startRun, waitFor, whyNoAsks } from './runs.ts';
 import { byWords, FIND_K, FIND_MAX, findApps } from './search.ts';
 import { words } from '../memory/store.ts';
 import { getApp, getRun, listApps, updateRun, type RunRecord } from './store.ts';
 import { missingSecrets } from './secrets.ts';
+import { startsFor } from './me.ts';
 import { pinsOf, theirsFirst } from './pins.ts';
 
 /** One app agents may run: the name they give it by, its run's app ("tpl:<id>" for a ready-made one), and what it is. */
@@ -93,7 +96,7 @@ export function useNote(db: DB): string | null {
   const list = usableApps(db);
   if (!list.length) return null;
   const head =
-    "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: the app's own card asks them first (unless they chose to always run it) and for what is missing, then shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same.";
+    "The user's apps (the Apps page) do jobs for them: small tools that look things up, work them out and show the answer in a view of their own (a forecast, a trip plan, a comparison, a quiz…). When the user asks for something an app does, run it with use_app instead of doing that work yourself: the app's own card asks them first (unless they chose to always run it) and for what is missing, then shows its answer in the conversation as the app shows it. Prefer their own apps to the ready-made ones that do the same. When they then ask to change what an app gave (another order, shorter, one thing for another, a column more), ask the app for it with use_app's run and change, so its card updates, rather than answering beside it; a new question (another place, other dates) is a new run.";
   if (list.length <= NAMED) return [head, ...list.map((u) => appLine(u, false))].join('\n');
   const used = byUse(db, list);
   // Those they pinned to the top of their Apps page come first, and say so.
@@ -239,20 +242,24 @@ function overview(db: DB, u: Usable) {
   return { approve: true, ...(u.recipe.description?.trim() ? { about: u.recipe.description.trim() } : {}), ...(steps.length ? { steps } : {}), ...(last ? { lastRun: last } : {}), link: pageOf(u) };
 }
 
+/** Whether the app needs a key the vault does not have. */
+const keysLack = (ctx: RunCtx, u: Usable) => missingSecrets(ctx.deps.db, u.recipe).length > 0;
+
 /**
  * The app's card with the questions left: those it needs that the request did not answer (or answered in a way the
  * form does not take) and the optional ones it left out, each filled in as far as it can be. Gives the answers
  * merged into the request's, or why there are none. `approve`: the card asks whether to run the app at all, with an overview of it, even when nothing is missing.
  */
-async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, raw: Record<string, unknown>, ms: number, approve: boolean): Promise<{ values: Record<string, string>; files: Record<string, Sent> } | { why: 'nobody' | 'declined' | 'timeout' }> {
+async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, raw: Record<string, unknown>, ms: number, approve: boolean, starts: Record<string, string> = {}): Promise<{ values: Record<string, string>; files: Record<string, Sent> } | { why: 'nobody' | 'declined' | 'timeout' }> {
   const adapter = ctx.deps.sessions.adapterByRun(ctx.runId);
   if (!adapter) return { why: 'nobody' };
   const fields = u.recipe.fields;
   const asked = fields.filter((f) => !(f.id in got.values || f.id in got.files) || !fine(f, got.values, got.files));
+  // Answered with what they start from (About you, the last answer): enough to run without asking.
+  const started = { ...starts, ...got.values };
+  if (!approve && !keysLack(ctx, u) && fields.every((f) => fine(f, started, got.files))) return { values: started, files: got.files };
   // Keys it needs that the vault does not have: the card asks for them too (they go straight to the vault).
   const keys = missingSecrets(ctx.deps.db, u.recipe);
-  // Everything answered already (ask: true on a form the request filled in) and every key there: nothing to show, unless it asks whether to run the app.
-  if (!approve && !asked.length && !keys.length) return { values: got.values, files: got.files };
   const given = fields.filter((f) => !asked.includes(f));
   const card: ApprovalRequest = {
     id: `app-${crypto.randomBytes(6).toString('hex')}`,
@@ -275,7 +282,9 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
         const keep = said && f.type !== 'file' && fine(f, { [f.id]: said }, {});
         // What the request said that the form does not take ("in May" for a date) shows under the question.
         const note = said && !keep && f.type !== 'file' ? `From your message: “${clipLine(said, 80)}”` : got.unread.includes(f.id) ? `“${clipLine(String(raw[f.id] ?? ''), 80)}” is not a file here: pick it` : '';
-        return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
+        // Nothing said for it: filled in with what it starts from (About you, the last answer), to change.
+        const start = !said && starts[f.id] !== undefined ? starts[f.id] : undefined;
+        return { ...f, ...(keep ? { default: checkInputs([f], { [f.id]: said }).values[f.id] } : start !== undefined ? { default: start } : {}), ...(note ? { help: [note, f.help].filter(Boolean).join(' · ') } : {}) };
       }),
     },
     app: {
@@ -296,6 +305,8 @@ async function askUser(ctx: RunCtx, u: Usable, got: ReturnType<typeof intake>, r
       const v = String(a.form?.[f.id] ?? '').trim();
       delete values[f.id];
       delete files[f.id];
+      // One that started filled in and was cleared on the card stays empty (the run would fill it again).
+      if (!v && starts[f.id] !== undefined) values[f.id] = '';
       if (!v) continue;
       if (f.type === 'file') {
         // A file picked on the card was saved ahead of the answer (POST /api/uploads): its path.
@@ -337,14 +348,30 @@ function clip(v: unknown, depth = 0): unknown {
   return v;
 }
 
-/** A run as the agent reads it: how it went, what it gave (shortened), and its page. */
+/** What the run could not have, as one line the agent can pass on to the person ('' when nothing was missed). */
+export function missLine(r: Pick<RunRecord, 'misses'>): string {
+  const list = r.misses ?? [];
+  if (!list.length) return '';
+  const n = list.reduce((a, m) => a + (m.times ?? 1), 0);
+  const named = list.slice(0, 3).map((m) => `${m.step}${m.what ? ` (${m.what})` : ''}: ${m.why}`);
+  const more = list.length > 3 ? `; and ${list.length - 3} more` : '';
+  return `It could not have ${n === 1 ? 'one thing' : `${n} things`} (its page lists them): ${named.join('; ')}${more}. Say so to the user in a few words.`;
+}
+
+/** A run as the agent reads it: how it went, what it gave (shortened), and its page; then what it could not have. */
 function runText(r: RunRecord): string {
+  const missed = missLine(r);
+  return `${runJson(r)}${missed ? `\n\n${missed}` : ''}`;
+}
+
+function runJson(r: RunRecord): string {
   return JSON.stringify(
     {
       app: r.appName,
       run: r.id,
       status: r.status,
-      ...(r.result ? { result: clip(r.result) } : {}),
+      // Its cards as Markdown: the agent reads them, the card under its reply draws them.
+      ...(r.result ? { result: clip(cardsAsText(r.recipe.answer, r.result)) } : {}),
       ...(r.reply && !r.result ? { reply: clip(r.reply) } : {}),
       ...(r.error ? { error: r.error } : {}),
       ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
@@ -360,7 +387,7 @@ const MISFIT = 'If its answer misses what the user asked, do not add a second an
 
 /** What the call answers once the run ended, or while it goes on. */
 function endText(r: RunRecord): string {
-  if (r.status === 'done') return `${r.appName} is done. Its card, with the answer as the app shows it, shows right under your reply: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it, and if you point to the card, it is below, not above. ${MISFIT}\n\n${runText(r)}`;
+  if (r.status === 'done') return `${r.appName} is done. Its card, with the answer as the app shows it, shows right under your reply: reply in a sentence or two (what came of it, what to look at or decide next) without repeating it, and if you point to the card, it is below, not above. ${MISFIT} If the user then asks to change what it gave, call use_app with run "${r.id}" and change.\n\n${runText(r)}`;
   if (r.status === 'stopped') return `${r.appName} was stopped before it finished.\n\n${runText(r)}`;
   if (r.status === 'failed') return `${r.appName} failed: ${r.error ?? 'it did not finish'}. Its card, under your reply, says so. Tell the user, and offer what could help (a detail it lacked, trying again).\n\n${runText(r)}`;
   const waiting = r.status === 'waiting' ? ' It waits for the user’s answer to one of its questions, on its card.' : '';
@@ -374,8 +401,18 @@ const watching = new Set<string>();
 export async function tellAsker(d: Deps, r: RunRecord) {
   if (!r.askedBy || r.told || watching.has(r.id) || isActive(r.status)) return;
   updateRun(d.db, r.id, { told: true });
-  const head =
-    r.status === 'done'
+  // A change it asked of the run (use_app with change), which its card keeps until it is told.
+  const card = notesOf(d.db, r.askedBy, 'app-run').find((n) => (n.data as { run?: string } | null)?.run === r.id);
+  const change = (card?.data as { change?: string } | null)?.change;
+  if (card && change) {
+    const { change: _c, ...data } = card.data as Record<string, unknown>;
+    updateNote(d.db, card.id, data);
+  }
+  const head = change
+    ? r.status === 'done'
+      ? `[${r.appName} changed] The change you asked of it for the user (“${clipLine(change, 200)}”) is done; its card with the new answer shows right under your reply. Say in a sentence or two what changed, without repeating it; if its answer did not change, its agent's words say why (another question is a new run).${r.reply ? `\n\nWhat its agent said: ${clip(r.reply)}` : ''}`
+      : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The change you asked of it for the user (“${clipLine(change, 200)}”) did not finish${r.error ? `: ${r.error}` : ''}.`
+    : r.status === 'done'
       ? `[${r.appName} finished] The run you started for the user is done; its card with the answer shows right under your reply. Reply in a sentence or two (what came of it, what to look at), without repeating it; if you point to the card, it is below, not above. ${MISFIT}`
       : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The run you started for the user did not finish${r.error ? `: ${r.error}` : ''}.`;
   try {
@@ -407,6 +444,67 @@ async function waitAndSay(ctx: RunCtx, id: string, ms: number): Promise<string> 
   if (!r) return 'That run is gone.';
   if (!isActive(r.status)) updateRun(db, id, { told: true });
   return endText(r);
+}
+
+// ---- a change asked of what a run gave ------------------------------------------------------------------------
+
+/**
+ * A change the user asks of what a run gave (use_app with run and change): it goes to the run as a follow-up from its
+ * page would (a run with steps gets its session for changes with the first), the run's card moves under this turn,
+ * and the call waits for that turn to end, then gives back the updated answer.
+ */
+async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Promise<string | { text: string; isError: true }> {
+  const { db } = c.deps;
+  if (isActive(r.status)) return { text: `${r.appName} is still at work on that run: wait for it first (use_app with run "${r.id}"), then ask for the change.`, isError: true };
+  const why = whyNoAsks(r);
+  if (why) return { text: `${r.appName} cannot change what that run gave: ${why}`, isError: true };
+  if (text.length > 20_000) return { text: 'That change is too long (at most 20,000 characters).', isError: true };
+  const sent = Date.now();
+  const before = JSON.stringify(r.result ?? null);
+  let card: ReturnType<typeof addNote> | null = null;
+  watching.add(r.id);
+  try {
+    // This session hears how it went by a message if it ends after the call stops waiting.
+    updateRun(db, r.id, { told: false });
+    try {
+      await askRun(r, text);
+    } catch (e) {
+      updateRun(db, r.id, { told: true });
+      return { text: `The change could not be sent: ${(e as Error).message}`, isError: true };
+    }
+    // Its card shows under this turn now, where its answer changes, and keeps the change until this session hears how it went.
+    const note = notesOf(db, c.key, 'app-run').find((n) => (n.data as { run?: string } | null)?.run === r.id);
+    if (note) {
+      removeNote(db, note.id);
+      card = addNote(db, { key: c.key, kind: 'app-run', anchor: await turnAnchor(c.deps, c.key), data: { ...(note.data as Record<string, unknown>), change: text.slice(0, 2000) } });
+    }
+    // Until that turn has ended (the run opens again when its agent goes to work).
+    for (let left = ms; left > 0 && !c.signal?.aborted; ) {
+      const now = getRun(db, r.id);
+      if (!now || (!isActive(now.status) && (now.endedAt ?? 0) >= sent)) break;
+      const step = Math.min(left, isActive(now.status) ? 5_000 : 400);
+      if (isActive(now.status)) await waitFor(r.id, step);
+      else await new Promise((ok) => setTimeout(ok, step));
+      left -= step;
+    }
+  } finally {
+    watching.delete(r.id);
+  }
+  const now = getRun(db, r.id);
+  if (!now) return 'That run is gone.';
+  if (isActive(now.status) || (now.endedAt ?? 0) < sent)
+    return `${now.appName} is still making the change (run ${now.id}); its card here shows it at work. Its new answer comes to you as a message when it is done: end your turn now (say it is on its way), or call use_app with run "${now.id}" to wait for it.`;
+  updateRun(db, now.id, { told: true });
+  // Told here: its card no longer waits to tell it.
+  if (card) {
+    const { change: _c, ...data } = card.data as Record<string, unknown>;
+    updateNote(db, card.id, data);
+  }
+  const said = now.reply ? `\n\nWhat its agent said: ${clip(now.reply)}` : '';
+  if (now.status !== 'done') return `${now.appName} could not make the change: ${now.error ?? 'it did not finish'}.${said}\n\n${runText(now)}`;
+  if (JSON.stringify(now.result ?? null) === before && now.result)
+    return `${now.appName} did not change its answer (its agent's words say why: another question is a new run, with use_app and the new answers). Tell the user in a sentence.${said}\n\n${runText(now)}`;
+  return `${now.appName} changed its answer as asked. Its card, under your reply, shows the new one: say in a sentence or two what changed, without repeating it.${said}\n\n${runText(now)}`;
 }
 
 // ---- the tool -------------------------------------------------------------------------------------------------
@@ -462,10 +560,12 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
     name: 'use_app',
     description: [
       "Runs one of the user's apps for them, here in the conversation: use it when they ask for what one of their apps does, instead of doing that work yourself.",
-      'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
+      'Give app and inputs, the answers to its form: only what the user said or clearly meant (dates as YYYY-MM-DD, numbers, true or false for yes/no, a choice word for word, a file by its path). Leave out what they did not say: the user fills in what the app needs on its card here, and may leave its optional questions empty. Questions about them that they keep in About you (their units, currency, country, diet…) are filled in from it when you leave them out. ask: true shows the card even when nothing it needs is missing, to let them add the optional details.',
+      'Give language: the language the user writes to you in, as a tag (el, de, ja…), so the app answers in it.',
       'Unless the user chose to always run that app, its card first asks them whether to run it, showing what it does. If they say no, do the job another way (or ask them in words); do not call it again for the same request.',
       'It runs once they have, and its answer shows in the conversation as the app shows it. The call waits for that answer (wait, in seconds: 300 unless set); a longer run comes back still running, and its answer comes to you as a message when it ends. Then reply in a sentence or two: the user sees the answer itself in its card, which shows under your reply (below it, not above).',
       'If an app’s answer turns out not to fit what the user asked and you answer yourself instead, call use_app with run (the run’s id) and remove: true: its card leaves the conversation, so it shows one answer, not two. The run stays in the app’s history.',
+      'When the user asks to change what an app gave here (another order, shorter or warmer, one thing swapped for another, a column more), call use_app with run (the run’s id) and change (what they want, in their words): the app’s own agent changes its answer, its card moves under your reply with the new answer, and the call waits for it as for a run. Use it for a change to that answer, not for a new question (another place, other dates): that is a new run.',
       many
         ? `The user has ${list.length} apps: find the one to run with find_apps, which gives each one's name to use here and what its form asks.`
         : `The apps (? marks a question it can do without):\n${list.map((u) => appLine(u, true)).join('\n')}`,
@@ -476,9 +576,11 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
         app: { type: 'string', ...(many ? {} : { enum: list.map((u) => u.ref) }), description: many ? 'Which app, by the name find_apps gives it (in quotes there).' : 'Which app, as listed.' },
         inputs: { type: 'object', description: 'The answers to its form that the user gave, by the names listed.' },
         ask: { type: 'boolean', description: 'Show its card even when nothing it needs is missing.' },
+        language: { type: 'string', description: 'The language the user writes to you in, as a tag: el, de, ja, en…' },
         wait: { type: 'number', description: 'Most seconds to wait for its answer (1 to 540; 300 unless set).' },
         run: { type: 'string', description: 'A run started here before that was still running: waits for its answer. With remove: true, the run whose card to take out.' },
         remove: { type: 'boolean', description: 'With run: takes that run’s card out of this conversation (its answer did not fit and you answer yourself). The run stays in the app’s history.' },
+        change: { type: 'string', description: 'With run: a change the user asks of what that run gave (“swap days 2 and 3”, “shorter, and warmer”), sent to the app; its card updates. Not for a new question.' },
       },
     },
     async run(args, c) {
@@ -493,6 +595,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
           if (note) removeNote(db, note.id);
           return note ? `Removed ${r.appName}'s card; the run stays in the app's history.` : `${r.appName}'s card is not in this conversation (it may be gone already); the run stays in the app's history.`;
         }
+        if (typeof args.change === 'string' && args.change.trim()) return changeRun(c, r, args.change.trim(), Math.min(wait, CALL_MS));
         return waitAndSay(c, r.id, wait);
       }
       const now = usableApps(db);
@@ -504,11 +607,15 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
       }
       const raw = args.inputs && typeof args.inputs === 'object' && !Array.isArray(args.inputs) ? (args.inputs as Record<string, unknown>) : {};
       let got = intake(u.recipe.fields, raw, c.cwd);
+      // What the questions it left out start from: About you, the user's last answers.
+      const given = (f: AppField) => got.values[f.id] !== undefined || !!got.files[f.id];
+      const starts = Object.fromEntries(Object.entries(startsFor(db, u.recipe.fields, u.app)).filter(([id]) => !given(u.recipe.fields.find((f) => f.id === id)!)));
+      const withStarts = { ...starts, ...got.values };
       // What it needs and lacks (or the user may add to, when asked): the app's card.
       // Asked first unless the user chose to always run it, or a scheduled task runs in this session (the user set it up and nobody is there to answer).
       const approve = !allowedApps(db).includes(u.app) && !inTaskRun(db, c.key);
-      if (approve || u.recipe.fields.some((f) => !fine(f, got.values, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
-        const a = await askUser(c, u, got, raw, CALL_MS - 60_000, approve);
+      if (approve || u.recipe.fields.some((f) => !fine(f, withStarts, got.files)) || args.ask === true || missingSecrets(db, u.recipe).length) {
+        const a = await askUser(c, u, got, raw, CALL_MS - 60_000, approve, starts);
         if ('why' in a) {
           if (a.why === 'declined' && approve) return `The user chose not to run ${u.recipe.name}. Don't run it again for this request: do what they asked another way, or ask them in words.`;
           if (a.why === 'declined') return `The user closed ${u.recipe.name}'s card without running it. Ask in words if you still need it, or go on without it.`;
@@ -524,7 +631,7 @@ export function useAppTool(ctx: RunCtx): RunTool | null {
           if (!a) return { text: 'That app is gone.', isError: true };
           checkDaily(db, a);
         }
-        r = startRun({ app: u.app, slug: u.slug, recipe: u.recipe, source: 'session', inputs: got.values, ...(Object.keys(got.files).length ? { files: got.files } : {}), askedBy: c.key });
+        r = startRun({ app: u.app, slug: u.slug, recipe: u.recipe, source: 'session', inputs: got.values, ...(Object.keys(got.files).length ? { files: got.files } : {}), askedBy: c.key, ...(typeof args.language === 'string' ? { lang: args.language } : {}) });
       } catch (e) {
         return { text: `${u.recipe.name} could not start: ${(e as Error).message}`, isError: true };
       }

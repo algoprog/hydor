@@ -24,6 +24,8 @@ export interface FetchedPage {
   body?: Buffer;
   /** The body was longer than the limit and was cut there. */
   truncated?: boolean;
+  /** Its Retry-After header, as sent (seconds or a date), when it says how long to wait. */
+  retryAfter?: string;
 }
 
 export class BlockedAddress extends Error {}
@@ -564,7 +566,8 @@ export async function fetchPage(input: string, o: { signal?: AbortSignal; maxByt
     const body = Buffer.concat(chunks);
     const sniffed = body.subarray(0, 5).toString('latin1');
     const textual = (/^text\/|html|xml|json|javascript|yaml|csv/i.test(contentType) || !contentType) && sniffed !== '%PDF-';
-    const base = { url: url.toString(), status: r.status, contentType, ...(truncated ? { truncated } : {}) };
+    const retryAfter = r.headers.get('retry-after');
+    const base = { url: url.toString(), status: r.status, contentType, ...(truncated ? { truncated } : {}), ...(retryAfter ? { retryAfter } : {}) };
     if (!textual) return { ...base, text: '', body };
     const raw = decodeBody(body, charsetOf(contentType, body));
     const html = /html/i.test(contentType) || /^\s*<(!doctype html|html|head|body)/i.test(raw);

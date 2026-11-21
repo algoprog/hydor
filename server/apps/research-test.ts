@@ -15,7 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
-import { allSteps, type CodeStep } from '../../shared/app-manifest.ts';
+import { allSteps, type CodeStep, type Step } from '../../shared/app-manifest.ts';
+import { fromField, startFrom, type AboutMe } from '../../shared/app-me.ts';
 import { isActive } from '../../shared/apps.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT } from '../config.ts';
@@ -30,9 +31,11 @@ import { AGENT_FILE } from '../models/config.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { runCode } from './code.ts';
-import { findRecords } from './data.ts';
+import { changeAboutMe } from './me.ts';
+import { findRecords, removeRecords } from './data.ts';
 import { apps } from './index.ts';
 import { startRun, startRuns, waitFor } from './runs.ts';
+import { forgetAll } from './sturdy.ts';
 import * as store from './store.ts';
 import { templateById } from './templates.ts';
 
@@ -169,7 +172,7 @@ test('Paper radar: what to look for, from the form and from you; the days to loo
   assert.equal(empty.count, 15);
 });
 
-test('Paper radar: the new papers from arXiv’s Atom and OpenAlex’s works, each once, with their BibTeX; arXiv asked three seconds apart; none seen before', async () => {
+test('Paper radar: the new papers from arXiv’s Atom and OpenAlex’s works, each once, with their BibTeX; none seen before', async () => {
   routes = [arxivRoute, openAlexRoute];
   asked.length = 0;
   const plan = { cats: ['cs.IR'], topics: ['dense retrieval'], people: [], count: 10, from: '2026-11-02', to: '2026-11-05', seen: ['ax2611_06876'] };
@@ -202,13 +205,13 @@ test('Paper radar: the new papers from arXiv’s Atom and OpenAlex’s works, ea
   assert.match(oa.abstract, /\w+ \w+ \w+/, 'its abstract put back together from the places of its words');
   assert.equal(v.fetched, 4);
   assert.deepEqual((v.ranking as { id: string }[]).map((x) => x.id), items.map((p) => p.key));
-  assert.ok((v.seen as string[]).includes('ax2611_06876'), 'what was fetched is kept as seen, the seen ones too');
+  assert.equal(v.seen, undefined, 'what was fetched is not marked as seen: only what an update shows is (its edition step keeps that)');
   // The categories, then the topics: arXiv twice, three seconds apart; OpenAlex once (no key), with its filter.
   const arxivCalls = asked.filter((u) => u.includes('export.arxiv.org'));
   assert.equal(arxivCalls.length, 2);
   assert.match(decodeURIComponent(arxivCalls[0]), /search_query=\(cat:cs\.IR\) AND submittedDate:\[202611020000 TO 202611052359\]&sortBy=submittedDate/);
   assert.match(decodeURIComponent(arxivCalls[1]), /\(ti:"dense retrieval" OR abs:"dense retrieval"\) AND submittedDate/);
-  assert.ok(Date.now() - started >= 3000, 'arXiv’s second call waited its turn');
+  assert.ok(Date.now() - started < 3000, 'the program keeps no clock of its own: the engine puts arXiv’s calls three seconds apart (sturdy-test)');
   assert.match(decodeURIComponent(asked.find((u) => u.includes('openalex'))!), /title_and_abstract\.search:"dense retrieval",from_publication_date:2026-11-02/);
   assert.match(String(v.sources), /^arXiv \(cs\.IR\) and OpenAlex$/);
   // arXiv down: said in a note, and what OpenAlex found still comes.
@@ -254,11 +257,11 @@ test('Paper radar: the best for you, the people you follow first, under the proj
   const plain = await program('paper-radar', 'pick', { items, ranked: '', interests, count: 5 });
   assert.equal((plain.papers as Record<string, unknown>[]).find((p) => p.key === 'a')!.group, 'dense retrieval', 'by the interests’ words, it still finds its group');
   assert.equal((plain.papers as Record<string, unknown>[]).find((p) => p.key === 'b')!.group, 'Also new');
-  // Laid out: what was written of each, the papers looked at kept (and a month-old update forgotten), the marks kept to the latest.
+  // Laid out: what was written of each, the papers shown kept, not those only fetched (and a month-old update forgotten), the marks kept to the latest.
   const ctx = ctxOf();
   ctx.data.set('seen', [{ id: 'old', day: '2026-09-01', keys: ['x'] }]);
   ctx.data.set('marks', Array.from({ length: 160 }, (_, i) => ({ id: `m${i}`, mark: 'aside' })));
-  const e = await program('paper-radar', 'edition', { papers, groups: v.groups, written: [{ n: 2, tldr: 'It chunks.', why: 'For Hydor: its eval.' }], headline: 'Long documents', seen: ['a', 'b', 'c'], today: '2026-11-05', fetched: 3, window: '2026-11-02' }, ctx);
+  const e = await program('paper-radar', 'edition', { papers, groups: v.groups, written: [{ n: 2, tldr: 'It chunks.', why: 'For Hydor: its eval.' }], headline: 'Long documents', today: '2026-11-05', fetched: 3, window: '2026-11-02' }, ctx);
   const out = e.papers as Record<string, unknown>[];
   assert.equal(e.headline, 'Long documents');
   assert.equal(e.window, 'sent since 2026-11-02');
@@ -271,19 +274,23 @@ test('Paper radar: the best for you, the people you follow first, under the proj
   );
   assert.deepEqual(
     ctx.data.get('seen')!.map((r) => [r.day, r.keys]),
-    [['2026-11-05', ['a', 'b', 'c']]],
+    [['2026-11-05', ['c', 'a']]],
   );
   assert.equal(ctx.data.get('marks')!.length, 150, 'the oldest marks forgotten (the latest found first)');
 });
 
 // ---- Semantic Scholar: Citation alerts' programs ------------------------------------------------------------------
 
-/** Semantic Scholar busy the first time an address is asked, then answering: what its key-less pool does. */
+/**
+ * Semantic Scholar, busy the first time an address is asked when `busy` is on, then answering: what its key-less pool
+ * does. The engine tries such an answer again (server/apps/sturdy.ts); a program asks once and does not wait.
+ */
+let busy = false;
 const busyOnce = new Set<string>();
 const s2Route: Route = (u) => {
   if (u.host !== 'api.semanticscholar.org') return null;
   const at = u.pathname + u.search;
-  if (/\/citations/.test(u.pathname) && !busyOnce.has(at)) {
+  if (busy && /\/citations/.test(u.pathname) && !busyOnce.has(at)) {
     busyOnce.add(at);
     return { status: 429 };
   }
@@ -308,16 +315,15 @@ test('Citation alerts: you and your papers from Semantic Scholar; only those wit
   assert.deepEqual((one.papers as Record<string, unknown>[]).map((p) => p.title), ['ProCIS: A Benchmark for Proactive Retrieval in Conversations']);
 });
 
-test('Citation alerts: who cited each paper, new ones against those seen (the first look: last month’s only), Semantic Scholar asked again after a wait; how each cites you, your paper’s mention marked', async () => {
+test('Citation alerts: who cited each paper, new ones against those seen (the first look: last month’s only); how each cites you, your paper’s mention marked', async () => {
   routes = [s2Route];
+  busy = false;
   busyOnce.clear();
   const mine = [{ key: 'axcolbert', title: 'ColBERT', s2: 'p1', first: 'Khattab', year: 2020 }];
   const ctx = ctxOf();
   ctx.data.set('cited', [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757'], count: 1 }]);
-  const started = Date.now();
   // Seen before: one of the four; the others new.
   const v = await program('citation-alerts', 'cites', { papers: mine, seen: ctx.data.get('cited'), today: '2026-11-05' }, ctx);
-  assert.ok(Date.now() - started >= 2500, 'it waited before asking again');
   const fresh = v.fresh as Record<string, unknown>[];
   assert.deepEqual(
     fresh.map((c) => c.title),
@@ -377,6 +383,42 @@ test('Citation alerts: who cited each paper, new ones against those seen (the fi
 });
 
 // ---- Hugging Face: New-model watch's programs ---------------------------------------------------------------------
+
+test('Citation alerts: when Semantic Scholar cannot give the citing sentences, OpenAlex says who cited, the answer says plainly that the sentences are to be read again, and those citations stay to be read: the next update shows each with its sentence', async () => {
+  const down: Route = (u) => (u.host === 'api.semanticscholar.org' ? { status: 403 } : null);
+  const mine = [{ key: 'axcolbert', title: 'ColBERT', s2: 'p1', oa: 'W2995', first: 'Khattab', year: 2020 }];
+  routes = [down, openAlexRoute];
+  const before = [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757'], count: 1 }];
+  const v = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const fresh = v.fresh as Record<string, unknown>[];
+  assert.ok(fresh.length > 0, 'OpenAlex gave citing papers');
+  assert.ok(fresh.every((c) => c.unread === true && (c.contexts as unknown[]).length === 0), 'each marked as without its sentence');
+  assert.equal(v.unread, fresh.length);
+  assert.equal(v.sorting, 0, 'no sentence to sort');
+  assert.doesNotMatch(String(v.notes), /too busy/, 'said in the answer’s own words, not among the notes');
+  const keep = (v.keep as Record<string, unknown>[])[0];
+  assert.deepEqual((keep.pending as string[]).slice().sort(), fresh.map((c) => c.key as string).sort(), 'kept as still to be read');
+  // What the answer says, and each citation marked.
+  const ctx = ctxOf();
+  ctx.data.set('cited', before.map((x) => ({ ...x })));
+  const r = await program('citation-alerts', 'report', { author: { name: 'Omar Khattab', source: 'Semantic Scholar' }, papers: [{ key: 'axcolbert', title: 'ColBERT', citations: 3000 }], fresh, counts: v.counts, keep: v.keep, unread: v.unread, kinds: [], notes: '', more: v.notes, today: '2026-11-05' }, ctx);
+  assert.equal(r.sentences, 'The citing sentences could not be read this time (Semantic Scholar limits requests); they are tried again at the next update.');
+  assert.ok((r.citations as Record<string, unknown>[]).every((c) => c.unread === true && c.kind === '' && c.gist === '' && c.mark === ''));
+  assert.deepEqual(ctx.data.get('cited')![0].pending, keep.pending, 'the record keeps what is to be read');
+  // Semantic Scholar answering: no such sentence is said; one it reads (not all of them have) is shown again with it, and leaves the list.
+  routes = [s2Route];
+  const base = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const withSentence = (base.fresh as Record<string, unknown>[]).filter((c) => (c.contexts as unknown[]).length).map((c) => c.key as string);
+  const all = (base.fresh as Record<string, unknown>[]).map((c) => c.key as string);
+  assert.ok(withSentence.length > 0 && withSentence.length < all.length, 'the fixture has some with a sentence, some without');
+  const again = await program('citation-alerts', 'cites', { papers: mine, seen: [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757', ...all], count: 4, pending: all }], today: '2026-11-05' }, ctxOf());
+  assert.deepEqual((again.fresh as Record<string, unknown>[]).map((c) => c.key).sort(), withSentence.slice().sort(), 'those with a sentence are shown again with it');
+  assert.ok((again.fresh as Record<string, unknown>[]).every((c) => !c.unread && (c.contexts as unknown[]).length > 0));
+  assert.equal(again.unread, 0);
+  assert.deepEqual(((again.keep as Record<string, unknown>[])[0].pending as string[]).sort(), all.filter((k) => !withSentence.includes(k)).sort(), 'the others stay to be read');
+  const quiet = await program('citation-alerts', 'report', { author: {}, papers: [], fresh: again.fresh, counts: again.counts, keep: again.keep, unread: again.unread, kinds: [], notes: '', more: '', today: '2026-11-05' }, ctxOf());
+  assert.equal(quiet.sentences, '');
+});
 
 test('New-model watch: the newest models, those old enough with downloads to look at (most downloaded first), those too new to wait; their pages and cards; the licence and size kept to', async () => {
   routes = [(u) => (u.host === 'huggingface.co' && u.pathname === '/api/models' ? fixture('hf-models.json') : null)];
@@ -597,6 +639,45 @@ test('Deadline radar: reminders at the days you gave, the nearest one come for e
   assert.equal(told.length, 0);
 });
 
+test('Deadline radar: a venue neither list has is looked up on the web: its page picked, its deadline taken as a moment and marked as from its website; what it did not find is still missing; a call’s page is kept and linked', async () => {
+  routes = deadlineRoutes;
+  const lists = await program('deadline-radar', 'lists', { venues: 'SIGIR, Zorgcon, Imaginary Conf', calls: [], now: '2027-01-12 09:00', zone: 'Europe/Athens', today: '2027-01-12' });
+  assert.deepEqual(lists.missing, ['Zorgcon', 'Imaginary Conf']);
+  assert.deepEqual((lists.unknown as Record<string, string>[]).map((u) => u.venue), ['Zorgcon', 'Imaginary Conf']);
+  assert.match((lists.unknown as Record<string, string>[])[0].query, /^Zorgcon conference next call for papers/);
+  // Its page: the result that reads like its dates and holds its name, whichever way the search was written.
+  const text = '[1] Zorgcon 2027 · Important dates\n    https://zorgcon.org/2027/dates\n    The dates.\n[2] Zorgcon\n    https://example.com/zorgcon-news\n';
+  const pick = await program('deadline-radar', 'site_pick', { found: { text }, venue: 'Zorgcon' });
+  assert.equal(pick.url, 'https://zorgcon.org/2027/dates');
+  assert.equal((await program('deadline-radar', 'site_pick', { found: { data: { results: [{ url: 'https://a.org/x', title: 'x' }] } }, venue: 'Zorgcon' })) .url, 'https://a.org/x');
+  // 1 February 2027, 23:59 AoE is 2 February 13:59 in Athens; the second venue's page gave nothing, so it is still missing.
+  const web = await program('deadline-radar', 'web_deadlines', {
+    lists,
+    unknown: lists.unknown,
+    said: [{ venue: 'Zorgcon', url: 'https://zorgcon.org/2027/dates', name: 'Zorg Conference', year: 2027, deadline: '2027-02-01 23:59', timezone: 'AoE' }, { venue: 'Imaginary Conf', url: '', name: '', year: null, deadline: '', timezone: '' }],
+  });
+  const wd = web.deadlines as Record<string, unknown>[];
+  assert.deepEqual(wd.map((d) => [d.venue, d.year, d.label, d.day, d.time, d.utc, d.given, d.source, d.next]), [['Zorg Conference', 2027, 'Papers', '2027-02-02', '13:59', '2027-02-02T11:59:00Z', '2027-02-01 23:59 AoE', 'https://zorgcon.org/2027/dates', true]]);
+  assert.deepEqual(web.missing, ['Imaginary Conf']);
+  // A date long past, or no date, is not a find.
+  const old = await program('deadline-radar', 'web_deadlines', { lists, unknown: [{ venue: 'Zorgcon' }], said: [{ venue: 'Zorgcon', url: 'https://zorgcon.org/', name: 'Zorg', year: 2024, deadline: '2024-02-01', timezone: '' }] });
+  assert.deepEqual([(old.deadlines as unknown[]).length, old.missing], [0, ['Zorgcon']]);
+  // Together with the lists' deadlines, in order, the website's marked; the call page found is kept and linked apart from the site.
+  const ctx = ctxOf();
+  const v = await program('deadline-radar', 'remind', { lists, web, read: [{ cfp: 'https://sigir2027.org/calls/full-papers', pages: '9 pages', template: '' }, {}], calls: [], sent: [], reminders: '', today: '2027-01-12' }, ctx);
+  const ds = v.deadlines as Record<string, unknown>[];
+  assert.deepEqual(ds.map((d) => d.venue), ['SIGIR', 'SIGIR', 'Zorg Conference']);
+  const sig = ds[0];
+  assert.deepEqual([sig.link, sig.source, sig.pages], ['https://sigir2027.org/calls/full-papers', '', '9 pages'], 'the call’s page, not the conference’s site');
+  assert.equal(ds[2].source, 'https://zorgcon.org/2027/dates');
+  assert.deepEqual(v.missing, ['Imaginary Conf'], 'only what the web did not give either');
+  assert.equal((v.venues as unknown[]).length, 2);
+  assert.equal(ctx.data.get('calls')![0].cfp, 'https://sigir2027.org/calls/full-papers', 'kept, not thrown away');
+  // Without the web step's answer (it failed), the lists' own missing stand.
+  const none = await program('deadline-radar', 'remind', { lists, web: '', read: [], calls: [], sent: [], reminders: '', today: '2027-01-12' }, ctxOf());
+  assert.deepEqual(none.missing, ['Zorgcon', 'Imaginary Conf']);
+});
+
 // ---- Living related work and Gap finder ----------------------------------------------------------------------------
 
 test('Living related work: each topic’s papers to weigh (the first time its best and latest, the seeds’ citing papers too), the closest numbered, what was kept added with cite keys of their own', async () => {
@@ -721,14 +802,18 @@ class FakeSessions extends EventEmitter {
 
 /** A model server as Custom's models speak to theirs: each answer from `reply`, by what was asked. */
 let reply = (_user: string): unknown => ({});
+let seenByModel: string[] = [];
 const srv = createServer((req, res) => {
   let body = '';
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     const b = JSON.parse(body || '{}');
     const user = String(b.messages?.find((m: { role: string }) => m.role === 'user')?.content ?? '');
+    seenByModel.push(user);
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(reply(user)) }, finish_reason: 'stop' }] })}\n\n`);
+    const said = reply(user);
+    // A step with no outputs asks for plain text (a LaTeX section): a string is sent as it is.
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: typeof said === 'string' ? said : JSON.stringify(said) }, finish_reason: 'stop' }] })}\n\n`);
     res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } })}\n\n`);
     res.end('data: [DONE]\n\n');
   });
@@ -748,6 +833,13 @@ const services: Feature = {
           stepTool('web_search', async (a) => JSON.stringify({ results: [{ title: `${String(a.query)}`, url: 'https://sigir2027.org/calls/full-papers', snippet: 'Call for full papers' }] })),
           stepTool('read_page', async (a) => `The call for full papers at ${String(a.url)}: papers are up to 9 pages, references not counted. Use the ACM template: https://www.acm.org/publications/proceedings-template`),
           stepTool('notify_user', async (a) => (notified.push(a), 'Sent.')),
+          // A paper with no open copy fails; a scanned one comes back with no text; any other is read.
+          stepTool('read_paper', async (a) => {
+            const p = String(a.paper ?? '');
+            if (p.includes('no-copy')) throw new Error('read_paper: There is no open copy of this paper anywhere it looked');
+            if (p.includes('scanned')) return JSON.stringify({ found: true, title: 'A scanned paper', parts: [], notes: ['The PDF has no text: it is pictures of pages'] });
+            return JSON.stringify({ found: true, title: 'A readable paper', parts: ['[Page 1] Abstract. We study things.'] });
+          }),
           RANK_BY_INTEREST,
           USER_PROFILE,
         ]
@@ -807,7 +899,7 @@ test('Paper radar, as it comes: you read, the papers found and ranked against yo
     [
       ['saved', 1],
       ['marks', 1],
-      ['seen', 2],
+      ['seen', 1],
     ],
   );
   // What you saved leans the next ranking toward it: the saved paper is liked.
@@ -825,7 +917,7 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   // Citation alerts: you found, your papers, who cited each (none new the first time: the fixture's are August's), kept.
   routes = [(u) => (u.host === 'api.semanticscholar.org' && /\/citations$/.test(u.pathname) ? fixture('s2-citations.json') : s2Route(u))];
   reply = (user) => (user.includes('cite the reader') ? { kinds: [] } : {});
-  const ca = await run('citation-alerts', { me: 'Chris Samarinas', papers: '' });
+  const ca = await run('citation-alerts', { author: 'Chris Samarinas', papers: '' });
   assert.equal(ca.res.name, 'Chris Samarinas');
   assert.equal(ca.res.papers.length, 6);
   assert.equal(ca.res.headline, 'No new citations');
@@ -834,13 +926,25 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   assert.ok(cited.every((c) => (c.citing as string[]).length === 4));
   // Deadline radar: SIGIR and ACL found, their calls read for the page limit and the template.
   routes = deadlineRoutes;
-  reply = (user) => (user.includes("call for papers") ? { pages: '9 pages, references not counted', template: 'https://www.acm.org/publications/proceedings-template' } : {});
-  const dl = await run('deadline-radar', { venues: 'SIGIR, ACL', reminders: '14, 3, 1' });
-  assert.deepEqual(dl.res.venues.map((v: any) => v.venue), ['SIGIR', 'ACL']);
-  assert.deepEqual(dl.res.missing, []);
+  const nextYear = new Date().getUTCFullYear() + 1;
+  reply = (user) =>
+    user.startsWith('From this part of a page about the conference')
+      ? { name: 'Zorg Conference', year: nextYear, deadline: `${nextYear}-06-01 23:59`, timezone: 'AoE' }
+      : user.includes("call for papers")
+        ? { pages: '9 pages, references not counted', template: 'https://www.acm.org/publications/proceedings-template' }
+        : {};
+  const dl = await run('deadline-radar', { venues: 'SIGIR, ACL, Zorgcon', reminders: '14, 3, 1' });
+  assert.deepEqual(dl.res.venues.map((v: any) => v.venue), ['SIGIR', 'ACL', 'Zorg Conference']);
+  assert.deepEqual(dl.res.missing, [], 'Zorgcon is in neither list, and the web gave its deadline');
   assert.ok(dl.res.deadlines.every((d: any) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(d.utc)));
+  const zorg = dl.res.deadlines.find((d: any) => d.venue === 'Zorg Conference');
+  assert.deepEqual([zorg.source, zorg.day], ['https://sigir2027.org/calls/full-papers', `${nextYear}-06-02`]);
   const calls = findRecords(db, 'tpl:deadline-radar', dl.t.data, 'calls').records;
-  for (const c of calls) assert.equal(c.pages, '9 pages, references not counted');
+  for (const c of calls) {
+    assert.equal(c.pages, '9 pages, references not counted');
+    assert.equal(c.cfp, 'https://sigir2027.org/calls/full-papers', 'the call’s page is kept');
+  }
+  assert.ok(dl.res.deadlines.filter((d: any) => !d.source).every((d: any) => d.link === 'https://sigir2027.org/calls/full-papers'));
   // Living related work: a topic grown from arXiv's and OpenAlex's papers, the model's verdicts kept; its BibTeX flow.
   routes = [arxivRoute, openAlexRoute, s2Route];
   reply = (user) => {
@@ -856,6 +960,20 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   const bib = await run('living-related-work', { topic: 'text embeddings' }, 'bib');
   assert.equal(bib.res.count, kept.length);
   assert.match(bib.res.bib, /^@\w+\{/);
+  // Its related work, drafted by a model from the papers kept, with each cite key checked against them.
+  const key = String(kept[0].citekey);
+  const other = String(kept[kept.length - 1].citekey);
+  let asked = '';
+  reply = (user) => {
+    asked = user;
+    return '```latex\nDense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',madeupkey2027,' + other + '}. Others differ \\cite{ghost2026}.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '} \\cite{nobody}.\n```';
+  };
+  const draft = await run('living-related-work', { topic: 'text embeddings' }, 'draft');
+  assert.ok(asked.includes('\\cite{' + key + '}') && asked.includes('## Embeddings'), 'the papers by theme, each with its key');
+  assert.equal(draft.res.latex, 'Dense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',' + other + '}. Others differ.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '}.', 'the fence is off; keys that are none of the papers’ are taken out, and a citation left with none goes whole');
+  assert.match(draft.res.note, /^3 citations to papers that are not in this topic \(madeupkey2027, ghost2026, nobody\) were taken out\.$/);
+  assert.equal(draft.res.count, kept.length);
+  assert.ok(draft.res.bib.startsWith('@'));
   // A second update: the papers it has are not weighed again.
   const again = await run('living-related-work', { topics: 'text embeddings', seeds: '', most: '20' });
   assert.equal(again.res.fresh, 0);
@@ -871,6 +989,365 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   assert.deepEqual(gap.res.ideas.map((i: any) => [i.title, i.verdict]), [['Idea 1', 'new'], ['Idea 3', 'new']]);
   assert.match(gap.res.ideas[0].crosses, /^“Balancing hierarchical/);
   assert.equal(gap.res.headline, '2 of 2 ideas look new');
+});
+
+// ---- About you: what the research apps start from, and whose language they write in -------------------------------
+
+const RESEARCH_APPS = ['paper-radar', 'citation-alerts', 'new-model-watch', 'deadline-radar', 'living-related-work', 'gap-finder', 'reading-list', 'literature-matrix', 'reproduce-paper', 'reviewer-simulator', 'rebuttal-workbench', 'paper-to-talk', 'figure-doctor', 'annotation-workbench', 'research-sprint', 'sweep-planner', 'weekly-report', 'lab-notebook', 'explore'];
+/** App, question, and what its answer starts from: a field of About you, or the person's last answer. */
+const STARTS: [string, string, string][] = [
+  ['paper-radar', 'fields', 'me.fields'],
+  ['paper-radar', 'topics', 'me.topics'],
+  ['citation-alerts', 'author', 'me.author'],
+  ['new-model-watch', 'task', 'remember'],
+  ['new-model-watch', 'words', 'remember'],
+  ['new-model-watch', 'licence', 'remember'],
+  ['new-model-watch', 'size', 'remember'],
+  ['new-model-watch', 'downloads', 'remember'],
+  ['new-model-watch', 'days', 'remember'],
+  ['new-model-watch', 'command', 'remember'],
+  ['new-model-watch', 'folder', 'remember'],
+  ['new-model-watch', 'metric', 'remember'],
+  ['new-model-watch', 'better', 'remember'],
+  ['new-model-watch', 'best', 'remember'],
+  ['deadline-radar', 'venues', 'me.venues'],
+  ['living-related-work', 'topics', 'remember'],
+  ['gap-finder', 'papers', 'me.author'],
+  ['gap-finder', 'area', 'me.fields'],
+  ['gap-finder', 'compute', 'me.compute'],
+  ['literature-matrix', 'columns', 'remember'],
+  ['reproduce-paper', 'limits', 'remember'],
+  ['reviewer-simulator', 'venue', 'remember'],
+  ['rebuttal-workbench', 'limit', 'remember'],
+  ['rebuttal-workbench', 'tone', 'remember'],
+  ['figure-doctor', 'venue', 'remember'],
+  ['figure-doctor', 'inches', 'remember'],
+  ['figure-doctor', 'font', 'remember'],
+  ['research-sprint', 'repo', 'remember'],
+  ['sweep-planner', 'folder', 'remember'],
+  ['weekly-report', 'projects', 'remember'],
+  ['lab-notebook', 'projects', 'remember'],
+];
+/** What a record holding every research field gives each kind of question. */
+const RECORD: AboutMe = { fields: ['Information retrieval', 'NLP'], topics: ['dense retrieval', 'query performance prediction'], venues: ['SIGIR', 'ACL'], author: { name: 'Chris Samarinas', id: 'A5012345678' }, compute: 'a laptop and one 24 GB GPU' };
+
+test('About you: each question that starts from the record or from the last answer is a real field of it, in the right kind of question', () => {
+  const found: [string, string, string][] = [];
+  for (const id of RESEARCH_APPS) {
+    const t = templateById(id);
+    assert.ok(t, `${id} is a ready-made app`);
+    for (const f of t.fields) {
+      if (f.from) {
+        const field = fromField(f.from);
+        assert.ok(field, `${id}: ${f.id} starts from ${f.from}, which is no field of About you`);
+        assert.ok(startFrom(f, field, RECORD), `${id}: ${f.id} takes the record’s ${field}`);
+        assert.ok(!f.remember, `${id}: ${f.id} has one start, not two`);
+        found.push([id, f.id, f.from]);
+      }
+      if (f.remember) {
+        assert.notEqual(f.type, 'file', `${id}: ${f.id} is a file, which is not remembered`);
+        found.push([id, f.id, 'remember']);
+      }
+    }
+  }
+  const key = (x: string[]) => x.join(' · ');
+  assert.deepEqual(found.map(key).sort(), STARTS.map(key).sort());
+  // The lists come as one comma-joined line; the author by name.
+  const q = (app: string, id: string) => templateById(app)!.fields.find((f) => f.id === id)!;
+  assert.equal(startFrom(q('paper-radar', 'fields'), 'fields', RECORD), 'Information retrieval, NLP');
+  assert.equal(startFrom(q('paper-radar', 'topics'), 'topics', RECORD), 'dense retrieval, query performance prediction');
+  assert.equal(startFrom(q('citation-alerts', 'author'), 'author', RECORD), 'Chris Samarinas');
+  assert.equal(startFrom(q('gap-finder', 'compute'), 'compute', RECORD), 'a laptop and one 24 GB GPU');
+  // Nothing in the record: nothing to start from, so a run comes out as it did.
+  assert.equal(startFrom(q('deadline-radar', 'venues'), 'venues', {}), undefined);
+});
+
+test('About you: the apps whose words only the person reads answer in their language, those that go to others or into a paper keep the paper’s', () => {
+  const person = RESEARCH_APPS.filter((id) => templateById(id)!.language === 'person').sort();
+  assert.deepEqual(person, ['citation-alerts', 'deadline-radar', 'explore', 'gap-finder', 'lab-notebook', 'new-model-watch', 'paper-radar']);
+  // Every model step of those whose answer a program reads says the words it must keep, in English.
+  const prompt = (app: string, step: string) => {
+    const t = templateById(app)!;
+    const s = [...allSteps(t.flow!.steps), ...Object.values(t.flows ?? {}).flatMap((f) => allSteps(f.steps))].find((x: Step) => x.id === step);
+    assert.ok(s && s.do === 'model', `${app} has a model step “${step}”`);
+    return s.instructions;
+  };
+  assert.match(prompt('citation-alerts', 'sort'), /exactly one of "builds on".*"mentions".*in English/s);
+  assert.match(prompt('gap-finder', 'verdict'), /exactly one of "new".*"partly done".*"done".*in English/s);
+  assert.match(prompt('gap-finder', 'verdict'), /exactly one of "fits".*"tight".*"too big".*in English/s);
+  assert.match(prompt('gap-finder', 'propose'), /queries:.*always in English/);
+  assert.match(prompt('paper-radar', 'guess'), /search words for arXiv: always in English/);
+  assert.match(prompt('explore', 'topics'), /Searches are always written in English/);
+});
+
+const oaAuthor = JSON.stringify({ id: 'https://openalex.org/A5012345678', display_name: 'Chris Samarinas', cited_by_count: 155, summary_stats: { h_index: 6 }, last_known_institutions: [{ display_name: 'University of Massachusetts Amherst' }] });
+const oaWorks: Route = (u) => (u.host === 'api.openalex.org' && u.pathname === '/works' ? JSON.stringify({ results: [{ id: 'https://openalex.org/W1', doi: 'https://doi.org/10.1145/1', title: 'A paper of mine', publication_date: '2024-01-01', publication_year: 2024, cited_by_count: 5, type: 'article', authorships: [], primary_location: {} }] }) : null);
+const oaById: Route = (u) => (u.host === 'api.openalex.org' && /^\/authors\/(A5012345678|orcid:0000-0002-1825-0097)$/.test(decodeURIComponent(u.pathname)) ? oaAuthor : null);
+
+test('Citation alerts: the id About you holds finds you where a name might find a namesake; the name wins when it is not the recorded one', async () => {
+  routes = [s2Route, oaById, oaWorks];
+  busy = false;
+  // An OpenAlex id: no search by name, no Semantic Scholar at all.
+  asked.length = 0;
+  const byId = await program('citation-alerts', 'who', { me: 'Chris Samarinas', id: 'A5012345678', recorded: 'Chris Samarinas', papers: '' });
+  assert.deepEqual([(byId.author as Record<string, unknown>).id, (byId.author as Record<string, unknown>).source, byId.notes], ['A5012345678', 'OpenAlex', ''], 'found on OpenAlex with no note: it was meant');
+  assert.ok(asked.some((u) => u.endsWith('/authors/A5012345678')));
+  assert.ok(!asked.some((u) => u.includes('semanticscholar.org') || u.includes('authors?search')), 'no search by name');
+  assert.ok((byId.papers as unknown[]).length > 0);
+  // An ORCID, the same way.
+  asked.length = 0;
+  const orcid = await program('citation-alerts', 'who', { me: 'Chris Samarinas', id: '0000-0002-1825-0097', recorded: 'chris samarinas', papers: '' });
+  assert.equal((orcid.author as Record<string, unknown>).source, 'OpenAlex');
+  assert.ok(asked.some((u) => decodeURIComponent(u).endsWith('/authors/orcid:0000-0002-1825-0097')));
+  // The question holds another name than the record’s: that person is looked up by name, the id is not theirs.
+  asked.length = 0;
+  await program('citation-alerts', 'who', { me: 'Gerard Salton', id: 'A5012345678', recorded: 'Chris Samarinas', papers: '' });
+  assert.ok(asked.some((u) => u.includes('author/search?query=Gerard%20Salton')), 'by name');
+  assert.ok(!asked.some((u) => u.endsWith('/authors/A5012345678')));
+  // No id in the record: by name as before; an id typed into the question works as before.
+  asked.length = 0;
+  const named = await program('citation-alerts', 'who', { me: 'Chris Samarinas', id: '', recorded: '', papers: '' });
+  assert.equal((named.author as Record<string, unknown>).source, 'Semantic Scholar');
+  assert.ok(asked.some((u) => u.includes('author/search')));
+  asked.length = 0;
+  const typed = await program('citation-alerts', 'who', { me: '2006776003', id: '', recorded: '', papers: '' });
+  assert.equal((typed.author as Record<string, unknown>).id, '2006776003');
+  assert.ok(!asked.some((u) => u.includes('author/search')));
+  // A recorded id nothing knows: said, with the name, as a failure that tells what to do.
+  await assert.rejects(program('citation-alerts', 'who', { me: 'Nobody Known', id: 'A99999999', recorded: 'Nobody Known', papers: '' }), /No author called Nobody Known \(nor the id A99999999\) was found/);
+});
+
+test('Gap finder: the id About you holds finds your papers on OpenAlex where a name might find a namesake; another name is looked up by name; the step is given {{me.author_id}}', async () => {
+  const yours = allSteps(templateById('gap-finder')!.flow!.steps).find((s) => s.id === 'yours') as CodeStep;
+  assert.deepEqual([yours.with?.id, yours.with?.recorded], ['{{me.author_id}}', '{{me.author}}']);
+  routes = [s2Route, oaById, oaWorks];
+  busy = false;
+  asked.length = 0;
+  const byId = await program('gap-finder', 'yours', { mine: 'Chris Samarinas', id: 'A5012345678', recorded: 'Chris Samarinas' });
+  assert.deepEqual((byId.papers as Record<string, unknown>[]).map((p) => p.title), ['A paper of mine']);
+  assert.ok(asked.some((u) => u.endsWith('/authors/A5012345678')));
+  assert.ok(asked.some((u) => decodeURIComponent(u).includes('/works?filter=author.id:A5012345678')));
+  assert.ok(!asked.some((u) => u.includes('author/search')), 'no search by name');
+  asked.length = 0;
+  const orcid = await program('gap-finder', 'yours', { mine: 'chris samarinas', id: '0000-0002-1825-0097', recorded: 'Chris Samarinas' });
+  assert.equal((orcid.papers as unknown[]).length, 1);
+  assert.ok(asked.some((u) => decodeURIComponent(u).endsWith('/authors/orcid:0000-0002-1825-0097')));
+  // Another name than the recorded one, or no id: by name, as before.
+  for (const input of [{ mine: 'Gerard Salton', id: 'A5012345678', recorded: 'Chris Samarinas' }, { mine: 'Chris Samarinas', id: '', recorded: '' }]) {
+    asked.length = 0;
+    await program('gap-finder', 'yours', input);
+    assert.ok(asked.some((u) => u.includes('author/search')), `by name: ${input.mine}`);
+    assert.ok(!asked.some((u) => u.endsWith('/authors/A5012345678')));
+  }
+});
+
+test('Citation alerts, whole: the id in About you reaches the program as {{me.author_id}} (the question is called author, not me), and only while the name is the recorded one', async () => {
+  changeAboutMe(db, { author: { name: 'Chris Samarinas', id: 'A5012345678' } });
+  forgetAll(); // look-ups are kept for five minutes: ask afresh
+  try {
+    routes = [s2Route, oaById, openAlexRoute];
+    busy = false;
+    reply = () => ({});
+    const t = templateById('citation-alerts')!;
+    asked.length = 0;
+    const r = (await waitFor(startRun({ app: 'tpl:citation-alerts', slug: 'citation-alerts', recipe: t, source: 'web', inputs: { author: 'Chris Samarinas', papers: '' } }).id, 120_000))!;
+    assert.equal(r.status, 'done', r.error);
+    assert.equal((r.result as Record<string, any>).source, 'OpenAlex');
+    assert.ok(asked.some((u) => u.endsWith('/authors/A5012345678')));
+    asked.length = 0;
+    forgetAll();
+    const other = (await waitFor(startRun({ app: 'tpl:citation-alerts', slug: 'citation-alerts', recipe: t, source: 'web', inputs: { author: 'Chris Samarinas Jr', papers: '' } }).id, 120_000))!;
+    assert.equal(other.status, 'done', other.error);
+    assert.ok(!asked.some((u) => u.endsWith('/authors/A5012345678')), 'another name, another person');
+    // A public page's visitor has none of it.
+    asked.length = 0;
+    forgetAll();
+    const pub = (await waitFor(startRun({ app: 'tpl:citation-alerts', slug: 'citation-alerts', recipe: t, source: 'web', inputs: { author: 'Chris Samarinas', papers: '' }, public: { model: 'fake', web: true, capUsd: 1 } }).id, 120_000))!;
+    assert.ok(!asked.some((u) => u.endsWith('/authors/A5012345678')), 'a public run starts from nothing of yours: ' + pub.status);
+  } finally {
+    changeAboutMe(db, { author: null });
+  }
+});
+
+test('Citation alerts: no wait or retry of its own: a busy Semantic Scholar is asked once and OpenAlex answers; the engine does the trying again', async () => {
+  const src = JSON.stringify([templateById('citation-alerts'), templateById('paper-radar'), templateById('gap-finder'), templateById('living-related-work')]);
+  for (const word of ['setTimeout', 'lastCall', 'sleep(', 's2Waited', 'S2_WAIT']) assert.ok(!src.includes(word), `no ${word} in the programs`);
+  busy = true;
+  busyOnce.clear();
+  routes = [s2Route, openAlexRoute];
+  const mine = [{ key: 'axcolbert', title: 'ColBERT', s2: 'p1', oa: 'W2995', first: 'Khattab', year: 2020 }];
+  asked.length = 0;
+  const started = Date.now();
+  const ctx = ctxOf();
+  const v = await program('citation-alerts', 'cites', { papers: mine, seen: [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757'], count: 1 }], today: '2026-11-05' }, ctx);
+  busy = false;
+  assert.ok(Date.now() - started < 3000, 'it did not wait');
+  assert.equal(ctx.calls.filter((c) => c.kind === 'tool' && String((c.args.with as Record<string, unknown>).url).includes('/citations') && !(c.args.with as Record<string, unknown>).auth).length, 1, 'asked once (after the probe for a key)');
+  assert.ok((v.fresh as unknown[]).length > 0 && Number(v.unread) > 0, 'OpenAlex said who cited, their sentences still to be read');
+});
+
+test('Citation alerts, whole: a busy Semantic Scholar is tried again by the engine, so the sentences come after all', async () => {
+  busy = true;
+  busyOnce.clear();
+  forgetAll();
+  routes = [s2Route];
+  reply = (user) => (user.includes('cite the reader') ? { kinds: [] } : {});
+  const t = templateById('citation-alerts')!;
+  asked.length = 0;
+  const r = (await waitFor(startRun({ app: 'tpl:citation-alerts', slug: 'citation-alerts', recipe: t, source: 'web', inputs: { author: 'Chris Samarinas', papers: '' } }).id, 180_000))!;
+  busy = false;
+  assert.equal(r.status, 'done', r.error);
+  const res = r.result as Record<string, any>;
+  assert.ok(!res.sentences, 'no “sentences could not be read” line: the second try answered');
+  assert.equal(res.source, 'Semantic Scholar');
+  const citationCalls = asked.filter((u) => u.includes('/citations')).length;
+  assert.ok(citationCalls >= 12, `each paper’s citations asked twice (busy, then answered): ${citationCalls}`);
+});
+
+test('Gap finder: several areas between commas are searched together; the ideas are checked side by side and each on its own', async () => {
+  routes = [arxivRoute];
+  asked.length = 0;
+  await program('gap-finder', 'month', { area: 'Information retrieval, NLP', today: '2026-11-05' });
+  const q = decodeURIComponent(asked.find((u) => u.includes('export.arxiv.org'))!);
+  assert.match(q, /search_query=\(cat:cs\.IR OR cat:cs\.CL\) AND submittedDate/, 'categories by their names');
+  asked.length = 0;
+  await program('gap-finder', 'month', { area: 'conversational search, dense retrieval', today: '2026-11-05' });
+  assert.match(decodeURIComponent(asked.find((u) => u.includes('export.arxiv.org'))!), /search_query=\(\(abs:conversational AND abs:search OR ti:"conversational search"\) OR \(abs:dense AND abs:retrieval OR ti:"dense retrieval"\)\) AND submittedDate/, 'areas in words');
+  asked.length = 0;
+  await program('gap-finder', 'month', { area: 'cs.IR', today: '2026-11-05' });
+  assert.match(decodeURIComponent(asked.find((u) => u.includes('export.arxiv.org'))!), /search_query=cat:cs\.IR AND submittedDate/, 'one area as before');
+  // The repeat goes several at a time, and a check does not depend on running alone.
+  const check = allSteps(templateById('gap-finder')!.flow!.steps).find((s) => s.id === 'check');
+  assert.ok(check && check.do === 'repeat' && (check.atOnce ?? 1) >= 2, 'its checks go side by side');
+  routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
+  const idea = (n: number) => ({ title: `Idea ${n}`, idea: `Do thing ${n}.`, queries: 'text embeddings quantization | hierarchical embeddings', first: 'Try it.', needs: 'a model' });
+  const alone = await program('gap-finder', 'prior', { idea: idea(1) });
+  const together = await Promise.all([1, 2, 3].map((n) => program('gap-finder', 'prior', { idea: idea(n) }, ctxOf())));
+  assert.deepEqual(together[0], alone, 'the same papers whether it runs alone or with others');
+  assert.deepEqual(together[2], await program('gap-finder', 'prior', { idea: idea(3) }), 'and the same again for another idea');
+});
+
+test('Gap finder, whole: its checks start side by side, and its answer is the same as one at a time', async () => {
+  routes = [arxivRoute, (u) => (u.host === 'api.semanticscholar.org' && u.pathname.endsWith('/paper/search') ? JSON.stringify({ data: [] }) : null)];
+  reply = (user) =>
+    user.includes('Propose')
+      ? { ideas: [1, 2, 3].map((i) => ({ title: `Idea ${i}`, idea: `Do thing ${i}.`, crosses: 'M1 × R2', queries: 'text embeddings quantization', first: `Try ${i}.`, needs: 'a 400M model' })) }
+      : user.includes('Judge it')
+        ? { verdict: 'new', why: 'P1 is near it.', closest: 1, first: 'Try it.', cost: 'about 5 GPU hours', fits: 'fits' }
+        : {};
+  const t = templateById('gap-finder')!;
+  const r = (await waitFor(startRun({ app: 'tpl:gap-finder', slug: 'gap-finder', recipe: t, source: 'web', inputs: { papers: 'Balancing hierarchical representation and quantization', area: 'cs.IR', compute: 'one 24 GB GPU', ideas: '3' } }).id, 180_000))!;
+  assert.equal(r.status, 'done', r.error);
+  assert.equal((r.result as Record<string, any>).ideas.length, 3);
+  const prior = store.listSteps(db, r.id).filter((s) => s.id === 'prior');
+  assert.equal(prior.length, 3);
+  const firstEnd = Math.min(...prior.map((s) => s.endedAt ?? Infinity));
+  assert.ok(prior.every((s) => (s.startedAt ?? Infinity) < firstEnd), 'all three started before any of them ended');
+});
+
+test('Explore: a story an edition showed is left out of the next ones for three weeks; what it shows is kept by address', async () => {
+  const hit = (title: string, url: string, date: string) => ({ title, url, date, snippet: 'It says something.' });
+  const news = [{ data: { results: [hit('Old story shown yesterday', 'https://www.example.com/a?utm_source=x', '2026-11-04'), hit('A fresh story about agents', 'https://news.example.org/b', '2026-11-04')] } }];
+  const reads = [{ data: { results: [hit('A long read shown last week', 'https://blog.example.net/essay/', ''), hit('Another long read on agents', 'https://blog.example.net/other', '')] } }];
+  const topics = [{ topic: 'AI agents', why: 'You build them', news: 'ai agents', reads: 'ai agents essay', n: 1 }];
+  const base = { topics, news, reads, since: '2026-10-22', today: '2026-11-05', skip: '' };
+  const before = await program('explore', 'pick', { ...base, shown: [] });
+  assert.deepEqual((before.items as Record<string, string>[]).map((i) => i.title).sort(), ['A fresh story about agents', 'A long read shown last week', 'Another long read on agents', 'Old story shown yesterday'], 'without a memory, everything is offered');
+  const after = await program('explore', 'pick', { ...base, shown: [{ id: 'e1', day: '2026-11-04', urls: ['example.com/a'] }, { id: 'e2', day: '2026-10-30', urls: ['blog.example.net/essay'] }] });
+  assert.deepEqual((after.items as Record<string, string>[]).map((i) => i.title).sort(), ['A fresh story about agents', 'Another long read on agents'], 'tracking parameters and a trailing slash do not hide a repeat');
+  // The edition lays out, and keeps what it showed (three weeks of it).
+  const ctx = ctxOf();
+  ctx.data.set('shown', [{ id: 'old', day: '2026-10-01', urls: ['example.com/very-old'] }]);
+  const front = await program('explore', 'front', { stories: [{ topic: 'AI agents', title: 'A fresh story about agents', url: 'https://www.news.example.org/b?utm_medium=y', kind: 'News' }, { topic: 'AI agents', title: 'Another', url: 'https://blog.example.net/other', kind: 'Long read' }], topics, cover: 1, today: '2026-11-05' }, ctx);
+  assert.equal(front.edition, '2026-11-05');
+  assert.deepEqual(ctx.data.get('shown')!.map((r) => [r.day, r.urls]), [['2026-11-05', ['news.example.org/b?utm_medium=y'.replace('?utm_medium=y', ''), 'blog.example.net/other']]]);
+  // Nothing shown, nothing kept.
+  const none = ctxOf();
+  await program('explore', 'front', { stories: [], topics: [], cover: 1, today: '2026-11-05' }, none);
+  assert.equal(none.data.get('shown')?.length ?? 0, 0);
+});
+
+test('Paper radar in Greek: models answer in Greek, the programs between them do not break on it, and the run says what stays as written', async () => {
+  routes = [arxivRoute, openAlexRoute];
+  forgetAll();
+  seenByModel = [];
+  reply = (user) => {
+    if (user.includes('They have not said what to follow yet'))
+      return { categories: ['cs.IR'], topics: ['text embeddings'] };
+    const n = [...user.matchAll(/^(\d+)\. \[/gm)].map((m) => Number(m[1]));
+    return { headline: 'Embeddings και πράκτορες', papers: n.map((i) => ({ n: i, tldr: `Η εργασία ${i} σε μία πρόταση.`, why: `Για το dense retrieval: αριθμός ${i}.` })) };
+  };
+  const t = templateById('paper-radar')!;
+  removeRecords(db, 'tpl:paper-radar', t.data, 'seen', { where: {} }); // what the earlier run showed is seen: start fresh
+  // Nothing given yet: the model chooses the fields (its search words stay English), then the run goes on in Greek.
+  const guessed = (await waitFor(startRun({ app: 'tpl:paper-radar', slug: 'paper-radar', recipe: t, source: 'test', inputs: { fields: '', topics: '', people: '', count: '5' }, lang: 'el' }).id, 120_000))!;
+  assert.equal(guessed.status, 'done', guessed.error);
+  const line = 'Write everything people will read in Greek. Keep the names of fields, the choices you were given, codes and numbers exactly as they are written.';
+  assert.ok(seenByModel.length >= 2 && seenByModel.every((u) => u.includes(line)), 'each model step is told the language, after its instructions');
+  assert.ok(seenByModel.some((u) => u.includes('search words for arXiv: always in English')), 'and that its search words stay English');
+  const res = guessed.result as Record<string, any>;
+  assert.equal(res.headline, 'Embeddings και πράκτορες');
+  assert.ok(res.papers.length >= 1 && res.papers.every((p: any) => /^Η εργασία \d σε μία πρόταση\.$/.test(p.tldr) && /^Για το dense retrieval: αριθμός \d\.$/.test(p.why)), 'Greek lines on each paper reach the page');
+  assert.ok(res.papers.every((p: any) => p.bibtex.startsWith('@') && /^https:\/\//.test(p.url) && p.group), 'what a program made is as it was: links, BibTeX, groups');
+  // With the fields given, in English, nothing is added to what the models are told.
+  removeRecords(db, 'tpl:paper-radar', t.data, 'seen', { where: {} });
+  seenByModel = [];
+  const plain = (await waitFor(startRun({ app: 'tpl:paper-radar', slug: 'paper-radar', recipe: t, source: 'test', inputs: { fields: 'cs.IR', topics: 'text embeddings', people: '', count: '5' }, lang: 'en' }).id, 120_000))!;
+  assert.equal(plain.status, 'done', plain.error);
+  assert.ok(seenByModel.length >= 1 && seenByModel.every((u) => !u.includes('Write everything people will read in')), 'in English, no line on language');
+});
+
+test('Paper radar: a topics line from About you (commas) is several topics; lines are one each, commas inside kept', async () => {
+  const base = { fields: '', people: '', count: '12', today: '2026-11-05', me: {}, seen: [] };
+  const joined = await program('paper-radar', 'plan', { ...base, topics: 'dense retrieval, query performance prediction' });
+  assert.deepEqual(joined.topics, ['dense retrieval', 'query performance prediction']);
+  const lined = await program('paper-radar', 'plan', { ...base, topics: 'retrieval, with long documents\nquery performance prediction' });
+  assert.deepEqual(lined.topics, ['retrieval, with long documents', 'query performance prediction']);
+  const fields = await program('paper-radar', 'plan', { ...base, fields: 'Information retrieval, NLP', topics: '' });
+  assert.deepEqual(fields.cats, ['cs.IR', 'cs.CL']);
+});
+
+test('Reviewer simulator and Paper to talk: a paper that could not be read stops the run with a line on how to give it another way, not the tool’s bare failure; one that was read needs no program', async () => {
+  const another = 'Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy.';
+  for (const id of ['reviewer-simulator', 'paper-to-talk']) {
+    const t = templateById(id)!;
+    const steps = allSteps(t.flow!.steps);
+    const read = steps.find((s) => s.id === 'paper_read')!;
+    assert.ok(Array.isArray(read.failed) && read.failed[0].id === 'unreadable', `${id}: a failed read has its own step`);
+    // A read with no page of text stops too; a read with pages skips that step (a computer that cannot run programs still goes on).
+    const text = steps.find((s) => s.id === 'unreadable_text') as CodeStep;
+    assert.ok(text && text.if === '{{paper_read.data.parts}} is empty', `${id}: the check runs only when the paper came back without text`);
+    // The steps that say it, run: only that line, no source line or stack of the program's.
+    const bad = steps.find((s) => s.id === 'unreadable') as CodeStep;
+    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: 'read_paper: There is no open copy of this paper.\nmore' }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another} (It said: There is no open copy of this paper)`);
+    await assert.rejects(runCode({ language: bad.language, code: bad.code, input: { why: '' }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another}`);
+    await assert.rejects(runCode({ language: text.language, code: text.code, input: { why: ['The PDF has no text.'] }, slug: id, seconds: 20 }), (e: Error) => e.message === `It stopped with an error:\n${another} (It said: The PDF has no text)`);
+  }
+});
+
+test('Reviewer simulator and Paper to talk, whole: a paper with no open copy, or one with no text, ends the run with that line and how to give it another way', async () => {
+  reply = () => ({});
+  for (const id of ['reviewer-simulator', 'paper-to-talk']) {
+    const t = templateById(id)!;
+    for (const paper of ['~/papers/no-copy.pdf', '~/papers/scanned.pdf']) {
+      seenByModel = [];
+      const r = (await waitFor(startRun({ app: `tpl:${id}`, slug: id, recipe: t, source: 'web', inputs: { paper } }).id, 60_000))!;
+      assert.equal(r.status, 'failed', `${id}: ${paper} stops the run`);
+      assert.equal(seenByModel.length, 0, `${id}: no model was asked about a paper it could not read`);
+      // The run's error, as its page shows it: what happened and how to give the paper another way, in words alone.
+      const error = String(r.error).replace(/\s+/g, ' ');
+      assert.ok(!/file:\/\/|\bat main\b|Node\.js|throw /.test(error), `${id}: no program source or stack in “${error}”`);
+      if (paper.includes('no-copy')) assert.equal(error, 'Your paper could not be read: It stopped with an error: Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy. (It said: There is no open copy of this paper anywhere it looked)');
+      else assert.equal(error, 'Your paper could not be read: It stopped with an error: Give it another way: upload its PDF (Or upload it), give the path of its .tex file or of its LaTeX project’s folder, or give its arXiv id or a link to an open copy. (It said: The PDF has no text: it is pictures of pages)');
+      // And what could not be had shows under it: the paper, with the tool's own words.
+      if (paper.includes('no-copy')) assert.ok((r.misses ?? []).some((m) => /There is no open copy/.test(m.why ?? '')), `${id}: the read is listed as what could not be had`);
+    }
+  }
+  // A paper that was read: the check is skipped, and the run goes on to its models.
+  seenByModel = [];
+  const read = (await waitFor(startRun({ app: 'tpl:reviewer-simulator', slug: 'reviewer-simulator', recipe: templateById('reviewer-simulator')!, source: 'web', inputs: { paper: '~/papers/draft.pdf', reviewers: '1' } }).id, 60_000))!;
+  assert.equal(store.listSteps(db, read.id).find((s) => s.id === 'unreadable_text')?.status, 'skipped', 'no program for a paper that was read');
+  assert.ok(seenByModel.length > 0, 'its models were asked about the paper: ' + read.status + ' ' + (read.error ?? ''));
 });
 
 // ---- the real services (LIVE=1) ----------------------------------------------------------------------------------

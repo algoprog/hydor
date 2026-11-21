@@ -1,6 +1,7 @@
-// Settings → Apps: the apps agents run for you without asking first. An agent that wants to run one of your apps asks
-// on the app's card in the conversation; "Always run it" there puts the app here. Remove one and agents ask again;
-// add one to skip the question before the first time.
+// Settings → Apps: About you (AboutYou.tsx), what apps start their questions from; then the apps agents run for you
+// without asking first. An agent that wants to run one of your apps asks on the app's card in the conversation;
+// "Always run it" there puts the app here. Remove one and agents ask again; add one to skip the question before the
+// first time.
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import { api, enc, put } from '../../lib/api';
@@ -9,6 +10,7 @@ import { toastError } from '../../lib/store';
 import { cx, IconButton, Popover, Throbber } from '../../components/ui';
 import { EmptyRow, Group, Row, Stack } from '../settings/kit';
 import { AppIcon } from './AppIcon';
+import { AboutYou } from './AboutYou';
 
 interface AppRef {
   id: string;
@@ -84,6 +86,7 @@ export function AllowedSettings() {
   };
   return (
     <Stack>
+      <AboutYou />
       <Group
         title="Run without asking"
         info="When an agent wants to run one of your apps, it first asks on the app’s card in the conversation: Run it, Always run it, or Don’t run. Apps listed here run without that question; the card still shows when the app needs details the request left out. Remove an app to be asked again."

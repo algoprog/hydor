@@ -16,7 +16,8 @@ import path from 'node:path';
 import type { RunRecord } from '../../shared/experiments.ts';
 import type { AppTemplate } from '../../shared/apps.ts';
 import { cleanRecipe } from '../../shared/apps.ts';
-import { allSteps, checkFlow, cleanFlow, type CodeStep } from '../../shared/app-manifest.ts';
+import { allSteps, checkFlow, cleanFlow, fillRefs, type CodeStep } from '../../shared/app-manifest.ts';
+import { meVars } from '../../shared/app-me.ts';
 import { checkUi, cleanUi, missingIn, uiEngine } from '../../shared/app-ui.ts';
 import { TEMPLATES } from './templates.ts';
 import { AGREE } from './templates-lab.ts';
@@ -38,6 +39,7 @@ import { AGENT_FILE } from '../models/config.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { apps } from './index.ts';
+import { changeAboutMe } from './me.ts';
 import { saveResult, startRun, startRuns, waitFor } from './runs.ts';
 import { keysOfFlow } from './secrets.ts';
 import { initMedia } from '../media/store.ts';
@@ -432,6 +434,16 @@ test('Sweep planner: the budget read as runs or GPU hours, grid or random within
   assert.deepEqual([tight.mode, tight.runs, tight.grid, tight.most], ['random', 3, 12, 3], 'seven GPU hours, two GPUs an hour each: three runs, drawn at random');
   assert.deepEqual(tight.params.dropout, [0, 0.1], 'the researcher’s own settings too');
   await assert.rejects(runCode(codeOf(t, 'plan'), { settings: [], given: '', command: 'x', budget: '5' }), /No settings to tune/);
+  // The script is read only for what the form leaves open: the settings, or how long a run takes (a budget in GPU hours).
+  const ready = (settings: string, budget: string) => runCode(codeOf(t, 'ready'), { settings, budget });
+  assert.deepEqual([(await ready('lr: 1e-4, 3e-4\nbatch_size: 16, 32', '6 runs')).need, (await ready('lr: 1e-4, 3e-4', '20')).need], ['', ''], 'all given, a budget in runs: nothing to find out');
+  assert.deepEqual([(await ready('', '6 runs')).need, (await ready('', '6 runs')).why], ['yes', 'the settings']);
+  assert.deepEqual([(await ready('lr: 1e-4, 3e-4', '10 GPU hours')).need, (await ready('lr: 1e-4, 3e-4', '10 GPU hours')).why], ['yes', 'the time a run takes']);
+  assert.equal((await ready('just try some things', '10 GPU hours')).why, 'the settings and the time a run takes', 'lines that are not settings are none');
+  // Without the agent: the researcher's settings and command, a run taken as an hour, and said so.
+  const built = await runCode(codeOf(t, 'plan'), { settings: '', given: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', command: '', form: 'python train.py --epochs 3', hours: '', gpus: '', budget: '4 runs' });
+  assert.deepEqual([built.mode, built.runs, built.grid, built.guess, built.command], ['random', 4, 6, 'yes', 'python train.py --epochs 3 --lr {lr} --batch-size {batch_size}']);
+  assert.equal((await runCode(codeOf(t, 'plan'), { settings, given: '', command: 'python t.py', form: 'x', hours: 0.5, gpus: 1, budget: '4 runs' })).guess, '', 'a time the script gave is not a guess');
   const final = await runCode(codeOf(t, 'final'), { params: plan.params, changes: 'lr: 3e-4, 1e-3\ndrop batch_size', command: plan.command, most: 20, each: 0.5, gpus: 1, metric: 'val_loss', better: 'Lower', early: 'Yes', steps: 200, run: 'r42' });
   assert.deepEqual(final.params, { lr: [0.0003, 0.001] });
   assert.deepEqual([final.mode, final.runs, final.group, final.better, final.hours], ['grid', 2, 'sweep-r42', 'min', 1]);
@@ -750,6 +762,9 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
     if (user.includes('A hyperparameter sweep of')) return { summary: 'The learning rate mattered most.', next: ['Try 3e-5', 'More seeds'] };
     return {};
   };
+  // What they can run on, kept in About you, reaches the model that proposes and the agent that builds.
+  changeAboutMe(db, { compute: 'a laptop and one 24 GB GPU' });
+  model.calls.length = 0;
   const s = startRun({ app: 'tpl:research-sprint', slug: 'research-sprint', recipe: tpl('research-sprint'), source: 'api', inputs: { question: 'Does a curriculum help long queries?', repo: '~/code/retriever', budget: '6', count: '2', gates: 'Yes' } });
   const build = await agentAnswers(s.id, 'build', {
     branch: 'sprint/curriculum',
@@ -765,6 +780,9 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
     ],
   });
   assert.match(sessions.made.find((m) => m.key === build.key)!.o.prompt, /H1\. A curriculum helps long queries\n {4}Supported if: \+2 MRR@10/);
+  assert.match(sessions.made.find((m) => m.key === build.key)!.o.prompt, /What they can run on \(from About you\): a laptop and one 24 GB GPU\n/);
+  assert.ok(model.calls.some((u) => u.includes('plan a short research sprint') && u.includes('They run on a laptop and one 24 GB GPU (from About you): keep the runs within it.')));
+  changeAboutMe(db, { compute: null });
   const analyse = await agentAnswers(s.id, 'analyse', { verdicts: [{ id: 'H1', verdict: 'supported', evidence: '0.34 against 0.31' }, { id: 'H2', verdict: 'Not tested: over the budget' }], report: '## What we found\nThe curriculum helps.', notebook: 'https://lab.example/pages/nb1', next: ['Three seeds'] });
   assert.match(sessions.made.find((m) => m.key === analyse.key)!.o.prompt, /\| curriculum \| 0\.340\* \|/, 'it reads the results table');
   const sprint = await ended(s.id);
@@ -787,11 +805,13 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
   // The sweep: the researcher's settings kept, the budget's runs, bad trials stopped early, what mattered worked out.
   exp.calls.length = 0;
   const w = startRun({ app: 'tpl:sweep-planner', slug: 'sweep-planner', recipe: tpl('sweep-planner'), source: 'api', inputs: { command: 'python train.py', folder: '/w/model', metric: 'val_loss', better: 'Lower', settings: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', budget: '4 runs', early: 'Yes', check: 'Yes' } });
-  await agentAnswers(w.id, 'read', { command: 'python train.py --lr {lr} --batch-size {batch_size}', settings: [{ name: 'lr', values: '1e-4, 3e-4, 1e-3' }, { name: 'batch_size', values: '16, 32' }], mode: 'grid', hours: 0.5, gpus: 1, steps: 100, notes: 'It logs val_loss each epoch.' });
+  // Every setting given and a budget in runs: nobody reads the script (no agent), and the plan is built from the form.
   const sweep = await ended(w.id);
+  assert.equal(sessions.made.some((m) => /Read the script|Plan a hyperparameter sweep/.test(String(m.o.prompt))), false, 'no agent read the script');
+  assert.equal(stepsOf(w.id).read, 'skipped');
   assert.equal(sweep.status, 'done', sweep.error);
   const call = exp.calls.find(([n]) => n === 'experiment_sweep')![1];
-  assert.deepEqual([call.command, call.cwd, call.mode, call.maxRuns, call.earlyStop], ['python train.py --lr {lr} --batch-size {batch_size}', '/w/model', 'random', 4, { metric: 'val_loss', better: 'min', afterSteps: 100 }]);
+  assert.deepEqual([call.command, call.cwd, call.mode, call.maxRuns, call.earlyStop], ['python train.py --lr {lr} --batch-size {batch_size}', '/w/model', 'random', 4, { metric: 'val_loss', better: 'min' }]);
   assert.deepEqual(call.params, { lr: [0.0001, 0.0003, 0.001], batch_size: [16, 32] });
   const wr = sweep.result as any;
   assert.equal(wr.count, 4);
@@ -800,6 +820,22 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
   assert.equal(wr.summary, 'The learning rate mattered most.');
   assert.equal(wr.page, '/system/experiments?sweep=sw1', 'the sweep’s page in Experiments');
   assert.ok(wr.points.length >= 8, 'a point for each run and setting');
+});
+
+test('What you can run on: About you’s compute goes to the steps that plan runs (a sprint’s hypotheses and its build, a sweep, a reproduction), and nothing is said of it when the record has none', () => {
+  const at = [
+    ['research-sprint', 'propose', 'They run on a laptop and one 24 GB GPU (from About you): keep the runs within it.'],
+    ['research-sprint', 'build', 'What they can run on (from About you): a laptop and one 24 GB GPU'],
+    ['sweep-planner', 'read', 'What they can run on (from About you): a laptop and one 24 GB GPU'],
+    ['reproduce-paper', 'work', 'What they can run on (from About you): a laptop and one 24 GB GPU. Choose what you run to fit it.'],
+  ];
+  for (const [app, id, line] of at) {
+    const step = allSteps(tpl(app).flow!.steps).find((x) => x.id === id);
+    assert.ok(step && (step.do === 'model' || step.do === 'agent'), `${app} has a step “${id}” that is told`);
+    const told = (compute?: string) => fillRefs(step.instructions, { inputs: {}, steps: {}, vars: { me: meVars(compute ? { compute } : {}) } });
+    assert.ok(told('a laptop and one 24 GB GPU').includes(line), `${app}: ${id} is told what they can run on`);
+    assert.ok(!told().includes('About you'), `${app}: ${id} says nothing of it with an empty record`);
+  }
 });
 
 test('Weekly progress report and Lab notebook, whole runs: the week written from work_log, saved as a document; a day’s entry kept under its date, written again in its place, found by a search', async () => {

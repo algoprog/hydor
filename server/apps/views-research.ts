@@ -200,10 +200,11 @@ const CITE_HEAD = String.raw`<header class="hero">
   </nav>{{/citations}}
 </header>`;
 
-const CITE_NEWS = String.raw`{{#papers}}{{#new}}<section class="mine">
+const CITE_NEWS = String.raw`{{#sentences}}<p class="note says">{{sentences}}</p>{{/sentences}}
+{{#papers}}{{#new}}<section class="mine">
   <h2><span class="lbl">Your paper</span>{{title}}</h2>
   <div class="list">{{#citations|where:mine=$key|where:kind=$state.kind}}<article class="cite k-{{kind|slug}}">
-    <p class="top">{{#kind}}<span class="badge kb">{{kind}}</span>{{/kind}}{{#influential}}<span class="badge info">Builds on it heavily</span>{{/influential}}{{#gist}}<span class="gist">{{gist}}</span>{{/gist}}</p>
+    <p class="top">{{#unread}}<span class="gist">Sentence not read yet</span>{{/unread}}{{#kind}}<span class="badge kb">{{kind}}</span>{{/kind}}{{#influential}}<span class="badge info">Builds on it heavily</span>{{/influential}}{{#gist}}<span class="gist">{{gist}}</span>{{/gist}}</p>
     {{#mark}}<blockquote>{{pre}}<mark>{{mark}}</mark>{{post}}</blockquote>{{/mark}}{{^mark}}{{#pre}}<blockquote>{{pre}}</blockquote>{{/pre}}{{/mark}}
     <p class="who"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{title}}</a></p>
     <p class="by">{{authors}}{{#venue}} · {{venue}}{{/venue}}{{#year}} · {{year}}{{/year}}</p>
@@ -218,6 +219,7 @@ const CITE_CSS =
   PAPER_CSS +
   BADGE_CSS +
   String.raw`
+.says { margin: 0 0 18px; }
 .mine { margin: 0 0 22px; }
 .mine h2 { margin: 0 0 10px; font-size: 17px; line-height: 1.35; }
 .lbl { display: block; margin-bottom: 2px; color: var(--n-muted); font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
@@ -386,7 +388,8 @@ const DL_ROW = String.raw`<div class="dl{{#next}} next{{/next}} k-{{kind|slug}}"
   <div class="what">
     <p class="v"><strong>{{venue}} {{year}}</strong><span class="lbl">{{label}}</span></p>
     <p class="m">{{day|weekday}}, {{day|longdate}} at {{time}} your time · {{given}}</p>
-    {{#place}}<p class="m">{{place}}{{#dates}} · {{dates}}{{/dates}}</p>{{/place}}
+    {{#where}}<p class="m">{{where}}</p>{{/where}}
+    {{#source}}<p class="m">Taken from <a href="{{source}}" target="_blank" rel="noopener noreferrer">the conference’s website</a>, not from the deadline lists: check the date there.</p>{{/source}}
     <p class="links">{{#link}}<a href="{{link}}" target="_blank" rel="noopener noreferrer">Call for papers ↗</a>{{/link}}{{#template}}<a href="{{template}}" target="_blank" rel="noopener noreferrer">Template ↗</a>{{/template}}{{#pages}}<span class="pg">{{pages}}</span>{{/pages}}</p>
   </div>
   <div class="left"><span class="pill">{{utc|ago}}</span></div>
@@ -473,7 +476,7 @@ const DEADLINE_RADAR_UI: AppUi = {
     },
     'dl-missing': {
       description: 'The venues neither list knows, and what to try',
-      html: String.raw`{{#missing|count}}<p class="miss">Not in the lists: <b>{{missing|join}}</b>. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
+      html: String.raw`{{#missing|count}}<p class="miss">Not found: <b>{{missing|join}}</b>, in the deadline lists or on the web. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
       css: String.raw`.miss { margin: 8px 0 0; padding: 10px 12px; border: 1px dashed var(--n-line); border-radius: var(--n-radius); color: var(--n-muted); font-size: 13.5px; line-height: 1.5; }`,
     },
   },
@@ -521,7 +524,7 @@ const LRW_TOPICS = String.raw`{{#last.result.topics|count|over:1}}<nav class="ch
   {{#state.drafting|is:$topic}}<div class="out">
     {{#state.draft.working}}<p class="m">Writing the related work: a few minutes. It goes on if you leave this page.</p>{{/state.draft.working}}
     {{#state.draft.error}}<p class="err">{{state.draft.error}}</p>{{/state.draft.error}}
-    {{#state.draft.result.latex}}<div class="oh"><b>The related work, in LaTeX</b><span><button type="button" class="b" data-event="copy_latex">Copy the LaTeX</button><button type="button" class="b" data-event="copy_draft_bib">Copy the .bib</button></span></div><pre>{{state.draft.result.latex}}</pre>{{/state.draft.result.latex}}
+    {{#state.draft.result.note}}<p class="m">{{state.draft.result.note}}</p>{{/state.draft.result.note}}{{#state.draft.result.latex}}<div class="oh"><b>The related work, in LaTeX</b><span><button type="button" class="b" data-event="copy_latex">Copy the LaTeX</button><button type="button" class="b" data-event="copy_draft_bib">Copy the .bib</button></span></div><pre>{{state.draft.result.latex}}</pre>{{/state.draft.result.latex}}
   </div>{{/state.drafting}}
   {{#state.bibbing|is:$topic}}<div class="out">
     {{#state.bib.working}}<p class="m">Gathering its BibTeX…</p>{{/state.bib.working}}

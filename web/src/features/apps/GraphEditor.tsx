@@ -22,11 +22,12 @@ import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNod
 import { createPortal } from 'react-dom';
 import { Boxes, CircleDot, ClipboardCheck, Clock, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Plus, Repeat, Snowflake, TextCursorInput, X } from 'lucide-react';
 import type { Flow, NamedFlow, Step, StepKind } from '@shared/app-manifest';
-import { allSteps, asText, BUILTIN_ROOTS, BUILTIN_VALUES, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
+import { allSteps, asText, BUILTIN_ROOTS, BUILTIN_VALUES, collapseSteps, givesOf, OWN_FIRST, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
 import type { AppDef, AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
 import { isActive } from '@shared/apps';
 import { api, enc, post } from '../../lib/api';
 import { tr } from '../../i18n/runtime';
+import { currentLang } from '../../i18n/locale';
 import { toast, toastError } from '../../lib/store';
 import { Button, cx, IconButton, inputCls, MenuItem, Popover, Throbber } from '../../components/ui';
 import { money, useRunEvents, type RunDetail } from './api';
@@ -327,6 +328,8 @@ function useTry(appId: string | null | undefined) {
         files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])),
         ...(pause.length ? { pause } : {}),
         ...(freeze ? { freeze } : {}),
+        // In the language the page is in, as a run from the form.
+        lang: currentLang(),
       });
       setRun(r.run);
       setDetail(null);
@@ -502,8 +505,11 @@ export function GraphEditor({ ctx, appId, graph, onGraph, onFlows, Body, Actions
   // ---- the run's ends: the form and the built-in values it starts with (above), and its answer (below) ----
   const fieldIds = new Set(ctx.recipe.fields.map((f) => f.id));
   const formUsers = nodes.filter((n) => usesOf(n.s).some((r) => r === 'inputs' || fieldIds.has(r)));
-  const builtUsers = nodes.filter((n) => usesOf(n.s).some((r) => BUILTIN_ROOTS.has(r)));
-  const builtUsed = [...new Set(builtUsers.flatMap((n) => refsIn(JSON.stringify(n.s)).filter((r) => BUILTIN_ROOTS.has(r.split(/[.[]/)[0]))))];
+  // A built-in value, unless the app has a step or a question of that name (its own "me" step, a question "language").
+  const stepIds = new Set(allSteps(flow.steps).map((x) => x.id));
+  const isBuilt = (r: string) => BUILTIN_ROOTS.has(r) && !(OWN_FIRST.has(r) && (fieldIds.has(r) || stepIds.has(r)));
+  const builtUsers = nodes.filter((n) => usesOf(n.s).some(isBuilt));
+  const builtUsed = [...new Set(builtUsers.flatMap((n) => refsIn(JSON.stringify(n.s)).filter((r) => isBuilt(r.split(/[.[]/)[0]))))];
   const first = entry(flow.steps, []);
   const lowest = Math.max(0, ...nodes.map((n) => n.y + H), ...slots.map((sl) => sl.y + SLOT_H), ...frames.map((f) => f.y + f.h));
   const highest = Math.min(0, ...nodes.map((n) => n.y), ...slots.map((sl) => sl.y));

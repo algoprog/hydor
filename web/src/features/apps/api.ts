@@ -43,6 +43,8 @@ export interface AppKey {
 /** An app that opens on its own page: the answers it runs with from there, and whether (and when) it updates every day. */
 export interface HomeSettings {
   inputs: Record<string, string>;
+  /** The questions whose answer is what they start from (About you, the last answer), not one kept in its settings. */
+  started?: string[];
   /** Update automatically: on or off, the time, and the days of the week (0 is Sunday; unset: every day). */
   daily: { on: boolean; time: string; days?: number[] };
 }
@@ -67,11 +69,13 @@ export interface AppDetail {
   latest?: number;
   /** The keys it needs, and how the vault has each (never a value). */
   secrets?: KeyState[];
+  /** What its questions start from, by question: About you's field (from), the last answer (remember). */
+  starts?: Record<string, string>;
 }
 
 /** What a run's page knows of its app: its face, form and answer, and the view its answer shows in (when it has one). */
 export type RunRecipe = Pick<AppRecipe, 'name' | 'icon' | 'color' | 'fields' | 'answer' | 'agent' | 'acpAgent' | 'model' | 'tier' | 'ui' | 'assets'> & {
-  /** Its main flow works in steps (a one-task app's run takes follow-ups). */
+  /** Its main flow works in steps (its run takes follow-ups once it is done: the first starts a session for them). */
   steps?: boolean;
 };
 
@@ -87,7 +91,7 @@ export interface RunDetail {
   first?: string;
   /** Follow-ups waiting for the turn running now to end. */
   queued: { id: string; text: string; at: number }[];
-  /** Why it takes no follow-ups (a public page's run, its session gone or open elsewhere). */
+  /** Why it takes no follow-ups now (a public page's run, a run of another flow, one with steps not done yet, its session gone or open elsewhere). */
   noAsks?: string;
   /** A run with steps: each step and how it went. */
   steps?: RunStepView[];

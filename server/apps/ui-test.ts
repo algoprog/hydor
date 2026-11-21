@@ -162,7 +162,24 @@ test('a view checked against its app: elements, pages, flows and lists it names,
   const e = errors.join(' | ');
   const w = warnings.join(' | ');
   for (const re of [/there is no element “nope”/, /it keeps no list “items”/, /there is no page “elsewhere”/, /it has no flow “other”/, /its form has no question “zone”/]) assert.match(e, re);
-  for (const re of [/its answer has no field “missing”/, /its form has no question “nope”/, /Element “spare” is on no page/, /the event “silent”, which does nothing/, /Event “unused”: no element sends it/, /a run with steps takes no follow-ups/, /a form shows on the app's own page only/]) assert.match(w, re);
+  for (const re of [/its answer has no field “missing”/, /its form has no question “nope”/, /Element “spare” is on no page/, /the event “silent”, which does nothing/, /Event “unused”: no element sends it/, /a form shows on the app's own page only/]) assert.match(w, re);
+  // ask works with steps too: a finished run takes changes (its first starts a session for them).
+  assert.doesNotMatch(w, /follow-ups/);
+});
+
+test('a view while its run works: a block whose answer the answer so far lacks is not there yet', () => {
+  const so = { weather: 'Sunny', map: [] };
+  // A block waits for its main field: what its data names, else its if.
+  assert.equal(E.notYet({ element: 'day', data: 'result.days', each: true }, so), true);
+  assert.equal(E.notYet({ element: 'map', data: 'result.map' }, so), false, 'an empty list that is there is there');
+  assert.equal(E.notYet({ element: 'know-weather', if: 'result.weather' }, so, '<p>{{result.weather}} {{#result.rain}}{{result.rain}}{{/result.rain}}</p>'), false, 'not for the optional parts its element names');
+  // Without one, every answer field its words or element name.
+  assert.equal(E.notYet({ title: 'Weather', text: '{{result.weather}} · {{inputs.city}}' }, so), false);
+  assert.equal(E.notYet({ element: 'card' }, so, '<p>{{#result.events}}{{name}}{{/result.events}}</p>'), true);
+  assert.equal(E.notYet({ element: 'pace', html: '<button data-event="slow">Relaxed</button>' }, so), false, 'naming none, it never waits');
+  // Another run's answer (the last run, a flow's run in the view's state) is not this answer.
+  assert.equal(E.notYet({ text: '{{last.result.days}} {{state.trip.result.days}}' }, so), false);
+  assert.equal(E.notYet('{{result.days}}', null), true);
 });
 
 test('a view and a run: the names it uses that a run’s answer did not give', () => {

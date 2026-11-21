@@ -77,7 +77,13 @@ export function runTools(ctx: RunCtx): RunTool[] {
       try {
         r = await t.run(a, c);
       } catch (e) {
-        throw new Error(clean(String((e as Error)?.message ?? e)));
+        const err = new Error(clean(String((e as Error)?.message ?? e)));
+        // What kind of failure it was (a timeout, a dropped connection) goes with it: an app's flow tries such a call again.
+        const o = e as { name?: unknown; code?: unknown; cause?: { code?: unknown } } | null;
+        if (o?.name === 'TimeoutError') err.name = 'TimeoutError';
+        const code = o?.code ?? o?.cause?.code;
+        if (typeof code === 'string') Object.assign(err, { code });
+        throw err;
       }
       const add = (s: string) => clean(notes.length ? `${s}\n\n${notes.join('\n')}` : s);
       return typeof r === 'string' ? add(r) : { ...r, text: add(r.text) };

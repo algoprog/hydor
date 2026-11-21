@@ -158,8 +158,8 @@ function targetsOf(v: unknown): OutputTarget[] {
 function outputOf(v: unknown): AgentOutput | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const o = v as Record<string, unknown>;
-  // Pictures and files are an app's: an agent's result is words, numbers, links, lists and tables.
-  const fields = Array.isArray(o.fields) && o.fields.length ? cleanAnswer(o.fields).filter((f) => f.type !== 'media') : [];
+  // Pictures, files and cards are an app's: an agent's result is words, numbers, links, lists and tables.
+  const fields = Array.isArray(o.fields) && o.fields.length ? cleanAnswer(o.fields).filter((f) => f.type !== 'media' && f.type !== 'ui') : [];
   const to = targetsOf(o.to);
   return fields.length || to.length ? { ...(fields.length ? { fields } : {}), ...(to.length ? { to } : {}) } : undefined;
 }

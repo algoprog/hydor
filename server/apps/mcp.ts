@@ -3,6 +3,7 @@
 // for the answer; a long run comes back with its id, for app_run_status.
 import type { AppDef } from '../../shared/apps.ts';
 import { isActive } from '../../shared/apps.ts';
+import { cardsAsText } from '../../shared/app-cards.ts';
 import { featureDeps } from '../features/registry.ts';
 import type { ToolOutput } from '../features/types.ts';
 import { apiAnswer, checkDaily, waitSeconds } from './api.ts';
@@ -36,7 +37,9 @@ function inputSchema(a: AppDef): Record<string, unknown> {
 
 const answerText = (r: NonNullable<ReturnType<typeof getRun>>) => {
   const { publicBase } = featureDeps();
-  const out = apiAnswer(r, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`, isFlowRun(r) ? stepsOf(r.id) : undefined);
+  const raw = apiAnswer(r, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`, isFlowRun(r) ? stepsOf(r.id) : undefined);
+  // The agent reads its cards as Markdown; the API gives their data.
+  const out = { ...raw, result: cardsAsText(r.recipe.answer, raw.result) };
   const note = isActive(r.status) ? `\n\nStill running: call app_run_status with run "${r.id}" for the answer.` : '';
   return `${JSON.stringify(out, null, 2)}${note}`;
 };

@@ -5,8 +5,9 @@
 // (project ideas from your papers crossed with this month's, each checked for prior work).
 //
 // They get their data from open services (arXiv's API, OpenAlex, Semantic Scholar, Hugging Face, and the deadline lists
-// ccfddl and ai-deadlines on GitHub), gently: one call at a time, arXiv's three seconds apart, Semantic Scholar's again
-// after a wait when it is busy. A program does what must come out exact (dates and time zones, dedupe, ranking, joins,
+// ccfddl and ai-deadlines on GitHub). The programs only ask: the engine spaces the calls to each service (arXiv's three
+// seconds apart, Semantic Scholar's a second) and tries a failed one again, so none keeps a clock or a retry loop of its
+// own; what a program keeps is a second source when one fails for good (OpenAlex for Semantic Scholar). A program does what must come out exact (dates and time zones, dedupe, ranking, joins,
 // BibTeX), a quick model reads and says things in plain words, an agent works only where judgement and tools are needed
 // (a related-work section written from the papers). The keys they use (OpenAlex's, Semantic Scholar's) are optional:
 // without them they ask less, or another service. The first five open on their own page and can update every day; what
@@ -90,27 +91,18 @@ function hash(s) {
 `;
 
 /**
- * Asking a service, as the programs do: http_request through ctx, one call at a time, arXiv's at least three seconds
- * apart (as it asks), the body of what came back, its status when a call failed, and a key from the vault when there is
- * one (tried once a run; a key that is not there means the calls go without it).
+ * Asking a service, as the programs do: http_request through ctx, the body of what came back, its status when a call
+ * failed, and a key from the vault when there is one (tried once a run; a key that is not there means the calls go
+ * without it). The engine spaces the calls to a service as it asks (arXiv's three seconds apart, Semantic Scholar's a
+ * second) for every step and run, and tries a call that failed for a moment again, so a program neither waits nor retries.
  */
 const HTTP = String.raw`const UA = '${UA}';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const lastCall = {};
 async function get(url, o) {
   o = o || {};
   const host = (/^https?:\/\/([^/?#]+)/.exec(url) || [])[1] || '';
-  const gap = /arxiv\.org$/.test(host) ? 3100 : /semanticscholar\.org$/.test(host) ? 1100 : 250;
-  const since = Date.now() - (lastCall[host] || 0);
-  if (since < gap) await sleep(gap - since);
-  lastCall[host] = Date.now();
   const args = { url: url, headers: { 'User-Agent': UA }, max_chars: o.max || 200000 };
   if (o.auth) args.auth = o.auth;
-  try {
-    return await ctx.tool('http_request', args, { title: o.title || 'Ask ' + host });
-  } finally {
-    lastCall[host] = Date.now();
-  }
+  return ctx.tool('http_request', args, { title: o.title || 'Ask ' + host });
 }
 // The body of an answer: http_request gives its status and headers, a blank line, then the body.
 function bodyText(r) {
@@ -129,11 +121,6 @@ function bodyOf(r) {
   } catch (e) {
     return null;
   }
-}
-// The status of a call that failed ("http_request: HTTP 429 Too Many Requests …"), 0 when it did not get that far.
-function statusOf(e) {
-  const m = /HTTP (\d{3})/.exec(String((e && e.message) || e || ''));
-  return m ? Number(m[1]) : 0;
 }
 // A call signed with a key from the vault when it has one: tried once; without it, the calls go unsigned.
 const keyState = {};
@@ -322,8 +309,8 @@ function byline(authors) {
 `;
 
 /**
- * The arXiv search the apps make: its query in pages of 50, newest first (or by relevance), each page three seconds
- * after the last, until it has as many as asked or there are no more.
+ * The arXiv search the apps make: its query in pages of 50, newest first (or by relevance), until it has as many as
+ * asked or there are no more (the engine keeps the pages three seconds apart).
  */
 const ARXIV = String.raw`async function arxiv(query, most, title, by) {
   const out = [];
@@ -422,9 +409,11 @@ const PAPER_RADAR: Draft = {
   category: 'Research',
   description: 'Each morning, the new papers of your field ranked against your projects, each with why it matters to you, to save, cite or dig into.',
   sessions: false,
+  // Its lines on each paper are for you alone: they follow your language (the searches stay as written).
+  language: 'person',
   fields: [
-    { id: 'fields', label: 'Fields to follow', type: 'text', placeholder: 'e.g. Information Retrieval, Computation and Language', help: 'arXiv’s categories, by name or code (cs.IR, cs.CL); empty: worked out from your profile and projects' },
-    { id: 'topics', label: 'Topics', type: 'long', placeholder: 'One a line: dense retrieval, query performance prediction…', help: 'Papers on these come in from any field, and from OpenAlex too' },
+    { id: 'fields', label: 'Fields to follow', type: 'text', from: 'me.fields', placeholder: 'e.g. Information Retrieval, Computation and Language', help: 'arXiv’s categories, by name or code (cs.IR, cs.CL); empty: worked out from your profile and projects' },
+    { id: 'topics', label: 'Topics', type: 'long', from: 'me.topics', placeholder: 'One a line: dense retrieval, query performance prediction…', help: 'Papers on these come in from any field, and from OpenAlex too' },
     { id: 'people', label: 'People to follow', type: 'long', placeholder: 'One a line, as their papers print it: Hamed Zamani' },
     { id: 'count', label: 'How many papers', type: 'number', default: '15', help: 'The best this many each day, between 5 and 40' },
   ],
@@ -432,7 +421,7 @@ const PAPER_RADAR: Draft = {
   data: {
     saved: { fields: fieldsOf(PAPER_FIELDS), description: 'The papers you saved: what the ranking leans toward' },
     marks: { fields: fieldsOf({ key: 'text', mark: 'text', title: 'text', abstract: 'text' }), description: 'Your latest marks on papers (saved, or not for you), by the paper’s key' },
-    seen: { fields: fieldsOf({ day: 'date', keys: 'list' }), description: 'The papers each update looked at, so none comes again' },
+    seen: { fields: fieldsOf({ day: 'date', keys: 'list' }), description: 'The papers each update showed, so none comes again' },
   },
   secrets: [OPENALEX_KEY],
   flow: {
@@ -467,7 +456,9 @@ for (const part of String(input.fields || '').split(/[,;\n]+/).map((s) => s.trim
   if (c && cats.indexOf(c) < 0) cats.push(c);
   else if (!c) topics.push(part);
 }
-for (const t of lines(input.topics)) if (!topics.some((x) => x.toLowerCase() === t.toLowerCase())) topics.push(t);
+// One line with commas is a list as About you gives it; several lines are one topic a line, commas inside a topic kept.
+const given = lines(input.topics);
+for (const t of given.length === 1 ? given[0].split(/\s*[,;]\s*/).filter(Boolean) : given) if (!topics.some((x) => x.toLowerCase() === t.toLowerCase())) topics.push(t);
 const people = lines(input.people).slice(0, 10);
 const count = Math.max(5, Math.min(40, Math.round(Number(input.count) || 15)));
 const today = String(input.today || '').slice(0, 10);
@@ -528,7 +519,7 @@ return {
         instructions: `Paper radar finds a researcher the new papers of their field each morning. They have not said what to follow yet: choose it from what you know of their work below.
 
 - categories: the 1 to 3 arXiv categories their work belongs in, as codes from the list (cs.IR, cs.CL…).
-- topics: 3 to 6 topics they work on, each 2 to 4 words that papers on it would use ("dense retrieval", "query performance prediction"), specific enough to find their work and not a whole field.
+- topics: 3 to 6 topics they work on, each 2 to 4 words that papers on it would use ("dense retrieval", "query performance prediction"), specific enough to find their work and not a whole field. They are search words for arXiv: always in English, whatever language you are asked to write in.
 
 When nothing is known of them, give no categories and no topics.
 
@@ -547,7 +538,7 @@ arXiv's categories:
         title: 'Find the new papers',
         do: 'code',
         language: 'javascript',
-        seconds: 90,
+        seconds: 30,
         with: { plan: '{{plan}}', guessed: '{{guess.categories}}', guessedTopics: '{{guess.topics}}' },
         code:
           LIST +
@@ -633,7 +624,6 @@ return {
   items: items,
   ranking: items.map((p) => ({ id: p.key, text: p.title + '\n' + p.abstract })),
   fetched: items.length,
-  seen: pool.all.map((p) => p.key),
   topics: topics,
   sources: sources,
   notes: notes.join('. '),
@@ -660,7 +650,6 @@ return {
           },
           { id: 'ranking', label: 'To rank', type: 'table', columns: [{ id: 'id', label: 'Paper id', type: 'text' }, { id: 'text', label: 'Words', type: 'text' }] },
           { id: 'fetched', label: 'New papers found', type: 'number' },
-          { id: 'seen', label: 'Looked at', type: 'list' },
           { id: 'topics', label: 'Topics', type: 'list' },
           { id: 'sources', label: 'Where from', type: 'text' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
@@ -789,11 +778,11 @@ The papers:
         title: 'Lay out the day’s papers',
         do: 'code',
         language: 'javascript',
-        with: { papers: '{{pick.papers}}', groups: '{{pick.groups}}', written: '{{write.papers}}', headline: '{{write.headline}}', seen: '{{search.seen}}', today: '{{today}}', fetched: '{{search.fetched}}', window: '{{plan.from}}' },
+        with: { papers: '{{pick.papers}}', groups: '{{pick.groups}}', written: '{{write.papers}}', headline: '{{write.headline}}', today: '{{today}}', fetched: '{{search.fetched}}', window: '{{plan.from}}' },
         code:
           LIST +
-          String.raw`// Each paper with what was written of it; the papers looked at kept, so no later update brings them again (a month of
-// them), and your marks kept to the latest 150.
+          String.raw`// Each paper with what was written of it; the papers shown kept, so no later update brings them again (a month of
+// them: a paper fetched but ranked below the cut stays a candidate), and your marks kept to the latest 150.
 const said = new Map(rows(input.written).map((w) => [Math.round(Number(w.n)), w]));
 const papers = rows(input.papers).map((p) => {
   const w = said.get(Math.round(Number(p.n))) || {};
@@ -804,10 +793,10 @@ const groups = rows(input.groups).map((g) => Object.assign({}, g, { count: paper
 const n = new Map(groups.map((g) => [g.group, g.n]));
 for (const p of papers) p.n = n.get(p.group) || 1;
 const today = String(input.today || '').slice(0, 10);
-const keys = list(input.seen).map(String);
-if (keys.length) await ctx.data.add('seen', { day: today, keys: keys.slice(0, 2000) }, { title: 'Keep what it looked at' });
+const keys = papers.map((p) => String(p.key));
+if (keys.length) await ctx.data.add('seen', { day: today, keys: keys.slice(0, 2000) }, { title: 'Keep what it showed' });
 const month = new Date(Date.parse(today) - 32 * 86400000).toISOString().slice(0, 10);
-await ctx.data.remove('seen', { where: { day: { '<': month } }, title: 'Forget what it looked at a month ago' });
+await ctx.data.remove('seen', { where: { day: { '<': month } }, title: 'Forget what it showed a month ago' });
 const marks = await ctx.data.find('marks', { sort: '-createdAt', limit: 400, title: 'Count your marks' });
 for (const m of rows(marks.records).slice(150, 190)) await ctx.data.remove('marks', { id: m.id, title: 'Forget an old mark' });
 const since = String(input.window || '');
@@ -859,22 +848,9 @@ return {
 
 // ---- Citation alerts ----------------------------------------------------------------------------------------------
 
-/** Semantic Scholar, asked as gently as it wants: its key when there is one, and again after a wait when it is busy (a few times, within a budget of waiting). */
-const S2 = String.raw`let s2Waited = 0;
-const S2_WAIT = 60000;
-async function s2(path, title) {
-  let wait = 2500;
-  for (let i = 0; ; i++) {
-    try {
-      return bodyOf(await keyed('https://api.semanticscholar.org/graph/v1/' + path, 'SEMANTIC_SCHOLAR_API_KEY', { title: title }));
-    } catch (e) {
-      const st = statusOf(e);
-      if ((st !== 429 && st < 500) || i >= 3 || s2Waited + wait > S2_WAIT) throw e;
-      await sleep(wait);
-      s2Waited += wait;
-      wait = Math.round(wait * 2.2);
-    }
-  }
+/** Semantic Scholar, asked with its key when there is one; the engine spaces the calls and tries a busy answer again. */
+const S2 = String.raw`async function s2(path, title) {
+  return bodyOf(await keyed('https://api.semanticscholar.org/graph/v1/' + path, 'SEMANTIC_SCHOLAR_API_KEY', { title: title }));
 }
 `;
 
@@ -893,6 +869,7 @@ const CITE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'mark', label: 'The mention', type: 'text' },
   { id: 'post', label: 'After the mention', type: 'text' },
   { id: 'influential', label: 'Builds on it heavily', type: 'yesno' },
+  { id: 'unread', label: 'Its sentence is still to be read', type: 'yesno' },
 ];
 const MY_PAPER_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'key', label: 'Paper id', type: 'text' },
@@ -912,13 +889,17 @@ const CITATION_ALERTS: Draft = {
   category: 'Research',
   description: 'Who cited your papers lately, with the sentence that cites you and whether it builds on, compares with or disputes your work.',
   sessions: false,
+  // What each citing sentence says of your work is for you alone: it follows your language (the four kinds stay as written).
+  language: 'person',
   fields: [
-    { id: 'me', label: 'You, as an author', type: 'text', required: true, placeholder: 'e.g. Chris Samarinas', help: 'Your name as your papers print it, or your Semantic Scholar id (digits) or OpenAlex id (A…)' },
+    // Not called "me": a question of that name would stand in the way of About you's {{me.author_id}}. It was called so
+    // until then: what settings and schedules kept under that name is its answer still.
+    { id: 'author', label: 'You, as an author', type: 'text', required: true, from: 'me.author', was: ['me'], placeholder: 'e.g. Gerard Salton', help: 'Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID' },
     { id: 'papers', label: 'Only these papers', type: 'long', placeholder: 'One a line: a title, a DOI or an arXiv id', help: 'Empty: all your papers' },
   ],
   prompt: '',
   data: {
-    cited: { fields: fieldsOf({ title: 'text', citing: 'list', count: 'number' }), description: 'Each of your papers, by its key, with the papers seen citing it' },
+    cited: { fields: fieldsOf({ title: 'text', citing: 'list', count: 'number', pending: 'list' }), description: 'Each of your papers, by its key, with the papers seen citing it, and those whose citing sentence is still to be read' },
   },
   secrets: [S2_KEY, OPENALEX_KEY],
   flow: {
@@ -929,24 +910,32 @@ const CITATION_ALERTS: Draft = {
         title: 'Find you and your papers',
         do: 'code',
         language: 'javascript',
-        seconds: 90,
-        with: { me: '{{me}}', papers: '{{papers}}' },
+        seconds: 30,
+        // The id About you holds for you finds you exactly, where a name may be a namesake's; it counts while the question still has the name it was given with.
+        with: { me: '{{author}}', id: '{{me.author_id}}', recorded: '{{me.author}}', papers: '{{papers}}' },
         code:
           LIST +
           HTTP +
           PAPERS +
           S2 +
-          String.raw`// You as an author (by Semantic Scholar's id or OpenAlex's, or your name: the one of that name with the most citations),
-// and your papers: those with citations, the most cited and the latest (thirty at most an update); with papers named,
-// only those. Semantic Scholar first; OpenAlex when it is too busy.
+          String.raw`// You as an author (by an id: Semantic Scholar's, OpenAlex's or an ORCID; else by your name: the one of that name with
+// the most citations), and your papers: those with citations, the most cited and the latest (thirty at most an update);
+// with papers named, only those. Semantic Scholar first; OpenAlex when it is down, or for an id only it knows.
 const me = String(input.me || '').trim();
 const plain = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const ORCID = /\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/;
+const isId = (t) => /^A\d{5,}$/i.test(t) || /openalex\.org\/A\d+/i.test(t) || /^\d{3,}$/.test(t) || ORCID.test(t);
+// The id About you holds is of the person it holds the name of: it is used when the question still has that name (or none).
+const kept = String(input.id || '').trim();
+const ident = kept && isId(kept) && (!me || plain(me) === plain(input.recorded)) ? kept : me;
+const orcid = (ORCID.exec(ident) || [])[0] || '';
 const notes = [];
 let author = null;
 let papers = [];
+let viaOa = false;
 try {
-  if (/^A\d{5,}$/i.test(me) || /openalex\.org\/A\d+/i.test(me)) throw new Error('an OpenAlex id');
-  let id = /^\d{3,}$/.test(me) ? me : '';
+  if (/^A\d{5,}$/i.test(ident) || /openalex\.org\/A\d+/i.test(ident) || orcid) throw new Error('an OpenAlex id');
+  let id = /^\d{3,}$/.test(ident) ? ident : '';
   if (!id) {
     const found = await s2('author/search?query=' + encodeURIComponent(me) + '&fields=name,affiliations,paperCount,citationCount,hIndex&limit=10', 'Look you up on Semantic Scholar');
     const all = rows(found && found.data);
@@ -960,17 +949,26 @@ try {
   const ps = await s2('author/' + id + '/papers?fields=title,year,venue,externalIds,citationCount,publicationDate,authors&limit=500', 'Read your papers');
   papers = rows(ps && ps.data).map((p) => Object.assign(fromS2(p), { year: p.year || null }));
 } catch (e) {
-  if (!/OpenAlex id/.test(e.message)) notes.push('Semantic Scholar did not answer (' + failedWhy(e) + '), so OpenAlex did, without the citing sentences');
-  const oaId = (/A\d{5,}/i.exec(me) || [])[0];
+  if (!/OpenAlex id/.test(e.message)) {
+    viaOa = true;
+    notes.push('Semantic Scholar did not answer (' + failedWhy(e) + '), so OpenAlex did, without the citing sentences');
+  }
+  const oaId = (/A\d{5,}/i.exec(ident) || [])[0];
   let a = null;
-  if (oaId) a = bodyOf(await keyed('https://api.openalex.org/authors/' + oaId.toUpperCase(), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
-  else {
+  if (oaId || orcid) {
+    // An id nothing knows is a 404: said below as no author found, with what to do.
+    try {
+      a = bodyOf(await keyed('https://api.openalex.org/authors/' + (oaId ? oaId.toUpperCase() : 'orcid:' + orcid), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
+    } catch (e) {
+      if (!/HTTP 404/.test(String(e.message))) throw e;
+    }
+  } else {
     const found = bodyOf(await keyed('https://api.openalex.org/authors?search=' + encodeURIComponent(me) + '&per-page=10', 'OPENALEX_API_KEY', { title: 'Look you up on OpenAlex' }));
     const all = rows(found && found.results);
     const same = all.filter((x) => plain(x.display_name) === plain(me));
     a = (same.length ? same : all).sort((x, y) => (y.cited_by_count || 0) - (x.cited_by_count || 0))[0] || null;
   }
-  if (!a) throw new Error('No author called ' + me + ' was found on Semantic Scholar or OpenAlex: write your name as your papers print it, or give your author id');
+  if (!a) throw new Error('No author called ' + me + (ident !== me ? ' (nor the id ' + ident + ')' : '') + ' was found on Semantic Scholar or OpenAlex: write your name as your papers print it, or give your author id');
   const id = String(a.id).replace(/^https?:\/\/openalex\.org\//, '');
   author = { name: a.display_name, id: id, where: ((a.last_known_institutions || [])[0] || {}).display_name || '', citations: a.cited_by_count || 0, hindex: (a.summary_stats || {}).h_index || 0, source: 'OpenAlex' };
   const ws = bodyOf(await keyed('https://api.openalex.org/works?filter=author.id:' + id + '&sort=cited_by_count:desc&per-page=100&select=id,doi,title,publication_date,publication_year,authorships,primary_location,cited_by_count,type', 'OPENALEX_API_KEY', { title: 'Read your papers on OpenAlex' }));
@@ -999,7 +997,7 @@ const chosen = most.concat(latest).map((p) => ({
   arxiv: p.arxiv || '',
   first: String((p.authors || [])[0] || '').split(/\s+/).pop(),
 }));
-return { author: author, papers: chosen, all: papers.length, notes: notes.join('. ') };`,
+return { author: author, papers: chosen, all: papers.length, via_oa: viaOa ? 'yes' : '', notes: notes.join('. ') };`,
         outputs: [
           { id: 'author', label: 'You', type: 'text', description: 'name, id, where, citations, hindex, source' },
           {
@@ -1021,6 +1019,7 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
             ],
           },
           { id: 'all', label: 'Papers of yours', type: 'number' },
+          { id: 'via_oa', label: 'Found on OpenAlex, as Semantic Scholar did not answer', type: 'text' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1030,8 +1029,8 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
         title: 'Find who cited them',
         do: 'code',
         language: 'javascript',
-        seconds: 110,
-        with: { papers: '{{who.papers}}', seen: '{{seen.records}}', today: '{{today}}' },
+        seconds: 30,
+        with: { papers: '{{who.papers}}', seen: '{{seen.records}}', today: '{{today}}', via_oa: '{{who.via_oa}}' },
         code:
           LIST +
           HTTP +
@@ -1040,8 +1039,9 @@ return { author: author, papers: chosen, all: papers.length, notes: notes.join('
           String.raw`// For each of your papers, the papers citing it, newest first, with the sentences that cite it (Semantic Scholar's; a
 // paper it has not read has none): those not seen before are new. The first time a paper is looked at, only those of the
 // last month count as new (the rest are taken as seen). When Semantic Scholar is too busy, OpenAlex says who cited it,
-// without the sentences.
-const seen = new Map(rows(input.seen).map((r) => [String(r.id), new Set(list(r.citing).map(String))]));
+// without the sentences: those citations are shown (marked as without their sentence) and kept as still to be read, and
+// the next update, when Semantic Scholar answers, shows each again with its sentence.
+const seen = new Map(rows(input.seen).map((r) => [String(r.id), { set: new Set(list(r.citing).map(String)), pending: list(r.pending).map(String) }]));
 const today = String(input.today || '').slice(0, 10);
 const month = new Date(Date.parse(today) - 31 * 86400000).toISOString().slice(0, 10);
 const notes = [];
@@ -1052,17 +1052,18 @@ let s2Down = false;
 let oaCalls = 0;
 for (const mine of rows(input.papers)) {
   const before = seen.get(mine.key);
-  const known = before || new Set();
+  const known = before ? before.set : new Set();
+  const pending = new Set(before ? before.pending : []);
+  const hadPending = pending.size;
   let citing = [];
   let from = '';
   if (mine.s2 && !s2Down) {
     try {
-      const r = await s2('paper/' + mine.s2 + '/citations?fields=contexts,intents,isInfluential,title,authors,year,venue,externalIds,publicationDate&limit=' + (before ? 30 : 100), 'Who cited “' + clip(mine.title, 50) + '”');
+      const r = await s2('paper/' + mine.s2 + '/citations?fields=contexts,intents,isInfluential,title,authors,year,venue,externalIds,publicationDate&limit=' + (before && !pending.size ? 30 : 100), 'Who cited “' + clip(mine.title, 50) + '”');
       citing = rows(r && r.data).map((c) => Object.assign(fromS2(c.citingPaper || {}), { contexts: list(c.contexts).map(String), intents: list(c.intents).map(String), influential: !!c.isInfluential, year: (c.citingPaper || {}).year || null }));
       from = 's2';
     } catch (e) {
       s2Down = true;
-      notes.push('Semantic Scholar was too busy, so OpenAlex said who cited your papers, without the sentences');
     }
   }
   if (!from && oaCalls < (keyState.OPENALEX_API_KEY === false ? 12 : 60)) {
@@ -1087,30 +1088,45 @@ for (const mine of rows(input.papers)) {
   citing.sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const now = new Set(known);
   let n = 0;
+  // Citations from OpenAlex have no sentence; when Semantic Scholar was meant to give them (it knows your paper, or it
+  // answered for none of them), they stay to be read again.
+  const noSentence = from === 'oa' && (!!mine.s2 || String(input.via_oa) === 'yes');
+  const row = (c, key, extra) => Object.assign({ key: key, mine: mine.key, title: c.title, authors: byline(c.authors), venue: c.where || '', year: c.year || Number(String(c.date).slice(0, 4)) || null, date: /^\d{4}-\d{2}-\d{2}$/.test(String(c.date)) ? c.date : null, url: c.url || '', contexts: c.contexts.slice(0, 3), intents: c.intents.join(', '), influential: c.influential, first: mine.first, myYear: mine.year }, extra);
   for (const c of citing) {
     if (!c.title) continue;
     const key = paperKey(c);
+    // One seen without its sentence, now read: shown again with it.
+    if (from === 's2' && pending.has(key)) {
+      if (c.contexts.length) {
+        pending.delete(key);
+        n++;
+        if (fresh.length < 60) fresh.push(row(c, key, {}));
+      }
+      continue;
+    }
     if (known.has(key)) continue;
     now.add(key);
     // The first look at a paper: only last month's are news.
     if (!before && !(String(c.date) >= month)) continue;
     n++;
-    if (fresh.length < 60) fresh.push({ key: key, mine: mine.key, title: c.title, authors: byline(c.authors), venue: c.where || '', year: c.year || Number(String(c.date).slice(0, 4)) || null, date: /^\d{4}-\d{2}-\d{2}$/.test(String(c.date)) ? c.date : null, url: c.url || '', contexts: c.contexts.slice(0, 3), intents: c.intents.join(', '), influential: c.influential, first: mine.first, myYear: mine.year });
+    if (noSentence && pending.size < 200) pending.add(key);
+    if (fresh.length < 60) fresh.push(row(c, key, { unread: noSentence }));
   }
   counts[mine.key] = n;
-  if (now.size !== known.size || !before) keep.push({ id: mine.key, title: mine.title, citing: Array.from(now).slice(-1500), count: now.size, had: !!before });
+  if (now.size !== known.size || !before || pending.size !== hadPending) keep.push({ id: mine.key, title: mine.title, citing: Array.from(now).slice(-1500), count: now.size, pending: Array.from(pending), had: !!before });
 }
 // The citing sentences to sort, numbered.
 const sortable = fresh.filter((c) => c.contexts.length).slice(0, 40);
 const linesOut = sortable.map((c, i) => (i + 1) + '. Citing: ' + c.title + (c.intents ? ' (intents: ' + c.intents + ')' : '') + '\n' + c.contexts.map((t) => '   “' + clip(t, 500) + '”').join('\n'));
 sortable.forEach((c, i) => (c.n = i + 1));
-return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'), sorting: sortable.length, notes: notes.filter((x, i) => notes.indexOf(x) === i).join('. ') };`,
+return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'), sorting: sortable.length, unread: fresh.filter((c) => c.unread).length, notes: notes.filter((x, i) => notes.indexOf(x) === i).join('. ') };`,
         outputs: [
           { id: 'fresh', label: 'New citations', type: 'table', columns: [{ id: 'key', label: 'Paper id', type: 'text' }, { id: 'mine', label: 'Your paper', type: 'text' }, { id: 'title', label: 'Citing paper', type: 'text' }, { id: 'n', label: 'Number', type: 'number' }] },
           { id: 'counts', label: 'New for each paper', type: 'text' },
           { id: 'keep', label: 'Seen now', type: 'table', columns: [{ id: 'id', label: 'Your paper', type: 'text' }, { id: 'count', label: 'Citations seen', type: 'number' }] },
           { id: 'to_sort', label: 'The citing sentences', type: 'text' },
           { id: 'sorting', label: 'How many to sort', type: 'number' },
+          { id: 'unread', label: 'Citations whose sentence could not be read', type: 'number' },
           { id: 'notes', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1122,7 +1138,7 @@ return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'
         if: '{{cites.sorting}} > 0',
         instructions: `Below are sentences from papers that cite the reader's work, numbered (one citing paper each, with Semantic Scholar's guess of its intent when it has one). For each number, say how the citing paper uses the reader's work, from its sentences alone:
 
-- kind: one of "builds on" (uses, extends or adopts it: its method, data, code or finding), "compares with" (measures against it, contrasts with it, as a baseline), "disputes" (finds it wrong, fails to reproduce it, argues against it), or "mentions" (cites it in passing, among others, as background).
+- kind: exactly one of "builds on" (uses, extends or adopts it: its method, data, code or finding), "compares with" (measures against it, contrasts with it, as a baseline), "disputes" (finds it wrong, fails to reproduce it, argues against it), or "mentions" (cites it in passing, among others, as background): write the kind exactly as given, in English, whatever language you are asked to write in.
 - gist: what the citing paper says of the reader's work, in a short plain phrase (at most 14 words), or nothing when it only lists it.
 
 {{cites.to_sort}}`,
@@ -1133,7 +1149,7 @@ return { fresh: fresh, counts: counts, keep: keep, to_sort: linesOut.join('\n\n'
         title: 'Lay out who cited you',
         do: 'code',
         language: 'javascript',
-        with: { author: '{{who.author}}', papers: '{{who.papers}}', fresh: '{{cites.fresh}}', counts: '{{cites.counts}}', keep: '{{cites.keep}}', kinds: '{{sort.kinds}}', notes: '{{who.notes}}', more: '{{cites.notes}}', today: '{{today}}' },
+        with: { author: '{{who.author}}', papers: '{{who.papers}}', fresh: '{{cites.fresh}}', counts: '{{cites.counts}}', keep: '{{cites.keep}}', kinds: '{{sort.kinds}}', unread: '{{cites.unread}}', notes: '{{who.notes}}', more: '{{cites.notes}}', today: '{{today}}' },
         code:
           LIST +
           String.raw`// Each new citation with how it cites you, and its sentence split around the mention of your paper (its first author's
@@ -1178,12 +1194,12 @@ const citations = rows(input.fresh).map((c) => {
   const kind = KINDS.find((x) => String(k.kind || '').toLowerCase().indexOf(x) >= 0) || (list(c.contexts).length ? 'mentions' : '');
   const best = list(c.contexts).map(String).find((t) => split(t, c.first, c.myYear).mark) || list(c.contexts).map(String).sort((a, b) => b.length - a.length)[0] || '';
   const parts = split(best, c.first, c.myYear);
-  return { key: c.key, mine: c.mine, title: c.title, authors: c.authors, venue: c.venue, year: Number(c.year) || null, date: c.date || null, url: link(c.url), kind: kind, gist: String(k.gist || '').trim(), pre: parts.pre, mark: parts.mark, post: parts.post, influential: !!c.influential };
+  return { key: c.key, mine: c.mine, title: c.title, authors: c.authors, venue: c.venue, year: Number(c.year) || null, date: c.date || null, url: link(c.url), kind: kind, gist: String(k.gist || '').trim(), pre: parts.pre, mark: parts.mark, post: parts.post, influential: !!c.influential, unread: !!c.unread };
 });
 const papers = rows(input.papers).map((p) => ({ key: p.key, title: p.title, year: Number(p.year) || null, venue: p.venue, cited: Number(p.citations) || 0, new: Number(counts[p.key]) || 0, url: link(p.url) }));
 papers.sort((a, b) => b.new - a.new || b.cited - a.cited);
 for (const k of rows(input.keep)) {
-  const rec = { title: k.title, citing: list(k.citing), count: Number(k.count) || 0 };
+  const rec = { title: k.title, citing: list(k.citing), count: Number(k.count) || 0, pending: list(k.pending).map(String) };
   if (k.had) await ctx.data.update('cited', { id: k.id, set: rec, title: 'Keep the citations seen' });
   else await ctx.data.add('cited', Object.assign({ id: k.id }, rec), { title: 'Keep the citations seen' });
 }
@@ -1199,6 +1215,7 @@ return {
   papers: papers,
   checked: String(input.today || '').slice(0, 10),
   source: a.source || '',
+  sentences: Number(input.unread) > 0 ? 'The citing sentences could not be read this time (Semantic Scholar limits requests); they are tried again at the next update.' : '',
   note: [input.notes, input.more].filter(Boolean).join('. '),
 };`,
         outputs: [
@@ -1212,6 +1229,7 @@ return {
           { id: 'papers', label: 'Your papers', type: 'table', columns: MY_PAPER_COLS },
           { id: 'checked', label: 'Checked', type: 'date' },
           { id: 'source', label: 'Where from', type: 'text' },
+          { id: 'sentences', label: 'About the citing sentences', type: 'text' },
           { id: 'note', label: 'What did not answer', type: 'text' },
         ],
         failed: 'agent',
@@ -1228,6 +1246,7 @@ return {
       citations: '{{report.citations}}',
       papers: '{{report.papers}}',
       source: '{{report.source}}',
+      sentences: '{{report.sentences}}',
       note: '{{report.note}}',
     },
   },
@@ -1242,11 +1261,12 @@ return {
     { id: 'citations', label: 'New citations', type: 'table', columns: CITE_COLS },
     { id: 'papers', label: 'Your papers', type: 'table', columns: MY_PAPER_COLS },
     { id: 'source', label: 'Where from', type: 'text' },
+    { id: 'sentences', label: 'About the citing sentences', type: 'text', description: 'Said only when they could not be read this time' },
     { id: 'note', label: 'What did not answer', type: 'text' },
   ],
   examples: [
-    { id: 'by-name', name: 'An author by name', inputs: { me: 'Chris Samarinas' }, checks: ['{{answer.name}} contains Samarinas', '{{answer.papers}} is not empty'] },
-    { id: 'one-paper', name: 'One paper by its DOI', inputs: { me: 'Omar Khattab', papers: '10.1145/3397271.3401075' }, checks: ['{{answer.papers}} is not empty', '{{answer.total}} > 0'] },
+    { id: 'by-name', name: 'An author by name', inputs: { author: 'Gerard Salton' }, checks: ['{{answer.name}} contains Salton', '{{answer.papers}} is not empty'] },
+    { id: 'one-paper', name: 'One paper by its DOI', inputs: { author: 'Gerard Salton', papers: '10.1145/361219.361220' }, checks: ['{{answer.papers}} is not empty', '{{answer.total}} > 0'] },
   ],
 };
 
@@ -1278,24 +1298,26 @@ const NEW_MODEL_WATCH: Draft = {
   category: 'Research',
   description: 'New rerankers, embedders and other models on Hugging Face, checked against your limits and run on your own evaluation: you hear only of those that beat your best.',
   sessions: false,
+  // What each model's card says is for you alone: it follows your language.
+  language: 'person',
   fields: [
     {
       id: 'task',
       label: 'What to watch',
-      type: 'choice',
+      type: 'choice', remember: true,
       options: ['Rerankers (text-ranking)', 'Embedders (sentence-similarity)', 'Embedders (feature-extraction)', 'Text generation (text-generation)', 'Text classification (text-classification)', 'Speech to text (automatic-speech-recognition)'],
       default: 'Rerankers (text-ranking)',
     },
-    { id: 'words', label: 'Words in its name', type: 'text', placeholder: 'e.g. colbert, splade', help: 'Only models with one of these in their name; empty: all of the kind' },
-    { id: 'licence', label: 'Licences you can use', type: 'text', placeholder: 'e.g. apache-2.0, mit', help: 'Empty: any licence' },
-    { id: 'size', label: 'Most parameters', type: 'text', placeholder: 'e.g. 1B or 350M', help: 'Empty: any size' },
-    { id: 'downloads', label: 'Least downloads', type: 'number', default: '50', help: 'Counted once it is as old as below' },
-    { id: 'days', label: 'Days before judging one', type: 'number', default: '7' },
-    { id: 'command', label: 'Your evaluation', type: 'text', placeholder: 'e.g. python eval.py --model {model}', help: 'A command run for each new model, {model} its name; empty: none is run' },
-    { id: 'folder', label: 'Its folder', type: 'text', placeholder: 'e.g. ~/projects/rerank-eval' },
-    { id: 'metric', label: 'The score it prints', type: 'text', placeholder: 'e.g. ndcg@10' },
-    { id: 'better', label: 'Better is', type: 'choice', options: ['Higher', 'Lower'], default: 'Higher' },
-    { id: 'best', label: 'Your best so far', type: 'number', help: 'You hear of a model that does better than this' },
+    { id: 'words', label: 'Words in its name', type: 'text', remember: true, placeholder: 'e.g. colbert, splade', help: 'Only models with one of these in their name; empty: all of the kind' },
+    { id: 'licence', label: 'Licences you can use', type: 'text', remember: true, placeholder: 'e.g. apache-2.0, mit', help: 'Empty: any licence' },
+    { id: 'size', label: 'Most parameters', type: 'text', remember: true, placeholder: 'e.g. 1B or 350M', help: 'Empty: any size' },
+    { id: 'downloads', label: 'Least downloads', type: 'number', remember: true, default: '50', help: 'Counted once it is as old as below' },
+    { id: 'days', label: 'Days before judging one', type: 'number', remember: true, default: '7' },
+    { id: 'command', label: 'Your evaluation', type: 'text', remember: true, placeholder: 'e.g. python eval.py --model {model}', help: 'A command run for each new model, {model} its name; empty: none is run' },
+    { id: 'folder', label: 'Its folder', type: 'text', remember: true, placeholder: 'e.g. ~/projects/rerank-eval' },
+    { id: 'metric', label: 'The score it prints', type: 'text', remember: true, placeholder: 'e.g. ndcg@10' },
+    { id: 'better', label: 'Better is', type: 'choice', remember: true, options: ['Higher', 'Lower'], default: 'Higher' },
+    { id: 'best', label: 'Your best so far', type: 'number', remember: true, help: 'You hear of a model that does better than this' },
   ],
   prompt: '',
   data: {
@@ -1312,7 +1334,7 @@ const NEW_MODEL_WATCH: Draft = {
         title: 'List the new models',
         do: 'code',
         language: 'javascript',
-        seconds: 60,
+        seconds: 30,
         with: { task: '{{task}}', words: '{{words}}', downloads: '{{downloads}}', days: '{{days}}', today: '{{today}}', kept: '{{kept.records}}' },
         code:
           LIST +
@@ -1774,9 +1796,9 @@ const DEADLINE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'given', label: 'As the call gives it', type: 'text' },
   { id: 'past', label: 'Past', type: 'yesno' },
   { id: 'next', label: 'Its next', type: 'yesno' },
-  { id: 'place', label: 'Where it is', type: 'text' },
-  { id: 'dates', label: 'When it is', type: 'text' },
-  { id: 'link', label: 'Call for papers', type: 'url' },
+  { id: 'where', label: 'Where and when it is', type: 'text' },
+  { id: 'link', label: 'Call for papers', type: 'url', description: 'The call’s page when it was found, else the conference’s site' },
+  { id: 'source', label: 'Taken from', type: 'url', description: 'The page of its website the deadline was read from, for a conference neither list has; empty for the lists' },
   { id: 'pages', label: 'Page limit', type: 'text' },
   { id: 'template', label: 'Template', type: 'url' },
 ];
@@ -1797,8 +1819,10 @@ const DEADLINE_RADAR: Draft = {
   category: 'Research',
   description: 'Your venues’ deadlines turned from AoE into your time zone, with reminders before each, and the page limit and template linked.',
   sessions: false,
+  // The notes on each call are for you alone: they follow your language (names, dates and addresses stay as the page writes them).
+  language: 'person',
   fields: [
-    { id: 'venues', label: 'Your venues', type: 'text', required: true, placeholder: 'e.g. SIGIR, ACL, EMNLP, NeurIPS', help: 'Their names as you say them, between commas' },
+    { id: 'venues', label: 'Your venues', type: 'text', required: true, from: 'me.venues', placeholder: 'e.g. SIGIR, ACL, EMNLP, NeurIPS', help: 'Their names as you say them, between commas' },
     { id: 'reminders', label: 'Remind me', type: 'text', default: '14, 3, 1', help: 'Days before each deadline, between commas; empty: no reminders' },
   ],
   prompt: '',
@@ -1846,6 +1870,7 @@ const known = new Map(rows(input.calls).map((r) => [String(r.id), r]));
 const deadlines = [];
 const venues = [];
 const missing = [];
+const unknown = [];
 const notes = [];
 const need = [];
 const KIND = (t) => (/abstract/i.test(t) ? 'abstract' : /supplement/i.test(t) ? 'supplementary' : /rebuttal|response|discussion/i.test(t) ? 'rebuttal' : /notif|decision/i.test(t) ? 'notification' : /camera/i.test(t) ? 'camera-ready' : /regist/i.test(t) ? 'other' : /review/i.test(t) ? 'other' : 'paper');
@@ -1857,6 +1882,7 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
   const hfName = pair[1] || '';
   if (!ccfName && !hfName) {
     missing.push(said);
+    unknown.push({ venue: said, query: said + ' conference next call for papers submission deadline' });
     continue;
   }
   const editions = new Map();
@@ -1945,11 +1971,12 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
   }
 }
 deadlines.sort((a, b) => a.at - b.at);
-return { deadlines: deadlines, venues: venues, missing: missing, need: need, zone: zone, now: now, notes: notes.join('. ') };`,
+return { deadlines: deadlines, venues: venues, missing: missing, unknown: unknown, need: need, zone: zone, now: now, notes: notes.join('. ') };`,
         outputs: [
           { id: 'deadlines', label: 'Deadlines', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'label', label: 'What is due', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
           { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not in the lists', type: 'list' },
+          { id: 'unknown', label: 'Conferences to look up on the web', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'query', label: 'Search for its deadline', type: 'text' }] },
           { id: 'need', label: 'Calls to read', type: 'table', columns: [{ id: 'id', label: 'Conference', type: 'text' }, { id: 'venue', label: 'Venue', type: 'text' }, { id: 'link', label: 'Its site', type: 'text' }, { id: 'query', label: 'Search for its call', type: 'text' }] },
           { id: 'zone', label: 'Your time zone', type: 'text' },
           { id: 'now', label: 'Now, as a moment', type: 'number' },
@@ -1964,7 +1991,7 @@ return { deadlines: deadlines, venues: venues, missing: missing, need: need, zon
         over: '{{lists.need}}',
         atOnce: 3,
         as: 'call',
-        collect: 'facts',
+        collect: 'noted',
         steps: [
           { id: 'find', title: 'Search for the call', do: 'tool', tool: 'web_search', with: { query: '{{call.query}}', k: 6 }, failed: 'skip' },
           {
@@ -1981,9 +2008,13 @@ if (r.data && Array.isArray(r.data.results)) for (const h of r.data.results) hit
 else for (const m of String(r.text || '').matchAll(/^\s+(https?:\/\/\S+)/gm)) hits.push(m[1]);
 const site = (u) => ((/^https?:\/\/([^/]+)/.exec(u) || [])[1] || '').replace(/^www\./, '');
 const same = hits.filter((u) => home && site(u) === home.replace(/^www\./, ''));
-const best = same.find((u) => /call|cfp|paper|submission|author/i.test(u)) || same[0] || hits.find((u) => /call|cfp/i.test(u)) || input.link || hits[0] || '';
-return { url: best };`,
-            outputs: [{ id: 'url', label: 'Its page', type: 'text' }],
+const call = same.find((u) => /call|cfp|paper|submission|author/i.test(u)) || same[0] || hits.find((u) => /call|cfp/i.test(u)) || '';
+// The page to read may be the conference's site when no call was found; only a found call is kept as its call for papers.
+return { url: call || input.link || hits[0] || '', cfp: call };`,
+            outputs: [
+              { id: 'url', label: 'Its page', type: 'text' },
+              { id: 'cfp', label: 'Its call for papers', type: 'text' },
+            ],
             failed: 'skip',
           },
           { id: 'page', title: 'Read the call', do: 'tool', tool: 'read_page', if: '{{pick.url}} is not empty', with: { url: '{{pick.url}}', question: 'How long a paper may be (its page limit, and whether references count), and where its template or author kit is (its address)' }, failed: 'skip' },
@@ -1994,7 +2025,7 @@ return { url: best };`,
             if: '{{page.text}} is not empty',
             instructions: `From this part of {{call.venue}} {{call.year}}'s call for papers ({{pick.url}}), note:
 - pages: its page limit for a full or long paper, in a few words as the call says it ("9 pages, references not counted"); empty when it does not say.
-- template: the address of its LaTeX or Word template or author kit, exactly as written on the page (a full https:// address); empty when it gives none.
+- template: the address of its LaTeX or Word template or author kit, exactly as written on the page (a full https:// address, never translated); empty when it gives none.
 
 {{page.text}}`,
             outputs: [
@@ -2002,20 +2033,154 @@ return { url: best };`,
               { id: 'template', label: 'Template', type: 'text' },
             ],
           },
+          {
+            id: 'noted',
+            title: 'Keep its call with what it says',
+            do: 'code',
+            language: 'javascript',
+            with: { cfp: '{{pick.cfp}}', pages: '{{facts.pages}}', template: '{{facts.template}}' },
+            code: String.raw`// The call's page goes with its page limit and template, so the page found is kept too (and linked), not only what it said.
+return { cfp: String(input.cfp || ''), pages: String(input.pages || ''), template: String(input.template || '') };`,
+            outputs: [
+              { id: 'cfp', label: 'Its call for papers', type: 'text' },
+              { id: 'pages', label: 'Page limit', type: 'text' },
+              { id: 'template', label: 'Template', type: 'text' },
+            ],
+            failed: 'skip',
+          },
         ],
+      },
+      {
+        id: 'web',
+        title: 'Look up the conferences the lists do not have',
+        do: 'repeat',
+        over: '{{lists.unknown}}',
+        atOnce: 3,
+        as: 'venue',
+        collect: 'said',
+        steps: [
+          { id: 'site_find', title: 'Search for its deadline', do: 'tool', tool: 'web_search', with: { query: '{{venue.query}}', k: 6 }, failed: 'skip' },
+          {
+            id: 'site_pick',
+            title: 'Pick its page',
+            do: 'code',
+            language: 'javascript',
+            with: { found: '{{site_find}}', venue: '{{venue.venue}}' },
+            code: String.raw`// The page most likely to give the venue's deadline: one whose address or title reads like its call for papers or its
+// dates, and whose address holds the venue's name, else the first result.
+const r = input.found || {};
+const hits = [];
+if (r.data && Array.isArray(r.data.results)) for (const h of r.data.results) hits.push({ url: String(h.url || ''), title: String(h.title || '') });
+else {
+  const lines = String(r.text || '').split('\n');
+  lines.forEach((l, i) => {
+    const m = /^\s+(https?:\/\/\S+)/.exec(l);
+    if (m) hits.push({ url: m[1], title: String((lines[i - 1] || '').replace(/^\s*\[\d+\]\s*/, '')) });
+  });
+}
+const name = String(input.venue || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const read = (h) => /call|cfp|deadline|dates|submission|author/i.test(h.url + ' ' + h.title);
+const own = (h) => name && h.url.toLowerCase().replace(/[^a-z0-9]+/g, '').includes(name);
+const best = hits.find((h) => read(h) && own(h)) || hits.find(own) || hits.find(read) || hits[0];
+return { url: best ? best.url : '' };`,
+            outputs: [{ id: 'url', label: 'Its page', type: 'text' }],
+            failed: 'skip',
+          },
+          { id: 'site_page', title: 'Read the page', do: 'tool', tool: 'read_page', if: '{{site_pick.url}} is not empty', with: { url: '{{site_pick.url}}', question: 'The conference’s full name and year, and the deadline for submitting a full paper (its date, time and time zone as written)' }, failed: 'skip' },
+          {
+            id: 'got',
+            title: 'Note its deadline',
+            do: 'model',
+            if: '{{site_page.text}} is not empty',
+            instructions: `From this part of a page about the conference {{venue.venue}} ({{site_pick.url}}), note its next edition's deadline for submitting a full paper:
+- name: the conference's name in full, exactly as the page writes it (never translated).
+- year: the year of that edition, four digits.
+- deadline: the date of the deadline as YYYY-MM-DD, then the time as HH:MM when the page gives one (2027-01-14 23:59). Empty when the page gives none, or only the dates of an edition long past. Do not guess a date.
+- timezone: the time zone the page gives the deadline in, exactly as it writes it (AoE, UTC-12, PST, CET); empty when it gives none.
+
+{{site_page.text}}`,
+            outputs: [
+              { id: 'name', label: 'Conference', type: 'text' },
+              { id: 'year', label: 'Year', type: 'number' },
+              { id: 'deadline', label: 'Deadline', type: 'text' },
+              { id: 'timezone', label: 'Time zone', type: 'text' },
+            ],
+            failed: 'skip',
+          },
+          {
+            id: 'said',
+            title: 'Keep what it says with its page',
+            do: 'code',
+            language: 'javascript',
+            with: { venue: '{{venue.venue}}', url: '{{site_pick.url}}', name: '{{got.name}}', year: '{{got.year}}', deadline: '{{got.deadline}}', timezone: '{{got.timezone}}' },
+            code: String.raw`return { venue: String(input.venue || ''), url: String(input.url || ''), name: String(input.name || ''), year: Number(input.year) || null, deadline: String(input.deadline || ''), timezone: String(input.timezone || '') };`,
+            outputs: [
+              { id: 'venue', label: 'Venue', type: 'text' },
+              { id: 'url', label: 'Its page', type: 'text' },
+              { id: 'name', label: 'Conference', type: 'text' },
+              { id: 'year', label: 'Year', type: 'number' },
+              { id: 'deadline', label: 'Deadline', type: 'text' },
+              { id: 'timezone', label: 'Time zone', type: 'text' },
+            ],
+            failed: 'skip',
+          },
+        ],
+      },
+      {
+        id: 'web_deadlines',
+        title: 'Turn what the web said into deadlines',
+        do: 'code',
+        language: 'javascript',
+        with: { lists: '{{lists}}', unknown: '{{lists.unknown}}', said: '{{web.items}}' },
+        code:
+          LIST +
+          WHEN +
+          String.raw`// For each venue the lists did not have: the deadline its website gave, as its moment (AoE when the page gives no
+// zone), marked as taken from the website; one that is no date, or that passed long ago, counts as not found.
+const L = input.lists || {};
+const zone = String(L.zone || 'UTC');
+const now = Number(L.now) || Date.now();
+const said = list(input.said);
+const deadlines = [];
+const venues = [];
+const missing = [];
+for (const [i, u] of rows(input.unknown).entries()) {
+  const f = said[i] && typeof said[i] === 'object' ? said[i] : {};
+  const m = f.deadline ? momentOf(f.deadline, f.timezone || 'AoE') : null;
+  const link = /^https?:\/\/\S+$/.test(String(f.url || '')) ? String(f.url) : null;
+  if (!m || !link || m.at < now - 120 * 86400000) {
+    missing.push(u.venue);
+    continue;
+  }
+  const z = inZone(m.at, zone);
+  const title = String(f.name || '').trim() || u.venue;
+  const year = Number(f.year) || Number(z.day.slice(0, 4));
+  const past = m.at < now - 12 * 3600000;
+  const compact = title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  deadlines.push({ key: ('web-' + compact + year + '-paper-' + z.day).replace(/[^\w-]/g, '_').slice(0, 64), venue: title, year: year, conf: 'web-' + compact + year, kind: 'paper', label: 'Papers', at: m.at, utc: new Date(m.at).toISOString().replace(/\.\d{3}Z$/, 'Z'), day: z.day, time: z.time, given: String(f.deadline).slice(0, 16) + ' ' + (f.timezone || 'AoE') + (m.assumed ? ' (AoE assumed)' : ''), past: past, next: !past, where: '', link: null, source: link });
+  venues.push({ venue: title, name: '', rank: '', next: past ? '' : 'Papers', day: past ? null : z.day, link: link });
+}
+return { deadlines: deadlines, venues: venues, missing: missing };`,
+        outputs: [
+          { id: 'deadlines', label: 'Deadlines from websites', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
+          { id: 'venues', label: 'Conferences from websites', type: 'table', columns: VENUE_COLS },
+          { id: 'missing', label: 'Not found anywhere', type: 'list' },
+        ],
+        failed: 'agent',
       },
       {
         id: 'remind',
         title: 'Remind you of what is near',
         do: 'code',
         language: 'javascript',
-        with: { lists: '{{lists}}', read: '{{look.items}}', calls: '{{calls.records}}', sent: '{{sent.records}}', reminders: '{{reminders}}', today: '{{today}}' },
+        with: { lists: '{{lists}}', web: '{{web_deadlines}}', read: '{{look.items}}', calls: '{{calls.records}}', sent: '{{sent.records}}', reminders: '{{reminders}}', today: '{{today}}' },
         code:
           LIST +
           String.raw`// Each deadline with its call's page limit and template; the reminders due (the nearest of the days before it you
 // gave that has come, each once: a later one is never sent before an earlier), all in one notification; and what was
-// read and sent kept.
+// read and sent kept. The deadlines a venue's website gave (venues the two lists do not have) are among them, marked.
 const L = input.lists || {};
+const W = input.web && typeof input.web === 'object' ? input.web : {};
 const today = String(input.today || '').slice(0, 10);
 const now = Number(L.now) || Date.now();
 const days = String(input.reminders || '').split(/[,;\s]+/).map(Number).filter((n) => n > 0 && n < 400).sort((a, b) => b - a);
@@ -2024,16 +2189,16 @@ const read = list(input.read);
 const link = (u) => (/^https?:\/\/\S+$/.test(String(u || '').trim()) ? String(u).trim() : null);
 for (const [i, need] of rows(L.need).entries()) {
   const f = read[i] && typeof read[i] === 'object' ? read[i] : {};
-  const rec = { pages: clip(f.pages, 120), template: link(f.template) || '', cfp: '', checked: today };
+  const rec = { pages: clip(f.pages, 120), template: link(f.template) || '', cfp: link(f.cfp) || '', checked: today };
   if (calls.has(need.id)) await ctx.data.update('calls', { id: need.id, set: rec, title: 'Keep what ' + need.venue + '’s call says' });
   else await ctx.data.add('calls', Object.assign({ id: need.id }, rec), { title: 'Keep what ' + need.venue + '’s call says' });
   calls.set(need.id, rec);
 }
 const sent = new Map(rows(input.sent).map((r) => [String(r.id), r]));
 const due = [];
-const deadlines = rows(L.deadlines).map((d) => {
+const deadlines = rows(L.deadlines).concat(rows(W.deadlines)).sort((a, b) => Number(a.at) - Number(b.at)).map((d) => {
   const c = calls.get(String(d.conf).replace(/[^\w-]/g, '_')) || {};
-  const out = { key: d.key, venue: d.venue, year: Number(d.year) || null, kind: d.kind, label: d.label, utc: d.utc, day: d.day, time: d.time, given: d.given, past: !!d.past, next: !!d.next, place: d.place || '', dates: d.dates || '', link: link(c.cfp) || link(d.link), pages: c.pages || '', template: link(c.template) };
+  const out = { key: d.key, venue: d.venue, year: Number(d.year) || null, kind: d.kind, label: d.label, utc: d.utc, day: d.day, time: d.time, given: d.given, past: !!d.past, next: !!d.next, where: [d.place, d.dates].filter(Boolean).join(' · '), link: link(c.cfp) || link(d.link), source: link(d.source) || '', pages: c.pages || '', template: link(c.template) };
   const left = (Number(d.at) - now) / 86400000;
   if (!d.past && left >= 0 && days.length && /abstract|paper/.test(d.kind)) {
     const stage = days.filter((n) => left <= n).pop();
@@ -2065,8 +2230,8 @@ return {
   today: today,
   headline: first ? first.venue + ' ' + (first.year || '') + ': ' + first.label.toLowerCase() + ' due ' + first.day : 'No deadline ahead in your venues',
   deadlines: deadlines,
-  venues: rows(L.venues).map((v) => Object.assign({}, v, { day: /^\d{4}-\d{2}-\d{2}$/.test(String(v.day)) ? v.day : null, link: link(v.link) })),
-  missing: list(L.missing),
+  venues: rows(L.venues).concat(rows(W.venues)).map((v) => Object.assign({}, v, { day: /^\d{4}-\d{2}-\d{2}$/.test(String(v.day)) ? v.day : null, link: link(v.link) })),
+  missing: input.web && typeof input.web === 'object' ? list(W.missing) : list(L.missing),
   reminded: reminded,
   ahead: upcoming.length,
   note: L.notes || '',
@@ -2125,7 +2290,7 @@ const LIVING_RELATED_WORK: Draft = {
   description: 'A page for each of your topics that adds papers as they appear, sums each up, groups them into themes and marks what is new; it drafts the related-work section in LaTeX.',
   sessions: false,
   fields: [
-    { id: 'topics', label: 'Topics', type: 'long', required: true, placeholder: 'One a line: retrieval-augmented generation for long documents…' },
+    { id: 'topics', label: 'Topics', type: 'long', required: true, remember: true, placeholder: 'One a line: retrieval-augmented generation for long documents…' },
     { id: 'seeds', label: 'Seed papers', type: 'long', placeholder: 'One a line: a title, an arXiv id or a DOI', help: 'Papers that cite them come in too' },
     { id: 'most', label: 'Most papers a topic', type: 'number', default: '80' },
   ],
@@ -2156,7 +2321,7 @@ const LIVING_RELATED_WORK: Draft = {
         title: 'Find the papers on each topic',
         do: 'code',
         language: 'javascript',
-        seconds: 110,
+        seconds: 30,
         with: { topics: '{{topics}}', seeds: '{{seeds}}', most: '{{most}}', known: '{{known.records}}', seeded: '{{seeded.records}}', themed: '{{themed.records}}', today: '{{today}}' },
         code:
           LIST +
@@ -2415,35 +2580,75 @@ return { updated: today, topics: topics, fresh: added, headline: added ? added +
           code:
             LIST +
             String.raw`// The papers to cite (those you did not take out), theme by theme, each with its key; and the .bib with all of them.
+// A model writes the section from what is listed here, and one asked at once reads about 100,000 characters: the
+// newest papers go in until about 60,000 characters of them are listed, and how many were left out is said.
 const papers = rows(input.papers).filter((p) => !p.hidden);
 if (!papers.length) throw new Error('This topic has no papers yet: update it first');
+const line = (p) => '- \\cite{' + p.citekey + '} ' + p.title + ' (' + [p.authors, p.venue, p.year].filter(Boolean).join(', ') + '): ' + (p.summary || '') + (p.relation ? ' [' + p.relation + ']' : '');
+let used = 0;
+const listed = papers.filter((p) => (used += line(p).length + 1) <= 60000);
 const themes = [];
-for (const p of papers) if (themes.indexOf(p.theme || 'Other') < 0) themes.push(p.theme || 'Other');
-const lines2 = themes.map((t) => '## ' + t + '\n' + papers.filter((p) => (p.theme || 'Other') === t).map((p) => '- \\cite{' + p.citekey + '} ' + p.title + ' (' + [p.authors, p.venue, p.year].filter(Boolean).join(', ') + '): ' + (p.summary || '') + (p.relation ? ' [' + p.relation + ']' : '')).join('\n')).join('\n\n');
-return { lines: lines2, bib: papers.map((p) => p.bibtex).filter(Boolean).join('\n\n'), count: papers.length };`,
+for (const p of listed) if (themes.indexOf(p.theme || 'Other') < 0) themes.push(p.theme || 'Other');
+const lines2 = themes.map((t) => '## ' + t + '\n' + listed.filter((p) => (p.theme || 'Other') === t).map(line).join('\n')).join('\n\n');
+const left = papers.length - listed.length;
+return { lines: lines2, bib: papers.map((p) => p.bibtex).filter(Boolean).join('\n\n'), keys: papers.map((p) => String(p.citekey || '')).filter(Boolean), count: papers.length, left };`,
           outputs: [
             { id: 'lines', label: 'Papers by theme', type: 'text' },
             { id: 'bib', label: 'BibTeX', type: 'text' },
+            { id: 'keys', label: 'Cite keys', type: 'list' },
             { id: 'count', label: 'How many', type: 'number' },
+            { id: 'left', label: 'Left out of the section', type: 'number' },
           ],
           failed: 'agent',
         },
         {
           id: 'write',
           title: 'Write the section',
-          do: 'agent',
-          tools: [],
+          do: 'model',
+          // Its answer is the LaTeX itself, not a JSON field: a backslash in JSON must be doubled, and a model does not always.
           instructions: `Write the related-work section of a research paper on "{{topic}}", in LaTeX, from the papers below (grouped by theme, each with its \\cite key, what it does, and how it relates).
 
 - \\subsection*{Related work} is not needed: start with the text itself. A paragraph for each theme, opening with a sentence that names it (\\paragraph{Theme.} or a plain sentence), then the papers: what they did, how they connect and differ, where the gaps are. Cite with \\cite{key} using only the keys below, each where it belongs; group citations for the same point (\\cite{a,b}).
 - Plain, precise academic prose; no claims beyond what is said of each paper; no bullet lists; no invented numbers.
-- Hand in latex: the section's LaTeX (no preamble, no \\begin{document}).
+- Answer with the section's LaTeX itself (no preamble, no \\begin{document}, no Markdown fence, nothing before or after it).
 
 {{prep.lines}}`,
-          outputs: [{ id: 'latex', label: 'The section, in LaTeX', type: 'markdown', required: true }],
+        },
+        {
+          id: 'checked',
+          title: 'Check the citations',
+          do: 'code',
+          language: 'javascript',
+          with: { latex: '{{write.text}}', keys: '{{prep.keys}}', left: '{{prep.left}}' },
+          code:
+            LIST +
+            String.raw`// The section with a Markdown fence taken off if the model put one, and every cite key that is not one of the papers' keys
+// taken out (a citation left with no key goes whole, with the space before it), so the .bib has all it cites.
+const valid = new Set(list(input.keys).map(String));
+const removed = [];
+let latex = String(input.latex || '').trim().replace(/^\x60{3}(?:latex|tex)?\s*\n/i, '').replace(/\n?\x60{3}\s*$/, '').trim();
+latex = latex.replace(/([ ~]?)\\(cite[a-z]*|parencite|textcite)(\*?)((?:\[[^\]]*\])*)\{([^}]*)\}/g, (all, lead, cmd, star, opt, keys) => {
+  const parts = keys.split(',').map((k) => k.trim()).filter(Boolean);
+  const ok = parts.filter((k) => valid.has(k));
+  for (const k of parts) if (valid.has(k) === false) removed.push(k);
+  if (ok.length === parts.length) return all;
+  return ok.length ? lead + '\\' + cmd + star + opt + '{' + ok.join(',') + '}' : '';
+});
+if (!latex) throw new Error('The model wrote nothing: try again');
+const notes = [];
+if (removed.length) notes.push(removed.length + (removed.length === 1 ? ' citation' : ' citations') + ' to papers that are not in this topic (' + [...new Set(removed)].join(', ') + ') were taken out.');
+const left = Number(input.left) || 0;
+if (left > 0) notes.push(left + (left === 1 ? ' older paper was' : ' older papers were') + ' left out of the section, as there are too many to write from at once; the .bib has them all.');
+return { latex, removed: [...new Set(removed)], note: notes.join(' ') };`,
+          outputs: [
+            { id: 'latex', label: 'The section, in LaTeX', type: 'markdown' },
+            { id: 'removed', label: 'Citations taken out', type: 'list' },
+            { id: 'note', label: 'What was changed', type: 'text' },
+          ],
+          failed: 'agent',
         },
       ],
-      outputs: { topic: '{{topic}}', latex: '{{write.latex}}', bib: '{{prep.bib}}', count: '{{prep.count}}' },
+      outputs: { topic: '{{topic}}', latex: '{{checked.latex}}', bib: '{{prep.bib}}', count: '{{prep.count}}', note: '{{checked.note}}' },
     },
     bib: {
       title: 'Its BibTeX',
@@ -2504,10 +2709,12 @@ const GAP_FINDER: Draft = {
   color: 'amber',
   category: 'Research',
   description: 'Project ideas from your papers crossed with this month’s in your area, each checked for prior work and sized to the compute you have.',
+  // Its ideas are for you alone: they follow your language (the searches for prior work, the verdicts and the sizes stay as written).
+  language: 'person',
   fields: [
-    { id: 'papers', label: 'Your papers', type: 'long', required: true, placeholder: 'Your name as an author, or your papers’ titles or arXiv ids, one a line', help: 'A name brings your latest and most cited papers' },
-    { id: 'area', label: 'The area', type: 'text', required: true, placeholder: 'e.g. conversational search, or cs.IR' },
-    { id: 'compute', label: 'The compute you have', type: 'text', default: 'one 24 GB GPU' },
+    { id: 'papers', label: 'Your papers', type: 'long', required: true, from: 'me.author', placeholder: 'Your name as an author, or your papers’ titles or arXiv ids, one a line', help: 'A name brings your latest and most cited papers' },
+    { id: 'area', label: 'The area', type: 'text', required: true, from: 'me.fields', placeholder: 'e.g. conversational search, or cs.IR', help: 'Several areas, between commas, are searched together' },
+    { id: 'compute', label: 'The compute you have', type: 'text', from: 'me.compute', default: 'one 24 GB GPU' },
     { id: 'ideas', label: 'How many ideas', type: 'number', default: '5', help: 'Between 2 and 8' },
   ],
   prompt: '',
@@ -2525,21 +2732,41 @@ const GAP_FINDER: Draft = {
               title: 'Find your papers',
               do: 'code',
               language: 'javascript',
-              seconds: 90,
-              with: { mine: '{{papers}}' },
+              seconds: 30,
+              // The id About you holds for you finds you exactly, where a name may find a namesake: while the question holds the name About you has.
+              with: { mine: '{{papers}}', id: '{{me.author_id}}', recorded: '{{me.author}}' },
               code:
                 LIST +
                 HTTP +
                 PAPERS +
                 ARXIV +
                 S2 +
-                String.raw`// Your papers with their abstracts: by your name (the author of that name with the most citations: their latest and
-// most cited), or each title or arXiv id given.
+                String.raw`// Your papers with their abstracts: by your name (by the id About you holds for you, an OpenAlex id or an ORCID,
+// while the name is the one it holds; else the author of that name with the most citations: their latest and most
+// cited), or each title or arXiv id given.
 const given = lines(input.mine).slice(0, 10);
 const plain = (s) => plainTitle(s);
 const out = [];
 const one = given.length === 1 && !/\d{4}\.\d{4,5}/.test(given[0]) && given[0].split(/\s+/).length <= 4;
-if (one) {
+const kept = String(input.id || '').trim();
+const oaId = (/A\d{5,}/i.exec(kept) || [])[0];
+const orcid = (/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/.exec(kept) || [])[0];
+if (one && (oaId || orcid) && plain(given[0]) === plain(input.recorded)) {
+  try {
+    const a = bodyOf(await keyed('https://api.openalex.org/authors/' + (oaId ? oaId.toUpperCase() : 'orcid:' + orcid), 'OPENALEX_API_KEY', { title: 'Read your author page on OpenAlex' }));
+    const aid = String((a && a.id) || '').replace(/^https?:\/\/openalex\.org\//, '');
+    if (aid) {
+      const works = async (sort, n, title) => rows((bodyOf(await keyed('https://api.openalex.org/works?filter=author.id:' + aid + '&sort=' + sort + '&per-page=' + n + '&select=id,doi,title,publication_date,publication_year,authorships,primary_location,abstract_inverted_index,type', 'OPENALEX_API_KEY', { title: title })) || {}).results);
+      const most = await works('cited_by_count:desc', 4, 'Read your most cited papers');
+      const latest = (await works('publication_date:desc', 8, 'Read your latest papers')).filter((w) => !most.some((m) => m.id === w.id)).slice(0, 4);
+      for (const w of latest.concat(most)) {
+        const p = fromOpenAlex(w);
+        if (p.title) out.push(p);
+      }
+    }
+  } catch (e) {}
+}
+if (one && !out.length) {
   try {
     const found = await s2('author/search?query=' + encodeURIComponent(given[0]) + '&fields=name,citationCount&limit=10', 'Look you up on Semantic Scholar');
     const all = rows(found && found.data);
@@ -2581,7 +2808,7 @@ return { papers: papers, titles: papers.map((p) => p.title), count: papers.lengt
               title: 'Find the month’s papers in the area',
               do: 'code',
               language: 'javascript',
-              seconds: 60,
+              seconds: 30,
               with: { area: '{{area}}', today: '{{today}}' },
               code:
                 LIST +
@@ -2590,13 +2817,18 @@ return { papers: papers, titles: papers.map((p) => p.title), count: papers.lengt
                 ARXIV +
                 CATEGORIES +
                 String.raw`// The past month's papers in the area: an arXiv category by its name or code, else its words in titles and abstracts.
+// Several areas between commas (About you lists your fields so) are searched together, each as it would be alone.
 const area = String(input.area || '').trim();
 const today = String(input.today || '').slice(0, 10);
 const from = new Date(Date.parse(today) - 30 * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
 const range = 'submittedDate:[' + from + '0000 TO ' + today.replace(/-/g, '') + '2359]';
-const cat = categoryOf(area);
-const ws = plainTitle(area).split(' ').filter((w) => w.length > 2 && !QUIET_WORDS.has(w)).slice(0, 5);
-const q = cat ? 'cat:' + cat : '(' + (ws.length > 1 ? ws.map((w) => 'abs:' + w).join(' AND ') : 'abs:' + phrase(area)) + ' OR ti:' + phrase(area) + ')';
+const one = (a) => {
+  const cat = categoryOf(a);
+  const ws = plainTitle(a).split(' ').filter((w) => w.length > 2 && !QUIET_WORDS.has(w)).slice(0, 5);
+  return cat ? 'cat:' + cat : '(' + (ws.length > 1 ? ws.map((w) => 'abs:' + w).join(' AND ') : 'abs:' + phrase(a)) + ' OR ti:' + phrase(a) + ')';
+};
+const areas = area.split(/\s*[,;]\s*/).filter(Boolean).slice(0, 4);
+const q = areas.length > 1 ? '(' + areas.map(one).join(' OR ') + ')' : one(area);
 const found = await arxiv(q + ' AND ' + range, 150, 'This month’s papers on ' + clip(area, 40));
 const papers = found.map((p) => ({ key: paperKey(p), title: p.title, date: p.date, url: p.url, abstract: clip(p.abstract, 1200) }));
 return { papers: papers, ranking: papers.map((p) => ({ id: p.key, text: p.title + '\n' + p.abstract })), count: papers.length };`,
@@ -2645,7 +2877,7 @@ For each idea:
 - title: a few words naming it.
 - idea: what it is and why it could work, in two or three plain sentences.
 - crosses: which of their papers and which of this month's it crosses, as "M2 × R5".
-- queries: two or three searches for prior work on exactly this idea, separated by " | ", in the words papers on it would use.
+- queries: two or three searches for prior work on exactly this idea, separated by " | ", in the words papers on it would use (always in English: they are searched for on arXiv and Semantic Scholar, whatever language you are asked to write in).
 - first: the first experiment to run: data, model, baseline and the measure, in one or two sentences.
 - needs: what that experiment needs to run (models and their sizes, data), in a few words.
 
@@ -2659,6 +2891,8 @@ Ideas that are concrete and testable, each clearly different from the others; no
         title: 'Check each one for prior work',
         do: 'repeat',
         over: '{{propose.ideas}}',
+        // Each idea is checked on its own (its searches, its verdict), so several go at once; the engine keeps the calls to arXiv and Semantic Scholar apart.
+        atOnce: 3,
         as: 'idea',
         collect: 'merge',
         steps: [
@@ -2667,7 +2901,7 @@ Ideas that are concrete and testable, each clearly different from the others; no
             title: 'Search for prior work',
             do: 'code',
             language: 'javascript',
-            seconds: 60,
+            seconds: 30,
             with: { idea: '{{idea}}' },
             code:
               LIST +
@@ -2723,12 +2957,12 @@ The idea: {{idea.title}}. {{idea.idea}}
 The first experiment: {{idea.first}} It needs: {{idea.needs}}
 The compute there is: {{compute}}
 
-- verdict: "new" when none of the papers below does it; "partly done" when one does part of it or something close (say which part is left); "done" when one already does it.
+- verdict: exactly one of "new" (none of the papers below does it), "partly done" (one does part of it or something close: say which part is left in why) or "done" (one already does it); write that word as given, in English, whatever language you are asked to write in.
 - why: one or two sentences saying so, naming the closest papers by their numbers (P2) when there are some.
 - closest: the number of the closest paper (1 for P1), or 0 when none is close.
 - first: the first experiment to run, as given or made sharper, in one or two sentences.
 - cost: what that first experiment takes on that compute, in plain numbers ("about 30 GPU hours", "a day on the GPU").
-- fits: "fits" when it runs on that compute as it is, "tight" when it does with care (smaller models, fewer runs), "too big" when it does not.
+- fits: exactly one of "fits" (it runs on that compute as it is), "tight" (it does with care: smaller models, fewer runs) or "too big" (it does not); write that word as given, in English, whatever language you are asked to write in.
 
 {{#prior.lines}}{{prior.lines}}{{/prior.lines}}{{^prior.lines}}The search found no papers.{{/prior.lines}}`,
             outputs: [
@@ -2837,8 +3071,8 @@ return {
     { id: 'month', label: 'Papers of the month read', type: 'number' },
   ],
   examples: [
-    { id: 'by-name', name: 'By your name, in an area', inputs: { papers: 'Chris Samarinas', area: 'retrieval-augmented generation', compute: 'one 24 GB GPU', ideas: '3' }, checks: ['{{answer.ideas}} is not empty', '{{answer.month}} > 0'] },
-    { id: 'by-titles', name: 'By your papers’ titles, in a category', inputs: { papers: 'ProCIS: A Benchmark for Proactive Retrieval in Conversations\nRevisiting Open Domain Query Facet Extraction and Generation', area: 'cs.IR', compute: 'two 80 GB GPUs', ideas: '4' }, checks: ['{{answer.ideas}} is not empty', '{{answer.mine}} is not empty'] },
+    { id: 'by-name', name: 'By your name, in an area', inputs: { papers: 'Gerard Salton', area: 'vector space model', compute: 'one 24 GB GPU', ideas: '3' }, checks: ['{{answer.ideas}} is not empty', '{{answer.month}} > 0'] },
+    { id: 'by-titles', name: 'By your papers’ titles, in a category', inputs: { papers: 'A vector space model for automatic indexing\nTerm-weighting approaches in automatic text retrieval', area: 'cs.IR', compute: 'two 80 GB GPUs', ideas: '4' }, checks: ['{{answer.ideas}} is not empty', '{{answer.mine}} is not empty'] },
   ],
 };
 

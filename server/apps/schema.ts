@@ -1,7 +1,8 @@
 // The JSON Schema of a template's app.json (its folder, /api/apps/schema.json), for an editor's completion and
 // checks as it is written; and the types of a code step's file. The app checks a template itself when it is
 // saved, in words: this only helps write it.
-import { STEP_KINDS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { BUILTIN_VALUES, STEP_KINDS, STEP_TOOLS } from '../../shared/app-manifest.ts';
+import { FROM_FIELDS } from '../../shared/app-me.ts';
 import { ANSWER_TYPES, APP_COLORS, APP_ICONS, FIELD_TYPES } from '../../shared/apps.ts';
 import { BUILTIN_ELEMENTS, UI_ACTIONS } from '../../shared/app-ui.ts';
 
@@ -23,6 +24,9 @@ export function appSchema(): Record<string, unknown> {
       options: { type: 'array', items: { type: 'string' }, description: 'A choice’s options. In an Ask a person step, an option that is one {{step.value}} gives that list’s items (what an earlier step found), picked at the moment it asks' },
       multi: { type: 'boolean', description: 'A choice: more than one may be picked; its value has one per line' },
       default: str('The answer it starts with'),
+      from: { enum: FROM_FIELDS.map((f) => `me.${f.id}`), description: 'A field of About you (the person’s own record) its answer starts from: the form shows it filled in (folded into one line when not required), and a run that leaves it unanswered takes it before default. Not for a file' },
+      remember: { type: 'boolean', description: 'Its answer starts from the person’s last answer to it in this app (for what About you has no field for); not with from, not for a file' },
+      was: { type: 'array', items: { type: 'string' }, description: 'Its former ids, when you rename a question others may have answered (a schedule, its own page’s settings, a last answer): an answer under one of them counts as its own while it has none. Ids no other question has (≤5)' },
     },
     required: ['label'],
   };
@@ -57,6 +61,7 @@ export function appSchema(): Record<string, unknown> {
       capUsd: { type: 'number', description: 'agent: most it may spend, in US dollars' },
       tool: { enum: STEP_TOOLS, description: 'tool: which of the app’s own tools' },
       with: values('tool, app, code: its inputs, each a value or text with {{values}}; data: the record, or what to change'),
+      cache: { type: ['boolean', 'number'], description: 'tool: how long the answer of a look-up (read_page, web_search, http_request GET) is kept for the same call: false never, else seconds (unset: 5 minutes, a day for places and encyclopedias)' },
       rule: str('decide: a rule'),
       ask: str('decide: or a question in words, answered yes or no'),
       then: { type: 'array', items: { $ref: '#/$defs/step' } },
@@ -82,7 +87,7 @@ export function appSchema(): Record<string, unknown> {
       fields: { type: 'array', items: field, description: 'ask: its form (none: yes or no)' },
       waitHours: { type: 'number' },
       language: { enum: ['javascript', 'typescript', 'python'] },
-      code: textOrFile('code: the body of a function of input and ctx that returns the step’s values (in a file of steps/: the function, as written there); ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run'),
+      code: textOrFile('code: the body of a function of input and ctx that returns the step’s values (in a file of steps/: the function, as written there); ctx.model, ctx.agent, ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run; ctx.locale is the run’s language and the person’s country, time zone, currency and units'),
       seconds: { type: 'number', description: 'code: most seconds it may take (1 to 120)' },
       of: str('value: what it works on ({{find.records}})'),
       op: { description: 'data: add, get, find, search, update or remove; value: first, last, count, sum, average, min, max, pick, join, unique, sort, number or date', type: 'string' },
@@ -115,7 +120,8 @@ export function appSchema(): Record<string, unknown> {
       effort: str('Its agent’s effort'),
       mode: str('Its agent’s mode (runs go ahead without asking unless set)'),
       cwd: str('The folder every run works in (unset: a new one per run)'),
-      prompt: textOrFile('The task for one agent, with {{field}} where each answer goes (an app without steps)'),
+      prompt: textOrFile(`The task for one agent, with {{field}} where each answer goes (an app without steps); it also takes ${BUILTIN_VALUES.filter((b) => !b.ref.startsWith('run.')).map((b) => `{{${b.ref}}}`).join(', ')}`),
+      language: { enum: ['person'], description: 'person: its model and agent steps (and a one-task app’s agent) are told to write what people read in the run’s language ({{language}}: the device’s or visitor’s, or one an agent gave), keeping field names, given choices, codes and numbers as written. Unset: nothing is said about language' },
       fields: { type: 'array', items: { $ref: '#/$defs/field' }, description: 'Its form' },
       answer: { type: 'array', items: { $ref: '#/$defs/answerField' }, description: 'What a run gives back' },
       tools: { type: ['array', 'null'], items: { type: 'string' }, description: 'The app’s own tools its runs may use (null: all)' },
@@ -266,13 +272,34 @@ interface Said {
   /** What the step is called on the run's page. */
   title?: string;
 }
+/** The run's language and where the person is (a public page's visitor: the language alone, the rest empty). */
+export interface Locale {
+  /** The language to write in, as a tag: "el". */
+  lang: string;
+  /** Its English name: "Greek". */
+  language: string;
+  /** Two letters: "GR". */
+  country: string;
+  /** An IANA time zone: "Europe/Athens". */
+  timeZone: string;
+  /** Three letters: "EUR". */
+  currency: string;
+  /** "metric" or "imperial". */
+  units: string;
+}
 export interface Ctx {
+  /** Not a call: the run's language and the person's country, time zone, currency and units, for Intl (new Intl.NumberFormat(ctx.locale.lang, { style: 'currency', currency: ctx.locale.currency })). In Python, ctx.locale['lang'] or ctx.locale.lang. */
+  locale: Readonly<Locale>;
   /** One answer from a model, with no tools: its outputs' fields, or { text }. model: one of Custom's (unset: the helper model). */
   model(instructions: string, o?: Said & { outputs?: Outputs; model?: string }): Promise<Record<string, any>>;
   /** An agent's session does it, with its tools: its outputs' fields, and { reply }. tier: the tier it thinks with (Settings → Models → Tiers) instead of a model by name, which wins over it. */
   agent(instructions: string, o?: Said & { outputs?: Outputs; assistant?: string; agent?: 'claude' | 'codex' | 'acp'; model?: string; tier?: 'quick' | 'standard' | 'best' | 'max'; tools?: string[]; capUsd?: number }): Promise<Record<string, any>>;
-  /** One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }. */
-  tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
+  /**
+   * One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }.
+   * A failure that may pass (a service limiting requests, one down for a moment) is tried again by the app first; a look-up's
+   * answer is kept a while for the same call: cache false never keeps it, a number of seconds keeps it that long.
+   */
+  tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string; cache?: false | number }): Promise<{ text: string; data?: unknown }>;
   /** Waits for the person: { yes }, or its fields' answers. */
   ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[]; multi?: boolean }[]; waitHours?: number }): Promise<Record<string, any>>;
   /** Another of the user's apps, by its address: its answer fields, and { reply }. */

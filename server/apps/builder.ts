@@ -1,14 +1,18 @@
-// What agents build templates with (the App builder, and any session): app_get reads them, app_save makes or
+// What agents build templates with (the App builder, and any session): app_get reads them (and the ready-made ones,
+// to build like them), app_sketch shows the user what a new one would be before anything is made, app_save makes or
 // changes one (whole, a patch, or one step), checked first, its mistakes said in plain words; app_try runs its
-// examples or a set of answers and waits for what they gave; app_screen gives it a screen or changes one;
-// app_data reads the records it keeps and adds some. The same can be done through the app's API (app_api),
-// which asks the user for each change; these say more, in fewer calls.
-import type { AppDef, AppRecipe } from '../../shared/apps.ts';
+// examples or a set of answers and waits for what they gave (and looks at its view); app_screen gives it a screen or
+// changes one; app_data reads the records it keeps and adds some; app_services lists the free data services the
+// ready-made apps use. The same can be done through the app's API (app_api), which asks the user for each change;
+// these say more, in fewer calls.
+import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { MEDIA_LIMITS, type AppAsset } from '../../shared/app-media.ts';
 import { cleanRecipe, isActive } from '../../shared/apps.ts';
-import type { Step } from '../../shared/app-manifest.ts';
-import { allSteps, asText, innerLists } from '../../shared/app-manifest.ts';
+import type { Flow, Step, StepKind } from '../../shared/app-manifest.ts';
+import { allSteps, asText, innerLists, STEP_KINDS, titleOf } from '../../shared/app-manifest.ts';
 import { missingIn, pagesFor } from '../../shared/app-ui.ts';
+import { estimateRun, estimateText } from '../../shared/app-estimate.ts';
+import { APP_SERVICES, type AppService } from '../../shared/app-services.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { dropEdits, noteBuilder, seenBy, userEditAt } from './edits.ts';
 import { collectionsOf, dataOp } from './data.ts';
@@ -17,13 +21,18 @@ import { dataChanged, stepsOf } from './flow.ts';
 import { appChanged, startRun, waitFor } from './runs.ts';
 import { changeScreen, makeScreen, screensOf } from './screens.ts';
 import { adviceOf } from './advice.ts';
-import { getApp, getRun, getVersion, lastExampleRuns, listApps, listVersions, saveApp, type RunRecord } from './store.ts';
+import { getApp, getRun, getVersion, lastExampleRuns, listApps, listRuns, listVersions, saveApp, type RunRecord } from './store.ts';
 import { putAsset } from './media.ts';
+import { lookAtRun } from './look.ts';
+import { findApps } from './search.ts';
+import { TEMPLATES } from './templates.ts';
 
 /** What saving checks a recipe with, and what follows a save (its packages): from index.ts. */
 export interface BuilderHelp {
   problemsOf(raw: unknown): { recipe: AppRecipe; errors: string[]; warnings: string[] };
   prepare(a: AppDef): AppDef;
+  /** Whether this server can draw pictures of a view (its capture browser); tests say no. */
+  canLook?: () => boolean;
 }
 
 /** JSON merge patch (RFC 7386): objects merge, null removes a key, anything else replaces. */
@@ -79,6 +88,81 @@ const lineOf = (a: AppDef) => {
   const steps = a.flow ? allSteps(a.flow.steps).length : 0;
   return { id: a.id, name: a.name, address: a.slug, description: a.description || undefined, steps: steps || undefined, examples: a.examples?.length || undefined, screens: a.screens ? Object.keys(a.screens) : undefined, ...(a.ui ? { view: a.ui.pages.map((p) => p.title) } : {}), ...(a.block ? { block: true } : {}), ...(a.sessions === false ? { sessions: false } : {}), ...(a.agents === false ? { agents: false } : {}), link: `/apps/${a.id}` };
 };
+
+/** The kinds of step an app uses, in the order they first come (a one-task app: one agent). */
+const kindsOf = (r: AppRecipe): StepKind[] => {
+  const steps = [...(r.flow ? allSteps(r.flow.steps) : []), ...Object.values(r.flows ?? {}).flatMap((f) => allSteps(f.steps))];
+  return steps.length ? [...new Set(steps.map((s) => s.do))] : r.prompt.trim() ? ['agent'] : [];
+};
+
+/** A ready-made app in a line: how to read it whole, what it does, and how it is made. */
+const readyLine = (t: AppTemplate) => {
+  const kinds = kindsOf(t);
+  const how = [
+    t.flow ? `steps: ${kinds.join(', ')}` : 'one agent task',
+    t.ui ? `a view (${t.ui.pages.map((p) => p.title).join(', ')})` : 'no view',
+    t.data && Object.keys(t.data).length ? `keeps ${Object.keys(t.data).join(', ')}` : '',
+    t.memory ? 'remembers across runs' : '',
+    t.home && t.home.editions !== false ? 'runs by itself on its own page' : '',
+    t.sessions === false ? 'used on its own page' : '',
+    t.block ? 'a block' : '',
+    t.secrets?.length ? `needs ${t.secrets.map((k) => k.name).join(', ')}` : '',
+  ].filter(Boolean);
+  return `- tpl:${t.id} — ${t.name}${t.category ? ` (${t.category})` : ''}: ${t.description} [${how.join('; ')}]`;
+};
+
+/** How many lines of a code step a ready-made app shows unless asked for all. */
+const CODE_LINES = 40;
+
+/** A ready-made app as app_save takes it, each code step's program cut to its first lines unless `whole`. */
+function readyRecipe(t: AppTemplate, whole: boolean): { recipe: AppRecipe; cut: number } {
+  const recipe = JSON.parse(JSON.stringify(cleanRecipe(t))) as AppRecipe;
+  let cut = 0;
+  if (whole) return { recipe, cut };
+  for (const f of [recipe.flow, ...Object.values(recipe.flows ?? {})])
+    for (const s of f ? allSteps(f.steps) : [])
+      if (s.do === 'code') {
+        const lines = s.code.split('\n');
+        if (lines.length <= CODE_LINES) continue;
+        cut++;
+        const mark = s.language === 'python' ? '#' : '//';
+        s.code = `${lines.slice(0, CODE_LINES).join('\n')}\n${mark} … ${lines.length - CODE_LINES} more lines (app_get with code: true gives them all)`;
+      }
+  return { recipe, cut };
+}
+
+/** A service in a few lines: what it gives, whether it needs a key, how often it may be called, and requests to start from. */
+const serviceText = (s: AppService) =>
+  [
+    `- ${s.name} (${s.hosts.join(', ')}): ${s.about} ${s.keyless ? 'No key needed.' : 'Needs a key (give the app a secret for it).'}${s.perSecond ? ` About ${s.perSecond} requests a second at most.` : ''}${s.cacheSeconds ? ` Its answers stay good for ${s.cacheSeconds >= 3600 ? `${Math.round(s.cacheSeconds / 3600)} h` : `${Math.round(s.cacheSeconds / 60)} min`}.` : ''}`,
+    ...(s.examples ?? []).map((x) => `  ${x.what}: ${x.url}`),
+  ].join('\n');
+
+/** Words a service is found by. */
+const serviceWords = (s: AppService) => [s.id, s.name, s.about, ...s.hosts, ...(s.examples ?? []).map((x) => x.what)].join(' ').toLowerCase();
+
+/** A step of a sketch, in words, as the card shows it: what it is called, its kind, how it runs (for each…), the steps inside it. */
+interface SketchStep {
+  title: string;
+  kind: StepKind;
+  how?: string;
+  inner?: SketchStep[];
+}
+
+/** How a step runs, in a few words, when that is more than once (as an app's page says it). */
+const howOf = (s: Step): string | undefined =>
+  s.do === 'parallel' ? `${s.branches.length} side by side` : s.do === 'repeat' ? `${s.over !== undefined ? 'for each' : 'until it holds'}${(s.atOnce ?? 1) > 1 ? `, ${s.atOnce} at once` : ''}` : s.do === 'decide' ? 'one way or the other' : undefined;
+
+/** A flow's steps in words, those inside a Decide, a Repeat or side by side one level in. */
+function wordsOf(steps: Step[], deep = true): SketchStep[] {
+  return steps.map((s) => {
+    const inner = deep ? innerLists(s).filter((l) => l !== s.failed).flat() : [];
+    const how = howOf(s);
+    return { title: titleOf(s), kind: s.do, ...(how ? { how } : {}), ...(inner.length ? { inner: wordsOf(inner, false) } : {}) };
+  });
+}
+
+const KINDS = new Set<string>(STEP_KINDS.map((k) => k.value));
 
 /** A step's values, each kept short: long text and big values as the start of their text. */
 const short = (values: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([k, v]) => [k, typeof v === 'string' || JSON.stringify(v ?? null).length > 600 ? asText(v, 600) : v]));
@@ -139,10 +223,34 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_get',
       description:
-        "The user's apps (Apps in Hydor: a form, a task or steps, an answer, a view, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less).",
-      inputSchema: { type: 'object', properties: { app: APP, version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' } } },
+        "The user's apps (Apps in Hydor: a form, a task or steps, an answer, a view, data, screens, examples). Without app: each one in a line. With app: the whole app as app_save takes it (its format: app_guide's apps and API topics), its screens, how its examples last went, its latest versions (each save that changed it: who saved it and what changed; version: one of them whole, to bring it back with app_save), and what its latest runs say of its steps (advice: steps that failed and had an agent do their work, which want fixing; agent steps that did the same each time, with the fixed steps that could do it for less). The ready-made apps are worked examples to build like: ready: true lists them, each in a line; like: what you will build, in a few words, gives the three closest; app: \"tpl:<id>\" gives one whole, as app_save takes it (each code step's program cut to its first 40 lines unless code: true).",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          app: { ...APP, description: 'The app: its id or its address; a ready-made one as tpl:<id>.' },
+          version: { type: 'number', description: 'One of its versions, whole (its recipe as it was then).' },
+          ready: { type: 'boolean', description: 'The ready-made apps, each in a line: what it does, the kinds of step it uses, whether it has a view, keeps data or runs by itself.' },
+          like: { type: 'string', description: 'What the app you will build does, in a few words: the three ready-made apps closest to it.' },
+          code: { type: 'boolean', description: 'With a ready-made app: its code steps whole.' },
+        },
+      },
       annotations: { readOnlyHint: true },
       async run(a) {
+        if (typeof a.like === 'string' && a.like.trim()) {
+          const list = TEMPLATES.map((t) => ({ ref: `tpl:${t.id}`, app: `tpl:${t.id}`, slug: t.id, recipe: t as AppRecipe, own: false }));
+          const { found, matched } = await findApps(db, list, a.like, 3);
+          const byId = new Map(TEMPLATES.map((t) => [`tpl:${t.id}`, t]));
+          const lines = found.map((f) => byId.get(f.u.ref)).filter((t): t is AppTemplate => !!t).map(readyLine);
+          return [matched ? `The ready-made apps closest to “${a.like.trim()}”, best first: read the one or two nearest whole (app: "tpl:<id>") and build the way they do.` : `No ready-made app is close to “${a.like.trim()}”; these are some of them (ready: true lists all).`, ...lines].join('\n');
+        }
+        if (a.ready) return [`The ready-made apps (${TEMPLATES.length}): read one whole with app: "tpl:<id>", or the closest to what you build with like.`, ...TEMPLATES.map(readyLine)].join('\n');
+        if (typeof a.app === 'string' && a.app.trim().startsWith('tpl:')) {
+          const id = a.app.trim().slice(4);
+          const t = TEMPLATES.find((x) => x.id === id);
+          if (!t) return { text: `There is no ready-made app “${id}”: app_get with ready: true lists them`, isError: true };
+          const { recipe, cut } = readyRecipe(t, !!a.code);
+          return JSON.stringify({ id: `tpl:${t.id}`, said: `A ready-made app, to build like: its recipe is as app_save takes it. Make the user's own app with app_save (a new one), never by changing this one.${cut ? ` ${cut} code step${cut > 1 ? 's are' : ' is'} cut to the first ${CODE_LINES} lines: code: true gives them whole.` : ''}`, recipe }, null, 1);
+        }
         if (!a.app) return JSON.stringify({ apps: listApps(db).map(lineOf) }, null, 1);
         const app = find(a.app);
         if (a.version !== undefined) {
@@ -155,6 +263,9 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         if (seenBy(db, app.id, ctx.key) !== undefined) noteBuilder(db, app.id, ctx.key);
         const last = lastExampleRuns(db, app.id);
         const advice = await adviceOf(ctx.deps, app);
+        // What a run takes and costs: the middle of its last finished runs, else a guess from its steps.
+        const finished = listRuns(db, { app: app.id, status: ['done'], limit: 30 }).map((r) => ({ ...(r.startedAt && r.endedAt ? { seconds: (r.endedAt - r.startedAt) / 1000 } : {}), ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}) }));
+        const guess = estimateRun(app, finished);
         return JSON.stringify(
           {
             id: app.id,
@@ -164,6 +275,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
             screens: screensOf(db, app),
             examples: (app.examples ?? []).map((e) => ({ id: e.id, ...(last.get(e.id) ? { last: runOf(last.get(e.id)!, false) } : {}) })),
             versions: listVersions(db, app.id, 8).map((v) => ({ ...v, at: new Date(v.at).toISOString() })),
+            ...(guess ? { estimate: estimateText(guess) } : {}),
             ...(advice.rescued.length || advice.firm.length
               ? {
                   advice: [
@@ -183,6 +295,108 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
       },
     },
     {
+      name: 'app_sketch',
+      description: [
+        'Shows the user a sketch of a new app before anything is made, as a card in the conversation: its name, icon and description, what it asks (the form), what it does (the steps in order, in words), what they get (a made-up answer in its view, or the plain card), a rough time and cost a run, the keys it needs, what you assumed, and your questions as choices to click, with Build it and Change it. Nothing is saved.',
+        'Give the draft as app_save takes a recipe (name, description, icon, color, fields, answer, ui if you designed its look, tier, and flow) or, before the steps are worked out, steps: a short list in words ([{ title, kind }]). It is checked as app_save checks it: what must change comes back in words, and no card shows.',
+        'Then end your turn and wait: build it (app_save) when the user says Build it (their message has the choices they picked), or change the sketch as they ask.',
+      ].join(' '),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string', description: 'What it does, in a sentence.' },
+          icon: { type: 'string' },
+          color: { type: 'string' },
+          fields: { type: 'array', items: { type: 'object' }, description: 'Its form, as in a recipe.' },
+          answer: { type: 'array', items: { type: 'object' }, description: 'Its answer fields, as in a recipe.' },
+          ui: { type: 'object', description: 'Its view, if you designed it (the card shows a made-up answer in it).' },
+          tier: { type: 'string', enum: ['quick', 'standard', 'best', 'max'], description: 'The tier its agent thinks with.' },
+          prompt: { type: 'string', description: 'The task, for an app that is one agent.' },
+          flow: { type: 'object', description: 'Its steps, whole, as in a recipe.' },
+          steps: {
+            type: 'array',
+            description: 'Or its steps in words, in order: each { title: what it does ("Find the forecast"), kind: agent|model|tool|decide|repeat|parallel|app|data|ask|code|value, tier?: for an agent step }.',
+            items: { type: 'object', properties: { title: { type: 'string' }, kind: { type: 'string' }, tier: { type: 'string' } }, required: ['title', 'kind'] },
+          },
+          needs: { type: 'array', description: 'Keys it needs, by name: { name: "OPENWEATHER_KEY", what: "An OpenWeather API key" }.', items: { type: 'object', properties: { name: { type: 'string' }, what: { type: 'string' } }, required: ['name'] } },
+          assumed: { type: 'array', items: { type: 'string' }, description: 'What you assumed, each in a short line ("Forecasts for the next 7 days").' },
+          questions: {
+            type: 'array',
+            description: 'At most three questions whose answers change the design, each with its likely answers to click (the first is what you assumed).',
+            items: { type: 'object', properties: { ask: { type: 'string' }, choices: { type: 'array', items: { type: 'string' } } }, required: ['ask', 'choices'] },
+          },
+        },
+        required: ['name', 'description', 'assumed'],
+      },
+      annotations: { readOnlyHint: true },
+      async run(a) {
+        const errors: string[] = [];
+        const flow = a.flow && typeof a.flow === 'object' ? (a.flow as Flow) : undefined;
+        // Steps in words, while there is no flow yet.
+        const worded: SketchStep[] = [];
+        if (!flow && Array.isArray(a.steps))
+          a.steps.slice(0, 30).forEach((x: unknown, i: number) => {
+            const st = (x && typeof x === 'object' ? x : {}) as { title?: unknown; kind?: unknown };
+            const title = typeof st.title === 'string' ? st.title.trim().slice(0, 120) : '';
+            const kind = typeof st.kind === 'string' ? st.kind.trim() : '';
+            if (!title) errors.push(`Step ${i + 1}: say what it does (title)`);
+            if (!KINDS.has(kind)) errors.push(`Step ${i + 1}: “${kind || 'nothing'}” is not a kind of step (${[...KINDS].join(', ')})`);
+            else if (title) worded.push({ title, kind: kind as StepKind });
+          });
+        const prompt = typeof a.prompt === 'string' ? a.prompt : '';
+        if (!flow && !worded.length && !prompt.trim()) errors.push('Say what it does: its steps (flow, or steps in words), or its task (prompt)');
+        // Checked as app_save checks it; a task stands in while its steps are only words.
+        const raw = { name: a.name, description: a.description, icon: a.icon, color: a.color, fields: a.fields, answer: a.answer, ui: a.ui, tier: a.tier, flow, prompt: flow ? prompt : prompt.trim() || 'The steps of the sketch.' };
+        const { recipe, errors: wrong, warnings } = help.problemsOf(raw);
+        errors.push(...wrong);
+        if (typeof a.name !== 'string' || !a.name.trim()) errors.push('Give it a name');
+        const assumed = (Array.isArray(a.assumed) ? a.assumed : []).filter((x: unknown): x is string => typeof x === 'string' && !!x.trim()).map((x: string) => x.trim().slice(0, 200));
+        if (assumed.length > 10) errors.push('Say what you assumed in at most ten lines');
+        const questions = (Array.isArray(a.questions) ? a.questions : []).map((q: unknown) => {
+          const o = (q && typeof q === 'object' ? q : {}) as { ask?: unknown; choices?: unknown };
+          return { ask: typeof o.ask === 'string' ? o.ask.trim().slice(0, 200) : '', choices: (Array.isArray(o.choices) ? o.choices : []).filter((c): c is string => typeof c === 'string' && !!c.trim()).map((c) => c.trim().slice(0, 100)) };
+        });
+        if (questions.length > 3) errors.push('Ask at most three questions: only those whose answers change the design');
+        questions.forEach((q: { ask: string; choices: string[] }, i: number) => {
+          if (!q.ask) errors.push(`Question ${i + 1}: write the question (ask)`);
+          if (q.choices.length < 2 || q.choices.length > 6) errors.push(`Question ${i + 1}: give two to six choices to click`);
+        });
+        const needs = (Array.isArray(a.needs) ? a.needs : [])
+          .map((k: unknown) => (typeof k === 'string' ? { name: k } : k && typeof k === 'object' ? (k as { name?: unknown; what?: unknown }) : {}))
+          .map((k: { name?: unknown; what?: unknown }) => ({ name: typeof k.name === 'string' ? k.name.trim() : '', ...(typeof k.what === 'string' && k.what.trim() ? { what: k.what.trim().slice(0, 160) } : {}) }));
+        for (const k of needs) if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(k.name)) errors.push(`A key it needs: “${k.name}” is not a name for the vault (capitals, digits and _, like OPENWEATHER_KEY)`);
+        if (errors.length) return { text: `Not shown. Fix these first:\n- ${[...new Set(errors)].join('\n- ')}`, isError: true };
+        const steps = recipe.flow ? wordsOf(recipe.flow.steps) : worded.length ? worded : [{ title: 'Do the task', kind: 'agent' as StepKind }];
+        // A rough guess from the steps, those in words each counted as a step of its kind.
+        const tiers = Array.isArray(a.steps) ? a.steps : [];
+        const guess = estimateRun({ prompt: recipe.prompt, tier: recipe.tier, flow: recipe.flow ?? (worded.length ? { steps: worded.map((w, i) => ({ id: `s${i}`, do: w.kind, ...(w.kind === 'agent' && ['quick', 'standard', 'best', 'max'].includes(tiers[i]?.tier) ? { tier: tiers[i].tier } : {}) }) as unknown as Step) } : undefined) });
+        return JSON.stringify(
+          {
+            said: 'The user sees this sketch as a card, with Build it and Change it; nothing is saved. End your turn and wait for their answer: build it with app_save when they say Build it (with the choices they picked), else change the sketch as they ask.',
+            sketch: {
+              name: recipe.name,
+              description: recipe.description,
+              icon: recipe.icon,
+              color: recipe.color,
+              fields: recipe.fields,
+              answer: recipe.answer,
+              steps,
+              view: !!recipe.ui,
+              ...(recipe.tier ? { tier: recipe.tier } : {}),
+            },
+            ...(guess ? { estimate: { seconds: guess.seconds, usd: guess.usd, ...(guess.waits ? { waits: true } : {}), text: estimateText(guess) } } : {}),
+            ...(needs.length ? { needs } : {}),
+            assumed,
+            ...(questions.length ? { questions } : {}),
+            ...(warnings.length ? { warnings } : {}),
+          },
+          null,
+          1,
+        );
+      },
+    },
+    {
       name: 'app_save',
       description:
         'Makes one of the user\'s apps, or changes one (app: its id or address). Give the whole recipe, or a patch merged into the one saved (JSON merge patch: objects merge, a list replaces, null removes), or step: one step to change by its id (its fields merged in; remove: true removes it; a new id adds it, after: the step it follows). It is checked first: what must change comes back in words and nothing is saved; what may surprise comes back as warnings. Its view is part of it (ui: patch one element with { ui: { elements: { "day-card": { … } } } }); its screens stay as they are (app_screen changes them). Files that come with it (pictures, videos, sounds, data its view shows as asset:<name>) go in assets: a name → a file\'s path on this computer or an https:// address (null removes one); they travel in its .hydor-app. Keys it needs (API keys, tokens) go in recipe.secrets by name, never a value: the user gives them when installing it or before its first run. Say why in a few words.',
@@ -190,7 +404,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         type: 'object',
         properties: {
           app: { ...APP, description: 'The app to change; none: a new one.' },
-          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
+          recipe: { type: 'object', description: 'The whole app: name, description, icon, color, fields (its form; a question that asks about the person, as their units, currency, country, diet or research fields, says from: "me.units" and starts from what they keep in About you; remember: true starts one from their last answer), language ("person": its model and agent steps write in the person\'s language; set it on every new app), prompt (a task for one agent) or flow (its steps), answer, ui (its view: how its answer looks and what a click there does; app_guide\'s API topic, Apps: views), data, memory, requires, flows, examples, tools, limits, agent, model, tier ("quick", "standard", "best" or "max": the tier its agent thinks with, Settings → Models → Tiers, instead of a model by name; it follows the table and works whichever program runs it; pick the lowest that does the job well: quick for short clear jobs, standard for most, best for research and hard reasoning, max rarely; a model by name wins; an agent step has its own), mode…' },
           patch: { type: 'object', description: 'Merged into the app as saved (or into recipe).' },
           step: { type: 'object', description: 'One step: { id, …its fields } changes it; { id, remove: true } removes it; a new id adds it (after: the step it follows; none: at the end).' },
           assets: { type: 'object', additionalProperties: { type: ['string', 'null'] }, description: 'Its own files by name ("cover.jpg"): a path on this computer, an https:// address or a data: address, kept with the app; null removes one.' },
@@ -247,7 +461,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
     {
       name: 'app_try',
       description:
-        "Tries an app as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time, and, for an app with a view, the names its view uses that the run did not give; runs not done when the wait ends can be read again with runs. The user sees a try's answer in its view on its page (link).",
+        "Tries an app as a test run and waits for it (at most wait seconds): its examples (examples: true, or their ids), or one set of answers (inputs). recipe tries a version that is not saved. Gives each run's status, answer, steps with their values, checks, cost and time, and, for an app with a view, the names its view uses that the run did not give; runs not done when the wait ends can be read again with runs. look: true also gives pictures of the first finished run's answer in its view as a person sees it (on a computer in the dark and in the light, and on a phone): look after you design or change a view, and fix what looks wrong. The user sees a try's answer in its view on its page (link).",
       inputSchema: {
         type: 'object',
         properties: {
@@ -258,13 +472,22 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
           recipe: { type: 'object', description: 'Try this version (not saved) instead.' },
           runs: { type: 'array', items: { type: 'string' }, description: 'Read these earlier tries again (no new runs).' },
           wait: { type: 'number', description: 'Seconds to wait (default 180, at most 600).' },
+          look: { type: 'boolean', description: 'Also pictures of the first finished run’s answer in its view: a computer in the dark and in the light, and a phone in the dark.' },
         },
       },
       async run(a) {
         const wait = Math.min(600, Math.max(0, Number(a.wait ?? 180) || 0)) * 1000;
+        // The answer, and with look the pictures of the first run that finished with one (or why there are none).
+        const answer = async (text: string, rs: RunRecord[]) => {
+          if (!a.look) return text;
+          const shown = rs.find((r) => r.status === 'done' && r.result && !r.flow) ?? rs.find((r) => !isActive(r.status));
+          if (!shown) return `${text}\nNo pictures: no try has finished yet (read them again with runs and look: true).`;
+          const l = await lookAtRun(shown, help.canLook);
+          return l.images.length ? { text: `${text}\n${l.text}`, images: l.images } : `${text}\n${l.text}`;
+        };
         if (Array.isArray(a.runs) && a.runs.length) {
           const rs = await waited(db, a.runs.map(String), wait);
-          return JSON.stringify({ runs: rs.map((r) => runOf(r)) }, null, 1);
+          return answer(JSON.stringify({ runs: rs.map((r) => runOf(r)) }, null, 1), rs);
         }
         const app = a.app ? find(a.app) : null;
         let recipe: AppRecipe | null = app;
@@ -289,7 +512,7 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         }
         const rs = await waited(db, ids, wait);
         const going = rs.filter((r) => isActive(r.status)).map((r) => r.id);
-        return JSON.stringify({ runs: rs.map((r) => runOf(r)), ...(problems.length ? { couldNotStart: problems } : {}), ...(going.length ? { stillRunning: `Read them again later with runs: ${JSON.stringify(going)}` } : {}) }, null, 1);
+        return answer(JSON.stringify({ runs: rs.map((r) => runOf(r)), ...(problems.length ? { couldNotStart: problems } : {}), ...(going.length ? { stillRunning: `Read them again later with runs: ${JSON.stringify(going)}` } : {}) }, null, 1), rs);
       },
     },
     {
@@ -347,6 +570,20 @@ export function builderTools(ctx: RunCtx, help: BuilderHelp): RunTool[] {
         const names = Object.keys(app.data ?? {});
         if (!names.includes(String(a.collection ?? ''))) return { text: `“${app.name}” keeps no list “${String(a.collection ?? '')}”: ${names.length ? `its lists are ${names.join(', ')}` : 'it keeps none yet (give it data with app_save)'}`, isError: true };
         return dataOp(db, app.id, app.data, a, ['find', 'search', 'get', 'add'], (coll) => dataChanged(app.id, coll));
+      },
+    },
+    {
+      name: 'app_services',
+      description:
+        'The free data services the ready-made apps use (forecasts, places, encyclopedia pages, exchange rates…), each with what it gives, a request to start from, whether it needs a key and how often it may be called. Look here before an app calls an address you know only from memory; for a service not listed, read its documentation (read_page) before you use it. query: words to find some (none: all).',
+      inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'What the data is about, in a few words ("weather", "currency").' } } },
+      annotations: { readOnlyHint: true },
+      async run(a) {
+        const words = typeof a.query === 'string' ? a.query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2) : [];
+        const hits = words.length ? APP_SERVICES.filter((x) => words.some((w) => serviceWords(x).includes(w))) : APP_SERVICES;
+        const shown = hits.length ? hits : APP_SERVICES;
+        const head = words.length && !hits.length ? `None of the services matched “${String(a.query).trim()}”: these are all of them. For another, read its documentation with read_page before you use it.` : `${shown.length} free service${shown.length > 1 ? 's' : ''} the ready-made apps use (an app's tool step calls one with http_request; send what it asks, and keep within its limits):`;
+        return [head, ...shown.map(serviceText)].join('\n');
       },
     },
   ];

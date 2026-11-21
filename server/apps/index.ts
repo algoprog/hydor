@@ -16,6 +16,7 @@ import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
+import { cardFieldProblems } from '../../shared/app-cards.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
@@ -48,7 +49,7 @@ import { PUBLIC_RUN_ENV } from './publicRun.ts';
 import { adviceOf } from './advice.ts';
 import { defaultFolder, folderOf, folderSaved, initFolders, linkFolder, unlinkFolder, unwatch } from './folder.ts';
 import { appSchema } from './schema.ts';
-import { appChanged, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, reopen, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, WORK_DIR } from './runs.ts';
+import { appChanged, askRun, onAppSaved, finish, followUpsOf, formOf, isFlowRun, markOf, noteAgentRun, noteChanged, onFinished, progressOf, runFolder, runInstructions, runOfCtx, saveResult, setDeps, startRun, startRuns, stopRun, useFlows, waitFor, whyNoAsks, WORK_DIR } from './runs.ts';
 import {
   appOfKey,
   createKey,
@@ -82,6 +83,8 @@ import {
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
 import { allowApp, allowedApps } from './allowed.ts';
+import { aboutMe, changeAboutMe, forgetAnswers, startsFor } from './me.ts';
+import { FROM_FIELDS, fromField } from '../../shared/app-me.ts';
 import { appHint, findAppsTool, tellAsker, usableApps, useAppTool, useNote } from './use.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
@@ -152,11 +155,19 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
+  const errors = [...cardFieldProblems(src.answer), ...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
   // Its files are kept here already (app_save's assets, or a page's upload, keeps a new one).
   for (const [name, a] of Object.entries(recipe.assets ?? {})) if (!hasMedia(db, a.sha)) errors.push(`Its file “${name}” is not kept here: add it again (assets)`);
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
   for (const f of recipe.fields) if (f.type === 'choice' && !f.options?.length) errors.push(`${f.label}: give the choices`);
+  // What a question starts from: a field of About you that is there, or the last answer; never for a file.
+  for (const x of Array.isArray(src.fields) ? src.fields : []) {
+    if (!x || typeof x !== 'object') continue;
+    const name = String(x.label || x.id || 'A question');
+    if (x.from !== undefined && x.from !== null && x.from !== '' && !fromField(x.from)) errors.push(`${name}: from names a field of About you: ${FROM_FIELDS.map((f) => `me.${f.id}`).join(', ')}`);
+    if (x.type === 'file' && (x.from || x.remember)) errors.push(`${name}: a file question starts empty (no from or remember)`);
+    else if (fromField(x.from) && x.remember === true) errors.push(`${name}: from or remember, not both`);
+  }
   const checked = checkFlow(recipe);
   errors.push(...checked.errors);
   const warnings = [...checked.warnings];
@@ -317,6 +328,15 @@ function routes(d: Deps) {
   });
 
   /** The apps pinned to the top of the Apps page, in their order: yours by id, ready-made ones as "tpl:<id>". */
+  // About you: the record apps start their questions from and steps read ({{me.units}}), as set and with what is not set worked out.
+  app.get('/api/apps/me', async () => aboutMe(db));
+  /** A change to it: only the fields given; null or empty clears one. */
+  app.put('/api/apps/me', async (req) => {
+    const b = req.body;
+    if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'Send the fields to change, as { "units": "metric" }');
+    return changeAboutMe(db, b);
+  });
+
   app.get('/api/apps/pins', async () => ({ ids: pinsOf(db) }));
 
   /** Pins these apps to the top of the Apps page, in this order, in place of those pinned before (every device shows the same). */
@@ -367,9 +387,13 @@ function routes(d: Deps) {
   app.get('/api/apps/models', async () => ({ models: customModels() }));
 
   app.post('/api/apps/draft', async (req) => {
-    const key = String((req.body as { key?: string })?.key ?? '');
+    const b = (req.body ?? {}) as { key?: string; turn?: unknown };
+    const key = String(b.key ?? '');
     if (!/^(claude|codex|acp):[A-Za-z0-9._-]{4,80}$/.test(key)) throw new HttpError(400, 'Bad session key');
-    return draftFromSession(d, key);
+    // The reply to draft from, by its place in the session (Do this again… under it); none: the latest.
+    const turn = b.turn === undefined || b.turn === null || b.turn === '' ? undefined : Number(b.turn);
+    if (turn !== undefined && !(Number.isInteger(turn) && turn >= 0)) throw new HttpError(400, 'Bad turn');
+    return draftFromSession(d, key, turn);
   });
 
   // Screens are pages of the template's own, made and removed by their routes: a new template starts without
@@ -419,10 +443,12 @@ function routes(d: Deps) {
       const latest = listRuns(db, { app: id, limit: 20 }).find((x) => x.status === 'done' && !x.flow && !x.parent && x.source !== 'chat');
       return { view: getView(db, `app:${id}`), home: homeOf(db, d.scheduler, id, r), ...(latest ? { latest: latest.endedAt ?? latest.createdAt } : {}) };
     };
-    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template) };
+    // What its questions start from (About you, the last answers), for its form.
+    const starts = (id: string, r: AppRecipe) => (r.fields.some((f) => f.from || f.remember) ? { starts: startsFor(db, r.fields, id) } : {});
+    if (template) return { template, installed: isInstalled(db, template.id), agents: agentsMay(db, template.id), secrets: secretsOf(db, template), ...ownPage(`tpl:${template.id}`, template), ...starts(`tpl:${template.id}`, template) };
     const today = dayStart();
     const own = ownPage(a!.id, a!);
-    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own };
+    return { app: a, keys: listKeys(db, a!.id), usage: usageShown(a!.id, today), publicUsage: usageSince(db, a!.id, today, 'public'), workDir: WORK_DIR, env: envOf(a!, a!.slug), secrets: secretsOf(db, a!), ...own, ...starts(a!.id, a!) };
   });
 
   /** One value its own page's view keeps: null removes it. Gives all it keeps now. */
@@ -485,6 +511,7 @@ function routes(d: Deps) {
     deleteApp(db, a.id);
     deleteRuns(db, a.id);
     clearData(db, a.id);
+    forgetAnswers(db, a.id);
     unpinned(a.id);
     return { ok: true };
   });
@@ -627,6 +654,8 @@ function routes(d: Deps) {
       files: b.files && typeof b.files === 'object' ? b.files : undefined,
       // Another of its flows, by name (a screen's form or button).
       flow: typeof b.flow === 'string' && b.flow && b.flow !== 'run' ? b.flow : undefined,
+      // The language the page is in, which the run writes in.
+      lang: typeof b.lang === 'string' ? b.lang : undefined,
       // A try in the graph: steps it pauses before, and steps frozen at what they gave in an earlier try of the same template.
       ...(b.source === 'test' ? triedIn(db, b, a?.id ?? (template ? `tpl:${template.id}` : 'test')) : {}),
     });
@@ -674,17 +703,7 @@ function routes(d: Deps) {
       }
     }
     if (a && !test) checkDaily(db, a);
-    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}) });
-  };
-
-  /** Why a run takes no follow-ups, or nothing when it does. */
-  const noAsks = (r: RunRecord): string | undefined => {
-    if (r.source === 'public') return 'Runs from the public page take no follow-ups.';
-    if (isFlowRun(r)) return 'A run with steps takes no follow-ups: change the answers and run it again, or open a step’s session to go on there.';
-    const s = r.key ? sessions.summary(r.key) : null;
-    if (!s) return r.key ? 'Its session is gone.' : undefined;
-    if (s.external && (!s.live || s.live.status === 'exited')) return `Its session is open in ${s.external.client}: continue it there.`;
-    return undefined;
+    return startRun({ app: old.app, slug, recipe, source: test ? 'test' : 'web', inputs: { ...old.inputs, ...changes }, ...(Object.keys(files).length ? { files } : {}), ...(old.lang ? { lang: old.lang } : {}) });
   };
 
   app.get('/api/apps/runs/:runId', async (req) => {
@@ -709,7 +728,7 @@ function routes(d: Deps) {
       ...(r.status === 'waiting' && isFlowRun(r) && askOf(r) ? { question: askOf(r) } : {}),
       // Follow-ups typed while the agent works wait their turn in the session's queue.
       queued: (s?.queue ?? []).map((m) => ({ id: m.id, text: m.text.slice(0, 4000), at: m.at })),
-      noAsks: noAsks(r),
+      noAsks: whyNoAsks(r),
     };
   });
 
@@ -846,25 +865,24 @@ function routes(d: Deps) {
       source: test ? 'test' : 'web',
       inputs: old.inputs,
       ...(old.flow ? { flow: old.flow } : {}),
+      // In the language it wrote in.
+      ...(old.lang ? { lang: old.lang } : {}),
       reuse: { run: old.id, steps: flow.steps.slice(0, k).map((s) => s.id) },
     });
     return { run: runView(r) };
   });
 
-  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is). */
+  /** A follow-up from the run's page: it goes to the run's session (after the turn running now, if one is); a finished flow's first starts its session. */
   app.post('/api/apps/runs/:runId/ask', async (req) => {
     const r = getRun(db, P(req).runId);
     if (!r) throw new HttpError(404, 'No such run');
-    const why = noAsks(r);
+    const why = whyNoAsks(r);
     if (why) throw new HttpError(409, why);
-    if (!r.key) throw new HttpError(409, 'It has not started yet: ask once it has.');
     const text = String((req.body as { text?: unknown })?.text ?? '').trim();
     if (!text) throw new HttpError(400, 'Write what to change');
     if (text.length > 20_000) throw new HttpError(413, 'That is too long for a follow-up (at most 20,000 characters)');
     noteUserMessage();
-    await sessions.deliverOrQueue(r.key, text);
-    // Sent: its turn has begun (a queued one opens the run when it goes out).
-    if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
+    await askRun(r, text);
     return { run: runView(getRun(db, r.id)!) };
   });
 
@@ -1089,10 +1107,13 @@ function submitTool(ctx: RunCtx): RunTool | null {
   const hit = runOfCtx(ctx);
   if (!hit || !hit.run.recipe.answer.length) return null;
   const answer = hit.run.recipe.answer;
+  // Once it has a result, a change hands in only the fields that change.
+  const had = !!hit.run.result;
+  const schema = answerSchema(answer);
   return {
     name: 'submit_result',
-    description: `Hand in the result of this run of the app "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again.`,
-    inputSchema: answerSchema(answer),
+    description: `Hand in the result of this run of the app "${hit.run.appName}": one object with the answer fields. The person sees it as a card or table. Call it when the work is done; if it answers with problems, fix them and call again. Once there is a result, a change needs only the fields that change (each one whole): those left out stay as they are.`,
+    inputSchema: had ? { ...schema, required: [] } : schema,
     async run(args, c) {
       const now = runOfCtx(c);
       if (!now) return { text: 'This session was not started from an app, so there is nothing to hand in.', isError: true };
@@ -1101,13 +1122,16 @@ function submitTool(ctx: RunCtx): RunTool | null {
       const ids = new Set(answer.map((f) => f.id));
       const keys = Object.keys(args ?? {});
       if (keys.length === 1 && !ids.has(keys[0]) && args[keys[0]] && typeof args[keys[0]] === 'object') raw = args[keys[0]];
+      // The fields it leaves out stay as they are (a change to a result hands in what changed); one sent empty is emptied.
+      const before = getRun(c.deps.db, now.run.id)?.result;
+      if (before && raw && typeof raw === 'object' && !Array.isArray(raw)) raw = { ...before, ...(raw as Record<string, unknown>) };
       // A public run's answer may only point at the web: nothing on this computer.
       const local = !(now.mark.public || now.run.source === 'public');
       const checked = checkAnswer(now.run.recipe.answer, raw, { local });
-      if (!checked.ok) return { text: `The result does not fit the answer fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call submit_result again with all the fields.`, isError: true };
+      if (!checked.ok) return { text: `The result does not fit the answer fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call submit_result again${before ? '' : ' with all the fields'}.`, isError: true };
       // Files on this computer it points at (and pictures as data: addresses): a copy kept, shown by its address.
       const taken = await takeInAnswer(c.deps.db, now.run.recipe.answer, checked.value, { cwd: c.cwd, local });
-      if (taken.errors.length) return { text: `Some of its files could not be kept:\n${taken.errors.map((e) => `- ${e}`).join('\n')}\nFix these (a path that is there, or an https:// address) and call submit_result again with all the fields.`, isError: true };
+      if (taken.errors.length) return { text: `Some of its files could not be kept:\n${taken.errors.map((e) => `- ${e}`).join('\n')}\nFix these (a path that is there, or an https:// address) and call submit_result again${before ? '' : ' with all the fields'}.`, isError: true };
       saveResult(now.run.id, taken.value);
       return 'Saved: the person sees this result now. Finish with a short reply (a sentence or two); no need to repeat the result.';
     },
@@ -1240,7 +1264,7 @@ function prepare(a: AppDef): AppDef {
 
 /** What every session that is not a template's run is told of templates and their tools. */
 const BUILDER_NOTE =
-  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get, app_save (its view is its ui) and app_try (try its examples before you hand it over, and say what a run costs), app_screen for a screen, and app_data for the records it keeps; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
+  "Apps (the Apps page in Hydor) are the user's own: a form, then one agent's task or steps (agents, quick model answers, tools, decisions, repeats, code, a person's answer), an answer, a view of it (pages of elements its answer fills, with maps, plots, pictures, videos and widgets of its own, and events for what a click does), files of its own, the keys it needs (by name: the user gives their values), data it keeps, screens, and examples with checks. To make or change one, use app_get (the ready-made ones too, to build like them: ready, like, tpl:<id>), app_sketch (a new app's sketch for the user, before anything is made), app_save (its view is its ui) and app_try (try its examples before you hand it over, look: true to see its view, and say what a run costs), app_screen for a screen, app_data for the records it keeps, and app_services for free data services to call; app_guide's apps topic says what each part does, and its API topic gives the format (Apps: views). Agents run the user's apps for them in sessions (use_app) unless one's recipe says sessions: false (an app used on its own page).";
 
 export const apps: Feature = {
   id: 'apps',
@@ -1273,7 +1297,7 @@ export const apps: Feature = {
     if (!mark)
       return {
         guides: [
-          { tools: ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data'], text: BUILDER_NOTE },
+          { tools: ['app_get', 'app_sketch', 'app_save', 'app_try', 'app_screen', 'app_data', 'app_services'], text: BUILDER_NOTE },
           ...[useNote(d.db)].filter((x): x is string => !!x).map((text) => ({ tools: ['use_app', 'find_apps'], text })),
         ],
       };

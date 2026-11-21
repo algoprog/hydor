@@ -7,6 +7,7 @@ import { allSteps, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequire
 import { cleanUi, type AppUi } from './app-ui.ts';
 import { cleanAssets, cleanMedia, type AppAsset } from './app-media.ts';
 import { cleanSecrets, type AppSecret } from './app-secrets.ts';
+import { fromField, ME_REFS } from './app-me.ts';
 
 export type FieldType = 'text' | 'long' | 'number' | 'date' | 'choice' | 'yesno' | 'file';
 
@@ -25,9 +26,30 @@ export interface AppField {
   multi?: boolean;
   /** What the form starts with (and what an API call without it gets). */
   default?: string;
+  /**
+   * A field of About you the answer starts from ("me.units"): the form shows it filled in, and a run that leaves the
+   * question unanswered (the API, a row, a schedule, an agent) takes it before the default.
+   */
+  from?: string;
+  /** It starts from the person's last answer to it in this app (not for a file), kept on the server: for what About you has no field for. */
+  remember?: boolean;
+  /**
+   * Its former ids, when it was renamed: an answer given or kept under one of them (a schedule's, an app page's
+   * settings, a last answer) counts as its own while it has none of its own.
+   */
+  was?: string[];
 }
 
-export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media';
+/** A question's answer among answers kept by id: under its own id, else under a former one (`was`); undefined when neither has one. */
+export function answerOf(f: Pick<AppField, 'id' | 'was'>, given: Record<string, unknown> | undefined | null): unknown {
+  if (!given) return undefined;
+  const own = given[f.id];
+  if (own !== undefined && own !== null) return own;
+  for (const w of f.was ?? []) if (given[w] !== undefined && given[w] !== null) return given[w];
+  return undefined;
+}
+
+export type AnswerType = 'text' | 'markdown' | 'number' | 'yesno' | 'date' | 'url' | 'list' | 'table' | 'media' | 'ui';
 export type ColumnType = 'text' | 'number' | 'yesno' | 'date' | 'url' | 'image';
 
 export interface AnswerColumn {
@@ -46,6 +68,8 @@ export interface AnswerField {
   required?: boolean;
   /** For a table: its columns. */
   columns?: AnswerColumn[];
+  /** For a card (type "ui"): the answer UI that draws it, by its name in the catalog (shared/answer-ui): "comparison", "itinerary"… Its value is the card's data. */
+  ui?: string;
 }
 
 export interface AppLimits {
@@ -145,6 +169,11 @@ export interface AppRecipe {
   sessions?: boolean;
   /** An app that opens on its own page: when Update automatically runs it until you pick another time (HH:MM) and days (0 is Sunday; unset: every day). */
   home?: HomeStart;
+  /**
+   * "person": its model and agent steps (and a one-task app's agent) write what people read in the run's language
+   * (what started the run says which; else About you's; else English). Unset: as written, with no word on language.
+   */
+  language?: 'person';
 }
 
 export interface HomeStart {
@@ -250,10 +279,33 @@ export interface AppRun {
   checks?: CheckResult[];
   /** The template's version it ran (none: a try of changes not saved, or a template as it was before versions). */
   version?: number;
+  /** What its flow could not have: calls that still failed after their tries, steps that failed (at most 30). */
+  misses?: RunMiss[];
+  /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
+  lang?: string;
+  /** While a run with steps works: the answer fields its steps have given so far (each one that fits); gone once it ends. */
+  partial?: Record<string, unknown>;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
 }
+
+/** Something a run's flow could not have: a call to a service that failed after its tries, or a step that failed. */
+export interface RunMiss {
+  /** The step's title. */
+  step: string;
+  /** What it wanted: a host or a shortened address, a search's words. */
+  what?: string;
+  /** Why, in plain words: "it limits requests", "it keeps programs out", "no answer in time". */
+  why: string;
+  /** Where in the flow (the step's path, "main/c4"). */
+  path?: string;
+  /** The same miss, more than once. */
+  times?: number;
+}
+
+/** Most misses a run keeps. */
+export const MAX_MISSES = 30;
 
 export type StepStatus = 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'stopped';
 
@@ -385,9 +437,10 @@ export const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
   { value: 'list', label: 'List' },
   { value: 'table', label: 'Table' },
   { value: 'media', label: 'Pictures, videos or files' },
+  { value: 'ui', label: 'A card' },
 ];
 
-export const COLUMN_TYPES = [...ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table' && t.value !== 'media'), { value: 'image', label: 'Picture' }] as { value: ColumnType; label: string }[];
+export const COLUMN_TYPES = [...ANSWER_TYPES.filter((t) => t.value !== 'markdown' && t.value !== 'list' && t.value !== 'table' && t.value !== 'media' && t.value !== 'ui'), { value: 'image', label: 'Picture' }] as { value: ColumnType; label: string }[];
 
 /** Icons an app can wear (lucide names; the pages draw them). */
 export const APP_ICONS = [
@@ -475,14 +528,20 @@ const given = (v: string | undefined) => !!v && !!v.trim() && v.trim().toLowerCa
  * the field was answered (and not with No), {{^id}}…{{/id}} only when it was not; {{today}} is today's
  * date. Placeholders that name no field stay as they are (a web app's own {{braces}}).
  */
-export function fillTemplate(tpl: string, values: Record<string, string>, o: { today?: string; moment?: Partial<Record<'today' | 'now' | 'weekday' | 'timezone', string>>; known?: string[] } = {}): string {
+export function fillTemplate(
+  tpl: string,
+  values: Record<string, string>,
+  o: { today?: string; moment?: Partial<Record<'today' | 'now' | 'weekday' | 'timezone', string>>; known?: string[]; vars?: Record<string, unknown> } = {},
+): string {
   const known = new Set(o.known ?? Object.keys(values));
   const moment: Record<string, string> = { today: o.today ?? o.moment?.today ?? new Date().toISOString().slice(0, 10), ...(o.moment?.now ? { now: o.moment.now } : {}), ...(o.moment?.weekday ? { weekday: o.moment.weekday } : {}), ...(o.moment?.timezone ? { timezone: o.moment.timezone } : {}) };
+  // Other values by name ("me.units", "language"): a list as one line.
+  for (const [k, v] of Object.entries(o.vars ?? {})) moment[k] = Array.isArray(v) ? v.join(', ') : v === null || v === undefined ? '' : String(v);
   const builtIn = (id: string) => !known.has(id) && id in moment;
   const value = (id: string) => (builtIn(id) ? moment[id] : (values[id] ?? ''));
   let out = String(tpl ?? '');
   // Sections, innermost first, until none are left.
-  const section = /\{\{([#^])\s*([\w-]+)\s*\}\}((?:(?!\{\{[#^]\s*\2\s*\}\})[\s\S])*?)\{\{\/\s*\2\s*\}\}/g;
+  const section = /\{\{([#^])\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}((?:(?!\{\{[#^]\s*\2\s*\}\})[\s\S])*?)\{\{\/\s*\2\s*\}\}/g;
   for (let i = 0; i < 20; i++) {
     const next = out.replace(section, (all, kind: string, id: string, body: string) => {
       if (!known.has(id) && !builtIn(id)) return all;
@@ -492,17 +551,20 @@ export function fillTemplate(tpl: string, values: Record<string, string>, o: { t
     if (next === out) break;
     out = next;
   }
-  out = out.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (all, id: string) => (known.has(id) || builtIn(id) ? value(id) : all));
+  out = out.replace(/\{\{\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}/g, (all, id: string) => (known.has(id) || builtIn(id) ? value(id) : all));
   return out
     .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
+/** Names a task fills besides its questions: the moment, the run's language and About you (`me.units`). */
+export const TASK_VALUES = ['today', 'now', 'weekday', 'timezone', 'language', 'lang', ...ME_REFS.map((r) => `me.${r}`)];
+
 /** The placeholders a prompt uses. */
 export function placeholders(tpl: string): string[] {
   const out = new Set<string>();
-  for (const m of String(tpl ?? '').matchAll(/\{\{\s*[#^/]?\s*([\w-]+)\s*\}\}/g)) out.add(m[1]);
+  for (const m of String(tpl ?? '').matchAll(/\{\{\s*[#^/]?\s*([\w-]+(?:\.[\w-]+)?)\s*\}\}/g)) out.add(m[1]);
   return [...out];
 }
 
@@ -556,14 +618,16 @@ function checkPicks(f: AppField, v: unknown): { value: string } | { error: strin
  * The form's answers, tidied and checked against its fields: every field gets a value (its default or
  * empty), yes/no as Yes or No, numbers and dates in a plain form. `errors` say what to fix, in words.
  */
-export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o: { maxText?: number; maxLong?: number } = {}): { values: Record<string, string>; errors: string[] } {
+export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o: { maxText?: number; maxLong?: number; starts?: Record<string, string> } = {}): { values: Record<string, string>; errors: string[] } {
   const values: Record<string, string> = {};
   const errors: string[] = [];
   const maxText = o.maxText ?? 2000;
   const maxLong = o.maxLong ?? 60_000;
   for (const f of fields) {
-    let v: unknown = raw?.[f.id];
-    if (v === undefined || v === null) v = f.default ?? '';
+    // Its answer, or one given under a former id (a schedule made before it was renamed).
+    let v: unknown = answerOf(f, raw);
+    // Left unanswered: what it starts from (About you, the last answer), else its default.
+    if (v === undefined || v === null) v = o.starts?.[f.id] ?? f.default ?? '';
     if (f.type === 'choice' && f.multi) {
       const picked = checkPicks(f, v);
       if ('error' in picked) errors.push(picked.error);
@@ -605,6 +669,45 @@ export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o:
 
 // ---- the answer ------------------------------------------------------------------------------------
 
+/**
+ * How a card field (type "ui") is named and checked: by the catalog of answer UIs (shared/answer-ui), which is large,
+ * so this file, which the pages load at once, does not import it. shared/app-cards.ts sets these when it is loaded,
+ * and the server always loads it (runs.ts). Until then a card's name is kept as it is written and its data is only
+ * checked to be one object.
+ */
+export interface CardRules {
+  /** The UI's own name for a name or another name agents write for it; undefined when the catalog has none. */
+  name: (ui: string) => string | undefined;
+  /** What does not fit the UI's type in the data, in words ("items is missing"). */
+  check: (ui: string, data: Record<string, unknown>) => string[];
+  /** Whether the data reads its numbers from a spreadsheet or a file (its `from` names one) rather than holding them. */
+  ref: (ui: string, data: Record<string, unknown>) => boolean;
+}
+let cardRules: CardRules | null = null;
+export const setCardRules = (r: CardRules) => void (cardRules = r);
+
+/** A card's name as the catalog writes it ("compare" → "comparison"); undefined when there is no such card. */
+export function cardName(ui: unknown): string | undefined {
+  const n = typeof ui === 'string' ? ui.trim().toLowerCase().slice(0, 60) : '';
+  if (!n) return undefined;
+  return cardRules ? cardRules.name(n) : n;
+}
+
+/**
+ * A card field's value: the card's data, one object (its JSON text, or a list taken as its items, as a reply's block
+ * is), checked against its UI's type. A card that reads its numbers from a spreadsheet or a file (`from`) is not
+ * offered in apps: what a run gives stays as it was.
+ */
+function cardValue(f: AnswerField, v: unknown): { v: Record<string, unknown> } | { e: string[] } {
+  const d = Array.isArray(v) ? { items: v } : v;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return { e: [`should be the ${f.ui ?? 'card'} card's data: one JSON object`] };
+  const data = d as Record<string, unknown>;
+  if (cardRules && f.ui && cardRules.ref(f.ui, data)) return { e: ['a card in an app holds its values itself: give them in place of from (cards that read a spreadsheet or a file are not offered in apps)'] };
+  const bad = cardRules && f.ui ? cardRules.check(f.ui, data) : [];
+  if (bad.length) return { e: [`its data does not fit the ${f.ui} card: ${bad.slice(0, 4).join('; ')} (its type is in your instructions)`] };
+  return { v: data };
+}
+
 function columnSchema(t: ColumnType, description?: string): Record<string, unknown> {
   const d = description ? { description } : {};
   if (t === 'number') return { type: 'number', ...d };
@@ -644,6 +747,7 @@ export function answerSchema(answer: AnswerField[]): Record<string, unknown> {
       };
     } else if (f.type === 'markdown') properties[f.id] = { type: 'string', description: `${description}. Markdown.` };
     else if (f.type === 'media') properties[f.id] = { ...MEDIA_SCHEMA, description: `${description}. Pictures, videos, sounds or files: one object each.` };
+    else if (f.type === 'ui') properties[f.id] = { type: 'object', description: `${description}. The ${f.ui ?? ''} card's data: one object of the type your instructions give.` };
     else properties[f.id] = columnSchema(f.type, description);
   }
   return { type: 'object', properties, required: answer.filter((f) => f.required).map((f) => f.id) };
@@ -715,12 +819,16 @@ export function checkAnswer(answer: AnswerField[], raw: unknown, o: { local?: bo
   const errors: string[] = [];
   for (const f of answer) {
     let v = unwrap(src[f.id]);
-    if (empty(v) || (Array.isArray(v) && !v.length)) {
+    if (empty(v) || (Array.isArray(v) && !v.length) || (f.type === 'ui' && v && typeof v === 'object' && !Object.keys(v).length)) {
       if (f.required) errors.push(`${f.id}: missing (${ANSWER_TYPES.find((t) => t.value === f.type)?.label.toLowerCase() ?? f.type})`);
       else value[f.id] = f.type === 'list' || f.type === 'table' || f.type === 'media' ? [] : null;
       continue;
     }
-    if (f.type === 'media') {
+    if (f.type === 'ui') {
+      const c = cardValue(f, v);
+      if ('e' in c) errors.push(...c.e.map((e) => `${f.id}: ${e}`));
+      else value[f.id] = c.v;
+    } else if (f.type === 'media') {
       const m = cleanMedia(v, { local });
       if (m.errors.length) errors.push(...m.errors.map((e) => `${f.id}: ${e}`));
       else value[f.id] = m.items;
@@ -849,7 +957,9 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
     if (!x || typeof x !== 'object') return [];
     const label = str(x.label, 80) || str(x.id, 80);
     if (!label) return [];
-    const type: AnswerType = ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
+    // A card the catalog does not have stays as formatted text: the agent's answer still shows.
+    const ui = x.type === 'ui' ? cardName(x.ui) : undefined;
+    const type: AnswerType = x.type === 'ui' && !ui ? 'markdown' : ANSWER_TYPES.some((t) => t.value === x.type) ? x.type : 'text';
     const id = fieldId(str(x.id, 40) || label, atTaken);
     atTaken.push(id);
     const cTaken: string[] = [];
@@ -863,7 +973,7 @@ export function cleanAnswer(raw: unknown): AnswerField[] {
             return [{ id: cid, label: cl, type: COLUMN_TYPES.some((t) => t.value === c.type) ? c.type : 'text', description: opt(c.description, 200) }];
           })
         : undefined;
-    return [{ id, label, type, description: opt(x.description, 400), required: !!x.required || undefined, columns: type === 'table' ? (columns?.length ? columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined }];
+    return [{ id, label, type, description: opt(x.description, 400), required: !!x.required || undefined, columns: type === 'table' ? (columns?.length ? columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined, ...(type === 'ui' ? { ui } : {}) }];
   });
 }
 
@@ -878,7 +988,28 @@ export function cleanFields(raw: unknown): AppField[] {
     const id = fieldId(str(x.id, 40) || label, taken);
     taken.push(id);
     const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
-    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, ...(type === 'choice' && x.multi ? { multi: true } : {}), default: opt(x.default, 4000) }];
+    // It starts from About you, or from the last answer (one or the other; never a file).
+    const from = type === 'file' ? undefined : fromField(x.from);
+    const remember = !from && type !== 'file' && x.remember === true;
+    // Its former ids: ids as a question's would be, none its own, nor another question's own id.
+    const ids = (Array.isArray(raw) ? raw : []).map((y: any) => (y && typeof y === 'object' ? str(y.id, 40) : ''));
+    const was = [...new Set<string>((Array.isArray(x.was) ? x.was : []).map((w: unknown) => str(w, 40)).filter((w: string) => /^[A-Za-z_][\w-]*$/.test(w) && w !== id && !ids.includes(w)))].slice(0, 5);
+    return [
+      {
+        id,
+        label,
+        type,
+        required: !!x.required || undefined,
+        help: opt(x.help, 240),
+        placeholder: opt(x.placeholder, 160),
+        options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined,
+        ...(type === 'choice' && x.multi ? { multi: true } : {}),
+        default: opt(x.default, 4000),
+        ...(from ? { from: `me.${from}` } : {}),
+        ...(remember ? { remember: true } : {}),
+        ...(was.length ? { was } : {}),
+      },
+    ];
   });
 }
 
@@ -932,6 +1063,7 @@ export function cleanRecipe(raw: any): AppRecipe {
     ...(r.block === true ? { block: true } : {}),
     ...(typeof r.sessions === 'boolean' ? { sessions: r.sessions } : {}),
     ...(home ? { home } : {}),
+    ...(r.language === 'person' ? { language: 'person' as const } : {}),
   };
 }
 
@@ -1027,10 +1159,11 @@ export function questionLine(md: string, max = 200): string {
 
 /**
  * The message a session gets when an app run its agent started ends after the call stopped waiting
- * ("[Trip planner finished] The run you started for the user…", then the run as JSON): its run's id, or null for any
+ * ("[Trip planner finished] The run you started for the user…", then the run as JSON), or a change it asked of the
+ * run does ("[Trip planner changed] The change you asked of it for the user…"): its run's id, or null for any
  * other message. The conversation shows no bubble for it, and the run's card moves under the reply it brings.
  */
 export function runEndedNotice(text: string): string | null {
-  if (!/^\[[^\]\n]+ (?:finished|was stopped|failed)\] The run you started for the user /.test(text)) return null;
+  if (!/^\[[^\]\n]+ (?:finished|changed|was stopped|failed)\] The (?:run you started|change you asked of it) for the user /.test(text)) return null;
   return text.match(/"run":\s*"([^"]+)"/)?.[1] ?? '';
 }

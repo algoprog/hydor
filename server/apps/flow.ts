@@ -14,9 +14,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
+import type { AnswerField, AppField, AppRecipe, RunMiss, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
-import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
+import { checkAnswer, cleanRecipe, isActive, MAX_MISSES, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
+import { cardLines } from '../../shared/app-cards.ts';
+import { languageLine, localeOf } from '../../shared/app-me.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -30,8 +32,10 @@ import { userTimezone } from '../userPrefs.ts';
 import { checkDaily } from './api.ts';
 import { runCode } from './code.ts';
 import { addRecord, findRecords, removeRecords, searchRecords, updateRecords } from './data.ts';
-import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { fieldLine, finish, formOf, isFlowRun, noteChanged, progressOf, runDeps, runFolder, runVars, startRun, stopRun, waitFor, type FlowRunner, type StartInput } from './runs.ts';
+import { aboutMe } from './me.ts';
 import { takeInAnswer } from './media.ts';
+import { callKey, callTool, firstLine, whatOf, whyOf } from './sturdy.ts';
 import { getApp, getRun, getStep, listSteps, removeSteps, saveStep, updateRun, type RunRecord, type StepRecord } from './store.ts';
 
 /** Public runs' throwaway folders (as for one-step public runs). */
@@ -53,6 +57,15 @@ interface Exec {
   ended: { id: string; kind: Step['do']; values: Record<string, unknown> }[];
   /** A test run tried in the graph: the steps it pauses before, whether it pauses before the next one too, and where it waits now (each with what lets it go on). */
   pause?: { before: Set<string>; next: boolean; at: Map<string, () => void> };
+  /** What it could not have (kept with the run); the places in the flow that missed, each with the miss it counts in; and the calls behind them (the same call answering later takes its miss back). */
+  misses: RunMiss[];
+  missAt: Map<string, RunMiss>;
+  missedCalls: Map<string, string>;
+  /**
+   * The answer so far, while it works (the main flow of a run with answer fields): the fields that come by name, the
+   * steps its outputs name (a step's end that touches neither changes nothing), the flow's own values, and what was kept last.
+   */
+  fill?: { named: Set<string>; roots: Set<string>; top?: Scope; last: string };
 }
 
 const execs = new Map<string, Exec>();
@@ -62,6 +75,9 @@ class Stopped extends Error {
     super('Stopped');
   }
 }
+
+/** A step failed and its miss is kept: the steps it is inside (a Decide, At the same time) fail for it, and keep none of their own. */
+class StepFailed extends Error {}
 
 const db = () => runDeps().db;
 
@@ -111,7 +127,16 @@ function execOf(r: RunRecord, o: FlowStart): Exec {
     waiting: new Set(),
     ended: [],
     ...(o.pause?.length ? { pause: { before: new Set(o.pause), next: false, at: new Map() } } : {}),
+    ...missesOf(r),
+    missedCalls: new Map(),
+    ...fillOf(r, flow),
   };
+}
+
+/** A run's misses as it kept them (it carries on after a restart). */
+function missesOf(r: RunRecord): Pick<Exec, 'misses' | 'missAt'> {
+  const misses = (r.misses ?? []).map((m) => ({ ...m }));
+  return { misses, missAt: new Map(misses.filter((m) => m.path).map((m) => [m.path!, m])) };
 }
 
 /** Starts a run's flow in the background; it ends the run itself. */
@@ -183,8 +208,8 @@ async function pauseAt(x: Exec, at: string) {
 }
 
 async function go(x: Exec, inputs: Record<string, unknown>) {
-  // The built-in values: the moment, in the user's time zone, and what started the run.
-  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source } };
+  // The built-in values: the moment, in the user's time zone, what started the run, the language it writes in, and About you (none for a public page's run).
+  const vars = { ...momentOf(userTimezone(runDeps().db)), run: { id: x.run.id, source: x.run.source }, ...runVars(x.run, !!x.pub) };
   const scope: Scope = { inputs, steps: Object.fromEntries(allSteps(x.flow.steps).map((s) => [s.id, null])), vars };
   try {
     await runList(x, x.flow.steps, scope, '');
@@ -197,6 +222,8 @@ async function go(x: Exec, inputs: Record<string, unknown>) {
 // ---- the steps ----------------------------------------------------------------------------------------------
 
 async function runList(x: Exec, steps: Step[], scope: Scope, prefix: string) {
+  // The flow's own values (not a round's): what the answer so far is made of.
+  if (!prefix && x.fill) x.fill.top ??= scope;
   for (const s of steps) await runOne(x, s, scope, prefix);
 }
 
@@ -250,20 +277,24 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
     }
     const msg = ((e as Error).message || 'It failed').slice(0, 2000);
     record(x, at, s, { status: 'failed', error: msg, endedAt: Date.now(), ...spent() });
-    return failed(x, s, scope, prefix, msg);
+    return failed(x, s, scope, prefix, msg, e instanceof StepFailed);
   }
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now(), ...spent() });
+  filled(x, s, values, !prefix);
 }
 
 /** A step failed: its own steps for that run (then the flow goes on), it is skipped, an agent does its work, or the run stops. */
-async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string) {
+async function failed(x: Exec, s: Step, scope: Scope, prefix: string, msg: string, inside = false) {
   scope.steps[s.id] = {};
+  // A step that failed for one inside it, or for a call it made (a tool step, a program's ctx.tool, a Repeat's round), has its miss already.
+  const at = `${prefix}${s.id}`;
+  if (!inside && ![...x.missAt.keys()].some((p) => p === at || p.startsWith(`${at}/`) || p.startsWith(`${at}#`))) noteMiss(x, { step: titleOf(s), why: firstLine(msg), path: at });
   if (s.failed === 'agent') return rescue(x, s, scope, prefix, msg);
   if (Array.isArray(s.failed)) return runList(x, s.failed, { inputs: scope.inputs, steps: scope.steps, vars: { ...scope.vars, error: msg } }, prefix);
   if (s.failed === 'skip') return;
-  throw new Error(`${titleOf(s)}: ${msg}`);
+  throw new StepFailed(`${titleOf(s)}: ${msg}`);
 }
 
 type Cost = { usd: number };
@@ -275,7 +306,7 @@ async function body(x: Exec, s: Step, scope: Scope, prefix: string, at: string, 
     case 'model':
       return modelStep(x, s, scope, cost);
     case 'tool':
-      return toolStep(x, s, scope);
+      return toolStep(x, s, scope, at);
     case 'app':
       return appStep(x, s, scope, at, before);
     case 'data':
@@ -366,14 +397,23 @@ function syncStatus(x: Exec) {
   }
 }
 
+/** Whether the run's model and agent steps write in the person's language (the app says language: "person", and it is not English). */
+const languageOn = (x: Exec) => x.run.recipe.language === 'person' && !!languageLine(x.run.lang);
+
+/** A model's or an agent's instructions, with the line on the language to write in after them when the app answers in the person's. */
+const withLanguage = (x: Exec, instructions: string) => (languageOn(x) ? `${instructions}\n\n${languageLine(x.run.lang)}` : instructions);
+
 /** A short program, run in a sandbox of its own with the values given (server/apps/code.ts). */
 async function codeStep(x: Exec, s: CodeStep, scope: Scope, at: string): Promise<Record<string, unknown>> {
   const input = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
   let n = 0;
+  // ctx.locale: the run's language, and where the person is (a public page's visitor: only the language).
+  const locale = localeOf(x.run.lang || 'en', x.pub ? {} : aboutMe(db()).values, x.pub ? 'UTC' : userTimezone(db()));
   const out = await runCode({
     language: s.language,
     code: s.code,
     input,
+    locale,
     slug: x.slug,
     requires: x.run.recipe.requires,
     seconds: s.seconds ?? 20,
@@ -448,7 +488,7 @@ function ctxStep(kind: string, a: Record<string, unknown>, id: string): Step {
   if (kind === 'agent' && a.tier !== undefined && !isTier(a.tier)) throw new Error('ctx.agent’s tier is "quick", "standard", "best" or "max"');
   if (kind === 'model' || kind === 'agent')
     raw = { do: kind, title: title ?? first(a.instructions), instructions: told(a.instructions), outputs: a.outputs, model: a.model, ...(kind === 'agent' ? { assistant: a.assistant, agent: a.agent, tier: a.tier, tools: a.tools, capUsd: a.capUsd } : {}) };
-  else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w };
+  else if (kind === 'tool') raw = { do: 'tool', title: title ?? String(a.tool ?? ''), tool: a.tool, with: w, cache: a.cache };
   else if (kind === 'ask') raw = { do: 'ask', title: title ?? first(a.question), question: told(a.question), fields: a.fields, waitHours: a.waitHours };
   else if (kind === 'app') raw = { do: 'app', title: title ?? String(a.app ?? ''), app: a.app, with: w };
   else if (kind === 'data')
@@ -605,14 +645,14 @@ async function agentStep(x: Exec, s: Extract<Step, { do: 'agent' }>, scope: Scop
       effort: s.effort ?? (other || s.tier ? undefined : recipe.effort),
       mode: s.mode ?? recipe.mode,
       cwd: x.pub ? undefined : x.folder,
-      prompt: agentPrompt(x, s.instructions, scope, at),
+      prompt: withLanguage(x, agentPrompt(x, s.instructions, scope, at)),
       fields: [],
       answer: s.outputs ?? [],
       tools: s.tools !== undefined ? s.tools : recipe.tools,
       limits: { capUsd: capFor(x, s.capUsd) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x, s.capUsd) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
     record(x, at, s, { childRun: childId });
   }
   const done = await follow(x, childId);
@@ -671,6 +711,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       '',
       owed.length ? `Do what it was to do, then hand in what it would have given: ${owed.map((f) => f.id).join(', ')}${owed.some((f) => STRUCTURED.has(f.id)) ? ' (lists and records as JSON)' : ''}.` : 'Do what it was to do.',
       'Do only this step’s work: the rest of the run carries on after you.',
+      ...(s.do === 'model' && languageOn(x) ? ['', languageLine(x.run.lang)] : []),
     ].join('\n');
     const child = cleanRecipe({
       name: `${recipe.name} · ${titleOf(s)}`,
@@ -692,7 +733,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
       limits: { capUsd: capFor(x) },
     });
     const pub = x.pub ? { ...x.pub, capUsd: capFor(x) ?? x.pub.capUsd } : undefined;
-    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub }).id;
+    childId = startRun({ app: x.run.app, slug: x.slug, recipe: child, source: 'step', inputs: {}, parent: x.run.id, step: at, public: pub, lang: x.run.lang }).id;
     record(x, at, s, { status: 'running', rescued: true, childRun: childId, error: msg, endedAt: undefined });
   }
   const done = await follow(x, childId);
@@ -704,7 +745,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
     const why = done.status !== 'done' ? done.error || 'it did not finish' : `it did not hand in ${owed.map((f) => f.id).join(', ')}`;
     const all = `${msg} (and the agent in its place: ${why})`;
     record(x, at, s, { status: 'failed', error: all.slice(0, 2000), endedAt: Date.now() });
-    throw new Error(`${titleOf(s)}: ${all}`);
+    throw new StepFailed(`${titleOf(s)}: ${all}`);
   }
   const values: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(done.result ?? {})) {
@@ -720,6 +761,9 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now() });
+  // The agent got what the step could not: nothing is missing.
+  dropMiss(x, at);
+  filled(x, s, values, !prefix);
 }
 
 /** How deep a run is in apps calling apps. */
@@ -740,7 +784,7 @@ async function appStep(x: Exec, s: Extract<Step, { do: 'app' }>, scope: Scope, a
     const given = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
     // The other app's form takes text, numbers and yes or no: lists and tables go in as text.
     const inputs = Object.fromEntries(Object.entries(given).map(([k, v]) => [k, v !== null && typeof v === 'object' ? asText(v) : v]));
-    childId = startRun({ app: target.id, slug: target.slug, recipe: target, source: 'app', inputs, parent: x.run.id, step: at }).id;
+    childId = startRun({ app: target.id, slug: target.slug, recipe: target, source: 'app', inputs, parent: x.run.id, step: at, lang: x.run.lang }).id;
     record(x, at, s, { childRun: childId });
   }
   const done = await follow(x, childId);
@@ -787,6 +831,7 @@ async function askOutputs(x: Exec, prompt: string, outputs: AnswerField[], model
     STEP_SYSTEM,
     'Answer with one JSON object and nothing else (no Markdown fence), with these fields:',
     ...outputs.map(fieldLine),
+    ...cardLines(outputs),
     'Each field holds its value alone, written for the person who will read it: no notes on where it came from, on what you were or were not given, or on sources that disagree (take the likeliest, or the latest announced). A value that cannot be known stays empty (null), unless its field is required: then give your best.',
   ].join('\n');
   let text = await ask(x, system, prompt, model, cost);
@@ -799,7 +844,7 @@ async function askOutputs(x: Exec, prompt: string, outputs: AnswerField[], model
 }
 
 async function modelStep(x: Exec, s: Extract<Step, { do: 'model' }>, scope: Scope, cost: Cost): Promise<Record<string, unknown>> {
-  const prompt = fillRefs(s.instructions, scope).slice(0, 100_000);
+  const prompt = withLanguage(x, fillRefs(s.instructions, scope).slice(0, 100_000));
   if (!s.outputs?.length) {
     const text = await ask(x, `${STEP_SYSTEM} Do what is asked and answer with the result itself: no preamble.`, prompt, s.model, cost);
     return { text: text.trim() };
@@ -824,7 +869,7 @@ async function judge(x: Exec, question: string, cost: Cost): Promise<{ yes: bool
 
 // ---- tools ------------------------------------------------------------------------------------------------
 
-async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope): Promise<Record<string, unknown>> {
+async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope, at: string): Promise<Record<string, unknown>> {
   if (!STEP_TOOLS.includes(s.tool)) throw new Error(`${s.tool} cannot run as a step on its own: use it in an Ask an agent step`);
   if (x.pub && !(x.pub.web && PUBLIC_WEB_TOOLS.includes(s.tool))) throw new Error(`A run from a public page cannot use ${s.tool}`);
   const allowed = x.run.recipe.tools;
@@ -832,9 +877,20 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
   const ctx: RunCtx = { runId: `flow-${x.run.id}`, key: `acp:flow-${x.run.id}`, agent: 'acp', acpAgent: CONSOLE_ID, cwd: x.folder, deps: runDeps(), signal: x.abort.signal, notice: { url: `/apps/runs/${encodeURIComponent(x.run.id)}`, title: x.run.appName }, step: true };
   const tool = runTools(ctx).find((t) => t.name === s.tool);
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
-  const out = await tool.run(valueOf(s.with ?? {}, scope) as Record<string, unknown>, ctx);
-  const text = typeof out === 'string' ? out : out.text;
-  if (typeof out === 'object' && out.isError) throw new Error(text.slice(0, 800) || 'The tool failed');
+  const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
+  // Tried again while its failure may pass, its host's calls spaced, a look-up kept a while (sturdy.ts).
+  // A public page's visitors do not get this computer's browser opening pages for them.
+  const called = await callTool(tool, args, ctx, { cache: s.cache, signal: x.abort.signal, browser: !x.pub });
+  const sig = callKey(s.tool, args);
+  if (!called.ok) {
+    const optional = (key: string) => !!x.run.recipe.secrets?.some((k) => k.name === key && k.optional);
+    noteMiss(x, { step: titleOf(s), what: whatOf(s.tool, args), why: whyOf(s.tool, called.failure, optional), path: at }, sig);
+    throw new Error(called.text.slice(0, 800) || 'The tool failed');
+  }
+  // The same call failed before in this run and answers now (a program that tries again itself): it was had after all.
+  const earlier = x.missedCalls.get(sig);
+  if (earlier) dropMiss(x, earlier);
+  const text = called.text;
   const values: Record<string, unknown> = { text: text.slice(0, 200_000) };
   if (/^\s*[[{]/.test(text)) {
     try {
@@ -842,6 +898,33 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope)
     } catch {}
   }
   return values;
+}
+
+// ---- what could not be had -----------------------------------------------------------------------------------
+
+/** Keeps a miss with the run (one a place in the flow; the same one again counts times), at most MAX_MISSES. */
+function noteMiss(x: Exec, m: RunMiss & { path: string }, sig?: string) {
+  if (x.missAt.has(m.path)) return;
+  let into = x.misses.find((o) => o.step === m.step && o.what === m.what && o.why === m.why);
+  if (into) into.times = (into.times ?? 1) + 1;
+  else if (x.misses.length < MAX_MISSES) x.misses.push((into = m));
+  else return;
+  x.missAt.set(m.path, into);
+  if (sig) x.missedCalls.set(sig, m.path);
+  updateRun(db(), x.run.id, { misses: x.misses });
+  noteChanged(x.run.id);
+}
+
+/** What this place in the flow missed was had after all. */
+function dropMiss(x: Exec, path: string) {
+  const m = x.missAt.get(path);
+  if (!m) return;
+  x.missAt.delete(path);
+  for (const [k, p] of x.missedCalls) if (p === path) x.missedCalls.delete(k);
+  if ((m.times ?? 1) > 1) m.times = m.times! - 1 > 1 ? m.times! - 1 : undefined;
+  else x.misses.splice(x.misses.indexOf(m), 1);
+  updateRun(db(), x.run.id, { misses: x.misses });
+  noteChanged(x.run.id);
 }
 
 // ---- what the app keeps -----------------------------------------------------------------------------------------
@@ -1028,6 +1111,57 @@ function byName(answer: AnswerField[], ended: Exec['ended']): Record<string, unk
   return out;
 }
 
+// ---- the answer so far ---------------------------------------------------------------------------------------
+
+/** What the answer so far needs to know of a run: nothing for a flow beside the main one, nor for an app without answer fields. */
+function fillOf(r: RunRecord, flow: Flow): Pick<Exec, 'fill'> {
+  if (r.flow || !r.recipe.answer.length) return {};
+  const outs = flow.outputs ?? {};
+  const roots = new Set(refsIn(Object.values(outs)).map((p) => /^[A-Za-z_]\w*/.exec(p)?.[0] ?? ''));
+  const named = new Set(r.recipe.answer.filter((f) => !(f.id in outs)).map((f) => f.id));
+  return { fill: { named, roots, last: JSON.stringify(r.partial ?? {}) } };
+}
+
+/**
+ * The answer so far: each answer field the steps that have ended can fill, as the end will (its output once every step
+ * value it names is there, else the last value of its name), checked on its own. A value that does not fit yet is left
+ * out, and so are files on this computer (they are kept at the end); pictures on the web show at once.
+ */
+function partialOf(x: Exec, scope: Scope): Record<string, unknown> {
+  const outs = x.flow.outputs ?? {};
+  const out: Record<string, unknown> = {};
+  for (const f of x.run.recipe.answer) {
+    let v: unknown;
+    if (f.id in outs) {
+      const there = refsIn(outs[f.id]).every((p) => {
+        const root = /^[A-Za-z_]\w*/.exec(p)?.[0] ?? '';
+        return !Object.prototype.hasOwnProperty.call(scope.steps, root) || (!!scope.steps[root] && lookup(p, scope).value !== undefined);
+      });
+      if (!there) continue;
+      v = valueOf(outs[f.id], scope);
+    } else v = byName([f], x.ended)[f.id];
+    const c = checkAnswer([{ ...f, required: false }], { [f.id]: v }, { local: false });
+    const got = c.ok ? c.value[f.id] : null;
+    if (got !== null && got !== undefined && !(Array.isArray(got) && !got.length)) out[f.id] = got;
+  }
+  return out;
+}
+
+/** A step ended: when it can change the answer so far (it gave a value of an answer field's name, or an output names it), the run keeps the new one and the pages hear of it. */
+function filled(x: Exec, s: Step, values: Record<string, unknown>, main: boolean) {
+  const f = x.fill;
+  if (!f?.top || !execs.has(x.run.id)) return;
+  // A round's steps only by name: their values reach the flow's own when the Repeat ends.
+  const named = Object.keys(values).some((k) => f.named.has(k));
+  if (!named && !(main && f.roots.size && allSteps([s]).some((t) => f.roots.has(t.id)))) return;
+  const now = partialOf(x, f.top);
+  const key = JSON.stringify(now);
+  if (key === f.last) return;
+  f.last = key;
+  updateRun(db(), x.run.id, { partial: now });
+  noteChanged(x.run.id);
+}
+
 /** The run's reply: what its last agent (or called app) said, else its last model step's text. */
 function replyOf(ended: Exec['ended']): string | undefined {
   const pick = (kinds: string[], key: string) => [...ended].reverse().find((e) => kinds.includes(e.kind) && typeof e.values[key] === 'string' && (e.values[key] as string).trim())?.values[key] as string | undefined;
@@ -1068,6 +1202,8 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
   finish(x.run.id, status, error, { result, reply: replyOf(x.ended), costUsd });
   // Its agent steps' costs settle a little later (finish reads them again then): so does the run's.
   setTimeout(() => {
+    // Changes asked of it since have a session of its own, whose end counts the steps' cost too (runs.ts).
+    if (getRun(db(), x.run.id)?.key) return;
     const later = Math.round(spentSoFar(x) * 10000) / 10000;
     if (later !== getRun(db(), x.run.id)?.costUsd) {
       updateRun(db(), x.run.id, { costUsd: later });
@@ -1138,5 +1274,14 @@ async function flowProgress(r: RunRecord, publicView: boolean): Promise<RunProgr
   return { steps, said: publicView ? undefined : inner?.said, waiting, ...(publicView ? {} : { own: true as const }), ...(paused.length && !publicView ? { paused } : {}) };
 }
 
+/** A run's reply as its flow gave it, from its steps as they ended (changes asked of it later have replies of their own). */
+function flowReply(r: RunRecord): string | undefined {
+  const ended = listSteps(db(), r.id)
+    .filter((st) => st.status === 'done' && st.kind !== 'round' && st.outputs)
+    .sort((a, b) => (a.endedAt ?? 0) - (b.endedAt ?? 0))
+    .map((st) => ({ id: st.id, kind: st.kind as Step['do'], values: st.outputs! }));
+  return replyOf(ended);
+}
+
 /** What runs flows, for runs.ts. */
-export const flowRunner: FlowRunner = { start: startFlow, resume: resumeFlow, stop: stopFlow, progress: flowProgress };
+export const flowRunner: FlowRunner = { start: startFlow, resume: resumeFlow, stop: stopFlow, progress: flowProgress, spent: (r) => spentSoFar({ run: r }), reply: flowReply };
