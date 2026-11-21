@@ -52,6 +52,8 @@ export interface AppMark {
   /** A public page's run: Custom without shell or files, the web only when `web`. */
   public?: boolean;
   web?: boolean;
+  /** A run with steps whose session for changes took over from an earlier one (deleted): what the earlier ones spent. */
+  spentBefore?: number;
 }
 
 export const markOf = (extra: SessionExtra | undefined): AppMark | null => {
@@ -695,6 +697,9 @@ export async function askRun(r: RunRecord, text: string) {
   if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
 }
 
+/** What a flow's run spent besides its session for changes now: its steps, and the sessions for changes before it. */
+const stepsSpent = (r: RunRecord) => (flows?.spent(r) ?? 0) + (r.key ? (markOf(sessionExtra(d().db, r.key))?.spentBefore ?? 0) : 0);
+
 /** Where the first message to a flow's session for changes says the person's own words begin (the pages show only those). */
 const ASKED = '\n\n---\nThe person asks:\n';
 const personsPart = (text: string) => (text.includes(ASKED) ? text.slice(text.indexOf(ASKED) + ASKED.length) : text);
@@ -739,6 +744,8 @@ async function changeFlowRun(r: RunRecord, text: string) {
       `The person wants a change to the result of a run of the app “${recipe.name}”.${recipe.description?.trim() ? `\nWhat the app gives: ${recipe.description.trim()}` : ''}`,
       titles.length ? `Its steps, in order:\n${titles.join('\n')}` : '',
       `In ${dir}:\n- answers.json: the answers its form was given\n${r.result ? '- result.json: its result as it is now' : '- reply.md: its answer as it is now'}${files.length ? `\n- steps/: what each step gave (${files.slice(0, 12).join(', ')}${files.length > 12 ? `, and ${files.length - 12} more` : ''})` : ''}`,
+      // An app that answers in the person's language: its changes are written in the run's, as its steps were.
+      recipe.language === 'person' ? languageLine(r.lang) : '',
     ].filter(Boolean);
     // As its own agent would run: its program, its model or tier (Standard when it names neither), within what is left of its cap.
     const agent = recipe.agent;
@@ -747,7 +754,9 @@ async function changeFlowRun(r: RunRecord, text: string) {
     const pick = tier ? tierPick(db, tier, agent, acpAgent) : null;
     const cap = recipe.limits.capUsd;
     const spent = r.costUsd ?? flows?.spent(r) ?? 0;
-    const extra: SessionExtra = { app: { id: r.app, run: r.id, name: recipe.name } satisfies AppMark };
+    // A session that takes over from a deleted one: what that one spent stays in the run's cost.
+    const before = r.key ? Math.round(Math.max(0, spent - (flows?.spent(r) ?? 0)) * 10000) / 10000 : 0;
+    const extra: SessionExtra = { app: { id: r.app, run: r.id, name: recipe.name, ...(before ? { spentBefore: before } : {}) } satisfies AppMark };
     if (recipe.assistant) extra.assistant = recipe.assistant;
     if (cap) extra.capUsd = Math.max(0.01, Math.round((cap - spent) * 100) / 100);
     const line = inputsLine(recipe.fields, r.inputs, 50);
@@ -840,8 +849,8 @@ export function finish(id: string, status: RunStatus, error?: string, got?: { re
       const items = tl?.parser.items ?? [];
       reply = replyOf(items);
       cost = runCost(r, sessions.summary(r.key), items);
-      // A flow's run: what its session spent on the changes asked of it, on top of what its steps spent.
-      if (cost !== undefined && isFlowRun(r)) cost += flows?.spent(r) ?? 0;
+      // A flow's run: what its session spent on the changes asked of it, on top of what its steps (and earlier sessions for changes) spent.
+      if (cost !== undefined && isFlowRun(r)) cost += stepsSpent(r);
     }
     // An agent done with nothing to show is a failure, said plainly (a flow may end with nothing to say).
     if (status === 'done' && !reply && !getRun(db, id)?.result && !got?.result && r.key) {
@@ -859,7 +868,7 @@ export function finish(id: string, status: RunStatus, error?: string, got?: { re
     if (next.key)
       setTimeout(() => {
         let later = indexedSpend(next.key);
-        if (later !== null && isFlowRun(next)) later += flows?.spent(next) ?? 0;
+        if (later !== null && isFlowRun(next)) later += stepsSpent(next);
         if (later !== null && later !== getRun(db, id)?.costUsd) updateRun(db, id, { costUsd: Math.round(later * 10000) / 10000 });
       }, 30_000).unref();
     changed(next);

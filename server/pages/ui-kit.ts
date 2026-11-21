@@ -21,6 +21,7 @@ const UI_CSS = `
 .n-ui-tab{flex:none;position:relative;padding:9px 12px 11px;border:0;background:none;color:var(--n-muted);font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
 .n-ui-tab:hover{color:var(--n-fg)}
 .n-ui-tab[aria-selected=true]{color:var(--n-fg)}
+.n-ui-tab.n-ui-tab-wait{opacity:.5}
 .n-ui-tab[aria-selected=true]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--n-accent)}
 .n-ui-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 14px;padding:4px 0;border:0;background:none;color:var(--n-muted);font:inherit;font-size:14px;cursor:pointer}
 .n-ui-back:hover{color:var(--n-accent)}
@@ -72,6 +73,7 @@ const UI_CSS = `
 .n-ui-note{color:var(--n-muted);font-size:13px}
 [data-event]{cursor:pointer}
 [data-event][aria-busy=true]{opacity:.6;pointer-events:none}
+[data-event][data-n-held]{opacity:.45;pointer-events:none;cursor:default}
 .n-ui-err{padding:10px 12px;border:1px solid var(--n-err);border-radius:10px;color:var(--n-err);font-size:13px;white-space:pre-wrap}
 `.trim();
 
@@ -144,6 +146,8 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     getOwnPropertyDescriptor: (_t, k) => (typeof k === 'string' && /^[A-Za-z]\w*$/.test(k) ? { configurable: true, enumerable: true, value: want(k, { limit: 200 }) ?? [] } : undefined),
   });
   let page = '';
+  /** The person went to a page themselves (a tab, an event's page, back): a run that works or ends no longer moves them. */
+  let picked = false;
   let pageItem: unknown = null;
   // The key of the item a page was opened with: its element there takes it as its own (@key), so what is kept for it is the same on both pages.
   let pageKey = '';
@@ -427,11 +431,31 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     const i = scopes.push({ stack, key }) - 1;
     return `<div class="n-el n-el-${esc(name)}" data-n-i="${i}">${html}</div>`;
   };
+  /** What a block names: its own settings and words, and its element's html. */
+  const srcOf = (b: any) => JSON.stringify(b) + (b.element ? (def.elements?.[b.element]?.html ?? '') : '');
+  /**
+   * While a run works: whether a page has something of its answer to draw (a block whose answer fields are there; a
+   * page that shows nothing of the answer always has). Pages without it wait: their tab is dimmed, and the view opens
+   * on one that has something.
+   */
+  const hasSomething = (p: any): boolean => {
+    if (!ctx.partial) return true;
+    const s = scope();
+    let ofAnswer = false;
+    for (const b of p.blocks ?? []) {
+      if (b.if && !E.test(b.if, s)) continue;
+      const src = srcOf(b);
+      if (!E.notYet(src, {})) continue;
+      ofAnswer = true;
+      if (!E.notYet(src, ctx.result)) return true;
+    }
+    return !ofAnswer;
+  };
   const block = (b: any, j: number): string => {
     const s = scope();
     if (b.if && !E.test(b.if, s)) return '';
     // A run still at work shows the answer so far: what it does not have yet is not drawn yet.
-    if (ctx.partial && E.notYet(JSON.stringify(b) + (b.element ? (def.elements?.[b.element]?.html ?? '') : ''), ctx.result)) {
+    if (ctx.partial && E.notYet(srcOf(b), ctx.result)) {
       held++;
       return '';
     }
@@ -480,12 +504,18 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     scopes = [];
     held = 0;
     const tabs = pages.filter(shown);
+    // A run still at work, and no page picked yet: one that has something to show, rather than one still empty.
+    if (ctx.partial && !picked) {
+      const now = pages.find((x: any) => x.id === page);
+      const there = tabs.find(hasSomething);
+      if ((!now || !hasSomething(now)) && there) page = there.id;
+    }
     const p = pages.find((x: any) => x.id === page) ?? tabs[0] ?? pages[0];
     if (!p) return '';
     page = p.id;
     const nav =
       tabs.length > 1
-        ? `<nav class="n-ui-tabs" role="tablist">${tabs.map((t: any) => `<button type="button" class="n-ui-tab" role="tab" data-n-page="${esc(t.id)}" aria-selected="${t.id === p.id || (p.tab === false && history.length && history[history.length - 1].page === t.id) ? 'true' : 'false'}">${esc(t.title)}</button>`).join('')}</nav>`
+        ? `<nav class="n-ui-tabs" role="tablist">${tabs.map((t: any) => `<button type="button" class="n-ui-tab${ctx.partial && !hasSomething(t) ? ' n-ui-tab-wait' : ''}" role="tab" data-n-page="${esc(t.id)}" aria-selected="${t.id === p.id || (p.tab === false && history.length && history[history.length - 1].page === t.id) ? 'true' : 'false'}">${esc(t.title)}</button>`).join('')}</nav>`
         : '';
     const back = p.tab === false ? `<button type="button" class="n-ui-back" data-n-back>← ${esc(history.length ? (pages.find((x: any) => x.id === history[history.length - 1].page)?.title ?? L('back', 'Back')) : L('back', 'Back'))}</button>` : '';
     const body = p.blocks.map(block).join('');
@@ -555,6 +585,13 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
       const t = document.createElement('template');
       t.innerHTML = viewHtml();
       clean(t.content);
+      // While its run works, what would reach the app (run it again, start another, ask…) waits: dimmed, not clickable.
+      for (const el of t.content.querySelectorAll('[data-event]')) {
+        if (!heldEvent(el.getAttribute('data-event')!)) continue;
+        el.setAttribute('data-n-held', '');
+        el.setAttribute('aria-disabled', 'true');
+        if (el.matches('button,input,select,textarea')) el.setAttribute('disabled', '');
+      }
       const next = document.createElement('div');
       next.append(t.content);
       morph(box, Object.assign(next, { id: 'n-ui', className: 'n-ui' }));
@@ -587,6 +624,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
   };
   const go = (to: string, item: unknown, key: string) => {
     if (!pages.some((p: any) => p.id === to)) return;
+    picked = true;
     history.push({ page, item: pageItem, key: pageKey });
     if (history.length > 30) history.shift();
     page = to;
@@ -595,6 +633,8 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     draw();
     send({ type: 'wa-ui-top' });
   };
+  /** An event that would reach the app while its run works (ctx.hold: the actions that wait then). */
+  const heldEvent = (name: string): boolean => Array.isArray(ctx.hold) && Array.isArray(def.events?.[name]) && def.events[name].some((a: any) => ctx.hold.includes(a.do));
   // The runs a view started (run … as), by their ids: their names in its state, kept up to date.
   const started = new Map<string, string>();
   const ACTIVE = ['queued', 'starting', 'running', 'waiting'];
@@ -627,6 +667,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         go(a.page, val(a.item), key);
         return true;
       case 'back': {
+        picked = true;
         const h = history.pop();
         if (h) {
           page = h.page;
@@ -701,6 +742,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
   }
 
   async function fire(name: string, el: Element, event: Record<string, unknown>) {
+    if (heldEvent(name)) return;
     const wrap = el.closest('[data-n-i]');
     const sc = wrap ? scopes[Number(wrap.getAttribute('data-n-i'))] : null;
     const key = el.closest('[data-key]')?.getAttribute('data-key') ?? sc?.key ?? '';
@@ -753,6 +795,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     if (tab && mine(tab)) {
       const to = tab.getAttribute('data-n-page')!;
       history.length = 0;
+      picked = true;
       page = to;
       pageItem = null;
       pageKey = '';
@@ -820,7 +863,15 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     }
     if (d.n !== cfg.n) return;
     if (d.type === 'wa-ui-ctx' && isObj(d.ctx)) {
+      const was = !!ctx.partial;
       ctx = { ...d.ctx, on: ctx.on };
+      // The run ended: someone who never picked a page sees its first, as a finished run opens.
+      if (was && !ctx.partial && !picked) {
+        history.length = 0;
+        page = firstPage();
+        pageItem = null;
+        pageKey = '';
+      }
       draw();
     } else if (d.type === 'wa-ui-data') {
       for (const k of [...records.keys()]) if (JSON.parse(k)[0] === d.collection) records.delete(k);

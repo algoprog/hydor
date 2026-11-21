@@ -23,7 +23,7 @@ import type { ApprovalAnswer } from '../agents/live.ts';
 import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
 import { openRunIn } from '../automations/runs.ts';
-import { addNote, notesOf, removeNote } from '../notes.ts';
+import { addNote, notesOf, removeNote, updateNote } from '../notes.ts';
 import { opensTurn } from '../opinion/turns.ts';
 import { allowApp, allowedApps } from './allowed.ts';
 import { checkDaily } from './api.ts';
@@ -401,8 +401,18 @@ const watching = new Set<string>();
 export async function tellAsker(d: Deps, r: RunRecord) {
   if (!r.askedBy || r.told || watching.has(r.id) || isActive(r.status)) return;
   updateRun(d.db, r.id, { told: true });
-  const head =
-    r.status === 'done'
+  // A change it asked of the run (use_app with change), which its card keeps until it is told.
+  const card = notesOf(d.db, r.askedBy, 'app-run').find((n) => (n.data as { run?: string } | null)?.run === r.id);
+  const change = (card?.data as { change?: string } | null)?.change;
+  if (card && change) {
+    const { change: _c, ...data } = card.data as Record<string, unknown>;
+    updateNote(d.db, card.id, data);
+  }
+  const head = change
+    ? r.status === 'done'
+      ? `[${r.appName} changed] The change you asked of it for the user (“${clipLine(change, 200)}”) is done; its card with the new answer shows right under your reply. Say in a sentence or two what changed, without repeating it; if its answer did not change, its agent's words say why (another question is a new run).${r.reply ? `\n\nWhat its agent said: ${clip(r.reply)}` : ''}`
+      : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The change you asked of it for the user (“${clipLine(change, 200)}”) did not finish${r.error ? `: ${r.error}` : ''}.`
+    : r.status === 'done'
       ? `[${r.appName} finished] The run you started for the user is done; its card with the answer shows right under your reply. Reply in a sentence or two (what came of it, what to look at), without repeating it; if you point to the card, it is below, not above. ${MISFIT}`
       : `[${r.appName} ${r.status === 'stopped' ? 'was stopped' : 'failed'}] The run you started for the user did not finish${r.error ? `: ${r.error}` : ''}.`;
   try {
@@ -451,6 +461,7 @@ async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Pro
   if (text.length > 20_000) return { text: 'That change is too long (at most 20,000 characters).', isError: true };
   const sent = Date.now();
   const before = JSON.stringify(r.result ?? null);
+  let card: ReturnType<typeof addNote> | null = null;
   watching.add(r.id);
   try {
     // This session hears how it went by a message if it ends after the call stops waiting.
@@ -461,11 +472,11 @@ async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Pro
       updateRun(db, r.id, { told: true });
       return { text: `The change could not be sent: ${(e as Error).message}`, isError: true };
     }
-    // Its card shows under this turn now, where its answer changes.
+    // Its card shows under this turn now, where its answer changes, and keeps the change until this session hears how it went.
     const note = notesOf(db, c.key, 'app-run').find((n) => (n.data as { run?: string } | null)?.run === r.id);
     if (note) {
       removeNote(db, note.id);
-      addNote(db, { key: c.key, kind: 'app-run', anchor: await turnAnchor(c.deps, c.key), data: note.data });
+      card = addNote(db, { key: c.key, kind: 'app-run', anchor: await turnAnchor(c.deps, c.key), data: { ...(note.data as Record<string, unknown>), change: text.slice(0, 2000) } });
     }
     // Until that turn has ended (the run opens again when its agent goes to work).
     for (let left = ms; left > 0 && !c.signal?.aborted; ) {
@@ -484,6 +495,11 @@ async function changeRun(c: RunCtx, r: RunRecord, text: string, ms: number): Pro
   if (isActive(now.status) || (now.endedAt ?? 0) < sent)
     return `${now.appName} is still making the change (run ${now.id}); its card here shows it at work. Its new answer comes to you as a message when it is done: end your turn now (say it is on its way), or call use_app with run "${now.id}" to wait for it.`;
   updateRun(db, now.id, { told: true });
+  // Told here: its card no longer waits to tell it.
+  if (card) {
+    const { change: _c, ...data } = card.data as Record<string, unknown>;
+    updateNote(db, card.id, data);
+  }
   const said = now.reply ? `\n\nWhat its agent said: ${clip(now.reply)}` : '';
   if (now.status !== 'done') return `${now.appName} could not make the change: ${now.error ?? 'it did not finish'}.${said}\n\n${runText(now)}`;
   if (JSON.stringify(now.result ?? null) === before && now.result)

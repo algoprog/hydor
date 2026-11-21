@@ -13,7 +13,8 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
-import { cleanRecipe, isActive, questionLine } from '../../shared/apps.ts';
+import { cleanRecipe, isActive, questionLine, runEndedNotice } from '../../shared/apps.ts';
+import { languageLine } from '../../shared/app-me.ts';
 import { formatSearch } from '../../shared/search.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, collapseSteps, evalRule, fillRefs, flowOf, readRule, valueOf, type Collapsed, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
@@ -22,6 +23,7 @@ import { listRuns as listTaskRuns } from '../automations/runs.ts';
 import { kvSet, openDb } from '../db.ts';
 import { setTiers, tierPick } from '../assistants/tiers.ts';
 import { addNote, notesOf } from '../notes.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 import { Scheduler } from '../scheduler.ts';
 import type { SessionManager } from '../sessions.ts';
 import { registerFeatures } from '../features/registry.ts';
@@ -74,6 +76,8 @@ class FakeSessions extends EventEmitter {
     const key = `acp:fake-${this.made.length + 1}-${Math.random().toString(36).slice(2, 8)}`;
     this.made.push({ key, o });
     this.status.set(key, 'working');
+    // As the session manager keeps a session's settings.
+    if (o.extra && Object.keys(o.extra).length) setSessionExtra(db, key, o.extra);
     return key;
   }
   setFlags(key: string, f: { archived?: boolean }) {
@@ -2184,9 +2188,10 @@ function turnEnds(key: string, ...lines: unknown[]) {
 }
 
 /** An app whose last step is a slow agent: its weather, link and pictures come first. */
-const filling = () =>
+const filling = (p: Record<string, unknown> = {}) =>
   app({
     name: 'Filling',
+    ...p,
     answer: [
       { id: 'weather', label: 'Weather', type: 'text', required: true },
       { id: 'link', label: 'Link', type: 'url' },
@@ -2396,6 +2401,54 @@ test('use_app with run and change: the change goes to the run the session starte
   assert.match(text2, /did not change its answer/);
   assert.match(text2, /Run again with Porto/);
   assert.equal(sessions.made.length, before + 1, 'one session for its changes');
+});
+
+test('changes to a run with steps: in the run’s language when its app writes in the person’s; an earlier session’s spending stays in the cost; a change that outlasts use_app is told as a change', async () => {
+  model.answer = (_system, user) => (/weather/i.test(user) ? JSON.stringify({ weather: 'Ζέστη' }) : '{}');
+  const a = filling({ name: 'Filling in Greek', language: 'person' });
+  assert.equal(a.language, 'person');
+  const key = 'claude:asker-greek';
+  const ctx: RunCtx = { runId: `run-${key}`, key, agent: 'claude', cwd: tmp, deps };
+  const run = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'session', inputs: { topic: 'Κρήτη' }, askedBy: key, lang: 'el' });
+  addNote(db, { key, kind: 'app-run', data: { run: run.id, app: a.id, name: a.name, icon: a.icon, color: a.color } });
+  await agentAnswers(run.id, 'write', { plan: 'Μέρα 1: Κνωσός.' });
+  const r0 = await ended(run.id);
+  assert.equal(r0.status, 'done', r0.error);
+  const steps = r0.costUsd ?? 0;
+  // The change's session hears the run's language, ahead of the person's words (which the page lists alone).
+  let before = sessions.made.length;
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: 'Πιο σύντομο' } })).statusCode, 200);
+  const first = sessions.made[before];
+  assert.ok(first.o.prompt.includes(`${languageLine('el')}\n\n---\nThe person asks:\nΠιο σύντομο`), first.o.prompt);
+  sessions.costs.set(first.key, 0.03);
+  turnEnds(first.key, said('user', first.o.prompt), said('assistant', 'Έγινε.'));
+  assert.equal((await ended(run.id)).costUsd, Math.round((steps + 0.03) * 10000) / 10000);
+  assert.deepEqual((await http.inject({ method: 'GET', url: `/api/apps/runs/${run.id}` })).json().asks.map((x: { text: string }) => x.text), ['Πιο σύντομο']);
+  // Its session deleted: the next change starts another, and what the first spent stays in the run's cost.
+  sessions.status.delete(first.key);
+  before = sessions.made.length;
+  assert.equal((await http.inject({ method: 'POST', url: `/api/apps/runs/${run.id}/ask`, payload: { text: 'Και πιο ζεστό' } })).statusCode, 200);
+  const second = sessions.made[before];
+  assert.notEqual(second.key, first.key);
+  assert.equal(second.o.extra.app.spentBefore, 0.03);
+  sessions.costs.set(second.key, 0.01);
+  turnEnds(second.key, said('user', second.o.prompt), said('assistant', 'Έγινε κι αυτό.'));
+  assert.equal((await ended(run.id)).costUsd, Math.round((steps + 0.04) * 10000) / 10000);
+  // A change asked through use_app that outlasts the call: the session hears later that the change is done.
+  const use = apps.tools!(ctx).find((t) => t.name === 'use_app')!;
+  const sent = sessions.sent.length;
+  assert.match(String(await use.run({ run: run.id, change: 'Swap the days', wait: 1 }, ctx)), /still making the change/);
+  assert.equal(store.getRun(db, run.id)!.status, 'running');
+  turnEnds(second.key, said('user', 'Swap the days'), said('assistant', 'Swapped.'));
+  await ended(run.id);
+  let told: { key: string; text: string } | undefined;
+  for (let i = 0; i < 100 && !(told = sessions.sent.slice(sent).find((m) => m.key === key)); i++) await sleep(25);
+  assert.ok(told, 'the asking session hears of it');
+  assert.match(told!.text, /^\[Filling in Greek changed\] The change you asked of it for the user \(“Swap the days”\) is done/);
+  assert.match(told!.text, /What its agent said: Swapped\./);
+  assert.equal(runEndedNotice(told!.text), run.id, 'the conversation hides it and moves the card under the reply');
+  assert.equal((notesOf(db, key, 'app-run')[0].data as { change?: string }).change, undefined, 'told once');
+  assert.equal(store.getRun(db, run.id)!.told, true);
 });
 
 for (const [name, fn] of tests) {

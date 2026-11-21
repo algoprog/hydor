@@ -5,7 +5,7 @@
 // nothing that reaches the app. A ready-made app's view is put in the app's language first.
 import { useMemo, useState } from 'react';
 import type { AppUi } from '@shared/app-ui';
-import { translateUi } from '@shared/app-ui';
+import { translateUi, UI_ACTIONS } from '@shared/app-ui';
 import { libsHead, type AppAsset } from '@shared/app-media';
 import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
@@ -16,7 +16,7 @@ import { mu } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
-import { LOCALE } from '../../i18n/locale';
+import { currentLang, LOCALE } from '../../i18n/locale';
 import { cx } from '../../components/ui';
 import { appCall, memoryStore, PageFrame, type UiBridge } from '../pages/frame';
 import { runPath } from './api';
@@ -103,6 +103,8 @@ export function AppView({
       on,
       result: run?.result ?? partial ?? {},
       ...(partial ? { partial: true } : {}),
+      // While its run works, what would reach the app waits (a second run from a half-made answer): the frame dims it.
+      ...(run && isActive(run.status) ? { hold: UI_ACTIONS.filter((a) => a.remote).map((a) => a.value) } : {}),
       inputs: run?.inputs ?? {},
       run: run ? runOf(run) : {},
       app: { name, description: description ?? '', id: appId },
@@ -152,7 +154,7 @@ export function AppView({
         case 'run': {
           need('run');
           try {
-            const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen' });
+            const r = await post<{ run: AppRun }>(`/api/apps/${enc(appId)}/runs`, { flow: typeof a.flow === 'string' ? a.flow : 'run', inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, source: 'screen', lang: currentLang() });
             return { id: r.run.id, status: r.run.status, result: r.run.result ?? null, error: r.run.error ?? '' };
           } catch (e) {
             // A flow that needs keys the vault lacks: the page asks for them.
@@ -174,7 +176,8 @@ export function AppView({
           if (!want) throw new Error(tr('Name the app to start'));
           // An app of yours by its id or address; else a ready-made one by its id.
           const target = want.startsWith('tpl:') ? want : await api(`/api/apps/${enc(want)}`).then(() => want, () => `tpl:${want}`);
-          const r = await post<{ run: AppRun }>(`/api/apps/${enc(target)}/runs`, { inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {} });
+          // In the language this page is in, as the app's own page runs it; again keeps the earlier run's.
+          const r = await post<{ run: AppRun }>(`/api/apps/${enc(target)}/runs`, { inputs: a.inputs && typeof a.inputs === 'object' ? a.inputs : {}, lang: currentLang() });
           go(runPath(r.run.id));
           return null;
         }
