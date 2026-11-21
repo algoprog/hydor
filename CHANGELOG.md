@@ -3,6 +3,50 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.102.0 · 21 November 2026
+
+Give a session a goal and the app itself checks every round, a project's memory in one list, and model tiers for
+scheduled tasks, Custom and apps.
+
+- **Goals the app checks**: give a session of any agent a goal (the session's menu → **Set a goal**, or **Options →
+  Goal** on the start page). The agent first proposes what "done" means as checks: a command that must pass, a number
+  to reach, a sentence that a reviewer who did none of the work must find true, or something only you confirm, with the
+  paths it may not change and limits on rounds, money and time. You agree or change them. From then on the app, not the
+  agent, runs the checks after every round: a round that got closer is kept, and one that made things worse is undone
+  when the session works in a worktree (elsewhere it stays, and the next round is told what got worse). The goal counts
+  as reached only when every check holds twice and a reviewer has read the whole change. A bar above the message box
+  shows the checks and the rounds, and a report at the end shows each check at the start and now.
+- **You steer a goal as much as you like**: it can work on its own, ask at turning points, or ask every round. When it
+  asks, it shows the ways it sees with its own pick, you tick one or several and add a note if you like, and after 10
+  minutes without an answer it goes on with its pick (or waits for you, if you prefer). At any time you can write to
+  it, pause it, add a rule that every later round must keep, change the checks, keep or undo a round yourself, or have
+  it take another way from a round. A goal that stopped at a limit can be given more rounds, money or time. Your own
+  changes in the folder are never thrown away: when they are in the way, the app says which files and what to run.
+- A goal in a Custom session is now this same loop. A `/goal` typed in Claude Code or Codex is still that program's
+  own, simpler goal, and a session that leads a team (a swarm, a campaign, a deep research or an arena match) cannot
+  have a goal yet.
+- **A project's memory in one list**: a project's **Memory** tab shows its notes, its wiki's articles and its own
+  documents together, newest first or A to Z, with chips to narrow them down and one search box over all three. A click
+  opens a note, an article or a document in a pane beside the list (in the list's place on a phone). **Add** takes a
+  note, files or a folder to keep up to date, and files dropped on the tab are added too. A wiki job at work shows as
+  one line with **Details**, and its **Stop** now works. A search of one project's notes no longer misses some of them.
+- **Tiers in more places**: a new scheduled task starts on **Automatic**, as a session does. Custom's tiers fill
+  themselves in from the models it can use, so Custom gets Automatic and can lead Hydor subagents. An app, or one agent
+  step in it, can think with a tier (Quick, Standard, Best or Max) instead of a model by name, so it keeps up when the
+  models change.
+- **A shorter Browser menu**: the Browser's **⋯** menu had 22 rows and ran off a laptop's screen. It is now grouped:
+  the page (Find in page, Translate page…, Reader view, Dark pages, Zoom), **Print…** and **Screenshot or PDF**, your
+  lists (History, Downloads, Bookmarks, Read later, Highlights) and the browser's own (Extensions, Site permissions,
+  Settings, Keyboard shortcuts). There is one **Read later** now, and its panel has **Add this page** at the top.
+- **Subagents' replies always reach their lead**: when a message of the lead was waiting as a Hydor subagent ended its
+  turn, the lead could get an empty reply and the real one was lost. After a restart of the app, what agents had queued
+  for each other is sent when their turn ends, instead of waiting for a **Resume** nobody presses.
+- **Edit from here** with the files put back now also removes the files made after that point, so the folder is
+  exactly as it was.
+- An HTML page made in the app's look keeps that look, in your theme, when you open it as a file in the file window or
+  on the **Files** page.
+- On a phone, folding **Active**, **Pinned** or **Projects** in the sessions drawer no longer closes the drawer.
+
 ## 0.101.0 · 21 November 2026
 
 Bigger text on your phone, pictures and PDFs that work again in the desktop app, and plan revisions that work on
