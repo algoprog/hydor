@@ -17,8 +17,8 @@ export function num(v: number): string {
   return String(Number(v.toPrecision(4)));
 }
 
-/** "$5.04". */
-export const usd = (v: number): string => `$${v.toFixed(2)}`;
+/** "$5.04"; under five cents with a third decimal ("$0.006"), so that a small limit and what was spent of it do not both read "$0.00" or "$0.01". */
+export const usd = (v: number): string => `$${v > 0 && v < 0.05 ? v.toFixed(3) : v.toFixed(2)}`;
 
 /** "1 h 11 min", "45 min", "3 h", "under a minute". */
 export function duration(ms: number): string {

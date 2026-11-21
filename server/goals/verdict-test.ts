@@ -7,7 +7,7 @@
 //   DATA_DIR=/tmp/hydor-test-goal-verdict PRICES_URL= node dist/dev/verdict-test.js
 import assert from 'node:assert/strict';
 import type { GoalCheck, GoalResult, GoalRound, GoalState } from '../../shared/goals.ts';
-import { allButYouHold, duration, limitReason, num, reckon, rejudged, relaxed, scoreOf, scored, stalled } from './verdict.ts';
+import { allButYouHold, duration, limitReason, num, reckon, rejudged, relaxed, scoreOf, scored, stalled, usd } from './verdict.ts';
 
 let passed = 0;
 const tests: [string, () => void | Promise<void>][] = [];
@@ -248,6 +248,16 @@ test('P3: a target changed by the person: the stored values of that check are ju
 });
 
 // ---- run ---------------------------------------------------------------------------------------------
+
+test('money in the loop’s sentences: two decimals, a third under five cents', () => {
+  assert.equal(usd(5.04), '$5.04');
+  assert.equal(usd(0.5), '$0.50');
+  assert.equal(usd(0.05), '$0.05');
+  assert.equal(usd(0.00606), '$0.006');
+  assert.equal(usd(0.003), '$0.003');
+  assert.equal(usd(0), '$0.00');
+  assert.equal(limitReason({ contract: { objective: 'x', checks: [], protect: [], limits: { rounds: 5, usd: 0.003 } }, rounds: [], spentUsd: 0.00606 } as never, 0), 'It spent $0.006 of its $0.003');
+});
 
 for (const [name, fn] of tests) {
   try {
