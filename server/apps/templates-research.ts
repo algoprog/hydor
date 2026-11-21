@@ -2556,35 +2556,74 @@ return { updated: today, topics: topics, fresh: added, headline: added ? added +
           code:
             LIST +
             String.raw`// The papers to cite (those you did not take out), theme by theme, each with its key; and the .bib with all of them.
+// A model writes the section from what is listed here, and one asked at once reads about 100,000 characters: the
+// newest papers go in until about 60,000 characters of them are listed, and how many were left out is said.
 const papers = rows(input.papers).filter((p) => !p.hidden);
 if (!papers.length) throw new Error('This topic has no papers yet: update it first');
+const line = (p) => '- \\cite{' + p.citekey + '} ' + p.title + ' (' + [p.authors, p.venue, p.year].filter(Boolean).join(', ') + '): ' + (p.summary || '') + (p.relation ? ' [' + p.relation + ']' : '');
+let used = 0;
+const listed = papers.filter((p) => (used += line(p).length + 1) <= 60000);
 const themes = [];
-for (const p of papers) if (themes.indexOf(p.theme || 'Other') < 0) themes.push(p.theme || 'Other');
-const lines2 = themes.map((t) => '## ' + t + '\n' + papers.filter((p) => (p.theme || 'Other') === t).map((p) => '- \\cite{' + p.citekey + '} ' + p.title + ' (' + [p.authors, p.venue, p.year].filter(Boolean).join(', ') + '): ' + (p.summary || '') + (p.relation ? ' [' + p.relation + ']' : '')).join('\n')).join('\n\n');
-return { lines: lines2, bib: papers.map((p) => p.bibtex).filter(Boolean).join('\n\n'), count: papers.length };`,
+for (const p of listed) if (themes.indexOf(p.theme || 'Other') < 0) themes.push(p.theme || 'Other');
+const lines2 = themes.map((t) => '## ' + t + '\n' + listed.filter((p) => (p.theme || 'Other') === t).map(line).join('\n')).join('\n\n');
+const left = papers.length - listed.length;
+return { lines: lines2, bib: papers.map((p) => p.bibtex).filter(Boolean).join('\n\n'), keys: papers.map((p) => String(p.citekey || '')).filter(Boolean), count: papers.length, left };`,
           outputs: [
             { id: 'lines', label: 'Papers by theme', type: 'text' },
             { id: 'bib', label: 'BibTeX', type: 'text' },
+            { id: 'keys', label: 'Cite keys', type: 'list' },
             { id: 'count', label: 'How many', type: 'number' },
+            { id: 'left', label: 'Left out of the section', type: 'number' },
           ],
           failed: 'agent',
         },
         {
           id: 'write',
           title: 'Write the section',
-          do: 'agent',
-          tools: [],
+          do: 'model',
+          // Its answer is the LaTeX itself, not a JSON field: a backslash in JSON must be doubled, and a model does not always.
           instructions: `Write the related-work section of a research paper on "{{topic}}", in LaTeX, from the papers below (grouped by theme, each with its \\cite key, what it does, and how it relates).
 
 - \\subsection*{Related work} is not needed: start with the text itself. A paragraph for each theme, opening with a sentence that names it (\\paragraph{Theme.} or a plain sentence), then the papers: what they did, how they connect and differ, where the gaps are. Cite with \\cite{key} using only the keys below, each where it belongs; group citations for the same point (\\cite{a,b}).
 - Plain, precise academic prose; no claims beyond what is said of each paper; no bullet lists; no invented numbers.
-- Hand in latex: the section's LaTeX (no preamble, no \\begin{document}).
+- Answer with the section's LaTeX itself (no preamble, no \\begin{document}, no Markdown fence, nothing before or after it).
 
 {{prep.lines}}`,
-          outputs: [{ id: 'latex', label: 'The section, in LaTeX', type: 'markdown', required: true }],
+        },
+        {
+          id: 'checked',
+          title: 'Check the citations',
+          do: 'code',
+          language: 'javascript',
+          with: { latex: '{{write.text}}', keys: '{{prep.keys}}', left: '{{prep.left}}' },
+          code:
+            LIST +
+            String.raw`// The section with a Markdown fence taken off if the model put one, and every cite key that is not one of the papers' keys
+// taken out (a citation left with no key goes whole, with the space before it), so the .bib has all it cites.
+const valid = new Set(list(input.keys).map(String));
+const removed = [];
+let latex = String(input.latex || '').trim().replace(/^\x60{3}(?:latex|tex)?\s*\n/i, '').replace(/\n?\x60{3}\s*$/, '').trim();
+latex = latex.replace(/([ ~]?)\\(cite[a-z]*|parencite|textcite)(\*?)((?:\[[^\]]*\])*)\{([^}]*)\}/g, (all, lead, cmd, star, opt, keys) => {
+  const parts = keys.split(',').map((k) => k.trim()).filter(Boolean);
+  const ok = parts.filter((k) => valid.has(k));
+  for (const k of parts) if (valid.has(k) === false) removed.push(k);
+  if (ok.length === parts.length) return all;
+  return ok.length ? lead + '\\' + cmd + star + opt + '{' + ok.join(',') + '}' : '';
+});
+if (!latex) throw new Error('The model wrote nothing: try again');
+const notes = [];
+if (removed.length) notes.push(removed.length + (removed.length === 1 ? ' citation' : ' citations') + ' to papers that are not in this topic (' + [...new Set(removed)].join(', ') + ') were taken out.');
+const left = Number(input.left) || 0;
+if (left > 0) notes.push(left + (left === 1 ? ' older paper was' : ' older papers were') + ' left out of the section, as there are too many to write from at once; the .bib has them all.');
+return { latex, removed: [...new Set(removed)], note: notes.join(' ') };`,
+          outputs: [
+            { id: 'latex', label: 'The section, in LaTeX', type: 'markdown' },
+            { id: 'removed', label: 'Citations taken out', type: 'list' },
+            { id: 'note', label: 'What was changed', type: 'text' },
+          ],
         },
       ],
-      outputs: { topic: '{{topic}}', latex: '{{write.latex}}', bib: '{{prep.bib}}', count: '{{prep.count}}' },
+      outputs: { topic: '{{topic}}', latex: '{{checked.latex}}', bib: '{{prep.bib}}', count: '{{prep.count}}', note: '{{checked.note}}' },
     },
     bib: {
       title: 'Its BibTeX',

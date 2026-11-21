@@ -522,7 +522,7 @@ const LRW_TOPICS = String.raw`{{#last.result.topics|count|over:1}}<nav class="ch
   {{#state.drafting|is:$topic}}<div class="out">
     {{#state.draft.working}}<p class="m">Writing the related work: a few minutes. It goes on if you leave this page.</p>{{/state.draft.working}}
     {{#state.draft.error}}<p class="err">{{state.draft.error}}</p>{{/state.draft.error}}
-    {{#state.draft.result.latex}}<div class="oh"><b>The related work, in LaTeX</b><span><button type="button" class="b" data-event="copy_latex">Copy the LaTeX</button><button type="button" class="b" data-event="copy_draft_bib">Copy the .bib</button></span></div><pre>{{state.draft.result.latex}}</pre>{{/state.draft.result.latex}}
+    {{#state.draft.result.note}}<p class="m">{{state.draft.result.note}}</p>{{/state.draft.result.note}}{{#state.draft.result.latex}}<div class="oh"><b>The related work, in LaTeX</b><span><button type="button" class="b" data-event="copy_latex">Copy the LaTeX</button><button type="button" class="b" data-event="copy_draft_bib">Copy the .bib</button></span></div><pre>{{state.draft.result.latex}}</pre>{{/state.draft.result.latex}}
   </div>{{/state.drafting}}
   {{#state.bibbing|is:$topic}}<div class="out">
     {{#state.bib.working}}<p class="m">Gathering its BibTeX…</p>{{/state.bib.working}}

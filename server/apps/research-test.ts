@@ -767,7 +767,9 @@ const srv = createServer((req, res) => {
     const b = JSON.parse(body || '{}');
     const user = String(b.messages?.find((m: { role: string }) => m.role === 'user')?.content ?? '');
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(reply(user)) }, finish_reason: 'stop' }] })}\n\n`);
+    const said = reply(user);
+    // A step with no outputs asks for plain text (a LaTeX section): a string is sent as it is.
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: typeof said === 'string' ? said : JSON.stringify(said) }, finish_reason: 'stop' }] })}\n\n`);
     res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } })}\n\n`);
     res.end('data: [DONE]\n\n');
   });
@@ -907,6 +909,20 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   const bib = await run('living-related-work', { topic: 'text embeddings' }, 'bib');
   assert.equal(bib.res.count, kept.length);
   assert.match(bib.res.bib, /^@\w+\{/);
+  // Its related work, drafted by a model from the papers kept, with each cite key checked against them.
+  const key = String(kept[0].citekey);
+  const other = String(kept[kept.length - 1].citekey);
+  let asked = '';
+  reply = (user) => {
+    asked = user;
+    return '```latex\nDense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',madeupkey2027,' + other + '}. Others differ \\cite{ghost2026}.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '} \\cite{nobody}.\n```';
+  };
+  const draft = await run('living-related-work', { topic: 'text embeddings' }, 'draft');
+  assert.ok(asked.includes('\\cite{' + key + '}') && asked.includes('## Embeddings'), 'the papers by theme, each with its key');
+  assert.equal(draft.res.latex, 'Dense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',' + other + '}. Others differ.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '}.', 'the fence is off; keys that are none of the papers’ are taken out, and a citation left with none goes whole');
+  assert.match(draft.res.note, /^3 citations to papers that are not in this topic \(madeupkey2027, ghost2026, nobody\) were taken out\.$/);
+  assert.equal(draft.res.count, kept.length);
+  assert.ok(draft.res.bib.startsWith('@'));
   // A second update: the papers it has are not weighed again.
   const again = await run('living-related-work', { topics: 'text embeddings', seeds: '', most: '20' });
   assert.equal(again.res.fresh, 0);
