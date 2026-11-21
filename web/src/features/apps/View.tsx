@@ -31,7 +31,7 @@ const shell = (title: string, lang: string) =>
   `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><style>body.n-page{padding:0 0 4px}</style></head><body class="n-page" data-n-fit><div id="n-ui" class="n-ui"></div></body></html>`;
 
 /** A run as its view knows it: how it stands, not its session. */
-const runOf = (r: AppRun) => ({ id: r.id, status: r.status, source: r.source, createdAt: r.createdAt, endedAt: r.endedAt ?? null, costUsd: r.costUsd ?? null, error: r.error ?? '' });
+const runOf = (r: AppRun) => ({ id: r.id, status: r.status, source: r.source, createdAt: r.createdAt, endedAt: r.endedAt ?? null, costUsd: r.costUsd ?? null, error: r.error ?? '', misses: r.misses ?? [], missed: (r.misses ?? []).reduce((n, m) => n + (m.times ?? 1), 0) });
 
 export function AppView({
   ui,
@@ -93,7 +93,7 @@ export function AppView({
   // An app that keeps records: yours, or a ready-made one that keeps some (under its "tpl:" id); not a try of changes, nor a public page.
   const saved = (!appId.startsWith('tpl:') || !!keeps) && appId !== 'test' && !publicView;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
-  const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs]) : '';
+  const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs, run.misses ?? null]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
   const ctx = useMemo(
     () => ({
