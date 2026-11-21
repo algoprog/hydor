@@ -194,6 +194,7 @@ const T: Draft[] = [
     icon: 'telescope',
     color: 'violet',
     category: 'Research',
+    tier: 'best',
     description: 'A sourced report on any question: the web searched, facts cross-checked, every claim cited.',
     fields: [
       { id: 'topic', label: 'What should be researched?', type: 'long', required: true, placeholder: 'e.g. How well do heat pumps work in cold climates, and what do they cost to run compared with gas?' },
@@ -644,6 +645,7 @@ return {
     icon: 'plane',
     color: 'indigo',
     category: 'Planning',
+    tier: 'standard',
     description: 'A day-by-day plan checked against your dates: opening hours, events, travel times, budget and what to book.',
     fields: [
       { id: 'destination', label: 'Where to', type: 'text', required: true, placeholder: 'e.g. Lisbon, or the west coast of Ireland' },
@@ -1618,6 +1620,7 @@ Too little was found to compare these: {{score.missing}}.
     icon: 'file-search',
     color: 'teal',
     category: 'Work',
+    tier: 'quick',
     description: 'Answers from a document you give it, each with the exact passage and where it is.',
     fields: [
       { id: 'document', label: 'Document', type: 'file', required: true, help: 'A PDF, Word document, spreadsheet or text file' },
@@ -2972,6 +2975,7 @@ return { stories };`,
     icon: 'scroll-text',
     color: 'slate',
     category: 'Work',
+    tier: 'standard',
     description: 'What an agreement really says, in plain words: key terms, dates, what is unusual, and what to ask before signing.',
     fields: [
       { id: 'contract', label: 'The contract', type: 'file', help: 'A PDF, Word document or text file' },
@@ -3323,6 +3327,7 @@ The contract was too long to read whole: only its first part was gone through.
     icon: 'app-window',
     color: 'cyan',
     category: 'Build',
+    tier: 'standard',
     description: 'A working app from a description: plain HTML, CSS and JavaScript that opens from a file, tested before it is handed over.',
     fields: [
       { id: 'idea', label: 'What should it do?', type: 'long', required: true, placeholder: 'e.g. A tracker for my plants: when I watered each one, and which are due' },

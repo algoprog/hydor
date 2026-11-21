@@ -1348,6 +1348,8 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
   assert.equal(status.choices, 'skipped', 'not asked: the run came from the API');
   for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'lookups', 'geo', 'fx', 'assemble']) assert.equal(status[id], 'done', id);
   const at = Object.fromEntries(st.map((s) => [s.id, s]));
+  // The app's own tier goes to its agent's session: the plan is standard work.
+  assert.equal(store.getRun(db, at.plan.childRun!)!.recipe.tier, 'standard');
   const started = Math.max(...['events_search', 'climate_search', 'sights_search', 'transport_search'].map((id) => at[id].startedAt!));
   const ended1 = Math.min(...['whats_on', 'weather', 'places', 'transport'].map((id) => at[id].endedAt!));
   assert.ok(started <= ended1, 'the four branches ran side by side');

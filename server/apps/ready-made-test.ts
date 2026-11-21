@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { allSteps, type CodeStep } from '../../shared/app-manifest.ts';
 import { runCode } from './code.ts';
-import { templateById } from './templates.ts';
+import { TEMPLATES, templateById } from './templates.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -282,6 +282,21 @@ test('News digest: with more topics than room (8 topics, the shortest length) ev
     reads: [{ what: 'w', date: '2026-01-01', this_week: false }], quiet: [], topics: [{ topic: 'Topic A' }], since: '2026-11-14', today: '2026-11-21', stories: 4,
   });
   assert.deepEqual(old.quiet, ['Topic A']);
+});
+
+// ---- Tiers ---------------------------------------------------------------------------------------------------------
+
+test('Tiers: every ready-made app with an agent step thinks with a tier of its own (never max), and no step sets one that would override what the person picked on the page', () => {
+  const withAgents: string[] = [];
+  for (const t of TEMPLATES) {
+    const steps = [...(t.flow ? allSteps(t.flow.steps) : []), ...Object.values(t.flows ?? {}).flatMap((f) => allSteps(f.steps))];
+    assert.ok(steps.every((s) => !('tier' in s) || s.tier === undefined), `${t.id}: a step names a tier`);
+    if (steps.some((s) => s.do === 'agent')) {
+      withAgents.push(t.id);
+      assert.ok(t.tier && ['quick', 'standard', 'best'].includes(t.tier), `${t.id}: tier ${t.tier}`);
+    } else assert.equal(t.tier, undefined, `${t.id} has no agent step: nothing for a tier to do`);
+  }
+  assert.deepEqual(withAgents.sort(), ['deep-research', 'document-qa', 'explain-contract', 'figure-doctor', 'paper-to-talk', 'reproduce-paper', 'research-sprint', 'small-web-app', 'sweep-planner', 'trip-planner']);
 });
 
 // ---- run -----------------------------------------------------------------------------------------------------------

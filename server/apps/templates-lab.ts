@@ -850,6 +850,7 @@ const SPRINT: Draft = {
   icon: 'flask',
   color: 'violet',
   category: 'Lab',
+  tier: 'best',
   description: 'A question taken through hypotheses, code on a branch of its own, runs, an analysis notebook and a short report, with you approving each step.',
   fields: [
     { id: 'question', label: 'Your research question', type: 'long', required: true, placeholder: 'e.g. Does a curriculum from short to long queries help our dense retriever on long queries?' },
@@ -1285,6 +1286,7 @@ const SWEEP: Draft = {
   icon: 'sliders',
   color: 'orange',
   category: 'Lab',
+  tier: 'standard',
   description: 'A hyperparameter sweep planned within a budget of runs or GPU hours, bad trials stopped early, and what mattered written up.',
   fields: [
     { id: 'command', label: 'The script or command', type: 'text', required: true, placeholder: 'python train.py --epochs 3' },

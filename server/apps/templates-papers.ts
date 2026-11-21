@@ -698,6 +698,7 @@ const REPRODUCE: Draft = {
   icon: 'code',
   color: 'slate',
   category: 'Research',
+  tier: 'best',
   description: 'Clones its code, builds the environment, fetches the checkpoints, runs its evaluation and compares the numbers with its table, and reports what it took.',
   fields: [
     { id: 'paper', label: 'The paper', type: 'text', required: true, placeholder: 'e.g. 2104.08663, a DOI, a link or a title', help: 'A link, an arXiv id, a DOI, a title, or a PDF on this computer' },
@@ -1727,6 +1728,7 @@ const PAPER_TO_TALK: Draft = {
   icon: 'graduation-cap',
   color: 'pink',
   category: 'Writing',
+  tier: 'standard',
   description: 'Slides from your paper with its real figures and equations, timed, with notes; an A0 poster; a thread for X, Bluesky and LinkedIn; and a project page.',
   fields: [
     { id: 'paper', label: 'Your paper', type: 'text', required: true, placeholder: 'e.g. ~/papers/colbert (its LaTeX project), a PDF or a link', help: 'Its LaTeX project’s folder is best, for its figures; or a .tex file, a PDF, an arXiv id or a link' },
@@ -1987,6 +1989,7 @@ const FIGURE_DOCTOR: Draft = {
   icon: 'chart',
   color: 'cyan',
   category: 'Writing',
+  tier: 'standard',
   description: 'Plots fit for the paper: the column’s width, the paper’s font, colours colour-blind readers tell apart, vector PDFs with their fonts embedded, and one style file for them all.',
   fields: [
     { id: 'plots', label: 'Your plotting code', type: 'text', required: true, placeholder: 'e.g. ~/papers/colbert/plots', help: 'A script, a notebook or a folder of them on this computer (matplotlib, seaborn)' },
