@@ -36,8 +36,8 @@ export type Composed = 'sent' | 'added';
  * A box that cannot send now (a message still on its way, a session running elsewhere, a move to another agent
  * picked) adds it as usual. Returns what the box did with it; nothing when no message box took it.
  */
-export function composeInsert(text: string, key?: string, replace?: string, opts?: { send?: boolean | 'empty' }): Composed | undefined {
-  const detail: ComposeDetail = { text, key, replace, send: opts?.send };
+export function composeInsert(text: string, key?: string, replace?: string, opts?: { send?: boolean | 'empty'; focus?: boolean }): Composed | undefined {
+  const detail: ComposeDetail = { text, key, replace, send: opts?.send, ...(opts?.focus ? { focus: true } : {}) };
   window.dispatchEvent(new CustomEvent('hydor:compose', { detail }));
   return detail.result;
 }
@@ -49,6 +49,8 @@ export interface ComposeDetail {
   replace?: string;
   send?: boolean | 'empty';
   files?: unknown[];
+  /** With no words: only the cursor goes to the box (a card's Change it). */
+  focus?: boolean;
   result?: Composed;
 }
 

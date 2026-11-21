@@ -141,7 +141,7 @@ export function timeText([lo, hi]: Range): string {
 /** "$0.10–0.40", "$1.20", "under a cent", "nothing". */
 export function costText([lo, hi]: Range): string {
   if (hi <= 0) return 'nothing';
-  if (hi < 0.01) return 'under a cent';
+  if (hi <= 0.01) return 'under a cent';
   const fmt = (x: number) => (x >= 10 ? x.toFixed(0) : x >= 1 ? x.toFixed(2).replace(/\.00$/, '') : x.toFixed(2));
   const a = fmt(lo);
   const b = fmt(hi);

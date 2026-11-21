@@ -74,6 +74,7 @@ assert.equal(costText([0.5, 2]), '$0.50–2');
 assert.equal(costText([0.2, 0.2]), '$0.20');
 assert.equal(costText([0, 0]), 'nothing');
 assert.equal(costText([0.001, 0.008]), 'under a cent');
+assert.equal(costText([0.001, 0.01]), 'under a cent');
 assert.equal(costText([0.001, 0.4]), '$0–0.40');
 assert.equal(estimateText(estimateRun({ prompt: 'Plan a trip' })!), 'A run takes about 1–3 min and costs about $0.10–0.40 (a rough guess from its steps).');
 assert.equal(estimateText(ran), 'A run takes about 50 s and costs about $0.20 (the middle of its last 3 finished runs).');
