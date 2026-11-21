@@ -11,7 +11,7 @@ import { AsksControls } from './Asks';
 import { say } from './Say';
 import { ChecksEditor, DraftButtons, draftChanges, draftOf, draftProblem, type ContractDraft } from './ChecksEditor';
 import { useAct } from './state';
-import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText } from './words';
+import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText, type Team } from './words';
 
 /** One check where the files stand: a tick, a measured value with its meter, a hollow dot, or an amber mark. */
 function Pill({ c, r }: { c: GoalCheck; r: GoalResult | undefined }) {
@@ -188,7 +188,7 @@ export function RulesRow({ g, className }: { g: GoalState; className?: string })
   );
 }
 
-export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; rounds: boolean; onRounds: () => void; className?: string }) {
+export function GoalBarCard({ g, rounds, onRounds, team, className }: { g: GoalState; rounds: boolean; onRounds: () => void; team?: Team; className?: string }) {
   const [run, busy] = useAct(g.key);
   const [confirm, confirmNode] = useConfirm();
   const waits = needsPerson(g.status);
@@ -212,7 +212,7 @@ export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; 
         <div className="flex min-w-[min(100%,180px)] flex-1 items-center gap-2">
           <Target size={15} className={cx('shrink-0', waits ? 'text-warn' : 'text-accent')} />
           <span className="font-medium">Goal</span>
-          <span className="min-w-0 truncate text-fg-3">· {say(statusWords(g))}</span>
+          <span className="min-w-0 truncate text-fg-3">· {say(statusWords(g, team))}</span>
         </div>
         <div className="ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1">
           <AsksChip g={g} />

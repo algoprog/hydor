@@ -25595,5 +25595,14 @@
   "The files could not be saved before putting them back: try again in a moment": "Die Dateien konnten nicht gespeichert werden, bevor sie zurückgelegt wurden: Versuche es in einem Moment erneut.",
   "It pauses once this round has been checked": "Pausiert, sobald diese Runde geprüft wurde",
   "{0} · running the checks · pausing after this round": "{0} · Prüfungen laufen · Pause nach dieser Runde",
-  "{0} · working · pausing after this round": "{0} · arbeitet · Pause nach dieser Runde"
+  "{0} · working · pausing after this round": "{0} · arbeitet · Pause nach dieser Runde",
+  "1 member": "1 Mitglied",
+  "Every member is a whole agent of its own, so a swarm usually costs several times what one agent does and uses up your plan’s limits that much faster. A spending cap keeps it in hand. With a goal, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.": "Jedes Mitglied ist ein eigener vollständiger Agent. Ein Schwarm kostet deshalb meist ein Vielfaches von einem einzelnen Agenten und verbraucht die Limits deines Tarifs entsprechend schneller. Mit einem Ausgabenlimit behältst du die Kosten im Griff. Bei einem Ziel ist jede Runde die Arbeit des ganzen Schwarms: Die Mitglieder kümmern sich um das, was noch nicht stimmt, und die Runde kostet so viel, wie sie alle zusammen verbrauchen.",
+  "Every round is a whole turn of the agent, plus the checks it runs, so a goal can cost many times what one turn does. It stops at the limits you agree before it starts: rounds, money and time. With a swarm, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.": "Jede Runde ist ein ganzer Durchgang des Agenten plus die Prüfungen, die er ausführt. Ein Ziel kann deshalb ein Vielfaches von einem einzelnen Durchgang kosten. Es hält an den Limits an, die du vor dem Start festlegst: Runden, Geld und Zeit. Bei einem Schwarm ist jede Runde die Arbeit des ganzen Schwarms: Die Mitglieder kümmern sich um das, was noch nicht stimmt, und die Runde kostet so viel, wie sie alle zusammen verbrauchen.",
+  "waiting for 1 member": "wartet auf 1 Mitglied",
+  "waiting for 1 subagent": "wartet auf 1 Subagent",
+  "waiting for {0} members": "wartet auf {0} Mitglieder",
+  "waiting for {0} subagents": "wartet auf {0} Subagenten",
+  "{0} members": "{0} Mitglieder",
+  "· pausing after this round": "· Pause nach dieser Runde"
 }

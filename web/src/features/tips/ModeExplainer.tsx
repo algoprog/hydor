@@ -22,7 +22,7 @@ const TEXT: Record<CostlyMode, ModeText> = {
     does: 'A lead agent and several members work on the same problem at once, each from its own angle, and share what they find on a board. The lead checks their work and answers you.',
     good: 'Hard problems with no clear way in: a stubborn bug, a design with several possible answers, a question that gains from very different approaches.',
     not: 'Simple or routine tasks: a question, a quick fix, a short edit, a document. One agent does those as well, for a fraction of the cost.',
-    cost: 'Every member is a whole agent of its own, so a swarm usually costs several times what one agent does and uses up your plan’s limits that much faster. A spending cap keeps it in hand.',
+    cost: 'Every member is a whole agent of its own, so a swarm usually costs several times what one agent does and uses up your plan’s limits that much faster. A spending cap keeps it in hand. With a goal, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.',
   },
   campaign: {
     name: 'Campaign',
@@ -50,7 +50,7 @@ const TEXT: Record<CostlyMode, ModeText> = {
     does: 'The agent first works out, with you, what “done” means as a short list of checks the app can run itself: tests that pass, a number that reaches a target, a sentence a reviewer finds true. Then it works round after round, and after each one the app runs the checks, keeps the round when things got closer and undoes it when not. It stops when every check holds, or at a limit.',
     good: 'Work with a clear finish line that takes many tries: making tests pass, bringing a number down or up, a refactor that must keep everything working.',
     not: 'Open-ended work with no way to check it, or a quick change. One agent in one turn does those for much less.',
-    cost: 'Every round is a whole turn of the agent, plus the checks it runs, so a goal can cost many times what one turn does. It stops at the limits you agree before it starts: rounds, money and time.',
+    cost: 'Every round is a whole turn of the agent, plus the checks it runs, so a goal can cost many times what one turn does. It stops at the limits you agree before it starts: rounds, money and time. With a swarm, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.',
   },
 };
 

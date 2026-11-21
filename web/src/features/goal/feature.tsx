@@ -9,6 +9,7 @@ import { OptionRow, Popover, SettingChip } from '../../components/ui';
 import type { WebFeature } from '../registry';
 import { useCostlyMode } from '../tips/ModeExplainer';
 import { AsksControls } from './Asks';
+import { goalStartPatch } from './can';
 import { asksChip } from './words';
 
 /** The settings a start-page goal carries, from what extra holds. */
@@ -23,8 +24,8 @@ function GoalStartOption({ value, onChange, scheduled }: { value: SessionExtra; 
   // Goals on a schedule do not ship: a scheduled task's editor has no Goal option.
   const settings = settingsOf(value.goal);
   // start: the session's loop has not taken it yet; the server clears it once it has.
-  // Goal does not combine with a swarm, a campaign, deep research or the arena (they each clear it when turned on).
-  const turnOn = (s: GoalSettings) => onChange({ goal: { ...s, start: true }, swarm: undefined, research: undefined, arena: undefined });
+  // Goal goes with a swarm (the lead has it) but not with a campaign, deep research or the arena: turning it on clears those.
+  const turnOn = (s: GoalSettings) => onChange({ goal: { ...s, start: true }, ...goalStartPatch(value) });
   if (scheduled) return null;
   return (
     // Its words are the goal's own ("Goal" is a football word elsewhere): the chip and its popover are one part.

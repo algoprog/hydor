@@ -26817,5 +26817,14 @@
   "The files could not be saved before putting them back: try again in a moment": "Δεν ήταν δυνατή η αποθήκευση των αρχείων πριν από την επαναφορά τους: δοκιμάστε ξανά σε λίγο",
   "It pauses once this round has been checked": "Θα γίνει παύση μόλις ολοκληρωθεί ο έλεγχος αυτού του γύρου",
   "{0} · running the checks · pausing after this round": "{0} · εκτέλεση των ελέγχων · παύση μετά από αυτόν τον γύρο",
-  "{0} · working · pausing after this round": "{0} · σε εξέλιξη · παύση μετά από αυτόν τον γύρο"
+  "{0} · working · pausing after this round": "{0} · σε εξέλιξη · παύση μετά από αυτόν τον γύρο",
+  "1 member": "1 μέλος",
+  "Every member is a whole agent of its own, so a swarm usually costs several times what one agent does and uses up your plan’s limits that much faster. A spending cap keeps it in hand. With a goal, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.": "Κάθε μέλος είναι ένας ολόκληρος πράκτορας από μόνο του, επομένως ένα σμήνος συνήθως κοστίζει πολλαπλάσια από έναν πράκτορα και εξαντλεί τα όρια του πλάνου σας τόσο πιο γρήγορα. Ένα όριο δαπανών το κρατά υπό έλεγχο. Με έναν στόχο, κάθε γύρος είναι η δουλειά ολόκληρου του σμήνους: τα μέλη του καταπιάνονται με ό,τι δεν ισχύει ακόμη και ο γύρος κοστίζει όσα ξοδεύουν όλα μαζί.",
+  "Every round is a whole turn of the agent, plus the checks it runs, so a goal can cost many times what one turn does. It stops at the limits you agree before it starts: rounds, money and time. With a swarm, each round is the whole swarm’s work: its members go at what does not hold yet, and the round costs what they all spend.": "Κάθε γύρος είναι ένας ολόκληρος κύκλος εργασίας του πράκτορα, μαζί με τους ελέγχους που εκτελεί, επομένως ένας στόχος μπορεί να κοστίσει πολλαπλάσια από έναν κύκλο. Σταματά στα όρια που συμφωνείτε πριν ξεκινήσει: γύροι, χρήματα και χρόνος. Με ένα σμήνος, κάθε γύρος είναι η δουλειά ολόκληρου του σμήνους: τα μέλη του καταπιάνονται με ό,τι δεν ισχύει ακόμη και ο γύρος κοστίζει όσα ξοδεύουν όλα μαζί.",
+  "waiting for 1 member": "αναμονή για 1 μέλος",
+  "waiting for 1 subagent": "αναμονή για 1 υποπράκτορα",
+  "waiting for {0} members": "αναμονή για {0} μέλη",
+  "waiting for {0} subagents": "αναμονή για {0} υποπράκτορες",
+  "{0} members": "{0} μέλη",
+  "· pausing after this round": "· παύση μετά από αυτόν τον γύρο"
 }

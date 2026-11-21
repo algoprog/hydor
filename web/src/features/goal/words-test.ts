@@ -1,7 +1,7 @@
 // OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/goal/words-test.ts && node dist/dev/words-test.js
 import assert from 'node:assert/strict';
 import { holding, tally, type GoalState } from '../../../../shared/goals.ts';
-import { canSetGoal, leadsTeam } from './can.ts';
+import { canSetGoal, goalStartPatch, leadsTeam, swarmStartPatch } from './can.ts';
 import { samples, sampleOf, STATUSES } from './samples.ts';
 import {
   agreementHead,
@@ -27,6 +27,7 @@ import {
   num,
   outcomeLabel,
   pillValue,
+  membersText,
   pauseButton,
   pauseWait,
   PAUSE_WAIT,
@@ -47,6 +48,8 @@ import {
   startAnyway,
   startLabel,
   statusWords,
+  teamOf,
+  waitingWords,
   timeText,
   unmeasured,
   UNMEASURED_NOTE,
@@ -344,13 +347,65 @@ test('a check changed after the start shows a dash with its round, not a value a
   assert.equal(startCellText(speed, undefined), '');
 });
 
+test('a round that waits for the lead’s subagents says so: members in a swarm, subagents elsewhere', () => {
+  const w = g('working-swarm');
+  assert.equal(w.rounds.filter((r) => r.members).length, 6);
+  assert.equal(statusWords(w, { helpers: 2, swarm: true }), 'round 7 of 12 · waiting for 2 members');
+  assert.equal(statusWords(w, { helpers: 1, swarm: true }), 'round 7 of 12 · waiting for 1 member');
+  assert.equal(statusWords(w, { helpers: 2, swarm: false }), 'round 7 of 12 · waiting for 2 subagents');
+  assert.equal(statusWords(w, { helpers: 1, swarm: false }), 'round 7 of 12 · waiting for 1 subagent');
+  assert.equal(statusWords({ ...w, pausing: true }, { helpers: 2, swarm: true }), 'round 7 of 12 · waiting for 2 members · pausing after this round');
+  assert.equal(statusWords({ ...w, pausing: true }), 'round 7 of 12 · working · pausing after this round');
+  assert.equal(statusWords(w), 'round 7 of 12 · working');
+  // Only a round that runs waits for them: the checks, a pause and a question say what they said.
+  assert.equal(statusWords({ ...w, status: 'checking' }, { helpers: 2, swarm: true }), 'round 7 of 12 · running the checks');
+  assert.equal(statusWords({ ...w, status: 'asking' }, { helpers: 2, swarm: true }), 'round 7 of 12 · asking you');
+  assert.equal(waitingWords({ helpers: 3, swarm: true }), 'waiting for 3 members');
+});
+
+test('the team comes from the session: its subagents run and its own turn has ended', () => {
+  const lead = { helpers: 2, live: { status: 'idle' }, extra: { swarm: true } } as never;
+  assert.deepEqual(teamOf(lead), { helpers: 2, swarm: true });
+  assert.deepEqual(teamOf({ ...(lead as object), extra: undefined } as never), { helpers: 2, swarm: false });
+  assert.deepEqual(teamOf({ ...(lead as object), live: null } as never), { helpers: 2, swarm: true });
+  assert.equal(teamOf({ ...(lead as object), live: { status: 'working' } } as never), undefined);
+  assert.equal(teamOf({ ...(lead as object), live: { status: 'waiting' } } as never), undefined);
+  assert.equal(teamOf({ ...(lead as object), helpers: 0 } as never), undefined);
+  assert.equal(teamOf({ extra: { swarm: true } } as never), undefined);
+});
+
+test('a round that a swarm worked in says how many members', () => {
+  const w = g('working-swarm');
+  assert.equal(membersText(w.rounds.find((r) => r.n === 1)!), '3 members');
+  assert.equal(membersText({ members: 1 }), '1 member');
+  assert.equal(membersText({}), '');
+  assert.equal(membersText(w.rounds.find((r) => r.n === 0)!), '');
+  assert.equal(membersText(g('working').rounds.find((r) => r.n === 1)!), '');
+});
+
+test('the start page’s options: Goal goes with a swarm, not with a campaign, a research or the arena', () => {
+  // Goal on keeps a swarm and clears the rest.
+  assert.deepEqual(goalStartPatch({ swarm: true }), { research: undefined, arena: undefined });
+  assert.deepEqual(goalStartPatch({}), { research: undefined, arena: undefined });
+  assert.deepEqual(goalStartPatch({ swarm: 'campaign' }), { research: undefined, arena: undefined, swarm: undefined });
+  assert.ok('swarm' in goalStartPatch({ swarm: 'campaign' }) && !('swarm' in goalStartPatch({ swarm: true })));
+  // Swarm on keeps the goal (and clears a research); a campaign clears the goal; off changes only itself.
+  assert.deepEqual(swarmStartPatch(true), { swarm: true, research: undefined });
+  assert.ok(!('goal' in swarmStartPatch(true)));
+  assert.deepEqual(swarmStartPatch('campaign'), { swarm: 'campaign', research: undefined, goal: undefined });
+  assert.deepEqual(swarmStartPatch(undefined), { swarm: undefined });
+});
+
 test('Set a goal is not offered to a session that leads a team, or that cannot have one', () => {
   const s = { goal: undefined, external: undefined, subagentOf: undefined, extra: undefined };
   assert.equal(canSetGoal(s), true);
-  for (const extra of [{ swarm: true }, { swarm: 'campaign' }, { research: { searches: 20 } }, { arena: { with: [{ agent: 'codex' }] } }]) {
+  for (const extra of [{ swarm: 'campaign' }, { research: { searches: 20 } }, { arena: { with: [{ agent: 'codex' }] } }]) {
     assert.equal(leadsTeam(extra as never), true, JSON.stringify(extra));
     assert.equal(canSetGoal({ ...s, extra: extra as never }), false, JSON.stringify(extra));
   }
+  // A swarm's lead may have a goal: a round is the whole swarm's work.
+  assert.equal(leadsTeam({ swarm: true } as never), false);
+  assert.equal(canSetGoal({ ...s, extra: { swarm: true } as never }), true);
   assert.equal(leadsTeam({ memory: false } as never), false);
   assert.equal(canSetGoal({ ...s, extra: { parent: 'claude:lead' } }), false);
   assert.equal(canSetGoal({ ...s, external: 'open' as never }), false);

@@ -2,6 +2,7 @@
 // its buttons, durations and money. Pure, so a test can read them (words-test.ts); the screens only draw them. Words are the
 // ones of the specification's section 2: Goal, Done when, check, holds, round, way, Kept, Undone, Best so far, Its pick, From you.
 import { holding, standing, type GoalAsks, type GoalLimits, type GoalCheck, type GoalResult, type GoalRound, type GoalSettings, type GoalState, type GoalStatus } from '@shared/goals';
+import type { SessionSummary } from '@shared/types';
 import { duration, usd } from '../../lib/format';
 
 export const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -50,8 +51,31 @@ export const KIND_LABEL: Record<GoalCheck['kind'], string> = { command: 'Command
 /** The round a goal is at: the one in progress, else the next. */
 export const roundNo = (g: Pick<GoalState, 'round' | 'rounds'>): number => g.round ?? Math.max(0, ...g.rounds.map((r) => r.n)) + 1;
 
-/** The muted words after "Goal" on the bar: "round 7 of 12 · working", "asking you", "paused". */
-export function statusWords(g: GoalState): string {
+/** A session's team at work while its own turn has ended: how many of its subagents run, and whether it leads a swarm (they are its members then). */
+export interface Team {
+  helpers: number;
+  swarm: boolean;
+}
+
+/**
+ * The team a round waits for: the session's own turn has ended (it is not working) but its subagents are, which is not a round
+ * that is done. Nothing when none runs, or the session itself is at work. It comes from the session, not the goal.
+ */
+export function teamOf(s: Pick<SessionSummary, 'helpers' | 'live' | 'extra'>): Team | undefined {
+  const helpers = s.helpers ?? 0;
+  const own = s.live?.status;
+  if (helpers < 1 || own === 'working' || own === 'waiting') return undefined;
+  return { helpers, swarm: s.extra?.swarm === true };
+}
+
+/** "waiting for 2 members" (a swarm's lead) or "waiting for 2 subagents", one in the singular. */
+export function waitingWords(t: Team): string {
+  if (t.swarm) return t.helpers === 1 ? 'waiting for 1 member' : `waiting for ${t.helpers} members`;
+  return t.helpers === 1 ? 'waiting for 1 subagent' : `waiting for ${t.helpers} subagents`;
+}
+
+/** The muted words after "Goal" on the bar: "round 7 of 12 · working", "asking you", "paused"; `team` where its subagents are at work. */
+export function statusWords(g: GoalState, team?: Team): string {
   const at = `round ${roundNo(g)} of ${g.contract.limits.rounds}`;
   switch (g.status) {
     case 'drafting':
@@ -62,6 +86,8 @@ export function statusWords(g: GoalState): string {
       return 'measuring where things stand';
     // Pause was pressed while the round ran: it is finished and checked first.
     case 'working':
+      // The lead's own turn has ended and its subagents (a swarm's members) are still at work: the round is not over.
+      if (team) return `${at} · ${waitingWords(team)}${g.pausing ? ' · pausing after this round' : ''}`;
       return g.pausing ? `${at} · working · pausing after this round` : `${at} · working`;
     case 'checking':
       return g.pausing ? `${at} · running the checks · pausing after this round` : `${at} · running the checks`;
@@ -276,6 +302,9 @@ export function outcomeLabel(r: GoalRound): string {
       return '';
   }
 }
+
+/** "3 members", "1 member": how many of a swarm's members worked in a round; nothing when none did. */
+export const membersText = (r: Pick<GoalRound, 'members'>): string => (r.members ? (r.members === 1 ? '1 member' : `${r.members} members`) : '');
 
 /** "$0.52 · 8 min": what a round cost and how long it took. */
 export const roundCost = (r: GoalRound): string => `${usd(r.usd)} · ${spanText(Math.max(0, r.endedAt - r.startedAt))}`;
