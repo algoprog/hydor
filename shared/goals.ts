@@ -108,6 +108,12 @@ export interface GoalRound {
   outcome: GoalOutcome;
   /** Why, in a sentence: "Speed fell far behind its best (365 → 910 ms)". */
   why?: string;
+  /**
+   * What kept it from being kept, for the screens to mark it without reading the sentence: a path it may not change changed
+   * (protected), a rule of the person's was broken (rule), a check that held stopped holding (broke), a number fell behind its
+   * best (behind), or nothing got closer (none).
+   */
+  cause?: 'protected' | 'rule' | 'broke' | 'behind' | 'none';
   /** The person overruled the outcome (Keep anyway, Undo), with their reason. */
   by?: 'you';
   reason?: string;
