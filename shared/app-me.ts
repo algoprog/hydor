@@ -243,17 +243,18 @@ function list(v: unknown): string[] {
 function cleanOne(id: MeId, v: unknown): AboutMe[MeId] | undefined {
   switch (id) {
     case 'country': {
-      const cc = text(v, 2).toUpperCase();
-      return currencyOfCountry(cc) || cc === 'AQ' ? cc : undefined;
+      // Two letters exactly: "Germany" cut short would be Georgia.
+      const cc = text(v, 10).toUpperCase();
+      return /^[A-Z]{2}$/.test(cc) && (currencyOfCountry(cc) || cc === 'AQ') ? cc : undefined;
     }
     case 'language':
-      return cleanLang(v);
+      return langOf(v);
     case 'units': {
       const u = text(v, 20).toLowerCase();
       return u === 'metric' || u === 'imperial' ? u : undefined;
     }
     case 'currency': {
-      const c = text(v, 3).toUpperCase();
+      const c = text(v, 10).toUpperCase();
       return /^[A-Z]{3}$/.test(c) ? c : undefined;
     }
     case 'household': {
