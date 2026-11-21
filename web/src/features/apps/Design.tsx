@@ -13,7 +13,9 @@ import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { Button, cx, Segmented, useConfirm } from '../../components/ui';
 import { AppView } from './View';
-import { mediaKind } from '@shared/app-media';
+import { sampleResult } from './sample';
+
+export { sampleResult } from './sample';
 
 /** A short number for a text, to draw the preview again whenever the view changes (the frame takes it once). */
 const hashOf = (t: string) => {
@@ -21,48 +23,6 @@ const hashOf = (t: string) => {
   for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
 };
-
-const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-/**
- * A made-up answer in the shape of its answer fields, to see a view with before it has run: its own files stand in
- * for pictures and videos, and columns named for a latitude and longitude get places near one another.
- */
-export function sampleResult(answer: AnswerField[], assets: AppRecipe['assets'] = {}): Record<string, unknown> {
-  const day = (n: number) => isoDay(new Date(Date.now() + n * 86_400_000));
-  const files = Object.entries(assets);
-  const pics = files.filter(([n, a]) => mediaKind(n, a.mime) === 'image').map(([n]) => `asset:${n}`);
-  const cell = (type: string, label: string, n: number, id = ''): unknown =>
-    type === 'number' && /^(lat|latitude)$/i.test(id)
-      ? Math.round((38.712 - n * 0.006) * 1e4) / 1e4
-      : type === 'number' && /^(lng|lon|long|longitude)$/i.test(id)
-        ? Math.round((-9.14 - n * 0.018) * 1e4) / 1e4
-        : type === 'number'
-          ? 10 * n
-          : type === 'yesno'
-            ? n % 2 === 1
-            : type === 'date'
-              ? day(n)
-              : type === 'url'
-                ? `https://example.com/${n}`
-                : type === 'image'
-                  ? (pics[(n - 1) % Math.max(1, pics.length)] ?? '')
-                  : `${label} ${n}`;
-  return Object.fromEntries(
-    answer.map((f) => [
-      f.id,
-      f.type === 'table'
-        ? [1, 2, 3].map((n) => Object.fromEntries((f.columns ?? []).map((c) => [c.id, cell(c.type, c.label, n, c.id)])))
-        : f.type === 'list'
-          ? [1, 2, 3].map((n) => `${f.label} ${n}`)
-          : f.type === 'markdown'
-            ? `**${f.label}**: a few sentences of it, as a run would give them.\n\n- One point\n- Another point`
-            : f.type === 'media'
-              ? files.slice(0, 4).map(([n, a]) => ({ src: `asset:${n}`, caption: a.caption ?? n, kind: mediaKind(n, a.mime) }))
-              : cell(f.type, f.label, 1, f.id),
-    ]),
-  );
-}
 
 export function DesignEditor({ recipe, appId, template, session, onChange }: { recipe: AppRecipe; appId: string | null; template?: string; session?: string; onChange: (p: Partial<AppRecipe>) => void }) {
   const ui = recipe.ui;

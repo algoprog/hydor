@@ -120,8 +120,9 @@ export function CardView({ name, data, info }: { name: string; data: Data; info:
 /**
  * The block, drawn: `name` is the word after ```ui (the UI's name), `code` the JSON so far, `done` whether it is whole.
  * Outside a reply (a board), `session` and `board` say where it is drawn: what a card that reads a source may read.
+ * `noPin`: no Pin to a board (an app's public page, whose visitor has no boards).
  */
-export function AnswerBlock({ name, code, done, demo, session, board }: { name: string; code: string; done: boolean; demo?: boolean; session?: string; board?: string }) {
+export function AnswerBlock({ name, code, done, demo, session, board, noPin }: { name: string; code: string; done: boolean; demo?: boolean; session?: string; board?: string; noPin?: boolean }) {
   const md = useContext(MdCtx);
   const parsed = useMemo(() => readUi(code, done), [code, done]);
   const asked = (name || (typeof parsed.value.ui === 'string' ? parsed.value.ui : '')).trim();
@@ -150,7 +151,7 @@ export function AnswerBlock({ name, code, done, demo, session, board }: { name: 
   // shared link (nothing is kept there), nor from a confidential session (what it says stays in it), nor for a UI the app
   // does not know.
   const pin = useMemo<PinCard | undefined>(() => {
-    if (!done || !spec || viaLink || md.offline) return undefined;
+    if (!done || !spec || viaLink || md.offline || noPin) return undefined;
     let data: Data = parsed.value;
     try {
       const v = JSON.parse(code);
@@ -158,7 +159,7 @@ export function AnswerBlock({ name, code, done, demo, session, board }: { name: 
     } catch {}
     const from = md.pinFrom ?? (md.sessionKey ? { session: md.sessionKey, ...(md.cwd ? { cwd: md.cwd } : {}) } : undefined);
     return { ui: spec.id, data, title: str(data.title) || spec.title, from };
-  }, [done, spec, code, parsed.value, md.pinFrom, md.sessionKey, md.cwd, md.offline]);
+  }, [done, spec, code, parsed.value, md.pinFrom, md.sessionKey, md.cwd, md.offline, noPin]);
   if (done && parsed.bad)
     return (
       <div className="my-3">
