@@ -388,6 +388,13 @@ export interface LiveState {
   /** Where the context in use goes, in tokens by part (Custom says so): estimated from the text, scaled to the model's own count. */
   contextParts?: Partial<Record<ContextPart, number>>;
   backgroundTasks?: BackgroundTask[];
+  /**
+   * How many commands the agent started are still running (Codex: its command items started and not completed). Codex
+   * keeps a command of a turn that was interrupted running until it ends by itself, so this can stay above zero after the
+   * turn; the goal loop waits on it (server/goals). Not set for Claude Code and Custom, which stop their own foreground
+   * commands when a turn is interrupted (their background ones are background tasks).
+   */
+  openCommands?: number;
   /** Background tasks that ended in this run of the session (done, failed or stopped), newest first, a few: the work tray lists them under the running ones. */
   endedTasks?: BackgroundTask[];
   /** Output decode speed of the last reply, tokens/sec (Claude: measured from the stream; Codex: per turn). */

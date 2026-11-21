@@ -372,6 +372,13 @@ export class CodexLive extends LiveAdapter {
   private lastTurnOut = 0;
   /** Lines re-read after a restart: they report no model calls again. */
   private replaying = false;
+  /**
+   * Its command items started and not completed yet (the person's own shell commands aside). Codex runs commands as
+   * sessions of their own that an interrupted turn does not stop ("Any running unified exec processes may still be
+   * running"): their items complete when they end, after the turn (seen 2026-11-21: a sleep 80 ended 22 s after its turn
+   * was interrupted). Nothing in its protocol stops one of the agent's commands, so they are counted, not stopped.
+   */
+  private commands = new Set<string>();
   /** The thread's running token totals as last reported, and how many calls this process saw. */
   private usageTotal: Json | null = null;
   private calls = 0;
@@ -555,6 +562,15 @@ export class CodexLive extends LiveAdapter {
     }
   }
 
+  /** A command item of this thread started or completed: how many are still running (state.openCommands). */
+  private onCommandItem(it: Json, started: boolean) {
+    if (typeOf(it) !== 'commandexecution' || it.id == null || String(it.source ?? '') === 'userShell') return;
+    const id = String(it.id);
+    if (started && it.status !== 'completed' && it.status !== 'failed' && it.status !== 'declined') this.commands.add(id);
+    else this.commands.delete(id);
+    this.state.openCommands = this.commands.size || undefined;
+  }
+
   /** A subagent's task: made when first heard of, its name and call filled in as they are told. */
   private agentTask(id: string, o: { status?: string; path?: string; callId?: string; description?: string }) {
     const last = (o.path ?? '').split('/').filter(Boolean).pop();
@@ -652,6 +668,7 @@ export class CodexLive extends LiveAdapter {
       case 'item/started':
       case 'item/completed': {
         this.onAgentItem(p.item ?? {}, method === 'item/started');
+        this.onCommandItem(p.item ?? {}, method === 'item/started');
         const it = liveItem(p.item ?? {}, method === 'item/started' ? now : this.overlayItems.get(String(p.item?.id))?.ts ?? now);
         if (!it) break;
         const prev = this.overlayItems.get(it.id);
@@ -996,5 +1013,8 @@ export class CodexLive extends LiveAdapter {
 
   protected onExited() {
     this.rpc.failAll('session ended');
+    // Its commands ended with it.
+    this.commands.clear();
+    this.state.openCommands = undefined;
   }
 }

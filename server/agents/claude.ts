@@ -874,6 +874,11 @@ export class ClaudeLive extends LiveAdapter {
     this.changed();
   }
 
+  /**
+   * Claude Code stops the turn's foreground command itself (its Bash tool's command ends with the turn); a command it was
+   * told to run in the background goes on, and shows among its background tasks. Read from its behaviour, not verified
+   * with an account. So no count of open commands here (LiveState.openCommands is Codex's).
+   */
   async interrupt(): Promise<void> {
     await this.control({ subtype: 'interrupt' }, 15_000).catch(() => {});
   }

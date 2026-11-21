@@ -42,7 +42,9 @@
 // measured again. And swarm rounds: a swarm's lead may have a goal (a campaign, a research, an arena may not); its round is
 // over once its members are quiet, their reports in (also while one is written) and its board delivered, once; its round
 // message names its members; a round records how many worked; an undone round takes their changes; a limit stops them;
-// Stop all pauses the goal; a member's goal tools say whose goal it is.
+// Stop all pauses the goal; a member's goal tools say whose goal it is. And limits already used refused where they are
+// set; a subagent's report still being written holding any goal's round; and the commands a turn leaves running (Codex
+// keeps an interrupted turn's): waited for at a limit, at most two minutes, and at a round's end within the background grace.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/driver-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-driver PRICES_URL= node dist/dev/driver-test.js
@@ -143,6 +145,8 @@ interface Fake {
   turnStartedAt?: number;
   /** Codex: its sandbox policy lets its commands use the network (SessionManager.codexNetwork). */
   network?: boolean;
+  /** Codex: commands its agent started that still run (LiveState.openCommands). */
+  commands?: number;
 }
 
 class Sessions extends EventEmitter {
@@ -176,7 +180,7 @@ class Sessions extends EventEmitter {
       cwd: f.cwd,
       worktree: f.worktree,
       stats: {} as SessionSummary['stats'],
-      live: f.live ? { status: f.live, startedAt: 1, pendingApprovals: 0, ...(f.mode ? { mode: f.mode } : {}), ...(f.tasks ? { backgroundTasks: f.tasks } : {}), ...(f.turnStartedAt ? { turnStartedAt: f.turnStartedAt } : {}) } : null,
+      live: f.live ? { status: f.live, startedAt: 1, pendingApprovals: 0, ...(f.mode ? { mode: f.mode } : {}), ...(f.tasks ? { backgroundTasks: f.tasks } : {}), ...(f.turnStartedAt ? { turnStartedAt: f.turnStartedAt } : {}), ...(f.commands ? { openCommands: f.commands } : {}) } : null,
       external: f.external ? { status: 'idle', client: 'VS Code', pid: 1 } : null,
       queue: f.queue.map((text, i) => ({ id: `q${i}`, text, at: 1 })),
       ...(f.queueHeld ? { queueHeld: true } : {}),
@@ -4308,6 +4312,106 @@ test('L3: in a session without a swarm, a Hydor subagent’s report still on its
   assert.equal(goal(P).rounds[1].outcome, 'kept');
   assert.equal(goal(P).rounds[1].members, undefined, 'members are a swarm’s');
   await act(P, { action: 'stop' });
+});
+
+// ---- L2: commands a stopped round leaves running -----------------------------------------------------------------------
+
+test('L2: at a limit, the half round’s checkpoint waits until the commands the agent’s turn started have ended (Codex runs them on after an interrupt); one still running at the bound is said in the round and the report', async () => {
+  const C = 'codex:goal-l2-limit';
+  const w = worktree();
+  sessions.add(C, { agent: 'codex', cwd: w.path, worktree: w });
+  await agreed(C, { limits: { rounds: 8, usd: 1 }, settings: { asks: 'own' } });
+  const f = sessions.all.get(C)!;
+  // Its turn runs a command that ends 80 ms after the turn is interrupted, writing as it ends.
+  f.live = 'working';
+  f.commands = 1;
+  write(w.path, 'half.txt', 'half done\n');
+  const interrupt = sessions.interrupt.bind(sessions);
+  sessions.interrupt = async (k: string) => {
+    await interrupt(k);
+    if (k === C)
+      setTimeout(() => {
+        write(w.path, 'late.txt', 'written as it ended\n');
+        f.commands = 0;
+      }, 80);
+  };
+  setLimitWaitStep(5);
+  spend(C, 2.5);
+  try {
+    await tick(deps);
+  } finally {
+    sessions.interrupt = interrupt;
+  }
+  let g = goal(C);
+  assert.equal(g.status, 'limit');
+  let half = g.rounds.at(-1)!;
+  assert.equal(half.why, 'Stopped at the limit midway', 'it ended within the bound: nothing to say');
+  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'late.txt'), 'written as it ended\n', 'the checkpoint waited for it');
+  assert.doesNotMatch(g.report!.summary, /still running/);
+  await act(C, { action: 'stop' });
+  // A command that does not end (a dev server, say): the checkpoint is taken at the bound, and the round and report say so.
+  const C2 = 'codex:goal-l2-bound';
+  const w2 = worktree();
+  sessions.add(C2, { agent: 'codex', cwd: w2.path, worktree: w2 });
+  await agreed(C2, { limits: { rounds: 8, usd: 1 }, settings: { asks: 'own' } });
+  const f2 = sessions.all.get(C2)!;
+  f2.live = 'working';
+  f2.commands = 1;
+  write(w2.path, 'half2.txt', 'the half round’s work\n');
+  spend(C2, 2.5);
+  try {
+    await tick(deps);
+  } finally {
+    setLimitWaitStep(null);
+  }
+  g = goal(C2);
+  half = g.rounds.at(-1)!;
+  assert.equal(half.why, 'Stopped at the limit midway; a command the agent started was still running');
+  assert.ok(half.checkpoint, 'taken all the same');
+  assert.match(g.report!.summary, /A command the agent started was still running when round 1’s files were saved: what it writes after that is in the folder but not in the round\.$/);
+  // Still the half round a restart may leave without its checkpoint (J2): the say takes it first, as for any half round.
+  f2.commands = 0;
+  remember(C2, (x) => {
+    delete x.rounds.find((r) => r.n === 1)!.checkpoint;
+    x._.filesAt = x.rounds[0].checkpoint;
+  });
+  await act(C2, { action: 'round', n: 0, do: 'keep' });
+  assert.equal(file(w2.path, 'half2.txt'), null, 'put back to the start');
+  assert.equal(inCheckpoint(w2.path, goal(C2).rounds.find((r) => r.n === 1)!.checkpoint!, 'half2.txt'), 'the half round’s work\n');
+  db.prepare('delete from sessions where key in (?, ?)').run(C, C2);
+  await act(C2, { action: 'stop' });
+});
+
+test('L2: a round’s turn that ended while a command it started still runs is not checked yet; once the command ends it is, and after the background grace it is checked anyway', async () => {
+  const O = 'codex:goal-l2-open';
+  const w = worktree();
+  sessions.add(O, { agent: 'codex', cwd: w.path, worktree: w });
+  await agreed(O, { settings: { asks: 'own' } });
+  const f = sessions.all.get(O)!;
+  // (A turn ends after its message went out, not in the same millisecond: the tick's look counts ends after it.)
+  await sleep(5);
+  await turn(O, () => {
+    write(w.path, 'score.txt', '5\n');
+    f.commands = 1;
+  });
+  assert.deepEqual([goal(O).status, goal(O).rounds.length], ['working', 1], 'not checked while its command runs');
+  await tick(deps);
+  assert.equal(goal(O).rounds.length, 1);
+  f.commands = 0;
+  await tick(deps);
+  assert.equal(goal(O).rounds[1].outcome, 'kept');
+  // Round 2: its command never ends (a server left running): checked once the background grace is over.
+  await sleep(5);
+  await turn(O, () => {
+    write(w.path, 'score.txt', '6\n');
+    f.commands = 1;
+  });
+  assert.equal(goal(O).rounds.length, 2);
+  f.endedAt = Date.now() - BACKGROUND_GRACE_MS - 1000;
+  await tick(deps);
+  assert.equal(goal(O).rounds[2].outcome, 'kept');
+  f.commands = 0;
+  await act(O, { action: 'stop' });
 });
 
 // Last: the tick it starts looks at every goal.

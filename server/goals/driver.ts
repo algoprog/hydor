@@ -41,6 +41,10 @@ const PAUSED = 'The user paused the goal: stop now and end your turn.';
 export const TICK_MS = 15_000;
 /** How often the limit's wait for the agent (and a swarm's members) to stop looks again, 60 looks at most; tests wait less (null puts it back). */
 let limitWaitStep = 500;
+/** How many looks the limit's wait gives the agent (and a swarm's members) to stop: 30 s at 500 ms. */
+const LIMIT_LOOKS = 60;
+/** And the commands its turn left running (L2): two minutes at 500 ms. */
+const LIMIT_LOOKS_COMMANDS = 240;
 export const setLimitWaitStep = (ms: number | null) => (limitWaitStep = ms ?? 500);
 /** At most this many notes of what was tried and dropped. */
 const MAX_DROPPED = 30;
@@ -285,15 +289,19 @@ export function idle(d: Deps, key: string, now = Date.now(), o: { heldQueue?: bo
 
 /**
  * A session's live work: its turn, a message on its way to its agent (taken off the queue, or sent: its status says
- * working only seconds later), its subagents, or background commands within BACKGROUND_GRACE_MS of its last turn. Not
- * what waits in its queue.
+ * working only seconds later), its subagents, or background commands within BACKGROUND_GRACE_MS of its last turn, and
+ * as those, commands its turn started that still run after it (Codex: openCommands; a dev server left running is waited
+ * for no longer than a background task). Not what waits in its queue.
  */
 function atWork(d: Deps, s: SessionSummary, now = Date.now()): boolean {
   if (liveBusy(s) || d.sessions.delivering?.(s.key)) return true;
   const left = stillAtWork(s);
   if (left.subagents) return true;
-  return !!left.background && now - (s.endedAt ?? now) < BACKGROUND_GRACE_MS;
+  return (!!left.background || !!s.live?.openCommands) && now - (s.endedAt ?? now) < BACKGROUND_GRACE_MS;
 }
+
+/** L2: how many commands the session's agent started still run (Codex keeps an interrupted turn's commands running). */
+const openCommands = (d: Deps, key: string) => d.sessions.summary(key)?.live?.openCommands ?? 0;
 
 /** Whether a check runs a command: a command or a measured number, or a review that reads a command's output. */
 export const runsCommand = (c: GoalCheck): boolean => c.kind === 'command' || c.kind === 'measure' || (c.kind === 'review' && !!c.evidence?.run?.trim());
@@ -978,15 +986,20 @@ const HALF = 'Stopped at the limit midway';
 function halfWithout(g: StoredGoal): number | undefined {
   if (g.status !== 'limit') return undefined;
   const r = g.rounds.reduce<GoalRound | undefined>((a, x) => (!a || x.n > a.n ? x : a), undefined);
-  return r && r.n > 0 && r.why === HALF && !r.results.length && !r.checkpoint ? r.n : undefined;
+  return r && r.n > 0 && !!r.why?.startsWith(HALF) && !r.results.length && !r.checkpoint ? r.n : undefined;
 }
 
 /** The checkpoint of a round a limit stopped midway, taken once its agent was told to stop: Keep anyway on it brings its work back. */
-async function halfRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, n: number, o: { memberAtWork?: boolean } = {}) {
+async function halfRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, n: number, o: { memberAtWork?: boolean; commandRunning?: boolean } = {}) {
   const f = fresh(d, g);
   // S4.2: a swarm's member still at work after the wait: the report says so (what it writes after is not the round's).
-  if (o.memberAtWork && f?.report) {
-    f.report = { ...f.report, summary: `${f.report.summary} ${MEMBER_LATE(n)}` };
+  // L2: a command the agent started still running then: the round and the report say so, so nobody takes the folder for final.
+  if (f && (o.memberAtWork || o.commandRunning)) {
+    if (o.commandRunning) {
+      const r = f.rounds.find((y) => y.n === n);
+      if (r?.why === HALF) r.why = HALF_RUNNING;
+    }
+    if (f.report) f.report = { ...f.report, summary: [f.report.summary, o.memberAtWork ? MEMBER_LATE(n) : '', o.commandRunning ? COMMAND_LATE(n) : ''].filter(Boolean).join(' ') };
     commit(d, f);
   }
   const w = f?.undo ? place(d, f.key, f)?.w : undefined;
@@ -1000,6 +1013,11 @@ async function halfRound(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, n: number, 
     x._.leftAt = Date.now();
   });
 }
+
+/** L2: why a half round stays, when a command the agent started was still running as its files were saved. */
+const HALF_RUNNING = 'Stopped at the limit midway; a command the agent started was still running';
+/** L2: and the limit report's sentence for it. */
+const COMMAND_LATE = (n: number) => `A command the agent started was still running when round ${n}’s files were saved: what it writes after that is in the folder but not in the round.`;
 
 /** The limit report's sentence when a swarm's member was still at work as a half round's files were saved. */
 const MEMBER_LATE = (n: number) => `A member of the swarm was still at work when round ${n}’s files were saved: what it wrote after that is in the folder but not in the round.`;
@@ -2453,10 +2471,13 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
           for (const k of crew) await stopMember(d, k).catch(() => {});
           // The round stopped midway stays as the team left it: its checkpoint once the agent (and its members) stopped, a
           // while at most; a member still at work then is said in the report.
+          // L2: and once the commands its turn started have ended too (Codex runs them on after an interrupt, and nothing
+          // can stop them from here): at most two minutes for those; still running then, the round and the report say so.
           if (mid != null) {
             const teamBusy = () => liveBusyKey(d, key) || crew.some((k) => liveBusyKey(d, k));
-            for (let i = 0; i < 60 && teamBusy(); i++) await new Promise((r) => setTimeout(r, limitWaitStep));
-            await halfRound(d, f, mid, { memberAtWork: crew.some((k) => liveBusyKey(d, k)) });
+            const open = () => openCommands(d, key) > 0;
+            for (let i = 0; i < LIMIT_LOOKS_COMMANDS && (open() || (i < LIMIT_LOOKS && teamBusy())); i++) await new Promise((r) => setTimeout(r, limitWaitStep));
+            await halfRound(d, f, mid, { memberAtWork: crew.some((k) => liveBusyKey(d, k)), commandRunning: open() });
           }
         }),
       );
