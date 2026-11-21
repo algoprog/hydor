@@ -270,6 +270,14 @@
 - [**セッションごとの同時作業数**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：1つのセッションが同時に実行するHydorサブエージェントの数。
 - [**スウォームの規模**](/settings?s=children&find=Swarm%20size)：スウォームやキャンペーンのエージェントが同時に作業する数。
 
+### 目標
+
+[設定 → 目標](/settings?s=goals)：新しいゴールの初期値：ラウンド数、確認する頻度、エージェント自身の選択で進めるタイミング。詳しくは[セッション](/guide/sessions)。
+
+- [**ゴールを実行できるラウンド数**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run)：新しいゴールに割り当てるラウンド数です。上限に達すると停止します。エージェントがこれより少ない数を提案した場合や、合意時に変更した場合は、そちらが優先されます。
+- [**ゴールが確認する頻度**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you)：新しいゴールを、自律的に進めるか、分岐点で確認するか、毎ラウンド確認するかを選びます。
+- [**自動で進めるまでの時間**](/settings?s=goals&find=Goes%20on%20with%20its%20own%20pick%20after)：新しいゴールが質問への回答を待つ時間です。この時間を過ぎると、エージェント自身の選択で進めます。0の場合は回答を待ち続けます。
+
 ### 画像、動画、音声
 
 [設定 → 画像、動画、音声](/settings?s=images)：エージェントがOpenRouter経由で作る画像、動画、音楽、音声と、そのキャプションを書く担当。詳しくは[ドキュメント、画像、動画、音声](/guide/documents-voice)。
@@ -312,11 +320,10 @@
 
 ### Custom
 
-[設定 → Custom](/settings?s=custom)：自動モード、コマンド用サンドボックス、ゴールの実行時間。詳しくは[Custom、アプリ独自のエージェント](/guide/custom)。
+[設定 → Custom](/settings?s=custom)：自動モードとコマンド用サンドボックス。詳しくは[Custom、アプリ独自のエージェント](/guide/custom)。
 
 - [**自動モード**](/settings?s=custom&find=Auto%20mode)：Customは安全な手順を自動で承認します。
 - [**コマンド用サンドボックス**](/settings?s=custom&find=Sandbox%20for%20commands)：自動モードのコマンドはサンドボックス内で実行されます。フルアクセスではサンドボックスなしで実行されます。
-- [**ゴールが一時停止するまでのラウンド数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：新しいゴールが上限に達して止まるまでに実行できるラウンド数（全エージェント共通）。
 
 ## エージェントに質問
 

@@ -54,6 +54,7 @@ export const SECTION_TOPIC: Record<string, string> = {
   computer: 'web',
   memory: 'memory',
   children: 'research',
+  goals: 'sessions',
   images: 'documents-voice',
   voice: 'documents-voice',
   assistants: 'agents',
@@ -86,11 +87,12 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['computer', 'Computer use', 'Capabilities', 'Agents see your screen and use the mouse and keyboard, in the desktop app'],
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
   ['children', 'Subagents', 'Capabilities', 'Agents handing parts of a job to subagents, and swarms for hard problems'],
+  ['goals', 'Goals', 'Capabilities', 'What a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick'],
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
   ['apps', 'Apps', 'Capabilities', 'What apps know about you, and which run without asking'],
-  ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
+  ['custom', 'Custom', 'Capabilities', 'Auto mode and a sandbox for commands'],
 ];
 
 /**
@@ -264,6 +266,10 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Subagents
   ['children', 'Working at once, per session', 'child sessions helper sessions parallel subagents concurrency limit', 'How many Hydor subagents one session runs at once'],
   ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof campaign migration', 'How many agents of a swarm or campaign work at once'],
+  // Capabilities › Goals
+  ['goals', 'Rounds a goal may run', 'goals rounds limit autonomous long running how many rounds default', 'How many rounds a new goal gets before it stops at its limit, unless the agent proposes fewer or you change it when you agree'],
+  ['goals', 'How much a goal asks you', 'goals asks questions turning points own every round default autonomy', 'Whether a new goal works on its own, asks at turning points or asks every round'],
+  ['goals', 'Goes on with its own pick after', 'goals minutes wait answer timeout no answer pick default waits for you', 'How long a new goal waits for your answer to a question before it goes on with its own pick; 0 waits for you'],
   // Capabilities › Images, video and audio
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
   ['images', 'For most pictures (Best)', 'image model best quality seedream flux gemini gpt openrouter scenes photos words in a picture diagrams change a picture', 'The model that makes most pictures, and every change to one', 'Image model for most pictures (Best)'],
@@ -292,7 +298,6 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap seatbelt macos windows low integrity security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
-  ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a new goal of any agent gets before it stops at its limit'],
 ];
 
 /** The themes that come with the app: name, and whether it is dark or light. */

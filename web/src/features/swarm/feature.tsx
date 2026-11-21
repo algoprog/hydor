@@ -16,6 +16,7 @@ import { activityOf, isWorking } from '../../lib/activity';
 import { enc, patch } from '../../lib/api';
 import { go, openSession } from '../../lib/nav';
 import { toast, toastError, useSessions } from '../../lib/store';
+import { swarmStartPatch } from '../goal/can';
 import type { WebFeature } from '../registry';
 import { useCostlyMode } from '../tips/ModeExplainer';
 import { BoardDialog, useMembers } from './Board';
@@ -195,9 +196,8 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const size = useChildSettingsState()?.swarmSize;
   const mode = swarmMode(value);
   const set = (swarm: true | 'campaign' | undefined) => {
-    // A swarm and a deep research both lead child sessions: one or the other.
-    // A goal and a swarm do not combine in this version: one or the other.
-    onChange(swarm ? { swarm, research: undefined, goal: undefined } : { swarm });
+    // A swarm and a deep research both lead child sessions: one or the other. A goal goes with a swarm, not with a campaign.
+    onChange(swarmStartPatch(swarm));
     setOpen(false);
   };
   const atOnce = size ? ` · ${size} at once` : '';

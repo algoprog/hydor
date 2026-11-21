@@ -7,7 +7,7 @@ import { tally, type GoalCheck, type GoalRound, type GoalState } from '@shared/g
 import { Badge, Button, cx, inputCls } from '../../components/ui';
 import { say } from './Say';
 import { useAct } from './state';
-import { before, busy, changeText, outcomeLabel, pauseWait, resultText, roundBroke, roundCost, roundName, shortLabel, sinceTitle, startResultText, valueText } from './words';
+import { before, busy, changeText, outcomeLabel, membersText, pauseWait, resultText, roundBroke, roundCost, roundName, shortLabel, sinceTitle, startResultText, valueText } from './words';
 
 const ROWS_SHOWN = 8;
 
@@ -200,6 +200,7 @@ function Row({ g, r, open, toggle }: { g: GoalState; r: GoalRound; open: boolean
           </span>
         )}
         {outcomeLabel(r) && <Chip g={g} r={r} />}
+        {membersText(r) && <span className="shrink-0 text-[11.5px] text-fg-3 tnum max-md:hidden">{membersText(r)}</span>}
         <span className="w-[84px] shrink-0 text-right text-[11.5px] text-fg-3 tnum max-md:hidden">
           {roundCost(r)}
         </span>

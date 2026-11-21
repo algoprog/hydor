@@ -139,11 +139,11 @@ Was jetzt für jeden Agenten gleich ist: die Vereinbarungskarte, die Prüfungen,
 
 - Eine **Prüfer**-Prüfung und die Abschlussprüfung beurteilt ein Modell, das an der Arbeit nicht beteiligt war. In einer [vertraulichen Sitzung](/guide/sessions#keep-a-session-confidential) ist das ein Modell auf diesem Computer; ohne ein solches kann die Prüfung nicht laufen.
 - Prüfbefehle laufen so wie die eigenen Befehle von Custom: im Modus „Automatisch“ bei eingeschalteter **Sandbox für Befehle** innerhalb der Sandbox, beschränkt auf den Ordner der Sitzung; in den anderen Modi so, wie die eigenen Befehle dort laufen; in einer vertraulichen Sitzung immer innerhalb der Sandbox ohne Netzwerk.
-- Die Runden, die ein neues Ziel bekommt, stammen aus **Runden bis zur Zielpause** weiter unten. Der Wert gilt jetzt für die Ziele jedes Agenten, nicht nur für die von Custom.
+- Die Runden, die ein neues Ziel bekommt, stammen aus **Runden, die ein Ziel laufen darf** unter [Einstellungen → Funktionen → Ziele](/settings?s=goals). Der Wert gilt für die Ziele jedes Agenten, nicht nur für die von Custom.
 
 Ziele, die Custom vor dieser Version laufen hatte, werden nicht übernommen: Setze ein neues.
 
-Um zu ändern, wie viele Runden ein neues Ziel bekommt, öffne [Einstellungen → Funktionen → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) und wähle **10**, **30** oder **100** in der Zeile **Runden bis zur Zielpause** in der Gruppe **Ziele**. Auf der Vereinbarungskarte kannst du eine andere Zahl festlegen, und auch der Agent kann eine vorschlagen.
+Um zu ändern, wie viele Runden ein neues Ziel bekommt, öffne [Einstellungen → Funktionen → Ziele](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) und wähle **10**, **30** oder **100** in der Zeile **Runden, die ein Ziel laufen darf**. Auf der Vereinbarungskarte kannst du eine andere Zahl festlegen, und auch der Agent kann eine vorschlagen.
 
 ## Lange Unterhaltungen und lange Ausgaben
 
@@ -226,11 +226,10 @@ Ein [Ausgabenlimit](/guide/usage#cap-what-a-session-spends) funktioniert auch f�
 
 ## Einstellungen → Funktionen → Custom
 
-[Einstellungen → Funktionen → Custom](/settings?s=custom) („Auto-Modus, eine Sandbox für Befehle und wie lange Ziele laufen“) hat drei Zeilen:
+[Einstellungen → Funktionen → Custom](/settings?s=custom) („Auto-Modus und eine Sandbox für Befehle“) hat zwei Zeilen:
 
 - **Auto-Modus** (einer der Modi von Custom, neben Fragen, Änderungen akzeptieren, Voller Zugriff und Plan): Sein (i) erklärt, was Auto durchlässt, was immer nachfragt und dass das Hilfsmodell die Prüfung übernimmt. Du musst nichts umschalten: Auto wählst du pro Sitzung unter **Berechtigungen**.
 - **Sandbox für Befehle** (im Auto-Modus ändern Befehle Dateien nur im Ordner der Sitzung und in /tmp unter Linux, in den temporären Ordnern auf einem Mac oder in einem eigenen temporären Ordner unter Windows; Voller Zugriff läuft ohne diese Sandbox und ohne Genehmigungsabfragen): ein Schalter, standardmäßig aktiviert. Ausgegraut, wenn die Sandbox hier nicht laufen kann (bubblewrap unter Linux, Seatbelt auf einem Mac, Git for Windows und das .NET Framework unter Windows); die Zeile nennt den Grund.
-- **Runden bis zur Zielpause** in der Gruppe **Ziele** (die Runden, die ein neues Ziel eines beliebigen Agenten bekommt; auf der Vereinbarungskarte des Ziels kannst du eine andere Zahl festlegen): **10**, **30** (Standard) oder **100** Runden. Ein Ziel, dem die Runden ausgehen, hält an seiner Grenze an, und du kannst ihm mehr geben.
 
 Die Modelle von Custom findest du unter [Einstellungen → Agenten → Modelle](/settings?s=models), und das Modell, das die Prüfungen durchführt, ist dort das **Hilfsmodell**.
 

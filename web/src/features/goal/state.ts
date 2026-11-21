@@ -2,6 +2,7 @@
 // session shows and kept up to date by the server's "goal" events, and the actions that change it.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
+import { activeNow } from './words';
 import type { GoalAction, GoalState } from '@shared/goals';
 import { api, enc, post } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
@@ -13,8 +14,17 @@ export const useGoals = create<{ byKey: Record<string, GoalState | null> }>(() =
 /** Events seen for each session, so a load that was slow does not replace what an event brought after it. */
 const seen: Record<string, number> = {};
 
+/** When the page got each goal state: the server's `activeMs` is the time at work up to when it last saved the goal, so the bar runs it on from here. */
+const arrived = new WeakMap<GoalState, number>();
+const arrivedAt = (g: GoalState): number => {
+  let t = arrived.get(g);
+  if (t == null) arrived.set(g, (t = Date.now()));
+  return t;
+};
+
 const put = (key: string, goal: GoalState | null) => {
   seen[key] = (seen[key] ?? 0) + 1;
+  if (goal) arrived.set(goal, Date.now());
   useGoals.setState((s) => ({ byKey: { ...s.byKey, [key]: goal } }));
 };
 
@@ -36,6 +46,7 @@ export function loadGoal(key: string) {
   api<{ goal: GoalState | null }>(`/api/goals/${enc(key)}`)
     .then((r) => {
       if ((seen[key] ?? 0) !== n) return;
+      if (r.goal) arrived.set(r.goal, Date.now());
       useGoals.setState((s) => ({ byKey: { ...s.byKey, [key]: r.goal ?? null } }));
     })
     .catch(() => {});
@@ -92,4 +103,17 @@ export function useAct(key: string) {
     [key],
   );
   return [run, busy] as const;
+}
+
+/** The time a goal has been at work, now: it ticks once a second while a round runs or its checks do, and is the server's count otherwise. */
+export function useActiveMs(g: GoalState): number {
+  const running = g.status === 'working' || g.status === 'checking';
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running, g]);
+  return activeNow(g, now, arrivedAt(g));
 }

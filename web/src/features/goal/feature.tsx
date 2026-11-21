@@ -3,16 +3,19 @@
 // start page, under Options: Goal, off or until it is done, with how much it asks. Not kept for the next session.
 import { useRef, useState } from 'react';
 import { Target } from 'lucide-react';
-import { GOAL_SETTINGS, type GoalSettings } from '@shared/goals';
+import type { GoalSettings } from '@shared/goals';
 import type { SessionExtra } from '@shared/features';
 import { OptionRow, Popover, SettingChip } from '../../components/ui';
 import type { WebFeature } from '../registry';
 import { useCostlyMode } from '../tips/ModeExplainer';
 import { AsksControls } from './Asks';
+import { goalStartPatch } from './can';
+import { settingsOfDefaults, useGoalDefaults } from './defaults';
+import { GoalsSettingsBody } from './GoalsSettings';
 import { asksChip } from './words';
 
-/** The settings a start-page goal carries, from what extra holds. */
-const settingsOf = (g: SessionExtra['goal']): GoalSettings => ({ asks: g?.asks ?? GOAL_SETTINGS.asks, noAnswerMin: g?.noAnswerMin ?? GOAL_SETTINGS.noAnswerMin });
+/** The settings a start-page goal carries, from what extra holds; what it does not say starts from the defaults (Settings → Goals). */
+const settingsOf = (g: SessionExtra['goal'], base: GoalSettings): GoalSettings => ({ asks: g?.asks ?? base.asks, noAnswerMin: g?.noAnswerMin ?? base.noAnswerMin });
 
 /** On the start page, under Options: no goal, or a goal the session starts with (its first message is the goal). */
 function GoalStartOption({ value, onChange, scheduled }: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; scheduled?: boolean }) {
@@ -21,10 +24,10 @@ function GoalStartOption({ value, onChange, scheduled }: { value: SessionExtra; 
   const { ask, dialog } = useCostlyMode();
   const on = !!value.goal;
   // Goals on a schedule do not ship: a scheduled task's editor has no Goal option.
-  const settings = settingsOf(value.goal);
+  const settings = settingsOf(value.goal, settingsOfDefaults(useGoalDefaults()));
   // start: the session's loop has not taken it yet; the server clears it once it has.
-  // Goal does not combine with a swarm, a campaign, deep research or the arena (they each clear it when turned on).
-  const turnOn = (s: GoalSettings) => onChange({ goal: { ...s, start: true }, swarm: undefined, research: undefined, arena: undefined });
+  // Goal goes with a swarm (the lead has it) but not with a campaign, deep research or the arena: turning it on clears those.
+  const turnOn = (s: GoalSettings) => onChange({ goal: { ...s, start: true }, ...goalStartPatch(value) });
   if (scheduled) return null;
   return (
     // Its words are the goal's own ("Goal" is a football word elsewhere): the chip and its popover are one part.
@@ -65,4 +68,5 @@ function GoalStartOption({ value, onChange, scheduled }: { value: SessionExtra; 
 export const goalFeature: WebFeature = {
   id: 'goal',
   StartOptions: GoalStartOption,
+  settings: [{ id: 'goals', label: 'Goals', icon: Target, sub: 'What a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick', Body: GoalsSettingsBody }],
 };

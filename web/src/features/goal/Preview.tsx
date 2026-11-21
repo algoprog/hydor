@@ -1,7 +1,7 @@
 // Development only (main.tsx loads it for /goal-preview in a dev server, never in a build): every sample goal
 // (samples.ts) drawn in the dock as it shows above the message box, without the server. ?s=<sample id> picks one,
 // ?rounds=1 opens the rounds, ?more=1 opens Give it more (on the limit sample), ?open=<n> opens that round's row, ?light=1 the light theme,
-// ?bare=1 leaves out the list of samples and ?zoom=0.8 draws smaller (for pictures of one state).
+// ?helpers=2&swarm=1 shows a lead whose own turn has ended while 2 members are at work (the working-swarm sample does by itself), ?bare=1 leaves out the list of samples and ?zoom=0.8 draws smaller (for pictures of one state).
 import { useEffect } from 'react';
 import type { SessionSummary } from '@shared/types';
 import { SessionCtx } from '../session/items';
@@ -17,10 +17,16 @@ export default function GoalPreview() {
   const all = samples();
   const pick = all.find((x) => x.id === (q.get('s') ?? 'working')) ?? all[0];
   const g = { ...pick.goal, key: KEY };
+  // The lead's own turn has ended while its subagents (a swarm's members) are at work: the bar says it waits for them.
+  const swarm = q.get('swarm') ? q.get('swarm') === '1' : pick.id.startsWith('working-swarm');
+  const helpers = q.has('helpers') ? Number(q.get('helpers')) : swarm ? 2 : 0;
   const s = {
     key: KEY,
     cwd: '/home/you/code/shop-app',
     worktree: g.undo ? { path: '/tmp/x', branch: 'goal/search-relevance', base: 'main', repo: '/home/you/code/shop-app' } : undefined,
+    helpers: helpers || undefined,
+    live: helpers ? { status: 'idle' } : undefined,
+    extra: swarm ? { swarm: true } : undefined,
     goal: { objective: g.contract.objective, status: 'active', app: { state: g.status, round: g.round, rounds: g.contract.limits.rounds, holds: 3, of: g.contract.checks.length } },
   } as unknown as SessionSummary;
   showGoal(KEY, g);

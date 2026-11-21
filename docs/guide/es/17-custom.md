@@ -139,11 +139,11 @@ Lo que ahora es igual para todos los agentes: la tarjeta de acuerdo, las comprob
 
 - Una comprobación del **Revisor**, y la comprobación final, las juzga un modelo que no hizo nada del trabajo. En una [sesión confidencial](/guide/sessions#keep-a-session-confidential) es un modelo de esta computadora; si no hay uno, la comprobación no puede ejecutarse.
 - Los comandos de comprobación se ejecutan como los propios comandos de Custom: en modo Automático con **Entorno aislado para comandos** activado, dentro del entorno aislado, limitados a la carpeta de la sesión; en sus otros modos, como se ejecutan sus propios comandos; en una sesión confidencial, siempre dentro del entorno aislado y sin red.
-- Las rondas que recibe un objetivo nuevo salen de **Rondas antes de pausar un objetivo**, más abajo. Ahora vale para los objetivos de todos los agentes, no solo los de Custom.
+- Las rondas que recibe un objetivo nuevo salen de **Rondas que puede ejecutar un objetivo** en [Configuración → Capacidades → Objetivos](/settings?s=goals). Vale para los objetivos de todos los agentes, no solo los de Custom.
 
 Los objetivos que Custom tenía en marcha antes de esta versión no se conservan: establece uno nuevo.
 
-Para cambiar cuántas rondas recibe un objetivo nuevo, abre [Configuración → Capacidades → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) y elige **10**, **30** o **100** en la fila **Rondas antes de pausar un objetivo** del grupo **Objetivos**. Puedes fijar otro número en la tarjeta de acuerdo, y el agente puede proponer uno.
+Para cambiar cuántas rondas recibe un objetivo nuevo, abre [Configuración → Capacidades → Objetivos](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) y elige **10**, **30** o **100** en la fila **Rondas que puede ejecutar un objetivo**. Puedes fijar otro número en la tarjeta de acuerdo, y el agente puede proponer uno.
 
 ## Conversaciones largas y salidas largas
 
@@ -226,11 +226,10 @@ Un [límite de gasto](/guide/usage#cap-what-a-session-spends) también funciona 
 
 ## Configuración → Capacidades → Custom
 
-[Configuración → Capacidades → Custom](/settings?s=custom) (“Modo automático, un entorno aislado para comandos y cuánto duran los objetivos”) tiene tres filas:
+[Configuración → Capacidades → Custom](/settings?s=custom) (“Modo automático y un sandbox para comandos”) tiene dos filas:
 
 - **Modo automático** (uno de los modos de Custom, junto a Preguntar, Aceptar ediciones, Acceso total y Planificar): su (i) explica qué deja pasar el modo automático, qué pregunta siempre y que el modelo auxiliar hace la comprobación. No hay nada que activar: eliges el modo automático en cada sesión en **Permisos**.
 - **Entorno aislado para comandos** (en el modo automático, los comandos solo cambian archivos en la carpeta de la sesión y en /tmp en Linux, en las carpetas temporales en un Mac, o en una carpeta temporal propia en Windows; Acceso total se ejecuta sin este entorno aislado ni avisos de aprobación): un interruptor, activado por defecto. Aparece atenuado cuando el entorno aislado no puede ejecutarse aquí (bubblewrap en Linux, Seatbelt en un Mac, Git for Windows y .NET Framework en Windows), y la fila indica el motivo.
-- **Rondas antes de pausar un objetivo**, en el grupo **Objetivos** (las rondas que recibe un objetivo nuevo de cualquier agente; puedes fijar otro número en la tarjeta de acuerdo del objetivo): **10**, **30** (el valor por defecto) o **100** rondas. Un objetivo que se queda sin rondas se detiene en su límite, y puedes darle más.
 
 Los modelos de Custom están en [Configuración → Agentes → Modelos](/settings?s=models), y el modelo que hace las comprobaciones es allí el **Modelo auxiliar**.
 

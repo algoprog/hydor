@@ -183,6 +183,14 @@ export function samples(now = Date.now()): GoalSample[] {
         g.round = 7;
         g.pausing = true;
       }),
+      mk('working-swarm', 'Working, a swarm waiting for its members', undo, (g) => {
+        // A session that leads a swarm: each round is the whole team's work, and a round's row says how many members worked in it.
+        midRun(g);
+        const members = [0, 3, 3, 4, 2, 2, 3];
+        g.rounds = g.rounds.map((r) => (members[r.n] ? { ...r, members: members[r.n], usd: Math.round(r.usd * 3.4 * 100) / 100 } : r));
+        g.status = 'working';
+        g.round = 7;
+      }),
       mk('checking', 'Checking', undo, (g) => {
         midRun(g);
         g.status = 'checking';

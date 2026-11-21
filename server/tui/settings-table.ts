@@ -767,7 +767,23 @@ row('custom', 'Sandbox for commands', 'switch', {
   write: put('/api/custom/settings', (v) => ({ sandbox: v })),
   note: 'It uses bubblewrap on Linux, Seatbelt on a Mac and low integrity on Windows; where it cannot run, commands run without it.',
 });
-row('custom', 'Rounds before a goal pauses', 'number', { range: { min: 1, max: 500 }, read: rd('/api/custom/settings', 'goalRounds'), write: put('/api/custom/settings', (v) => ({ goalRounds: v })) });
+
+row('goals', 'Rounds a goal may run', 'number', { range: { min: 1, max: 500 }, read: rd('/api/goal-settings', 'rounds'), write: put('/api/goal-settings', (v) => ({ rounds: v })) });
+row('goals', 'How much a goal asks you', 'choice', {
+  choices: [
+    { value: 'own', label: 'Works on its own' },
+    { value: 'forks', label: 'Asks at turning points' },
+    { value: 'every', label: 'Asks every round' },
+  ],
+  read: rd('/api/goal-settings', 'asks'),
+  write: put('/api/goal-settings', (v) => ({ asks: v })),
+});
+row('goals', 'Goes on with its own pick after', 'number', {
+  range: { min: 0, max: 1440 },
+  read: rd('/api/goal-settings', 'noAnswerMin'),
+  write: put('/api/goal-settings', (v) => ({ noAnswerMin: v })),
+  note: 'Minutes; 0 waits for you.',
+});
 
 /** Every option, in the order of the catalog (the order the page shows them). */
 export const ROWS: Row[] = (() => {

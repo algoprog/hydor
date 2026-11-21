@@ -29,6 +29,7 @@ import { askMessage, draftMessage, draftNotes, reminderMessage, restartedMessage
 import { addAsked, changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
+import { goalDefaults } from './settings.ts';
 import { cleanContract, cleanSettings, topId } from './validate.ts';
 import { allButYouHold, duration, limitReason, reckon, rejudged, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
 
@@ -1620,12 +1621,15 @@ export async function setGoal(d: Deps, key: string, objective: string, settings?
   // (a reset under way or one a restart cut) goes, and the new goal starts from the files as they are (X9).
   const now = Date.now();
   const spent = spentNow(d, key);
+  const defaults = goalDefaults(d.db);
   const g: StoredGoal = {
     key,
     id: rid(),
     status: 'drafting',
-    contract: { objective: clip(text, 4000), checks: [], protect: [], limits: { rounds: customSettings(d.db).goalRounds } },
-    settings: { ...GOAL_SETTINGS, ...(settings ?? {}) },
+    // What a new goal starts from is the person's own (Settings → Capabilities → Goals): the rounds it may run, how much it
+    // asks and the minutes before it goes on with its pick; what was sent with the goal comes first.
+    contract: { objective: clip(text, 4000), checks: [], protect: [], limits: { rounds: defaults.rounds } },
+    settings: { asks: defaults.asks, noAnswerMin: defaults.noAnswerMin, ...(settings ?? {}) },
     rounds: [],
     undo: !!s.worktree,
     rules: [],

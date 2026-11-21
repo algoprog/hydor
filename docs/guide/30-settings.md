@@ -270,6 +270,14 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many Hydor subagents one session runs at once.
 - [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm or campaign work at once.
 
+### Goals
+
+[Settings → Goals](/settings?s=goals): what a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick. More in [Sessions](/guide/sessions).
+
+- [**Rounds a goal may run**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run): How many rounds a new goal gets before it stops at its limit, unless the agent proposes fewer or you change it when you agree.
+- [**How much a goal asks you**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you): Whether a new goal works on its own, asks at turning points or asks every round.
+- [**Goes on with its own pick after**](/settings?s=goals&find=Goes%20on%20with%20its%20own%20pick%20after): How long a new goal waits for your answer to a question before it goes on with its own pick; 0 waits for you.
+
 ### Images, video and audio
 
 [Settings → Images, video and audio](/settings?s=images): pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions. More in [Documents, images, videos and voice](/guide/documents-voice).
@@ -312,11 +320,10 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Custom
 
-[Settings → Custom](/settings?s=custom): auto mode, a sandbox for commands, and how long goals run. More in [Custom, the app's own agent](/guide/custom).
+[Settings → Custom](/settings?s=custom): auto mode and a sandbox for commands. More in [Custom, the app's own agent](/guide/custom).
 
 - [**Auto mode**](/settings?s=custom&find=Auto%20mode): Custom approves safe steps by itself.
 - [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Auto mode commands run in a sandbox; Full access runs without it.
-- [**Rounds before a goal pauses**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): How many rounds a new goal of any agent gets before it stops at its limit.
 
 ## Ask an agent
 

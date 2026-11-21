@@ -1,15 +1,19 @@
 // Set a goal: from a session's menu. What done looks like as a sentence, how much it asks you, and Draft the checks: the
 // agent works out how to check it and shows you; nothing starts before you agree.
 import { useState } from 'react';
-import { GOAL_SETTINGS, type GoalSettings } from '@shared/goals';
+import type { GoalSettings } from '@shared/goals';
 import type { SessionSummary } from '@shared/types';
 import { Button, cx, Dialog, inputCls } from '../../components/ui';
 import { AsksControls } from './Asks';
+import { settingsOfDefaults, useGoalDefaults } from './defaults';
 import { useAct } from './state';
 
 export function SetGoal({ s, open, onClose }: { s: SessionSummary; open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
-  const [settings, setSettings] = useState<GoalSettings>({ ...GOAL_SETTINGS });
+  // It starts from the defaults (Settings → Goals) until you pick otherwise here.
+  const defaults = settingsOfDefaults(useGoalDefaults());
+  const [picked, setSettings] = useState<GoalSettings | null>(null);
+  const settings = picked ?? defaults;
   const [run, busy] = useAct(s.key);
   const set = async () => {
     if (busy || !text.trim()) return;

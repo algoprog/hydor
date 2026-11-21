@@ -270,6 +270,14 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**En cours en même temps, par session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session) : Combien de sous-agents Hydor une session exécute en même temps.
 - [**Taille de l’essaim**](/settings?s=children&find=Swarm%20size) : Combien d’agents d’un essaim ou d’une campagne travaillent en même temps.
 
+### Objectifs
+
+[Paramètres → Objectifs](/settings?s=goals) : point de départ d’un nouvel objectif : ses tours, la fréquence de ses questions et le moment où il poursuit avec son propre choix. Pour en savoir plus : [Sessions](/guide/sessions).
+
+- [**Tours qu’un objectif peut exécuter**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) : Nombre de tours accordés à un nouvel objectif avant qu’il s’arrête à sa limite, sauf si l’agent en propose moins ou si vous le modifiez en l’approuvant.
+- [**Fréquence des questions posées par un objectif**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you) : Indique si un nouvel objectif travaille seul, vous demande votre avis aux tournants ou à chaque tour.
+- [**Poursuit avec son propre choix après**](/settings?s=goals&find=Goes%20on%20with%20its%20own%20pick%20after) : Durée pendant laquelle un nouvel objectif attend votre réponse à une question avant de poursuivre avec son propre choix ; 0 pour vous attendre.
+
 ### Images, vidéo et audio
 
 [Paramètres → Images, vidéo et audio](/settings?s=images) : images, vidéos, musiques et voix que les agents créent pour vous via OpenRouter, et qui rédige leurs légendes. Pour en savoir plus : [Documents, images, vidéos et voix](/guide/documents-voice).
@@ -312,11 +320,10 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 ### Custom
 
-[Paramètres → Custom](/settings?s=custom) : mode automatique, bac à sable pour les commandes et durée d’exécution des objectifs. Pour en savoir plus : [Custom, l’agent propre à l’app](/guide/custom).
+[Paramètres → Custom](/settings?s=custom) : mode automatique et bac à sable pour les commandes. Pour en savoir plus : [Custom, l’agent propre à l’app](/guide/custom).
 
 - [**Mode automatique**](/settings?s=custom&find=Auto%20mode) : Custom approuve lui-même les étapes sûres.
 - [**Bac à sable pour les commandes**](/settings?s=custom&find=Sandbox%20for%20commands) : Les commandes du mode Auto s’exécutent dans un bac à sable ; l’Accès complet s’exécute sans.
-- [**Tours avant la pause d’un objectif**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) : Nombre de tours accordés à un nouvel objectif, quel que soit l’agent, avant qu’il s’arrête à sa limite.
 
 ## Demander à un agent
 
