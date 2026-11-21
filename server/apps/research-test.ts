@@ -642,9 +642,9 @@ test('Deadline radar: a venue neither list has is looked up on the web: its page
   assert.match((lists.unknown as Record<string, string>[])[0].query, /^Zorgcon conference next call for papers/);
   // Its page: the result that reads like its dates and holds its name, whichever way the search was written.
   const text = '[1] Zorgcon 2027 · Important dates\n    https://zorgcon.org/2027/dates\n    The dates.\n[2] Zorgcon\n    https://example.com/zorgcon-news\n';
-  const pick = await program('deadline-radar', 'pick', { found: { text }, venue: 'Zorgcon' });
+  const pick = await program('deadline-radar', 'site_pick', { found: { text }, venue: 'Zorgcon' });
   assert.equal(pick.url, 'https://zorgcon.org/2027/dates');
-  assert.equal((await program('deadline-radar', 'pick', { found: { data: { results: [{ url: 'https://a.org/x', title: 'x' }] } }, venue: 'Zorgcon' })) .url, 'https://a.org/x');
+  assert.equal((await program('deadline-radar', 'site_pick', { found: { data: { results: [{ url: 'https://a.org/x', title: 'x' }] } }, venue: 'Zorgcon' })) .url, 'https://a.org/x');
   // 1 February 2027, 23:59 AoE is 2 February 13:59 in Athens; the second venue's page gave nothing, so it is still missing.
   const web = await program('deadline-radar', 'web_deadlines', {
     lists,

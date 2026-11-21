@@ -1733,9 +1733,9 @@ test('a tier in place of a model: running a ready-made app with a tier replaces 
   const model = await run({ agent: 'claude', model: 'named-model', tier: 'best' });
   assert.deepEqual([model.tier, model.model], [undefined, 'named-model']);
   const neither = await run({});
-  assert.deepEqual([neither.tier, neither.model], [undefined, undefined]);
+  assert.deepEqual([neither.tier, neither.model], ['best', undefined], 'the app’s own tier: Deep research report is research work');
   const huge = await run({ tier: 'huge' });
-  assert.equal(huge.tier, undefined);
+  assert.equal(huge.tier, 'best', 'a tier that is none is ignored: the app’s own stays');
 });
 
 // ---- memory -------------------------------------------------------------------------------------------------

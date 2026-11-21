@@ -1319,7 +1319,7 @@ return { need: !given || hours ? 'yes' : '', why: !given && hours ? 'the setting
           { id: 'need', label: 'The script is to be read', type: 'text' },
           { id: 'why', label: 'What it is read for', type: 'text' },
         ],
-        failed: 'skip',
+        failed: 'agent',
       },
       {
         id: 'read',

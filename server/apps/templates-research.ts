@@ -2062,13 +2062,13 @@ return { cfp: String(input.cfp || ''), pages: String(input.pages || ''), templat
         as: 'venue',
         collect: 'said',
         steps: [
-          { id: 'find', title: 'Search for its deadline', do: 'tool', tool: 'web_search', with: { query: '{{venue.query}}', k: 6 }, failed: 'skip' },
+          { id: 'site_find', title: 'Search for its deadline', do: 'tool', tool: 'web_search', with: { query: '{{venue.query}}', k: 6 }, failed: 'skip' },
           {
-            id: 'pick',
+            id: 'site_pick',
             title: 'Pick its page',
             do: 'code',
             language: 'javascript',
-            with: { found: '{{find}}', venue: '{{venue.venue}}' },
+            with: { found: '{{site_find}}', venue: '{{venue.venue}}' },
             code: String.raw`// The page most likely to give the venue's deadline: one whose address or title reads like its call for papers or its
 // dates, and whose address holds the venue's name, else the first result.
 const r = input.found || {};
@@ -2089,19 +2089,19 @@ return { url: best ? best.url : '' };`,
             outputs: [{ id: 'url', label: 'Its page', type: 'text' }],
             failed: 'skip',
           },
-          { id: 'page', title: 'Read the page', do: 'tool', tool: 'read_page', if: '{{pick.url}} is not empty', with: { url: '{{pick.url}}', question: 'The conference’s full name and year, and the deadline for submitting a full paper (its date, time and time zone as written)' }, failed: 'skip' },
+          { id: 'site_page', title: 'Read the page', do: 'tool', tool: 'read_page', if: '{{site_pick.url}} is not empty', with: { url: '{{site_pick.url}}', question: 'The conference’s full name and year, and the deadline for submitting a full paper (its date, time and time zone as written)' }, failed: 'skip' },
           {
             id: 'got',
             title: 'Note its deadline',
             do: 'model',
-            if: '{{page.text}} is not empty',
-            instructions: `From this part of a page about the conference {{venue.venue}} ({{pick.url}}), note its next edition's deadline for submitting a full paper:
+            if: '{{site_page.text}} is not empty',
+            instructions: `From this part of a page about the conference {{venue.venue}} ({{site_pick.url}}), note its next edition's deadline for submitting a full paper:
 - name: the conference's name in full, as the page writes it.
 - year: the year of that edition, four digits.
 - deadline: the date of the deadline as YYYY-MM-DD, then the time as HH:MM when the page gives one (2027-01-14 23:59). Empty when the page gives none, or only the dates of an edition long past. Do not guess a date.
 - timezone: the time zone the page gives the deadline in, as it writes it (AoE, UTC-12, PST, CET); empty when it gives none.
 
-{{page.text}}`,
+{{site_page.text}}`,
             outputs: [
               { id: 'name', label: 'Conference', type: 'text' },
               { id: 'year', label: 'Year', type: 'number' },
@@ -2115,7 +2115,7 @@ return { url: best ? best.url : '' };`,
             title: 'Keep what it says with its page',
             do: 'code',
             language: 'javascript',
-            with: { venue: '{{venue.venue}}', url: '{{pick.url}}', name: '{{got.name}}', year: '{{got.year}}', deadline: '{{got.deadline}}', timezone: '{{got.timezone}}' },
+            with: { venue: '{{venue.venue}}', url: '{{site_pick.url}}', name: '{{got.name}}', year: '{{got.year}}', deadline: '{{got.deadline}}', timezone: '{{got.timezone}}' },
             code: String.raw`return { venue: String(input.venue || ''), url: String(input.url || ''), name: String(input.name || ''), year: Number(input.year) || null, deadline: String(input.deadline || ''), timezone: String(input.timezone || '') };`,
             outputs: [
               { id: 'venue', label: 'Venue', type: 'text' },
@@ -2169,7 +2169,7 @@ return { deadlines: deadlines, venues: venues, missing: missing };`,
           { id: 'venues', label: 'Conferences from websites', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not found anywhere', type: 'list' },
         ],
-        failed: 'skip',
+        failed: 'agent',
       },
       {
         id: 'remind',
@@ -2648,6 +2648,7 @@ return { latex, removed: [...new Set(removed)], note: notes.join(' ') };`,
             { id: 'removed', label: 'Citations taken out', type: 'list' },
             { id: 'note', label: 'What was changed', type: 'text' },
           ],
+          failed: 'agent',
         },
       ],
       outputs: { topic: '{{topic}}', latex: '{{checked.latex}}', bib: '{{prep.bib}}', count: '{{prep.count}}', note: '{{checked.note}}' },
