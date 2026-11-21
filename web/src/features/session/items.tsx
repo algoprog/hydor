@@ -50,6 +50,7 @@ import { commandLabel, commandLine } from '../../lib/commands';
 import { toolView } from '../registry';
 import { mu } from '../../lib/machine';
 import { ReadAloudButton } from '../voice/ReadAloud';
+import { DoThisAgain } from '../apps/DoThisAgain';
 import { TriggerIcon } from '../automations/parts';
 import { ChildReplyRow } from '../children/ChildReply';
 import { tr } from '../../i18n/runtime';
@@ -1047,7 +1048,20 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
  * (Timeline.tsx), in smaller, quieter type than the reply, and never a text the view holds as it grows.
  * The sources it cites show as chips in its text and as one line under it, not as a list at its end.
  */
-export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet, allowFork = true }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean; quiet?: boolean; allowFork?: boolean }) {
+export const AssistantBlock = memo(function AssistantBlock({
+  item,
+  note,
+  quiet,
+  allowFork = true,
+  again,
+}: {
+  item: Extract<TimelineItem, { kind: 'assistant' }>;
+  note?: boolean;
+  quiet?: boolean;
+  allowFork?: boolean;
+  /** The last reply of a turn in which the agent used a tool or showed a card: Do this again…, with what the turn asked. */
+  again?: { request?: string };
+}) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork, sessionKey, cwd } = useContext(SessionCtx);
   // A confidential session's replies are read aloud only with a voice on this device.
@@ -1081,6 +1095,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet, 
             </button>
           )}
           <ReadAloudButton id={item.id} text={spokenReply(item.text)} local={confidential} />
+          {again && sessionKey && !note && <DoThisAgain sessionKey={sessionKey} seq={item.seq} request={again.request} />}
         </div>
       )}
     </div>

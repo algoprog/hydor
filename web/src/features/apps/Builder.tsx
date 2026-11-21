@@ -1,8 +1,8 @@
 // Making or changing an app: its face, the questions of its form, the task with the answers put in (or
 // its steps, once it works in steps), the answer fields of its result, what it keeps between runs, who
 // does it (agent, model, mode, assistant, folder), which tools it may use, its limits, and a test run of
-// what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
-// session.
+// what is on screen before saving. "Save as an app" in a session's menu, and Do this again… under a reply, open it
+// with a draft from that session (from that reply's turn), What changes each time? on top.
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Shapes, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
@@ -28,6 +28,8 @@ import { ResultView, RunBody } from './Result';
 import { DesignEditor } from './Design';
 import { sampleResult } from './sample';
 import { exampleOf, useCardCatalog } from './cards';
+import { Changes } from './Changes';
+import type { DraftPart } from './requestParts';
 import { AppView } from './View';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
@@ -641,7 +643,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
 }
 
 /** `embedded`: beside a session's conversation (`session`), where an agent builds it: no way back, a save stays here, and a step can be asked about there. */
-export function BuilderPage({ id, template, from, embedded, session }: { id?: string; template?: string; from?: string; embedded?: boolean; session?: string }) {
+export function BuilderPage({ id, template, from, turn, embedded, session }: { id?: string; template?: string; from?: string; turn?: string; embedded?: boolean; session?: string }) {
   const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
   const [saved, setSaved] = useState<AppDef | null>(null);
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
@@ -656,6 +658,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     setNewer(null);
   };
   const [note, setNote] = useState('');
+  // A draft from a session: its request in pieces, each question's words marked (What changes each time?).
+  const [parts, setParts] = useState<DraftPart[] | null>(null);
   // What the next save says it did, when it is not what the changes say (a version brought back).
   const why = useRef<string | undefined>(undefined);
   const noteBox = useRef<HTMLDivElement>(null);
@@ -683,10 +687,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => load(r.app), (e) => (toastError(e), embedded || go('/apps')));
     else if (template) api<{ template: AppTemplate }>(`/api/apps/tpl:${enc(template)}`).then((r) => setRecipe(recipeOf(r.template)), (e) => (toastError(e), setRecipe(BLANK)));
     else if (from)
-      post<{ recipe: AppRecipe; note?: string }>('/api/apps/draft', { key: from }).then(
+      post<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }>('/api/apps/draft', { key: from, ...(turn ? { turn: Number(turn) } : {}) }).then(
         (r) => {
           setRecipe(r.recipe);
           if (r.note) setNote(r.note);
+          if (r.parts?.length) setParts(r.parts);
         },
         (e) => (toastError(e), setRecipe(BLANK)),
       );
@@ -697,7 +702,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       (r) => setAssistants((Array.isArray(r) ? r : (r.assistants ?? [])).filter((a) => a && typeof a.id === 'string')),
       () => {},
     );
-  }, [id, template, from]);
+  }, [id, template, from, turn]);
 
   const set = (p: Partial<AppRecipe>) => setRecipe((r) => (r ? { ...r, ...p } : r));
   // Another save (an agent's, or this template open elsewhere): taken at once, or offered while there are changes here.
@@ -870,6 +875,16 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           )}
           {!saved && !template && !from && <Describe />}
+          {parts && !saved && (
+            <Changes
+              parts={parts}
+              recipe={recipe}
+              onChange={(p, r) => {
+                setParts(p);
+                setRecipe(r);
+              }}
+            />
+          )}
           <section className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4 sm:gap-4 sm:p-5">
             <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
             <div className="-mt-1 min-w-0 flex-1 space-y-0.5">
