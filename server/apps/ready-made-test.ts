@@ -133,7 +133,7 @@ const json = (url: string, body: unknown) => answer(url, JSON.stringify(body));
 const meteo = (...results: Record<string, unknown>[]) => ({ results });
 const place = (name: string, lat: number, lng: number, admin1: string, country: string) => ({ name, latitude: lat, longitude: lng, admin1, country });
 
-test('Trip planner: each day’s area is looked up (Open-Meteo near the destination, then OpenStreetMap a second apart), and what neither finds is left to the model', async () => {
+test('Trip planner: each day’s area is looked up (Open-Meteo near the destination, then OpenStreetMap; the engine spaces its calls, the program waits for nothing), and what neither finds is left to the model', async () => {
   const stamps: [string, number][] = [];
   const tools = (tool: string, a: Record<string, unknown>) => {
     assert.equal(tool, 'http_request');
@@ -164,7 +164,7 @@ test('Trip planner: each day’s area is looked up (Open-Meteo near the destinat
   assert.equal(stamps.filter(([k]) => k === 'meteo Alfama').length, 1, 'an area is asked once');
   const osm = stamps.filter(([k]) => k.startsWith('osm'));
   assert.deepEqual(osm.map(([k]) => k), ['osm Sintra, Lisbon', 'osm Nowhereville, Lisbon']);
-  assert.ok(osm[1][1] - osm[0][1] >= 1000, 'OpenStreetMap is asked once a second');
+  assert.ok(osm[1][1] - osm[0][1] < 1000, 'the program leaves the spacing of OpenStreetMap’s calls to the engine');
   // A destination that names its region tells places apart: Paris in Texas, not in France.
   const paris = (name: string) =>
     name === 'Paris' ? meteo(place('Paris', 48.85, 2.35, 'Île-de-France', 'France'), place('Paris', 33.66, -95.55, 'Texas', 'United States')) : name === 'Downtown' ? meteo(place('Downtown', 48.86, 2.34, 'Île-de-France', 'France'), place('Downtown', 33.67, -95.56, 'Texas', 'United States')) : {};
