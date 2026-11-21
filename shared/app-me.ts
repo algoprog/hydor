@@ -208,7 +208,7 @@ export const ME_FIELDS: MeField[] = [
   { id: 'units', label: 'Units', kind: 'choice', group: 'You', options: ['metric', 'imperial'] },
   { id: 'currency', label: 'Currency', kind: 'choice', group: 'You', options: currencyOptions() },
   { id: 'diet', label: 'What you eat', kind: 'text', group: 'Home life', placeholder: 'Vegetarian, no nuts' },
-  { id: 'household', label: 'People at home', kind: 'number', group: 'Home life', placeholder: '2' },
+  { id: 'household', label: 'People at home', kind: 'number', group: 'Home life' },
   { id: 'services', label: 'Streaming services', kind: 'list', group: 'Home life', placeholder: 'Netflix, Disney+' },
   { id: 'teams', label: 'Teams you follow', kind: 'list', group: 'Home life', placeholder: 'Real Madrid, Boston Celtics' },
   { id: 'fields', label: 'Your fields', kind: 'list', group: 'Research', placeholder: 'Information retrieval, NLP' },
