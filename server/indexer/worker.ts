@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parentPort, workerData } from 'node:worker_threads';
 import { openDb } from '../db.ts';
-import { ClaudeParser } from '../history/claude.ts';
+import { ClaudeParser, claudeCost } from '../history/claude.ts';
 import { CodexParser } from '../history/codex.ts';
 import { AcpParser } from '../history/acp.ts';
 import { PARSE_VERSION } from '../history/common.ts';
@@ -285,7 +285,7 @@ async function indexFile(f: FileRef): Promise<string | null> {
       tokens_in: st.tokensIn,
       tokens_out: st.tokensOut,
       tokens_cached: st.tokensCached,
-      cost_usd: st.costUsd ?? null,
+      cost_usd: parser instanceof ClaudeParser ? claudeCost(db, st, s.model) : (st.costUsd ?? null),
       gen_ms: st.genMs ?? 0,
       work_ms: Math.round(st.workMs ?? 0),
       parent_key: parentKey ?? null,
