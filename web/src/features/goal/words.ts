@@ -60,10 +60,11 @@ export function statusWords(g: GoalState): string {
       return 'the checks wait for you';
     case 'measuring':
       return 'measuring where things stand';
+    // Pause was pressed while the round ran: it is finished and checked first.
     case 'working':
-      return `${at} · working`;
+      return g.pausing ? `${at} · working · pausing after this round` : `${at} · working`;
     case 'checking':
-      return `${at} · running the checks`;
+      return g.pausing ? `${at} · running the checks · pausing after this round` : `${at} · running the checks`;
     case 'asking':
       return `${at} · asking you`;
     case 'paused':
@@ -118,6 +119,12 @@ export const busy = (s: GoalStatus): boolean => s === 'working' || s === 'checki
 export const needsPerson = (s: GoalStatus): boolean => s === 'agreeing' || s === 'asking' || s === 'needs-you' || s === 'paused';
 
 export const PAUSE_WAIT = 'Pause the goal first, or wait for the round to end';
+/** The same while a pause waits for the round that runs: the say comes once it has been checked. */
+export const PAUSING_WAIT = 'It pauses once this round has been checked';
+export const pauseWait = (g: Pick<GoalState, 'pausing'>): string => (g.pausing ? PAUSING_WAIT : PAUSE_WAIT);
+
+/** The bar's button that pauses: while a pause waits for the round that runs it takes the pause back, as Resume does. */
+export const pauseButton = (g: Pick<GoalState, 'pausing'>): { label: 'Pause' | 'Resume'; action: 'pause' | 'resume' } => (g.pausing ? { label: 'Resume', action: 'resume' } : { label: 'Pause', action: 'pause' });
 
 /** The report's button for a goal that stopped at a limit (nothing for one that was reached or stopped), and the dialog's buttons. */
 export const giveMore = (g: Pick<GoalState, 'status'>): string => (g.status === 'limit' ? 'Give it more…' : '');

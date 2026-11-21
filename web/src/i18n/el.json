@@ -26814,5 +26814,8 @@
   "wiki articles when a task needs them.": "άρθρα wiki όταν τα χρειάζεται μια εργασία.",
   "{0} passages": "{0} αποσπάσματα",
   "Another session (“{0}”) is at work in the same folder: wait for it to finish, then try again.": "Μια άλλη συνεδρία («{0}») εργάζεται στον ίδιο φάκελο: περιμένετε να ολοκληρωθεί και δοκιμάστε ξανά.",
-  "The files could not be saved before putting them back: try again in a moment": "Δεν ήταν δυνατή η αποθήκευση των αρχείων πριν από την επαναφορά τους: δοκιμάστε ξανά σε λίγο"
+  "The files could not be saved before putting them back: try again in a moment": "Δεν ήταν δυνατή η αποθήκευση των αρχείων πριν από την επαναφορά τους: δοκιμάστε ξανά σε λίγο",
+  "It pauses once this round has been checked": "Θα γίνει παύση μόλις ολοκληρωθεί ο έλεγχος αυτού του γύρου",
+  "{0} · running the checks · pausing after this round": "{0} · εκτέλεση των ελέγχων · παύση μετά από αυτόν τον γύρο",
+  "{0} · working · pausing after this round": "{0} · σε εξέλιξη · παύση μετά από αυτόν τον γύρο"
 }

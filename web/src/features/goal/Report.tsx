@@ -1,10 +1,11 @@
 // The report of a goal that is over: reached (every check with its proof and what it took), stopped at a limit, or stopped by
 // you. Where things stood at the start and where they stand now, and the way to see the changes or dismiss it.
 import { useContext, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, CircleAlert, Square } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, CircleAlert, Plus, Square } from 'lucide-react';
 import { standing, tally, type GoalState } from '@shared/goals';
 import { Button, cx } from '../../components/ui';
 import { SessionCtx } from '../session/items';
+import { AsksChip, RuleDialog, RulesRow } from './Bar';
 import { useAct } from './state';
 import { MoreDialog } from './MoreDialog';
 import { say } from './Say';
@@ -14,6 +15,7 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
   const [run, busy] = useAct(g.key);
   const { openChanges } = useContext(SessionCtx);
   const [more, setMore] = useState(false);
+  const [rule, setRule] = useState(false);
   const reached = g.status === 'reached';
   const t = tally(g);
   const start = g.rounds.find((r) => r.n === 0)?.results ?? [];
@@ -88,6 +90,16 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
           {reached ? `How it got there: ${plural(t.kept, 'round')} kept, ${t.undone} undone` : g.undo ? `The files stand at ${bestRound}, the best so far` : 'The files stand as the last round left them'}
         </p>
       </div>
+      {/* At a limit the rules and how much it asks can still change: they count when it goes on. */}
+      {g.status === 'limit' && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-line px-4 py-2.5">
+          <AsksChip g={g} />
+          <Button size="sm" variant="ghost" icon={<Plus size={13} />} onClick={() => setRule(true)}>
+            Add a rule…
+          </Button>
+          <RulesRow g={g} className="ml-auto" />
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         <Button variant="primary" size="sm" onClick={() => openChanges?.()} disabled={!openChanges}>
           See the changes
@@ -107,6 +119,7 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
           </button>
         )}
       </div>
+      {rule && <RuleDialog g={g} open onClose={() => setRule(false)} />}
       {more && <MoreDialog g={g} open onClose={() => setMore(false)} />}
     </div>
   );

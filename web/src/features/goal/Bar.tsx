@@ -11,7 +11,7 @@ import { AsksControls } from './Asks';
 import { say } from './Say';
 import { ChecksEditor, DraftButtons, draftChanges, draftOf, draftProblem, type ContractDraft } from './ChecksEditor';
 import { useAct } from './state';
-import { asksChip, moneyText, needsPerson, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText } from './words';
+import { asksChip, moneyText, needsPerson, pauseButton, pendingNote, pillValue, shortLabel, statusWords, statusWordsApp, timeText } from './words';
 
 /** One check where the files stand: a tick, a measured value with its meter, a hollow dot, or an amber mark. */
 function Pill({ c, r }: { c: GoalCheck; r: GoalResult | undefined }) {
@@ -47,7 +47,7 @@ function Use({ text, used, limit }: { text: string; used: number; limit?: number
 }
 
 /** The chip that shows how much it asks and changes it. */
-function AsksChip({ g }: { g: GoalState }) {
+export function AsksChip({ g }: { g: GoalState }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [run] = useAct(g.key);
@@ -75,7 +75,7 @@ function AsksChip({ g }: { g: GoalState }) {
 }
 
 /** Add a rule: something that holds for every round from now on. */
-function RuleDialog({ g, open, onClose }: { g: GoalState; open: boolean; onClose: () => void }) {
+export function RuleDialog({ g, open, onClose }: { g: GoalState; open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
   const [run, busy] = useAct(g.key);
   const add = async () => {
@@ -167,6 +167,27 @@ function Menu({ g }: { g: GoalState }) {
   );
 }
 
+/** What you told it for every round, as pills with a × to take one back (also on the report of a goal that stopped at a limit). */
+export function RulesRow({ g, className }: { g: GoalState; className?: string }) {
+  const [run, busy] = useAct(g.key);
+  if (!g.rules.length) return null;
+  return (
+    <div className={cx('flex flex-wrap items-center gap-1.5', className)}>
+      <span className="text-[11.5px] text-fg-3">From you</span>
+      {g.rules.map((r) => (
+        <span key={r.id} className="inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-line bg-bg-1 pr-1 pl-2.5 text-[12px] text-fg-2">
+          <span translate="no" className="truncate">
+            {r.text}
+          </span>
+          <button type="button" disabled={busy} onClick={() => void run({ action: 'unrule', id: r.id })} aria-label="Remove this rule" title="Remove this rule" className="shrink-0 rounded-full p-0.5 text-fg-3 hover:bg-bg-3 hover:text-fg">
+            <X size={11} />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; rounds: boolean; onRounds: () => void; className?: string }) {
   const [run, busy] = useAct(g.key);
   const [confirm, confirmNode] = useConfirm();
@@ -174,7 +195,7 @@ export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; 
   const res = standing(g);
   const t = tally(g);
   const l = g.contract.limits;
-  const rules = g.rules;
+  const pause = pauseButton(g);
   const live = g.status === 'working' || g.status === 'checking' || g.status === 'asking' || g.status === 'measuring';
   const stop = async () => {
     const ok = await confirm({
@@ -197,9 +218,10 @@ export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; 
           <AsksChip g={g} />
           {/* Pause, Stop and the menu stay together on a line. */}
           <div className="flex shrink-0 items-center gap-1">
+            {/* While a pause waits for the round that runs, the button takes the pause back (Resume). */}
             {live && g.status !== 'measuring' && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run({ action: 'pause' })} icon={<Pause size={13} />}>
-                Pause
+              <Button size="sm" variant={pause.action === 'pause' ? 'ghost' : 'secondary'} disabled={busy} onClick={() => void run({ action: pause.action })} icon={pause.action === 'pause' ? <Pause size={13} /> : <Play size={13} />}>
+                {pause.label}
               </Button>
             )}
             {g.status === 'paused' && (
@@ -230,21 +252,7 @@ export function GoalBarCard({ g, rounds, onRounds, className }: { g: GoalState; 
         </div>
       )}
       {pendingNote(g) && <div className="mt-1.5 text-[12px] text-fg-3">Your change to the checks takes effect after this round.</div>}
-      {rules.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11.5px] text-fg-3">From you</span>
-          {rules.map((r) => (
-            <span key={r.id} className="inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-line bg-bg-1 pr-1 pl-2.5 text-[12px] text-fg-2">
-              <span translate="no" className="truncate">
-                {r.text}
-              </span>
-              <button type="button" disabled={busy} onClick={() => void run({ action: 'unrule', id: r.id })} aria-label="Remove this rule" title="Remove this rule" className="shrink-0 rounded-full p-0.5 text-fg-3 hover:bg-bg-3 hover:text-fg">
-                <X size={11} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <RulesRow g={g} className="mt-2" />
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         <Use text={moneyText(g)} used={g.spentUsd} limit={l.usd} />
         <Use text={timeText(g)} used={g.activeMs} limit={l.minutes ? l.minutes * 60000 : undefined} />

@@ -24955,5 +24955,8 @@
   "wiki articles when a task needs them.": "articles du wiki quand une tâche l’exige.",
   "{0} passages": "{0} passages",
   "Another session (“{0}”) is at work in the same folder: wait for it to finish, then try again.": "Une autre session (« {0} ») travaille dans le même dossier : attendez qu’elle ait terminé, puis réessayez.",
-  "The files could not be saved before putting them back: try again in a moment": "Les fichiers n’ont pas pu être enregistrés avant leur remise en place : réessayez dans un instant."
+  "The files could not be saved before putting them back: try again in a moment": "Les fichiers n’ont pas pu être enregistrés avant leur remise en place : réessayez dans un instant.",
+  "It pauses once this round has been checked": "Elle se met en pause une fois ce tour vérifié",
+  "{0} · running the checks · pausing after this round": "{0} · exécute les vérifications · pause après ce tour",
+  "{0} · working · pausing after this round": "{0} · au travail · pause après ce tour"
 }

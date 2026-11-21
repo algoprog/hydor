@@ -24956,5 +24956,8 @@
   "wiki articles when a task needs them.": "artigos da wiki quando uma tarefa precisa deles.",
   "{0} passages": "{0} trechos",
   "Another session (“{0}”) is at work in the same folder: wait for it to finish, then try again.": "Outra sessão (“{0}”) está trabalhando na mesma pasta: espere até que ela termine e tente novamente.",
-  "The files could not be saved before putting them back: try again in a moment": "Não foi possível salvar os arquivos antes de restaurá-los: tente novamente em instantes"
+  "The files could not be saved before putting them back: try again in a moment": "Não foi possível salvar os arquivos antes de restaurá-los: tente novamente em instantes",
+  "It pauses once this round has been checked": "Pausa assim que esta rodada for verificada",
+  "{0} · running the checks · pausing after this round": "{0} · executando as verificações · vai pausar após esta rodada",
+  "{0} · working · pausing after this round": "{0} · trabalhando · vai pausar após esta rodada"
 }

@@ -7,7 +7,7 @@ import { tally, type GoalCheck, type GoalRound, type GoalState } from '@shared/g
 import { Badge, Button, cx, inputCls } from '../../components/ui';
 import { say } from './Say';
 import { useAct } from './state';
-import { before, busy, changeText, outcomeLabel, PAUSE_WAIT, resultText, roundBroke, roundCost, roundName, shortLabel, sinceTitle, startResultText, valueText } from './words';
+import { before, busy, changeText, outcomeLabel, pauseWait, resultText, roundBroke, roundCost, roundName, shortLabel, sinceTitle, startResultText, valueText } from './words';
 
 const ROWS_SHOWN = 8;
 
@@ -102,7 +102,7 @@ function Detail({ g, r }: { g: GoalState; r: GoalRound }) {
   const was = before(g, r);
   const res = (c: GoalCheck) => r.results.find((x) => x.id === c.id);
   const sayBtn = (what: 'keep' | 'undo' | 'from', label: string) => (
-    <span title={wait ? PAUSE_WAIT : undefined}>
+    <span title={wait ? pauseWait(g) : undefined}>
       <Button size="sm" variant={panel === what ? 'secondary' : 'ghost'} disabled={wait} onClick={() => setPanel(panel === what ? null : what)}>
         {label}
       </Button>

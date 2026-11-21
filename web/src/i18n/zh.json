@@ -26811,5 +26811,8 @@
   "wiki articles when a task needs them.": "篇 Wiki 文章。",
   "{0} passages": "{0} 个段落",
   "Another session (“{0}”) is at work in the same folder: wait for it to finish, then try again.": "另一个会话（“{0}”）正在同一个文件夹中工作：请等它完成后再试一次。",
-  "The files could not be saved before putting them back: try again in a moment": "放回之前无法保存这些文件：请稍后再试"
+  "The files could not be saved before putting them back: try again in a moment": "放回之前无法保存这些文件：请稍后再试",
+  "It pauses once this round has been checked": "本轮检查完成后会暂停",
+  "{0} · running the checks · pausing after this round": "{0} · 正在运行检查 · 本轮结束后暂停",
+  "{0} · working · pausing after this round": "{0} · 工作中 · 本轮结束后暂停"
 }

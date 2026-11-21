@@ -24954,5 +24954,8 @@
   "wiki articles when a task needs them.": "件のWiki記事を読みます。",
   "{0} passages": "{0}件のパッセージ",
   "Another session (“{0}”) is at work in the same folder: wait for it to finish, then try again.": "別のセッション（「{0}」）が同じフォルダで作業中です。完了するまで待ってから、もう一度お試しください。",
-  "The files could not be saved before putting them back: try again in a moment": "元に戻す前にファイルを保存できませんでした。しばらくしてからもう一度お試しください。"
+  "The files could not be saved before putting them back: try again in a moment": "元に戻す前にファイルを保存できませんでした。しばらくしてからもう一度お試しください。",
+  "It pauses once this round has been checked": "このラウンドのチェックが終わったら一時停止します",
+  "{0} · running the checks · pausing after this round": "{0} · チェックを実行中 · このラウンドの後に一時停止します",
+  "{0} · working · pausing after this round": "{0} · 作業中 · このラウンドの後に一時停止します"
 }
