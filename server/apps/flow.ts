@@ -852,7 +852,8 @@ async function toolStep(x: Exec, s: Extract<Step, { do: 'tool' }>, scope: Scope,
   if (!tool) throw new Error(`The tool ${s.tool} is not here: is its part of Hydor turned on?`);
   const args = valueOf(s.with ?? {}, scope) as Record<string, unknown>;
   // Tried again while its failure may pass, its host's calls spaced, a look-up kept a while (sturdy.ts).
-  const called = await callTool(tool, args, ctx, { cache: s.cache, signal: x.abort.signal });
+  // A public page's visitors do not get this computer's browser opening pages for them.
+  const called = await callTool(tool, args, ctx, { cache: s.cache, signal: x.abort.signal, browser: !x.pub });
   const sig = callKey(s.tool, args);
   if (!called.ok) {
     const optional = (key: string) => !!x.run.recipe.secrets?.some((k) => k.name === key && k.optional);

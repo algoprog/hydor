@@ -245,10 +245,10 @@ export type Called = { ok: true; text: string; from?: 'cache' | 'browser'; tries
 
 /**
  * One call of a flow: from what is kept when it is there; else made in its host's turn, tried again while its failure may
- * pass, a page that keeps programs out read in the browser, and a good answer kept. `cache`: the step's say (false: never
- * kept; seconds: kept that long).
+ * pass, a page that keeps programs out read in the browser (unless `browser` is false), and a good answer kept. `cache`:
+ * the step's say (false: never kept; seconds: kept that long).
  */
-export async function callTool(tool: RunTool, args: Record<string, unknown>, ctx: RunCtx, o: { cache?: false | number; signal?: AbortSignal; random?: () => number } = {}): Promise<Called> {
+export async function callTool(tool: RunTool, args: Record<string, unknown>, ctx: RunCtx, o: { cache?: false | number; signal?: AbortSignal; random?: () => number; browser?: boolean } = {}): Promise<Called> {
   const host = hostOf(tool.name, args);
   const key = o.cache !== false && o.cache !== 0 && cacheable(tool.name, args) ? callKey(tool.name, args) : null;
   if (key) {
@@ -281,7 +281,7 @@ export async function callTool(tool: RunTool, args: Record<string, unknown>, ctx
     const wait = retryWait(failure, { tries, waited, safe, random: o.random });
     if (wait === null) {
       // A page that keeps programs out: once in the browser.
-      if (tool.name === 'read_page' && (failure.kind === 'botwall' || failure.status === 401 || failure.status === 403 || failure.status === 429)) {
+      if (o.browser !== false && tool.name === 'read_page' && (failure.kind === 'botwall' || failure.status === 401 || failure.status === 403 || failure.status === 429)) {
         const url = String(args.url ?? '');
         const read = await readInBrowser({ url: /^https?:/i.test(url) ? url : `https://${url}`, question: typeof args.question === 'string' ? args.question : undefined, page: Number(args.page) || undefined }, o.signal).catch(() => null);
         if (read) {
