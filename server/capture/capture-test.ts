@@ -9,7 +9,7 @@
 //   DATA_DIR=/tmp/hydor-test-capture node dist/dev/capture-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { pickChrome } from '../browser/chrome.ts';
+import { pickRunnableChrome } from '../browser/chrome.ts';
 import { jpegLayout } from '../browser/jpeg.ts';
 import { canCapture, capture, closeCapture, withTab, type Captured } from './index.ts';
 
@@ -119,7 +119,7 @@ if (!canCapture()) {
   console.log('No Chromium here: the pictures are not tested.');
   process.exit(0);
 }
-console.log(`with ${pickChrome('')?.path}`);
+console.log(`with ${pickRunnableChrome('')?.path}`);
 let failed = 0;
 for (const [name, fn] of tests) {
   try {

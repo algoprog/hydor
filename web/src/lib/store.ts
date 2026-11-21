@@ -457,6 +457,8 @@ export const useSystemLive = create<{ samples: SystemSample[]; push: (s: SystemS
 export type Theme = 'dark' | 'light' | 'system';
 /** How much moves (Settings → General → Appearance): everything, all but what moves as you open things, or none of the decorative motion. */
 export type Motion = 'full' | 'calm' | 'off';
+/** How big reading text is (Settings → General → Appearance): the size it has, a seventh larger, or a third larger (lib/textSize.ts). */
+export type TextSize = 'default' | 'large' | 'larger';
 export type SideView = 'sessions' | 'files' | 'search';
 
 export interface OpenTab {
@@ -472,6 +474,8 @@ interface UIState {
   theme: Theme;
   /** How much of the app's small motion plays on this device (lib/motion.ts). */
   motion: Motion;
+  /** How big messages, Help pages and the message box are on this device (lib/textSize.ts). */
+  textSize: TextSize;
   /** The theme shown in each mode (lib/theme.ts). */
   darkTheme: string;
   lightTheme: string;
@@ -538,6 +542,7 @@ function loadUI(): Partial<UIState> {
 export const useUI = create<UIState>((set, get) => ({
   theme: 'dark',
   motion: 'full',
+  textSize: 'default',
   darkTheme: 'naget-dark',
   lightTheme: 'naget-light',
   termSuggest: true,

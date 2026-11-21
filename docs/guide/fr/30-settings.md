@@ -19,6 +19,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Importer**](/settings?s=general&find=Import) : Ajouter un thème partagé par quelqu’un.
 - [**Langue**](/settings?s=general&find=Language) : La langue d’affichage de l’app, et celle dans laquelle les agents écrivent.
 - [**Animations**](/settings?s=general&find=Motion) : Quelle part de mouvement dans l’app : complet, calme (rien ne glisse ni ne s’estompe à l’ouverture d’une page ou d’une fenêtre), ou aucun.
+- [**Taille du texte**](/settings?s=general&find=Text%20size) : Taille des messages, des pages d’Aide et de la zone de saisie sur cet appareil : par défaut, grande ou plus grande.
 - [**Envoi pendant qu’un agent travaille**](/settings?s=general&find=Sending%20while%20an%20agent%20works) : Entrée rejoint le tour en cours, ou attend qu’il se termine.
 - [**Suggestions du terminal**](/settings?s=general&find=Terminal%20suggestions) : Suggestions grisées après le curseur dans les terminaux.
 - [**Reprendre après les limites d’utilisation**](/settings?s=general&find=Resume%20after%20usage%20limits) : Reprend une session une minute après la réinitialisation de la limite d’un forfait.

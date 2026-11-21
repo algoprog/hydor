@@ -502,7 +502,7 @@ agents that speak ACP and take MCP servers.
   trusts only its own Codex hook (found once per Codex version). Every chat in a project with Wiki memory on uses it (a Confidential chat never does); there is no switch in a chat's own options.
   Plans: an agent adopts a plan you give it or choose (`wiki_plan_preview`, then `wiki_plan_adopt`) as
   `output/projects/<name>/plan.md` in the project's wiki, with an execution register (separate states for implementation, deployment
-  and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as a protected snapshot,
+  and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as an ordinary snapshot file with its checksum (it works on network drives too),
   the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
   write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
@@ -1911,7 +1911,10 @@ programs shows each program's version and what is out, with Check now, Update no
   in the session and in Settings; the agent pressing Escape itself does not. Each step shows in the conversation with
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
-  can be changed.
+  can be changed. Text size, set per device in Settings → General → Appearance (Default, Large or Larger: about 15% or
+  30% bigger), enlarges what is read and typed: the messages in a conversation (the agent's replies and your own), the
+  Help pages and the message box; menus, the sidebar, editors and answer cards keep their size, and on a phone the message
+  box never goes below 16 px.
 - Small, quiet motion, set per device in Settings → General → Appearance → Motion (Full, Calm or Off; the system's
   Reduce motion always means Off). Full: buttons, rail tiles, session rows and chips dip to 97% while pressed; a copy turns into a check that draws itself, holds for a moment and turns back; switches spring;
   the rail's accent bar glides to the page you open; a session's dot turns green with one ring when work finishes and

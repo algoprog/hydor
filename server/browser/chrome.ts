@@ -168,6 +168,16 @@ export function pickChrome(chosen: string): ChromeInfo | null {
   return (chosen && all.find((c) => c.path === chosen)) || all[0] || null;
 }
 
+/**
+ * A Chromium this server starts itself (pictures and PDFs, server/capture): the chosen one, else the best found, never the
+ * desktop app's own browser, which has no program to run (its path is only DESKTOP_CHROME) and opens its pages in the
+ * app's window.
+ */
+export function pickRunnableChrome(chosen: string): ChromeInfo | null {
+  const all = findChromes().filter((c) => c.source !== 'desktop');
+  return (chosen && all.find((c) => c.path === chosen)) || all[0] || null;
+}
+
 // ---- running it -----------------------------------------------------------------------------------
 
 /** Chromium binaries whose sandbox this system refuses (unprivileged user namespaces off, or root). */
@@ -267,6 +277,7 @@ function start(bin: string, o: LaunchOpts, sandbox: boolean): Promise<Launched> 
 }
 
 export async function launchChrome(c: ChromeInfo, o: Omit<LaunchOpts, 'shell'>): Promise<Launched> {
+  if (c.source === 'desktop' || c.path === DESKTOP_CHROME) throw new Error('The desktop app’s own browser is started by the desktop app (launchDesktop), not run as a program');
   fs.mkdirSync(o.userDataDir, { recursive: true, mode: 0o700 });
   const opts = { ...o, shell: c.shell };
   if (!noSandbox.has(c.path)) {

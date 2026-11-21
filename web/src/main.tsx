@@ -5,6 +5,7 @@ import { App } from './App';
 import { startLanguage } from './i18n';
 import { startHoverScroll } from './lib/hoverScroll';
 import { startMotion } from './lib/motion';
+import { startTextSize } from './lib/textSize';
 import { endBoot } from './lib/boot';
 import { watchInstall } from './lib/install';
 
@@ -24,6 +25,7 @@ const portal = /^(?:\/m\/[a-z0-9-]+)?\/p\/([^/]+)\/?$/.test(location.pathname);
 startHoverScroll();
 // How much moves here, on <html> for the stylesheet.
 startMotion();
+startTextSize();
 // The browser's offer to install the app comes once, as the page loads: kept for Settings → App → Use on your phone.
 watchInstall();
 

@@ -19,6 +19,7 @@
 - [**インポート**](/settings?s=general&find=Import)：共有されたテーマを追加。
 - [**言語**](/settings?s=general&find=Language)：アプリの表示言語と、エージェントが書く言語。
 - [**動き**](/settings?s=general&find=Motion)：アプリの動きの量：フル、控えめ（ページやウィンドウを開くときにスライドやフェードをしない）、またはなし。
+- [**文字サイズ**](/settings?s=general&find=Text%20size)：この端末でのメッセージ、ヘルプページ、入力ボックスの文字の大きさ：標準、大、特大。
 - [**エージェントの作業中に送信**](/settings?s=general&find=Sending%20while%20an%20agent%20works)：Enterで実行中のターンに加わるか、終わるまで待ちます。
 - [**ターミナルのサジェスト**](/settings?s=general&find=Terminal%20suggestions)：ターミナルでカーソルの後ろに表示されるグレーの入力候補。
 - [**使用量の上限後に再開**](/settings?s=general&find=Resume%20after%20usage%20limits)：プランの上限がリセットされた1分後にセッションを続行します。

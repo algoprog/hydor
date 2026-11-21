@@ -8,7 +8,7 @@ import type { ChildProcess } from 'node:child_process';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { Cdp, CdpSession } from '../browser/cdp.ts';
-import { launchChrome, pickChrome } from '../browser/chrome.ts';
+import { launchChrome, pickRunnableChrome } from '../browser/chrome.ts';
 import { captureJpeg } from '../browser/jpeg.ts';
 import { browserSettings } from '../browser/settings.ts';
 
@@ -70,9 +70,12 @@ let db: DB | null = null;
 /** Settings → Browser decides which Chromium runs. */
 export const setCaptureDb = (d: DB) => (db = d);
 
-/** A Chromium to take pictures with is on this machine. */
+/**
+ * A Chromium to take pictures with is on this machine: one the server can start itself, never the desktop app's own
+ * browser (which the desktop app runs in its window; Settings → Browser may pick it for agents' browsing).
+ */
 export function canCapture(): boolean {
-  return !!pickChrome(db ? browserSettings(db).chrome : '');
+  return !!pickRunnableChrome(db ? browserSettings(db).chrome : '');
 }
 
 let proc: ChildProcess | null = null;
@@ -93,7 +96,7 @@ function reap() {
 async function browser(): Promise<Cdp> {
   if (cdp && !cdp.closed) return cdp;
   starting ??= (async () => {
-    const chrome = pickChrome(db ? browserSettings(db).chrome : '');
+    const chrome = pickRunnableChrome(db ? browserSettings(db).chrome : '');
     if (!chrome) throw new Error('There is no Chromium on this computer to take the picture with: Settings → Browser can download one.');
     fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
     reap();

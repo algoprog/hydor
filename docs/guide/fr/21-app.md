@@ -99,6 +99,10 @@ Les agents vous écrivent dans la langue que vous choisissez : on le leur demand
 
 Chaque mouvement dure environ un dixième à un quart de seconde, ne retarde jamais ce que vous ouvrez et ne se répète jamais, sauf le travail en cours. Le réglage **Réduire les animations** de votre appareil l’emporte toujours : s’il est activé, l’app se comporte comme si **Désactivé** était choisi, quoi que dise ce paramètre. Le choix est conservé dans ce navigateur. Sur téléphone, les glissements de la barre latérale et des colonnes et les fondus entre pages ne se jouent pas, mais les fenêtres montent toujours depuis le bas.
 
+## Agrandir le texte
+
+Si le texte est trop petit à lire, par exemple sur un téléphone, [Paramètres → App → Général → Apparence → Taille du texte](/settings?s=general&find=Text%20size) l’agrandit sur cet appareil : **Par défaut**, **Grand** (environ 15 % plus grand) ou **Plus grand** (environ 30 % plus grand). Il agrandit ce que vous lisez et écrivez : les messages d’une conversation (les réponses de l’agent et les vôtres), les pages d’Aide et la zone de saisie. Les menus, la barre latérale, les éditeurs et les cartes qu’un agent affiche gardent leur taille. Le choix est conservé dans ce navigateur : votre téléphone et votre ordinateur peuvent donc différer.
+
 ## Décider du rôle d’Entrée pendant qu’un agent travaille
 
 Dans le groupe **Sessions**, [**Envoi pendant qu’un agent travaille**](/settings?s=general&find=Sending%20while%20an%20agent%20works) décide de ce qui se passe quand vous envoyez un message alors que l’agent est au milieu d’un tour :
@@ -266,6 +270,7 @@ Certains choix appartiennent au navigateur dans lequel vous les faites, si bien 
 - le mode (sombre, clair ou système) et le thème sombre et le thème clair affichés ;
 - la langue ;
 - l’importance des mouvements (**Animations**) ;
+- la taille du texte (**Taille du texte**) ;
 - l’action de la touche Entrée pendant qu’un agent travaille ;
 - les suggestions du terminal, le son des notifications, et si cet appareil reçoit des notifications ;
 - le dossier de la page Fichiers, les fichiers ouverts, les fichiers récents et l’affichage des dossiers (liste ou vignettes, et leur ordre) ; les dossiers épinglés sont conservés sur le serveur, les mêmes sur tous les appareils ;
@@ -286,3 +291,4 @@ Le reste est conservé par l’app et est identique sur tous les appareils : les
 - « Active la reprise des sessions après les limites d’utilisation. »
 - « Réactive les astuces et affiche-les toutes à nouveau depuis le début. »
 - « Règle les animations sur Calme. » ou « Désactive les animations sur cet appareil. »
+- « Agrandis le texte sur cet appareil. » ou « Mets la taille du texte sur Plus grand. »

@@ -10,6 +10,11 @@
     var m = JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').motion;
     root.dataset.motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : m === 'calm' || m === 'off' ? m : 'full';
   } catch (e) {}
+  // How big reading text is (Settings → General → Appearance → Text size): the stylesheet's --n-text-scale reads it.
+  try {
+    var ts = JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').textSize;
+    root.dataset.textSize = ts === 'large' || ts === 'larger' ? ts : 'default';
+  } catch (e) {}
   try {
     var b = JSON.parse(localStorage.getItem('wa.theme.boot') || 'null');
     var mode = b ? b.mode : (JSON.parse(localStorage.getItem('wa.ui.v1') || '{}').theme || 'dark');

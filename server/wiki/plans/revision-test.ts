@@ -1,4 +1,4 @@
-// Verify protected plan revisions, explicit approval and fail-closed concurrent writes.
+// Verify plan revisions kept as ordinary snapshots, explicit approval and fail-closed concurrent writes.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -65,23 +65,27 @@ try {
   assert.equal(record.original_path, args.path);
   assert.equal(record.original_link_base, 'output/projects/sample');
   assert.equal(record.superseded_by_revision, 4);
-  assert.equal(record.protection, result.protection);
-  assert.equal(fs.statSync(path.join(archived, 'document.md')).mode & 0o222, 0);
-  assert.equal(fs.statSync(path.join(archived, 'record.json')).mode & 0o222, 0);
-  assert.equal(fs.statSync(path.join(archived, 'WHY.md')).mode & 0o222, 0);
+  // Snapshots are ordinary files: nothing is made read-only or immutable, and record.json holds the checksum that detects changes.
+  assert.equal('protection' in record, false);
+  assert.equal('protection' in result, false);
+  for (const name of ['document.md', 'record.json', 'WHY.md']) {
+    assert.equal(fs.statSync(path.join(archived, name)).mode & 0o200, 0o200, `${name} stays writable by its owner`);
+    fs.accessSync(path.join(archived, name), fs.constants.W_OK);
+  }
+  assert.equal(record.sha256, wikiHash(fs.readFileSync(path.join(archived, 'document.md'))));
   assert.match(fs.readFileSync(file, 'utf8'), /revision: 4/);
   assert.match(fs.readFileSync(file, 'utf8'), /WP-2: New work/);
   assert.equal(cards, 3);
   assert.throws(() => previewRevision(root, args), /changed/i);
   // A colliding historical snapshot fails without replacing the current plan.
   const second = { ...args, expectedSha256: readWiki(root, args.path).sha256, content: `${fs.readFileSync(file, 'utf8')}\nWP-3: More work.\n` };
-  assert.throws(() => previewRevision(root, { ...second, content: '# Plan\n\nWP-3: More work.\n' }), /identifiers/);
+  assert.throws(() => previewRevision(root, { ...second, content: '# Plan\n\nWP-3: More work.\n' }), /work item ids the plan has: WP-1/);
   const next = previewRevision(root, second);
   fs.mkdirSync(path.join(root, next.snapshot));
   const beforeCollision = fs.readFileSync(file);
   assert.throws(() => applyRevision(root, second, next.sha256));
   assert.deepEqual(fs.readFileSync(file), beforeCollision);
-  assert.throws(() => previewRevision(root, { ...second, path: 'output/projects/.archive/old/plan.md' }), /active project plan/);
+  assert.throws(() => previewRevision(root, { ...second, path: 'output/projects/.archive/old/plan.md' }), /path must be output\/projects\/<plan>\/<file>\.md/);
   // A failed final replacement leaves the original intact and leaves no snapshot behind, so the plan can be revised again.
   const failureFile = path.join(root, 'output/projects/sample/failure-plan.md');
   const failureOriginal = '# Original plan\n';
@@ -150,28 +154,54 @@ try {
   const crlfResult = applyRevision(root, crlfArgs, crlfPreview.sha256);
   assert.equal(crlfResult.revision, 3);
   assert.deepEqual(fs.readFileSync(path.join(root, crlfResult.snapshot, 'document.md')), Buffer.from(crlf));
-  // Simulate a filesystem that reports read-only mode but still opens the snapshot for writing.
+  // A filesystem that ignores chmod (a network share) changes nothing: the snapshot is plain files either way.
   const weakPath = 'output/projects/sample/weak.md';
   const weakOriginal = '# Weak protection plan\n';
   fs.writeFileSync(path.join(root, weakPath), weakOriginal);
   const weakArgs = { ...args, path: weakPath, content: '# Proposed plan\n', expectedSha256: wikiHash(weakOriginal) };
   const weakPreview = previewRevision(root, weakArgs);
-  const weakDocument = path.join(root, weakPreview.snapshot, 'document.md');
-  const open = fs.openSync;
+  const chmod = fs.chmodSync;
+  let chmods = 0;
   try {
-    fs.openSync = ((file: fs.PathLike, flags: string | number, mode?: fs.Mode) => {
-      if (String(file).includes('.tmp-revision-') && String(file).endsWith('document.md') && typeof flags === 'number' && (flags & fs.constants.O_APPEND)) return open(file, 'r');
-      return open(file, flags, mode);
-    }) as typeof fs.openSync;
-    assert.throws(() => applyRevision(root, weakArgs, weakPreview.sha256), /cannot be protected/);
-  } finally {
-    fs.openSync = open;
-  }
-  assert.equal(fs.existsSync(path.dirname(weakDocument)), false, 'a snapshot that cannot be protected is removed');
-  assert.equal(fs.readFileSync(path.join(root, weakPath), 'utf8'), weakOriginal);
+    fs.chmodSync = (() => { chmods++; }) as typeof fs.chmodSync;
+    assert.equal(applyRevision(root, weakArgs, weakPreview.sha256).revision, 2);
+  } finally { fs.chmodSync = chmod; }
+  assert.equal(chmods, 0, 'no mode is changed on the user\'s files');
+  assert.equal(fs.readFileSync(path.join(root, weakPreview.snapshot, 'document.md'), 'utf8'), weakOriginal);
+  // Words in document_status are fine; an ending status in the replacement is refused with its line; owned fields written oddly are ignored.
+  const wordsPath = 'output/projects/sample/words.md';
+  const wordsOriginal = '---\ndocument_status: In progress\ntitle: Words\n---\n# Words\n\nWP-1: Work.\n';
+  fs.writeFileSync(path.join(root, wordsPath), wordsOriginal);
+  const wordsArgs = { ...args, path: wordsPath, expectedSha256: wikiHash(wordsOriginal), content: wordsOriginal.replace('In progress', '"Waiting for review (draft 2)"') + '\nWP-2: More.\n' };
+  assert.match(previewRevision(root, wordsArgs).content, /document_status: "Waiting for review \(draft 2\)"/);
+  assert.throws(() => previewRevision(root, { ...wordsArgs, content: wordsOriginal.replace('In progress', 'Archived') + '\nWP-2: More.\n' }), /The replacement, line 2: document_status "Archived" ends a plan/);
+  const oddOwned = '---\ndocument_id: not a valid id!\ndocument_kind: [a, b]\nrevision: 3 (draft)\nchange_reason: >\n  long text\ndocument_status: In progress\ntitle: Words\n---\n# Words\n\nWP-1: Work.\n\nWP-2: More.\n';
+  const oddPreview = previewRevision(root, { ...wordsArgs, content: oddOwned });
+  assert.match(oddPreview.content, /^---\ndocument_status: In progress\ntitle: Words\ndocument_id: "DOC-[a-f0-9]{12}"\ndocument_kind: "plan"\nrevision: 2\n/);
+  assert.equal(oddPreview.content.includes('long text'), false, 'an owned field takes its continuation lines with it');
+  // Errors in the current plan name the document, the field, the line and what was found.
+  const badPath = 'output/projects/sample/bad.md';
+  const bad = '---\ntitle: Bad\nrevision: 3 (draft)\n---\n# Bad\n';
+  fs.writeFileSync(path.join(root, badPath), bad);
+  const badArgs = { ...args, path: badPath, expectedSha256: wikiHash(bad), content: '# Better\n' };
+  assert.throws(() => previewRevision(root, badArgs), (error: Error) => error.message === 'The current plan, line 3: revision must be a whole number (found "3 (draft)").');
+  fs.writeFileSync(path.join(root, badPath), '---\ntitle: Bad\n');
+  assert.throws(() => previewRevision(root, { ...badArgs, expectedSha256: wikiHash('---\ntitle: Bad\n') }), /The current plan's frontmatter opens with --- on line 1 but has no closing --- line/);
+  assert.throws(() => previewRevision(root, { ...wordsArgs, content: '---\ndocument_status: a\ndocument_status: b\n---\n# X\nWP-1 WP-2\n' }), /The replacement, line 3: document_status appears twice \(first on line 2\)/);
+  assert.throws(() => previewRevision(root, { ...wordsArgs, content: '---\ntitle: x\n<<: *base\n---\n# X\n' }), /The replacement, line 3: YAML merge keys \(<<:\) are not allowed/);
+  // A replacement that drops work item ids names them (ten at most).
+  const manyOriginal = `# Many\n\n${Array.from({ length: 12 }, (_, i) => `WI-${i + 1}: item`).join('\n')}\nWP-3: x\n`;
+  fs.writeFileSync(path.join(root, 'output/projects/sample/many.md'), manyOriginal);
+  const manyArgs = { ...args, path: 'output/projects/sample/many.md', expectedSha256: wikiHash(manyOriginal), content: '# Many\n\nWI-1: item\n' };
+  assert.throws(() => previewRevision(root, manyArgs), /drops work item ids the plan has: WI-2, WI-3, WI-4, WI-5, WI-6, WI-7, WI-8, WI-9, WI-10, WI-11 and 2 more\. Keep every id/);
+  assert.throws(() => previewRevision(root, { ...manyArgs, content: '' }), /The replacement is empty/);
+  assert.throws(() => previewRevision(root, { ...manyArgs, reason: '' }), /The reason is missing/);
+  assert.throws(() => previewRevision(root, { ...manyArgs, authorization: 'a\nb' }), /The authorization must be one line/);
+  assert.throws(() => previewRevision(root, { ...manyArgs, path: 'output/projects/sample/_index.md' }), /not a plan/);
+  assert.throws(() => previewRevision(root, { ...manyArgs, expectedSha256: wikiHash('other') }), /wiki_read it again for its current sha256/);
   const generic = wikiTools().find((tool) => tool.name === 'wiki_write')!;
   await assert.rejects(() => generic.run({ path: args.path, content: '# Bypass', expectedSha256: second.expectedSha256 }, ctx), /wiki_plan_revise/);
-  // Clearly named older plans and explicitly typed plans cannot bypass revision protection.
+  // Clearly named older plans and explicitly typed plans cannot bypass revision rules.
   const older = 'output/projects/sample/old-umsetzungsplan.md';
   fs.writeFileSync(path.join(root, older), '# Older plan\n');
   await assert.rejects(() => generic.run({ path: older, content: '# Bypass', expectedSha256: wikiHash('# Older plan\n') }, ctx), /wiki_plan_revise/);
@@ -181,9 +211,9 @@ try {
   await assert.rejects(() => generic.run({ path: quoted, content: '# Bypass', expectedSha256: wikiHash(quotedContent) }, ctx), /wiki_plan_revise/);
   const quotedPreview = previewRevision(root, { ...args, path: quoted, content: `${quotedContent}\nNew work.\n`, expectedSha256: wikiHash(quotedContent) });
   assert.equal((quotedPreview.content.match(/document_kind\s*:/g) ?? []).length, 1);
-  console.log('Plan revision preview, approvals, protection and concurrency passed');
+  console.log('Plan revision preview, approvals, snapshots and concurrency passed');
 } finally {
   db.close();
-  // Remove only this disposable test wiki; protected test files have ordinary read-only modes.
+  // Remove only this disposable test wiki.
   fs.rmSync(temp, { recursive: true, force: true });
 }

@@ -19,6 +19,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Importar**](/settings?s=general&find=Import): Agregar un tema que alguien compartió.
 - [**Idioma**](/settings?s=general&find=Language): El idioma en que se muestra la app y en que escriben los agentes.
 - [**Movimiento**](/settings?s=general&find=Motion): Cuánto se mueve la app: completo, tranquilo (nada se desliza ni se desvanece al abrir una página o una ventana) o ninguno.
+- [**Tamaño del texto**](/settings?s=general&find=Text%20size): Tamaño de los mensajes, las páginas de Ayuda y el cuadro donde escribes en este dispositivo: predeterminado, grande o más grande.
 - [**Enviar mientras un agente trabaja**](/settings?s=general&find=Sending%20while%20an%20agent%20works): Enter se une al turno en curso, o espera a que termine.
 - [**Sugerencias en la terminal**](/settings?s=general&find=Terminal%20suggestions): Sugerencias grises tras el cursor en las terminales.
 - [**Reanudar tras los límites de uso**](/settings?s=general&find=Resume%20after%20usage%20limits): Continúa una sesión un minuto después de que se restablece el límite de un plan.

@@ -635,7 +635,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                           ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
                           : 'Message to continue…'
             }
-            className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
+            className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 composer-input leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />
           <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">

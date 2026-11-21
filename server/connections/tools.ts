@@ -166,6 +166,7 @@ const HTTP_REQUEST: RunTool = {
     'auth: a key’s NAME signs the request (in Authorization: Bearer, or as the user set it up; auth_header, auth_prefix or auth_query change that for one call).',
     'Or write {{NAME}} where a key goes, in the address, a header or the body (a sign-in’s password in a JSON body: "password": "{{VOLTARO_PASSWORD}}"), and basic_auth takes a user name and password the same way.',
     'The server puts the keys in, only for the hosts each is allowed for, and masks them in the answer.',
+    'A saved key in an answer shows as [secret NAME]: to send it back unchanged (an update that takes the whole configuration again), write {{NAME}} in its place.',
     'list_connections shows the saved keys; request_secret asks the user for a missing one.',
   ].join(' '),
   inputSchema: {

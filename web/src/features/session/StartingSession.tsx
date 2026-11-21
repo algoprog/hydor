@@ -71,7 +71,7 @@ export function StartingSession({ id }: { id: string }) {
                 {(st.text || files.length > 0) && (
                   <div className="max-w-full rounded-[20px] bg-bg-2 px-4 py-2.5">
                     {st.text && (
-                      <div translate="no" className="max-h-[6lh] overflow-hidden text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                      <div translate="no" className="max-h-[6lh] overflow-hidden msg-text leading-relaxed break-words whitespace-pre-wrap">
                         {st.text}
                       </div>
                     )}
