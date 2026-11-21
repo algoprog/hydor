@@ -330,7 +330,7 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
       case 'table': {
         if (!rows.length) return '';
         const f = answerField(b.data);
-        const named = Array.isArray(w.columns) ? (w.columns as unknown[]).map((c) => (isObj(c) ? { id: String(c.id), label: String(c.label ?? label(String(c.id))), type: c.type } : { id: String(c), label: label(String(c)) })) : null;
+        const named = Array.isArray(w.columns) ? (w.columns as unknown[]).map((c) => (isObj(c) ? { id: String(c.id), label: String(c.label ?? label(String(c.id))), type: c.type } : { id: String(c), label: f?.columns?.find((y: any) => y.id === String(c))?.label ?? label(String(c)) })) : null;
         const cols: any[] = named ?? (f?.columns?.length ? f.columns : [...new Set(rows.flatMap((r) => (isObj(r) ? Object.keys(r) : [])))].filter((k) => !['id', 'createdAt', 'updatedAt'].includes(k)).map((id) => ({ id, label: label(id) })));
         const cell = (c: any, x: unknown) => {
           const t = c.type ?? f?.columns?.find((y: any) => y.id === c.id)?.type;
