@@ -21,7 +21,11 @@ function firstLine(t: string) {
     .map((x) =>
       x
         .replace(/^\s*(#+|[-*+>]|\d+[.)])\s+/, '')
+        // A link as its words and a picture left out: the address would fill the line.
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/[*_`]/g, '')
+        .replace(/\s{2,}/g, ' ')
         .trim(),
     )
     .filter(Boolean);
