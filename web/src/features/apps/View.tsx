@@ -9,6 +9,7 @@ import { translateUi } from '@shared/app-ui';
 import { libsHead, type AppAsset } from '@shared/app-media';
 import { openLightbox, openVideo } from '../../components/Lightbox';
 import type { AnswerField, AppRun } from '@shared/apps';
+import { isActive } from '@shared/apps';
 import type { AppInfo } from '@shared/app-manifest';
 import { api, enc, post, put } from '../../lib/api';
 import { mu } from '../../lib/machine';
@@ -92,13 +93,16 @@ export function AppView({
   const store = useMemo(() => memoryStore(), []);
   // An app that keeps records: yours, or a ready-made one that keeps some (under its "tpl:" id); not a try of changes, nor a public page.
   const saved = (!appId.startsWith('tpl:') || !!keeps) && appId !== 'test' && !publicView;
+  // A run with steps at work shows the answer so far: the view draws what is there (not there yet: shared/app-ui.ts notYet).
+  const partial = run && !run.result && isActive(run.status) && run.partial ? run.partial : null;
   // What changes while it is on screen: its run's status and answer (compared by what they hold, not by each new copy).
-  const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, run.inputs, run.misses ?? null]) : '';
+  const runKey = run ? JSON.stringify([run.id, run.status, run.result ?? null, partial, run.inputs, run.misses ?? null]) : '';
   const lastKey = last ? JSON.stringify([last.id, last.status, last.result ?? null]) : '';
   const ctx = useMemo(
     () => ({
       on,
-      result: run?.result ?? {},
+      result: run?.result ?? partial ?? {},
+      ...(partial ? { partial: true } : {}),
       inputs: run?.inputs ?? {},
       run: run ? runOf(run) : {},
       app: { name, description: description ?? '', id: appId },

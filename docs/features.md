@@ -897,7 +897,8 @@ agents that speak ACP and take MCP servers.
   run, or added under Settings → Capabilities → Apps → Run without asking (remove it there to be asked again), shows its
   card only when it needs details your message left out, and a scheduled task's own session runs apps without asking.
   Its run and its view show in the conversation, and when its answer does not fit and the agent answers itself, the
-  card is taken out so there is one answer. Each app's Agents can
+  card is taken out so there is one answer; a change you then ask of what it gave (another order, shorter, one
+  thing for another) goes to the app's run, and its card moves under the reply with the new answer. Each app's Agents can
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. About you
   (Settings → Apps) is one short record apps read instead of asking every run: where you live, country, language,
   units, currency, diet, people at home, streaming services, teams, research fields, topics, venues, you as an author
@@ -962,7 +963,10 @@ agents that speak ACP and take MCP servers.
   in its file. An app names the keys it needs (API keys, tokens) and never their values: they are asked for on
   its form, on its install card or on its card in a session when an agent runs it, and kept in the vault, where
   its runs use them by name; a run without one does not start. Follow-ups refine a run's
-  result, asked on its page or in its session, which opens on that result with a switch to the conversation.
+  result, asked on its page, in its session (which opens on that result with a switch to the conversation) or by
+  its view's buttons: the agent hands in what changed and the rest stays. A finished run with steps takes them too:
+  the first starts a session for it with the app's agent, told what the app did, with the form's answers, the
+  result and what each step gave as files in the run's folder, and what it spends adds to the run's cost.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
   to you that it waits for (a short form whose choices can be what the run found, to tick one or several),
@@ -982,7 +986,9 @@ agents that speak ACP and take MCP servers.
   called in their place, which other apps can call too; Add a step offers these blocks, yours and ready-made
   ones to sum up a page, translate, answer from the web, sort into kinds or pull out facts) or by an agent, shown
   step by step on the run's page, run again from any step there (the steps before it giving what they gave, also
-  from a test run in its Edit) and resumed after a restart; keep records between runs that its steps, its agents
+  from a test run in its Edit) and resumed after a restart, its result filling in under the status card as its
+  steps end (a view draws the parts whose answer is there, the rest when it is; on its page, in a conversation
+  and on its public page); keep records between runs that its steps, its agents
   and the API share (lists named in its Edit, with the fields their records hold); remember across runs in a
   memory of its own; and install the Node and Python packages it needs in a folder of its own. Examples (answers
   with checks on what a run gives) try it as it is on screen, each saying how its last try went. Each save that

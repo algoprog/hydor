@@ -430,6 +430,11 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
   const block = (b: any, j: number): string => {
     const s = scope();
     if (b.if && !E.test(b.if, s)) return '';
+    // A run still at work shows the answer so far: what it does not have yet is not drawn yet.
+    if (ctx.partial && E.notYet(JSON.stringify(b) + (b.element ? (def.elements?.[b.element]?.html ?? '') : ''), ctx.result)) {
+      held++;
+      return '';
+    }
     let v: unknown;
     let waiting = false;
     const m = /^data\.([A-Za-z]\w*)$/.exec(b.data || '');
@@ -469,8 +474,11 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
     const title = b.title ? `<h2 class="n-ui-title">${esc(E.fill(b.title, s))}</h2>` : '';
     return `<section class="n-ui-block n-ui-w-${esc(b.width ?? 'full')}" data-n-b="${j}">${title}${body}</section>`;
   };
+  /** Blocks of the page drawn now that wait for the rest of the answer. */
+  let held = 0;
   const viewHtml = (): string => {
     scopes = [];
+    held = 0;
     const tabs = pages.filter(shown);
     const p = pages.find((x: any) => x.id === page) ?? tabs[0] ?? pages[0];
     if (!p) return '';
@@ -480,7 +488,10 @@ function uiKit(cfg: { n: string; def: any; ctx: any; can: string[]; labels: Reco
         ? `<nav class="n-ui-tabs" role="tablist">${tabs.map((t: any) => `<button type="button" class="n-ui-tab" role="tab" data-n-page="${esc(t.id)}" aria-selected="${t.id === p.id || (p.tab === false && history.length && history[history.length - 1].page === t.id) ? 'true' : 'false'}">${esc(t.title)}</button>`).join('')}</nav>`
         : '';
     const back = p.tab === false ? `<button type="button" class="n-ui-back" data-n-back>← ${esc(history.length ? (pages.find((x: any) => x.id === history[history.length - 1].page)?.title ?? L('back', 'Back')) : L('back', 'Back'))}</button>` : '';
-    return `${nav}${back}<div class="n-ui-blocks" data-n-pg="${esc(p.id)}">${p.blocks.map(block).join('')}</div>`;
+    const body = p.blocks.map(block).join('');
+    // Some of this page is not there yet: one quiet line where it will be.
+    const wait = held ? `<p class="n-ui-block n-ui-note">${esc(L('working', 'Still working on this part…'))}</p>` : '';
+    return `${nav}${back}<div class="n-ui-blocks" data-n-pg="${esc(p.id)}">${body}${wait}</div>`;
   };
 
   // What a template may not do: run scripts, load frames, or point a link at a script. Its values are escaped

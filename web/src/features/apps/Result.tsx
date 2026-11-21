@@ -544,7 +544,10 @@ export function RunBody({
   /** Leave out the agent's reply when there is a result (in a session, whose agent says what came of it). */
   noReply?: boolean;
 }) {
-  const hasResult = !!run.result && Object.keys(run.result).length > 0;
+  // A run with steps at work: the answer so far, with what its steps have given, until the whole one comes.
+  const partial = !run.result && isActive(run.status) && run.partial && Object.keys(run.partial).length > 0 ? run.partial : null;
+  const result = run.result ?? partial;
+  const hasResult = !!result && Object.keys(result).length > 0;
   const text = reply ?? run.reply;
   const [plain, setPlain] = useState(false);
   // A card pinned to a board from here says it came from this run.
@@ -561,7 +564,7 @@ export function RunBody({
           </button>
         )}
       </RunStatusCard>
-      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} cardFrom={cardFrom} publicView={publicView} />)}
+      {hasResult && (inView ? view : <ResultView answer={partial ? answer.filter((f) => f.id in partial) : answer} result={result!} name={name} assets={assets} cardFrom={cardFrom} publicView={publicView} />)}
       {text && !(noReply && hasResult) && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );

@@ -46,6 +46,8 @@ export function publicRun(r: RunRecord): Omit<AppRun, 'key' | 'costUsd' | 'agent
     status: r.status,
     inputs: r.inputs,
     result: r.result,
+    // What its steps have given so far, while it works.
+    ...(r.partial ? { partial: r.partial } : {}),
     reply: r.reply,
     error: r.status === 'failed' ? 'Something went wrong with this run. Try again in a while.' : r.status === 'stopped' ? 'This run was stopped.' : undefined,
     createdAt: r.createdAt,

@@ -269,6 +269,8 @@ export interface AppRun {
   misses?: RunMiss[];
   /** The language it writes in, a tag ("el"): what started it said so, else About you's (none kept: English). */
   lang?: string;
+  /** While a run with steps works: the answer fields its steps have given so far (each one that fits); gone once it ends. */
+  partial?: Record<string, unknown>;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;

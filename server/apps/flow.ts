@@ -61,6 +61,11 @@ interface Exec {
   misses: RunMiss[];
   missAt: Map<string, RunMiss>;
   missedCalls: Map<string, string>;
+  /**
+   * The answer so far, while it works (the main flow of a run with answer fields): the fields that come by name, the
+   * steps its outputs name (a step's end that touches neither changes nothing), the flow's own values, and what was kept last.
+   */
+  fill?: { named: Set<string>; roots: Set<string>; top?: Scope; last: string };
 }
 
 const execs = new Map<string, Exec>();
@@ -124,6 +129,7 @@ function execOf(r: RunRecord, o: FlowStart): Exec {
     ...(o.pause?.length ? { pause: { before: new Set(o.pause), next: false, at: new Map() } } : {}),
     ...missesOf(r),
     missedCalls: new Map(),
+    ...fillOf(r, flow),
   };
 }
 
@@ -216,6 +222,8 @@ async function go(x: Exec, inputs: Record<string, unknown>) {
 // ---- the steps ----------------------------------------------------------------------------------------------
 
 async function runList(x: Exec, steps: Step[], scope: Scope, prefix: string) {
+  // The flow's own values (not a round's): what the answer so far is made of.
+  if (!prefix && x.fill) x.fill.top ??= scope;
   for (const s of steps) await runOne(x, s, scope, prefix);
 }
 
@@ -274,6 +282,7 @@ async function runOne(x: Exec, s: Step, scope: Scope, prefix: string) {
   scope.steps[s.id] = values;
   x.ended.push({ id: s.id, kind: s.do, values });
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now(), ...spent() });
+  filled(x, s, values, !prefix);
 }
 
 /** A step failed: its own steps for that run (then the flow goes on), it is skipped, an agent does its work, or the run stops. */
@@ -754,6 +763,7 @@ async function rescue(x: Exec, s: Step, scope: Scope, prefix: string, msg: strin
   record(x, at, s, { status: 'done', outputs: values, endedAt: Date.now() });
   // The agent got what the step could not: nothing is missing.
   dropMiss(x, at);
+  filled(x, s, values, !prefix);
 }
 
 /** How deep a run is in apps calling apps. */
@@ -1101,6 +1111,57 @@ function byName(answer: AnswerField[], ended: Exec['ended']): Record<string, unk
   return out;
 }
 
+// ---- the answer so far ---------------------------------------------------------------------------------------
+
+/** What the answer so far needs to know of a run: nothing for a flow beside the main one, nor for an app without answer fields. */
+function fillOf(r: RunRecord, flow: Flow): Pick<Exec, 'fill'> {
+  if (r.flow || !r.recipe.answer.length) return {};
+  const outs = flow.outputs ?? {};
+  const roots = new Set(refsIn(Object.values(outs)).map((p) => /^[A-Za-z_]\w*/.exec(p)?.[0] ?? ''));
+  const named = new Set(r.recipe.answer.filter((f) => !(f.id in outs)).map((f) => f.id));
+  return { fill: { named, roots, last: JSON.stringify(r.partial ?? {}) } };
+}
+
+/**
+ * The answer so far: each answer field the steps that have ended can fill, as the end will (its output once every step
+ * value it names is there, else the last value of its name), checked on its own. A value that does not fit yet is left
+ * out, and so are files on this computer (they are kept at the end); pictures on the web show at once.
+ */
+function partialOf(x: Exec, scope: Scope): Record<string, unknown> {
+  const outs = x.flow.outputs ?? {};
+  const out: Record<string, unknown> = {};
+  for (const f of x.run.recipe.answer) {
+    let v: unknown;
+    if (f.id in outs) {
+      const there = refsIn(outs[f.id]).every((p) => {
+        const root = /^[A-Za-z_]\w*/.exec(p)?.[0] ?? '';
+        return !Object.prototype.hasOwnProperty.call(scope.steps, root) || (!!scope.steps[root] && lookup(p, scope).value !== undefined);
+      });
+      if (!there) continue;
+      v = valueOf(outs[f.id], scope);
+    } else v = byName([f], x.ended)[f.id];
+    const c = checkAnswer([{ ...f, required: false }], { [f.id]: v }, { local: false });
+    const got = c.ok ? c.value[f.id] : null;
+    if (got !== null && got !== undefined && !(Array.isArray(got) && !got.length)) out[f.id] = got;
+  }
+  return out;
+}
+
+/** A step ended: when it can change the answer so far (it gave a value of an answer field's name, or an output names it), the run keeps the new one and the pages hear of it. */
+function filled(x: Exec, s: Step, values: Record<string, unknown>, main: boolean) {
+  const f = x.fill;
+  if (!f?.top || !execs.has(x.run.id)) return;
+  // A round's steps only by name: their values reach the flow's own when the Repeat ends.
+  const named = Object.keys(values).some((k) => f.named.has(k));
+  if (!named && !(main && f.roots.size && allSteps([s]).some((t) => f.roots.has(t.id)))) return;
+  const now = partialOf(x, f.top);
+  const key = JSON.stringify(now);
+  if (key === f.last) return;
+  f.last = key;
+  updateRun(db(), x.run.id, { partial: now });
+  noteChanged(x.run.id);
+}
+
 /** The run's reply: what its last agent (or called app) said, else its last model step's text. */
 function replyOf(ended: Exec['ended']): string | undefined {
   const pick = (kinds: string[], key: string) => [...ended].reverse().find((e) => kinds.includes(e.kind) && typeof e.values[key] === 'string' && (e.values[key] as string).trim())?.values[key] as string | undefined;
@@ -1141,6 +1202,8 @@ async function end(x: Exec, scope: Scope | null, status: 'done' | 'failed' | 'st
   finish(x.run.id, status, error, { result, reply: replyOf(x.ended), costUsd });
   // Its agent steps' costs settle a little later (finish reads them again then): so does the run's.
   setTimeout(() => {
+    // Changes asked of it since have a session of its own, whose end counts the steps' cost too (runs.ts).
+    if (getRun(db(), x.run.id)?.key) return;
     const later = Math.round(spentSoFar(x) * 10000) / 10000;
     if (later !== getRun(db(), x.run.id)?.costUsd) {
       updateRun(db(), x.run.id, { costUsd: later });
@@ -1211,5 +1274,14 @@ async function flowProgress(r: RunRecord, publicView: boolean): Promise<RunProgr
   return { steps, said: publicView ? undefined : inner?.said, waiting, ...(publicView ? {} : { own: true as const }), ...(paused.length && !publicView ? { paused } : {}) };
 }
 
+/** A run's reply as its flow gave it, from its steps as they ended (changes asked of it later have replies of their own). */
+function flowReply(r: RunRecord): string | undefined {
+  const ended = listSteps(db(), r.id)
+    .filter((st) => st.status === 'done' && st.kind !== 'round' && st.outputs)
+    .sort((a, b) => (a.endedAt ?? 0) - (b.endedAt ?? 0))
+    .map((st) => ({ id: st.id, kind: st.kind as Step['do'], values: st.outputs! }));
+  return replyOf(ended);
+}
+
 /** What runs flows, for runs.ts. */
-export const flowRunner: FlowRunner = { start: startFlow, resume: resumeFlow, stop: stopFlow, progress: flowProgress };
+export const flowRunner: FlowRunner = { start: startFlow, resume: resumeFlow, stop: stopFlow, progress: flowProgress, spent: (r) => spentSoFar({ run: r }), reply: flowReply };
