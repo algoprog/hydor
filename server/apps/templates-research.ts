@@ -1774,9 +1774,9 @@ const DEADLINE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'given', label: 'As the call gives it', type: 'text' },
   { id: 'past', label: 'Past', type: 'yesno' },
   { id: 'next', label: 'Its next', type: 'yesno' },
-  { id: 'place', label: 'Where it is', type: 'text' },
-  { id: 'dates', label: 'When it is', type: 'text' },
-  { id: 'link', label: 'Call for papers', type: 'url' },
+  { id: 'where', label: 'Where and when it is', type: 'text' },
+  { id: 'link', label: 'Call for papers', type: 'url', description: 'The call’s page when it was found, else the conference’s site' },
+  { id: 'source', label: 'Taken from', type: 'url', description: 'The page of its website the deadline was read from, for a venue neither list has; empty for the lists' },
   { id: 'pages', label: 'Page limit', type: 'text' },
   { id: 'template', label: 'Template', type: 'url' },
 ];
@@ -1846,6 +1846,7 @@ const known = new Map(rows(input.calls).map((r) => [String(r.id), r]));
 const deadlines = [];
 const venues = [];
 const missing = [];
+const unknown = [];
 const notes = [];
 const need = [];
 const KIND = (t) => (/abstract/i.test(t) ? 'abstract' : /supplement/i.test(t) ? 'supplementary' : /rebuttal|response|discussion/i.test(t) ? 'rebuttal' : /notif|decision/i.test(t) ? 'notification' : /camera/i.test(t) ? 'camera-ready' : /regist/i.test(t) ? 'other' : /review/i.test(t) ? 'other' : 'paper');
@@ -1857,6 +1858,7 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
   const hfName = pair[1] || '';
   if (!ccfName && !hfName) {
     missing.push(said);
+    unknown.push({ venue: said, query: said + ' conference next call for papers submission deadline' });
     continue;
   }
   const editions = new Map();
@@ -1945,11 +1947,12 @@ for (const said of String(input.venues || '').split(/[,;\n]+/).map((s) => s.trim
   }
 }
 deadlines.sort((a, b) => a.at - b.at);
-return { deadlines: deadlines, venues: venues, missing: missing, need: need, zone: zone, now: now, notes: notes.join('. ') };`,
+return { deadlines: deadlines, venues: venues, missing: missing, unknown: unknown, need: need, zone: zone, now: now, notes: notes.join('. ') };`,
         outputs: [
           { id: 'deadlines', label: 'Deadlines', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'label', label: 'What is due', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
           { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not in the lists', type: 'list' },
+          { id: 'unknown', label: 'Venues to look up on the web', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'query', label: 'Search for its deadline', type: 'text' }] },
           { id: 'need', label: 'Calls to read', type: 'table', columns: [{ id: 'id', label: 'Conference', type: 'text' }, { id: 'venue', label: 'Venue', type: 'text' }, { id: 'link', label: 'Its site', type: 'text' }, { id: 'query', label: 'Search for its call', type: 'text' }] },
           { id: 'zone', label: 'Your time zone', type: 'text' },
           { id: 'now', label: 'Now, as a moment', type: 'number' },
@@ -1964,7 +1967,7 @@ return { deadlines: deadlines, venues: venues, missing: missing, need: need, zon
         over: '{{lists.need}}',
         atOnce: 3,
         as: 'call',
-        collect: 'facts',
+        collect: 'noted',
         steps: [
           { id: 'find', title: 'Search for the call', do: 'tool', tool: 'web_search', with: { query: '{{call.query}}', k: 6 }, failed: 'skip' },
           {
@@ -1981,9 +1984,13 @@ if (r.data && Array.isArray(r.data.results)) for (const h of r.data.results) hit
 else for (const m of String(r.text || '').matchAll(/^\s+(https?:\/\/\S+)/gm)) hits.push(m[1]);
 const site = (u) => ((/^https?:\/\/([^/]+)/.exec(u) || [])[1] || '').replace(/^www\./, '');
 const same = hits.filter((u) => home && site(u) === home.replace(/^www\./, ''));
-const best = same.find((u) => /call|cfp|paper|submission|author/i.test(u)) || same[0] || hits.find((u) => /call|cfp/i.test(u)) || input.link || hits[0] || '';
-return { url: best };`,
-            outputs: [{ id: 'url', label: 'Its page', type: 'text' }],
+const call = same.find((u) => /call|cfp|paper|submission|author/i.test(u)) || same[0] || hits.find((u) => /call|cfp/i.test(u)) || '';
+// The page to read may be the conference's site when no call was found; only a found call is kept as its call for papers.
+return { url: call || input.link || hits[0] || '', cfp: call };`,
+            outputs: [
+              { id: 'url', label: 'Its page', type: 'text' },
+              { id: 'cfp', label: 'Its call for papers', type: 'text' },
+            ],
             failed: 'skip',
           },
           { id: 'page', title: 'Read the call', do: 'tool', tool: 'read_page', if: '{{pick.url}} is not empty', with: { url: '{{pick.url}}', question: 'How long a paper may be (its page limit, and whether references count), and where its template or author kit is (its address)' }, failed: 'skip' },
@@ -2002,20 +2009,154 @@ return { url: best };`,
               { id: 'template', label: 'Template', type: 'text' },
             ],
           },
+          {
+            id: 'noted',
+            title: 'Keep its call with what it says',
+            do: 'code',
+            language: 'javascript',
+            with: { cfp: '{{pick.cfp}}', pages: '{{facts.pages}}', template: '{{facts.template}}' },
+            code: String.raw`// The call's page goes with its page limit and template, so the page found is kept too (and linked), not only what it said.
+return { cfp: String(input.cfp || ''), pages: String(input.pages || ''), template: String(input.template || '') };`,
+            outputs: [
+              { id: 'cfp', label: 'Its call for papers', type: 'text' },
+              { id: 'pages', label: 'Page limit', type: 'text' },
+              { id: 'template', label: 'Template', type: 'text' },
+            ],
+            failed: 'skip',
+          },
         ],
+      },
+      {
+        id: 'web',
+        title: 'Look up the venues the lists do not have',
+        do: 'repeat',
+        over: '{{lists.unknown}}',
+        atOnce: 3,
+        as: 'venue',
+        collect: 'said',
+        steps: [
+          { id: 'find', title: 'Search for its deadline', do: 'tool', tool: 'web_search', with: { query: '{{venue.query}}', k: 6 }, failed: 'skip' },
+          {
+            id: 'pick',
+            title: 'Pick its page',
+            do: 'code',
+            language: 'javascript',
+            with: { found: '{{find}}', venue: '{{venue.venue}}' },
+            code: String.raw`// The page most likely to give the venue's deadline: one whose address or title reads like its call for papers or its
+// dates, and whose address holds the venue's name, else the first result.
+const r = input.found || {};
+const hits = [];
+if (r.data && Array.isArray(r.data.results)) for (const h of r.data.results) hits.push({ url: String(h.url || ''), title: String(h.title || '') });
+else {
+  const lines = String(r.text || '').split('\n');
+  lines.forEach((l, i) => {
+    const m = /^\s+(https?:\/\/\S+)/.exec(l);
+    if (m) hits.push({ url: m[1], title: String((lines[i - 1] || '').replace(/^\s*\[\d+\]\s*/, '')) });
+  });
+}
+const name = String(input.venue || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const read = (h) => /call|cfp|deadline|dates|submission|author/i.test(h.url + ' ' + h.title);
+const own = (h) => name && h.url.toLowerCase().replace(/[^a-z0-9]+/g, '').includes(name);
+const best = hits.find((h) => read(h) && own(h)) || hits.find(own) || hits.find(read) || hits[0];
+return { url: best ? best.url : '' };`,
+            outputs: [{ id: 'url', label: 'Its page', type: 'text' }],
+            failed: 'skip',
+          },
+          { id: 'page', title: 'Read the page', do: 'tool', tool: 'read_page', if: '{{pick.url}} is not empty', with: { url: '{{pick.url}}', question: 'The conference’s full name and year, and the deadline for submitting a full paper (its date, time and time zone as written)' }, failed: 'skip' },
+          {
+            id: 'got',
+            title: 'Note its deadline',
+            do: 'model',
+            if: '{{page.text}} is not empty',
+            instructions: `From this part of a page about the conference {{venue.venue}} ({{pick.url}}), note its next edition's deadline for submitting a full paper:
+- name: the conference's name in full, as the page writes it.
+- year: the year of that edition, four digits.
+- deadline: the date of the deadline as YYYY-MM-DD, then the time as HH:MM when the page gives one (2027-01-14 23:59). Empty when the page gives none, or only the dates of an edition long past. Do not guess a date.
+- timezone: the time zone the page gives the deadline in, as it writes it (AoE, UTC-12, PST, CET); empty when it gives none.
+
+{{page.text}}`,
+            outputs: [
+              { id: 'name', label: 'Conference', type: 'text' },
+              { id: 'year', label: 'Year', type: 'number' },
+              { id: 'deadline', label: 'Deadline', type: 'text' },
+              { id: 'timezone', label: 'Time zone', type: 'text' },
+            ],
+            failed: 'skip',
+          },
+          {
+            id: 'said',
+            title: 'Keep what it says with its page',
+            do: 'code',
+            language: 'javascript',
+            with: { venue: '{{venue.venue}}', url: '{{pick.url}}', name: '{{got.name}}', year: '{{got.year}}', deadline: '{{got.deadline}}', timezone: '{{got.timezone}}' },
+            code: String.raw`return { venue: String(input.venue || ''), url: String(input.url || ''), name: String(input.name || ''), year: Number(input.year) || null, deadline: String(input.deadline || ''), timezone: String(input.timezone || '') };`,
+            outputs: [
+              { id: 'venue', label: 'Venue', type: 'text' },
+              { id: 'url', label: 'Its page', type: 'text' },
+              { id: 'name', label: 'Conference', type: 'text' },
+              { id: 'year', label: 'Year', type: 'number' },
+              { id: 'deadline', label: 'Deadline', type: 'text' },
+              { id: 'timezone', label: 'Time zone', type: 'text' },
+            ],
+            failed: 'skip',
+          },
+        ],
+      },
+      {
+        id: 'web_deadlines',
+        title: 'Turn what the web said into deadlines',
+        do: 'code',
+        language: 'javascript',
+        with: { lists: '{{lists}}', unknown: '{{lists.unknown}}', said: '{{web.items}}' },
+        code:
+          LIST +
+          WHEN +
+          String.raw`// For each venue the lists did not have: the deadline its website gave, as its moment (AoE when the page gives no
+// zone), marked as taken from the website; one that is no date, or that passed long ago, counts as not found.
+const L = input.lists || {};
+const zone = String(L.zone || 'UTC');
+const now = Number(L.now) || Date.now();
+const said = list(input.said);
+const deadlines = [];
+const venues = [];
+const missing = [];
+for (const [i, u] of rows(input.unknown).entries()) {
+  const f = said[i] && typeof said[i] === 'object' ? said[i] : {};
+  const m = f.deadline ? momentOf(f.deadline, f.timezone || 'AoE') : null;
+  const link = /^https?:\/\/\S+$/.test(String(f.url || '')) ? String(f.url) : null;
+  if (!m || !link || m.at < now - 120 * 86400000) {
+    missing.push(u.venue);
+    continue;
+  }
+  const z = inZone(m.at, zone);
+  const title = String(f.name || '').trim() || u.venue;
+  const year = Number(f.year) || Number(z.day.slice(0, 4));
+  const past = m.at < now - 12 * 3600000;
+  const compact = title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  deadlines.push({ key: ('web-' + compact + year + '-paper-' + z.day).replace(/[^\w-]/g, '_').slice(0, 64), venue: title, year: year, conf: 'web-' + compact + year, kind: 'paper', label: 'Papers', at: m.at, utc: new Date(m.at).toISOString().replace(/\.\d{3}Z$/, 'Z'), day: z.day, time: z.time, given: String(f.deadline).slice(0, 16) + ' ' + (f.timezone || 'AoE') + (m.assumed ? ' (AoE assumed)' : ''), past: past, next: !past, where: '', link: null, source: link });
+  venues.push({ venue: title, name: '', rank: '', next: past ? '' : 'Papers', day: past ? null : z.day, link: link });
+}
+return { deadlines: deadlines, venues: venues, missing: missing };`,
+        outputs: [
+          { id: 'deadlines', label: 'Deadlines from websites', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
+          { id: 'venues', label: 'Conferences from websites', type: 'table', columns: VENUE_COLS },
+          { id: 'missing', label: 'Not found anywhere', type: 'list' },
+        ],
+        failed: 'skip',
       },
       {
         id: 'remind',
         title: 'Remind you of what is near',
         do: 'code',
         language: 'javascript',
-        with: { lists: '{{lists}}', read: '{{look.items}}', calls: '{{calls.records}}', sent: '{{sent.records}}', reminders: '{{reminders}}', today: '{{today}}' },
+        with: { lists: '{{lists}}', web: '{{web_deadlines}}', read: '{{look.items}}', calls: '{{calls.records}}', sent: '{{sent.records}}', reminders: '{{reminders}}', today: '{{today}}' },
         code:
           LIST +
           String.raw`// Each deadline with its call's page limit and template; the reminders due (the nearest of the days before it you
 // gave that has come, each once: a later one is never sent before an earlier), all in one notification; and what was
-// read and sent kept.
+// read and sent kept. The deadlines a venue's website gave (venues the two lists do not have) are among them, marked.
 const L = input.lists || {};
+const W = input.web && typeof input.web === 'object' ? input.web : {};
 const today = String(input.today || '').slice(0, 10);
 const now = Number(L.now) || Date.now();
 const days = String(input.reminders || '').split(/[,;\s]+/).map(Number).filter((n) => n > 0 && n < 400).sort((a, b) => b - a);
@@ -2024,16 +2165,16 @@ const read = list(input.read);
 const link = (u) => (/^https?:\/\/\S+$/.test(String(u || '').trim()) ? String(u).trim() : null);
 for (const [i, need] of rows(L.need).entries()) {
   const f = read[i] && typeof read[i] === 'object' ? read[i] : {};
-  const rec = { pages: clip(f.pages, 120), template: link(f.template) || '', cfp: '', checked: today };
+  const rec = { pages: clip(f.pages, 120), template: link(f.template) || '', cfp: link(f.cfp) || '', checked: today };
   if (calls.has(need.id)) await ctx.data.update('calls', { id: need.id, set: rec, title: 'Keep what ' + need.venue + '’s call says' });
   else await ctx.data.add('calls', Object.assign({ id: need.id }, rec), { title: 'Keep what ' + need.venue + '’s call says' });
   calls.set(need.id, rec);
 }
 const sent = new Map(rows(input.sent).map((r) => [String(r.id), r]));
 const due = [];
-const deadlines = rows(L.deadlines).map((d) => {
+const deadlines = rows(L.deadlines).concat(rows(W.deadlines)).sort((a, b) => Number(a.at) - Number(b.at)).map((d) => {
   const c = calls.get(String(d.conf).replace(/[^\w-]/g, '_')) || {};
-  const out = { key: d.key, venue: d.venue, year: Number(d.year) || null, kind: d.kind, label: d.label, utc: d.utc, day: d.day, time: d.time, given: d.given, past: !!d.past, next: !!d.next, place: d.place || '', dates: d.dates || '', link: link(c.cfp) || link(d.link), pages: c.pages || '', template: link(c.template) };
+  const out = { key: d.key, venue: d.venue, year: Number(d.year) || null, kind: d.kind, label: d.label, utc: d.utc, day: d.day, time: d.time, given: d.given, past: !!d.past, next: !!d.next, where: [d.place, d.dates].filter(Boolean).join(' · '), link: link(c.cfp) || link(d.link), source: link(d.source) || '', pages: c.pages || '', template: link(c.template) };
   const left = (Number(d.at) - now) / 86400000;
   if (!d.past && left >= 0 && days.length && /abstract|paper/.test(d.kind)) {
     const stage = days.filter((n) => left <= n).pop();
@@ -2065,8 +2206,8 @@ return {
   today: today,
   headline: first ? first.venue + ' ' + (first.year || '') + ': ' + first.label.toLowerCase() + ' due ' + first.day : 'No deadline ahead in your venues',
   deadlines: deadlines,
-  venues: rows(L.venues).map((v) => Object.assign({}, v, { day: /^\d{4}-\d{2}-\d{2}$/.test(String(v.day)) ? v.day : null, link: link(v.link) })),
-  missing: list(L.missing),
+  venues: rows(L.venues).concat(rows(W.venues)).map((v) => Object.assign({}, v, { day: /^\d{4}-\d{2}-\d{2}$/.test(String(v.day)) ? v.day : null, link: link(v.link) })),
+  missing: input.web && typeof input.web === 'object' ? list(W.missing) : list(L.missing),
   reminded: reminded,
   ahead: upcoming.length,
   note: L.notes || '',

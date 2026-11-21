@@ -386,7 +386,8 @@ const DL_ROW = String.raw`<div class="dl{{#next}} next{{/next}} k-{{kind|slug}}"
   <div class="what">
     <p class="v"><strong>{{venue}} {{year}}</strong><span class="lbl">{{label}}</span></p>
     <p class="m">{{day|weekday}}, {{day|longdate}} at {{time}} your time · {{given}}</p>
-    {{#place}}<p class="m">{{place}}{{#dates}} · {{dates}}{{/dates}}</p>{{/place}}
+    {{#where}}<p class="m">{{where}}</p>{{/where}}
+    {{#source}}<p class="m">Taken from <a href="{{source}}" target="_blank" rel="noopener noreferrer">the venue’s website</a>, not from the deadline lists: check the date there.</p>{{/source}}
     <p class="links">{{#link}}<a href="{{link}}" target="_blank" rel="noopener noreferrer">Call for papers ↗</a>{{/link}}{{#template}}<a href="{{template}}" target="_blank" rel="noopener noreferrer">Template ↗</a>{{/template}}{{#pages}}<span class="pg">{{pages}}</span>{{/pages}}</p>
   </div>
   <div class="left"><span class="pill">{{utc|ago}}</span></div>
@@ -473,7 +474,7 @@ const DEADLINE_RADAR_UI: AppUi = {
     },
     'dl-missing': {
       description: 'The venues neither list knows, and what to try',
-      html: String.raw`{{#missing|count}}<p class="miss">Not in the lists: <b>{{missing|join}}</b>. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
+      html: String.raw`{{#missing|count}}<p class="miss">Not found: <b>{{missing|join}}</b>, in the deadline lists or on the web. Try the name the conference goes by (NeurIPS, KDD, The Web Conference), or its short name as ccfddl and ai-deadlines keep it.</p>{{/missing}}`,
       css: String.raw`.miss { margin: 8px 0 0; padding: 10px 12px; border: 1px dashed var(--n-line); border-radius: var(--n-radius); color: var(--n-muted); font-size: 13.5px; line-height: 1.5; }`,
     },
   },
