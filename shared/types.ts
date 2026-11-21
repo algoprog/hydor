@@ -1,6 +1,7 @@
 // Types shared by the server and the web client.
 import type { SessionExtra, SessionNote } from './features.ts';
 import type { ApprovalForm } from './forms.ts';
+import type { GoalStatus } from './goals.ts';
 import type { QuickAnswer } from './inbox.ts';
 import type { AppTheme } from './themes.ts';
 import type { SignatureCard } from './signatures.ts';
@@ -530,6 +531,11 @@ export interface GoalInfo {
   tokenBudget?: number;
   /** Time spent on it, in seconds (Codex). */
   seconds?: number;
+  /**
+   * Set for a goal the app's own loop drives (shared/goals.ts): where it stands, for the sidebar and the goal bar before the
+   * whole goal is loaded. round: the one in progress; rounds: the most it may take; holds of: checks holding where the files stand.
+   */
+  app?: { state: GoalStatus; round?: number; rounds: number; holds: number; of: number };
 }
 
 /** Scheduled tasks and their schedules live with the rest of the automations (shared/automations.ts). */

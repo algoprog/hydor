@@ -2,6 +2,7 @@
 // the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
 import type { ArenaStart } from './arena.ts';
 import type { MakeExtra } from './content-asks.ts';
+import type { GoalSettings } from './goals.ts';
 import type { ResearchSettings } from './research.ts';
 
 /** Settings a session keeps beyond its agent's own. Each capability reads and writes its own fields. */
@@ -37,6 +38,11 @@ export interface SessionExtra {
   browserHandoff?: { tab: string };
   /** The session may use the browser and nothing else: no commands, files, other network or other tools. Set when it starts, never removed. */
   browserOnly?: true;
+  /**
+   * Goal: the session was started to work towards a goal (the start page's Goal option): its first message is the goal, and the
+   * app's goal loop takes it from there (shared/goals.ts) with these settings. start is set until the loop has taken it.
+   */
+  goal?: Partial<GoalSettings> & { start?: boolean };
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }
