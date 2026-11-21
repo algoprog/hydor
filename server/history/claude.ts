@@ -67,6 +67,7 @@ interface ClaudeState {
   genPrevTs?: number;
   bg?: Record<string, BackgroundTask>;
   bgEnded?: string[];
+  callBuckets?: Record<string, [number, number, number]>;
 }
 
 interface TurnAcc {
@@ -87,6 +88,8 @@ interface TurnAcc {
 }
 
 type Json = Record<string, any>;
+
+export const CALL_BUCKET_MS = 10_000;
 
 const tokensNow = (st: SessionStats) => ({ tokensIn: st.tokensIn, tokensCached: st.tokensCached, tokensOut: st.tokensOut });
 
@@ -125,6 +128,12 @@ export class ClaudeParser {
   private agentCalls = new Map<string, string>();
   /** Notices of agents coming back that were shown already: one notice can be written as a message and as an attachment. */
   private noticed = new Set<string>();
+  /**
+   * A subagent transcript's model calls by 10-second bucket (the time over 10 000 ms, rounded down): the tokens in (with
+   * cache writes), cached and out of the calls in it. Claude Code's total for its session covers its subagents' calls up to
+   * the moment it was saved; the ones after are priced from these (spend.ts). Kept for subagent transcripts only.
+   */
+  callBuckets: Record<string, [number, number, number]> = {};
   /** Activity of the lines parsed in this run (not part of the saved state). */
   act: ActivityLog | null;
   /** The goal set with /goal while it is not met or cleared (from the transcript's goal checks). */
@@ -146,9 +155,16 @@ export class ClaudeParser {
     p.seq = s.seq ?? 0;
     p.turn = s.turn ? { ...s.turn, cacheWrite: s.turn.cacheWrite ?? 0, genMs: s.turn.genMs ?? 0 } : null;
     p.genPrevTs = s.genPrevTs;
+    p.callBuckets = s.callBuckets ?? {};
     p.bg = new Map(Object.entries(s.bg ?? {}));
     p.bgEnded = s.bgEnded ?? [];
     return p;
+  }
+
+  /** The calls as saved in a subagent transcript's row: [[bucket, in, cached, out], …] by time; null with none. */
+  callsJson(): string | null {
+    const rows = Object.entries(this.callBuckets).map(([b, t]) => [Number(b), ...t]);
+    return rows.length ? JSON.stringify(rows.sort((a, b) => a[0] - b[0])) : null;
   }
 
   toState(): ClaudeState {
@@ -166,6 +182,7 @@ export class ClaudeParser {
       genPrevTs: this.genPrevTs,
       bg: Object.fromEntries(this.bg),
       bgEnded: this.bgEnded,
+      ...(this.opts.sidechain ? { callBuckets: this.callBuckets } : {}),
     };
   }
 
@@ -282,6 +299,8 @@ export class ClaudeParser {
         if (typeof m.totalCostUSD === 'number' && (this.stats.costUsd == null || m.totalCostUSD > this.stats.costUsd)) {
           this.stats.costUsd = m.totalCostUSD;
           this.stats.costTokens = tokensNow(this.stats);
+          // Written when its process stops, or now and then: the lines before it are the best sign of when (it has no time of its own).
+          this.stats.costAt = this.summary.updatedAt;
         }
         break;
     }
@@ -544,6 +563,12 @@ export class ClaudeParser {
       this.stats.tokensIn += input;
       this.stats.tokensOut += u.output_tokens ?? 0;
       this.stats.tokensCached += u.cache_read_input_tokens ?? 0;
+      if (this.opts.sidechain && ts != null) {
+        const b = (this.callBuckets[Math.floor(ts / CALL_BUCKET_MS)] ??= [0, 0, 0]);
+        b[0] += input;
+        b[1] += u.cache_read_input_tokens ?? 0;
+        b[2] += u.output_tokens ?? 0;
+      }
       this.act?.bump(ts, 'tokensIn', input);
       this.act?.bump(ts, 'tokensOut', u.output_tokens ?? 0);
       this.act?.bump(ts, 'tokensCached', u.cache_read_input_tokens ?? 0);

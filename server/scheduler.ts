@@ -16,7 +16,7 @@ import { acpAgents } from './agents/acp.ts';
 import { HttpError } from './auth.ts';
 import type { DB } from './db.ts';
 import type { TurnInfo } from './features/types.ts';
-import { costOf } from './prices.ts';
+import { spentSoFar } from './budget/spend.ts';
 import type { SessionManager } from './sessions.ts';
 import { localNow, userTimezone } from './userPrefs.ts';
 import { AUTO_MODEL, nextTier, tierRank, type Tier } from '../shared/tiers.ts';
@@ -1050,11 +1050,9 @@ export class Scheduler extends EventEmitter {
     return next && tierRank(next) <= tierRank('best') ? next : null;
   }
 
-  /** What a session has cost so far, in dollars (the agent's own figure, else from its tokens). */
+  /** What a session has cost so far, in dollars: what its spending counts (budget/spend.ts), else its summary's figures. */
   private costNow(key: string): number {
-    const s = this.sessions.summary(key);
-    if (!s) return 0;
-    return s.stats.costUsd ?? costOf(this.db, s.model, s.stats) ?? 0;
+    return spentSoFar(this.db, key, this.sessions.summary(key)) ?? 0;
   }
 
   /** The agent's last reply in a session. */

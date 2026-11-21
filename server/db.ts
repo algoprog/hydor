@@ -55,7 +55,9 @@ create table if not exists sessions (
   work_ms integer not null default 0,
   parent_key text,
   hidden integer not null default 0,
-  bg_tasks text
+  bg_tasks text,
+  cost_at integer,
+  calls text
 );
 create index if not exists sessions_updated on sessions(updated_at desc);
 create index if not exists sessions_path on sessions(path);
@@ -165,6 +167,15 @@ export function openDb(file = paths.db, o: { cacheMb?: number } = {}): DB {
     try {
       db.exec('alter table sessions add column work_ms integer not null default 0');
     } catch {} // the indexer's connection got there first
+  }
+  // Claude Code's spending after its saved total (server/budget/spend.ts): when the total was saved (a parent), and a
+  // subagent's model calls by 10-second bucket. Empty on rows from before, which add nothing.
+  for (const col of ['cost_at integer', 'calls text']) {
+    if (!cols.has(col.split(' ')[0])) {
+      try {
+        db.exec(`alter table sessions add column ${col}`);
+      } catch {} // the indexer's connection got there first
+    }
   }
   const appCols = new Set((db.prepare('pragma table_info(app_sessions)').all() as { name: string }[]).map((c) => c.name));
   if (!appCols.has('sort_order')) {

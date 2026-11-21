@@ -21,7 +21,7 @@ import { cardLines } from '../../shared/app-cards.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
-import { spending } from '../budget/spend.ts';
+import { spending, statsCost } from '../budget/spend.ts';
 import { config } from '../config.ts';
 import { extractText } from '../documents/extract.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
@@ -806,8 +806,7 @@ export function runCost(r: Pick<RunRecord, 'recipe' | 'source' | 'key'>, s: Sess
   const db = d().db;
   const counted = indexedSpend(r.key);
   if (counted !== null) return counted;
-  if (s?.stats.costUsd) return s.stats.costUsd;
-  if (s && s.stats.tokensIn + s.stats.tokensOut > 0) return costOf(db, s.model ?? r.recipe.model, s.stats) ?? undefined;
+  if (s && (s.stats.costUsd || s.stats.tokensIn + s.stats.tokensOut > 0)) return statsCost(db, s.stats, s.model ?? r.recipe.model) ?? undefined;
   const custom = s?.agent === 'acp' || r.source === 'public' || r.recipe.agent === 'acp';
   if (!custom) return undefined;
   const m = customModel(s?.prefs?.model ?? s?.model ?? r.recipe.model);

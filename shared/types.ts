@@ -327,6 +327,8 @@ export interface SessionStats {
   costUsd?: number;
   /** Claude Code: the tokens counted (tokensIn, tokensCached, tokensOut) when that highest total was set; what came after is not in it yet. */
   costTokens?: { tokensIn: number; tokensCached: number; tokensOut: number };
+  /** Claude Code: when that highest total was saved (ms; the last timestamp in the transcript before its line). Unset: unknown. */
+  costAt?: number;
   /** Active generation time (ms): summed TTFT+decode per assistant reply, excluding tool runs and idle. Output throughput = tokensOut / genMs. */
   genMs?: number;
   /** Time spent working (ms): the finished turns' lengths added up, each from its message to the agent's last step. */

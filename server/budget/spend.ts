@@ -3,13 +3,15 @@
 // this machine costs nothing. A session's cap covers the Hydor subagents it started too. While a turn
 // runs, the model calls its agent reports come in ahead of the indexer: see setLiveSpend.
 import type { BudgetState } from '../../shared/budget.ts';
-import type { Agent } from '../../shared/types.ts';
+import type { Agent, SessionStats } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
+import { CALL_BUCKET_MS, claudeCost } from '../history/claude.ts';
 import { costOf } from '../prices.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { childKeys, parentOf } from '../children/family.ts';
 
 interface Row {
+  key?: string;
   agent: Agent;
   model: string | null;
   tokens_in: number;
@@ -17,6 +19,10 @@ interface Row {
   tokens_cached: number;
   cost_usd: number | null;
   parent_key: string | null;
+  /** Claude Code, a transcript with a saved total: when it was saved (ms). */
+  cost_at?: number | null;
+  /** Claude Code, a subagent's transcript: its model calls by 10-second bucket, [[bucket, in, cached, out], …]. */
+  calls?: string | null;
 }
 
 /** One transcript's cost in dollars; null when its tokens have no known price. */
@@ -45,20 +51,69 @@ export function callCost(db: DB, agent: Agent, model: string | undefined, c: { u
 let liveSpend: (key: string, indexed: number) => number = (_key, indexed) => indexed;
 export const setLiveSpend = (fn: typeof liveSpend) => (liveSpend = fn);
 
+/**
+ * What a Claude Code subagent spent after its lead's highest saved total was written, in dollars (null: nothing known to
+ * add). That total covers the subagents' calls up to the moment it was saved and none after, so the calls after it are
+ * priced here. A call is placed by its 10-second bucket, and only buckets wholly after the moment count: a call in the
+ * bucket the moment falls in is left out rather than counted twice. A row with no moment, no calls or a model with no
+ * price adds nothing.
+ */
+function afterSavedTotal(db: DB, lead: Row, sub: Row): number {
+  if (lead.cost_at == null || !sub.calls) return 0;
+  let calls: unknown;
+  try {
+    calls = JSON.parse(sub.calls);
+  } catch {
+    return 0;
+  }
+  if (!Array.isArray(calls)) return 0;
+  const first = Math.floor(lead.cost_at / CALL_BUCKET_MS);
+  const t = { tokensIn: 0, tokensCached: 0, tokensOut: 0 };
+  for (const c of calls) {
+    if (!Array.isArray(c) || !(c[0] > first)) continue;
+    t.tokensIn += Number(c[1]) || 0;
+    t.tokensCached += Number(c[2]) || 0;
+    t.tokensOut += Number(c[3]) || 0;
+  }
+  if (!t.tokensIn && !t.tokensCached && !t.tokensOut) return 0;
+  return costOf(db, sub.model ?? '', t) ?? 0;
+}
+
 /** A session's own spending: its transcript, and its agent's own subagents' (Claude's, Codex's sub-agent threads). */
 export function ownSpend(db: DB, key: string): { usd: number; unpriced: boolean } {
-  const rows = db.prepare('select agent, model, tokens_in, tokens_out, tokens_cached, cost_usd, parent_key from sessions where key = ? or parent_key = ?').all(key, key) as Row[];
-  // Claude Code's own figure covers its subagents.
-  const whole = rows.some((r) => !r.parent_key && r.cost_usd != null && r.agent === 'claude');
+  const rows = db.prepare('select key, agent, model, tokens_in, tokens_out, tokens_cached, cost_usd, parent_key, cost_at, calls from sessions where key = ? or parent_key = ?').all(key, key) as Row[];
+  // Claude Code's own figure covers its subagents, up to when it was saved: their calls after that are added.
+  const lead = rows.find((r) => !r.parent_key && r.cost_usd != null && r.agent === 'claude');
   let usd = 0;
   let unpriced = false;
   for (const r of rows) {
-    if (whole && r.parent_key) continue;
+    if (lead && r.parent_key) {
+      usd += afterSavedTotal(db, lead, r);
+      continue;
+    }
     const c = rowCost(db, r);
     if (c == null) unpriced = true;
     else usd += c;
   }
   return { usd, unpriced };
+}
+
+/** What a session's summary says it spent (the agent's own figure and the tokens counted since it, else the tokens at the model's price); null when not priced. */
+export function statsCost(db: DB, stats: SessionStats, model: string | null | undefined): number | null {
+  return stats.costUsd ? claudeCost(db, stats, model ?? undefined) : costOf(db, model, stats);
+}
+
+/**
+ * What a session has spent, for what has its summary at hand (a scheduled run, an app's run): what spending() says once its
+ * transcript is indexed (the figure the caps count, with its subagents' calls and the calls after the agent's saved total),
+ * else its summary's stats. Null when nothing is priced.
+ */
+export function spentSoFar(db: DB, key: string | undefined, s: { stats: SessionStats; model?: string | null } | null): number | null {
+  if (key && db.prepare('select 1 from sessions where key = ?').get(key)) {
+    const sp = spending(db, key);
+    if (sp.spentUsd > 0 || !sp.unpriced) return sp.spentUsd;
+  }
+  return s ? statsCost(db, s.stats, s.model) : null;
 }
 
 /** The session's spending cap in dollars, if it has one. */
