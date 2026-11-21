@@ -30,7 +30,7 @@ import { changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protec
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
 import { cleanContract, cleanSettings, topId } from './validate.ts';
-import { allButYouHold, duration, limitReason, reckon, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
+import { allButYouHold, duration, limitReason, reckon, rejudged, relaxed, scored, scoreOf, stalled, usd, type RoundInput } from './verdict.ts';
 
 export const NO_GOAL = 'This session has no goal.';
 const PAUSED = 'The user paused the goal: stop now and end your turn.';
@@ -778,18 +778,57 @@ const canonical = (v: unknown): unknown =>
             .map(([k, x]) => [k, canonical(x)]),
         )
       : v;
-/** What of a check decides what the app measures: all of it but its name. */
-const measured = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+/**
+ * What of a check decides what the app measures: its kind, command, how its number is read, its claim and evidence. Its
+ * name, target, slack and unit only say how a value is named, judged or shown, and its time limit how long a run may take
+ * (P3): a check changed in those alone measures the same thing.
+ */
+const measured = ({ label: _label, target: _target, slack: _slack, unit: _unit, timeoutS: _timeoutS, ...c }: GoalCheck) => JSON.stringify(canonical(c));
+/** All of a check but its name: whether it changed at all. */
+const defined = ({ label: _label, ...c }: GoalCheck) => JSON.stringify(canonical(c));
 
 /**
- * Checks that are new or whose definition differs from before: those are measured again, and the start then holds where
- * they stand now, not where they stood at the start (since). A check written with its keys in another order (what the
- * agent proposed and what a change sends are written differently) or only renamed is the same check: counted as changed,
- * every check lost its value at the start the first time the person changed any of them.
+ * Checks that are new or that measure something else than before (measured): those are measured again, and the start then
+ * holds where they stand now, not where they stood at the start (since). A check written with its keys in another order
+ * (what the agent proposed and what a change sends are written differently), only renamed, or changed only in how its
+ * value is judged (its target, slack, unit, time limit) is not: it keeps its values (retargeted, rejudged).
  */
 export function changedChecks(before: GoalCheck[], after: GoalCheck[]): string[] {
   const was = new Map(before.map((c) => [c.id, measured(c)]));
   return after.filter((c) => was.get(c.id) !== measured(c)).map((c) => c.id);
+}
+
+/** Checks that measure what they did and whose target changed: their stored values are judged again (rejudged), not measured. */
+export function retargeted(before: GoalCheck[], after: GoalCheck[]): string[] {
+  const was = new Map(before.map((c) => [c.id, c]));
+  return after
+    .filter((c) => {
+      const b = was.get(c.id);
+      return !!b && measured(b) === measured(c) && JSON.stringify(canonical(b.target)) !== JSON.stringify(canonical(c.target));
+    })
+    .map((c) => c.id);
+}
+
+/**
+ * Puts the person's checks in place of the goal's (a change, at once or once the round that runs is over, or at the
+ * agreement) and says which to measure again (P3). Those that measure something else, and any changed one the start holds
+ * no value of to judge again (it could not run there: a longer time limit is how that is put right), are measured again;
+ * one changed only in its target keeps its values, judged again against it wherever they are stored and those rounds
+ * scored again; a change of name, slack, unit or time limit alone changes nothing that was measured.
+ */
+function putChecks(g: StoredGoal, after: GoalCheck[]): string[] {
+  const before = g.contract.checks;
+  const start = g.rounds[0];
+  const valued = (id: string) => {
+    const r = start?.results.find((x) => x.id === id);
+    return !!r && !r.error;
+  };
+  const was = new Map(before.map((c) => [c.id, defined(c)]));
+  const measure = new Set(changedChecks(before, after));
+  for (const c of after) if (was.has(c.id) && was.get(c.id) !== defined(c) && start && !valued(c.id)) measure.add(c.id);
+  g.contract = { ...g.contract, checks: after };
+  g.rounds = rejudged(after, g.rounds, retargeted(before, after).filter((id) => !measure.has(id)));
+  return [...measure];
 }
 
 /**
@@ -801,8 +840,7 @@ function applyPending(g: StoredGoal) {
   if (!p) return;
   g.pending = undefined;
   if (p.checks) {
-    const changed = changedChecks(g.contract.checks, p.checks);
-    g.contract = { ...g.contract, checks: p.checks };
+    const changed = putChecks(g, p.checks);
     if (changed.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...changed])];
   }
   if (p.protect) g.contract = { ...g.contract, protect: p.protect };
@@ -1790,10 +1828,9 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       if (g.status !== 'agreeing') throw new HttpError(409, g.status === 'measuring' ? 'The checks are still being measured' : 'The checks are not waiting for your agreement');
       const c = cleanContract(a.contract, g.contract, { title: true, ids: true, top: usedTop(g) });
       if (c.errors.length) throw new HttpError(400, c.errors[0]);
-      const before = g.contract.checks;
+      const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
       g._.topId = c.top;
-      const changed = c.contract.checks ? changedChecks(before, c.contract.checks) : [];
       g._.agreed = true;
       g.reason = undefined;
       // Measured now, with the person's agreement: every check without a value at the start, and those they changed.
@@ -1836,9 +1873,8 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
         commit(d, g);
         break;
       }
-      const before = g.contract.checks;
+      const changed = c.contract.checks ? putChecks(g, c.contract.checks) : [];
       g.contract = { ...g.contract, ...c.contract };
-      const changed = c.contract.checks ? changedChecks(before, c.contract.checks) : [];
       if (changed.length) g._.remeasure = [...new Set([...(g._.remeasure ?? []), ...changed])];
       if (g.status === 'agreeing' && g.reason !== 'A check could not run') g.reason = agreeNote(d, g);
       // Waiting for the person's agreement: measured now, and back to the agreement, where the agent may run commands

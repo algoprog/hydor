@@ -36,7 +36,10 @@
 // worktree's top folder; and nothing touched where git is too old to put files back. And Pause pressed while a round
 // runs: the round is finished and checked (kept, undone, left as it is, or checked again later), then the goal pauses,
 // before the final check, a limit, a question, an ask turn or the next round, also when Pause comes during the final
-// check, while the next round's start is saved, or across a restart; Resume meanwhile takes it back.
+// check, while the next round's start is saved, or across a restart; Resume meanwhile takes it back. Rules and settings
+// on a goal stopped at a limit. A check changed only in its target keeps its values, judged again (at once, once the
+// round that runs is over, and at the agreement); one changed in what it measures, or with no value at the start, is
+// measured again.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/goals/driver-test.ts
 //   DATA_DIR=/tmp/hydor-test-goal-driver PRICES_URL= node dist/dev/driver-test.js
@@ -46,7 +49,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { goalHead, goalMessageOf, holding, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
+import { goalHead, goalMessageOf, holding, standing, type GoalAction, type GoalCheck, type GoalState } from '../../shared/goals.ts';
 import { CUT_BY_RESTART } from '../agents/acp.ts';
 import { asked as userAsked } from '../custom/review.ts';
 import { kvSet } from '../db.ts';
@@ -58,7 +61,7 @@ import type { Deps, RunCtx, SpawnAdditions, SpawnInfo } from '../features/types.
 import { setSessionExtra } from '../sessionExtra.ts';
 import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees.ts';
 import { RESTARTED } from './brief.ts';
-import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
+import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, retargeted, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, isDriving, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setRestorer, settled, stopTick, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -2538,7 +2541,13 @@ test('a check written with its keys in another order, or only renamed, is not a 
   const sent = { kind: 'measure', label: 'Score, renamed', id: 'c1', timeoutS: 30, run: 'npm run eval', target: { value: 1, op: '>=' }, read: 'score: ([0-9.]+)' } as GoalCheck;
   assert.deepEqual(changedChecks([proposed], [sent]), [], 'nothing to measure again: the start keeps its value');
   assert.deepEqual(changedChecks([proposed], [{ ...sent, run: 'npm run eval:all' }]), ['c1']);
-  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  // P3: a new target (or slack, unit, time limit) measures the same thing: judged again, not measured again.
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, target: { op: '>=', value: 0.9 } }]), ['c1']);
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, slack: 0.3, unit: 'pts', timeoutS: 90 }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, slack: 0.3, unit: 'pts', timeoutS: 90 }]), []);
+  assert.deepEqual(retargeted([proposed], [{ ...sent, run: 'npm run eval:all', target: { op: '>=', value: 0.9 } }]), [], 'measured again, not judged again');
+  assert.deepEqual(changedChecks([proposed], [{ ...sent, read: 'total: ([0-9.]+)' }]), ['c1']);
   assert.deepEqual(changedChecks([proposed], [sent, { kind: 'command', label: 'New', run: 'true', id: 'c2' }]), ['c2'], 'a new check is measured');
   const review = { kind: 'review', label: 'Reads well', claim: 'Every error says what to do', evidence: { diff: true, files: ['a.md', 'b.md'] }, id: 'c3' } as GoalCheck;
   assert.deepEqual(changedChecks([review], [{ id: 'c3', evidence: { files: ['a.md', 'b.md'], diff: true }, claim: 'Every error says what to do', label: 'Reads well', kind: 'review' }]), []);
@@ -3691,6 +3700,119 @@ test('P1: paused while the person’s say put the files back (a question open): 
   assert.equal(goal(PO).status, 'paused');
   assert.equal(sent(PO), n, 'no round started');
   await act(PO, { action: 'stop' });
+});
+
+// ---- P3: a changed target keeps the check's values ---------------------------------------------------------------------
+
+/** How many times a check that notes each run in `log` ran. */
+const runsIn = (log: string) => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length : 0);
+
+test('P3: a check changed only in its target keeps its values: judged again in the start and the best round, nothing runs, no since; through a change at once and once the round that runs is over; a changed command is measured again', async () => {
+  const P3 = 'claude:goal-p3';
+  const w = worktree();
+  sessions.add(P3, { cwd: w.path, worktree: w });
+  const log = path.join(tmp, 'p3-runs.log');
+  const checks = [
+    { kind: 'measure', label: 'Score', run: `echo x >> ${log}; cat score.txt`, target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await agreed(P3, { checks, settings: { asks: 'own' } });
+  // Round 1 raises the score to 6; the goal pauses after it, between rounds.
+  await act(P3, { action: 'pause' });
+  await turn(P3, () => write(w.path, 'score.txt', '6\n'));
+  let g = goal(P3);
+  assert.deepEqual([g.status, g.best, g.round], ['paused', 1, undefined]);
+  const score = (r: number) => goal(P3).rounds[r].results.find((x) => x.id === 'c1')!;
+  assert.deepEqual([score(0).value, score(0).holds, score(1).value, score(1).holds], [2, false, 6, false]);
+  // At once: 5 is enough now, and its name, slack, unit and time limit change too. Nothing runs.
+  let n = runsIn(log);
+  const to = (target: { op: '>=' | '<='; value: number }, more: Record<string, unknown> = {}) => goal(P3).contract.checks.map((c) => (c.id === 'c1' ? { ...c, target, ...more } : c));
+  await act(P3, { action: 'change', contract: { checks: to({ op: '>=', value: 5 }, { label: 'Score (5 is enough)', slack: 0.2, unit: 'pts', timeoutS: 60 }) } });
+  g = goal(P3);
+  assert.equal(runsIn(log), n, 'nothing ran');
+  assert.equal(g.status, 'paused', 'not measuring');
+  assert.equal(loadGoal(db, P3)!._.remeasure, undefined);
+  assert.deepEqual([score(0).value, score(0).holds, score(0).since, score(0).closeness], [2, false, undefined, 0], 'the start keeps its value: judged again, still short of 5');
+  assert.deepEqual([score(1).value, score(1).holds, score(1).closeness], [6, true, 1], 'the best round: 6 meets 5 now');
+  assert.equal(g.rounds[1].score, 0.5, 'scored again: one of two checks holds');
+  assert.deepEqual(standing(g).map((r) => [r.id, r.holds]), [['c1', true], ['c2', false]]);
+  // Through a change while a round runs: it counts once that round is over, and still nothing is measured again.
+  await act(P3, { action: 'resume' });
+  assert.deepEqual([goal(P3).status, goal(P3).round], ['working', 2]);
+  await act(P3, { action: 'change', contract: { checks: to({ op: '>=', value: 7 }) } });
+  assert.equal(goal(P3).pending?.checks?.find((c) => c.id === 'c1')!.target!.value, 7);
+  assert.equal(goal(P3).contract.checks.find((c) => c.id === 'c1')!.target!.value, 5, 'round 2 is judged by the checks it started with');
+  n = runsIn(log);
+  await turn(P3, () => write(w.path, 'score.txt', '6\n'));
+  g = goal(P3);
+  assert.equal(runsIn(log), n + 1, 'only round 2’s own checks ran');
+  assert.deepEqual([g.status, g.round], ['working', 3], 'not measured first');
+  assert.equal(g.contract.checks.find((c) => c.id === 'c1')!.target!.value, 7);
+  assert.deepEqual([score(0).value, score(0).holds, score(0).since], [2, false, undefined]);
+  assert.deepEqual([score(1).value, score(1).holds], [6, false], 'judged again against 7');
+  assert.ok(score(1).closeness > 0 && score(1).closeness < 1);
+  // A changed command measures something else: measured again before the next round, its start value from then (since).
+  await act(P3, { action: 'pause' });
+  await turn(P3);
+  assert.equal(goal(P3).status, 'paused');
+  n = runsIn(log);
+  await act(P3, { action: 'change', contract: { checks: goal(P3).contract.checks.map((c) => (c.id === 'c1' ? { ...c, run: `echo y >> ${log}; cat score.txt` } : c)) } });
+  assert.deepEqual(loadGoal(db, P3)!._.remeasure, ['c1']);
+  await act(P3, { action: 'resume' });
+  await until('measured', () => goal(P3).status !== 'measuring');
+  assert.equal(runsIn(log), n + 1, 'measured again');
+  assert.equal(score(0).since, 3);
+  assert.equal(score(0).value, 6);
+  await act(P3, { action: 'stop' });
+});
+
+test('P3: at the agreement, a check changed only in its target keeps the value measured when it was proposed: judged again, nothing runs, round 1 goes', async () => {
+  const P3a = 'claude:goal-p3-agree';
+  const w = worktree();
+  // Its agent runs commands unasked: the proposal is measured at once, before the agreement.
+  sessions.add(P3a, { cwd: w.path, worktree: w, mode: 'bypassPermissions' });
+  const log = path.join(tmp, 'p3a-runs.log');
+  const checks = [
+    { kind: 'measure', label: 'Score', run: `echo x >> ${log}; cat score.txt`, target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await act(P3a, { action: 'set', objective: 'Score reaches 10 and done.txt exists', settings: { asks: 'own' } });
+  await turn(P3a, async () => {
+    assert.equal((await tool(P3a, 'goal_propose', { checks, protect: ['docs/'], limits: { rounds: 8 } })).isError, false);
+  });
+  await until('agreeing', () => goal(P3a).status === 'agreeing');
+  const c1 = () => goal(P3a).rounds[0].results.find((x) => x.id === 'c1')!;
+  assert.deepEqual([c1().value, c1().holds], [2, false]);
+  const n = runsIn(log);
+  await act(P3a, { action: 'agree', contract: { checks: goal(P3a).contract.checks.map((c) => (c.id === 'c1' ? { ...c, target: { op: '>=', value: 2 } } : c)) } });
+  assert.equal(runsIn(log), n, 'nothing ran');
+  assert.deepEqual([goal(P3a).status, goal(P3a).round], ['working', 1], 'not measured first');
+  assert.deepEqual([c1().value, c1().holds, c1().closeness, c1().since], [2, true, 1, undefined]);
+  await act(P3a, { action: 'stop' });
+});
+
+test('P3: a changed check the start holds no value of (it could not run there) is measured again, even when only its time limit changed', async () => {
+  const P3b = 'claude:goal-p3-novalue';
+  const w = worktree();
+  sessions.add(P3b, { cwd: w.path, worktree: w, mode: 'bypassPermissions' });
+  const checks = [
+    { kind: 'measure', label: 'Speed', run: 'cat speed.txt', target: { op: '>=', value: 10 } },
+    { kind: 'command', label: 'Done file exists', run: 'test -f done.txt' },
+  ];
+  await act(P3b, { action: 'set', objective: 'Speed reaches 10 and done.txt exists', settings: { asks: 'own' } });
+  await turn(P3b, async () => {
+    assert.equal((await tool(P3b, 'goal_propose', { checks, protect: ['docs/'], limits: { rounds: 8 } })).isError, false);
+  });
+  await until('agreeing', () => goal(P3b).status === 'agreeing');
+  const c1 = () => goal(P3b).rounds[0].results.find((x) => x.id === 'c1')!;
+  assert.ok(c1().error, 'it could not run at the start');
+  // What a longer time limit would have let it read.
+  write(w.path, 'speed.txt', '4\n');
+  await act(P3b, { action: 'agree', contract: { checks: goal(P3b).contract.checks.map((c) => (c.id === 'c1' ? { ...c, timeoutS: 120 } : c)) } });
+  await until('measured', () => goal(P3b).status !== 'measuring');
+  assert.deepEqual([c1().value, c1().error], [4, undefined], 'measured again');
+  assert.deepEqual([goal(P3b).status, goal(P3b).round], ['working', 1]);
+  await act(P3b, { action: 'stop' });
 });
 
 // Last: the tick it starts looks at every goal.
