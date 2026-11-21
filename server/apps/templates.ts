@@ -999,8 +999,8 @@ const to = String(input.home || '').trim().toUpperCase();
 const own = Number(input.rate);
 if (/^[A-Z]{3}$/.test(from) && /^[A-Z]{3}$/.test(to) && from !== to) {
   try {
-    const b = bodyOf(await ctx.tool('http_request', { url: 'https://api.frankfurter.app/latest?from=' + from + '&to=' + to }, { title: 'Get the rate of ' + from + ' to ' + to }));
-    const v = b && b.rates ? Number(b.rates[to]) : NaN;
+    const b = bodyOf(await ctx.tool('http_request', { url: 'https://api.frankfurter.dev/v2/rate/' + from.toLowerCase() + '/' + to.toLowerCase() }, { title: 'Get the rate of ' + from + ' to ' + to }));
+    const v = b ? Number(b.rate) : NaN;
     if (isFinite(v) && v > 0) return { rate: v, date: String(b.date || '').slice(0, 10), source: 'Frankfurter' };
   } catch (e) {}
 }

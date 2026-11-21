@@ -177,10 +177,10 @@ test('Trip planner: each day’s area is looked up (Open-Meteo near the destinat
 
 test('Trip planner: the exchange rate comes from Frankfurter when the currencies differ, else from the plan, and the budget says whose day it is', async () => {
   const asked: string[] = [];
-  const bank = (tool: string, a: Record<string, unknown>) => (asked.push(String(a.url)), json(String(a.url), { amount: 1, base: 'EUR', date: '2026-11-20', rates: { USD: 1.0812 } }));
+  const bank = (tool: string, a: Record<string, unknown>) => (asked.push(String(a.url)), json(String(a.url), { date: '2026-11-20', base: 'EUR', quote: 'USD', rate: 1.0812 }));
   const live = await program('trip-planner', 'fx', { currency: 'eur', home: 'USD', rate: 1.5 }, bank);
   assert.deepEqual([live.rate, live.date, live.source], [1.0812, '2026-11-20', 'Frankfurter']);
-  assert.deepEqual(asked, ['https://api.frankfurter.app/latest?from=EUR&to=USD']);
+  assert.deepEqual(asked, ['https://api.frankfurter.dev/v2/rate/eur/usd']);
   asked.length = 0;
   const same = await program('trip-planner', 'fx', { currency: 'EUR', home: 'EUR', rate: 1 }, bank);
   assert.deepEqual([asked.length, same.source], [0, 'the plan']);
