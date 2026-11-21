@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { AppRecipe } from '@shared/apps';
+import { tr } from '../../i18n/runtime';
 import { askEachTime, fixWords, tidyParts, type DraftPart } from './requestParts';
 
 export function Changes({ parts, recipe, onChange }: { parts: DraftPart[]; recipe: AppRecipe; onChange: (parts: DraftPart[], recipe: AppRecipe) => void }) {
@@ -44,7 +45,7 @@ export function Changes({ parts, recipe, onChange }: { parts: DraftPart[]; recip
             <button
               key={i}
               type="button"
-              title={`Asked each time (${label(p.field)}): click to keep these words as they are`}
+              title={tr('Asked each time as “{0}”: click to keep these words as they are').replace('{0}', label(p.field))}
               onClick={() => {
                 const done = fixWords(recipe, shown, i);
                 onChange(done.parts, done.recipe);
