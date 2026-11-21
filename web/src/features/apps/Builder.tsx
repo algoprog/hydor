@@ -1,10 +1,10 @@
 // Making or changing an app: its face, the questions of its form, the task with the answers put in (or
 // its steps, once it works in steps), the answer fields of its result, what it keeps between runs, who
 // does it (agent, model, mode, assistant, folder), which tools it may use, its limits, and a test run of
-// what is on screen before saving. "Save as template" in a session's menu opens it with a draft from that
-// session.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
+// what is on screen before saving. "Save as an app" in a session's menu, and Do this again… under a reply, open it
+// with a draft from that session (from that reply's turn), What changes each time? on top.
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, Bot, ChevronDown, ClipboardList, Database, Ellipsis, Eye, FileOutput, FlaskConical, FolderOpen, Gauge, History, Images, KeyRound, Palette, Plus, Puzzle, Settings2, Shapes, Sparkles, Trash2, Workflow, Wrench, X } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import type { Agent } from '@shared/types';
 import type { AnswerField, AppDef, AppField, AppRecipe, AppRun, AppTemplate, RunProgress } from '@shared/apps';
@@ -25,7 +25,11 @@ import { appPath, useRunEvents, type RunDetail } from './api';
 import { AppIcon, ICONS } from './AppIcon';
 import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } from './Form';
 import { ResultView, RunBody } from './Result';
-import { DesignEditor, sampleResult } from './Design';
+import { DesignEditor } from './Design';
+import { sampleResult } from './sample';
+import { exampleOf, useCardCatalog } from './cards';
+import { Changes } from './Changes';
+import type { DraftPart } from './requestParts';
 import { AppView } from './View';
 import { InstallFromFile } from './Install';
 import { Advice } from './Advice';
@@ -36,6 +40,9 @@ import { KeepsEditor } from './Keeps';
 import { RunSteps } from './Steps';
 import { StepsEditor } from './StepsEditor';
 import { FilesEditor, SecretsEditor } from './Needs';
+
+// The cards to pick from load with the catalog and its views, the first time A card… is picked.
+const CardPicker = lazy(() => import('./CardPicker'));
 
 /** A flow that is only the task (one agent step, as Work in steps makes it): its instructions, to go back to one task. */
 const oneTask = (flow: Flow): string | null => {
@@ -175,14 +182,15 @@ function FormPreview({ fields }: { fields: AppField[] }) {
   );
 }
 
-/** A run's answer as a card, with made-up values in its shape. */
+/** A run's answer as a card, with made-up values in its shape (a card field: its card's example). */
 function AnswerPreview({ recipe }: { recipe: AppRecipe }) {
   const fields = recipe.answer.filter((a) => a.label.trim());
   const shape = JSON.stringify(fields);
-  const result = useMemo(() => sampleResult(fields, recipe.assets), [shape, recipe.assets]);
+  const cards = useCardCatalog(fields.some((f) => f.type === 'ui'));
+  const result = useMemo(() => sampleResult(fields, recipe.assets, cards ? exampleOf(cards) : undefined), [shape, recipe.assets, cards]);
   return (
     <PreviewBox note={recipe.ui ? 'As a plain card; its view, under Design, shows it its own way' : 'A made-up answer, as a run shows it'}>
-      {fields.length ? <ResultView answer={fields} result={result} name={recipe.name} assets={recipe.assets} /> : <p className="text-[13px] leading-relaxed text-fg-3">No answer fields: the agent’s reply is the answer.</p>}
+      {fields.length ? <ResultView answer={fields} result={result} name={recipe.name} assets={recipe.assets} demo /> : <p className="text-[13px] leading-relaxed text-fg-3">No answer fields: the agent’s reply is the answer.</p>}
     </PreviewBox>
   );
 }
@@ -407,19 +415,55 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
 
 function AnswerRow({ f, n, onChange, ...nav }: { f: AnswerField; n: number; onChange: (f: AnswerField) => void; onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   const cols = f.columns ?? [];
+  // A card: picked from the catalog (A card… in the kind menu, or Change), which loads when it is needed.
+  const [picking, setPicking] = useState(false);
+  const cards = useCardCatalog(f.type === 'ui');
+  const card = f.type === 'ui' && f.ui ? cards?.answerUi(f.ui) : undefined;
   return (
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
         <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="A heading, e.g. Recommendation" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AnswerField['type'], columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined })}>
+        <select
+          className={cx(smallFit, 'min-w-[130px] flex-1')}
+          aria-label="Its kind"
+          value={f.type}
+          onChange={(e) => {
+            if (e.target.value === 'ui') return setPicking(true);
+            onChange({ ...f, type: e.target.value as AnswerField['type'], ui: undefined, columns: e.target.value === 'table' ? (f.columns?.length ? f.columns : [{ id: 'item', label: 'Item', type: 'text' }]) : undefined });
+          }}
+        >
           {ANSWER_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
-              {t.label}
+              {t.value === 'ui' ? 'A card…' : t.label}
             </option>
           ))}
         </select>
         <Needed on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} />
       </div>
+      {f.type === 'ui' && (
+        <div className="flex items-center gap-2 text-[13px]">
+          <Shapes size={14} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-fg-3">Card: </span>
+            <span className="font-medium">{card ? tr(card.title) : (f.ui ?? '')}</span>
+          </span>
+          <button type="button" className="shrink-0 text-[12.5px] text-accent hover:underline" onClick={() => setPicking(true)}>
+            Change
+          </button>
+        </div>
+      )}
+      {picking && (
+        <Suspense fallback={null}>
+          <CardPicker
+            current={f.type === 'ui' ? f.ui : undefined}
+            onClose={() => setPicking(false)}
+            onPick={(s) => {
+              setPicking(false);
+              onChange({ ...f, type: 'ui', ui: s.id, columns: undefined, label: f.label.trim() ? f.label : s.title });
+            }}
+          />
+        </Suspense>
+      )}
       <input className={small} placeholder="What goes here, for the agent (optional)" value={f.description ?? ''} onChange={(e) => onChange({ ...f, description: e.target.value || undefined })} />
       {f.type === 'table' && (
         <div className="space-y-1.5 rounded-lg border border-line bg-panel p-2.5">
@@ -599,7 +643,7 @@ function TestRun({ recipe, appId, open, onClose, onKeep }: { recipe: AppRecipe; 
 }
 
 /** `embedded`: beside a session's conversation (`session`), where an agent builds it: no way back, a save stays here, and a step can be asked about there. */
-export function BuilderPage({ id, template, from, embedded, session }: { id?: string; template?: string; from?: string; embedded?: boolean; session?: string }) {
+export function BuilderPage({ id, template, from, turn, embedded, session }: { id?: string; template?: string; from?: string; turn?: string; embedded?: boolean; session?: string }) {
   const [recipe, setRecipe] = useState<AppRecipe | null>(id || template || from ? null : BLANK);
   const [saved, setSaved] = useState<AppDef | null>(null);
   // The version on screen as it was loaded or saved here: what differs from it is not saved yet.
@@ -614,6 +658,8 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
     setNewer(null);
   };
   const [note, setNote] = useState('');
+  // A draft from a session: its request in pieces, each question's words marked (What changes each time?).
+  const [parts, setParts] = useState<DraftPart[] | null>(null);
   // What the next save says it did, when it is not what the changes say (a version brought back).
   const why = useRef<string | undefined>(undefined);
   const noteBox = useRef<HTMLDivElement>(null);
@@ -641,10 +687,11 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       api<{ app: AppDef }>(`/api/apps/${enc(id)}`).then((r) => load(r.app), (e) => (toastError(e), embedded || go('/apps')));
     else if (template) api<{ template: AppTemplate }>(`/api/apps/tpl:${enc(template)}`).then((r) => setRecipe(recipeOf(r.template)), (e) => (toastError(e), setRecipe(BLANK)));
     else if (from)
-      post<{ recipe: AppRecipe; note?: string }>('/api/apps/draft', { key: from }).then(
+      post<{ recipe: AppRecipe; note?: string; parts?: DraftPart[] }>('/api/apps/draft', { key: from, ...(turn ? { turn: Number(turn) } : {}) }).then(
         (r) => {
           setRecipe(r.recipe);
           if (r.note) setNote(r.note);
+          if (r.parts?.length) setParts(r.parts);
         },
         (e) => (toastError(e), setRecipe(BLANK)),
       );
@@ -655,7 +702,7 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
       (r) => setAssistants((Array.isArray(r) ? r : (r.assistants ?? [])).filter((a) => a && typeof a.id === 'string')),
       () => {},
     );
-  }, [id, template, from]);
+  }, [id, template, from, turn]);
 
   const set = (p: Partial<AppRecipe>) => setRecipe((r) => (r ? { ...r, ...p } : r));
   // Another save (an agent's, or this template open elsewhere): taken at once, or offered while there are changes here.
@@ -828,6 +875,16 @@ export function BuilderPage({ id, template, from, embedded, session }: { id?: st
             </div>
           )}
           {!saved && !template && !from && <Describe />}
+          {parts && !saved && (
+            <Changes
+              parts={parts}
+              recipe={recipe}
+              onChange={(p, r) => {
+                setParts(p);
+                setRecipe(r);
+              }}
+            />
+          )}
           <section className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4 sm:gap-4 sm:p-5">
             <IconPick icon={recipe.icon} color={recipe.color} onChange={set} />
             <div className="-mt-1 min-w-0 flex-1 space-y-0.5">

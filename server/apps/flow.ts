@@ -17,6 +17,7 @@ import path from 'node:path';
 import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
+import { cardLines } from '../../shared/app-cards.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -787,6 +788,7 @@ async function askOutputs(x: Exec, prompt: string, outputs: AnswerField[], model
     STEP_SYSTEM,
     'Answer with one JSON object and nothing else (no Markdown fence), with these fields:',
     ...outputs.map(fieldLine),
+    ...cardLines(outputs),
     'Each field holds its value alone, written for the person who will read it: no notes on where it came from, on what you were or were not given, or on sources that disagree (take the likeliest, or the latest announced). A value that cannot be known stays empty (null), unless its field is required: then give your best.',
   ].join('\n');
   let text = await ask(x, system, prompt, model, cost);

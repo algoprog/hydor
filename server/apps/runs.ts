@@ -14,6 +14,8 @@ import type { SessionExtra } from '../../shared/features.ts';
 import type { AnswerField, AppRecipe, AppRun, RunAsk, RunProgress, RunSource, RunStatus } from '../../shared/apps.ts';
 import { ACTIVE, checkInputs, fillTemplate, inputsLine, isActive } from '../../shared/apps.ts';
 import { momentOf } from '../../shared/app-manifest.ts';
+// Loaded first of the cards' part for the whole server: it tells shared/apps.ts how to name and check a card field.
+import { cardLines } from '../../shared/app-cards.ts';
 import type { Agent, AgentModel, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -332,7 +334,9 @@ export function fieldLine(f: AnswerField): string {
             ? 'true or false'
             : f.type === 'media'
               ? 'pictures, videos, sounds or files: a list of { src, caption }, src an https:// address or the path of a file on this computer (a copy is kept)'
-              : f.type;
+              : f.type === 'ui'
+                ? `card: one JSON object, the ${f.ui} card's data (its type below)`
+                : f.type;
   return `- ${f.id} (${kind}${f.required ? ', required' : ''}): ${f.label}${f.description ? ` — ${f.description}` : ''}`;
 }
 
@@ -361,6 +365,7 @@ export function runInstructions(r: Pick<RunRecord, 'recipe' | 'source' | 'appNam
     lines.push(
       'When you have the result, call the submit_result tool (on the hydor server) with these fields:',
       ...a.map(fieldLine),
+      ...cardLines(a),
       'If it answers with problems, fix them and call it again. Then end with a short reply; the person sees the result as a card, so there is no need to repeat it all.',
     );
     if (later)

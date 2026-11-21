@@ -1,9 +1,10 @@
 // A run as its person sees it: where it stands (with the latest steps while it works), the structured
-// result (short fields as a card, long text, lists, and tables, which on a phone become a card a row
-// when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+// result (short fields as a card, long text, lists, cards drawn as a chat draws them, and tables, which on a
+// phone become a card a row when they would not fit), and the agent's own reply. The owner's pages and the public page show the same.
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, ChevronRight, CircleAlert, Clock, Copy, Download, ExternalLink, FileDown, Hand, PanelsTopLeft, Play, Square, Table2 } from 'lucide-react';
 import type { AnswerColumn, AnswerField, AppRun, RunProgress } from '@shared/apps';
+import type { CardSource } from '@shared/boards';
 import { cellText, isActive, toCsv } from '@shared/apps';
 import { mediaKind, mediaSrc, videoEmbed, type AppAsset, type MediaItem } from '@shared/app-media';
 import { openLightbox, openVideo } from '../../components/Lightbox';
@@ -11,6 +12,7 @@ import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import { money } from './api';
+import { CardField } from './CardField';
 import { LOCALE } from '../../i18n/locale';
 
 const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ');
@@ -290,10 +292,36 @@ export function ResultTable({ f, rows }: { f: AnswerField; rows: Row[] }) {
 
 const SHORT = new Set(['text', 'number', 'yesno', 'date', 'url']);
 
-/** The answer fields: short ones together as a card, the rest each under its heading. */
-export function ResultView({ answer, result, name, assets }: { answer: AnswerField[]; result: Record<string, unknown>; name?: string; assets?: Record<string, Pick<AppAsset, 'sha'>> }) {
+/**
+ * The answer fields: short ones together as a card, the rest each under its heading, in the app's order; a card field
+ * drawn by its answer UI, as wide as the rest, under its heading unless the card has a title of its own. `cardFrom`:
+ * the run its cards are pinned from; `publicView`: a public page (nothing pinned or kept); `demo`: a made-up answer.
+ */
+export function ResultView({
+  answer,
+  result,
+  name,
+  assets,
+  cardFrom,
+  publicView,
+  demo,
+}: {
+  answer: AnswerField[];
+  result: Record<string, unknown>;
+  name?: string;
+  assets?: Record<string, Pick<AppAsset, 'sha'>>;
+  cardFrom?: CardSource;
+  publicView?: boolean;
+  demo?: boolean;
+}) {
   // Fields the recipe does not name (an agent's extra keys) are left out; a result from an older recipe shows by its keys.
-  const fields: AnswerField[] = answer.length ? answer : Object.keys(result).map((id) => ({ id, label: humanize(id), type: Array.isArray(result[id]) ? (typeof (result[id] as unknown[])[0] === 'object' ? 'table' : 'list') : 'text' }));
+  // An object there is a card's data, drawn by its card when the field names it, else laid out as it is.
+  const fields: AnswerField[] = answer.length
+    ? answer
+    : Object.keys(result).map((id) => {
+        const v = result[id];
+        return { id, label: humanize(id), type: Array.isArray(v) ? (typeof v[0] === 'object' ? 'table' : 'list') : v && typeof v === 'object' ? 'ui' : 'text' };
+      });
   const short = fields.filter((f) => SHORT.has(f.type) && !(typeof result[f.id] === 'string' && (result[f.id] as string).length > 160));
   const long = fields.filter((f) => !short.includes(f));
   return (
@@ -312,6 +340,16 @@ export function ResultView({ answer, result, name, assets }: { answer: AnswerFie
       )}
       {long.map((f) => {
         const v = result[f.id];
+        if (f.type === 'ui') {
+          if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+          const titled = typeof (v as { title?: unknown }).title === 'string' && !!(v as { title: string }).title.trim();
+          return (
+            <section key={f.id}>
+              {!titled && <h3 className="mb-2 px-1 text-[13.5px] font-semibold">{f.label}</h3>}
+              <CardField ui={f.ui ?? ''} data={v} from={cardFrom} publicView={publicView} demo={demo} />
+            </section>
+          );
+        }
         const rows = Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
         return (
           <section key={f.id} className="rounded-2xl border border-line bg-panel px-4 pt-3 pb-3.5">
@@ -481,6 +519,8 @@ export function RunBody({
   const hasResult = !!run.result && Object.keys(run.result).length > 0;
   const text = reply ?? run.reply;
   const [plain, setPlain] = useState(false);
+  // A card pinned to a board from here says it came from this run.
+  const cardFrom = useMemo<CardSource>(() => ({ run: run.id, title: run.appName, ...(run.key ? { session: run.key } : {}) }), [run.id, run.appName, run.key]);
   const inView = !!view && hasResult && !plain;
   return (
     <div className="space-y-3">
@@ -493,7 +533,7 @@ export function RunBody({
           </button>
         )}
       </RunStatusCard>
-      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} />)}
+      {hasResult && (inView ? view : <ResultView answer={answer} result={run.result!} name={name} assets={assets} cardFrom={cardFrom} publicView={publicView} />)}
       {text && !(noReply && hasResult) && (reply !== undefined || !isActive(run.status) || !hasResult) && <ReplyBlock key={`${run.id}-${hasResult}`} text={text} folded={hasResult} />}
     </div>
   );

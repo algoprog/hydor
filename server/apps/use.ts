@@ -16,6 +16,7 @@ import path from 'node:path';
 import type { AppField, AppRecipe } from '../../shared/apps.ts';
 import { checkInputs, isActive, madeForSessions } from '../../shared/apps.ts';
 import { titleOf } from '../../shared/app-manifest.ts';
+import { cardsAsText } from '../../shared/app-cards.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
 import type { ApprovalAnswer } from '../agents/live.ts';
 import type { DB } from '../db.ts';
@@ -344,7 +345,8 @@ function runText(r: RunRecord): string {
       app: r.appName,
       run: r.id,
       status: r.status,
-      ...(r.result ? { result: clip(r.result) } : {}),
+      // Its cards as Markdown: the agent reads them, the card under its reply draws them.
+      ...(r.result ? { result: clip(cardsAsText(r.recipe.answer, r.result)) } : {}),
       ...(r.reply && !r.result ? { reply: clip(r.reply) } : {}),
       ...(r.error ? { error: r.error } : {}),
       ...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),

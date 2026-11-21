@@ -884,6 +884,15 @@ const SegmentView = memo(function SegmentView({
   const subCalls = useMemo(() => [...seg.work, ...seg.answer].filter((i) => i.kind === 'tool' && i.tool.subagent), [seg.work, seg.answer]);
   const replying = replyItems.some((a) => a.kind === 'assistant' && a.streaming);
   let works = 0;
+  // Do this again…, under the turn's last reply once it has ended, when the agent used a tool or showed a card in it.
+  const lastReply = !live && seg.end ? [...answer].reverse().find((x) => x.item.kind === 'assistant')?.item.id : undefined;
+  const again = useMemo(
+    () =>
+      lastReply && [...seg.work, ...seg.answer].some((i) => i.kind === 'tool' || (i.kind === 'assistant' && /(^|\n)[ \t]*(`{3,}|~{3,})ui[ \t]+[A-Za-z0-9_-]/.test(i.text)))
+        ? { request: seg.prompt && !seg.prompt.peer ? seg.prompt.text : undefined }
+        : undefined,
+    [lastReply, seg.work, seg.answer, seg.prompt],
+  );
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
@@ -947,7 +956,7 @@ const SegmentView = memo(function SegmentView({
         )),
         ...answer.map(({ key, item: a, more }) => (
           <div key={a.kind === 'assistant' ? `text:${a.id}` : `reply:${key}`} className={cx(fresh(key) && 'anim-in')}>
-            {a.kind === 'assistant' && <AssistantBlock item={a} allowFork={agent === 'claude' || (!live && !!seg.end && a.id === [...answer].reverse().find((x) => x.item.kind === 'assistant')?.item.id)} />}
+            {a.kind === 'assistant' && <AssistantBlock item={a} allowFork={agent === 'claude' || (!live && !!seg.end && a.id === [...answer].reverse().find((x) => x.item.kind === 'assistant')?.item.id)} again={a.id === lastReply ? again : undefined} />}
             {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
           </div>
         )),

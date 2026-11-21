@@ -16,6 +16,7 @@ import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
 import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
+import { cardFieldProblems } from '../../shared/app-cards.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
@@ -152,7 +153,7 @@ function customModels(): { id: string; label: string; provider: string }[] {
 function problemsOf(db: Deps['db'], raw: any): { recipe: AppRecipe; errors: string[]; warnings: string[] } {
   const src = raw && typeof raw === 'object' ? raw : {};
   const recipe = cleanRecipe(src);
-  const errors = [...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
+  const errors = [...cardFieldProblems(src.answer), ...cleanFlow(src.flow).errors, ...cleanFlows(src.flows).errors, ...cleanData(src.data).errors, ...cleanRequires(src.requires).errors, ...cleanSecrets(src.secrets).errors, ...cleanExamples(src.examples).errors, ...cleanUi(src.ui).errors];
   // Its files are kept here already (app_save's assets, or a page's upload, keeps a new one).
   for (const [name, a] of Object.entries(recipe.assets ?? {})) if (!hasMedia(db, a.sha)) errors.push(`Its file “${name}” is not kept here: add it again (assets)`);
   if (!recipe.prompt.trim() && !recipe.flow) errors.push('Write the prompt: it is what the agent is asked to do');
@@ -367,9 +368,13 @@ function routes(d: Deps) {
   app.get('/api/apps/models', async () => ({ models: customModels() }));
 
   app.post('/api/apps/draft', async (req) => {
-    const key = String((req.body as { key?: string })?.key ?? '');
+    const b = (req.body ?? {}) as { key?: string; turn?: unknown };
+    const key = String(b.key ?? '');
     if (!/^(claude|codex|acp):[A-Za-z0-9._-]{4,80}$/.test(key)) throw new HttpError(400, 'Bad session key');
-    return draftFromSession(d, key);
+    // The reply to draft from, by its place in the session (Do this again… under it); none: the latest.
+    const turn = b.turn === undefined || b.turn === null || b.turn === '' ? undefined : Number(b.turn);
+    if (turn !== undefined && !(Number.isInteger(turn) && turn >= 0)) throw new HttpError(400, 'Bad turn');
+    return draftFromSession(d, key, turn);
   });
 
   // Screens are pages of the template's own, made and removed by their routes: a new template starts without

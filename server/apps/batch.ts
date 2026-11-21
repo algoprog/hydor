@@ -4,6 +4,7 @@
 // Stopping ends the rows still waiting and interrupts the rest.
 import type { AppBatch, AppRecipe } from '../../shared/apps.ts';
 import { cellText, isActive, resultHeader, toCsv } from '../../shared/apps.ts';
+import { cardText } from '../../shared/app-cards.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { checkedInputs, launchQueued, onFinished, startRun, stopRun } from './runs.ts';
@@ -62,7 +63,8 @@ export function batchCsv(db: DB, id: string, recipe: AppRecipe, link: (key: stri
   const rows = runs.map((r) => [
     r.row ?? '',
     ...fields.map((f) => r.inputs[f.id] ?? ''),
-    ...answer.map((a) => cellText(r.result?.[a.id])),
+    // A card's cell is its text, as its Copy gives it, not its data.
+    ...recipe.answer.map((a) => (a.type === 'ui' && r.result?.[a.id] && typeof r.result[a.id] === 'object' ? cardText(a.ui, r.result[a.id]) : cellText(r.result?.[a.id]))),
     ...(recipe.answer.length ? [] : [r.reply ?? '']),
     r.status,
     r.error ?? '',

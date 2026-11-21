@@ -6,16 +6,18 @@
 //   /apps/<id>            an app: its form and Run, runs, rows of a CSV, API and sharing
 //   /apps/t/<template>    a template, run as it is (also /apps/tpl:<template>)
 //   ?in.<question>=…      on an app's page: its form filled in with that answer (several may be given), not run yet
-//   /apps/new, …/edit     the builder (?template=… to start from one, ?from=<session> from a session)
+//   /apps/new, …/edit     the builder (?template=… to start from one, ?from=<session> from a session, &turn=<a reply's place> from that turn)
 //   /apps/runs/<run>      a run's result, its follow-ups and a box for the next one
 //   /a/<slug>             the public page (main.tsx, without the sign-in)
 //
 // A run's session opens on the same result (SessionPane), with a switch to its conversation. An app an agent ran for
 // you in another session shows there as its card (InSession), under the turn that asked for it.
+import { useEffect, useState } from 'react';
 import { ClipboardCheck, LayoutGrid } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
+import type { AnswerField, AppRecipe } from '@shared/apps';
 import type { ToolItem } from '@shared/types';
-import { enc } from '../../lib/api';
+import { api, enc } from '../../lib/api';
 import { go, sessionPath } from '../../lib/nav';
 import { useSessions } from '../../lib/store';
 import { MenuItem } from '../../components/ui';
@@ -38,7 +40,7 @@ function AppsRoutes() {
   const q = new URLSearchParams(search);
   const tab = q.get('tab');
   let m: RegExpExecArray | null;
-  if (loc === '/apps/new') return <BuilderPage key={search} template={q.get('template') ?? undefined} from={q.get('from') ?? undefined} />;
+  if (loc === '/apps/new') return <BuilderPage key={search} template={q.get('template') ?? undefined} from={q.get('from') ?? undefined} turn={q.get('turn') ?? undefined} />;
   if (loc === '/apps/connected') return <GalleryPage tab="connected" />;
   if ((m = /^\/apps\/runs\/([^/]+)$/.exec(loc))) return <RunPage key={m[1]} id={decodeURIComponent(m[1])} />;
   if ((m = /^\/apps\/t\/([^/]+)$/.exec(loc))) return <AppPage key={m[1]} id={`tpl:${decodeURIComponent(m[1])}`} tab="run" again={q.get('again')} prefill={search} />;
@@ -54,6 +56,12 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
   const [loc] = useLocation();
   const t = item.tool;
   const input = t.input && typeof t.input === 'object' ? (t.input as Record<string, unknown>) : null;
+  // A card's data draws as its card only with the run's answer fields (which card it is): read once, when there is one.
+  const card = !!input && Object.values(input).some((v) => !!v && typeof v === 'object' && !Array.isArray(v));
+  const [answer, setAnswer] = useState<AnswerField[]>([]);
+  useEffect(() => {
+    if (run && card) api<{ recipe: AppRecipe }>(`/api/apps/runs/${enc(run)}`).then((r) => setAnswer(r.recipe.answer), () => {});
+  }, [run, card]);
   const failed = t.status === 'error';
   const running = t.status === 'running' || t.status === 'pending';
   return (
@@ -72,7 +80,7 @@ function SubmitRow({ item, sessionKey }: { item: ToolItem; sessionKey: string })
           </button>
         )}
       </div>
-      {failed ? <div className="rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2">{(t.output ?? '').slice(0, 1200)}</div> : input && <ResultView answer={[]} result={input} />}
+      {failed ? <div className="rounded-xl bg-bg-2 px-3 py-2 text-[12.5px] whitespace-pre-wrap text-fg-2">{(t.output ?? '').slice(0, 1200)}</div> : input && <ResultView answer={answer} result={input} />}
     </div>
   );
 }
