@@ -261,7 +261,7 @@ agents that speak ACP and take MCP servers.
     duplicate, reload, copy its address or **Copy as Markdown link**, bookmark; add it to a group or take it out. **Tab groups**: a header with a colour
     (one of seven), a name and the tab count, folded or opened by a click, its tabs under it (drag a tab on or off a group);
     the header's menu renames, colours, opens a new tab in it, ungroups or closes it. Groups are kept with the tabs for the next
-    start. **Group my tabs with AI** (the sparkles in the **Tabs** row, or the ⋯ menu) sends the titles and addresses of the
+    start. **Group my tabs with AI** (the sparkles in the **Tabs** row) sends the titles and addresses of the
     tabs in no group (never a private tab), without what follows a ? or #, to the helper model, only when pressed, and makes the groups it answers
     with, with **Undo**.
   - **The column beside the page**: **Ask**, with a switch at its top, **Ask** or **Do** (kept on this device): Ask about the
@@ -332,8 +332,8 @@ agents that speak ACP and take MCP servers.
     font (**Serif**, **Sans**), kept for every article; also **Menu** → **Reader view**. Nothing leaves the tab.
   - **Dark pages**: **Menu** → **Dark pages** (or the setting) shows pages with no dark look of their own dark, and uses a
     site's own dark look; the padlock's **Dark pages on this site** shows one site as it is.
-  - **Screenshots and PDFs**: **Menu** → **Screenshot of what you see**, **Screenshot of the whole page** (PNG, saved in
-    Downloads and copied to the clipboard, with **Show in folder**) and **Save as PDF…** (in Downloads).
+  - **Screenshots and PDFs**: **Menu** → **Screenshot or PDF** → **Screenshot of what you see**, **Screenshot of the whole
+    page** (PNG, saved in Downloads and copied to the clipboard, with **Show in folder**) and **Save as PDF…** (in Downloads).
   - **Sound that plays by itself** waits until you click or type in the page (muted video still plays), unless you turn
     on **Let sites play sound by themselves**. Pointing at a link shows its address in a small box at the bottom left of
     the page.
@@ -356,8 +356,9 @@ agents that speak ACP and take MCP servers.
     characters), **Translate “…”** and Highlight; on a highlight of
     yours, Remove highlight; on the page itself, also **Translate to** your language; in a field, spelling
     suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this page, Read this page later, Print… and Inspect.
-  - **Read later**: right-click a page or a link (or the ⋯ menu) to set it aside. The list shows in the tab column and as
-    its own **Read later** panel beside Bookmarks (`/browser?panel=later`); each page has **Mark as read** (it leaves the list; **Show read**
+  - **Read later**: right-click a page or a link, or press **Add this page** at the top of the **Read later** panel, to set
+    it aside. The list shows in the tab column and as its own **Read later** panel (⋯ → **Read later**, which says how many
+    pages wait; `/browser?panel=later`); each page has **Mark as read** (it leaves the list; **Show read**
     brings the read ones back) and **Remove**. It is yours alone: agents are refused its routes.
   - **Zoom** (Ctrl/⌘ with + − 0, Ctrl and the wheel, and a **Zoom** row in the ⋯ menu with − and + and the percent; the
     **Page zoom** setting is what a site you did not zoom shows at, and a chip in the address bar resets one you did),
@@ -383,7 +384,8 @@ agents that speak ACP and take MCP servers.
   app's welcome tour offers both, bookmarks and history, from those browsers. Someone who took the tour before it had
   that page, or skipped it, is offered them once, in a bar above the Browser page the first time it opens with other
   browsers on the computer (**No thanks**, or **Import…**, which opens the **Import bookmarks and history** panel);
-  the panel stays at Menu → Import bookmarks and history… (`/browser?panel=import`), with a switch for Bookmarks and
+  the panel stays at `/browser?panel=import` (the search box finds it; the Bookmarks and History panels have **Import**
+  at their foot too), with a switch for Bookmarks and
   one for History and a row for each browser and profile with its counts and **Import**.
 - **Chrome extensions** in your own browser (the desktop app's browser runs them): from the Chrome Web Store by link or
   id, or the **Add to Hydor** button on a Web Store page, from a folder (loaded where it is), or from the Chrome-based
@@ -617,8 +619,8 @@ agents that speak ACP and take MCP servers.
   page, with its site and when it was saved, among the project's kept things in its Files; the ▾ beside Save (Choose a
   project to save to) picks the project, or No project (the last pick is kept on the device); More → Open the original
   page opens the address it came from. A saved page is a kept thing like the rest, so agents can read it. The Browser's
-  ⋯ menu has panels for what your own browser keeps as lists: History, Downloads, Bookmarks, Read later (`/browser?panel=later`),
-  Import and Highlights (each with a search field, a row's Open, Delete,
+  ⋯ menu has panels for what your own browser keeps as lists: History, Downloads, Bookmarks, Read later (`/browser?panel=later`)
+  and Highlights, besides Import (`/browser?panel=import`) (each with a search field, a row's Open, Delete,
   Mark as read, Show in folder and Remove from the list or history, Show read on Read later, History and Downloads by
   day with Show older, and Highlights by page with Copy, a note and Ask an agent about these), for every project;
   agents are refused them. A picture kept from a page with Save image to a project (in the right-click menu) is a kept

@@ -26508,5 +26508,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}：{1} 的引号没有在这一行闭合；请把整个值写在同一行（发现：{2}）。",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}：{1} 的引号内含有无效的转义字符（发现：{2}）。",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}：{1} 为空；请在冒号后写上它的值，或删除这一行。",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1} 必须是不含控制字符的单行纯文本（发现：{2}）。"
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1} 必须是不含控制字符的单行纯文本（发现：{2}）。",
+  "Add this page": "添加此网页",
+  "On your list": "在你的列表中",
+  "Screenshot or PDF": "截图或 PDF"
 }

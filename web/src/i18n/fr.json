@@ -24645,5 +24645,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0} : {1} contient un guillemet qui n’est pas fermé sur cette ligne ; écrivez toute la valeur sur une seule ligne (trouvé : {2}).",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0} : {1} contient une séquence d’échappement non valide entre guillemets (trouvé : {2}).",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0} : {1} est vide ; écrivez sa valeur après les deux-points ou supprimez la ligne.",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0} : {1} doit tenir sur une seule ligne de texte brut, sans caractères de contrôle (trouvé : {2})."
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0} : {1} doit tenir sur une seule ligne de texte brut, sans caractères de contrôle (trouvé : {2}).",
+  "Add this page": "Ajouter cette page",
+  "On your list": "Dans votre liste",
+  "Screenshot or PDF": "Capture d’écran ou PDF"
 }

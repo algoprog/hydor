@@ -24645,5 +24645,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}：{1}に、この行で閉じていない引用符があります。値全体を1行で書いてください（見つかった値：{2}）。",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}：{1}の引用符内に無効なエスケープがあります（見つかった値：{2}）。",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}：{1}が空です。コロンの後に値を書くか、その行を削除してください。",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1}は、制御文字を含まない1行のプレーンテキストにしてください（見つかった値：{2}）。"
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}：{1}は、制御文字を含まない1行のプレーンテキストにしてください（見つかった値：{2}）。",
+  "Add this page": "このページを追加",
+  "On your list": "リストに追加済み",
+  "Screenshot or PDF": "スクリーンショットまたはPDF"
 }

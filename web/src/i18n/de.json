@@ -25285,5 +25285,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}: {1} hat ein Anführungszeichen, das in dieser Zeile nicht geschlossen wird; schreibe den ganzen Wert in eine Zeile (gefunden: {2}).",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}: {1} enthält in den Anführungszeichen eine ungültige Escape-Sequenz (gefunden: {2}).",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}: {1} ist leer; schreibe den Wert nach dem Doppelpunkt oder entferne die Zeile.",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} muss eine Zeile mit reinem Text ohne Steuerzeichen sein (gefunden: {2})."
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} muss eine Zeile mit reinem Text ohne Steuerzeichen sein (gefunden: {2}).",
+  "Add this page": "Diese Seite hinzufügen",
+  "On your list": "Auf deiner Liste",
+  "Screenshot or PDF": "Screenshot oder PDF"
 }

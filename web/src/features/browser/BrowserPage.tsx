@@ -55,7 +55,7 @@ import { MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { canReveal, revealLabel } from '../../lib/reveal';
 import { toastError, useApp, useToasts, useUI } from '../../lib/store';
-import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Sheet, Throbber, useIsMobile } from '../../components/ui';
+import { Button, cx, Empty, IconButton, Kbd, MenuBack, MenuItem, MenuSep, Popover, Sheet, Throbber, useIsMobile } from '../../components/ui';
 import { live as socket } from '../../lib/ws';
 import { useAskRun } from '../guide/ask';
 import { NavButton } from '../layout/PageHeader';
@@ -71,8 +71,6 @@ import {
   activeTab,
   addBookmark,
   addLater,
-  groupWithAi,
-  useGrouping,
   addFromStore,
   answerPermission,
   closeTab,
@@ -85,6 +83,7 @@ import {
   loadAgentBrowsers,
   loadBookmarks,
   loadExtensions,
+  loadLater,
   loadPrefs,
   navigate,
   newTab,
@@ -101,6 +100,7 @@ import {
   switchTab,
   usePageHighlights,
   useBookmarks,
+  useLater,
   desktopBrowser,
   goTo,
   showDownload,
@@ -298,7 +298,8 @@ function OwnBrowser() {
   const [find, setFind] = useState(false);
   const [findTick, setFindTick] = useState(0);
   const [menu, setMenu] = useState(false);
-  const grouping = useGrouping((s) => s.busy);
+  // A submenu of the menu, shown in its place (null: the main list): Screenshot or PDF.
+  const [menuSub, setMenuSub] = useState<'capture' | null>(null);
   const [saving, setSaving] = useState(false);
   // The history's "Clear browsing data…" opens the settings at that section.
   const [clearAt, setClearAt] = useState(false);
@@ -395,6 +396,11 @@ function OwnBrowser() {
   const savePdf = desktopBrowser()?.savePdf;
   // How many highlights this page has (the Highlights item of the menu says it).
   const pageMarks = usePageHighlights(tab?.url);
+  // How many pages wait on your Read later list (its item in the menu says it; the tab column loads the list, or the menu when it opens).
+  const laterWaiting = useLater((s) => s.items.filter((n) => n.readAt === undefined).length);
+  useEffect(() => {
+    if (menu && !useLater.getState().loaded) void loadLater();
+  }, [menu]);
 
   // Without a native page, the picture is laid out for the room it has here (as the page does when a phone drives).
   const latest = useRef({ native, open: !!view?.open, watching });
@@ -739,23 +745,11 @@ function OwnBrowser() {
       <MenuItem icon={<Printer size={14} />} disabled={!tab || !canHand} hint={mobile ? undefined : <Kbd>{MOD}P</Kbd>} onClick={() => (setMenu(false), tab && void desktopBrowser()?.print(tab.id))}>
         Print…
       </MenuItem>
-      <MenuItem icon={<Camera size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, false))}>
-        Screenshot of what you see
-      </MenuItem>
-      <MenuItem icon={<Scan size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, true))}>
-        Screenshot of the whole page
-      </MenuItem>
-      <MenuItem icon={<FileDown size={14} />} disabled={!tab || !canAsk || !savePdf} onClick={() => (setMenu(false), tab && void savePageAsPdf(tab.id))}>
-        Save as PDF…
+      <MenuItem icon={<Camera size={14} />} submenu disabled={!tab || !canAsk || (!capture && !savePdf)} onClick={() => setMenuSub('capture')}>
+        Screenshot or PDF
       </MenuItem>
       <MenuSep />
-      <MenuItem icon={<Clock size={14} />} disabled={!canAsk} onClick={() => (setMenu(false), tab && void addLater(tab.url, tab.title || tab.url))}>
-        Read this page later
-      </MenuItem>
-      <MenuItem icon={<Sparkles size={14} />} disabled={grouping || view.tabs.filter((t) => !t.private).length < 3} onClick={() => (setMenu(false), void groupWithAi())}>
-        Group my tabs with AI
-      </MenuItem>
-      <MenuSep />
+      {/* Your lists, each a panel in the column beside the page. */}
       <MenuItem icon={<History size={14} />} checked={panel === 'history'} hint={mobile ? undefined : <Kbd>{MOD}H</Kbd>} onClick={() => (setMenu(false), togglePanel('history'))}>
         History
       </MenuItem>
@@ -765,15 +759,15 @@ function OwnBrowser() {
       <MenuItem icon={<Bookmark size={14} />} checked={panel === 'bookmarks'} onClick={() => (setMenu(false), togglePanel('bookmarks'))}>
         Bookmarks
       </MenuItem>
-      <MenuItem icon={<Clock size={14} />} checked={panel === 'later'} onClick={() => (setMenu(false), togglePanel('later'))}>
+      {/* The list itself: its panel's Add this page (and a page's right-click menu) set the page you are on aside. */}
+      <MenuItem icon={<Clock size={14} />} checked={panel === 'later'} hint={laterWaiting ? String(laterWaiting) : undefined} onClick={() => (setMenu(false), togglePanel('later'))}>
         Read later
-      </MenuItem>
-      <MenuItem icon={<Import size={14} />} checked={panel === 'import'} onClick={() => (setMenu(false), togglePanel('import'))}>
-        Import bookmarks and history…
       </MenuItem>
       <MenuItem icon={<Highlighter size={14} />} checked={panel === 'highlights'} hint={pageMarks?.length ? String(pageMarks.length) : undefined} onClick={() => (setMenu(false), togglePanel('highlights'))}>
         Highlights
       </MenuItem>
+      <MenuSep />
+      {/* The browser itself. Import bookmarks and history is in the Bookmarks and History panels (and at /browser?panel=import). */}
       <MenuItem icon={<Puzzle size={14} />} checked={panel === 'extensions'} onClick={() => (setMenu(false), togglePanel('extensions'))}>
         Extensions
       </MenuItem>
@@ -788,9 +782,24 @@ function OwnBrowser() {
       </MenuItem>
     </>
   );
+  // Screenshot or PDF: the page kept as a file, in the menu's place.
+  const captureItems = (
+    <>
+      <MenuBack onClick={() => setMenuSub(null)}>Screenshot or PDF</MenuBack>
+      <MenuItem icon={<Camera size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, false))}>
+        Screenshot of what you see
+      </MenuItem>
+      <MenuItem icon={<Scan size={14} />} disabled={!tab || !canAsk || !capture} onClick={() => (setMenu(false), tab && void screenshotTab(tab.id, true))}>
+        Screenshot of the whole page
+      </MenuItem>
+      <MenuItem icon={<FileDown size={14} />} disabled={!tab || !canAsk || !savePdf} onClick={() => (setMenu(false), tab && void savePageAsPdf(tab.id))}>
+        Save as PDF…
+      </MenuItem>
+    </>
+  );
 
   const menuButton = (
-    <IconButton ref={menuRef} label="Menu" active={menu} onClick={() => setMenu((m) => !m)}>
+    <IconButton ref={menuRef} label="Menu" active={menu} onClick={() => (setMenuSub(null), setMenu((m) => !m))}>
       <span className="relative flex">
         <Ellipsis size={18} />
         {/* A page with highlights of yours: a small yellow mark; the menu's Highlights says how many. */}
@@ -810,7 +819,7 @@ function OwnBrowser() {
       ) : panel === 'bookmarks' ? (
         <BookmarksPanel onClose={close} />
       ) : panel === 'later' ? (
-        <LaterPanel onClose={close} />
+        <LaterPanel tab={tab} onClose={close} />
       ) : panel === 'extensions' ? (
         <ExtensionsPanel onClose={close} />
       ) : panel === 'downloads' ? (
@@ -953,7 +962,7 @@ function OwnBrowser() {
       </div>
 
       <Popover anchor={menuRef} open={menu} onClose={() => setMenu(false)} align="end" width={290}>
-        {menuItems}
+        <div key={menuSub ?? 'main'}>{menuSub === 'capture' ? captureItems : menuItems}</div>
       </Popover>
       {tab && <TranslatePopover anchor={menuRef} open={translateAt === 'menu'} onClose={() => useTranslateUI.setState({ at: null })} tab={tab} />}
       <TranslateTextDialog />

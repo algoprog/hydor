@@ -24645,5 +24645,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}: {1} tem aspas que não fecham nesta linha; escreva o valor inteiro em uma só linha (encontrado: {2}).",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}: {1} tem um escape inválido dentro das aspas (encontrado: {2}).",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}: {1} está vazio; escreva o valor depois dos dois-pontos ou remova a linha.",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} deve ser uma linha de texto simples, sem caracteres de controle (encontrado: {2})."
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} deve ser uma linha de texto simples, sem caracteres de controle (encontrado: {2}).",
+  "Add this page": "Adicionar esta página",
+  "On your list": "Na sua lista",
+  "Screenshot or PDF": "Captura de tela ou PDF"
 }

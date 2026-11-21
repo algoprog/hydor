@@ -26511,5 +26511,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}: το {1} έχει εισαγωγικά που δεν κλείνουν σε αυτή τη γραμμή· γράψτε ολόκληρη την τιμή σε μία γραμμή (βρέθηκε {2}).",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}: το {1} έχει μη έγκυρη ακολουθία διαφυγής μέσα στα εισαγωγικά του (βρέθηκε {2}).",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}: το {1} είναι κενό· γράψτε την τιμή του μετά την άνω και κάτω τελεία ή αφαιρέστε τη γραμμή.",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: το {1} πρέπει να είναι μία γραμμή απλού κειμένου χωρίς χαρακτήρες ελέγχου (βρέθηκε {2})."
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: το {1} πρέπει να είναι μία γραμμή απλού κειμένου χωρίς χαρακτήρες ελέγχου (βρέθηκε {2}).",
+  "Add this page": "Προσθήκη αυτής της σελίδας",
+  "On your list": "Στη λίστα σας",
+  "Screenshot or PDF": "Στιγμιότυπο οθόνης ή PDF"
 }

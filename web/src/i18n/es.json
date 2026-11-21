@@ -24645,5 +24645,8 @@
   "{0}: {1} has a quote that does not close on this line; write the whole value on one line (found {2}).": "{0}: {1} tiene unas comillas que no se cierran en esta línea; escribe el valor completo en una sola línea (se encontró {2}).",
   "{0}: {1} has an invalid escape inside its quotes (found {2}).": "{0}: {1} tiene un carácter de escape no válido dentro de las comillas (se encontró {2}).",
   "{0}: {1} is empty; write its value after the colon or remove the line.": "{0}: {1} está vacío; escribe su valor después de los dos puntos o quita la línea.",
-  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} debe ser una sola línea de texto sin formato y sin caracteres de control (se encontró {2})."
+  "{0}: {1} must be one line of plain text without control characters (found {2}).": "{0}: {1} debe ser una sola línea de texto sin formato y sin caracteres de control (se encontró {2}).",
+  "Add this page": "Añadir esta página",
+  "On your list": "En tu lista",
+  "Screenshot or PDF": "Captura de pantalla o PDF"
 }
