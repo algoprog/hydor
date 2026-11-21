@@ -571,7 +571,15 @@ p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.5; } .min { color: var(--
 
 const MEALS: AppUi = {
   pages: [
-    { id: 'week', title: 'The week', blocks: [{ element: 'ml-hero' }, { element: 'ml-day', data: 'result.days', each: true, layout: 'grid', empty: 'No dinners planned' }] },
+    {
+      id: 'week',
+      title: 'The week',
+      blocks: [
+        { element: 'ml-hero' },
+        { element: 'ml-day', data: 'result.days', each: true, layout: 'grid', empty: 'No dinners planned' },
+        { if: 'result.off', html: '<p class="n-muted" style="margin:0;font-size:13.5px">Not quite the diet, and no other choice fit: {{result.off|join:, }}.</p>' },
+      ],
+    },
     { id: 'dinner', title: 'Dinner', tab: false, blocks: [{ element: 'ml-detail', data: 'page.item' }, { element: 'video', data: 'page.item.video' }] },
     {
       id: 'list',
@@ -579,6 +587,7 @@ const MEALS: AppUi = {
       if: 'result.shopping',
       blocks: [
         { element: 'ml-aisles' },
+        { if: 'result.note', html: '<p class="n-muted" style="margin:0;font-size:13px">{{result.note}}</p>' },
         { element: 'ml-item', data: 'result.shopping', each: true, where: { aisle: '{{state.aisle}}' } },
       ],
     },
