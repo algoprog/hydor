@@ -35,7 +35,7 @@
 
 ### 通知
 
-[设置 → 通知](/settings?s=notifications)：当会话完成、失败或需要你回答时。详见[收件箱和通知](/guide/inbox)。
+[设置 → 通知](/settings?s=notifications)：当会话完成、失败或需要你回答时。详见[收件箱与通知](/guide/inbox)。
 
 - [**通知此设备**](/settings?s=notifications&find=Notify%20this%20device)：会话完成、失败或需要你回复时发出通知，即使应用已关闭。
 - [**声音**](/settings?s=notifications&find=Sound)：应用打开时，每条通知都会响起简短的提示音。
@@ -311,11 +311,11 @@
 
 ### Custom
 
-[设置 → Custom](/settings?s=custom)：自动模式、命令沙盒，以及目标的运行时长。详见[Custom，应用自己的智能体](/guide/custom)。
+[设置 → Custom](/settings?s=custom)：自动模式、命令沙盒，以及目标的运行时长。详见[Custom，Hydor 自带的智能体](/guide/custom)。
 
 - [**自动模式**](/settings?s=custom&find=Auto%20mode)：Custom 会自行批准安全的步骤。
 - [**命令沙盒**](/settings?s=custom&find=Sandbox%20for%20commands)：自动模式的命令在沙盒中运行；完全访问不使用沙盒。
-- [**目标暂停前的轮数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：一个目标最多运行多少轮后会暂停，等你处理。
+- [**目标暂停前的轮数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：任意智能体的新目标在达到上限停止之前可以运行的轮次数。
 
 ## 问问智能体
 

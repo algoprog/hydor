@@ -63,6 +63,7 @@ Glossary (one translation per concept; keep these exactly):
 - Terminal → Terminal
 - Browser → Navegador
 - Git → Git; worktree → worktree; pull request → pull request; commit → commit; branch → branch
+- Goal (a session's goal, Goal mode) → objetivo (never meta or gol); round → rodada; the checks → as verificações
 - Usage → Uso
 - System → Sistema
 - Experiments → Experimentos

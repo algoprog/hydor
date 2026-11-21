@@ -99,6 +99,7 @@ import { codexFolderNames } from './codex-projects.ts';
 import { claimSessions, syncFoundProjects } from './spaces/found.ts';
 import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
+import { parseGoalAction } from './goals/validate.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
 
@@ -825,13 +826,8 @@ app.post('/api/sessions/:key/flags', async (req) => {
   sessions.setFlags(K(req), { archived: b.archived, pinned: b.pinned, snoozedUntil: b.snoozedUntil === null ? null : typeof b.snoozedUntil === 'number' ? b.snoozedUntil : undefined });
   return { ok: true };
 });
-/** A goal the agent keeps working towards: set, pause, resume or clear. */
-app.post('/api/sessions/:key/goal', async (req) => {
-  const b = (req.body ?? {}) as any;
-  if (!['set', 'pause', 'resume', 'clear'].includes(b.action)) throw new HttpError(400, 'Unknown goal action');
-  await sessions.goal(K(req), b.action, typeof b.objective === 'string' ? b.objective.slice(0, 4000) : undefined);
-  return { ok: true };
-});
+/** A goal the app's own loop drives towards (server/goals): set it, agree its checks, answer it, steer it, pause or stop it. */
+app.post('/api/sessions/:key/goal', async (req) => ({ goal: await sessions.goal(K(req), parseGoalAction(req.body)) }));
 
 app.post('/api/sessions/:key/settle', async (req) => {
   await sessions.settle(K(req));

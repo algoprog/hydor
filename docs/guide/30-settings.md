@@ -315,7 +315,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 - [**Auto mode**](/settings?s=custom&find=Auto%20mode): Custom approves safe steps by itself.
 - [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Auto mode commands run in a sandbox; Full access runs without it.
-- [**Rounds before a goal pauses**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): How many rounds a goal may run before it pauses for you.
+- [**Rounds before a goal pauses**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): How many rounds a new goal of any agent gets before it stops at its limit.
 
 ## Ask an agent
 

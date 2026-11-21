@@ -3,6 +3,7 @@ import { ArrowRightLeft, ArrowUp, ChevronDown, MonitorUp, Paperclip, Plus, Slide
 import type { Agent, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
+import { goalMessageOf } from '@shared/goals';
 import { accountAgentOf } from '@shared/grok';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
@@ -25,7 +26,7 @@ import { stopEverything } from './WorkRow';
 import { WorkTray } from './WorkTray';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
-import { GoalBar } from './GoalBar';
+import { GoalDock } from '../goal/GoalDock';
 import { LimitBanner } from '../usage/LimitReset';
 import { SignInBanner } from '../accounts/SignInPrompt';
 import { useSignIn } from '../accounts/signin';
@@ -254,7 +255,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // Up in an empty box walks back through this session's prompts; -1 is the draft.
   const [recall, setRecall] = useState(-1);
   const prompts = useTimeline((x) => x.byKey[key]?.items)
-    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text))
+    ?.filter((i) => i.kind === 'user' && !i.meta && !i.peer && !childReplyOf(i.text) && !goalMessageOf(i.text))
     .map((i) => (i as { text: string }).text)
     .reverse();
 
@@ -475,7 +476,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const effortOn = on.effort ? on.effort[0].toUpperCase() + on.effort.slice(1) : null;
   const modeOn = on.c && on.mode && on.mode !== on.c.defaultMode ? (on.c.modes.find((m) => m.value === on.mode)?.label ?? null) : null;
   const modeNow = on.c?.modes.find((m) => m.value === (on.mode ?? on.c?.defaultMode))?.label;
-  const summary = [assistantOn, on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn].filter(Boolean).join(' · ');
+  const summary = [assistantOn, on.c ? modelLabel(on.c, on.model) : '…', effortOn, modeOn, s.goal?.app ? 'Goal mode' : null].filter(Boolean).join(' · ');
   // Running without asking: the chip turns amber, so it is not forgotten.
   const unguarded = on.mode === 'bypassPermissions' || on.mode === 'full';
   const optionsTitle = [
@@ -497,7 +498,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
         {signInNeed && <SignInBanner need={signInNeed} className="mb-2" />}
         {limitAgent && <LimitBanner agent={limitAgent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />}
-        <GoalBar s={s} className="mb-2" />
+        <GoalDock key={s.key} s={s} className="mb-2" />
         <WorkTray key={key} s={s} />
         <QueueList s={s} />
         {move && (

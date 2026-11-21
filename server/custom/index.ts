@@ -1,11 +1,10 @@
 // Custom, the app's own agent: Auto mode's reviewer (its fixed rules run in Custom itself, see
-// server/agent/review.ts), the sandbox setting for its commands, and /goal. Fork and "Edit from here"
-// are in fork.ts, which sessions.ts calls.
+// server/agent/review.ts) and the sandbox setting for its commands. Its goals are the app's own loop's, as every
+// agent's are (server/goals). Fork and "Edit from here" are in fork.ts, which sessions.ts calls.
 import { sandboxAvailable } from '../agent/sandbox.ts';
 import { confidentialKey, privateHelper } from '../confidential/index.ts';
 import type { Feature } from '../features/types.ts';
 import { runOf } from '../mcp.ts';
-import { watchGoals } from './goal.ts';
 import { reviewStep, type StepInfo } from './review.ts';
 import { customSettings, setCustomSettings, type CustomSettings } from './settings.ts';
 
@@ -43,8 +42,5 @@ export const custom: Feature = {
       setCustomSettings(d.db, (req.body ?? {}) as Partial<CustomSettings>);
       return state();
     });
-  },
-  start(d) {
-    watchGoals(d);
   },
 };

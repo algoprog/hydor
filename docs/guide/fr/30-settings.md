@@ -315,7 +315,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 - [**Mode automatique**](/settings?s=custom&find=Auto%20mode) : Custom approuve lui-même les étapes sûres.
 - [**Bac à sable pour les commandes**](/settings?s=custom&find=Sandbox%20for%20commands) : Les commandes du mode Auto s’exécutent dans un bac à sable ; l’Accès complet s’exécute sans.
-- [**Tours avant la pause d’un objectif**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) : Combien de tours un objectif peut durer avant de se mettre en pause pour vous.
+- [**Tours avant la pause d’un objectif**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) : Nombre de tours accordés à un nouvel objectif, quel que soit l’agent, avant qu’il s’arrête à sa limite.
 
 ## Demander à un agent
 

@@ -21,6 +21,10 @@ const publicApp = /^\/a\/([^/]+)\/?$/.exec(location.pathname);
 const PortalPage = lazy(() => import('./features/portal/PortalPage'));
 const portal = /^(?:\/m\/[a-z0-9-]+)?\/p\/([^/]+)\/?$/.test(location.pathname);
 
+// A development server also has /goal-preview: every goal screen with made-up goals (features/goal/Preview.tsx). Never in a build.
+const GoalPreview = import.meta.env.DEV ? lazy(() => import('./features/goal/Preview')) : null;
+const goalPreview = import.meta.env.DEV && location.pathname === '/goal-preview';
+
 // Text cut short with an ellipsis scrolls while a mouse rests on it, so all of it can be read.
 startHoverScroll();
 // How much moves here, on <html> for the stylesheet.
@@ -39,7 +43,13 @@ function Arrived({ children }: { children: ReactNode }) {
 void startLanguage().then(() =>
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      {guest ? (
+      {goalPreview && GoalPreview ? (
+        <Suspense fallback={null}>
+          <Arrived>
+            <GoalPreview />
+          </Arrived>
+        </Suspense>
+      ) : guest ? (
         <Suspense fallback={null}>
           <Arrived>
             <GuestPage token={decodeURIComponent(guest[1])} />

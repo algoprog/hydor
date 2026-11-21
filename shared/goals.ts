@@ -220,6 +220,11 @@ export interface GoalState {
   activeMs: number;
   /** When it is over: what the last check found, in sentences for the report card. */
   report?: { summary: string; final?: GoalResult[]; review?: string };
+  /**
+   * Checks or protected paths the person changed while a round ran: that round is judged by the checks it started with,
+   * and these take effect (measured first where they changed) once it has been checked.
+   */
+  pending?: Partial<Pick<GoalContract, 'checks' | 'protect'>>;
 }
 
 // ---- what the web sends: POST /api/sessions/:key/goal -------------------------------------------------------------------

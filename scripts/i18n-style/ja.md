@@ -63,6 +63,7 @@ Glossary (one translation per concept; keep these exactly):
 - Terminal → ターミナル
 - Browser → ブラウザ
 - Git → Git; worktree → ワークツリー; pull request → プルリクエスト; commit → コミット; branch → ブランチ
+- Goal (a session's goal, Goal mode) → ゴール (not 目標); round → ラウンド; the checks → チェック
 - Usage → 使用量
 - System → システム
 - Experiments → 実験

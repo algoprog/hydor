@@ -69,6 +69,7 @@ Glossary (the app's own Chinese; keep these exactly):
 - Terminal → 终端
 - Browser → 浏览器
 - Git → Git
+- Goal (a session's goal, Goal mode) → 目标; round → 轮; the checks → 检查项
 - Worktree → 工作树
 - Pull request → 拉取请求
 - Usage → 用量

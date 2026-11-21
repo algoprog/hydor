@@ -42,7 +42,10 @@ import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKe
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
-import { customGoal } from './custom/goal.ts';
+import { goalAction, goalNotSetText, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal } from './goals/driver.ts';
+import { goalStartSettings } from './goals/validate.ts';
+import { goalHoldsNotices, goalInfo, hasGoal } from './goals/store.ts';
+import type { GoalAction, GoalState } from '../shared/goals.ts';
 import { titleFor } from './titles.ts';
 import { dropSignInSession, isSignedOut, markSignedOut, needSignIn, onSignedIn } from './signin.ts';
 import { isConfidential } from '../shared/confidential.ts';
@@ -576,8 +579,10 @@ export class SessionManager extends EventEmitter {
       acpAgent: r.acp_agent ?? undefined,
       extra: r.extra ? parseExtra(r.extra) : undefined,
       acpName: r.acp_agent ? (acpAgents(this.db).find((a) => a.id === r.acp_agent)?.name ?? r.acp_agent) : undefined,
-      // A live Codex session knows its goal first-hand; otherwise the transcript tells.
-      goal: (live && r.key.startsWith('codex:') ? live.adapter.state.goal : this.timelines.get(r.key)?.goal()) ?? undefined,
+      // A goal the app's own loop drives comes first (none once it is over); else the program's own (/goal in Claude Code, a
+      // Codex thread's goal), which a live Codex session knows first-hand and a transcript tells otherwise. Custom's old
+      // goal lines are not one any more: the loop that kept them is gone.
+      goal: goalInfo(this.db, r.key) ?? (live && r.key.startsWith('codex:') ? live.adapter.state.goal : r.key.startsWith('acp:') ? undefined : this.timelines.get(r.key)?.goal()) ?? undefined,
       resumeAt: this.resumeLookup?.(r.key),
       ...this.queueOf(r.key),
       createdByApp: !!r.created_by_app,
@@ -847,11 +852,12 @@ export class SessionManager extends EventEmitter {
    * A turn of `s` ended as `st` (`long`: it ran 10 s or more, as a "Finished" notice needs). Its notice, or one held from
    * an earlier turn, goes out unless the session is still at work: background tasks or Hydor subagents it started still
    * run, and their end wakes it again, so it has not finished (a command left running, such as a dev server, holds it
-   * too); then it waits (heldDone). A failed turn has a notice of its own, and a Custom goal still going says when it is met.
+   * too); then it waits (heldDone). A failed turn has a notice of its own, and a goal the app's loop drives (not over yet)
+   * sends its own, one for each turn that matters (reached, needs you, at its limit), instead of one for every round.
    */
   private finishedNotice(s: SessionSummary, st: Phase, long: boolean, now: number) {
     const held = this.heldDone.get(s.key);
-    if (st !== 'idle' || (s.acpAgent === CONSOLE_ID && s.goal?.status === 'active')) {
+    if (st !== 'idle' || goalHoldsNotices(s.goal)) {
       this.heldDone.delete(s.key);
       return;
     }
@@ -1637,6 +1643,17 @@ export class SessionManager extends EventEmitter {
     // a confidential one only from a helper model on this computer, else from its first words.
     const request = (splitHandoff(o.prompt ?? '')?.request ?? o.prompt ?? '').trim();
     const titling = !o.title?.trim() && request ? (isConfidential(o.extra) ? confidentialTitle(this.db, request) : titleFor(this.db, request)) : null;
+    // Started with a goal (the start page's Goal option): its first message is the goal, and its agent gets what the goal
+    // loop asks first with that message. Its settings are checked as a goal's are (a 400). Not without a message, in Plan
+    // mode, for a Hydor subagent (server/goals refuses those): the session starts as a plain one, its first message goes
+    // out as it is, and the person hears why below. In a scheduled run or a try of an agent's examples, or in a session
+    // that leads its own work (a swarm, a research, an arena), it is ignored without a word: nobody there set it.
+    let goalOff: string | null = null;
+    if (o.extra?.goal?.start) {
+      goalOff = goalStartIgnored(o.extra) ? null : goalStartRefusal({ request, parent: o.extra.parent, mode: o.mode, agent: o.agent });
+      if (goalOff || goalStartIgnored(o.extra)) o = { ...o, extra: { ...o.extra, goal: undefined } };
+      else goalStartSettings(o.extra.goal);
+    }
     let cwd = path.resolve(o.cwd || config.defaultCwd);
     let wt: WorktreeInfo | undefined;
     if (o.worktree) {
@@ -1680,6 +1697,16 @@ export class SessionManager extends EventEmitter {
     if (account) this.db.prepare('update app_sessions set account = ? where key = ?').run(account, l.key);
     if (o.acpAgent) this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(o.acpAgent, l.key);
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
+    if (o.extra?.goal?.start) {
+      // The loop takes it now; the start mark goes, so a restart does not set it again.
+      const { start: _start, ...settings } = o.extra.goal;
+      setSessionExtra(this.db, l.key, { goal: settings });
+      await goalOnCreate(featureDeps(), l.key, request, settings);
+    }
+    if (goalOff) {
+      console.warn(`[goal] ${l.key}: not set at its start: ${goalOff}`);
+      this.notify({ key: l.key, kind: 'waiting', title: this.summary(l.key)?.title || o.title?.trim() || request.slice(0, 80) || 'New session', agent: o.agent, at: Date.now(), body: goalNotSetText(goalOff) });
+    }
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
@@ -1760,6 +1787,9 @@ export class SessionManager extends EventEmitter {
    */
   async rewind(key: string, o: { itemId: string; text: string; restoreFiles?: boolean }): Promise<string> {
     refuseSubagent(leadsOf(this), key);
+    // Putting the files back is refused while the session's goal checks its files or puts them back itself (server/goals).
+    const busy = o.restoreFiles ? goalResetRefusal(this.db, key) : null;
+    if (busy) throw new HttpError(409, busy);
     const custom = this.isCustom(key);
     if (key.startsWith('acp:') && !custom) throw new HttpError(400, 'Not available for this agent');
     const s = this.summary(key);
@@ -1805,18 +1835,29 @@ export class SessionManager extends EventEmitter {
   }
 
   private async restoreFilesBefore(key: string, agent: Agent, msg: Extract<TimelineItem, { kind: 'user' }>) {
+    // The goal's refusal again, with nothing awaited between it and the reset: rewind checked it before reading the
+    // timeline, and the goal may have begun a step or a reset of its own since.
+    const goalFree = () => {
+      const busy = goalResetRefusal(this.db, key);
+      if (busy) throw new HttpError(409, busy);
+    };
     const w = this.worktreeOf(key);
     if (w) {
       const c = this.db.prepare('select commit_id from checkpoints where key = ? and at <= ? order by at desc limit 1').get(key, (msg.ts ?? Date.now()) + 3000) as { commit_id: string } | undefined;
       if (!c) throw new HttpError(404, 'No snapshot of the files from before that message (they are taken for messages sent from this app)');
+      goalFree();
       await restoreCheckpoint(w, c.commit_id);
       return;
     }
     // Custom kept what its own edits changed, per turn.
-    if (this.isCustom(key)) return restoreCustomFiles(key, msg.id);
+    if (this.isCustom(key)) {
+      goalFree();
+      return restoreCustomFiles(key, msg.id);
+    }
     if (agent !== 'claude') throw new HttpError(400, 'Putting the files back needs a worktree for Codex sessions');
     if (!this.lives.has(key)) await this.start(key);
     const adapter = this.live(key).adapter as ClaudeLive;
+    goalFree();
     const r = await adapter.rewindFiles(msg.id);
     if (r?.error || r?.canRewind === false) throw new HttpError(409, `Claude Code could not put the files back: ${r.error ?? 'no checkpoint for that message (they are kept from now on)'}`);
   }
@@ -2270,8 +2311,8 @@ export class SessionManager extends EventEmitter {
     const agent = this.accountAgentOf(key);
     if (!agent) return false;
     const s = this.summary(key);
-    // Codex keeps a thread's goal in its account's own folder: it is set again on the new one.
-    const goal = agent === 'codex' ? s?.goal : undefined;
+    // Codex keeps a thread's goal in its account's own folder: it is set again on the new one. (A goal the app's loop drives is the app's.)
+    const goal = agent === 'codex' && !s?.goal?.app ? s?.goal : undefined;
     await this.moveToAccount(key, to);
     // Each a whole sentence, so the app's dictionaries translate it.
     const title = s?.title ?? 'A session';
@@ -2279,9 +2320,9 @@ export class SessionManager extends EventEmitter {
     const now = this.accountName(agent, to);
     this.emit('toast', { level: 'info', text: why === 'signedout' ? `${title}: ${was} is signed out, so it continues on ${now}` : `${title}: ${was} is at its usage limit, so it continues on ${now}` });
     if (!goal) return false;
-    await this.goal(key, 'set', goal.objective);
+    await this.programGoal(key, 'set', goal.objective);
     if (goal.status === 'active' || goal.status === 'limited') return true;
-    await this.goal(key, 'pause');
+    await this.programGoal(key, 'pause');
     return false;
   }
 
@@ -2520,11 +2561,21 @@ export class SessionManager extends EventEmitter {
     else await l.adapter.sendMessage('/compact', []);
   }
 
-  /** Sets, pauses, resumes or clears a session's goal: Codex through its thread goal, Claude Code with /goal, Custom by the app's own loop. */
-  async goal(key: string, action: 'set' | 'pause' | 'resume' | 'clear', objective?: string) {
-    if (key.startsWith('acp:') && !this.isCustom(key)) throw new HttpError(400, 'Not available for this agent');
+  /**
+   * Does what the person asked of a session's goal. Setting one, and every action on a goal the app's own loop drives,
+   * goes to the loop (server/goals), for every agent. Pause, resume and clear without such a goal are for the program's
+   * own (typed as /goal in the chat): Codex's thread goal, Claude Code's /goal.
+   */
+  async goal(key: string, a: GoalAction): Promise<GoalState | null> {
+    if (a.action === 'set' || hasGoal(this.db, key) || !['pause', 'resume', 'clear'].includes(a.action)) return goalAction(featureDeps(), key, a);
+    await this.programGoal(key, a.action as 'pause' | 'resume' | 'clear');
+    return null;
+  }
+
+  /** Sets, pauses, resumes or clears the goal of the agent's program itself: Codex through its thread goal, Claude Code with /goal. */
+  private async programGoal(key: string, action: 'set' | 'pause' | 'resume' | 'clear', objective?: string) {
+    if (key.startsWith('acp:')) throw new HttpError(409, 'This session has no goal');
     const text = (objective ?? '').trim();
-    if (key.startsWith('acp:')) return customGoal(key, action, text);
     if (action === 'set' && !text) throw new HttpError(400, 'Say what the goal is');
     if (key.startsWith('codex:')) {
       if (!this.lives.has(key)) await this.start(key);
@@ -2919,19 +2970,57 @@ export class SessionManager extends EventEmitter {
     return m;
   }
 
-  private async deliver(key: string, m: NonNullable<ReturnType<SessionManager['take']>>) {
-    const images: ImageInput[] = m.images.flatMap((i) => {
-      try {
-        return [{ mediaType: i.mediaType, data: fs.readFileSync(i.path).toString('base64'), path: i.path }];
-      } catch {
-        return [];
-      }
+  /**
+   * Messages on their way to a session's agent, by key: taken off its queue (or sent) but not handed over yet. Starting
+   * the agent and the snapshot of a worktree take seconds, while the queue is already empty and the status still idle;
+   * a session in that gap is not idle (delivering), or the goal loop would take the round for over and run its checks
+   * (and maybe undo the round) while the person's message is being worked on.
+   */
+  private sending?: Map<string, number>;
+
+  /**
+   * Whether a Codex session's sandbox lets its commands use the network (its thread's policy), while its agent runs;
+   * undefined otherwise. Codex keeps it off below Full access unless its settings turn it on: the goal loop's checks
+   * follow it (server/goals).
+   */
+  codexNetwork(key: string): boolean | undefined {
+    const a = this.lives.get(key)?.adapter;
+    return a instanceof CodexLive ? !!(a.settings?.sandboxPolicy as { networkAccess?: boolean } | undefined)?.networkAccess : undefined;
+  }
+
+  /** Whether a message is on its way to the session's agent (taken off the queue, or sent, and not handed over yet). */
+  delivering(key: string): boolean {
+    return (this.sending?.get(key) ?? 0) > 0;
+  }
+
+  /** Runs `fn` (the handing over of a message) with the session marked as delivering until it ends, however it ends. */
+  private async handing<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const m = (this.sending ??= new Map());
+    m.set(key, (m.get(key) ?? 0) + 1);
+    try {
+      return await fn();
+    } finally {
+      const n = (m.get(key) ?? 1) - 1;
+      if (n > 0) m.set(key, n);
+      else m.delete(key);
+    }
+  }
+
+  private deliver(key: string, m: NonNullable<ReturnType<SessionManager['take']>>) {
+    return this.handing(key, async () => {
+      const images: ImageInput[] = m.images.flatMap((i) => {
+        try {
+          return [{ mediaType: i.mediaType, data: fs.readFileSync(i.path).toString('base64'), path: i.path }];
+        } catch {
+          return [];
+        }
+      });
+      if (!this.lives.has(key)) await this.start(key);
+      await this.snapshot(key);
+      const l = this.live(key);
+      await l.adapter.sendMessage(await withNotes(key, withFiles(m.text, m.files), m.text, takeFirst(l, m.text)), images);
+      this.touchApp(key);
     });
-    if (!this.lives.has(key)) await this.start(key);
-    await this.snapshot(key);
-    const l = this.live(key);
-    await l.adapter.sendMessage(await withNotes(key, withFiles(m.text, m.files), m.text, takeFirst(l, m.text)), images);
-    this.touchApp(key);
   }
 
   private dispatchQueued(key: string) {
@@ -3086,6 +3175,10 @@ export class SessionManager extends EventEmitter {
     };
     // The agent has not had its first message yet (it waits for the project's memory): this one goes after it.
     if (this.gates.has(key)) return queued();
+    return this.handing(key, () => this.sendNow(key, text, images, files, queued));
+  }
+
+  private async sendNow(key: string, text: string, images: ImageInput[], files: FileInput[], queued: () => 'queued'): Promise<'queued' | undefined> {
     await beforeSend(key);
     await this.switchBeforeSend(key).catch(() => {});
     if (!this.lives.has(key)) await this.start(key);

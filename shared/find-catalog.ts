@@ -291,7 +291,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap seatbelt macos windows low integrity security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
-  ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a goal may run before it pauses for you'],
+  ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a new goal of any agent gets before it stops at its limit'],
 ];
 
 /** The themes that come with the app: name, and whether it is dark or light. */

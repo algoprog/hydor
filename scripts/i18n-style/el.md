@@ -69,6 +69,7 @@ Glossary (the app's own Greek; keep these exactly):
 - Terminal → Τερματικό
 - Browser → Πρόγραμμα περιήγησης
 - Git → Git
+- Goal (a session's goal, Goal mode) → στόχος; round → γύρος; the checks → οι έλεγχοι
 - Worktree → Worktree
 - Pull request → Pull request
 - Usage → Χρήση

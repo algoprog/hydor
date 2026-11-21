@@ -315,7 +315,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 - [**Auto-Modus**](/settings?s=custom&find=Auto%20mode): Custom genehmigt sichere Schritte selbstständig.
 - [**Sandbox für Befehle**](/settings?s=custom&find=Sandbox%20for%20commands): Befehle im Auto-Modus laufen in einer Sandbox; bei Vollzugriff laufen sie ohne Sandbox.
-- [**Runden bis zur Zielpause**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Wie viele Runden ein Ziel laufen darf, bevor es für dich pausiert.
+- [**Runden bis zur Zielpause**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Wie viele Runden ein neues Ziel eines beliebigen Agents bekommt, bevor es an sein Limit stößt.
 
 ## Beispielaufträge
 

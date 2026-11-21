@@ -311,11 +311,11 @@
 
 ### Custom
 
-[設定 → Custom](/settings?s=custom)：自動モード、コマンド用サンドボックス、目標の実行時間。詳しくは[Custom、アプリ独自のエージェント](/guide/custom)。
+[設定 → Custom](/settings?s=custom)：自動モード、コマンド用サンドボックス、ゴールの実行時間。詳しくは[Custom、アプリ独自のエージェント](/guide/custom)。
 
 - [**自動モード**](/settings?s=custom&find=Auto%20mode)：Customは安全な手順を自動で承認します。
 - [**コマンド用サンドボックス**](/settings?s=custom&find=Sandbox%20for%20commands)：自動モードのコマンドはサンドボックス内で実行されます。フルアクセスではサンドボックスなしで実行されます。
-- [**目標が一時停止するまでのラウンド数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：ゴールが一時停止して確認を求めるまでに実行できるラウンド数。
+- [**ゴールが一時停止するまでのラウンド数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：新しいゴールが上限に達して止まるまでに実行できるラウンド数（全エージェント共通）。
 
 ## エージェントに質問
 

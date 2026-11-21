@@ -1,5 +1,6 @@
 // Who started whom: a child session keeps its parent's key in its settings (extra.parent).
 import type { SessionExtra } from '../../shared/features.ts';
+import { goalMessageOf } from '../../shared/goals.ts';
 import type { BackgroundTask, LiveState, SessionSummary } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
 import { parseExtra, sessionExtra } from '../sessionExtra.ts';
@@ -33,12 +34,13 @@ export const betweenAgents = (text: string) => text.startsWith(`${FROM_LEAD}\n`)
 /**
  * Whether the queue of a session still at work when the app restarted goes out when its turn ends, as it would have
  * without the restart, instead of waiting for Resume like every other queue then: only when it holds nothing but what
- * agents sent each other (no attachments) and no Stop all came after any of it was queued. Nobody watches those queues
- * to press Resume: on 2026-11-21 a restart held a lead's next request to its subagent, which finished its turn, and the
- * two sat idle, each waiting for the other.
+ * agents sent each other or the app's goal loop sent (server/goals: its round, its question; no attachments) and no
+ * Stop all came after any of it was queued. Nobody watches those queues to press Resume: on 2026-11-21 a restart held a
+ * lead's next request to its subagent, which finished its turn, and the two sat idle, each waiting for the other; a
+ * goal's next round, held so, would leave the goal at work for ever with nothing at work on it.
  */
 export function queueGoesOn(queue: { text: string; at: number; attachments: number }[], extra: SessionExtra): boolean {
-  if (!queue.length || !queue.every((m) => betweenAgents(m.text) && !m.attachments)) return false;
+  if (!queue.length || !queue.every((m) => (betweenAgents(m.text) || !!goalMessageOf(m.text)) && !m.attachments)) return false;
   const stopped = Math.max(Number(extra.stoppedAll) || 0, Number(extra.stoppedWithParent) || 0);
   return queue.every((m) => m.at > stopped);
 }
@@ -55,15 +57,19 @@ const runningTasks = (live?: LiveWork | null): BackgroundTask[] =>
  */
 export const workStatus = (live: LiveWork): string => (live.status === 'idle' && runningTasks(live).length ? 'working' : live.status);
 
+/** What a session still has at work besides its own turn: subagents (its program's own and its Hydor subagents), and other background tasks (commands, monitors). */
+export function stillAtWork(s: Pick<SessionSummary, 'live' | 'helpers'>): { subagents: number; background: number } {
+  const tasks = runningTasks(s.live);
+  const agents = tasks.filter((t) => (t.kind ?? '').toLowerCase().includes('agent')).length;
+  return { subagents: agents + (s.helpers ?? 0), background: tasks.length - agents };
+}
+
 /**
  * What a session still has at work besides its own turn, in words for an agent: "2 subagents and 1 background task it
  * started are still running" (subagents: its program's own and its Hydor subagents), or '' when nothing is.
  */
 export function stillRunning(s: Pick<SessionSummary, 'live' | 'helpers'>): string {
-  const tasks = runningTasks(s.live);
-  const agents = tasks.filter((t) => (t.kind ?? '').toLowerCase().includes('agent')).length;
-  const subs = agents + (s.helpers ?? 0);
-  const other = tasks.length - agents;
+  const { subagents: subs, background: other } = stillAtWork(s);
   const parts = [subs ? `${subs} subagent${subs === 1 ? '' : 's'}` : '', other ? `${other} background task${other === 1 ? '' : 's'}` : ''].filter(Boolean);
   if (!parts.length) return '';
   return `${parts.join(' and ')} it started ${subs + other === 1 ? 'is' : 'are'} still running`;

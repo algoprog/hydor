@@ -109,7 +109,7 @@ export function AcpSettings() {
         <Group
           title="Agents that speak ACP"
           hint="Install one, sign in once in its own CLI, then add it here"
-          info="The app talks to each agent over the Agent Client Protocol: it opens a session in the folder you pick, shows its messages and steps, and asks you before what the agent asks permission for. Goals, forks and hand-offs are for Claude Code and Codex."
+          info="The app talks to each agent over the Agent Client Protocol: it opens a session in the folder you pick, shows its messages and steps, and asks you before what the agent asks permission for. Forks and hand-offs are for Claude Code and Codex; goals work for every agent."
         >
           {shown.map((a) => (
             <Row

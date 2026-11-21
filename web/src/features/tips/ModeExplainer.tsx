@@ -45,6 +45,13 @@ const TEXT: Record<CostlyMode, ModeText> = {
     not: 'Everyday tasks: each extra model is a whole extra session doing the same work.',
     cost: 'Two or three times what one session costs, one share for each model.',
   },
+  goal: {
+    name: 'Goal',
+    does: 'The agent first works out, with you, what “done” means as a short list of checks the app can run itself: tests that pass, a number that reaches a target, a sentence a reviewer finds true. Then it works round after round, and after each one the app runs the checks, keeps the round when things got closer and undoes it when not. It stops when every check holds, or at a limit.',
+    good: 'Work with a clear finish line that takes many tries: making tests pass, bringing a number down or up, a refactor that must keep everything working.',
+    not: 'Open-ended work with no way to check it, or a quick change. One agent in one turn does those for much less.',
+    cost: 'Every round is a whole turn of the agent, plus the checks it runs, so a goal can cost many times what one turn does. It stops at the limits you agree before it starts: rounds, money and time.',
+  },
 };
 
 function Part({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
@@ -78,6 +85,7 @@ export function useCostlyMode(): { ask: (mode: CostlyMode, use: () => void) => v
   const dialog = (
     <Dialog
       open={!!pending}
+      part={pending?.mode === 'goal' ? 'goal' : undefined}
       onClose={close}
       title={t ? `Before you use ${t.name}` : ''}
       width={460}

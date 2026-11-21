@@ -1153,7 +1153,7 @@ test('the turn that ended is reported, not the next one its waiting message bega
   assert.equal(sessions.delivered.length, n + 2);
 });
 
-test('after a restart, a queue of what agents sent each other goes out for a session still at work; anything a person wrote, an attachment, or a Stop all after it keeps it for Resume', () => {
+test('after a restart, a queue of what agents sent each other (or the goal loop sent) goes out for a session still at work; anything a person wrote, an attachment, or a Stop all after it keeps it for Resume', () => {
   const base = { key: 'acp:x', title: 'T', label: 'Custom · M', link: 'L' };
   const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
   // What the app sends between agents: a lead's message_child, each kind of report back, a step up.
@@ -1177,6 +1177,12 @@ test('after a restart, a queue of what agents sent each other goes out for a ses
   assert.equal(queueGoesOn([{ ...lead, attachments: 1 }], {}), false);
   assert.equal(queueGoesOn([lead, report], { stoppedAll: 2000 }), false);
   assert.equal(queueGoesOn([report], { stoppedWithParent: 2600 }), false);
+  // The app's goal loop sends its rounds through the queue too: nobody presses Resume for those either.
+  const round = { text: '[Goal · round 3 of 12]\n\nThe goal: “Fast export”', at: 2700, attachments: 0 };
+  assert.equal(queueGoesOn([round], {}), true);
+  assert.equal(queueGoesOn([lead, round], {}), true);
+  assert.equal(queueGoesOn([round, { text: 'Also fix the README', at: 3000, attachments: 0 }], {}), false, 'a person’s message still waits for Resume');
+  assert.equal(queueGoesOn([{ ...round, text: 'Goal · round 3 (typed by hand)' }], {}), false);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

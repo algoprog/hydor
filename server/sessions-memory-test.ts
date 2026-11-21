@@ -3,7 +3,8 @@
 // server/wiki/ask-test.ts): the first message is held and the agent has had nothing; the session needs you while it
 // asks and shows "building" while it builds, with no second notification; the agent gets the first message when the
 // essentials are read, when the job ends, on Start now, Start without memory and Don't ask; a failed build asks again;
-// what is sent meanwhile goes after the first message; "Start without memory" keeps the question away for a week; and
+// what is sent meanwhile goes after the first message; a message on its way to the agent counts as delivering until
+// the agent has it (the goal loop's idle); "Start without memory" keeps the question away for a week; and
 // the cards and the waiting come back after a restart, a build that ended meanwhile starting the agent.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sessions-memory-test.ts
@@ -21,6 +22,9 @@ import { buildApi, SNOOZE_MS, askedNot, loadGates, saveGates } from './wiki/ask.
 import type { BuildOffer } from './wiki/areas/build.ts';
 import { saveJob, wikiJobEvents, type JobState } from './wiki/areas/jobs.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
+import { dropGoal, saveGoal } from './goals/store.ts';
+import { checkpoint } from './worktrees.ts';
+import { execFileSync } from 'node:child_process';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -327,6 +331,127 @@ test('what is sent while it waits goes after the first message, in order', async
   assert.match(h.sent[2]?.text ?? '', /third/);
 });
 
+test('a message on its way to the agent: the session counts as delivering from the moment it leaves the queue until the agent has it', async () => {
+  // The goal loop (server/goals) takes an idle session with an empty queue for one whose round is over: while a queued
+  // message is being handed over (the agent started, the worktree's snapshot taken: seconds), it must not look so.
+  const h = manager();
+  const key = `claude:${crypto.randomUUID()}`;
+  db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, ?, ?)').run(key, 'claude', folder, Date.now(), Date.now());
+  h.sessions(key);
+  let release!: () => void;
+  h.m.snapshot = () => new Promise<void>((res) => (release = res));
+  h.m.enqueue(key, 'the person’s message', [], [], true);
+  assert.equal(h.m.delivering(key), false, 'waiting in the queue is not delivering');
+  h.m.resumeQueue(key);
+  await sleep(20);
+  assert.equal(h.m.queues.get(key), undefined, 'taken off the queue');
+  assert.equal(h.adapter.state.status, 'idle', 'and the agent is not at work yet');
+  assert.equal(h.m.delivering(key), true, 'so the session is delivering');
+  release();
+  await sleep(20);
+  assert.equal(h.sent.at(-1)?.text, 'the person’s message');
+  assert.equal(h.m.delivering(key), false, 'the agent has it: working, not delivering');
+  // A delivery that fails ends it as well (the message goes back to the person as a toast, as before).
+  h.adapter.state = { ...h.adapter.state, status: 'idle' };
+  h.m.snapshot = async () => {
+    throw new Error('disk full');
+  };
+  h.m.enqueue(key, 'third');
+  await sleep(20);
+  assert.equal(h.m.delivering(key), false);
+  assert.ok(h.emitted.some((a) => a[0] === 'toast' && /disk full/.test((a[1] as { text: string }).text)));
+  // A message sent straight away (send) is on its way the same way, until the agent has it or it fails.
+  let done!: () => void;
+  h.m.sendNow = () => new Promise<undefined>((res) => (done = () => res(undefined)));
+  const sending = h.m.send(key, 'another');
+  await sleep(5);
+  assert.equal(h.m.delivering(key), true);
+  done();
+  await sending;
+  assert.equal(h.m.delivering(key), false);
+  h.m.sendNow = async () => {
+    throw new Error('the agent is gone');
+  };
+  await assert.rejects(h.m.send(key, 'fourth'), /the agent is gone/);
+  assert.equal(h.m.delivering(key), false);
+});
+
+test('I5: Edit from here with the files put back is refused while the session’s goal has a reset of its own under way', async () => {
+  const h = manager();
+  const key = `claude:${crypto.randomUUID()}`;
+  db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, ?, ?)').run(key, 'claude', folder, Date.now(), Date.now());
+  h.sessions(key);
+  saveGoal(db, {
+    key,
+    id: 'g1',
+    status: 'checking',
+    contract: { objective: 'Fast checkout', checks: [], protect: [], limits: { rounds: 3 } },
+    settings: { asks: 'forks', noAnswerMin: 10 },
+    rounds: [],
+    undo: true,
+    rules: [],
+    next: [],
+    dropped: [],
+    startedAt: 1,
+    spentUsd: 0,
+    activeMs: 0,
+    _: { spentAtStart: 0, restoreTo: { to: 'abc', n: 2, by: 'undo', at: 1, safety: 'def' } },
+  });
+  await assert.rejects(h.m.rewind(key, { itemId: 'u1', text: 'Try it again', restoreFiles: true }), (e: any) => e.status === 409 && /goal is putting its files back/.test(e.message));
+  // Without putting the files back, the goal is no reason to refuse it (here it fails later, for want of a transcript).
+  await assert.rejects(h.m.rewind(key, { itemId: 'u1', text: 'Try it again' }), (e: any) => !/goal is putting its files back/.test(e.message));
+  dropGoal(db, key);
+});
+
+test('J8: Edit from here checks the goal again right before its reset: a reset the goal began while the conversation was read refuses it, and the files stay as they are', async () => {
+  const h = manager();
+  const key = `claude:${crypto.randomUUID()}`;
+  const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', ...a], { cwd, stdio: 'pipe' }).toString().trim();
+  const repo = path.join(tmp, 'j8-repo');
+  fs.mkdirSync(repo);
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'one\n');
+  git(repo, 'init', '-q', '-b', 'main');
+  // The checkpoint's own commit takes the repository's identity (none in a scratch HOME).
+  git(repo, 'config', 'user.name', 'Test');
+  git(repo, 'config', 'user.email', 'test@example.invalid');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'start');
+  const w = { path: path.join(tmp, 'j8-wt'), branch: 'agent/j8', base: 'main', repo };
+  git(repo, 'worktree', 'add', '-q', '-b', w.branch, w.path, 'main');
+  db.prepare('insert into app_sessions (key, agent, cwd, worktree, created_at, updated_at) values (?, ?, ?, ?, ?, ?)').run(key, 'claude', w.path, JSON.stringify(w), Date.now(), Date.now());
+  db.exec('create table if not exists checkpoints (key text not null, at integer not null, commit_id text not null)');
+  const before = (await checkpoint(w))!;
+  db.prepare('insert into checkpoints (key, at, commit_id) values (?, ?, ?)').run(key, Date.now() - 1000, before);
+  fs.writeFileSync(path.join(w.path, 'a.txt'), 'two\n');
+  h.sessions(key);
+  const g = {
+    key,
+    id: 'g1',
+    status: 'checking' as const,
+    contract: { objective: 'Fast checkout', checks: [], protect: [], limits: { rounds: 3 } },
+    settings: { asks: 'forks' as const, noAnswerMin: 10 },
+    rounds: [],
+    undo: true,
+    rules: [],
+    next: [],
+    dropped: [],
+    startedAt: 1,
+    spentUsd: 0,
+    activeMs: 0,
+    _: { spentAtStart: 0 },
+  };
+  saveGoal(db, g);
+  // The goal begins a reset of its own while the conversation is read (after rewind's first look).
+  h.m.timeline = async () => {
+    saveGoal(db, { ...g, _: { spentAtStart: 0, restoreTo: { to: before, n: 2, by: 'undo', at: Date.now(), safety: before } } });
+    return { parser: { items: [{ kind: 'user', id: 'u1', seq: 0, ts: Date.now(), text: 'Make it faster' }] } };
+  };
+  await assert.rejects(h.m.rewind(key, { itemId: 'u1', text: 'Try it again', restoreFiles: true }), (e: any) => e.status === 409 && /goal is putting its files back/.test(e.message));
+  assert.equal(fs.readFileSync(path.join(w.path, 'a.txt'), 'utf8'), 'two\n', 'nothing put back');
+  dropGoal(db, key);
+  git(repo, 'worktree', 'remove', '--force', w.path);
+});
+
 test('after a restart, a session that was asking still asks, and its card comes back', async () => {
   const h = await asking();
   // A new manager over the same database: nothing in memory.
@@ -480,6 +605,29 @@ test('create(): it sends at once when it does not ask: started by something else
   const h = await created({ askMemory: true, cwd: path.join(tmp, 'not-a-project'), extra: {} });
   assert.equal(h.sent.length, 1, 'not in a project');
   void none;
+});
+
+test('create() with a goal: in Plan mode the session starts plain and the person hears why; minutes that are not whole refuse it before it starts', async () => {
+  const warned: string[] = [];
+  const warn = console.warn;
+  console.warn = (...a: unknown[]) => void warned.push(a.join(' '));
+  let h: Awaited<ReturnType<typeof created>>;
+  try {
+    h = await created({ mode: 'plan', extra: { goal: { start: true, asks: 'own' } } });
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(h.spawned[0].extra?.goal, undefined, 'no goal goes with the first message');
+  assert.equal(sessionExtra(db, h.key).goal, undefined);
+  const n = h.notices.find((x: any) => x.kind === 'waiting' && x.key === h.key);
+  assert.equal(n?.body, 'The goal was not set: the session is in Plan mode, where it changes nothing: switch to another mode first.');
+  assert.equal(n?.title, 'Fix the checkout tests');
+  assert.ok(warned.some((w) => w.includes(h.key) && w.includes('not set at its start')), 'and in the log');
+  // Whole minutes only: refused with a sentence, and no session is made.
+  await assert.rejects(created({ extra: { goal: { start: true, noAnswerMin: 0.1 } } }), (e: any) => e.status === 400 && /whole number from 0 to 1440/.test(e.message));
+  // In a scheduled run it is ignored without a word, as before.
+  const quiet = await created({ mode: 'plan', extra: { goal: { start: true }, automations: { task: 't', run: 'r' } } });
+  assert.equal(quiet.notices.some((x: any) => /goal was not set/.test(x.body ?? '')), false);
 });
 
 test('create(): a Codex session asks like the others', async () => {

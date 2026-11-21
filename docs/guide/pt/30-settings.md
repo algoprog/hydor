@@ -311,11 +311,11 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 ### Custom
 
-[Configurações → Custom](/settings?s=custom): modo automático, um sandbox para comandos e por quanto tempo as metas são executadas. Mais em [Custom, o agente próprio do app](/guide/custom).
+[Configurações → Custom](/settings?s=custom): modo automático, um sandbox para comandos e por quanto tempo os objetivos são executados. Mais em [Custom, o agente próprio do app](/guide/custom).
 
 - [**Modo automático**](/settings?s=custom&find=Auto%20mode): O Custom aprova sozinho os passos seguros.
 - [**Sandbox para comandos**](/settings?s=custom&find=Sandbox%20for%20commands): No modo Automático, os comandos rodam em um sandbox; o Acesso total roda sem ele.
-- [**Rodadas antes de uma meta pausar**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Quantas rodadas uma meta pode executar antes de pausar e esperar por você.
+- [**Rodadas antes de um objetivo pausar**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Quantas rodadas um novo objetivo de qualquer agente recebe antes de parar no limite.
 
 ## Perguntar a um agente
 

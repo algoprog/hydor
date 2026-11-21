@@ -115,7 +115,15 @@ A notification's title is the session's name (cut short when it is long). Its te
   - for a call held in the Outbox, "Waits for your OK in the Outbox:", the account and tool, and who it goes to. Tapping it opens the inbox.
 - **Failed**, then the error.
 
-A session working on a goal says "Goal met: …" when the goal holds, and "The goal needs you: …" or "Goal paused: …" when it stops ([Give the session a goal](/guide/sessions#give-the-session-a-goal)).
+A session working on a goal sends one notice for each thing that needs you or ends it, in place of a "Finished" after every round ([Give the session a goal](/guide/sessions#give-the-session-a-goal)). "Finished" notices are held back only while the goal is at work, not while it waits for you:
+
+- "The goal's checks are ready for you", when the agent has proposed the checks and waits for your **Start**, and "A check could not run: …", with which one and why, when pressing **Start** found a check that cannot run;
+- the agent's question, when it asks which way to go next; "The goal needs you: …", when it is blocked on something only you can give; and "The goal needs you: does "…" hold?", for a check only you can confirm;
+- "The goal waits: The session's queue is paused: press Resume there", when messages wait in a queue that is on hold;
+- "Goal paused: …" with why. These pause with a notice: its message could not be sent; the files could not be saved (before measuring, before a round's checks, or before putting them back: "…so round 4 was not undone. Resume to check it again."); putting a round's files back did not finish ("Putting round 4's files back did not finish, so the files may be partly put back. Everything that was in the folder is saved: Keep anyway… on round 4 brings it back. Resume goes on from the files as they are."); a round could not be checked because the session kept working in the folder while its checks ran, three times in a row ("Round 4 could not be checked: … Resume to check it again."); a check that held cannot run any more ("“Tests pass” could not run: …"); the final check could not run ("The reviewer could not be reached, so the final check did not run. Resume to try again."); the agent stopped at its plan's usage limit and the app will not carry it on by itself; a restart of the app cut the agent's turn short a second time; or the app restarted as a message of the loop was going out and sending it again did not help ("The loop's message did not reach the agent…"). A pause you press yourself, one after you stop the agent ("You stopped the agent.") and one after a failed turn show in the bar without a notice;
+- "Goal stopped at its limit: …", with the limit ("It ran its 12 rounds", "It spent $10.00 of its $10.00");
+- "Goal reached: …", with the goal;
+- "The goal was not set: …", when a session you started with **Goal** could not have it (a Hydor subagent, Plan mode, no message to take as the goal).
 
 A scheduled task's run says how it went, in a line the agent wrote. A run with nothing new to report stays quiet, a failed run always tells you, a blocked run reads "Blocked: …", and a task paused after failures in a row says so ([Scheduled tasks](/guide/tasks)).
 

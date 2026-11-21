@@ -70,6 +70,7 @@ Glossary (the app's own German; keep these exactly):
 - Terminal → Terminal
 - Browser → Browser
 - Git → Git
+- Goal (a session's goal, Goal mode) → Ziel; round → Runde; the checks → die Prüfungen
 - Worktree → Worktree
 - Pull request → Pull-Request
 - Usage → Nutzung

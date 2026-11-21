@@ -70,7 +70,22 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
 - Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
   conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
-- Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
+- **Goals** (the session's menu → Set a goal, or Options → Goal on the start page), for every agent: the person and the
+  agent first agree what done means as checks (a command that must pass, a measured number with a target, a sentence a
+  reviewer that did none of the work must find true, something only you confirm), the paths it may not change and limits
+  (rounds, money, time); the app measures where things stand, then after every round runs the checks itself, as the
+  session's own commands would run (inside the sandbox in a confidential session, or where Custom's or Codex's mode keeps
+  commands in one), and keeps the round when things got closer and nothing broke, or undoes it (the files go back to the
+  round's start in a session with a worktree, and only when nobody else worked in the folder meanwhile: otherwise the
+  round stays, with the reason, and the goal goes on; everything in the folder is saved first; the app never tries a
+  second time; elsewhere the next round is told what got worse). When every check holds the app runs them a second
+  time and a reviewer reads the whole change: only then is the goal reached, and the agent cannot end it. How much it
+  asks (Works on its own, Asks at turning points, Asks every round) with a clock (10 minutes, or waits) before it goes on with its pick;
+  you steer at any time with messages, Pause and Resume, **Add a rule…**, **Change the checks…** and your say on a round
+  (**Keep anyway…**, **Undo**, **Another way from here**). A bar above the message box shows the checks and the
+  rounds, a card asks the questions and shows the report, a goal that stopped at a limit can be given more (it goes on when no limit is hit any more), it never sits at work
+  silently (a queue on hold, a turn cut by a restart or a usage limit, commands left running each have a reason or carry
+  on), and the messages of the loop show as quiet rows. A `/goal` typed in Claude Code or Codex is still that program's own, simpler goal, and a session cannot have both. A session that leads a team (a swarm, a campaign, a deep research or an arena match) cannot have a goal in this version.
 - A rail of tool icons at the left edge of every page on a computer (a tooltip names each one, with its shortcut, under the pointer or the keyboard), and, on the start page and in a session, the sidebar with your sessions beside it (its header: the logo, a filter and group button, and Hide). A session started as an agent other than the usual one names it at the start of its row's second line (its icon and name; the usual one is its project's own agent for a session in a project that has one, General otherwise; sessions started outside Hydor and deleted agents are not named either, and under Projects such a row keeps a second line for it). The filter button's menu has sections: Agent (All agents, then the agents your sessions were started as, the most used first, up to eight, each with its number of sessions), Runs on (Any, Claude Code, Codex) and Project (Every project and up to eight), then New project… and Group by folder or project; the filters combine, a chip for each one that is on shows under New session (its × shows everything again), and a list with nothing in it says so. Apps, Agents, Help and Settings have a column of the same kind (the logo, their own list, Hide), the Browser its own tab column, and the other pages (Projects, Inbox, Usage, System…) use the whole width. `Ctrl+B` (or Sessions on the rail) hides and shows the column of the page you are on. The column's width, 180 to 560 pixels, is the same in all of them, set by dragging its edge or with the arrow keys on it, and kept. A column's list shows its scroll bar whenever it holds more than fits (macOS would hide it until you scroll), and its foot fades while more is below.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
@@ -777,9 +792,9 @@ agents that speak ACP and take MCP servers.
 - **Swarm** (Options → Swarm, or a running session's menu → Session settings → Swarm; **Campaign** is the same for one
   big change in parts, below): a lead agent splits a hard problem into different angles, starts a member for each,
   and has the answer checked; members share a board. Like Deep research it takes effect from the next message, turning
-  one on turns the other off, and neither is offered for a confidential session or one another session started.
-  The first time someone picks Swarm, Campaign, Deep research or Arena (on the start page, in a scheduled task's
-  options or in a session's dialog), a dialog says what it does, what it is worth it for and not, and what it costs;
+  one on turns the other off, and neither is offered for a confidential session or one another session started. Goal does not combine with them either.
+  The first time someone picks Swarm, Campaign, Deep research, Arena or Goal (on the start page, in a scheduled task's
+  options or in a session's dialog; a scheduled task has no Goal), a dialog says what it does, what it is worth it for and not, and what it costs;
   it shows once per mode, on every device, whether tips are on or not.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), are kept with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
   link (a published page with a description and a social picture where its link is shared; **Published**, `/published`, lists them, from a page's Share menu or the search box). Kept things go by project: what an agent saves goes in its session's project, where it shows in the project's Files (its details window, from the sidebar), and Keep
@@ -1468,8 +1483,8 @@ Custom is the app's own agent, for models beyond Claude Code's and Codex's, and 
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
-about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks,
-"Edit from here" (with the files put back) and `/goal` work for it as they do for Claude Code and Codex.
+about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks and
+"Edit from here" (with the files put back) work for it as they do for Claude Code and Codex, and goals work for it as for every agent.
 
 - **Your plans' models, and any others**: Custom's Model menu groups models under **Your subscriptions**, **On this computer** and **In the cloud**, each row with what it comes through (Claude Code, Codex, OpenRouter, Ollama, vLLM, an endpoint's name). With nothing to set up, a signed-in Claude Code offers Claude Opus, Fable, Sonnet and Haiku (always the newest of each), and Codex signed in with ChatGPT offers the models the plan lists (a program found signed out drops its models; Codex on an API key lends none). They use the plan's usage, not an API key or money per token (a session shows $0 for those steps), and each account of the program is tried in turn, so one at its limit or signed out hands the step to the next (with **Switch accounts at a limit** on). Claude's models answer through Claude Code itself, one step at a time, as Anthropic lets only its own programs use a plan's sign-in: Custom's tools are described in its instructions and Claude writes its calls as text, each step reusing the last one's cache. Claude Code cannot end a reply at its calls, so Custom ends it there and stops the program: what Claude writes after its calls (results it imagined, more calls on top of them) is never run, shown or kept. A step cut short by an update of the app is asked again once the app is back. Codex's are asked directly on the ChatGPT plan, with Custom's tools as real tools. A confidential session never uses them. They can be picked wherever Custom's models can: the start page, a session's model menu, Custom's tiers, the helper model, an agent's or app's model. Settings → Agents → Models shows them in **Your subscriptions**, after **Tiers**.
 - **A helper for anything**: research, writing, documents and everyday tasks, with an engineer's habits in a code

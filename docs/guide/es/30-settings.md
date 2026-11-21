@@ -315,7 +315,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 
 - [**Modo automático**](/settings?s=custom&find=Auto%20mode): Custom aprueba por sí mismo los pasos seguros.
 - [**Entorno aislado para comandos**](/settings?s=custom&find=Sandbox%20for%20commands): Los comandos del modo Automático se ejecutan en un entorno aislado; Acceso total se ejecuta sin él.
-- [**Rondas antes de pausar un objetivo**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Cuántas rondas puede ejecutar un objetivo antes de pausarse y esperarte.
+- [**Rondas antes de pausar un objetivo**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): Cuántas rondas tiene un objetivo nuevo de cualquier agente antes de detenerse en su límite.
 
 ## Preguntar a un agente
 

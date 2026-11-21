@@ -133,32 +133,17 @@ In a [confidential session](/guide/sessions#keep-a-session-confidential) every c
 
 ## Give Custom a goal
 
-A goal keeps Custom working, turn after turn, until a condition holds: "npm test passes and the upload page handles 2 GB files".
+Custom has the same goals as every other agent: the app's own loop drives it, round after round, until checks you agree hold. Open the session's menu (⋯) → **Set a goal**, or turn on **Options** → **Goal** on the start page, and the agent proposes the checks for you to agree. Each round the app runs the checks itself, keeps the round or undoes it (in a worktree), asks you which way to go at turning points, and stops when every check holds, you stop it, or a limit is reached. The whole story, with the screens, is in [Give the session a goal](/guide/sessions#give-the-session-a-goal).
 
-1. Open the session's menu (⋯) → **Set a goal**.
-2. Describe what "done" looks like, as a condition that is true when the work is done.
-3. Click **Start working on it** (or press Ctrl+Enter, ⌘Enter on a Mac).
+What is the same for every agent now: the agreement card, the checks, the rounds list, the questions, your rules and **Your say**, and the report. Typing `/goal` in a Custom session does nothing special any more: it is plain text. Two things are about Custom:
 
-Custom starts on it at once; if a turn is running, the goal is checked when that turn ends.
+- A **Reviewer** check, and the final check, are judged by a model that did none of the work. In a [confidential session](/guide/sessions#keep-a-session-confidential) that is a model on this computer; without one, the check cannot run.
+- Check commands run the way Custom's own commands do: in Auto mode with **Sandbox for commands** on, inside the sandbox, kept to the session's folder; in its other modes as its own commands run; in a confidential session always inside the sandbox without network.
+- The rounds a new goal gets come from **Rounds before a goal pauses** below. It now holds for every agent's goals, not only Custom's.
 
-After each turn, the helper model checks the goal against the evidence: what the steps did and showed (command output, test results, files, pages read). Custom saying it's done doesn't count by itself. Then:
+Goals Custom had running before this version are not carried over: set a new one.
 
-- **Done**: the goal is cleared and you get a notice, "Goal met".
-- **Not yet**: the check writes the next step and sends it as the next message ("Goal check 3: not there yet…").
-- **Needs you**: the goal shows "stuck: the agent needs you" with the question, and you get a notice. Answer in the session.
-- **Waiting** for something outside (a deploy, a download): it looks again in three minutes.
-
-Your own messages go first: a check waits until the queue is empty.
-
-The goal pauses, and tells you why, when:
-
-- it has sent as many next steps as **Rounds before a goal pauses** in Settings allows (30 unless you change it);
-- three rounds in a row made no progress;
-- you stopped the agent, a turn failed, the agent wasn't running, or the check itself failed.
-
-The goal bar above the message box shows the goal, how it stands ("working on it", "paused", "stuck: the agent needs you"), how many times it was checked and for how long, and the last check's reason. **Pause** sends no more next steps (a turn already running finishes), **Resume** carries on from the last next step (the count of rounds starts again), and **Clear** stops working towards it. While a goal runs, you get one notice when it's met rather than one after every turn.
-
-To change how many rounds a goal may run, open [Settings → Capabilities → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) and pick **10**, **30** or **100** in the **Rounds before a goal pauses** row of the **Goals** group.
+To change how many rounds a new goal gets, open [Settings → Capabilities → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) and pick **10**, **30** or **100** in the **Rounds before a goal pauses** row of the **Goals** group. You can set another number on the agreement card, and the agent may propose one.
 
 ## Long conversations and long output
 
@@ -245,15 +230,15 @@ A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessio
 
 - **Auto mode** (one of Custom's modes, beside Ask, Accept edits, Full access and Plan): its (i) says what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
 - **Sandbox for commands** (in Auto mode, commands change files only in the session's folder and /tmp on Linux, the temporary folders on a Mac, or a temporary folder of their own on Windows; Full access runs without this sandbox or approval prompts): a switch, on by default. Greyed out when the sandbox can't run here (bubblewrap on Linux, Seatbelt on a Mac, Git for Windows and the .NET Framework on Windows), and the row says why.
-- **Rounds before a goal pauses**, in the **Goals** group (with /goal, Custom works turn after turn until the goal holds; after this many rounds it pauses for you): **10**, **30** (the default) or **100** rounds. It also pauses after three rounds without progress.
+- **Rounds before a goal pauses**, in the **Goals** group (the rounds a new goal of any agent is given; you can set another number on the goal's agreement card): **10**, **30** (the default) or **100** rounds. A goal that runs out of rounds stops at its limit, and you can give it more.
 
 Custom's models are in [Settings → Agents → Models](/settings?s=models), and the model that does the checks is the **Helper model** there.
 
 ## Ask an agent
 
 - "Turn off the sandbox for Custom's Auto mode commands."
-- "Let Custom's goals run for up to 100 rounds."
-- "Set a goal on my Custom session 'Upload page': npm test passes and uploads of 2 GB work."
+- "Give new goals up to 100 rounds."
+- "Set a goal on my Custom session 'Upload page': npm test passes and uploads of 2 GB work, and ask me only when you are stuck."
 - "Which helper model does Auto mode use, and can it see images?"
 - "Can this computer run my confidential sessions' commands without network?"
 - "Add Qwen3 Coder from OpenRouter so I can use it with Custom." (once your OpenRouter key is set)

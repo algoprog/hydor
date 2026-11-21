@@ -50,7 +50,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const ids = new Set(picked.map(contenderId));
   const set = (next: Contender[]) => {
     if (next.length) localStorage.setItem(LAST, JSON.stringify(next));
-    onChange({ arena: next.length ? { with: next } : undefined });
+    onChange(next.length ? { arena: { with: next }, goal: undefined } : { arena: undefined });
   };
   const toggle = (c: Contender) => {
     const id = contenderId(c);

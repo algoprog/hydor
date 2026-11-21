@@ -15,7 +15,7 @@ An agent is the program that does the work in a session: it reads your message, 
 
 What each can do in the app:
 
-- Goals (the agent keeps working until a condition holds) and forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
+- Goals (the app keeps the agent working, round after round, until checks you agree hold; see [Give the session a goal](/guide/sessions#give-the-session-a-goal)): every agent, Claude Code, Codex, Custom and the other ACP agents. A `/goal` typed in a Claude Code or Codex chat is that program's own, simpler goal. Forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
 - **Continue in…** (hand the conversation to another agent): from Claude Code or Codex, to the other one or to Custom.
 - Effort (how hard the model thinks): Claude Code, Codex and Grok Build, and any other ACP agent whose models offer it.
 - More than one account, plan usage limits and switching accounts at a limit: Claude Code, Codex and Grok Build.
@@ -181,7 +181,7 @@ With two or more accounts for the same agent, the app can use them all: when one
 - Hydor subagents (the sessions an agent starts to do part of its work) are sessions of their own, so each one moves by itself when a limit stops its turn. The agent that started it hears that it carries on, not that it failed, and gets its reply when it finishes.
 - Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex, Grok Build from Grok Build.
 - A Grok Build account is at its limit when it reaches its weekly limit, its credit limit or its pay-as-you-go spending cap. The session then moves to another signed-in Grok account with usage left (the least used one) and continues with "… reached its usage limit, so this session now runs on …". A short rate limit (a burst of requests) moves nothing: it passes by itself. The limit notice above the message box shows for Grok sessions too.
-- A Codex goal moves with the session and keeps going.
+- A goal the app drives is the app's, so it keeps going on the new account. A goal typed as `/goal` in Codex moves with the session and keeps going.
 - When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below, for Claude Code). With **Resume after usage limits** on, the session continues when the first account resets, on that account. This holds for Grok Build sessions too. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
 - A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away. With your message, the agent learns that it now runs on an account with usage left, so it doesn't wait for the old account's reset, and which of its subagents can go on.
 - Sessions open in VS Code or a terminal stay on their account.
@@ -270,7 +270,7 @@ The app opens a session in the folder you pick, shows the agent's messages and s
 - It takes one message at a time. A message you send while it works waits in the queue above the message box and goes out when the turn ends. (Custom works this way too.)
 - An agent that can't reopen earlier sessions starts afresh when you continue an old one, without the conversation above it. The session says so. The same happens when an agent could reopen a session before but can no longer: it carries on afresh, with a note, instead of failing.
 - Pictures you attach reach it only if it accepts images.
-- Goals, forks and hand-offs aren't available (Custom has goals and forks).
+- Forks and hand-offs aren't available (Custom has forks). Goals are: the app's own loop drives them for every agent.
 - The app's tools (pages, search, memory…) reach an agent as an MCP server: by address when the agent accepts that, otherwise through a small program the app starts for it. An agent that takes none of them works with its own tools alone, but still gets the guidelines, memory notes and skills.
 
 ## Where Custom's models come from
@@ -300,7 +300,7 @@ In Custom's **Model** menu, the models are grouped under **Your subscriptions**,
 The helper model does small jobs beside your sessions, outside any conversation:
 
 - naming each new session from your request (its title in the sidebar);
-- checking steps in Custom's Auto mode, and checking a Custom goal after each turn;
+- checking steps in Custom's Auto mode, and judging the checks of a goal that a reviewer must find true (a reviewer is a model that did none of the work, and in a confidential session it is a model on this computer);
 - tidying up memory about once a day, learning from the conversations since, and titling notes for the index agents start with;
 - answering one question about a web page the browser has open;
 - reading the filters (sites, dates, kinds of pages, languages) that the words of a web search state, before Naget Search searches (see [How agents search the web](/guide/web#how-agents-search-the-web));

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, KeyboardSensor, MouseSensor, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Trash2, X } from 'lucide-react';
+import { CornerDownLeft, FileText, GripVertical, Paperclip, Pencil, Play, Target, Trash2, X } from 'lucide-react';
 import { childReplyOf } from '@shared/children';
+import { goalMessageOf } from '@shared/goals';
 import type { QueuedAttachment, QueuedMessage, SessionSummary } from '@shared/types';
 import { enc, post } from '../../lib/api';
 import { attachmentPayload, dropSentPictures, queuedPicturesOf, readAttachments, releaseAttachments, useSentPictures, type Attachment, type SentPictures } from '../../lib/attachments';
@@ -66,6 +67,8 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
   const call = (path: string, then?: () => void) => post(`/api/sessions/${enc(s.key)}/queue/${enc(m.id)}${path}`).then(then, toastError);
   const reply = childReplyOf(m.text);
+  // A message of the app's goal loop waiting its turn: one line, and nothing to edit.
+  const goal = goalMessageOf(m.text);
   return (
     <div
       ref={setNodeRef}
@@ -87,7 +90,23 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
       </button>
       <span className="tnum mt-0.5 w-3 shrink-0 text-[11px] text-fg-3">{n}</span>
       <div className="min-w-0 flex-1">
-        {m.text && <div className="line-clamp-2 text-[13.5px] leading-snug whitespace-pre-wrap text-fg-2">{reply ? <ChildReplyLabel reply={reply} /> : m.text}</div>}
+        {m.text && (
+          <div className="line-clamp-2 text-[13.5px] leading-snug whitespace-pre-wrap text-fg-2">
+            {goal ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Target size={13} className="shrink-0 text-accent" />
+                <span data-i18n="goal">
+                  <span className="font-medium text-fg">Goal</span>
+                  {goal.head && <span> · {goal.head}</span>}
+                </span>
+              </span>
+            ) : reply ? (
+              <ChildReplyLabel reply={reply} />
+            ) : (
+              m.text
+            )}
+          </div>
+        )}
         {m.att && (
           <div className={cx('flex flex-wrap gap-1.5', m.text && 'mt-1.5')}>
             {m.att.map((a) => (
@@ -100,9 +119,11 @@ function QueueRow({ s, m, n, sent, onEdit }: { s: SessionSummary; m: QueuedMessa
         <button title="Send now, into the running turn" onClick={() => call('/send')} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
           <CornerDownLeft size={13} />
         </button>
-        <button title="Edit the text and attachments" onClick={onEdit} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
-          <Pencil size={13} />
-        </button>
+        {!goal && (
+          <button title="Edit the text and attachments" onClick={onEdit} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg">
+            <Pencil size={13} />
+          </button>
+        )}
         <button title="Remove" onClick={() => call('/delete', () => sent && dropSentPictures(s.key, sent.id))} className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-err">
           <Trash2 size={13} />
         </button>

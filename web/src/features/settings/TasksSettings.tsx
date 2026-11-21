@@ -580,7 +580,7 @@ export function TaskEditor({
           <ModelPicker label="Model" agent={d.agent} acp={d.acpAgent} value={d.model ?? null} onChange={(v) => ((modelPicked.current = true), set({ model: v ?? undefined }))} localOnly={confidential} auto={auto.hint ?? (d.model === AUTO_MODEL ? auto.line : undefined)} />
           <EffortPicker label="Effort" agent={d.agent} acp={d.acpAgent} model={d.model === AUTO_MODEL ? auto.bestModel : (d.model ?? null)} value={d.effort ?? null} onChange={(v) => set({ effort: v ?? undefined })} />
           <ModePicker label="Permissions" agent={d.agent} acp={d.acpAgent} value={d.mode ?? null} onChange={(v) => set({ mode: v })} />
-          <FeatureStartOptions value={extra} onChange={(p) => set({ extra: tidyExtra({ ...extra, ...p }) })} cwd={d.cwd} />
+          <FeatureStartOptions value={extra} onChange={(p) => set({ extra: tidyExtra({ ...extra, ...p }) })} cwd={d.cwd} scheduled />
         </div>
         <div>
           <textarea

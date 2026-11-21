@@ -98,7 +98,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
  * The modes that cost several times what one agent does. The first time someone picks one, a short explanation
  * says what it is for, when it is not worth it and what it costs, before it is on; whether tips are on or not.
  */
-export const COSTLY_MODES = ['swarm', 'campaign', 'research', 'arena'] as const;
+export const COSTLY_MODES = ['swarm', 'campaign', 'research', 'arena', 'goal'] as const;
 
 export type CostlyMode = (typeof COSTLY_MODES)[number];
 

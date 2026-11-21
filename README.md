@@ -200,6 +200,10 @@ On a Mac, the app puts the command on your PATH by itself.
 - **Agents of your own**: describe one and it is drafted for you, with schedules, a model tier, a monthly budget and
   the agents it may hand work to. Every change is a version, examples check it still does its job, and it travels as
   a file to install on another Hydor ([agents](docs/guide/05-agents.md)).
+- **Goals the app checks**: agree with an agent what "done" means (commands that must pass, a number to reach, a claim
+  a reviewer checks, something you confirm) and how far it may go (rounds, money, time). After each round the app runs
+  the checks itself, keeps a round that got closer and, in a worktree, undoes one that made things worse, asks you at
+  turning points, and only it says the goal is reached ([goals](docs/guide/02-sessions.md#give-the-session-a-goal)).
 - Scheduled tasks, watchers (a new email, deal, file or ticket in a connected app, or the half hour before a meeting),
   webhooks, and goals an agent keeps working on, all on one week view ([tasks](docs/guide/12-tasks.md)).
 - **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.

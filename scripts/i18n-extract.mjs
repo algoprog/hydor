@@ -315,6 +315,9 @@ const add = (s, where, jsx = false) => {
 // Files with no words the pages show: the code highlighter's keyword lists (its languages' names are the same in every
 // language), which read as words, and the requests the kinds an agent makes, and Resolve with AI, send it.
 const NO_WORDS = new Set([
+  // Goal mode's made-up example (a shop's search) and the page that shows it: development only, never the app's words.
+  'web/src/features/goal/samples.ts',
+  'web/src/features/goal/Preview.tsx',
   'shared/code-colours.ts',
   'shared/content-asks.ts',
   'shared/comment-asks.ts',

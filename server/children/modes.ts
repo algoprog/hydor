@@ -23,6 +23,9 @@ export const modeFamily = (agent: Agent, acpAgent?: string): string | null => (a
 /** How free a mode is; ask when it is not known. */
 export const modeLevel = (family: string | null, mode: string | undefined): number => (family && mode ? (LEVELS[family]?.[mode] ?? ASK) : ASK);
 
+/** Whether a mode lets the agent run anything without asking (Claude Code's Bypass, Codex's and Custom's Full access); not when it is not known. */
+export const neverAsks = (family: string | null, mode: string | undefined): boolean => modeLevel(family, mode) >= BYPASS;
+
 /**
  * The mode for a child of agent family `child`: the parent's own when the child's agent has it, else the
  * freest of the child's modes that is no freer than the parent's. None for another ACP agent (its default).

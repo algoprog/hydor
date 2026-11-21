@@ -64,6 +64,11 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'search_sessions',
   'memory_search',
   'read_session',
+  // A goal the app drives (server/goals): its checks run here, and its reviewer is a model on this computer.
+  'goal_propose',
+  'goal_report',
+  'goal_ask',
+  'goal_note',
   // Hydor subagents (child sessions), confidential too.
   'start_child_session',
   'child_sessions',

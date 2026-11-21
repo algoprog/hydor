@@ -190,7 +190,7 @@ function ResearchStartOption({ value, onChange }: { value: SessionExtra; onChang
   const set = (next: ResearchSettings | undefined) => {
     if (next) localStorage.setItem(LAST, JSON.stringify(next));
     // A research and a swarm both lead child sessions: one or the other.
-    onChange(next ? { research: next, swarm: undefined } : { research: undefined });
+    onChange(next ? { research: next, swarm: undefined, goal: undefined } : { research: undefined });
   };
   const cur = r ?? last();
   return (

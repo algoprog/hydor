@@ -20,7 +20,8 @@ import { SnoozeItems } from '../sessions/SnoozeMenu';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { continueIn, handoffName } from './Composer';
 import { copyMarkdown, downloadMarkdown, saveToLibrary } from './exportSession';
-import { GoalDialog } from './GoalBar';
+import { canSetGoal } from '../goal/can';
+import { SetGoal } from '../goal/SetGoal';
 import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
 
@@ -51,7 +52,7 @@ export function SessionMenu({ s, anchor, open, onClose, onRename, onFork, onPull
       {open && <MenuBody s={s} anchor={anchor} close={onClose} show={setShown} confirm={confirm} onRename={onRename} onFork={onFork} onPullRequest={onPullRequest} customReady={customReady} />}
       {confirmNode}
       {s.worktree && <WorktreeDialog s={s} open={shown === 'worktree'} onClose={hide} />}
-      <GoalDialog s={s} open={shown === 'goal'} onClose={hide} />
+      <SetGoal s={s} open={shown === 'goal'} onClose={hide} />
       <ShareDialog s={s} open={shown === 'share'} onClose={hide} />
     </>
   );
@@ -65,7 +66,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
   const back = () => setAt({ sub: null, back: true });
   const running = !!s.live && s.live.status !== 'exited';
   const working = running && isBusy(activityOf(s));
-  // Custom (the app's own agent) forks and keeps goals like Claude Code and Codex; other ACP agents do not.
+  // Custom (the app's own agent) forks like Claude Code and Codex; other ACP agents do not. Every agent can have a goal: the app's own loop drives it.
   const custom = s.agent === 'acp' && s.acpAgent === 'console';
   // A confidential session stays on this computer: no read-only link, no pull request, no other agent.
   const closed = isConfidential(s.extra);
@@ -219,7 +220,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
             Continue in {handoffName(t.agent)}
           </MenuItem>
         ))}
-        {!s.goal && !s.external && (s.agent !== 'acp' || custom) && (
+        {canSetGoal(s) && (
           <MenuItem icon={<Target size={15} />} onClick={() => (close(), show('goal'))}>
             Set a goal
           </MenuItem>

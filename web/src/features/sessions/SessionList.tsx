@@ -51,6 +51,7 @@ import { assistantTranslate } from '../assistants/language';
 import { Swap } from '../../components/Swap';
 import { useFlip } from '../../lib/flip';
 import { tr } from '../../i18n/runtime';
+import { markTitle } from '../goal/words';
 
 /**
  * Active sessions keep their places: newest to become active on top, then fixed. Working,
@@ -326,7 +327,7 @@ const RowBody = memo(function RowBody({
       {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Finished since you last looked" />}
       {s.pr && <PrBadge pr={s.pr} />}
       {s.goal && (
-        <span title={`Goal: ${s.goal.objective}`} className="shrink-0">
+        <span data-i18n="goal" title={markTitle(s.goal.objective, s.goal.app)} className="shrink-0">
           <Target size={11} className={s.goal.status === 'active' ? 'text-accent' : 'text-warn'} />
         </span>
       )}

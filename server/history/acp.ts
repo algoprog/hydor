@@ -8,7 +8,8 @@
 //   {"t":"update","ts":…,"u":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"…"}}}
 //   {"t":"end","ts":…,"stopReason":"end_turn"}
 //   {"t":"title","title":"…"}
-//   {"t":"goal","ts":…,"goal":{…}|null,"note":{"text":"…"},"step":"…"}   Custom's /goal (server/custom/goal.ts)
+//   {"t":"goal","ts":…,"goal":{…}|null,"note":{"text":"…"},"step":"…"}   Custom's /goal before the app's own goal loop
+//                                                                     (server/goals): still read, so old transcripts keep their notes
 //
 // Custom adds a usage_update after each model call: its running totals for the ACP session (tokens in
 // `_meta.hydor`, or `_meta.naget` from before the rename, the cost when it knows it). Another ACP agent may send the cost alone.
@@ -124,7 +125,7 @@ export class AcpParser {
   /** The item agent text and thoughts go on appending to, while nothing else came between. */
   private open: { kind: 'assistant' | 'thinking'; id: string } | null = null;
   private turn: { id: string; start: number; tools: number } | null = null;
-  /** Custom's goal (/goal), as its latest "goal" line says; other ACP agents have none. */
+  /** Custom's goal from before the app's own loop (server/goals), as its latest "goal" line says; nothing shows it now. */
   goal: GoalInfo | null = null;
   /** The message the goal loop sends next: its note says it, so it does not show as yours. */
   private goalStep: string | null = null;

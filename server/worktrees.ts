@@ -112,14 +112,50 @@ export async function checkpoint(w: WorktreeInfo): Promise<string | null> {
   }
 }
 
+/** The oldest git that can put files back: checkout's --no-overlay came with 2.22. */
+const RESTORE_GIT = [2, 22] as const;
+
+/** Reads git's version (`git --version`); tests put another reading in its place (null puts it back). */
+const readGit = async (cwd: string) => (await git(cwd, ['--version'])).out;
+let gitVersion: (cwd: string) => Promise<string> = readGit;
+/** What the version read says, once: why files cannot be put back with this git, or null. */
+let gitRefused: Promise<string | null> | null = null;
+export function setGitVersionReader(fn: ((cwd: string) => Promise<string>) | null) {
+  gitVersion = fn ?? readGit;
+  gitRefused = null;
+}
+
+/**
+ * Why this computer's git cannot put files back, or null: checked once, before anything is touched (with an older git,
+ * the checkout would fail after the reset and the clean had already run). A version that cannot be read is no reason.
+ */
+export function restoreRefusal(cwd: string): Promise<string | null> {
+  gitRefused ??= gitVersion(cwd).then(
+    (out) => {
+      const m = /(\d+)\.(\d+)(?:\.\d+)?/.exec(out);
+      if (!m) return null;
+      const [major, minor] = [Number(m[1]), Number(m[2])];
+      const ok = major > RESTORE_GIT[0] || (major === RESTORE_GIT[0] && minor >= RESTORE_GIT[1]);
+      return ok ? null : `Putting files back needs git ${RESTORE_GIT.join('.')} or newer; this computer has ${m[0]}`;
+    },
+    () => null,
+  );
+  return gitRefused;
+}
+
 /** Puts the worktree's files back as they were in a checkpoint: the commit it was on, and the changes on top. */
 export async function restoreCheckpoint(w: WorktreeInfo, commit: string) {
+  // Refused before any step with a git too old for them: nothing is touched.
+  const old = await restoreRefusal(w.path);
+  if (old) throw new HttpError(500, old);
   const parent = (await git(w.path, ['rev-parse', `${commit}^`])).out.trim();
   if (!parent) throw new HttpError(404, 'That checkpoint is gone');
   const steps: string[][] = [
     ['reset', '--hard', parent],
     ['clean', '-fd'],
-    ['checkout', commit, '--', '.'],
+    // --no-overlay: files the checkpoint does not have go too (a file a kept round deleted stays deleted), so the folder
+    // is exactly the checkpoint's afterwards, as the goal loop and "Edit from here" then say it is.
+    ['checkout', '--no-overlay', commit, '--', '.'],
     ['reset', '--mixed', parent],
   ];
   for (const s of steps) {

@@ -75,8 +75,8 @@ function CustomSettings() {
       <Group title="Goals">
         <Row
           label="Rounds before a goal pauses"
-          hint="With /goal, Custom works turn after turn until the goal holds"
-          info="After each turn the helper model checks the goal against what the turn did, and gives the next step. It also pauses after three rounds without progress."
+          hint="How many rounds a new goal gets, for every agent"
+          info="A goal works round after round until the checks you agree hold. A new goal of any agent gets this many rounds; you can set another number when you agree its checks. A goal that runs out of rounds stops, and you can give it more."
           control={st ? <Segmented size="sm" value={String(st.goalRounds)} options={rounds.map((v) => ({ value: v, label: v }))} onChange={(v) => void save({ goalRounds: Number(v) })} /> : wait}
         />
       </Group>

@@ -23,6 +23,7 @@ import { customFeature } from './custom/feature';
 import { documentsFeature } from './documents/feature';
 import { experimentsFeature } from './experiments/feature';
 import { commitsFeature } from './git/feature';
+import { goalFeature } from './goal/feature';
 import { guideFeature } from './guide/feature';
 import { guidelinesFeature } from './guidelines/feature';
 import { imagesFeature } from './images/feature';
@@ -121,9 +122,10 @@ export interface WebFeature {
   SessionOptions?: ComponentType<{ s: SessionSummary }>;
   /**
    * On the start page, options for the new session, kept in its settings. `how.auto`: an option set by itself (a
-   * default, or in place of one that is gone), not picked: the start page does not keep it as a pick.
+   * default, or in place of one that is gone), not picked: the start page does not keep it as a pick. `scheduled`: drawn in a
+   * scheduled task's editor, where an option that does not fit a schedule (Goal) draws nothing.
    */
-  StartOptions?: ComponentType<{ value: SessionExtra; onChange: StartChange; cwd: string }>;
+  StartOptions?: ComponentType<{ value: SessionExtra; onChange: StartChange; cwd: string; scheduled?: boolean }>;
 }
 
 let list: WebFeature[] | null = null;
@@ -144,6 +146,7 @@ export const features = (): WebFeature[] =>
     outboxFeature,
     budgetFeature,
     swarmFeature,
+    goalFeature,
     researchFeature,
     arenaFeature,
     commitsFeature,
@@ -245,7 +248,7 @@ const startRank = (f: WebFeature) => (f.id === 'assistants' ? 0 : 1);
  * The capabilities' options for a new session; with `part`, only the one that leads (on the start page's
  * row, always there) or the rest (in its Options menu, there only while it is open).
  */
-export function FeatureStartOptions({ part, ...p }: { value: SessionExtra; onChange: StartChange; cwd: string; part?: 'lead' | 'rest' }) {
+export function FeatureStartOptions({ part, ...p }: { value: SessionExtra; onChange: StartChange; cwd: string; part?: 'lead' | 'rest'; scheduled?: boolean }) {
   return (
     <>
       {[...features()]

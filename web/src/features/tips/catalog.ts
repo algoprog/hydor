@@ -55,7 +55,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   goal: {
     title: 'A goal for the session',
-    body: 'The agent keeps working, turn after turn, until the goal holds. Pause or clear it here.',
+    body: 'The agent works round after round until the checks you agreed hold, and the app runs them itself. Steer, pause or stop it here.',
   },
   children: {
     title: 'A subagent',

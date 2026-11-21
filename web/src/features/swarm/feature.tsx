@@ -196,7 +196,8 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
   const mode = swarmMode(value);
   const set = (swarm: true | 'campaign' | undefined) => {
     // A swarm and a deep research both lead child sessions: one or the other.
-    onChange(swarm ? { swarm, research: undefined } : { swarm });
+    // A goal and a swarm do not combine in this version: one or the other.
+    onChange(swarm ? { swarm, research: undefined, goal: undefined } : { swarm });
     setOpen(false);
   };
   const atOnce = size ? ` · ${size} at once` : '';

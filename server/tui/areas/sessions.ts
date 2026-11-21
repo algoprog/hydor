@@ -228,12 +228,12 @@ export const sessions: Area = {
       name: 'goal',
       args: [session, { name: 'goal', kind: 'text', rest: true, optional: true }],
       options: {
-        clear: { type: 'boolean', desc: 'Drop the goal' },
-        pause: { type: 'boolean', desc: 'Pause it (Codex and Custom)' },
-        resume: { type: 'boolean', desc: 'Go on with a paused goal (Codex and Custom)' },
+        clear: { type: 'boolean', desc: 'Stop the goal (a goal that is over is dismissed)' },
+        pause: { type: 'boolean', desc: 'Pause it (not a Claude Code /goal)' },
+        resume: { type: 'boolean', desc: 'Go on with a paused goal' },
       },
       summary: 'See, set, pause or clear a session’s goal',
-      help: 'A goal is what the agent keeps working towards, turn after turn, until it holds: say what “done” looks like. It keeps an agent working (and spending), so it is set only when you give the words.',
+      help: 'A goal is what the agent keeps working towards, round after round, until checks you agree hold: say what “done” looks like. The agent first proposes the checks and the app measures where things stand; nothing starts before you press Start on the goal’s card in the app (the terminal only sets, shows, pauses and stops it). It keeps an agent working (and spending) until its checks hold or a limit is reached, so it is set only when you give the words.',
       examples: ['hydor sessions goal 3f9a', 'hydor sessions goal 3f9a "all tests pass and the PR is open"', 'hydor sessions goal 3f9a --clear'],
       async run(ctx, [given, ...words], v) {
         const s = await findSession(ctx, given);
