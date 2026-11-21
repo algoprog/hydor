@@ -378,6 +378,43 @@ test('Citation alerts: who cited each paper, new ones against those seen (the fi
 
 // ---- Hugging Face: New-model watch's programs ---------------------------------------------------------------------
 
+test('Citation alerts: when Semantic Scholar cannot give the citing sentences, OpenAlex says who cited, the answer says plainly that the sentences are to be read again, and those citations stay to be read: the next update shows each with its sentence', async () => {
+  const down: Route = (u) => (u.host === 'api.semanticscholar.org' ? { status: 403 } : null);
+  const mine = [{ key: 'axcolbert', title: 'ColBERT', s2: 'p1', oa: 'W2995', first: 'Khattab', year: 2020 }];
+  routes = [down, openAlexRoute];
+  const before = [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757'], count: 1 }];
+  const v = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const fresh = v.fresh as Record<string, unknown>[];
+  assert.ok(fresh.length > 0, 'OpenAlex gave citing papers');
+  assert.ok(fresh.every((c) => c.unread === true && (c.contexts as unknown[]).length === 0), 'each marked as without its sentence');
+  assert.equal(v.unread, fresh.length);
+  assert.equal(v.sorting, 0, 'no sentence to sort');
+  assert.doesNotMatch(String(v.notes), /too busy/, 'said in the answer’s own words, not among the notes');
+  const keep = (v.keep as Record<string, unknown>[])[0];
+  assert.deepEqual((keep.pending as string[]).slice().sort(), fresh.map((c) => c.key as string).sort(), 'kept as still to be read');
+  // What the answer says, and each citation marked.
+  const ctx = ctxOf();
+  ctx.data.set('cited', before.map((x) => ({ ...x })));
+  const r = await program('citation-alerts', 'report', { author: { name: 'Omar Khattab', source: 'Semantic Scholar' }, papers: [{ key: 'axcolbert', title: 'ColBERT', citations: 3000 }], fresh, counts: v.counts, keep: v.keep, unread: v.unread, kinds: [], notes: '', more: v.notes, today: '2026-11-05' }, ctx);
+  assert.equal(r.sentences, 'The citing sentences could not be read this time (Semantic Scholar limits requests); they are tried again at the next update.');
+  assert.ok((r.citations as Record<string, unknown>[]).every((c) => c.unread === true && c.kind === '' && c.gist === '' && c.mark === ''));
+  assert.deepEqual(ctx.data.get('cited')![0].pending, keep.pending, 'the record keeps what is to be read');
+  // Semantic Scholar answering: no such sentence is said; one it reads (not all of them have) is shown again with it, and leaves the list.
+  busyOnce.clear();
+  routes = [s2Route];
+  const base = await program('citation-alerts', 'cites', { papers: mine, seen: before, today: '2026-11-05' }, ctxOf());
+  const withSentence = (base.fresh as Record<string, unknown>[]).filter((c) => (c.contexts as unknown[]).length).map((c) => c.key as string);
+  const all = (base.fresh as Record<string, unknown>[]).map((c) => c.key as string);
+  assert.ok(withSentence.length > 0 && withSentence.length < all.length, 'the fixture has some with a sentence, some without');
+  const again = await program('citation-alerts', 'cites', { papers: mine, seen: [{ id: 'axcolbert', title: 'ColBERT', citing: ['ax2608_30757', ...all], count: 4, pending: all }], today: '2026-11-05' }, ctxOf());
+  assert.deepEqual((again.fresh as Record<string, unknown>[]).map((c) => c.key).sort(), withSentence.slice().sort(), 'those with a sentence are shown again with it');
+  assert.ok((again.fresh as Record<string, unknown>[]).every((c) => !c.unread && (c.contexts as unknown[]).length > 0));
+  assert.equal(again.unread, 0);
+  assert.deepEqual(((again.keep as Record<string, unknown>[])[0].pending as string[]).sort(), all.filter((k) => !withSentence.includes(k)).sort(), 'the others stay to be read');
+  const quiet = await program('citation-alerts', 'report', { author: {}, papers: [], fresh: again.fresh, counts: again.counts, keep: again.keep, unread: again.unread, kinds: [], notes: '', more: '', today: '2026-11-05' }, ctxOf());
+  assert.equal(quiet.sentences, '');
+});
+
 test('New-model watch: the newest models, those old enough with downloads to look at (most downloaded first), those too new to wait; their pages and cards; the licence and size kept to', async () => {
   routes = [(u) => (u.host === 'huggingface.co' && u.pathname === '/api/models' ? fixture('hf-models.json') : null)];
   asked.length = 0;
@@ -597,6 +634,45 @@ test('Deadline radar: reminders at the days you gave, the nearest one come for e
   assert.equal(told.length, 0);
 });
 
+test('Deadline radar: a venue neither list has is looked up on the web: its page picked, its deadline taken as a moment and marked as from its website; what it did not find is still missing; a call’s page is kept and linked', async () => {
+  routes = deadlineRoutes;
+  const lists = await program('deadline-radar', 'lists', { venues: 'SIGIR, Zorgcon, Imaginary Conf', calls: [], now: '2027-01-12 09:00', zone: 'Europe/Athens', today: '2027-01-12' });
+  assert.deepEqual(lists.missing, ['Zorgcon', 'Imaginary Conf']);
+  assert.deepEqual((lists.unknown as Record<string, string>[]).map((u) => u.venue), ['Zorgcon', 'Imaginary Conf']);
+  assert.match((lists.unknown as Record<string, string>[])[0].query, /^Zorgcon conference next call for papers/);
+  // Its page: the result that reads like its dates and holds its name, whichever way the search was written.
+  const text = '[1] Zorgcon 2027 · Important dates\n    https://zorgcon.org/2027/dates\n    The dates.\n[2] Zorgcon\n    https://example.com/zorgcon-news\n';
+  const pick = await program('deadline-radar', 'site_pick', { found: { text }, venue: 'Zorgcon' });
+  assert.equal(pick.url, 'https://zorgcon.org/2027/dates');
+  assert.equal((await program('deadline-radar', 'site_pick', { found: { data: { results: [{ url: 'https://a.org/x', title: 'x' }] } }, venue: 'Zorgcon' })) .url, 'https://a.org/x');
+  // 1 February 2027, 23:59 AoE is 2 February 13:59 in Athens; the second venue's page gave nothing, so it is still missing.
+  const web = await program('deadline-radar', 'web_deadlines', {
+    lists,
+    unknown: lists.unknown,
+    said: [{ venue: 'Zorgcon', url: 'https://zorgcon.org/2027/dates', name: 'Zorg Conference', year: 2027, deadline: '2027-02-01 23:59', timezone: 'AoE' }, { venue: 'Imaginary Conf', url: '', name: '', year: null, deadline: '', timezone: '' }],
+  });
+  const wd = web.deadlines as Record<string, unknown>[];
+  assert.deepEqual(wd.map((d) => [d.venue, d.year, d.label, d.day, d.time, d.utc, d.given, d.source, d.next]), [['Zorg Conference', 2027, 'Papers', '2027-02-02', '13:59', '2027-02-02T11:59:00Z', '2027-02-01 23:59 AoE', 'https://zorgcon.org/2027/dates', true]]);
+  assert.deepEqual(web.missing, ['Imaginary Conf']);
+  // A date long past, or no date, is not a find.
+  const old = await program('deadline-radar', 'web_deadlines', { lists, unknown: [{ venue: 'Zorgcon' }], said: [{ venue: 'Zorgcon', url: 'https://zorgcon.org/', name: 'Zorg', year: 2024, deadline: '2024-02-01', timezone: '' }] });
+  assert.deepEqual([(old.deadlines as unknown[]).length, old.missing], [0, ['Zorgcon']]);
+  // Together with the lists' deadlines, in order, the website's marked; the call page found is kept and linked apart from the site.
+  const ctx = ctxOf();
+  const v = await program('deadline-radar', 'remind', { lists, web, read: [{ cfp: 'https://sigir2027.org/calls/full-papers', pages: '9 pages', template: '' }, {}], calls: [], sent: [], reminders: '', today: '2027-01-12' }, ctx);
+  const ds = v.deadlines as Record<string, unknown>[];
+  assert.deepEqual(ds.map((d) => d.venue), ['SIGIR', 'SIGIR', 'Zorg Conference']);
+  const sig = ds[0];
+  assert.deepEqual([sig.link, sig.source, sig.pages], ['https://sigir2027.org/calls/full-papers', '', '9 pages'], 'the call’s page, not the conference’s site');
+  assert.equal(ds[2].source, 'https://zorgcon.org/2027/dates');
+  assert.deepEqual(v.missing, ['Imaginary Conf'], 'only what the web did not give either');
+  assert.equal((v.venues as unknown[]).length, 2);
+  assert.equal(ctx.data.get('calls')![0].cfp, 'https://sigir2027.org/calls/full-papers', 'kept, not thrown away');
+  // Without the web step's answer (it failed), the lists' own missing stand.
+  const none = await program('deadline-radar', 'remind', { lists, web: '', read: [], calls: [], sent: [], reminders: '', today: '2027-01-12' }, ctxOf());
+  assert.deepEqual(none.missing, ['Zorgcon', 'Imaginary Conf']);
+});
+
 // ---- Living related work and Gap finder ----------------------------------------------------------------------------
 
 test('Living related work: each topic’s papers to weigh (the first time its best and latest, the seeds’ citing papers too), the closest numbered, what was kept added with cite keys of their own', async () => {
@@ -728,7 +804,9 @@ const srv = createServer((req, res) => {
     const b = JSON.parse(body || '{}');
     const user = String(b.messages?.find((m: { role: string }) => m.role === 'user')?.content ?? '');
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(reply(user)) }, finish_reason: 'stop' }] })}\n\n`);
+    const said = reply(user);
+    // A step with no outputs asks for plain text (a LaTeX section): a string is sent as it is.
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: typeof said === 'string' ? said : JSON.stringify(said) }, finish_reason: 'stop' }] })}\n\n`);
     res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } })}\n\n`);
     res.end('data: [DONE]\n\n');
   });
@@ -834,13 +912,25 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   assert.ok(cited.every((c) => (c.citing as string[]).length === 4));
   // Deadline radar: SIGIR and ACL found, their calls read for the page limit and the template.
   routes = deadlineRoutes;
-  reply = (user) => (user.includes("call for papers") ? { pages: '9 pages, references not counted', template: 'https://www.acm.org/publications/proceedings-template' } : {});
-  const dl = await run('deadline-radar', { venues: 'SIGIR, ACL', reminders: '14, 3, 1' });
-  assert.deepEqual(dl.res.venues.map((v: any) => v.venue), ['SIGIR', 'ACL']);
-  assert.deepEqual(dl.res.missing, []);
+  const nextYear = new Date().getUTCFullYear() + 1;
+  reply = (user) =>
+    user.startsWith('From this part of a page about the conference')
+      ? { name: 'Zorg Conference', year: nextYear, deadline: `${nextYear}-06-01 23:59`, timezone: 'AoE' }
+      : user.includes("call for papers")
+        ? { pages: '9 pages, references not counted', template: 'https://www.acm.org/publications/proceedings-template' }
+        : {};
+  const dl = await run('deadline-radar', { venues: 'SIGIR, ACL, Zorgcon', reminders: '14, 3, 1' });
+  assert.deepEqual(dl.res.venues.map((v: any) => v.venue), ['SIGIR', 'ACL', 'Zorg Conference']);
+  assert.deepEqual(dl.res.missing, [], 'Zorgcon is in neither list, and the web gave its deadline');
   assert.ok(dl.res.deadlines.every((d: any) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(d.utc)));
+  const zorg = dl.res.deadlines.find((d: any) => d.venue === 'Zorg Conference');
+  assert.deepEqual([zorg.source, zorg.day], ['https://sigir2027.org/calls/full-papers', `${nextYear}-06-02`]);
   const calls = findRecords(db, 'tpl:deadline-radar', dl.t.data, 'calls').records;
-  for (const c of calls) assert.equal(c.pages, '9 pages, references not counted');
+  for (const c of calls) {
+    assert.equal(c.pages, '9 pages, references not counted');
+    assert.equal(c.cfp, 'https://sigir2027.org/calls/full-papers', 'the call’s page is kept');
+  }
+  assert.ok(dl.res.deadlines.filter((d: any) => !d.source).every((d: any) => d.link === 'https://sigir2027.org/calls/full-papers'));
   // Living related work: a topic grown from arXiv's and OpenAlex's papers, the model's verdicts kept; its BibTeX flow.
   routes = [arxivRoute, openAlexRoute, s2Route];
   reply = (user) => {
@@ -856,6 +946,20 @@ test('Citation alerts, Deadline radar, Living related work and Gap finder, as th
   const bib = await run('living-related-work', { topic: 'text embeddings' }, 'bib');
   assert.equal(bib.res.count, kept.length);
   assert.match(bib.res.bib, /^@\w+\{/);
+  // Its related work, drafted by a model from the papers kept, with each cite key checked against them.
+  const key = String(kept[0].citekey);
+  const other = String(kept[kept.length - 1].citekey);
+  let asked = '';
+  reply = (user) => {
+    asked = user;
+    return '```latex\nDense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',madeupkey2027,' + other + '}. Others differ \\cite{ghost2026}.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '} \\cite{nobody}.\n```';
+  };
+  const draft = await run('living-related-work', { topic: 'text embeddings' }, 'draft');
+  assert.ok(asked.includes('\\cite{' + key + '}') && asked.includes('## Embeddings'), 'the papers by theme, each with its key');
+  assert.equal(draft.res.latex, 'Dense models were studied~\\cite{' + key + '} and later extended \\cite{' + key + ',' + other + '}. Others differ.\n\\paragraph{Gaps.} Little is known \\citep[see][]{' + other + '}.', 'the fence is off; keys that are none of the papers’ are taken out, and a citation left with none goes whole');
+  assert.match(draft.res.note, /^3 citations to papers that are not in this topic \(madeupkey2027, ghost2026, nobody\) were taken out\.$/);
+  assert.equal(draft.res.count, kept.length);
+  assert.ok(draft.res.bib.startsWith('@'));
   // A second update: the papers it has are not weighed again.
   const again = await run('living-related-work', { topics: 'text embeddings', seeds: '', most: '20' });
   assert.equal(again.res.fresh, 0);

@@ -1339,11 +1339,18 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
     { item: 'Total', estimate: '450–650 EUR' },
   ]);
   assert.equal(result.overview, 'Three easy days.');
+  // What the research found reaches the answer, each field straight from the step that found it.
+  assert.deepEqual([result.weather, result.temperatures, result.rain, result.pack], ['Sunny, by the forecast', '14–20 °C', 'Some', ['A light jacket']]);
+  assert.deepEqual(result.events.map((e: any) => [e.name, e.date, e.where]), [['Jazz festival', 'Saturday', 'Belém']]);
+  assert.deepEqual([result.holidays, result.closures], [[], ['The castle closes on Mondays']]);
+  assert.deepEqual([result.arrival, result.around], ['The metro from the airport', 'A Viva Viagem card']);
   const st = store.listSteps(db, r.id);
   const status = Object.fromEntries(st.map((s) => [s.path, s.status]));
   assert.equal(status.choices, 'skipped', 'not asked: the run came from the API');
-  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'assemble']) assert.equal(status[id], 'done', id);
+  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'lookups', 'geo', 'fx', 'assemble']) assert.equal(status[id], 'done', id);
   const at = Object.fromEntries(st.map((s) => [s.id, s]));
+  // The app's own tier goes to its agent's session: the plan is standard work.
+  assert.equal(store.getRun(db, at.plan.childRun!)!.recipe.tier, 'standard');
   const started = Math.max(...['events_search', 'climate_search', 'sights_search', 'transport_search'].map((id) => at[id].startedAt!));
   const ended1 = Math.min(...['whats_on', 'weather', 'places', 'transport'].map((id) => at[id].endedAt!));
   assert.ok(started <= ended1, 'the four branches ran side by side');
@@ -1727,9 +1734,9 @@ test('a tier in place of a model: running a ready-made app with a tier replaces 
   const model = await run({ agent: 'claude', model: 'named-model', tier: 'best' });
   assert.deepEqual([model.tier, model.model], [undefined, 'named-model']);
   const neither = await run({});
-  assert.deepEqual([neither.tier, neither.model], [undefined, undefined]);
+  assert.deepEqual([neither.tier, neither.model], ['best', undefined], 'the app’s own tier: Deep research report is research work');
   const huge = await run({ tier: 'huge' });
-  assert.equal(huge.tier, undefined);
+  assert.equal(huge.tier, 'best', 'a tier that is none is ignored: the app’s own stays');
 });
 
 // ---- memory -------------------------------------------------------------------------------------------------

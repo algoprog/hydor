@@ -42,7 +42,7 @@ function num(v) {
 `;
 
 /** The JSON an address answered with, from what http_request gives (its status and headers, a blank line, the body). */
-const BODY = String.raw`// The JSON an address answered with: http_request gives its status and headers, a blank line, then the body. An
+export const BODY = String.raw`// The JSON an address answered with: http_request gives its status and headers, a blank line, then the body. An
 // answer cut short (a long list) keeps the items that came whole.
 function bodyOf(r) {
   if (r && typeof r === 'object' && !Array.isArray(r)) {
@@ -1296,12 +1296,13 @@ const tally = [
   { who: 'Draw', wins: meetings.filter((m) => m.winner === 'Draw').length },
   { who: opp, wins: meetings.filter((m) => same(m.winner, opp)).length },
 ];
-return { chances, team_pct: a, draw_pct: d, opponent_pct: b, team_form: letters(input.team_form), opponent_form: letters(input.opponent_form), meetings, tally };`,
+return { chances, team_pct: a, draw_pct: d, opponent_pct: b, total_pct: a + d + b, team_form: letters(input.team_form), opponent_form: letters(input.opponent_form), meetings, tally };`,
           outputs: [
             { id: 'chances', label: 'Chances', type: 'table', columns: [{ id: 'outcome', label: 'Result', type: 'text' }, { id: 'pct', label: 'Chance, %', type: 'number' }] },
             { id: 'team_pct', label: 'Chance the team wins, %', type: 'number' },
             { id: 'draw_pct', label: 'Chance of a draw, %', type: 'number' },
             { id: 'opponent_pct', label: 'Chance the opponent wins, %', type: 'number' },
+            { id: 'total_pct', label: 'The chances added up, %', type: 'number', description: '100 when there are chances, for the examples to check' },
             { id: 'team_form', label: 'The team’s form', type: 'text' },
             { id: 'opponent_form', label: 'The opponent’s form', type: 'text' },
             { id: 'meetings', label: 'Last meetings', type: 'table', columns: MEETING_COLS },
@@ -1356,8 +1357,8 @@ return { chances, team_pct: a, draw_pct: d, opponent_pct: b, team_form: letters(
       { id: 'keys', label: 'What to watch', type: 'list' },
     ],
     examples: [
-      { id: 'a-league-match', name: 'A league match', inputs: { team: 'Arsenal', opponent: 'Chelsea', competition: 'Premier League' }, checks: ['{{answer.summary}} is not empty', '{{odds.team_pct}} >= 0'] },
-      { id: 'basketball-no-draws', name: 'Basketball, no draws', inputs: { team: 'Boston Celtics', opponent: 'New York Knicks', competition: 'NBA' }, checks: ['{{answer.draw_pct}} = 0'] },
+      { id: 'a-league-match', name: 'A league match', inputs: { team: 'Arsenal', opponent: 'Chelsea', competition: 'Premier League' }, checks: ['{{answer.summary}} is not empty', '{{answer.team_pct}} >= 0 and {{answer.team_pct}} <= 100 and {{answer.draw_pct}} >= 0 and {{answer.draw_pct}} <= 100 and {{answer.opponent_pct}} >= 0 and {{answer.opponent_pct}} <= 100', '{{odds.total_pct}} = 100'] },
+      { id: 'basketball-no-draws', name: 'Basketball, no draws', inputs: { team: 'Boston Celtics', opponent: 'New York Knicks', competition: 'NBA' }, checks: ['{{answer.draw_pct}} = 0', '{{odds.total_pct}} = 100'] },
     ],
   },
   // ---- food --------------------------------------------------------------------------------------------------------
@@ -1741,37 +1742,62 @@ return { items, count: items.length };`,
           title: 'Write the plan and the list',
           do: 'code',
           language: 'javascript',
-          with: { found: '{{details.items}}', picked: '{{picked.items}}', dates: '{{plan.dates}}', diet: '{{diet}}' },
+          with: { found: '{{details.items}}', picked: '{{picked.items}}', dates: '{{plan.dates}}', diet: '{{diet}}', people: '{{people}}', pool: '{{pool.items}}' },
+          seconds: 60,
           code:
             LIST +
             BODY +
             KITCHEN +
             String.raw`// The dinners on their days, each with its ingredients and method; and one shopping list for all of them: the same
-// thing once (its amounts added up where their units agree), by aisle, the basics marked as probably there already.
+// thing once (its amounts added up where their units agree, scaled to the people), by aisle, the basics marked as
+// probably there already. A dinner that does not suit the diet is swapped for a choice that does; only what no choice
+// could replace is listed as not quite the diet.
 const dates = rows(input.dates);
 const picked = rows(input.picked);
 const meals = list(input.found).map((r) => ((bodyOf(r) || {}).meals || [])[0] || null);
-const days = [];
-meals.forEach((m, i) => {
-  if (!m || days.length >= dates.length) return;
+const dayOf = (m, d, why) => {
   const ings = ingredientsOf(m);
-  const d = dates[days.length];
-  days.push({
+  return {
     day: d.day,
     date: d.date,
     meal: m.strMeal,
     picture: linkOf(m.strMealThumb),
     area: m.strArea || m.strCountry || '',
     category: m.strCategory || '',
-    why: picked[i] ? picked[i].why : '',
+    why,
     ingredients: ings.map((x) => (x.amount ? x.amount + ' ' : '') + x.item).join('\n'),
     method: String(m.strInstructions || '').replace(/\r/g, '').trim(),
     video: linkOf(m.strYoutube),
     link: linkOf(m.strSource) || 'https://www.themealdb.com/meal/' + m.idMeal,
     ings,
     fits: suits(input.diet, m.strCategory, ings.map((x) => x.item)),
-  });
+  };
+};
+const days = [];
+meals.forEach((m, i) => {
+  if (!m || days.length >= dates.length) return;
+  days.push(dayOf(m, dates[days.length], picked[i] ? picked[i].why : ''));
 });
+// The swaps: the choices not picked yet are looked up in their order, four at once, until as many fit the diet as
+// there are dinners that do not (at most 24 looked up, so a diet the choices rarely suit does not go on for long).
+const off = days.filter((d) => !d.fits);
+if (off.length) {
+  const used = new Set(meals.filter(Boolean).map((m) => String(m.idMeal)));
+  const spare = rows(input.pool).filter((x) => !used.has(String(x.id)));
+  const fitting = [];
+  for (let looked = 0; fitting.length < off.length && spare.length && looked < 24; looked += 4) {
+    const got = await Promise.all(spare.splice(0, 4).map((c) => ctx.tool('http_request', { url: '${MEALDB}/lookup.php?i=' + c.id }).then((r) => ((bodyOf(r) || {}).meals || [])[0] || null, () => null)));
+    for (const m of got) if (m && !used.has(String(m.idMeal)) && suits(input.diet, m.strCategory, ingredientsOf(m).map((x) => x.item))) (used.add(String(m.idMeal)), fitting.push(m));
+  }
+  off.forEach((d, k) => {
+    if (!fitting[k]) return;
+    const slot = days.indexOf(d);
+    days[slot] = dayOf(fitting[k], d, 'Swapped in for ' + d.meal + ', which did not suit the diet');
+  });
+}
+// A recipe of TheMealDB gives no servings: each is taken to serve four, and the amounts on the list are scaled to the people.
+const people = Math.max(1, Math.round(Number(input.people) || 2));
+const SCALE = people / 4;
 const AISLES = [
   ['Meat and fish', MEAT],
   ['Meat and fish', FISH],
@@ -1789,7 +1815,7 @@ const FRACTION = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3
 function amountOf(s) {
   const t = String(s || '').trim().toLowerCase().replace(/[½¼¾⅓⅔]/g, (c) => ' ' + FRACTION[c]);
   const m = /^(\d+(?:\.\d+)?)(?:\s+(\d+)\s*\/\s*(\d+)|\s*\/\s*(\d+)|\s+(0\.\d+))?\s*([a-z]+)?/.exec(t.trim());
-  if (!m) return null;
+  if (!m || /^\s*[-–]\s*\d/.test(t.slice(m[0].length))) return null;
   let n = Number(m[1]);
   if (m[2]) n += Number(m[2]) / Number(m[3]);
   else if (m[4]) n = n / Number(m[4]);
@@ -1798,9 +1824,40 @@ function amountOf(s) {
   if (m[6] && !u) return null;
   return { n: n * u[1], unit: u[0] };
 }
+// An amount scaled and rounded to what can be measured out: weights and volumes to 1, 5 or 10, spoons and cups to a
+// quarter, things to count to a half (a whole from three up); fractions written as ¼ ½ ¾ ⅓ ⅔.
+const GLYPHS = [[0.25, '¼'], [0.5, '½'], [0.75, '¾'], [1 / 3, '⅓'], [2 / 3, '⅔']];
+const nice = (n) => {
+  const whole = Math.floor(n + 0.04);
+  const f = n - whole;
+  const g = GLYPHS.find(([v]) => Math.abs(f - v) < 0.04);
+  if (g) return (whole ? whole + ' ' : '') + g[1];
+  return String(Math.round(n * 100) / 100);
+};
+const roundTo = (n, unit) => {
+  if (SCALE === 1) return Math.round(n * 100) / 100;
+  if (unit === 'g' || unit === 'ml') {
+    const step = n >= 100 ? 10 : n >= 20 ? 5 : 1;
+    return Math.max(step, Math.round(n / step) * step);
+  }
+  if (unit === 'tbsp' || unit === 'tsp' || unit === 'cup' || unit === 'oz' || unit === 'lb') return Math.max(0.25, Math.round(n * 4) / 4);
+  return n >= 3 ? Math.round(n) : Math.max(0.5, Math.round(n * 2) / 2);
+};
 const shown = (n, unit) => {
   const big = unit === 'g' && n >= 1000 ? [n / 1000, 'kg'] : unit === 'ml' && n >= 1000 ? [n / 1000, 'l'] : [n, unit];
-  return Math.round(big[0] * 100) / 100 + (big[1] ? ' ' + big[1] : '');
+  return (big[1] === unit ? nice(roundTo(big[0], unit)) : String(Math.round(big[0] * 100) / 100)) + (big[1] ? ' ' + big[1] : '');
+};
+// A measure that is not a weight or a volume ("2 large", "3 sprigs") scaled by its leading number; one with no number
+// at the start, or a range ("2-3"), stays as written.
+const scaleText = (s) => {
+  const t = String(s || '').trim().replace(/[½¼¾⅓⅔]/g, (c) => ' ' + FRACTION[c]).trim();
+  const m = /^(\d+(?:\.\d+)?)(?:\s+(\d+)\s*\/\s*(\d+)|\s*\/\s*(\d+)|\s+(0\.\d+))?(?![\d\-–/])/.exec(t);
+  if (!m || SCALE === 1 || /^\s*(?:-|–|to\b|or\b)\s*\d/.test(t.slice(m[0].length))) return String(s || '').trim();
+  let n = Number(m[1]);
+  if (m[2]) n += Number(m[2]) / Number(m[3]);
+  else if (m[4]) n = n / Number(m[4]);
+  else if (m[5]) n += Number(m[5]);
+  return nice(roundTo(n * SCALE, '')) + t.slice(m[0].length);
 };
 const list2 = new Map();
 for (const d of days)
@@ -1808,8 +1865,8 @@ for (const d of days)
     const key = words(x.item).join(' ') || x.item.toLowerCase();
     const e = list2.get(key) || { item: x.item, sums: {}, other: [], meals: new Set() };
     const a = amountOf(x.amount);
-    if (a) e.sums[a.unit] = (e.sums[a.unit] || 0) + a.n;
-    else if (x.amount) e.other.push(x.amount);
+    if (a) e.sums[a.unit] = (e.sums[a.unit] || 0) + a.n * SCALE;
+    else if (x.amount) e.other.push(scaleText(x.amount));
     e.meals.add(d.meal);
     list2.set(key, e);
   }
@@ -1823,22 +1880,26 @@ const shopping = [...list2.values()]
     staple: isStaple(e.item),
   }))
   .sort((a, b) => Number(a.staple) - Number(b.staple) || ORDER.indexOf(a.aisle) - ORDER.indexOf(b.aisle) || a.item.localeCompare(b.item));
-return { days: days.map(({ ings, fits, ...d }) => d), shopping, count: days.length, off: days.filter((d) => !d.fits).map((d) => d.meal) };`,
+const note = SCALE === 1 ? 'The amounts are the recipes’, which are for four.' : 'The recipes are for four; the amounts here are scaled for ' + people + ' ' + (people === 1 ? 'person' : 'people') + ' and rounded. A measure that could not be read is as the recipe has it.';
+return { days: days.map(({ ings, fits, ...d }) => d), shopping, note, count: days.length, off: days.filter((d) => !d.fits).map((d) => d.meal) };`,
           outputs: [
             { id: 'days', label: 'Dinners', type: 'table', columns: DINNER_COLS },
             { id: 'shopping', label: 'Shopping list', type: 'table', columns: SHOP_COLS },
+            { id: 'note', label: 'About the amounts', type: 'text' },
             { id: 'count', label: 'Dinners planned', type: 'number' },
             { id: 'off', label: 'Not quite the diet', type: 'list' },
           ],
           failed: 'agent',
         },
       ],
-      outputs: { overview: '{{choose.overview}}', days: '{{assemble.days}}', shopping: '{{assemble.shopping}}', tips: '{{choose.tips}}' },
+      outputs: { overview: '{{choose.overview}}', days: '{{assemble.days}}', shopping: '{{assemble.shopping}}', note: '{{assemble.note}}', off: '{{assemble.off}}', tips: '{{choose.tips}}' },
     },
     answer: [
       { id: 'overview', label: 'The week', type: 'text', required: true },
       { id: 'days', label: 'Dinners', type: 'table', required: true, columns: DINNER_COLS },
       { id: 'shopping', label: 'Shopping list', type: 'table', required: true, columns: SHOP_COLS },
+      { id: 'note', label: 'About the amounts', type: 'text' },
+      { id: 'off', label: 'Not quite the diet', type: 'list' },
       { id: 'tips', label: 'Tips', type: 'list' },
     ],
     examples: [
@@ -2254,8 +2315,13 @@ if (input.coming === true || /^(yes|true)$/i.test(String(input.coming))) return 
 const STORES = { 1: 'Steam', 2: 'GamersGate', 3: 'GreenManGaming', 7: 'GOG', 11: 'Humble Store', 13: 'Ubisoft Store', 15: 'Fanatical', 21: 'WinGameStore', 23: 'GameBillet', 25: 'Epic Games Store', 27: 'Gamesplanet', 28: 'Gamesload', 30: 'IndieGala', 35: 'DreamGame' };
 const headers = { 'User-Agent': '${UA}' };
 const plain = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+// A title as its game: the same once an edition word (Deluxe, GOTY, Definitive, Remastered…) and a leading "The" are
+// left out, so "Cyberpunk 2077: Ultimate Edition" is Cyberpunk 2077, and "Portal 2" is not Portal.
+const EDITION = /\b(?:deluxe|goty|game of the year|definitive|remastered|remaster|complete|gold|ultimate|special|enhanced|anniversary|collectors|premium|standard|digital|directors cut|edition|version)\b/g;
+const core = (s) => plain(String(s || '').toLowerCase().replace(/['’]/g, '').replace(/&/g, ' and ').replace(/^the\s+/, '').replace(EDITION, ' '));
 const found = bodyOf(await ctx.tool('http_request', { url: 'https://www.cheapshark.com/api/1.0/games?limit=5&title=' + encodeURIComponent(input.title), headers }, { title: 'Find it at CheapShark' })) || [];
-const g = found.find((x) => plain(x.external) === plain(input.title)) || found[0];
+// Only a hit that is this game: the first of another game would show that game's price. None is no price.
+const g = found.find((x) => plain(x.external) === plain(input.title)) || found.find((x) => core(x.external) && core(x.external) === core(input.title));
 if (!g) return { title: input.title, found: false };
 const d = bodyOf(await ctx.tool('http_request', { url: 'https://www.cheapshark.com/api/1.0/games?id=' + g.gameID, headers }, { title: 'Get its prices' })) || {};
 const deals = (d.deals || []).slice().sort((a, b) => Number(a.price) - Number(b.price));

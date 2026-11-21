@@ -432,6 +432,16 @@ test('Sweep planner: the budget read as runs or GPU hours, grid or random within
   assert.deepEqual([tight.mode, tight.runs, tight.grid, tight.most], ['random', 3, 12, 3], 'seven GPU hours, two GPUs an hour each: three runs, drawn at random');
   assert.deepEqual(tight.params.dropout, [0, 0.1], 'the researcher’s own settings too');
   await assert.rejects(runCode(codeOf(t, 'plan'), { settings: [], given: '', command: 'x', budget: '5' }), /No settings to tune/);
+  // The script is read only for what the form leaves open: the settings, or how long a run takes (a budget in GPU hours).
+  const ready = (settings: string, budget: string) => runCode(codeOf(t, 'ready'), { settings, budget });
+  assert.deepEqual([(await ready('lr: 1e-4, 3e-4\nbatch_size: 16, 32', '6 runs')).need, (await ready('lr: 1e-4, 3e-4', '20')).need], ['', ''], 'all given, a budget in runs: nothing to find out');
+  assert.deepEqual([(await ready('', '6 runs')).need, (await ready('', '6 runs')).why], ['yes', 'the settings']);
+  assert.deepEqual([(await ready('lr: 1e-4, 3e-4', '10 GPU hours')).need, (await ready('lr: 1e-4, 3e-4', '10 GPU hours')).why], ['yes', 'the time a run takes']);
+  assert.equal((await ready('just try some things', '10 GPU hours')).why, 'the settings and the time a run takes', 'lines that are not settings are none');
+  // Without the agent: the researcher's settings and command, a run taken as an hour, and said so.
+  const built = await runCode(codeOf(t, 'plan'), { settings: '', given: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', command: '', form: 'python train.py --epochs 3', hours: '', gpus: '', budget: '4 runs' });
+  assert.deepEqual([built.mode, built.runs, built.grid, built.guess, built.command], ['random', 4, 6, 'yes', 'python train.py --epochs 3 --lr {lr} --batch-size {batch_size}']);
+  assert.equal((await runCode(codeOf(t, 'plan'), { settings, given: '', command: 'python t.py', form: 'x', hours: 0.5, gpus: 1, budget: '4 runs' })).guess, '', 'a time the script gave is not a guess');
   const final = await runCode(codeOf(t, 'final'), { params: plan.params, changes: 'lr: 3e-4, 1e-3\ndrop batch_size', command: plan.command, most: 20, each: 0.5, gpus: 1, metric: 'val_loss', better: 'Lower', early: 'Yes', steps: 200, run: 'r42' });
   assert.deepEqual(final.params, { lr: [0.0003, 0.001] });
   assert.deepEqual([final.mode, final.runs, final.group, final.better, final.hours], ['grid', 2, 'sweep-r42', 'min', 1]);
@@ -787,11 +797,13 @@ test('Research sprint and Sweep planner, whole runs with Experiments’ tools as
   // The sweep: the researcher's settings kept, the budget's runs, bad trials stopped early, what mattered worked out.
   exp.calls.length = 0;
   const w = startRun({ app: 'tpl:sweep-planner', slug: 'sweep-planner', recipe: tpl('sweep-planner'), source: 'api', inputs: { command: 'python train.py', folder: '/w/model', metric: 'val_loss', better: 'Lower', settings: 'lr: 1e-4, 3e-4, 1e-3\nbatch_size: 16, 32', budget: '4 runs', early: 'Yes', check: 'Yes' } });
-  await agentAnswers(w.id, 'read', { command: 'python train.py --lr {lr} --batch-size {batch_size}', settings: [{ name: 'lr', values: '1e-4, 3e-4, 1e-3' }, { name: 'batch_size', values: '16, 32' }], mode: 'grid', hours: 0.5, gpus: 1, steps: 100, notes: 'It logs val_loss each epoch.' });
+  // Every setting given and a budget in runs: nobody reads the script (no agent), and the plan is built from the form.
   const sweep = await ended(w.id);
+  assert.equal(sessions.made.some((m) => /Read the script|Plan a hyperparameter sweep/.test(String(m.o.prompt))), false, 'no agent read the script');
+  assert.equal(stepsOf(w.id).read, 'skipped');
   assert.equal(sweep.status, 'done', sweep.error);
   const call = exp.calls.find(([n]) => n === 'experiment_sweep')![1];
-  assert.deepEqual([call.command, call.cwd, call.mode, call.maxRuns, call.earlyStop], ['python train.py --lr {lr} --batch-size {batch_size}', '/w/model', 'random', 4, { metric: 'val_loss', better: 'min', afterSteps: 100 }]);
+  assert.deepEqual([call.command, call.cwd, call.mode, call.maxRuns, call.earlyStop], ['python train.py --lr {lr} --batch-size {batch_size}', '/w/model', 'random', 4, { metric: 'val_loss', better: 'min' }]);
   assert.deepEqual(call.params, { lr: [0.0001, 0.0003, 0.001], batch_size: [16, 32] });
   const wr = sweep.result as any;
   assert.equal(wr.count, 4);

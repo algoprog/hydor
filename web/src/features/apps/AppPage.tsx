@@ -32,6 +32,7 @@ import { PinMenuItem } from './Pinned';
 import { DownloadDialog, EnvLine } from './Install';
 import { AppScreen } from './Screen';
 import { AppView } from './View';
+import { PROGRAM_KEY, startingProgram, startingThinks, thinksKey, thinksToKeep } from './pick';
 import { Schedules } from './Schedules';
 import { ShareTab } from './Share';
 import { tr } from '../../i18n/runtime';
@@ -166,22 +167,18 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
   const [files, setFiles] = useState<FormFiles>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  // A ready-made app runs with the agent picked here (the last one used for one, else its own), changed behind one line.
+  // A ready-made app runs with the program and mode last used for one, and the model, tier and effort last changed on this
+  // app's own page, else its own (pick.ts).
   const [picking, setPicking] = useState(false);
-  const remembered = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('wa.apps.agent') ?? 'null') as { agent: Agent; acpAgent?: string; model?: string | null; tier?: Tier | null; effort?: string | null; mode?: string | null } | null;
-    } catch {
-      return null;
-    }
-  })();
-  const [agent, setAgent] = useState<Agent>(template ? (remembered?.agent ?? recipe.agent) : recipe.agent);
-  const [acpAgent, setAcpAgent] = useState<string | null>(template ? (remembered?.acpAgent ?? null) : (recipe.acpAgent ?? null));
-  const [model, setModel] = useState<string | null>(template ? (remembered?.model ?? null) : (recipe.model ?? null));
-  // The tier it thinks with in place of a model by name: the last pick's, else the app's own; a model named wins.
-  const [tier, setTier] = useState<Tier | null>((template ? (remembered ? (remembered.model ? null : (remembered.tier ?? (recipe.model ? null : recipe.tier))) : recipe.model ? null : recipe.tier) : recipe.model ? null : recipe.tier) ?? null);
-  const [effort, setEffort] = useState<string | null>(template ? (remembered?.effort ?? null) : (recipe.effort ?? null));
-  const [mode, setMode] = useState<string | null>(template ? (remembered?.mode ?? null) : (recipe.mode ?? null));
+  const program = startingProgram(localStorage.getItem(PROGRAM_KEY), recipe);
+  const thinks = startingThinks(template ? localStorage.getItem(thinksKey(id)) : null, recipe);
+  const [agent, setAgent] = useState<Agent>(template ? program.agent : recipe.agent);
+  const [acpAgent, setAcpAgent] = useState<string | null>(template ? program.acpAgent : (recipe.acpAgent ?? null));
+  const [model, setModel] = useState<string | null>(template ? thinks.model : (recipe.model ?? null));
+  // The tier it thinks with in place of a model by name; a model named wins.
+  const [tier, setTier] = useState<Tier | null>(template ? thinks.tier : recipe.model ? null : (recipe.tier ?? null));
+  const [effort, setEffort] = useState<string | null>(template ? thinks.effort : (recipe.effort ?? null));
+  const [mode, setMode] = useState<string | null>(template ? program.mode : (recipe.mode ?? null));
   const acpList = useApp((s) => s.boot?.acpAgents) ?? [];
   const run = async () => {
     const errs = formErrors(recipe.fields, values, files);
@@ -192,7 +189,12 @@ function RunTab({ id, recipe, template, again, given, agents, secrets }: { id: s
     setBusy(true);
     try {
       const pick = template ? { agent, acpAgent: agent === 'acp' ? acpAgent : undefined, model: model ?? undefined, tier: model ? undefined : (tier ?? undefined), effort: effort ?? undefined, mode: mode ?? undefined } : {};
-      if (template) localStorage.setItem('wa.apps.agent', JSON.stringify(pick));
+      if (template) {
+        localStorage.setItem(PROGRAM_KEY, JSON.stringify({ agent, acpAgent: agent === 'acp' ? acpAgent : undefined, mode: mode ?? undefined }));
+        const keep = thinksToKeep({ model, tier, effort }, recipe);
+        if (keep) localStorage.setItem(thinksKey(id), JSON.stringify(keep));
+        else localStorage.removeItem(thinksKey(id));
+      }
       const r = await post<{ run: AppRun }>(`/api/apps/${enc(id)}/runs`, { inputs: values, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { name: f.name, data: f.data }])), ...pick, ...keysBody(keys) });
       go(runPath(r.run.id));
     } catch (e) {

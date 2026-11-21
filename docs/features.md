@@ -877,8 +877,11 @@ agents that speak ACP and take MCP servers.
   by name (Edit → Who does it, a step's What it thinks with, or Change beside a ready-made app's "runs with": the
   Model menu lists Quick, Standard, Best and Max first, each with the model it means now for that program, then the
   models by name; a tier follows Settings → Models → Tiers and works whichever program runs the app, a model by name
-  wins, an agent step's own pick replaces the app's, and the last pick is remembered); the agents that build apps pick
-  the lowest tier that does the job well. Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
+  wins, an agent step's own pick replaces the app's; a ready-made app's page remembers the program and mode for all of them,
+  and the model, tier and effort for each app on its own, only once changed there); the agents that build apps pick
+  the lowest tier that does the job well, and so do the ready-made apps with an agent step (Best for Deep research
+  report, Reproduce a paper and Research sprint, Standard for most, Quick for Document Q&A's look; no step names a tier,
+  so what you pick on the page reaches all of an app's agents). Ready-made apps come installed; Uninstall puts one aside, and Install brings it back after a card
   that says in plain words what it asks, gives and does. A session is told of the few apps pinned or run most with
   what they do (the pinned ones first) and of the others by name (up to 40 in all), and a message one app clearly does tells the agent which, with its
   form (a clear lead by words, so "best upcoming games for switch 2" runs the Game finder); past 40, agents find the
@@ -909,16 +912,16 @@ agents that speak ACP and take MCP servers.
   what to always cover and what to leave out. An app of your own whose view has pages for its own page gets the same
   Update and settings. Beside those come sixteen small, quick apps for everyday things that get real data from free services, no key needed, and show it
   as charts, maps and cards: a weather outlook and the best time to go somewhere (Open-Meteo), a team tracker and
-  match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners with one
-  shopping list by aisle (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
+  match previews (TheSportsDB and the web), recipes from what is in your fridge and a week of dinners (swapped for the diet where one does not fit) with one
+  shopping list by aisle, its amounts scaled to the people (TheMealDB), gift ideas, what to watch tonight and where it streams (TVmaze), a game finder
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
-  their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
+  their lowest ever, for the game asked for and no other (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
   topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
-  off, a page for each day, a map of the days, a list to book and a budget chart; Compare products' pick, and the products side by side with their scores on a chart;
+  off, a page for each day, a map of the days with each area looked up, a Good to know page with the weather, what is on and getting around, a list to book and a budget chart at the day's Frankfurter rate; Compare products' pick, and the products side by side with their scores on a chart;
   the news digest's stories by topic), with buttons that run it again with a change (a slower pace, one more day,
   a more formal letter, new questions about the same document) or start another app on part of it (research a
   story, a finding or a product). An app's view is part of it: elements (HTML templates its values fill, each
@@ -1427,11 +1430,12 @@ agents that speak ACP and take MCP servers.
   **Paper radar** (each morning, new arXiv and OpenAlex papers in your fields, on your topics and by the people you
   follow, ranked against your projects with the local embedding model, each with why it matters to you; Save, Cite as
   BibTeX, Dig deeper, Not for me, which steer the next days), **Citation alerts** (who cited your papers, with the citing
-  sentence, and whether it builds on, compares with or disputes your work), **New-model watch** (new Hugging Face
+  sentence, and whether it builds on, compares with or disputes your work; it says when the sentences could not be read and
+  tries them again at the next update), **New-model watch** (new Hugging Face
   models of a task, checked against your limits and run on your own evaluation through Experiments; you hear only of
   those that beat your best), **Deadline radar** (your venues' deadlines from ccfddl and ai-deadlines, from AoE into your
-  time zone, with reminders, page limits and templates), **Living related work** (a page per topic that grows as papers
-  appear, in themes, with a LaTeX related-work draft and BibTeX) and **Gap finder** (project ideas from your papers and
+  time zone, with reminders, page limits and templates; a venue neither list has is looked up on its website), **Living related work** (a page per topic that grows as papers
+  appear, in themes, with a LaTeX related-work draft, its cite keys checked, and BibTeX) and **Gap finder** (project ideas from your papers and
   this month's, each checked for prior work and sized to your compute).
 - **Read and organise papers**: a **Reading list** by project, kept in step with Zotero both ways (add by DOI, arXiv id,
   link or title; import and export .bib; status, tags, notes and a page per paper); a **Literature matrix** that reads up
@@ -1488,7 +1492,7 @@ agents that speak ACP and take MCP servers.
   model's label hidden until you give yours; disagreements, Cohen's κ and a confusion matrix; publish on Hugging Face
   with a dataset card), a **Research sprint** (hypotheses, code on its own branch, runs in Experiments, an analysis
   notebook and a report, with you approving each step), a **Sweep planner** (a sweep fitted to a budget of runs or GPU
-  hours, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
+  hours, reading the script only when the form leaves settings or a run's time open, and how much each setting mattered), a **Weekly progress report** for your advisor, team or manager, and a
   **Lab notebook** with a dated entry for each day you worked, kept apart from memory and searchable.
 - New skills for every agent: papers' peer review, reproducing a paper, and figures for papers.
 
