@@ -213,7 +213,7 @@ Many apps ask the same things every time: your units, your currency, where you l
 
 - **You**: **Where you live** (as you would type it, "Thessaloniki, Greece"), **Country**, **Language**, **Units** (metric or imperial) and **Currency**.
 - **Home life**: **What you eat**, **People at home**, **Streaming services** and **Teams you follow**.
-- **Research**: **Your fields**, **Topics you follow**, **Venues you read**, **You as an author** (your name as on your papers, with your ORCID or OpenAlex id if you like) and **What you can run on** ("a laptop and one 24 GB GPU").
+- **Research**: **Your fields**, **Topics you follow**, **Conferences and journals you read**, **You as an author** (your name as on your papers, with your ORCID or OpenAlex id if you like) and **What you can run on** ("a laptop and one 24 GB GPU").
 
 **Home life** and **Research** stay folded to a line until you open them. Each change is saved as you make it; separate the items of a list with commas. What you leave empty is worked out where it can be, and shows greyed with where it came from: the country from your time zone, units and currency from the country, the language from the one you use Hydor in. Set one yourself and it wins.
 

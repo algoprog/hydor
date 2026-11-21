@@ -389,7 +389,7 @@ const DL_ROW = String.raw`<div class="dl{{#next}} next{{/next}} k-{{kind|slug}}"
     <p class="v"><strong>{{venue}} {{year}}</strong><span class="lbl">{{label}}</span></p>
     <p class="m">{{day|weekday}}, {{day|longdate}} at {{time}} your time · {{given}}</p>
     {{#where}}<p class="m">{{where}}</p>{{/where}}
-    {{#source}}<p class="m">Taken from <a href="{{source}}" target="_blank" rel="noopener noreferrer">the venue’s website</a>, not from the deadline lists: check the date there.</p>{{/source}}
+    {{#source}}<p class="m">Taken from <a href="{{source}}" target="_blank" rel="noopener noreferrer">the conference’s website</a>, not from the deadline lists: check the date there.</p>{{/source}}
     <p class="links">{{#link}}<a href="{{link}}" target="_blank" rel="noopener noreferrer">Call for papers ↗</a>{{/link}}{{#template}}<a href="{{template}}" target="_blank" rel="noopener noreferrer">Template ↗</a>{{/template}}{{#pages}}<span class="pg">{{pages}}</span>{{/pages}}</p>
   </div>
   <div class="left"><span class="pill">{{utc|ago}}</span></div>

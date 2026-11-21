@@ -1798,7 +1798,7 @@ const DEADLINE_COLS: NonNullable<Draft['answer'][number]['columns']> = [
   { id: 'next', label: 'Its next', type: 'yesno' },
   { id: 'where', label: 'Where and when it is', type: 'text' },
   { id: 'link', label: 'Call for papers', type: 'url', description: 'The call’s page when it was found, else the conference’s site' },
-  { id: 'source', label: 'Taken from', type: 'url', description: 'The page of its website the deadline was read from, for a venue neither list has; empty for the lists' },
+  { id: 'source', label: 'Taken from', type: 'url', description: 'The page of its website the deadline was read from, for a conference neither list has; empty for the lists' },
   { id: 'pages', label: 'Page limit', type: 'text' },
   { id: 'template', label: 'Template', type: 'url' },
 ];
@@ -1976,7 +1976,7 @@ return { deadlines: deadlines, venues: venues, missing: missing, unknown: unknow
           { id: 'deadlines', label: 'Deadlines', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'label', label: 'What is due', type: 'text' }, { id: 'day', label: 'Your day', type: 'text' }, { id: 'time', label: 'Your time', type: 'text' }] },
           { id: 'venues', label: 'Conferences', type: 'table', columns: VENUE_COLS },
           { id: 'missing', label: 'Not in the lists', type: 'list' },
-          { id: 'unknown', label: 'Venues to look up on the web', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'query', label: 'Search for its deadline', type: 'text' }] },
+          { id: 'unknown', label: 'Conferences to look up on the web', type: 'table', columns: [{ id: 'venue', label: 'Venue', type: 'text' }, { id: 'query', label: 'Search for its deadline', type: 'text' }] },
           { id: 'need', label: 'Calls to read', type: 'table', columns: [{ id: 'id', label: 'Conference', type: 'text' }, { id: 'venue', label: 'Venue', type: 'text' }, { id: 'link', label: 'Its site', type: 'text' }, { id: 'query', label: 'Search for its call', type: 'text' }] },
           { id: 'zone', label: 'Your time zone', type: 'text' },
           { id: 'now', label: 'Now, as a moment', type: 'number' },
@@ -2052,7 +2052,7 @@ return { cfp: String(input.cfp || ''), pages: String(input.pages || ''), templat
       },
       {
         id: 'web',
-        title: 'Look up the venues the lists do not have',
+        title: 'Look up the conferences the lists do not have',
         do: 'repeat',
         over: '{{lists.unknown}}',
         atOnce: 3,

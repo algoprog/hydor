@@ -25261,5 +25261,10 @@
   "The addresses of the stories each edition showed, so a later one leaves them out": "Les adresses des articles affichés par chaque édition, pour qu’une édition suivante les écarte",
   "The papers each update showed, so none comes again": "Les articles affichés par chaque mise à jour, pour qu’aucun ne revienne",
   "What the last editions showed": "Ce que les dernières éditions ont affiché",
-  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "Votre nom tel que vos articles l’impriment, ou votre identifiant Semantic Scholar (chiffres), votre identifiant OpenAlex (A…) ou votre ORCID"
+  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "Votre nom tel que vos articles l’impriment, ou votre identifiant Semantic Scholar (chiffres), votre identifiant OpenAlex (A…) ou votre ORCID",
+  "Conferences and journals you read": "Conférences et revues que vous lisez",
+  "Conferences to look up on the web": "Conférences à rechercher sur le web",
+  "Look up the conferences the lists do not have": "Rechercher les conférences que les listes ne contiennent pas",
+  "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "La page de son site web où la date limite a été lue, pour une conférence absente des deux listes ; vide pour les listes",
+  "the conference’s website": "le site web de la conférence"
 }

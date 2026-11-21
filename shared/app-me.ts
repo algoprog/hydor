@@ -227,7 +227,7 @@ export const ME_FIELDS: MeField[] = [
   { id: 'teams', label: 'Teams you follow', kind: 'list', group: 'Home life', placeholder: 'Real Madrid, Boston Celtics' },
   { id: 'fields', label: 'Your fields', kind: 'list', group: 'Research', placeholder: 'Information retrieval, NLP' },
   { id: 'topics', label: 'Topics you follow', kind: 'list', group: 'Research', placeholder: 'Retrieval-augmented generation' },
-  { id: 'venues', label: 'Venues you read', kind: 'list', group: 'Research', placeholder: 'SIGIR, ACL, TOIS' },
+  { id: 'venues', label: 'Conferences and journals you read', kind: 'list', group: 'Research', placeholder: 'SIGIR, ACL, TOIS' },
   { id: 'author', label: 'You as an author', kind: 'text', group: 'Research', placeholder: 'Your name as on your papers' },
   { id: 'compute', label: 'What you can run on', kind: 'text', group: 'Research', placeholder: 'A laptop and one 24 GB GPU', free: true },
 ];

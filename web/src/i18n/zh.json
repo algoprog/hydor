@@ -27117,5 +27117,10 @@
   "The addresses of the stories each edition showed, so a later one leaves them out": "每期展示过的报道的地址，这样之后的期数就不会重复这些报道",
   "The papers each update showed, so none comes again": "每次更新展示过的论文，这样同一篇论文不会再次出现",
   "What the last editions showed": "最近几期展示过的内容",
-  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "你的名字（与论文上署的写法一致），或你的 Semantic Scholar ID（数字）、OpenAlex ID（A…）或 ORCID"
+  "Your name as your papers print it, or your Semantic Scholar id (digits), OpenAlex id (A…) or ORCID": "你的名字（与论文上署的写法一致），或你的 Semantic Scholar ID（数字）、OpenAlex ID（A…）或 ORCID",
+  "Conferences and journals you read": "你阅读的会议和期刊",
+  "Conferences to look up on the web": "需要在网络上查找的会议",
+  "Look up the conferences the lists do not have": "查找两份列表中没有的会议",
+  "The page of its website the deadline was read from, for a conference neither list has; empty for the lists": "截止日期所在的会议官网页面，适用于两份列表都没有的会议；列表中已有的会议则留空",
+  "the conference’s website": "会议官网"
 }
