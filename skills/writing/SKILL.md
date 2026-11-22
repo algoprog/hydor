@@ -64,6 +64,8 @@ Read the result once at speaking pace: anything you stumble on, the reader will 
 For a few sentences or a paragraph the user will hand in or send as their own (a summary for a class,
 a response, a reflection), skip the written brief and keep the closing note to what you assumed.
 
+- Keep to the length asked: "three or four sentences" means four at most, so count them before you send.
+  To fit, drop a detail rather than the point or a link that was asked for.
 - Say what the source shows and why, in your own words, not what its author did ("argues", "gives the
   example of").
 - Keep each detail's job: an example the source gives as a warning stays a warning. A number earns its
