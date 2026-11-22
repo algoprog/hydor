@@ -66,9 +66,13 @@ const FINAL_SYSTEM = [
   '- something removed or switched off just so a check passes;',
   '- the goal itself not really met, whatever the checks say.',
   WHOLE,
+  'After the change you may get files that the reviewers of the checks asked to read (<also-read>): each is its content now, whether or not the change touched it, given so that you can judge what the change relies on.',
   ...RULES,
   'Answer with JSON only: {"ok": true or false, "reason": "one or two sentences, quoting the change"}',
 ].join('\n');
+
+/** How much of the files the checks' reviewers asked for the final reviewer gets, beside the change. */
+const ALSO_MAX = EVIDENCE_MAX / 2;
 
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 const unit = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined);
@@ -131,8 +135,11 @@ export async function reviewRules(d: Deps, key: string, rules: string[], change:
   }
 }
 
-/** The final check's review of the whole change against the goal and its checks; an error when the reviewer could not answer. */
-export async function finalReview(d: Deps, key: string, objective: string, checks: GoalCheck[], change: string): Promise<{ ok: boolean; reason: string } | { error: string }> {
+/**
+ * The final check's review of the whole change against the goal and its checks; an error when the reviewer could not answer.
+ * `also`: the files the checks' reviewers asked to read, as blocks (checks.ts askedBlocks).
+ */
+export async function finalReview(d: Deps, key: string, objective: string, checks: GoalCheck[], change: string, also = ''): Promise<{ ok: boolean; reason: string } | { error: string }> {
   const list = checks.map((c) => `- ${c.label} (${c.kind}${c.run ? `: ${c.run}` : c.claim ? `: ${c.claim}` : ''}${c.target ? `, ${c.target.op} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}` : ''})`).join('\n');
   try {
     const v = await ask(
@@ -140,7 +147,7 @@ export async function finalReview(d: Deps, key: string, objective: string, check
       key,
       {
         system: FINAL_SYSTEM,
-        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>\n\nYour JSON answer:`,
+        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>${also ? `\n\n<also-read>\n${clipMiddle(also, ALSO_MAX)}\n</also-read>` : ''}\n\nYour JSON answer:`,
         timeoutMs: 300_000,
         maxTokens: 600,
         strong: true,

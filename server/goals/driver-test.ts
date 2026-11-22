@@ -4064,7 +4064,7 @@ test('S2.3: a swarm lead’s round message names its members (how each stands, t
   const first = last(M);
   assert.match(first, /You lead a swarm in this goal\. Put your members on what does not hold yet: one angle or one check each/);
   assert.match(first, /Your members now:\n- “Speed” \(not started a turn yet\)\n- “Cache” \(not started a turn yet\)/);
-  assert.match(first, /The round is over when you have called goal_report \(what the swarm did, what remains\) and every member’s turn has ended: then the app runs the checks on this folder\. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do\.\n\n\(This message is from the app’s goal loop/);
+  assert.match(first, /Call goal_report \(what the swarm did, what remains\) once your members have reported, not when you start them\. The round is over when every member’s turn and yours have ended: then the app runs the checks on this folder\. Do not conclude, and do not stop members because you think it is solved: you cannot end the goal, only the checks do\.\n\n\(This message is from the app’s goal loop/);
   assert.doesNotMatch(first, /The app runs the checks itself when your turn ends/);
   // How each stands now: at work, waiting for the lead (its report, or a later post), stopped.
   await memberTurn(m2, () => {}, { reply: 'Cache added for the search results.\nMore below.' });
@@ -4435,12 +4435,13 @@ test('J5: the tick runs once as the feature starts: a reset a restart cut is dea
 });
 
 test('a file a reviewer asked for stays with its check in the goal’s private state, and is in the evidence of the next runs', async () => {
-  const dir = path.join(tmp, 'asks');
-  fs.mkdirSync(dir);
+  // In a worktree: the final check reviews a change only where git can show one.
+  const w = worktree();
+  const dir = w.path;
   write(dir, 'guide.md', 'GUIDE-TEXT\n');
   write(dir, '.env', 'KEY\n');
   const M = 'codex:goal-asks';
-  sessions.add(M, { agent: 'codex', cwd: dir });
+  sessions.add(M, { agent: 'codex', cwd: dir, worktree: w });
   reviewer.claim = false;
   reviewer.needs = ['guide.md', '.env'];
   try {
@@ -4464,6 +4465,17 @@ test('a file a reviewer asked for stays with its check in the goal’s private s
     assert.match(claims[0].prompt, /<file path="guide.md">\nGUIDE-TEXT/, 'in the first question');
     assert.ok(!claims.some((a) => a.prompt.includes('KEY')));
     assert.deepEqual(goal(M)._.asked, { c1: ['guide.md'] });
+    // Once the claim holds, the reviewer of the whole change gets that file too: the change alone does not show it.
+    await until('round 2', () => goal(M).status === 'working' && goal(M).round === 2);
+    reviewer.claim = true;
+    const n0 = asked.length;
+    await turn(M, () => write(dir, 'work.txt', 'y\n'));
+    await until('reached', () => goal(M).status === 'reached');
+    const last = asked.slice(n0).find((a) => a.system.includes('You are the last check'));
+    assert.ok(last, 'the final review ran');
+    assert.match(last!.system, /files that the reviewers of the checks asked to read \(<also-read>\)/);
+    assert.match(last!.prompt, /<\/change>\n\n<also-read>\n<file path="guide\.md">\nGUIDE-TEXT\n\n<\/file>\n<\/also-read>\n\nYour JSON answer:$/);
+    assert.ok(!last!.prompt.includes('KEY'));
   } finally {
     reviewer.needs = undefined;
     reviewer.claim = true;

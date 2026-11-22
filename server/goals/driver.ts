@@ -27,7 +27,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { boardNow, boardWaits, members as swarmMembers, stopMember } from '../swarm/index.ts';
 import { checkpoint as takeCheckpoint, restoreCheckpoint, restoreRefusal } from '../worktrees.ts';
 import { askMessage, draftMessage, draftNotes, reminderMessage, restartedMessage, roundMessage } from './brief.ts';
-import { addAsked, changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
+import { addAsked, askedBlocks, changedPaths, diffText, headOf, killLeftover, parentOf, pathsIn, protectedHits, runChecks, sameFiles, treeOf, untrackedStamp, type CheckEnv } from './checks.ts';
 import { finalReview, reviewClaim, reviewRules } from './review.ts';
 import { allGoals, dropGoal, goalUpdated, loadGoal, publicGoal, saveGoal, type Judged, type RestoreMark, type StoredGoal } from './store.ts';
 import { goalDefaults } from './settings.ts';
@@ -1255,7 +1255,10 @@ async function finalCheck(d: Deps, g: StoredGoal): Promise<{ ok: boolean; reason
     return { ok: false, reason: `The change since the goal started could not be read (${clip(bare((e as Error).message), 200)}), so it could not be reviewed`, results, flaky: [], reran: again.length };
   }
   if (!change.trim()) return { ok: true, reason: 'Every check held on a second run.', results, flaky: [], reran: again.length };
-  const v = await finalReview(d, g.key, g.contract.objective, g.contract.checks, change);
+  // The files the checks' reviewers asked to read go to the last reviewer too: it judges the same claims, and said of a
+  // goal on the live app that it "could not check the descriptions against the helper source, which is not in the change".
+  const also = await askedBlocks(p.cwd, (fresh(d, g) ?? g)._.asked);
+  const v = await finalReview(d, g.key, g.contract.objective, g.contract.checks, change, also);
   if ('error' in v) return { error: v.error, reviewer: true };
   return { ok: v.ok, reason: v.reason, review: v.reason, results, flaky: [], reran: again.length };
 }

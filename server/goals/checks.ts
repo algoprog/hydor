@@ -521,6 +521,21 @@ const fileBlock = (shown: string, r: { text: string } | { skip: string }) => {
   return `<file path="${shown}">\n${text.length > FILE_MAX ? `${text.slice(0, FILE_MAX)}\n… (the rest left out)` : text}\n</file>`;
 };
 
+/**
+ * The files the checks' reviewers asked to read, as evidence for the final review of the whole change: each once, the newest
+ * ASKED_KEPT of them, read again as askedFile reads them now (one that is gone, or may no longer be read, is left out).
+ * Without them the last reviewer would judge the same claims on less than the checks' reviewers had.
+ */
+export async function askedBlocks(cwd: string, asked: Record<string, string[]> | undefined): Promise<string> {
+  const names = [...new Set(Object.values(asked ?? {}).flat())].slice(-ASKED_KEPT);
+  const parts: string[] = [];
+  for (const f of names) {
+    const r = await askedFile(cwd, f);
+    if ('text' in r) parts.push(fileBlock(r.path, r));
+  }
+  return parts.join('\n\n');
+}
+
 /** Why a command that did not pass could not be run at all, or null when it ran and failed. */
 function cannotRun(r: Ran, timeoutS: number): string | null {
   if (r.failed) return `It could not start: ${r.failed}`;
