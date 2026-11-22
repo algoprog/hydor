@@ -788,12 +788,51 @@ return {
               { id: 'events_search', title: 'Search for events', do: 'tool', tool: 'web_search', with: { query: 'events festivals concerts {{destination}} {{calendar.month}} {{calendar.year}}', k: 8 }, failed: 'skip' },
               { id: 'holidays_search', title: 'Search for holidays and closures', do: 'tool', tool: 'web_search', with: { query: 'public holidays closures {{destination}} {{calendar.month}} {{calendar.year}}', k: 6 }, failed: 'skip' },
               {
+                id: 'events_pages',
+                title: 'Pick listings to read',
+                do: 'code',
+                language: 'javascript',
+                with: { found: '{{events_search}}', dates: '{{calendar.dates}}' },
+                code:
+                  HITS +
+                  String.raw`// Three listing pages of the events search to read: its snippets say which pages list events, seldom the events
+// themselves, so What is on came back empty from them alone. Event guides and the city's own pages before social media
+// and ticket resellers, one page a site; and what to look for on a page, in the words listings write their dates in
+// (the trip's weekdays and months, in English as the searches are).
+// (Songkick answers programs 406: a page that cannot be read is no listing to pick.)
+const BAD = /(^|\.)(facebook\.com|instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com|reddit\.com|pinterest\.[a-z.]+|tripadvisor\.[a-z.]+|viagogo\.[a-z.]+|stubhub\.[a-z.]+|songkick\.com)$/;
+const score = (h) => (/event|what.?s.?on|things to do|agenda|listing|calendar|festival|concert/i.test(h.title + ' ' + h.url) ? 5 : 0) + (/timeout\.com|visit|agenda|culture|allevents\.in|eventbrite\./i.test(h.url) ? 3 : 0) - h.rank / 3;
+const sites = new Set();
+const items = [];
+for (const h of hitsOf(input.found).filter((x) => !BAD.test(siteOf(x.url))).sort((a, b) => score(b) - score(a))) {
+  const site = siteOf(h.url);
+  if (!site || sites.has(site)) continue;
+  sites.add(site);
+  items.push({ url: h.url, title: h.title });
+  if (items.length === 3) break;
+}
+const days = (Array.isArray(input.dates) ? input.dates : []).map((d) => new Date(String((d && d.date) || '').slice(0, 10) + 'T00:00:00Z')).filter((d) => !isNaN(d.getTime()));
+const said = (o) => [...new Set(days.map((d) => new Intl.DateTimeFormat('en', Object.assign({ timeZone: 'UTC' }, o)).format(d)))];
+const when = days.length ? said({ weekday: 'long' }).slice(0, 7).join(', ') + ' in ' + said({ month: 'long' }).join(' and ') + ' ' + days[0].getUTCFullYear() : '';
+return { items, question: ('Events, concerts, festivals, markets and exhibitions' + (when ? ' on ' + when : '') + ': name, date, time, venue').slice(0, 300) };`,
+                outputs: [
+                  { id: 'items', label: 'Pages', type: 'table', columns: [{ id: 'url', label: 'Link', type: 'url' }, { id: 'title', label: 'Title', type: 'text' }] },
+                  { id: 'question', label: 'What to look for', type: 'text' },
+                ],
+                failed: 'agent',
+              },
+              { id: 'events_read', title: 'Read the listings', do: 'repeat', over: '{{events_pages.items}}', atOnce: 3, as: 'page', steps: [{ id: 'listing', title: 'Read a listing', do: 'tool', tool: 'read_page', with: { url: '{{page.url}}', question: '{{events_pages.question}}' }, failed: 'skip' }] },
+              {
                 id: 'whats_on',
                 title: 'What is on',
                 do: 'model',
-                instructions: `From the search results below, list what is on in {{destination}} between {{calendar.first}} and {{calendar.last}}: events and festivals, public holidays, and closures or works that affect visitors. Only what falls within those dates, each with its date as the results give it; leave out what you cannot place in them.
+                instructions: `From the listings and the search results below, list what is on in {{destination}} between {{calendar.first}} and {{calendar.last}}: events and festivals, public holidays, and closures or works that affect visitors. Only what falls on those dates or runs through them (a market, a festival or an exhibition that began before and is still on), each with its date as its source gives it; leave out what you cannot place in them, and add nothing the sources do not say.
+- events: at most eight, those a visitor would most want to know of first: its name, when (as its source says), where, and a few words on it.
 
-Events:
+Listings, as read:
+{{events_read.items}}
+
+Events, as searched:
 {{events_search.text}}
 
 Holidays and closures:

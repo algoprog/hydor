@@ -221,7 +221,8 @@ export async function runCode(o: { language: 'javascript' | 'typescript' | 'pyth
       ...cmd,
     ];
     const { code, printed } = await new Promise<{ code: number | null; printed: string }>((resolve, reject) => {
-      const p = spawn(bwrap, args, { stdio: ['pipe', 'pipe', 'pipe', 'pipe'] });
+      // A process group of its own, so a kill reaches what bwrap started as well (below).
+      const p = spawn(bwrap, args, { stdio: ['pipe', 'pipe', 'pipe', 'pipe'], detached: true });
       let out = '';
       const take = (b: Buffer) => {
         if (out.length < PRINTED * 2) out += b.toString('utf8');
@@ -230,9 +231,17 @@ export async function runCode(o: { language: 'javascript' | 'typescript' | 'pyth
       p.stderr!.on('data', take);
       p.stdin!.on('error', () => {});
       let why = '';
+      // Killed with its whole group: bwrap killed in the moment it sets its sandbox up leaves the process it started
+      // waiting for it for ever, with this step's pipes open (seen on 2026-11-21: a run stopped as a code step began
+      // stayed at work, about one stop in fifty at that moment).
       const kill = (reason: string) => {
         why ||= reason;
-        p.kill('SIGKILL');
+        try {
+          if (p.pid) process.kill(-p.pid, 'SIGKILL');
+          else p.kill('SIGKILL');
+        } catch {
+          p.kill('SIGKILL');
+        }
       };
       // Its time is its own: the clock stops while a ctx call it waits for is out.
       let left = o.seconds * 1000;
@@ -289,6 +298,15 @@ export async function runCode(o: { language: 'javascript' | 'typescript' | 'pyth
         clearTimeout(timer);
         o.signal?.removeEventListener('abort', onStop);
         reject(e);
+      });
+      // Killed: it has ended, and what it printed is not waited for (its pipes close when the last process that holds
+      // them goes; were one left, the step would wait with it).
+      p.on('exit', () => {
+        if (!why) return;
+        clearTimeout(timer);
+        o.signal?.removeEventListener('abort', onStop);
+        reject(new Error(why));
+        for (const io of p.stdio) io?.destroy();
       });
       p.on('close', (c) => {
         clearTimeout(timer);

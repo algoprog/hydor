@@ -953,6 +953,29 @@ test('run again from a step: the steps before it give what they gave, the rest r
   assert.equal(calls(), searched + 1);
   const missing = await http.inject({ method: 'POST', url: `/api/apps/runs/${first.id}/again`, payload: { from: 'nope' } });
   assert.equal(missing.statusCode, 400);
+  // An agent step taken over from the earlier run cost that run, not the new one: its total leaves it out.
+  const b = app({
+    name: 'Again, with an agent',
+    data: { items: { title: 'text' } },
+    answer: [{ id: 'note', label: 'Note', type: 'text', required: true }],
+    flow: { steps: [{ id: 'think', do: 'agent', instructions: 'Think about {{topic}}', outputs: { idea: 'text' } }, { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: '{{think.idea}}' } }], outputs: { note: '{{keep.record.title}}' } },
+  });
+  const r1 = startRun({ app: b.id, slug: b.slug, recipe: b, source: 'web', inputs: { topic: 'tides' } });
+  let child: store.RunRecord | undefined;
+  for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r1.id }).find((r) => r.step === 'think' && r.key)); i++) await sleep(25);
+  assert.ok(child, 'the agent step started its run');
+  sessions.costs.set(child.key!, 0.25);
+  saveResult(child.id, { idea: 'Spring tides' });
+  sessions.end(child.key!, 'Done.');
+  const one = await ended(r1.id);
+  assert.equal(one.status, 'done', one.error);
+  assert.equal(store.getRun(db, child.id)!.costUsd, 0.25, 'the agent’s run cost that');
+  assert.equal(one.costUsd, 0.25, 'and so did the run it was a step of');
+  const res2 = await http.inject({ method: 'POST', url: `/api/apps/runs/${r1.id}/again`, payload: { from: 'keep' } });
+  assert.equal(res2.statusCode, 200, res2.body);
+  const two = await ended(res2.json().run.id);
+  assert.equal(two.result!.note, 'Spring tides');
+  assert.ok(!two.costUsd, `a step taken over costs the new run nothing (${two.costUsd})`);
 });
 
 test('Ask a person: the run waits for the answer (its page, the inbox, a notice), goes on with it, asks the same after a restart, and fails when nobody answers in time', async () => {
@@ -1397,8 +1420,12 @@ test('Deep research and Compare products in Greek: the writers are told the lang
 
 test('Trip planner, as it comes: its dates worked out, four branches of research side by side (the forecast only for a trip that is near), the plan on the trip’s own dates and its budget added up; it asks what you would like only when you are there', async () => {
   const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const whatsOn: string[] = [];
   model.answer = (_system, user) => {
-    if (user.startsWith('From the search results below, list what is on')) return JSON.stringify({ events: [{ name: 'Jazz festival', date: 'Saturday', where: 'Belém', note: '' }], holidays: [], closures: ['The castle closes on Mondays'] });
+    if (user.startsWith('From the listings and the search results below, list what is on')) {
+      whatsOn.push(user);
+      return JSON.stringify({ events: [{ name: 'Jazz festival', date: 'Saturday', where: 'Belém', note: '' }], holidays: [], closures: ['The castle closes on Mondays'] });
+    }
     if (user.startsWith('Say what weather to expect')) return JSON.stringify({ summary: user.includes('The forecast:') ? 'Sunny, by the forecast' : 'Mild, as usual then', temperatures: '14–20 °C', rain: 'Some', pack: ['A light jacket'] });
     if (user.startsWith('From the search results below, pick the areas')) return JSON.stringify({ areas: [{ area: 'Alfama', why: 'The old town', good_for: 'Walkers' }], sights: [{ name: 'Castle', area: 'Alfama', hours: '9–21', book: 'A day ahead' }] });
     if (user.startsWith('From the search results below, say how visitors get')) return JSON.stringify({ arrival: 'The metro from the airport', around: 'A Viva Viagem card', currency: 'EUR' });
@@ -1420,6 +1447,19 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
     tips: ['Get a Viva Viagem card'],
   };
   const tpl = templateById('trip-planner')!;
+  // Its events search finds listings: a social page, a site that refuses programs, two pages of one site, and others.
+  const LISTINGS = [
+    { title: 'Lisbon events', url: 'https://www.facebook.com/lisbon.events' },
+    { title: 'Concerts in Lisbon', url: 'https://www.songkick.com/metro-areas/lisbon' },
+    { title: 'Agenda: events in Lisbon', url: 'https://agenda.lisboa.example/month' },
+    { title: 'Agenda: concerts in Lisbon', url: 'https://agenda.lisboa.example/concerts' },
+    { title: 'What’s on in Lisbon', url: 'https://whatson.example/lisbon' },
+    { title: 'A blog about Lisbon', url: 'https://blog.example/lisbon' },
+    { title: 'Lisbon festivals this month', url: 'https://festivals.example/lisbon' },
+  ];
+  searchAs = (a) => JSON.stringify({ results: String(a.query).startsWith('events festivals concerts') ? LISTINGS : [{ title: `About ${a.query}`, url: 'https://example.com/1' }] });
+  const callsBefore = toolCalls.length;
+  try {
   // From the API, nobody is there to answer: it does not ask, even when its form says to.
   const r = startRun({ app: 'tpl:trip-planner', slug: 'trip-planner', recipe: tpl, source: 'api', inputs: { destination: 'Lisbon', start: day(5), days: '3', choose: 'Yes' } });
   const agent = await agentAnswers(r.id, 'plan', plan);
@@ -1446,8 +1486,19 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
   const st = store.listSteps(db, r.id);
   const status = Object.fromEntries(st.map((s) => [s.path, s.status]));
   assert.equal(status.choices, 'skipped', 'not asked: the run came from the API');
-  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'lookups', 'geo', 'fx', 'assemble']) assert.equal(status[id], 'done', id);
+  for (const id of ['calendar', 'research', 'events_search', 'holidays_search', 'events_pages', 'events_read', 'whats_on', 'climate_search', 'soon', 'forecast_search', 'weather', 'sights_search', 'areas_search', 'places', 'transport_search', 'transport', 'plan', 'lookups', 'geo', 'fx', 'assemble']) assert.equal(status[id], 'done', id);
   const at = Object.fromEntries(st.map((s) => [s.id, s]));
+  // What is on is read from listings, not only from the search's snippets (which name pages, seldom events): three
+  // pages, one a site, no social page and none that refuses programs; each read for the trip's weekdays and month.
+  const reads = toolCalls.slice(callsBefore).filter((c) => c.tool === 'read_page' && /lisboa\.example|whatson\.example|blog\.example|festivals\.example|facebook|songkick/.test(String(c.args.url)));
+  assert.deepEqual(reads.map((c) => c.args.url).sort(), ['https://agenda.lisboa.example/month', 'https://festivals.example/lisbon', 'https://whatson.example/lisbon']);
+  const en = (n: number, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en', { timeZone: 'UTC', ...o }).format(new Date(`${day(n)}T00:00:00Z`));
+  for (const c of reads) {
+    for (const n of [5, 6, 7]) assert.ok(String(c.args.question).includes(en(n, { weekday: 'long' })), `the question names ${en(n, { weekday: 'long' })}: ${c.args.question}`);
+    assert.ok(String(c.args.question).includes(en(5, { month: 'long' })) && String(c.args.question).includes(day(5).slice(0, 4)), c.args.question);
+  }
+  assert.match(whatsOn[0], /The page at https:\/\/agenda\.lisboa\.example\/month says hello\./, 'the model reads the listings');
+  assert.match(whatsOn[0], /Agenda: events in Lisbon/, 'and the search results');
   // The app's own tier goes to its agent's session: the plan is standard work.
   assert.equal(store.getRun(db, at.plan.childRun!)!.recipe.tier, 'standard');
   const started = Math.max(...['events_search', 'climate_search', 'sights_search', 'transport_search'].map((id) => at[id].startedAt!));
@@ -1471,6 +1522,9 @@ test('Trip planner, as it comes: its dates worked out, four branches of research
   const status2 = Object.fromEntries(store.listSteps(db, w.id).map((s) => [s.path, s.status]));
   assert.equal(status2.choices, 'done');
   assert.equal(status2.forecast_search, undefined, 'no forecast for a trip weeks off');
+  } finally {
+    searchAs = null;
+  }
 });
 
 test('examples: saved inputs with checks; trying them runs each as a test, and its checks are read against what it gave', async () => {

@@ -196,6 +196,9 @@ export function hostOf(tool: string, args: Record<string, unknown>): string | un
 
 // ---- a page that keeps programs out, in the browser --------------------------------------------------------
 
+/** How long a bot check seen in the browser is given to let it through. */
+const WALL_WAIT = 8000;
+
 type BrowserRead = (a: { url: string; question?: string; page?: number }, signal?: AbortSignal) => Promise<string | null>;
 
 /** Reads a page in this server's headless browser, as read_page would give it; null when there is no browser or it is kept out there too. */
@@ -207,9 +210,12 @@ const browserRead: BrowserRead = async (a, signal) => {
   type Shown = { html: string; title: string; url: string };
   const SHOWN = '({ html: document.documentElement.outerHTML, title: document.title, url: location.href })';
   const job = withTab({ url: url.toString(), width: 1280, height: 900, blockPrivate: true, plainAgent: true, settleMs: 800 }, async (tab) => {
-    // A check that lets a browser through does so after a few seconds of its script.
+    // A check that lets a browser through does so after a few seconds of its script; one that still stands after
+    // WALL_WAIT will not clear (a Cloudflare check stood the whole 20 s on 2026-11-21 and held a run that had two
+    // other pages to read). The 20 s are for a page that is slow to load.
     let page = await tab.evaluate<Shown>(SHOWN);
-    while (botWall(htmlMarkdown(page.html, page.url).markdown, page.title) && Date.now() < deadline - 2000 && !signal?.aborted) {
+    const until = Math.min(deadline - 2000, Date.now() + WALL_WAIT);
+    while (botWall(htmlMarkdown(page.html, page.url).markdown, page.title) && Date.now() < until && !signal?.aborted) {
       await sleep(1500);
       page = await tab.evaluate<Shown>(SHOWN);
     }
