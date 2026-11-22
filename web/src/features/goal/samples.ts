@@ -282,6 +282,22 @@ export function samples(now = Date.now()): GoalSample[] {
         g.endedAt = now - MIN;
         g.report = { summary: 'Relevance and speed pull against each other here. Three ways tried did not get both.' };
       }),
+      mk('limit-midway', 'Stopped at a limit, a round cut midway', undo, (g) => {
+        midRun(g);
+        // The round the limit cut: left as it is, not measured, its work still in the folder.
+        const cut = (g.rounds.at(-1)?.n ?? 0) + 1;
+        g.rounds = [...g.rounds, { n: cut, startedAt: now - 6 * MIN, endedAt: now - MIN, results: [], score: 0, outcome: 'stays', why: 'Stopped at the limit midway', usd: 0.41 }];
+        g.contract = { ...g.contract, limits: { ...g.contract.limits, usd: 3.5 } };
+        g.status = 'limit';
+        g.reason = 'It spent $3.67 of its $3.50';
+        g.spentUsd = 3.67;
+        g.activeMs = 64 * MIN;
+        g.endedAt = now - MIN;
+        g.report = {
+          summary: `It spent $3.67 of its $3.50. Round ${cut} was stopped midway and its work is still in the folder.${undo ? ` Keep anyway… on round ${g.best} puts the files back to the best round.` : ''}`,
+          mid: cut,
+        };
+      }),
       mk('stopped', 'Stopped by you', undo, (g) => {
         midRun(g);
         g.status = 'stopped';

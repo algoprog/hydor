@@ -47,7 +47,8 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
         <span className="ml-auto text-[12px] text-fg-3 tnum">{reportLine(g)}</span>
       </div>
       <div className="max-h-[min(60dvh,520px)] overflow-y-auto px-4 py-3 text-[13.5px]">
-        {g.reason && !reached && (
+        {/* The reason, unless the summary under it begins with the same words (a limit's does: it read twice). */}
+        {g.reason && !reached && !g.report?.summary?.startsWith(g.reason.replace(/[.!?…]+$/, '')) && (
           <p className="mb-1 font-medium">
             {g.reason}
           </p>
