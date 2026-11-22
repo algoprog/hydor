@@ -1,6 +1,6 @@
 // Who started whom: a child session keeps its parent's key in its settings (extra.parent).
 import type { SessionExtra } from '../../shared/features.ts';
-import { goalMessageOf, goalOver } from '../../shared/goals.ts';
+import { goalMessageOf } from '../../shared/goals.ts';
 import type { BackgroundTask, LiveState, SessionSummary } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
 import { loadGoal } from '../goals/store.ts';
@@ -38,8 +38,9 @@ export const betweenAgents = (text: string) => text.startsWith(`${FROM_LEAD}\n`)
 
 /**
  * Child sessions whose report to their parent is being written now (server/children reportTurn: its turn read, a long
- * reply summarized, a step up weighed, then sent), by how many: the turn is marked reported before that is done, so for
- * up to a minute nothing else says a report is on its way.
+ * reply summarized, a step up weighed, then handed over), by how many. The gate of a goal counts a turn not yet marked
+ * reported (only once handed over) as on its way for ten minutes after it ended; this covers one written later than that
+ * (an older turn, reported by the catch-up after a restart).
  */
 const reporting = new Map<string, number>();
 export function reportBegins(key: string) {
@@ -55,18 +56,21 @@ export const reportOnItsWay = (key: string) => reporting.has(key);
 
 /**
  * Whether news for a lead (a Hydor subagent's report, its swarm board's batch) about work begun at `since` waits in its
- * held queue instead of waking it: the lead was stopped at or after then (Stop all, the board's Stop all, its goal's
- * limit: stoppedAll), or its goal (server/goals) was paused or ended at or after then. A lead woken by it could set a
- * stopped member to work again and spend after the stop. News of work begun later (the person set it going again) goes
- * as before; what was held goes when the person resumes the queue, or when the goal goes on (it releases it).
+ * held queue instead of waking it, which could set a stopped member to work again and spend after the stop:
+ * - the lead was stopped at or after then (Stop all, the board's Stop all, or its goal's limit, which marks it so:
+ *   stoppedAll), unless its goal went on since (R2: Resume, Give it more…, wentOn), when the stop is over;
+ * - its goal (server/goals) is paused, since a pause at or after then;
+ * - its goal waits at its limit, reached at or after then (R1: one the person stopped, or reached, holds nothing).
+ * News of work begun later (the person set it going again) goes as before. What was held goes when the person resumes
+ * the queue, or when the goal goes on (server/goals releaseHeldNews), and only then.
  */
 export function holdsNewsFor(db: DB, lead: string, since: number): boolean {
-  const stopped = sessionExtra(db, lead).stoppedAll;
-  if (typeof stopped === 'number' && stopped > 0 && stopped >= since) return true;
   const g = loadGoal(db, lead);
+  const stopped = sessionExtra(db, lead).stoppedAll;
+  if (typeof stopped === 'number' && stopped > 0 && stopped >= since && stopped > (g?._.wentOn ?? 0)) return true;
   if (!g) return false;
   if (g.status === 'paused') return (g._.pausedAt ?? Infinity) >= since;
-  return goalOver(g.status) && (g.endedAt ?? Infinity) >= since;
+  return g.status === 'limit' && (g.endedAt ?? Infinity) >= since;
 }
 
 /**
