@@ -25485,5 +25485,12 @@
   "Money (usd) is a number above 0 and at most {0}.": "L’argent (usd) doit être un nombre supérieur à 0 et inférieur ou égal à {0}.",
   "The check held": "La vérification est respectée",
   "The check holds": "La vérification est respectée",
-  "Time (minutes) is a number above 0 and at most {0}.": "La durée (minutes) doit être un nombre supérieur à 0 et inférieur ou égal à {0}."
+  "Time (minutes) is a number above 0 and at most {0}.": "La durée (minutes) doit être un nombre supérieur à 0 et inférieur ou égal à {0}.",
+  "The subagent “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Le sous-agent « {0} » travaillait encore quand les fichiers du tour {1} ont été enregistrés : ce qu’il écrit après coup se trouve dans le dossier, mais pas dans le tour.",
+  "The subagents {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les sous-agents {0} et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
+  "The subagents “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les sous-agents « {0} » et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
+  "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Le membre de l’essaim « {0} » travaillait encore quand les fichiers du tour {1} ont été enregistrés : ce qu’il écrit après coup se trouve dans le dossier, mais pas dans le tour.",
+  "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les membres de l’essaim {0} et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
+  "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les membres de l’essaim « {0} » et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
+  "You stopped the agent and its subagents. Resume checks what they did.": "Vous avez arrêté l’agent et ses sous-agents. « Reprendre » vérifie ce qu’ils ont fait."
 }

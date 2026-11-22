@@ -24882,7 +24882,7 @@
   "goal::Reviewer": "レビュアー",
   "goal::Target": "ターゲット",
   "{0}, so the files of the round it stopped are not put back yet: try again in a moment.": "{0}ため、停止したラウンドのファイルはまだ元に戻っていません。しばらくしてからもう一度お試しください。",
-  "{0}: give it more than that.": "{0}：これより大きい値を指定してください。",
+  "{0}: give it more than that.": "{0}。これより多く追加してください。",
   "1 passage": "1件のパッセージ",
   ": articles agents keep as they work.": "：エージェントが作業中に残す記事。",
   ": short facts agents start with.": "：エージェントが最初に読む短い事実。",
@@ -25484,5 +25484,12 @@
   "Money (usd) is a number above 0 and at most {0}.": "金額（usd）は0より大きく{0}以下の数値にしてください。",
   "The check held": "チェックが成立しました",
   "The check holds": "チェックが成立します",
-  "Time (minutes) is a number above 0 and at most {0}.": "時間（minutes）は0より大きく{0}以下の数値にしてください。"
+  "Time (minutes) is a number above 0 and at most {0}.": "時間（minutes）は0より大きく{0}以下の数値にしてください。",
+  "The subagent “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "ラウンド{1}のファイルが保存された時点で、サブエージェント「{0}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "The subagents {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、サブエージェント{0}と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "The subagents “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、サブエージェント「{0}」と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "ラウンド{1}のファイルが保存された時点で、スウォームのメンバー「{0}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、スウォームのメンバー{0}と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、スウォームのメンバー「{0}」と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
+  "You stopped the agent and its subagents. Resume checks what they did.": "エージェントとそのサブエージェントを停止しました。「再開」を押すと、それまでの作業内容をチェックします。"
 }

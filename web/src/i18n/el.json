@@ -27344,5 +27344,12 @@
   "Money (usd) is a number above 0 and at most {0}.": "Το usd είναι αριθμός μεγαλύτερος από 0 και το πολύ {0}.",
   "The check held": "Ο έλεγχος ίσχυε",
   "The check holds": "Ο έλεγχος ισχύει",
-  "Time (minutes) is a number above 0 and at most {0}.": "Τα minutes είναι αριθμός μεγαλύτερος από 0 και το πολύ {0}."
+  "Time (minutes) is a number above 0 and at most {0}.": "Τα minutes είναι αριθμός μεγαλύτερος από 0 και το πολύ {0}.",
+  "The subagent “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Ο υποπράκτορας «{0}» εργαζόταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {1}: όσα γράψει μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "The subagents {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Οι υποπράκτορες {0} και «{1}» εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "The subagents “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Οι υποπράκτορες «{0}» και «{1}» εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Το μέλος «{0}» του σμήνους εργαζόταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {1}: όσα γράψει μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Τα μέλη {0} και «{1}» του σμήνους εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Τα μέλη «{0}» και «{1}» του σμήνους εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
+  "You stopped the agent and its subagents. Resume checks what they did.": "Διακόψατε τον πράκτορα και τους υποπράκτορές του. Με το «Συνέχεια» ελέγχεται τι έκαναν."
 }

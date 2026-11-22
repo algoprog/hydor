@@ -25486,5 +25486,12 @@
   "Money (usd) is a number above 0 and at most {0}.": "O dinheiro (usd) deve ser um número maior que 0 e no máximo {0}.",
   "The check held": "A verificação se cumpriu",
   "The check holds": "A verificação se cumpre",
-  "Time (minutes) is a number above 0 and at most {0}.": "O tempo (minutes) deve ser um número maior que 0 e no máximo {0}."
+  "Time (minutes) is a number above 0 and at most {0}.": "O tempo (minutes) deve ser um número maior que 0 e no máximo {0}.",
+  "The subagent “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "O subagente “{0}” ainda estava trabalhando quando os arquivos da rodada {1} foram salvos: o que ele escrever depois disso fica na pasta, mas não entra na rodada.",
+  "The subagents {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os subagentes {0} e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
+  "The subagents “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os subagentes “{0}” e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
+  "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "O membro do enxame “{0}” ainda estava trabalhando quando os arquivos da rodada {1} foram salvos: o que ele escrever depois disso fica na pasta, mas não entra na rodada.",
+  "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os membros do enxame {0} e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
+  "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os membros do enxame “{0}” e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
+  "You stopped the agent and its subagents. Resume checks what they did.": "Você parou o agente e os subagentes dele. “Retomar” verifica o que eles fizeram."
 }
