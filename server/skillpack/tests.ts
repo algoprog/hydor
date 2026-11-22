@@ -272,12 +272,14 @@ await test('the right skill for real asks', () => {
   assert.equal(firstMatch('Please research heat pumps versus gas boilers for a small flat'), 'research');
   assert.equal(firstMatch('Find papers on sleep and memory from the last five years'), 'research');
   assert.equal(firstMatch('Draft a cover letter for this job posting'), 'writing');
+  assert.equal(firstMatch('Give me a 3-4 sentence summary of this article for our class'), 'writing');
+  assert.equal(firstMatch('Write me an article about home batteries for our newsletter'), 'writing');
   assert.equal(firstMatch('Keep going on the migration while I’m away tonight'), 'decisions-log');
   assert.equal(firstMatch('Fix the bug, then double-check that the export works'), 'evidence-before-done');
 });
 
 await test('nothing for small or unrelated asks', () => {
-  for (const msg of ['hi', 'thanks!', 'yes please', 'research it', 'Fix the typo in the README title', 'Rename the variable x to count everywhere', 'Write a function that adds two numbers', 'What time is it in Tokyo right now?', 'Add a dark mode toggle to the settings page'])
+  for (const msg of ['hi', 'thanks!', 'yes please', 'research it', 'Fix the typo in the README title', 'Rename the variable x to count everywhere', 'Write a function that adds two numbers', 'What time is it in Tokyo right now?', 'What is this article about and how is it related to our class?', 'What does the report on climate risk say about insurers?', 'Add a dark mode toggle to the settings page'])
     assert.equal(firstMatch(msg), null, msg);
 });
 
@@ -380,6 +382,12 @@ await test('by meaning, only the closest skill and only when alike enough; by wo
     const byWords = await matchSkills(db, list, 'my kite needs repair after the storm', { vector: null });
     assert.deepEqual(byWords.map((f) => f.skill.name), ['kite-repair'], JSON.stringify(byWords.map((f) => [f.skill.name, f.words])));
     assert.deepEqual(await matchSkills(db, list, 'my kite flew well after the storm today', { vector: null }), [], 'one word is not enough');
+    // Keywords changed in place (as many as before) are searched at once, not through the index built for the old ones.
+    const withKeys = (keys: string[]) => list.map((x) => (x.name === 'tide-tables' ? { ...x, triggers: keys } : x));
+    const lamps = 'where are the lighthouse lamps kept in winter';
+    assert.deepEqual(await matchSkills(db, withKeys(['harbour charts']), lamps, { vector: null }), [], 'not by the old keywords');
+    const relit = await matchSkills(db, withKeys(['lighthouse lamps']), lamps, { vector: null });
+    assert.deepEqual(relit.map((f) => f.skill.name), ['tide-tables'], 'by the new keywords');
   } finally {
     setShippedForTests(was);
     setCodebookForTests(levels);

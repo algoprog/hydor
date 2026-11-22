@@ -2,7 +2,7 @@
 name: writing
 description: Use when writing or substantially editing something people will read, such as a report, article, proposal, letter or email, documentation or a speech. Not for fiction or a book (creative-writing), or a one-line reply.
 category: writing
-triggers: [draft a, draft an, proofread, essay, blog post, article about, cover letter, newsletter, press release, speech, proposal for, report on]
+triggers: [draft a, draft an, proofread, an essay, my essay, blog post, write an article, write me an article, cover letter, newsletter, press release, speech, proposal for, a report on, write a report, write a summary, sentence summary, paragraph summary]
 ---
 
 # Writing
@@ -58,6 +58,24 @@ Read the result once at speaking pace: anything you stumble on, the reader will 
   kind of file.
 - Add a short note: what you assumed, what the user should check, and easy variations (shorter, more
   formal, another audience).
+
+## A summary or short response
+
+For a few sentences or a paragraph the user will hand in or send as their own (a summary for a class,
+a response, a reflection), skip the written brief and keep the closing note to what you assumed.
+
+- Say what the source shows and why, in your own words, not what its author did ("argues", "gives the
+  example of").
+- Keep each detail's job: an example the source gives as a warning stays a warning. A number earns its
+  place only if it carries the point.
+- Make it one line of thought, each sentence building on the one before. In three or four sentences,
+  one or two links made well beat four touched on.
+- Link a course idea by applying it to a case in the source (this bond, this patient, this scene), not
+  by defining it: the teacher knows the definition, and using it is what shows understanding.
+- Use the field's terms exactly, without explaining them, when the reader knows the field. Commit to
+  claims rather than hedging them ("can contribute to").
+- If you do not know what the course has covered, link what the source shows most directly, and say
+  outside the text what you assumed.
 
 ## Editing someone else's text
 

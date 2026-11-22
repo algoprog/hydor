@@ -66,7 +66,8 @@ const fieldsOf = (s: SkillDoc) => {
 
 let cached: { sig: string; ix: Bm25<number> } | null = null;
 function indexOf(list: SkillDoc[]): Bm25<number> {
-  const sig = list.map((s) => `${s.name}:${s.description.length}:${(s.triggers ?? []).length}`).join('|');
+  // Everything the index is built from, so a keyword or a description changed in place is searched at once.
+  const sig = list.map((s) => `${s.name}\u0000${s.description}\u0000${(s.triggers ?? []).join('\u0001')}\u0000${s.category ?? ''}`).join('\u0002');
   if (cached?.sig !== sig) cached = { sig, ix: new Bm25(list.map((s, i) => ({ item: i, fields: fieldsOf(s) }))) };
   return cached.ix;
 }
