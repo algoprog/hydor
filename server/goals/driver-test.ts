@@ -5264,6 +5264,23 @@ test('S2 (third review): what the queue held goes first and the loop’s message
     assert.match(toLead(B).at(-1)!.text, /^\[Reply from the Hydor subagent "Speed"/);
     await turn(B);
     assert.equal(goal(B).rounds[3].outcome, 'kept');
+    // Its agent's program is ending (stopping, or just gone and still listed for a moment): no queue is dispatched to it
+    // and no turn of its ends, so the message is not left in the queue behind the news: it is sent as any message is.
+    await stopInAskTurn(B, m1);
+    lf.live = 'stopping';
+    const direct: string[] = [];
+    const queueing = sessions.deliverOrQueue;
+    sessions.deliverOrQueue = async function (this: Sessions, k: string, text: string) {
+      if (k === B) direct.push(text);
+      return queueing.call(this, k, text);
+    };
+    try {
+      await act(B, { action: 'resume' });
+    } finally {
+      sessions.deliverOrQueue = queueing;
+    }
+    assert.equal(direct.length, 1, 'handed to the session manager itself');
+    assert.match(direct[0], /round 4 of/);
   } finally {
     sessions.resumeQueue = real.resumeQueue;
     sessions.deliverOrQueue = real.deliverOrQueue;

@@ -388,13 +388,16 @@ async function say(d: Deps, g: StoredGoal, text: string, o: { again?: boolean } 
   // the queue's dispatch (which takes a moment, the agent still idle meanwhile), this message could go first or with the
   // news, and the end of the turn on the news be taken for the round's. While it waits in the queue the session is not
   // idle, so nothing takes it for a message that never went out (quiet's two minutes count once the queue is empty).
-  // Only where the agent runs: a queue goes to a running agent, so one that is not running starts with this message
-  // (sent below) and takes what was held at that turn's end.
+  // Only where the agent runs: a queue goes to a running agent, so one that is not running (or whose program is ending)
+  // starts with this message (sent below) and takes what was held at that turn's end.
   if (fresh(d, g)?._.releaseHeld) {
     remember(d, g, (f) => (f._.releaseHeld = undefined));
     if (heldNewsOnly(d, g.key)) {
       let queued = false;
-      if (d.sessions.summary(g.key)?.live) {
+      // Where its agent runs and takes messages: one whose program is ending (stopping, or just gone and still listed a
+      // moment) gets no queue dispatched and no turn's end to send the next, so the message would wait there for ever.
+      const st = d.sessions.summary(g.key)?.live?.status;
+      if (st === 'idle' || st === 'working' || st === 'waiting') {
         try {
           d.sessions.enqueue(g.key, text, [], [], true);
           queued = true;
