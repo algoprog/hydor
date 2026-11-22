@@ -612,18 +612,27 @@ async function namedBlocks(cwd: string, name: string, shown: Set<string>): Promi
 }
 
 /**
- * The files the checks' reviewers asked to read, as evidence for the final review of the whole change: each once, the newest
- * ASKED_KEPT of them, read again as askedFile reads them now (one that is gone, or may no longer be read, is left out).
- * Without them the last reviewer would judge the same claims on less than the checks' reviewers had.
+ * What the last reviewer of the whole change reads beside it, as blocks: the files the review checks name as evidence (a
+ * folder as its files) and those their reviewers asked to read (the newest ASKED_KEPT), each once, as they are now.
+ * Without them it would judge the same claims on less than the checks' reviewers had: on the live app it said "I could
+ * not check the descriptions against the helper source, which is not in the change", and of a specification a check
+ * named, "I could not read docs/usage.md".
  */
-export async function askedBlocks(cwd: string, asked: Record<string, string[]> | undefined): Promise<string> {
-  const names = [...new Set(Object.values(asked ?? {}).flat())].slice(-ASKED_KEPT);
+export async function alsoBlocks(cwd: string, checks: GoalCheck[], asked: Record<string, string[]> | undefined): Promise<string[]> {
+  const rel = (f: string) => path.relative(path.resolve(cwd), path.resolve(cwd, f)).split(path.sep).join('/');
+  const named = [...new Set(checks.filter((c) => c.kind === 'review').flatMap((c) => c.evidence?.files ?? []))];
+  // By path from the session's folder, as in a check's own evidence: a file named by itself and in a folder is shown once.
+  const shown = new Set(named.map(rel));
   const parts: string[] = [];
-  for (const f of names) {
+  for (const f of named) parts.push(...(await namedBlocks(cwd, f, shown)));
+  for (const f of [...new Set(Object.values(asked ?? {}).flat())].slice(-ASKED_KEPT)) {
+    if (shown.has(f)) continue;
     const r = await askedFile(cwd, f);
-    if ('text' in r) parts.push(fileBlock(r.path, r));
+    if (shown.has(r.path) || !('text' in r)) continue;
+    shown.add(r.path);
+    parts.push(fileBlock(r.path, r));
   }
-  return parts.join('\n\n');
+  return parts;
 }
 
 /** Why a command that did not pass could not be run at all, or null when it ran and failed. */

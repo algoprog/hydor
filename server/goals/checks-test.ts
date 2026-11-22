@@ -19,7 +19,7 @@ import path from 'node:path';
 import type { GoalCheck } from '../../shared/goals.ts';
 import { netCutAvailable, sandboxShell } from '../agent/sandbox.ts';
 import type { Deps } from '../features/types.ts';
-import { addAsked, askedFile, ASKED_KEPT, changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, FILE_MAX, fitParts, FOLDER_FILES, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
+import { addAsked, alsoBlocks, askedFile, ASKED_KEPT, changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, FILE_MAX, fitParts, FOLDER_FILES, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
 import { reviewClaim, setReviewer } from './review.ts';
 import { cleanProtect, MAX_WILDCARDS } from './validate.ts';
 
@@ -508,6 +508,25 @@ test('a folder named as evidence shows its files: those git knows, none in a dot
   await runCheck({ id: 'c1', kind: 'review', label: 'L', claim: 'C', evidence: { files: ['docs'] } }, env({ cwd: plain, review: async (_c, evidence) => (seen.push(evidence), { holds: true, score: 1, reason: 'ok' }) }));
   assert.ok(seen[2].includes('DOC-A') && seen[2].includes('DOC-B'));
   assert.ok(!seen[2].includes('DOC-C') && !seen[2].includes('DOT-DOC'));
+});
+
+test('the last reviewer reads the files the review checks name as evidence (a folder as its files) and those their reviewers asked for, each once', async () => {
+  const root = askRepo();
+  fs.writeFileSync(path.join(root, 'spec.md'), 'SPEC-TEXT\n');
+  const checks: GoalCheck[] = [
+    { id: 'c1', kind: 'command', label: 'Tests', run: 'true' },
+    { id: 'c2', kind: 'review', label: 'Spec', claim: 'It follows the spec', evidence: { diff: true, files: ['spec.md', 'src/'] } },
+    { id: 'c3', kind: 'review', label: 'Slug', claim: 'The slug is right', evidence: { files: ['src/slug.js', 'gone.md'] } },
+  ];
+  const parts = await alsoBlocks(root, checks, { c2: ['src/duration.js', 'link-to-secret.txt', '.env'], c3: ['src/new.js'] });
+  const all = parts.join('\n\n');
+  assert.match(parts[0], /^<file path="spec.md">\nSPEC-TEXT/, 'the named files first, in the checks\' order');
+  for (const f of ['src/slug.js', 'src/duration.js', 'src/new.js']) assert.equal(all.split(`<file path="${f}">`).length - 1, 1, `${f} once`);
+  assert.match(all, /<file path="gone.md">\n\(Left out: it does not exist\.\)/, 'a named file that is gone says so');
+  for (const secret of ['IGNORED-KEY', 'DOT-KEY', 'DOT-FILE', 'HIDDEN-TRACKED']) assert.ok(!all.includes(secret), secret);
+  assert.ok(!all.includes('link-to-secret.txt'), 'a file a reviewer asked for that may not be read is left out, not named');
+  // Nothing named and nothing asked: nothing beside the change.
+  assert.deepEqual(await alsoBlocks(root, [checks[0], { id: 'c4', kind: 'review', label: 'L', claim: 'C' }], undefined), []);
 });
 
 test('a reviewer that cannot tell asks for files: the app reads them, asks once more, and says so in the detail', async () => {

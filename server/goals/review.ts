@@ -8,7 +8,7 @@ import type { GoalCheck } from '../../shared/goals.ts';
 import { confidentialKey, privateHelper } from '../confidential/index.ts';
 import type { Deps } from '../features/types.ts';
 import { helperJson, type HelperAsk } from '../helper.ts';
-import { clipMiddle, EVIDENCE_MAX, withFiles } from './checks.ts';
+import { clipMiddle, EVIDENCE_MAX, fitParts, withFiles } from './checks.ts';
 
 export const NO_LOCAL_REVIEWER = 'No model on this computer to review with';
 
@@ -66,12 +66,12 @@ const FINAL_SYSTEM = [
   '- something removed or switched off just so a check passes;',
   '- the goal itself not really met, whatever the checks say.',
   WHOLE,
-  'After the change you may get files that the reviewers of the checks asked to read (<also-read>): each is its content now, whether or not the change touched it, given so that you can judge what the change relies on.',
+  'After the change you may get the files the checks name as evidence and the files that the reviewers of the checks asked to read (<also-read>): each is its content now, whether or not the change touched it, given so that you can judge what the change relies on.',
   ...RULES,
   'Answer with JSON only: {"ok": true or false, "reason": "one or two sentences, quoting the change"}',
 ].join('\n');
 
-/** How much of the files the checks' reviewers asked for the final reviewer gets, beside the change. */
+/** How much of the files the checks name or their reviewers asked for the final reviewer gets, beside the change. */
 const ALSO_MAX = EVIDENCE_MAX / 2;
 
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -137,9 +137,9 @@ export async function reviewRules(d: Deps, key: string, rules: string[], change:
 
 /**
  * The final check's review of the whole change against the goal and its checks; an error when the reviewer could not answer.
- * `also`: the files the checks' reviewers asked to read, as blocks (checks.ts askedBlocks).
+ * `also`: the files the checks name as evidence and those their reviewers asked to read, as blocks (checks.ts alsoBlocks).
  */
-export async function finalReview(d: Deps, key: string, objective: string, checks: GoalCheck[], change: string, also = ''): Promise<{ ok: boolean; reason: string } | { error: string }> {
+export async function finalReview(d: Deps, key: string, objective: string, checks: GoalCheck[], change: string, also: string[] = []): Promise<{ ok: boolean; reason: string } | { error: string }> {
   const list = checks.map((c) => `- ${c.label} (${c.kind}${c.run ? `: ${c.run}` : c.claim ? `: ${c.claim}` : ''}${c.target ? `, ${c.target.op} ${c.target.value}${c.unit ? ` ${c.unit}` : ''}` : ''})`).join('\n');
   try {
     const v = await ask(
@@ -147,7 +147,7 @@ export async function finalReview(d: Deps, key: string, objective: string, check
       key,
       {
         system: FINAL_SYSTEM,
-        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>${also ? `\n\n<also-read>\n${clipMiddle(also, ALSO_MAX)}\n</also-read>` : ''}\n\nYour JSON answer:`,
+        prompt: `<goal>\n${objective}\n</goal>\n\n<checks>\n${list}\n</checks>\n\n<change>\n${clipMiddle(withFiles(change), EVIDENCE_MAX)}\n</change>${also.length ? `\n\n<also-read>\n${fitParts(also, ALSO_MAX).join('\n\n')}\n</also-read>` : ''}\n\nYour JSON answer:`,
         timeoutMs: 300_000,
         maxTokens: 600,
         strong: true,
