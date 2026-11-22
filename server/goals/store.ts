@@ -240,11 +240,16 @@ export function goalUpdated(db: DB, key: string): number {
   return (db.prepare('select updated from goals where key = ?').get(key) as { updated: number } | undefined)?.updated ?? 0;
 }
 
-/** The goal as it leaves the server: the loop's own fields stripped. */
-export function publicGoal(g: StoredGoal | null): GoalState | null {
+/**
+ * The goal as it leaves the server: the loop's own fields stripped, and its time at work brought up to now. activeMs is
+ * saved as the status changes, so while a round runs or is checked it lacks the stretch in progress: added here, the page
+ * can run the clock on from the moment it got the state (it read "4 s" a minute into a round on a page just opened, and
+ * fell back whenever a new state arrived in the middle of a round).
+ */
+export function publicGoal(g: StoredGoal | null, now = Date.now()): GoalState | null {
   if (!g) return null;
-  const { _: _private, ...out } = g;
-  return out;
+  const { _: loop, ...out } = g;
+  return loop?.activeSince != null ? { ...out, activeMs: out.activeMs + Math.max(0, now - loop.activeSince) } : out;
 }
 
 /** What the sidebar and the goal bar show of a driven goal that is not over; undefined without one. */

@@ -14,7 +14,7 @@ export const useGoals = create<{ byKey: Record<string, GoalState | null> }>(() =
 /** Events seen for each session, so a load that was slow does not replace what an event brought after it. */
 const seen: Record<string, number> = {};
 
-/** When the page got each goal state: the server's `activeMs` is the time at work up to when it last saved the goal, so the bar runs it on from here. */
+/** When the page got each goal state: the server's `activeMs` is the time at work up to the moment it sent the state (publicGoal adds the stretch in progress), so the bar runs it on from here. */
 const arrived = new WeakMap<GoalState, number>();
 const arrivedAt = (g: GoalState): number => {
   let t = arrived.get(g);
