@@ -28,10 +28,16 @@ export const READ_TAIL = KEEP;
 export const READ_MS = 200;
 /** The variable each check's command carries, with a mark of its own: what a restart left running is known by it (killLeftover). */
 const MARK_VAR = 'HYDOR_GOAL_CHECK';
-/** What the reviewer is shown at most, how much of each file, and the largest file it is shown at all. */
+/**
+ * What the reviewer is shown at most, how much of one file at most (half of it: a specification of a few pages is read
+ * whole; at 8,000 characters a reviewer on the live app said of a 14,000-character one that "the spec text is cut off"
+ * and could never find the claim true), and the largest file it is shown at all.
+ */
 export const EVIDENCE_MAX = 60_000;
-const FILE_MAX = 8000;
+export const FILE_MAX = EVIDENCE_MAX / 2;
 export const FILE_BYTES_MAX = 200 * 1024;
+/** How many files of a folder named as evidence are shown (the first by path); the others are named, to be asked for. */
+export const FOLDER_FILES = 24;
 
 export interface Ran {
   /** Its exit code; null when it was killed or could not start. */
@@ -178,6 +184,29 @@ export function clipMiddle(s: string, n: number): string {
   if (s.length <= n) return s;
   const head = Math.floor(n * 0.4);
   return `${s.slice(0, head)}\n… (${s.length - n} characters left out) …\n${s.slice(-(n - head))}`;
+}
+
+/**
+ * The parts of a reviewer's evidence (the change, each file, a command's output) made to fit in `max` together, joined by
+ * a blank line: nothing is cut while the whole fits, and otherwise only the longest parts are, each in its middle and down
+ * to the same length, so a short file is never lost to a long one beside it.
+ */
+export function fitParts(parts: string[], max: number): string[] {
+  const room = max - 2 * Math.max(0, parts.length - 1);
+  if (parts.reduce((n, x) => n + x.length, 0) <= room) return parts;
+  // The length the longest are cut to: the shorter ones keep theirs, and what is left is shared among the rest.
+  const lens = parts.map((x) => x.length).sort((x, y) => x - y);
+  let left = Math.max(0, room);
+  let cap = 0;
+  for (let i = 0; i < lens.length; i++) {
+    const share = Math.floor(left / (lens.length - i));
+    if (lens[i] > share) {
+      cap = share;
+      break;
+    }
+    left -= lens[i];
+  }
+  return parts.map((x) => (x.length > cap ? clipMiddle(x, cap) : x));
 }
 
 const NUMBER = /[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/g;
@@ -522,6 +551,67 @@ const fileBlock = (shown: string, r: { text: string } | { skip: string }) => {
 };
 
 /**
+ * A folder named as a check's evidence ("src/"): its files, by path from the session's folder, or null when the name is
+ * not a folder inside it. As git knows them (tracked, or new and not ignored); outside a git folder, the files in it and
+ * one level down, without node_modules. None whose path has a part that starts with a dot.
+ */
+async function folderFiles(cwd: string, name: string): Promise<string[] | null> {
+  const root = path.resolve(cwd);
+  const abs = path.resolve(cwd, name);
+  if (!inside(root, abs)) return null;
+  try {
+    if (!fs.statSync(abs).isDirectory() || !inside(fs.realpathSync(cwd), fs.realpathSync(abs))) return null;
+  } catch {
+    return null;
+  }
+  const rel = (x: string) => path.relative(root, x).split(path.sep).join('/');
+  const dotted = (x: string) => x.split('/').some((c) => c.startsWith('.'));
+  let found: string[];
+  if ((await git(cwd, ['rev-parse', '--is-inside-work-tree'])).out.trim() === 'true') {
+    const l = await git(cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '--', rel(abs) || '.']);
+    found = l.ok ? l.out.split('\n').filter(Boolean) : [];
+  } else {
+    found = [];
+    const list = (dir: string, deeper: boolean) => {
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+        if (e.isFile()) found.push(rel(path.join(dir, e.name)));
+        else if (e.isDirectory() && deeper) list(path.join(dir, e.name), false);
+      }
+    };
+    list(abs, true);
+  }
+  return [...new Set(found)].filter((x) => x && !dotted(x)).sort();
+}
+
+/**
+ * What a name in a check's evidence shows the reviewer: a file's block, or for a folder the blocks of its first
+ * FOLDER_FILES files (each read as a file a reviewer asked for is: askedFile) and a line that names the rest, which the
+ * reviewer can ask for. `shown` gets the paths that were shown.
+ */
+async function namedBlocks(cwd: string, name: string, shown: Set<string>): Promise<string[]> {
+  const files = await folderFiles(cwd, name);
+  if (!files) return [fileBlock(name, evidenceFile(cwd, name))];
+  const out: string[] = [];
+  for (const f of files.slice(0, FOLDER_FILES)) {
+    if (shown.has(f)) continue;
+    const r = await askedFile(cwd, f);
+    shown.add(r.path);
+    out.push(fileBlock(r.path, r));
+  }
+  const more = files.slice(FOLDER_FILES);
+  if (!files.length) out.push(`<file path="${name}">\n(Left out: the folder has no files that can be shown.)\n</file>`);
+  if (more.length) out.push(`(The folder ${name} has ${more.length} more ${more.length === 1 ? 'file' : 'files'} that are not shown: ${more.slice(0, 60).join(', ')}${more.length > 60 ? ', …' : ''}.)`);
+  return out;
+}
+
+/**
  * The files the checks' reviewers asked to read, as evidence for the final review of the whole change: each once, the newest
  * ASKED_KEPT of them, read again as askedFile reads them now (one that is gone, or may no longer be read, is left out).
  * Without them the last reviewer would judge the same claims on less than the checks' reviewers had.
@@ -585,9 +675,10 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
     );
     parts.push(d);
   }
-  for (const f of ev.files ?? []) parts.push(fileBlock(f, evidenceFile(env.cwd, f)));
   // What is in the evidence already, by path from the session's folder: a file is shown once.
   const shownPaths = new Set((ev.files ?? []).map((f) => path.relative(path.resolve(env.cwd), path.resolve(env.cwd, f)).split(path.sep).join('/')));
+  // A folder among them shows its files (an agent on the live app named "src/" and the reviewer got "it is not a file").
+  for (const f of ev.files ?? []) parts.push(...(await namedBlocks(env.cwd, f, shownPaths)));
   // The files a reviewer asked for in earlier runs of this check, that can still be read.
   const read: string[] = [];
   for (const f of env.asked?.(c.id) ?? []) {
@@ -603,7 +694,7 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
     const bad = cannotRun(r, timeoutOf(c));
     parts.push(`<output of="${ev.run}" exit="${r.code ?? 'none'}">\n${bad ? `${bad}\n` : ''}${r.output}\n</output>`);
   }
-  let v = await env.review(c.claim, clipMiddle(parts.join('\n\n') || '(No evidence was named.)', EVIDENCE_MAX));
+  let v = await env.review(c.claim, fitParts(parts, EVIDENCE_MAX).join('\n\n') || '(No evidence was named.)');
   // Not holding for lack of files the reviewer names: it is shown those it may see, and asked once more; that answer stands.
   if (!('error' in v) && !v.holds && v.needs?.length) {
     const fresh = [...new Set(v.needs)].filter((f) => !shownPaths.has(path.relative(path.resolve(env.cwd), path.resolve(env.cwd, f)).split(path.sep).join('/')));
@@ -618,7 +709,7 @@ export async function runCheck(c: GoalCheck, env: CheckEnv): Promise<GoalResult>
       }
       if (added.length) env.askedMore?.(c.id, added);
       read.push(...added);
-      v = await env.review(c.claim, clipMiddle(parts.join('\n\n'), EVIDENCE_MAX));
+      v = await env.review(c.claim, fitParts(parts, EVIDENCE_MAX).join('\n\n'));
     }
   }
   if ('error' in v) return errorResult(c.id, v.error, Date.now() - t0);

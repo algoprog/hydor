@@ -19,7 +19,7 @@ import path from 'node:path';
 import type { GoalCheck } from '../../shared/goals.ts';
 import { netCutAvailable, sandboxShell } from '../agent/sandbox.ts';
 import type { Deps } from '../features/types.ts';
-import { addAsked, askedFile, ASKED_KEPT, changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
+import { addAsked, askedFile, ASKED_KEPT, changedFilesLine, changedPaths, clipMiddle, diffText, evidenceFile, FILE_MAX, fitParts, FOLDER_FILES, globMatch, headOf, isProtected, killLeftover, protectedHits, readNumber, runCheck, runChecks, runCommand, sameFiles, SLOW_READ, type CheckEnv } from './checks.ts';
 import { reviewClaim, setReviewer } from './review.ts';
 import { cleanProtect, MAX_WILDCARDS } from './validate.ts';
 
@@ -152,7 +152,7 @@ test('a person’s check holds only once they confirmed it, and nothing runs', a
 });
 
 test('a review: the reviewer gets the claim and the evidence named (the change, files, a command’s output); a failed review is an error', async () => {
-  fs.writeFileSync(path.join(tmp, 'notes.md'), `# Notes\n${'n'.repeat(9000)}`);
+  fs.writeFileSync(path.join(tmp, 'notes.md'), `# Notes\n${'n'.repeat(FILE_MAX + 1000)}`);
   reviewed.length = 0;
   const r = await runCheck({ id: 'c1', kind: 'review', label: 'Errors are explained', claim: 'Every error says what to do', evidence: { diff: true, files: ['notes.md', 'gone.md'], run: 'echo from-the-command' } }, env());
   assert.equal(r.holds, true);
@@ -162,7 +162,8 @@ test('a review: the reviewer gets the claim and the evidence named (the change, 
   // The files that changed are named first, so the reviewer knows the list is whole (a file not in it did not change).
   assert.match(ev, /<change since the goal started>\nEvery file that changed \(1\): [^\n]+\. No other file changed\.\n\ndiff --git/);
   assert.match(ev, /<file path="notes.md">\n# Notes/);
-  assert.match(ev, /the rest left out/, 'a file is cut at 8000 characters');
+  assert.match(ev, /the rest left out/, 'a file is cut at FILE_MAX characters');
+  assert.ok(ev.includes('n'.repeat(FILE_MAX - 20)), 'and not before: a specification of a few pages is read whole');
   assert.match(ev, /<file path="gone.md">\n\(Left out: it does not exist\.\)/);
   assert.match(ev, /<output of="echo from-the-command" exit="0">\nfrom-the-command/);
   // No evidence named: the change since the start.
@@ -458,6 +459,56 @@ const asking = (asks: (string[] | undefined)[], holdsWith: string, o: Partial<Ch
   });
   return { e, evidences, added };
 };
+
+test('the parts of the evidence are cut only when the whole does not fit, the longest first and to the same length; a short part is never lost to a long one', () => {
+  const short = 'S'.repeat(300);
+  const mid = 'M'.repeat(2000);
+  const long = 'L'.repeat(9000);
+  assert.deepEqual(fitParts([short, mid, long], 20_000), [short, mid, long], 'it fits: nothing is cut');
+  const cut = fitParts([long, short, 'K'.repeat(8000), mid], 10_000);
+  assert.equal(cut[1], short);
+  assert.equal(cut[3], mid, 'the shorter parts are whole');
+  assert.match(cut[0], /^L+\n… \(\d+ characters left out\) …\nL+$/);
+  assert.match(cut[2], /^K+\n… \(\d+ characters left out\) …\nK+$/);
+  // The two long ones share what is left, cut to the same length (clipMiddle's note comes on top of it).
+  const kept = (x: string) => x.replace(/\n… \(\d+ characters left out\) …\n/, '').length;
+  assert.equal(kept(cut[0]), kept(cut[2]));
+  assert.equal(kept(cut[0]), Math.floor((10_000 - 2 * 3 - short.length - mid.length) / 2));
+  assert.deepEqual(fitParts([], 10), []);
+  // Every part longer than its share: all are cut alike.
+  assert.ok(fitParts(['a'.repeat(500), 'b'.repeat(500)], 202).every((x) => kept(x) === 100));
+});
+
+test('a folder named as evidence shows its files: those git knows, none in a dot path, each once; the rest of a large folder are named', async () => {
+  const root = askRepo();
+  const seen: string[] = [];
+  const e = env({ cwd: root, review: async (_c, evidence) => (seen.push(evidence), { holds: true, score: 1, reason: 'ok' }) });
+  await runCheck({ id: 'c1', kind: 'review', label: 'L', claim: 'C', evidence: { files: ['src/', 'src/slug.js', '.hidden', 'nowhere/'] } }, e);
+  const ev = seen[0];
+  assert.match(ev, /<file path="src\/duration.js">\nDURATION-BODY/);
+  assert.match(ev, /<file path="src\/new.js">\nNEW-BODY/, 'a new file git does not ignore');
+  assert.equal(ev.split('<file path="src/slug.js">').length - 1, 1, 'named by itself too: shown once');
+  assert.ok(!ev.includes('DOT-FILE') && !ev.includes('HIDDEN-TRACKED'), 'nothing from a dot path');
+  assert.match(ev, /<file path="\.hidden">\n\(Left out: the folder has no files that can be shown\.\)/);
+  assert.match(ev, /<file path="nowhere\/">\n\(Left out: it does not exist\.\)/);
+  assert.ok(!ev.includes('it is not a file'));
+  // A large folder: the first FOLDER_FILES by path are shown, the others named so the reviewer can ask for one.
+  fs.mkdirSync(path.join(root, 'many'));
+  for (let i = 0; i < FOLDER_FILES + 3; i++) fs.writeFileSync(path.join(root, 'many', `f${String(i).padStart(2, '0')}.txt`), `BODY-${i}\n`);
+  await runCheck({ id: 'c1', kind: 'review', label: 'L', claim: 'C', evidence: { files: ['many'] } }, e);
+  assert.equal(seen[1].split('<file path="many/').length - 1, FOLDER_FILES);
+  assert.match(seen[1], new RegExp(`\\(The folder many has 3 more files that are not shown: many/f${FOLDER_FILES}\\.txt, many/f${FOLDER_FILES + 1}\\.txt, many/f${FOLDER_FILES + 2}\\.txt\\.\\)`));
+  // Outside a git folder: the files in it and one level down, without dot names.
+  const plain = fs.mkdtempSync(path.join(tmp, 'plainfolder-'));
+  fs.mkdirSync(path.join(plain, 'docs', 'deep', 'deeper'), { recursive: true });
+  fs.writeFileSync(path.join(plain, 'docs', 'a.md'), 'DOC-A\n');
+  fs.writeFileSync(path.join(plain, 'docs', 'deep', 'b.md'), 'DOC-B\n');
+  fs.writeFileSync(path.join(plain, 'docs', 'deep', 'deeper', 'c.md'), 'DOC-C\n');
+  fs.writeFileSync(path.join(plain, 'docs', '.secret'), 'DOT-DOC\n');
+  await runCheck({ id: 'c1', kind: 'review', label: 'L', claim: 'C', evidence: { files: ['docs'] } }, env({ cwd: plain, review: async (_c, evidence) => (seen.push(evidence), { holds: true, score: 1, reason: 'ok' }) }));
+  assert.ok(seen[2].includes('DOC-A') && seen[2].includes('DOC-B'));
+  assert.ok(!seen[2].includes('DOC-C') && !seen[2].includes('DOT-DOC'));
+});
 
 test('a reviewer that cannot tell asks for files: the app reads them, asks once more, and says so in the detail', async () => {
   const root = askRepo();

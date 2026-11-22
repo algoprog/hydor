@@ -72,7 +72,7 @@ import { catchUp, reportTurn } from '../children/index.ts';
 import { addPost, members as swarmMembers, postsOf, stopMember, tellLead } from '../swarm/index.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
-import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
+import { goalHoldsNotices, goalInfo, loadGoal, publicGoal, saveGoal, type RestoreMark } from './store.ts';
 import { GOAL_TOOLS } from './tools.ts';
 import { goalStartSettings, parseGoalAction } from './validate.ts';
 
@@ -4779,6 +4779,25 @@ test('J5: the tick runs once as the feature starts: a reset a restart cut is dea
   assert.match(g.reason!, /^Putting round 2’s files back did not finish/);
   assert.equal(loadGoal(db, J5)!._.restoreTo, undefined);
   await act(J5, { action: 'stop' });
+});
+
+test('the goal as the page gets it has its time at work up to now: the stretch in progress is added to what was saved', async () => {
+  const T1 = 'claude:goal-clock';
+  const w = worktree();
+  sessions.add(T1, { cwd: w.path, worktree: w });
+  await agreed(T1);
+  const g = loadGoal(db, T1)!;
+  assert.equal(g.status, 'working');
+  assert.ok(g._.activeSince != null, 'a round runs: its time counts from here');
+  const at = g._.activeSince! + 5000;
+  assert.equal(publicGoal(g, at)!.activeMs, g.activeMs + 5000, 'the saved time and the five seconds since');
+  assert.equal(publicGoal({ ...g, _: { ...g._, activeSince: undefined } }, at)!.activeMs, g.activeMs, 'nothing in progress: as saved');
+  assert.equal('_' in publicGoal(g)!, false);
+  // What an action answers and what the page loads are the same state.
+  const before = Date.now();
+  const got = (await act(T1, { action: 'rule', text: 'Keep it small' }))!;
+  assert.ok(got.activeMs >= g.activeMs + (before - g._.activeSince!), 'a state sent in the middle of a round does not set the clock back');
+  await act(T1, { action: 'stop' });
 });
 
 test('a file a reviewer asked for stays with its check in the goal’s private state, and is in the evidence of the next runs', async () => {
