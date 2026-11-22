@@ -712,8 +712,9 @@ async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'exter
   // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest). Not when
   // its news is held for its parent (stopped, its goal paused or at its limit since the turn began: R3): a new child
   // would start, unmarked, and spend after the stop; the reply goes as it is, held.
+  // S3: and looked at again once its check returns (a judge may take 45 s): a stop meanwhile starts nothing either.
   const up = after || holdsNewsFor(d.db, parent, t.startedAt) ? null : await stepUpCheck(d, t.key, turn, t.startedAt);
-  if (up) {
+  if (up && !holdsNewsFor(d.db, parent, t.startedAt)) {
     try {
       sent(await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why)));
       return;

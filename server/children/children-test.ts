@@ -48,6 +48,8 @@ const test = (name: string, fn: () => void | Promise<void>) => tests.push([name,
 const asked: string[] = [];
 /** What the helper model says when it checks a helper's work (stepping up). */
 let verdict = '{"pass": true, "why": "it does the job"}';
+/** Runs as the helper model is asked to check a helper's work (a test acts while the check runs). */
+let onCheck: (() => void) | undefined;
 const srv = http.createServer((req, res) => {
   let b = '';
   req.on('data', (c) => (b += c));
@@ -55,6 +57,7 @@ const srv = http.createServer((req, res) => {
     const body = JSON.parse(b);
     asked.push(String(body.messages.at(-1).content));
     const checking = String(body.messages[0]?.content ?? '').startsWith('You check the work');
+    if (checking) onCheck?.();
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: checking ? verdict : 'SUMMARY: three files changed, tests pass.' }, finish_reason: 'stop' }] })}\n\n`);
     res.end('data: [DONE]\n\n');
@@ -888,6 +891,33 @@ test('R3: a helper on a tier whose reply fails its check is not run again a tier
   assert.equal(sessions.queuedHeld.at(-1), true, 'held, not waking the lead');
   assert.match(sessions.queued.at(-1)!.text, /I could not find the bug\.$/);
   verdict = '{"pass": true, "why": "it does the job"}';
+});
+
+test('S3 (third review): the lead stopped while a helper’s reply was being checked (a check may take 45 seconds): no helper is started a tier up once the check returns; the reply goes as it is, held', async () => {
+  const k = leadKey('s3-judge');
+  await call(k, 'start_child_session', { brief: 'Find the bug in lexer.ts and fix it.', tier: 'quick', title: 'Fix the lexer' });
+  const a = newest();
+  verdict = '{"pass": false, "why": "it gave up without fixing anything"}';
+  finish(a, 'I could not find the bug.');
+  const startedAt = Date.now() - 1000;
+  let checked = false;
+  onCheck = () => {
+    checked = true;
+    setSessionExtra(db, k, { stoppedAll: Date.now() });
+  };
+  const n = sessions.created.length;
+  const q = sessions.queued.length;
+  try {
+    await reportTurn(deps, { key: a, startedAt, external: false });
+  } finally {
+    onCheck = undefined;
+    verdict = '{"pass": true, "why": "it does the job"}';
+  }
+  assert.equal(checked, true, 'its reply was checked');
+  assert.equal(sessions.created.length, n, 'no new helper one tier up: it would spend after the stop');
+  assert.equal(sessions.queued.length, q + 1);
+  assert.equal(sessions.queuedHeld.at(-1), true, 'held, not waking the lead');
+  assert.match(sessions.queued.at(-1)!.text, /I could not find the bug\.$/);
 });
 
 test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {
