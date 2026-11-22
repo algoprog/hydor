@@ -1000,7 +1000,7 @@ function atLimit(d: Deps, g: StoredGoal, reason: string) {
   }
   setStatus(g, 'limit');
   g.reason = reason;
-  g.report = { summary: limitSummary(g, reason, mid), final: standing(g) };
+  g.report = { summary: limitSummary(g, reason, mid), final: standing(g), ...(mid != null ? { mid } : {}) };
   commit(d, g);
   notify(d, g.key, 'waiting', `Goal stopped at its limit: ${reason}`);
 }
@@ -1952,7 +1952,7 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       g.reason = 'Stopped by you.';
       setStatus(g, 'stopped');
       // Stopped while paused after a reset that did not finish: the report says what I2's pause said (what is saved where).
-      g.report = { summary: [mid != null ? `Stopped by you during round ${mid}: that round’s work was not checked.` : 'Stopped by you.', g._.unfinished ?? ''].filter(Boolean).join(' '), final: standing(g) };
+      g.report = { summary: [mid != null ? `Stopped by you during round ${mid}: that round’s work was not checked.` : 'Stopped by you.', g._.unfinished ?? ''].filter(Boolean).join(' '), final: standing(g), ...(mid != null ? { mid } : {}) };
       g._.unfinished = undefined;
       commit(d, g);
       break;

@@ -22,6 +22,17 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
   const now = (reached && g.report?.final) || standing(g);
   const bestRound = g.best != null && g.best > 0 ? `round ${g.best}` : 'where they started';
   const head = reached ? 'Goal reached' : g.status === 'limit' ? 'Stopped at its limit' : 'Stopped by you';
+  // Where the files stand, said here only when the summary above does not say it already (at a limit it does, for the
+  // best round and for a round cut midway alike), and never as "the best so far" while a cut round's work is in the folder:
+  // a swarm's goal stopped by its time limit read "its work is still in the folder" and, under it, "The files stand at
+  // where they started".
+  const where = reached
+    ? `How it got there: ${plural(t.kept, 'round')} kept, ${t.undone} undone`
+    : g.status === 'limit' || g.report?.mid != null
+      ? null
+      : g.undo
+        ? `The files stand at ${bestRound}, the best so far`
+        : 'The files stand as the last round left them';
   return (
     <div
       className={cx(
@@ -86,9 +97,7 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
             <span translate="no">{g.report.review}</span>
           </p>
         )}
-        <p className="mt-3 text-[12.5px] leading-snug text-fg-3">
-          {reached ? `How it got there: ${plural(t.kept, 'round')} kept, ${t.undone} undone` : g.undo ? `The files stand at ${bestRound}, the best so far` : 'The files stand as the last round left them'}
-        </p>
+        {where && <p className="mt-3 text-[12.5px] leading-snug text-fg-3">{where}</p>}
       </div>
       {/* At a limit the rules and how much it asks can still change: they count when it goes on. */}
       {g.status === 'limit' && (

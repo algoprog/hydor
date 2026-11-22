@@ -233,7 +233,11 @@ export interface GoalState {
   spentUsd: number;
   activeMs: number;
   /** When it is over: what the last check found, in sentences for the report card. */
-  report?: { summary: string; final?: GoalResult[]; review?: string };
+  /**
+   * `mid`: the round that was cut short (a limit, or the person's Stop, in the middle of it): its unfinished work is still
+   * in the folder, so the files do not stand at the best round.
+   */
+  report?: { summary: string; final?: GoalResult[]; review?: string; mid?: number };
   /**
    * Checks or protected paths the person changed while a round ran: that round is judged by the checks it started with,
    * and these take effect (measured first where they changed) once it has been checked.

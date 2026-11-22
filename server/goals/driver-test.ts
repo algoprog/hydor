@@ -605,6 +605,7 @@ test('where nothing can be undone, a round that is no better stays, and is where
   await act(N, { action: 'stop' });
   assert.equal(goal(N).status, 'stopped');
   assert.equal(goal(N).report!.summary, 'Stopped by you during round 2: that round’s work was not checked.');
+  assert.equal(goal(N).report!.mid, 2);
 });
 
 // ---- asking: the clock, Wait for me, an ask turn that asks nothing, not asking at all --------------------------------
@@ -694,6 +695,7 @@ test('I3, X3: a limit of money while a round runs: the agent is stopped and noth
   assert.deepEqual([half.n, half.outcome, half.why, half.results.length], [1, 'stays', 'Stopped at the limit midway', 0]);
   assert.equal(inCheckpoint(wtL.path, half.checkpoint!, 'half.txt'), 'half done\n');
   assert.equal(g.report!.summary, 'It spent $2.50 of its $1.00. Round 1 was stopped midway and its work is still in the folder. Keep anyway… on the start puts the files back to the best round.');
+  assert.equal(g.report!.mid, 1, 'the cut round: the report card does not say the files stand at the best');
   // X3: the tick again (as after a restart) does nothing to the files or the record.
   await tick(deps);
   assert.equal(file(wtL.path, 'half.txt'), 'half done\n');
