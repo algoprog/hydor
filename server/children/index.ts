@@ -592,7 +592,6 @@ async function summarize(d: Deps, reply: string, key?: string): Promise<string> 
   return `${reply.slice(0, 1500).trimEnd()}…`;
 }
 
-/** Sends the parent a message: now when it is free, else after its turn; refused (its cap), it waits in its queue. */
 /** Sends the parent a message: now when it is free, else after its turn; refused (its cap), it waits in its queue. False when neither took it. */
 async function tell(d: Deps, parent: string, text: string): Promise<boolean> {
   try {
