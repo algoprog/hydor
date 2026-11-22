@@ -953,6 +953,29 @@ test('run again from a step: the steps before it give what they gave, the rest r
   assert.equal(calls(), searched + 1);
   const missing = await http.inject({ method: 'POST', url: `/api/apps/runs/${first.id}/again`, payload: { from: 'nope' } });
   assert.equal(missing.statusCode, 400);
+  // An agent step taken over from the earlier run cost that run, not the new one: its total leaves it out.
+  const b = app({
+    name: 'Again, with an agent',
+    data: { items: { title: 'text' } },
+    answer: [{ id: 'note', label: 'Note', type: 'text', required: true }],
+    flow: { steps: [{ id: 'think', do: 'agent', instructions: 'Think about {{topic}}', outputs: { idea: 'text' } }, { id: 'keep', do: 'data', op: 'add', collection: 'items', with: { title: '{{think.idea}}' } }], outputs: { note: '{{keep.record.title}}' } },
+  });
+  const r1 = startRun({ app: b.id, slug: b.slug, recipe: b, source: 'web', inputs: { topic: 'tides' } });
+  let child: store.RunRecord | undefined;
+  for (let i = 0; i < 200 && !(child = store.listRuns(db, { parent: r1.id }).find((r) => r.step === 'think' && r.key)); i++) await sleep(25);
+  assert.ok(child, 'the agent step started its run');
+  sessions.costs.set(child.key!, 0.25);
+  saveResult(child.id, { idea: 'Spring tides' });
+  sessions.end(child.key!, 'Done.');
+  const one = await ended(r1.id);
+  assert.equal(one.status, 'done', one.error);
+  assert.equal(store.getRun(db, child.id)!.costUsd, 0.25, 'the agent’s run cost that');
+  assert.equal(one.costUsd, 0.25, 'and so did the run it was a step of');
+  const res2 = await http.inject({ method: 'POST', url: `/api/apps/runs/${r1.id}/again`, payload: { from: 'keep' } });
+  assert.equal(res2.statusCode, 200, res2.body);
+  const two = await ended(res2.json().run.id);
+  assert.equal(two.result!.note, 'Spring tides');
+  assert.ok(!two.costUsd, `a step taken over costs the new run nothing (${two.costUsd})`);
 });
 
 test('Ask a person: the run waits for the answer (its page, the inbox, a notice), goes on with it, asks the same after a restart, and fails when nobody answers in time', async () => {

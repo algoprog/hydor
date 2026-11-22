@@ -1094,6 +1094,8 @@ async function parallelStep(x: Exec, s: Extract<Step, { do: 'parallel' }>, scope
 function spentSoFar(x: Pick<Exec, 'run'>): number {
   let usd = 0;
   for (const st of listSteps(db(), x.run.id)) {
+    // A step taken over from an earlier run cost that run, not this one (its agent's run is the earlier one's).
+    if (st.reused) continue;
     if (st.childRun) usd += getRun(db(), st.childRun)?.costUsd ?? 0;
     // A step an agent stood in for spent its own too, before it failed.
     if (!st.childRun || st.rescued) usd += st.costUsd ?? 0;
