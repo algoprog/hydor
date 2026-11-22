@@ -696,10 +696,10 @@ test('S1: create() with a goal and a swarm sets the goal (its first message carr
   }
 });
 
-test('S5.2: the session’s Stop all pauses the goal of a swarm’s lead whose round is at work, even with the lead between turns; a session without a swarm keeps it', async () => {
+test('S5.2, R6: the session’s Stop all pauses the goal whose round is at work, even with the session between turns: a swarm’s lead with its sentence, a session without subagents with a stopped turn’s', async () => {
   for (const [swarm, status, reason] of [
     [true, 'paused', STOPPED_SWARM],
-    [false, 'working', undefined],
+    [false, 'paused', 'You stopped the agent.'],
   ] as const) {
     const h = manager();
     const key = `claude:${crypto.randomUUID()}`;

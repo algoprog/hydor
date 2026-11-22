@@ -99,6 +99,10 @@ export interface GoalPrivate {
   asked?: Record<string, string[]>;
   /** When it was last paused (M1: news for its lead from work begun before then waits in the lead's held queue). */
   pausedAt?: number;
+  /** When it last went on after a pause or its limit (Resume, Give it more…): a stop of its session before then is over (R2). */
+  wentOn?: number;
+  /** What its session's queue held for it goes before the loop's next message (R5: Resume while a step still ran). */
+  releaseHeld?: boolean;
   /**
    * M7b: when the stop of its team at a limit began (its subagents at work stopped, the lead marked as stopped): set until
    * that is done, so a restart that cuts it has the tick finish it.

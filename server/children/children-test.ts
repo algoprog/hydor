@@ -871,6 +871,25 @@ test('a helper whose first turn ends with work of its own still running is not j
   verdict = '{"pass": true, "why": "it does the job"}';
 });
 
+test('R3: a helper on a tier whose reply fails its check is not run again a tier up when its lead was stopped since the turn began: the reply goes as it is, held', async () => {
+  const k = leadKey('r3');
+  await call(k, 'start_child_session', { brief: 'Find the bug in lexer.ts and fix it.', tier: 'quick', title: 'Fix the lexer' });
+  const a = newest();
+  verdict = '{"pass": false, "why": "it gave up without fixing anything"}';
+  finish(a, 'I could not find the bug.');
+  const startedAt = Date.now() - 1000;
+  // The lead was stopped (Stop all, its goal's limit) after this turn began.
+  setSessionExtra(db, k, { stoppedAll: Date.now() });
+  const n = sessions.created.length;
+  const q = sessions.queued.length;
+  await reportTurn(deps, { key: a, startedAt, external: false });
+  assert.equal(sessions.created.length, n, 'no new helper one tier up: it would spend after the stop');
+  assert.equal(sessions.queued.length, q + 1);
+  assert.equal(sessions.queuedHeld.at(-1), true, 'held, not waking the lead');
+  assert.match(sessions.queued.at(-1)!.text, /I could not find the bug\.$/);
+  verdict = '{"pass": true, "why": "it does the job"}';
+});
+
 test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {
   const k = leadKey('s6');
   await call(k, 'start_child_session', { brief: 'Write the six tasks.', tier: 'standard', title: 'Tasks' });

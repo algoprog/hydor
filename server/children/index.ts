@@ -593,13 +593,18 @@ async function summarize(d: Deps, reply: string, key?: string): Promise<string> 
 }
 
 /** Sends the parent a message: now when it is free, else after its turn; refused (its cap), it waits in its queue. */
-async function tell(d: Deps, parent: string, text: string) {
+/** Sends the parent a message: now when it is free, else after its turn; refused (its cap), it waits in its queue. False when neither took it. */
+async function tell(d: Deps, parent: string, text: string): Promise<boolean> {
   try {
     await d.sessions.deliverOrQueue(parent, text);
+    return true;
   } catch {
     try {
       d.sessions.enqueue(parent, text);
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -613,15 +618,17 @@ const markedSince = (d: Deps, key: string, field: 'stoppedAll' | 'stoppedWithPar
  * A child's report to its parent. When the parent was stopped (Stop all) at or after the turn began, the report waits in
  * its held queue, so it does not wake the parent that was just stopped; the user sees it there and resumes it.
  */
-async function tellParent(d: Deps, parent: string, startedAt: number, text: string) {
-  // Stopped since the turn began, or its goal paused or ended since (holdsNewsFor): held, not waking it.
+async function tellParent(d: Deps, parent: string, startedAt: number, text: string): Promise<boolean> {
+  // Stopped since the turn began, or its goal paused or at its limit since (holdsNewsFor): held, not waking it.
   if (holdsNewsFor(d.db, parent, startedAt)) {
     try {
       d.sessions.enqueue(parent, text, [], [], true);
-    } catch {}
-    return;
+      return true;
+    } catch {
+      return false;
+    }
   }
-  await tell(d, parent, text);
+  return tell(d, parent, text);
 }
 
 /** The turn of a child last reported to its parent (the id of the message that began it). */
@@ -689,23 +696,27 @@ async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'exter
   // A turn its plan's usage limit stopped: first, how the child carries on is settled (with another account, on API
   // credit, or once the limit lifts), and the parent hears that instead of an error. One that stays stopped is
   // reported as any other turn.
-  // Two marks kept with the child (M7a): its report is being made (reporting), and it was handed over to be sent
-  // (reported, only then). A restart between them reports the turn again (catchUp looks for a turn not reported), and
-  // until then its lead's goal counts it as on its way: a rare report twice is better than one lost.
+  // Marked reported (kept with the child) only once the report was handed over (to the parent's turn, or its queue): a
+  // restart before that finds the turn not reported and reports it again (catchUp), and until then the gate of its
+  // lead's goal counts it as on its way (server/goals reportsPending). A rare report twice is better than one lost. One
+  // that could not be handed over at all is let go here too, for a later catchUp to try.
   const prompt = turn.prompt.id;
-  setSessionExtra(d.db, t.key, { reporting: prompt });
-  const sent = () => setSessionExtra(d.db, t.key, { reported: prompt });
+  const sent = (ok = true) => {
+    if (ok) setSessionExtra(d.db, t.key, { reported: prompt });
+    else reported.delete(id);
+  };
   const after = await limitAfter(d, t.key, t.startedAt);
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
   if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return sent();
   // A child stopped with its parent (Stop all): the stop was the parent's own doing, so it is not told of it.
   if (turn.status === 'interrupted' && markedSince(d, t.key, 'stoppedWithParent', t.startedAt)) return sent();
-  // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
-  const up = after ? null : await stepUpCheck(d, t.key, turn, t.startedAt);
+  // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest). Not when
+  // its news is held for its parent (stopped, its goal paused or at its limit since the turn began: R3): a new child
+  // would start, unmarked, and spend after the stop; the reply goes as it is, held.
+  const up = after || holdsNewsFor(d.db, parent, t.startedAt) ? null : await stepUpCheck(d, t.key, turn, t.startedAt);
   if (up) {
     try {
-      await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why));
-      sent();
+      sent(await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why)));
       return;
     } catch {
       // It could not start again (the most at once, an agent gone): its reply goes as it is.
@@ -729,8 +740,7 @@ async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'exter
     still: (s && stillRunning(s)) || undefined,
     goneOn: (!!latest?.prompt && latest.prompt.id !== turn.prompt.id) || undefined,
   });
-  await tellParent(d, parent, t.startedAt, msg);
-  sent();
+  sent(await tellParent(d, parent, t.startedAt, msg));
 }
 
 // ---- stepping up ---------------------------------------------------------------------------------

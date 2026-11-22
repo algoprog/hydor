@@ -42,6 +42,9 @@ const PAUSED = 'The user paused the goal: stop now and end your turn.';
 export const TICK_MS = 15_000;
 /** How often the limit's wait for the agent (and a swarm's members) to stop looks again, 60 looks at most; tests wait less (null puts it back). */
 let limitWaitStep = 500;
+/** Tests: called after each look of the limit's wait, with its number. */
+let limitLook: ((i: number) => void) | undefined;
+export const setLimitLook = (fn: ((i: number) => void) | null) => (limitLook = fn ?? undefined);
 /** How many looks the limit's wait gives the agent (and a swarm's members) to stop: 30 s at 500 ms. */
 const LIMIT_LOOKS = 60;
 /** And the commands its turn left running (L2): two minutes at 500 ms. */
@@ -380,6 +383,11 @@ export async function checkRunner(d: Deps, key: string, cwd: string): Promise<{ 
 async function say(d: Deps, g: StoredGoal, text: string, o: { again?: boolean } = {}): Promise<boolean> {
   // Kept to send again once if a restart of the app cuts the agent's turn short (the original, not the copy sent again).
   if (!o.again) remember(d, g, (f) => (f._.lastMessage = text));
+  // What its queue held while the goal was stopped or paused goes first (releaseHeldNews), then this message after it.
+  if (fresh(d, g)?._.releaseHeld) {
+    remember(d, g, (f) => (f._.releaseHeld = undefined));
+    releaseHeldNews(d, g.key);
+  }
   try {
     await d.sessions.deliverOrQueue(g.key, text);
     return true;
@@ -1067,18 +1075,16 @@ export const STOPPED_SWARM = 'You stopped the swarm. Resume checks what it did.'
 export const STOPPED_TEAM = 'You stopped the agent and its subagents. Resume checks what they did.';
 
 /**
- * S5.2, M5: the person stopped a session and its Hydor subagents (the session's Stop all, or a swarm board's while a round
- * is at work): the goal pauses as when they stop the agent, whether the session was in a turn or waiting for its
- * subagents (then no turn of its ends to say so, and the round would be checked and the next one sent). Resume checks
- * what the round did. For every session with a goal that has Hydor subagents (a swarm's lead, or one that started them
- * itself: the swarm turned off mid-round is still a team), while a round is at work.
+ * S5.2, M5, R6: the person stopped a session and everything it started (the session's Stop all, or a swarm board's while
+ * a round is at work): the goal pauses as when they stop the agent, whether the session was in a turn or waiting for its
+ * subagents or a background command of its own (then no turn of its ends to say so, and the round would be checked and
+ * the next one sent). Resume checks what the round did. For every session whose round is at work; the reason says who
+ * was stopped (a swarm, the agent and its Hydor subagents, or the agent: a stopped turn's own sentence).
  */
 export function goalStopAll(d: Deps, key: string) {
-  const swarm = leadsSwarm(d, key);
-  if (!swarm && !childKeys(d.db, key).length) return;
   const g = loadGoal(d.db, key);
   if (!g || (g.status !== 'working' && g.status !== 'checking')) return;
-  pause(d, g, swarm ? STOPPED_SWARM : STOPPED_TEAM);
+  pause(d, g, leadsSwarm(d, key) ? STOPPED_SWARM : childKeys(d.db, key).length ? STOPPED_TEAM : 'You stopped the agent.');
 }
 
 /**
@@ -1114,7 +1120,11 @@ async function stopChild(d: Deps, k: string, swarm: boolean) {
  */
 async function stopTeam(d: Deps, key: string, stopped = new Set<string>()) {
   const swarm = leadsSwarm(d, key);
-  setSessionExtra(d.db, key, { stoppedAll: Date.now() });
+  const now = Date.now();
+  setSessionExtra(d.db, key, { stoppedAll: now });
+  // R4: every member of a swarm is marked stopped, those not at work too (nothing is stopped in them), so a post on the
+  // board wakes none of them after the limit; message_child still reaches one after Give it more…
+  if (swarm) for (const k of childKeys(d.db, key)) if (!sessionExtra(d.db, k).swarmStopped) setSessionExtra(d.db, k, { swarmStopped: now });
   const st = d.sessions.summary(key)?.live?.status;
   if (st === 'working' || st === 'waiting' || st === 'starting') await d.sessions.interrupt(key).catch(() => {});
   const again = async () => {
@@ -1972,17 +1982,24 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
       const from = g._.pausedFrom;
       g.reason = undefined;
       g._.pausedFrom = undefined;
-      // A step still runs (the checks): it carries on as if never paused.
+      // A step still runs (the checks): it carries on as if never paused. What was held for the session goes before the
+      // loop's next message, not while the checks run (R5), and the stop before this is over (R2: wentOn).
       if (driving.has(key)) {
         setStatus(g, from ?? 'working');
+        g._.wentOn = Date.now();
+        g._.releaseHeld = true;
         commit(d, g);
         break;
       }
       await step(key, async () => {
         const f = fresh(d, g);
         if (!f || f.status !== 'paused') return;
-        // M1: what its subagents and board held for the session while the goal was paused or stopped goes first.
-        releaseHeldNews(d, key);
+        // R2: the goal goes on; a stop of its session before now is over (holdsNewsFor). M1: what its subagents and board
+        // held meanwhile goes now when a round waits to be checked (the agent hears it first, then the round is checked
+        // at its turn's end), else right before the loop's next message (never while checks or measuring run).
+        f._.wentOn = Date.now();
+        if (f.round != null) releaseHeldNews(d, key);
+        else f._.releaseHeld = true;
         f.reason = undefined;
         f._.pausedFrom = undefined;
         // After a reset that did not finish (I2), the round it was for is already recorded as it stands and "where the loop
@@ -2007,14 +2024,15 @@ export async function goalAction(d: Deps, key: string, a: GoalAction): Promise<G
           f.reason = agreeNote(d, f);
           return commit(d, f);
         }
-        // A round that ran and was not checked yet is checked now, or when the turn still running ends.
+        // A round that ran and was not checked yet is checked now, or when the turn still running ends (or the one on what
+        // was held, or on the board's news, which goes first as at any round's end: boardFirst).
         if (f.round != null) {
-          if (idle(d, key)) {
+          setStatus(f, 'working');
+          if (idle(d, key) && !(await boardFirst(d, f))) {
             setStatus(f, 'checking');
             commit(d, f);
             return checkStep(d, key);
           }
-          setStatus(f, 'working');
           return commit(d, f);
         }
         if (f._.starting) return startRound(d, f, f._.starting);
@@ -2192,8 +2210,10 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
   await step(key, async () => {
     const f = fresh(d, g);
     if (!f || f.status !== 'limit') return;
-    // M1: what its subagents and board held for the session since the limit goes first.
-    releaseHeldNews(d, key);
+    // R2: the goal goes on; the limit's stop of its session is over (holdsNewsFor). M1: what its subagents and board held
+    // since goes right before the loop's next message (never while the final check runs).
+    f._.wentOn = Date.now();
+    f._.releaseHeld = true;
     // J2: a half round whose checkpoint a restart kept from being taken gets it below (where the files are left as well).
     const half = halfWithout(f);
     f.contract = { ...f.contract, limits };
@@ -2215,9 +2235,12 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
 }
 
 /**
- * M1: the goal goes on (Resume, Give it more…): the session's queue, held while it was stopped or the goal paused or over
- * (children/family.ts holdsNewsFor), goes now when it holds nothing but what agents sent it (its subagents' reports, its
- * board's batches) or the loop's own messages; one with something the person wrote waits for them to press Resume there.
+ * M1: the goal goes on (Resume, Give it more…): the session's queue, held while it was stopped or the goal paused or at
+ * its limit (children/family.ts holdsNewsFor), goes when it holds nothing but what agents sent it (its subagents'
+ * reports, its board's batches) or the loop's own messages; one with something the person wrote waits for them to press
+ * Resume there. The order, for "Resume checks what it did": with a round waiting to be checked, Resume sends what was held
+ * to the agent first, its turn on it ends, and the round is checked then; otherwise (and after a Resume while a step still
+ * ran, R5) it goes right before the loop's next message (say), never while checks or measuring run.
  */
 function releaseHeldNews(d: Deps, key: string) {
   const s = d.sessions.summary(key);
@@ -2597,9 +2620,14 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
           if (mid != null) {
             const teamBusy = () => liveBusyKey(d, key) || childrenAtWork(d, key).length > 0;
             const open = () => openCommands(d, key) > 0;
-            for (let i = 0; i < LIMIT_LOOKS_COMMANDS && (open() || (i < LIMIT_LOOKS && teamBusy())); i++) await new Promise((r) => setTimeout(r, limitWaitStep));
+            // Each look stops a subagent that appeared meanwhile (R7: else it would run, and keep the wait going, to its end).
+            for (let i = 0; i < LIMIT_LOOKS_COMMANDS && (open() || (i < LIMIT_LOOKS && teamBusy())); i++) {
+              await new Promise((r) => setTimeout(r, limitWaitStep));
+              await again();
+              limitLook?.(i);
+            }
           }
-          // And one more look: a subagent that appeared while the stop was applied (a start_child_session in flight).
+          // And one more look: a subagent that appeared as the wait ended (a start_child_session in flight).
           await again();
           if (mid != null) {
             const late = childrenAtWork(d, key).map((k) => d.sessions.summary(k)?.title || k);
