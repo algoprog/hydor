@@ -412,11 +412,25 @@ for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) =
 // with commands in it: it stays in English as a whole rather than half translated. A sentence with a value in it (a number, a
 // name) comes out as a pattern with {0}, which the pages' translator matches (shared/translate.ts); a text of several
 // sentences is translated sentence by sentence, or not at all.
+/** The limit report's sentence for the subagents or a swarm's members still at work (TEAM_LATE in driver.ts), each reading whole. */
+function teamLate() {
+  const out = [];
+  for (const who of ['The swarm’s', 'The']) {
+    const [one, many] = who === 'The' ? ['subagent', 'subagents'] : ['member', 'members'];
+    const tail = (was, it) => `${was} still at work when round {N}’s files were saved: what ${it} after that is in the folder but not in the round.`;
+    out.push(`${who} ${one} “{0}” ${tail('was', 'it writes').replace('{N}', '{1}')}`);
+    out.push(`${who} ${many} “{0}” and “{1}” ${tail('were', 'they write').replace('{N}', '{2}')}`);
+    out.push(`${who} ${many} {0} and “{1}” ${tail('were', 'they write').replace('{N}', '{2}')}`);
+  }
+  return out;
+}
 const GOAL_LOOP = {
   'server/goals/driver.ts': {
     skip: /console\.|\.prepare\(|\bsendAsk\(|\bg\._\.note\b|\btext: ['`]|\{ ok: (true|false), text|\bconst (PAUSED|LEADS_GOAL|NO_GOAL) =|Fix these and call|\bconst about = |\bdropped\b/,
     // The say refused for files changed outside the goal, and the sentence of a reset that did not finish: clauses and git commands.
-    skipFunctions: /^function (editedText|unfinishedText)\(/,
+    skipFunctions: /^(function (editedText|unfinishedText)\(|const TEAM_LATE = )/,
+    // TEAM_LATE names the subagents (a swarm's members) still at work with their titles as values: its readings written out, for one name, two, and more (the first names kept as one value).
+    extra: teamLate(),
     // Why a goal cannot be set: said whole as a refusal, and with its first letter lower after "The goal was not set: " (goalNotSetText).
     lowered: /^(const (IN_PLAN|IN_SUBAGENT) =|export function (teamRefusal|refusal|goalStartRefusal)\()/,
   },
@@ -425,13 +439,14 @@ const GOAL_LOOP = {
   'server/goals/checks.ts': { only: /errorResult\(|\bSLOW_READ =|\br\.(failed|timedOut|code ===)/ },
   'server/goals/review.ts': { only: /NO_LOCAL_REVIEWER =|gave no answer|could not answer|'It holds\.'|meets the goal/ },
 };
-for (const [f, { skip, only, skipFunctions, lowered }] of Object.entries(GOAL_LOOP)) {
+for (const [f, { skip, only, skipFunctions, lowered, extra }] of Object.entries(GOAL_LOOP)) {
+  for (const s of extra ?? []) add(s, f);
   let inSkipped = false;
   // Inside a function whose sentences also come lower-cased (to its closing brace at the line's start), or on a one-line constant.
   let inLowered = false;
   for (const line of fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n')) {
     if (inSkipped) {
-      inSkipped = line !== '}';
+      inSkipped = line !== '}' && line !== '};';
       continue;
     }
     if (skipFunctions?.test(line)) {

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { translator, type Dictionary } from '../../shared/translate.ts';
 import type { GoalState } from '../../shared/goals.ts';
 import { APP_ROOT } from '../config.ts';
-import { UNPRICED, NO_SANDBOX, STOPPED_SWARM, goalNotSetText, reviewerDown, teamRefusal } from './driver.ts';
+import { UNPRICED, NO_SANDBOX, STOPPED_SWARM, STOPPED_TEAM, goalNotSetText, reviewerDown, teamRefusal } from './driver.ts';
 import { cleanChecks, cleanLimits, parseGoalAction } from './validate.ts';
 import { limitReason } from './verdict.ts';
 
@@ -37,6 +37,14 @@ const constant = (name: string): string => {
   return m[1].replace(/\\'/g, "'");
 };
 
+/** TEAM_LATE of driver.ts (not exported), as the server defines it: read from its source and run. */
+const teamLate: (n: number, titles: string[], swarm: boolean) => string = (() => {
+  const m = /^const TEAM_LATE = (\(n: number, titles: string\[\], swarm: boolean\) => \{[\s\S]*?^\});?$/m.exec(source('driver.ts'));
+  assert.ok(m, 'TEAM_LATE is not written as an arrow function of driver.ts any more: update this test');
+  const js = m[1].replace(/: (number|string\[\]|boolean)/g, '');
+  return new Function('clip', `return ${js}`)((x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1).trimEnd()}…` : x));
+})();
+
 /** A sentence in a statement of driver.ts, by the words it starts with (for the ones not kept in a constant). */
 const literal = (file: string, start: string): string => {
   const m = new RegExp(`'(${start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^']*)'`).exec(source(file)) ?? new RegExp(`\`(${start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\`]*)\``).exec(source(file));
@@ -56,6 +64,10 @@ function sentences(): Record<string, string> {
   put('limit: money', limitReason(goal(2, { rounds: 30, usd: 10 }, 10.2), 0));
   put('limit: time', limitReason(goal(2, { rounds: 30, minutes: 90 }), 95 * 60_000));
   put('stopped swarm', STOPPED_SWARM);
+  put('stopped team', STOPPED_TEAM);
+  // The limit report's sentence for the subagents or members still at work: one name, two, and more.
+  for (const swarm of [true, false]) for (const titles of [['Try the cache'], ['Try the cache', 'Rewrite the query'], ['Try the cache', 'Rewrite the query', 'Read the logs'], ['A', 'B', 'C', 'D']]) put(`late ${swarm ? 'member' : 'subagent'} x${titles.length}`, teamLate(4, titles, swarm));
+  put('give it more', 'It has run 6 rounds: give it more than that.');
   put('unpriced', UNPRICED);
   put('no sandbox', NO_SANDBOX);
   put('campaign', teamRefusal({ swarm: 'campaign' }));
@@ -107,7 +119,7 @@ test('the goal loop’s sentences, with their values, come out translated in Ger
       assert.ok(t != null && t !== s, `${lang}: "${name}" has no translation: ${s}`);
       // The values in these sentences are numbers and the labels "Tests pass", "The results feel right", "No new dependencies",
       // "Fix the login" and a command's error: a sentence left half in English shows as one of the words below outside them.
-      const rest = t.replace(/Tests pass|The results feel right|The command was not found|The reviewer gave no answer that could be read|No new dependencies|Fix the login|Search on the shop puts the right product first, and stays fast/g, '');
+      const rest = t.replace(/Try the cache|Rewrite the query|Read the logs|Tests pass|The results feel right|The command was not found|The reviewer gave no answer that could be read|No new dependencies|Fix the login|Search on the shop puts the right product first, and stays fast/g, '');
       assert.ok(!ENGLISH.test(rest), `${lang}: "${name}" is half in English: ${t}`);
     }
   }
