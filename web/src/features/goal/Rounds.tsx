@@ -33,6 +33,13 @@ function Mark({ c, holds, error }: { c: GoalCheck; holds: boolean; error?: strin
   return c.kind === 'measure' ? <Circle size={10} className="text-fg-3" /> : <X size={12} strokeWidth={2.5} className="text-err" />;
 }
 
+/**
+ * Whether this round is where the files go back to after a round was cut short at a limit: the best round (or the start),
+ * while the cut round's work is still in the folder. The limit's report says "Keep anyway… on round 3 puts the files back
+ * to the best round", so the say is offered there.
+ */
+const backToBest = (g: GoalState, r: GoalRound) => g.status === 'limit' && g.report?.mid != null && r.n === (g.best ?? 0) && r.n !== g.report.mid;
+
 /** The panel under Your say: keep the round anyway (and what to do with checks it fails), undo it, or go another way from it. */
 function SayPanel({ g, r, what, onClose }: { g: GoalState; r: GoalRound; what: 'keep' | 'undo' | 'from'; onClose: () => void }) {
   const [run, working] = useAct(g.key);
@@ -45,14 +52,19 @@ function SayPanel({ g, r, what, onClose }: { g: GoalState; r: GoalRound; what: '
     const done = await run({ action: 'round', n: r.n, do: what, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(Object.keys(targets).length ? { relax: targets } : {}) });
     if (done !== undefined) onClose();
   };
-  const head = what === 'keep' ? `Keep round ${r.n} anyway?` : what === 'undo' ? `Undo round ${r.n}?` : `Another way from round ${r.n}`;
-  const body =
-    what === 'keep'
+  // Keep anyway on the best round (or the start) while a cut round's work is in the folder takes the files back to it.
+  const back = what === 'keep' && backToBest(g, r);
+  const head = back ? (r.n === 0 ? 'Put the files back to the start?' : `Put the files back to round ${r.n}?`) : what === 'keep' ? `Keep round ${r.n} anyway?` : what === 'undo' ? `Undo round ${r.n}?` : `Another way from round ${r.n}`;
+  const body = back
+    ? r.n === 0
+      ? 'The files go to how they were before round 1.'
+      : 'The files go to how that round left them.'
+    : what === 'keep'
       ? 'It becomes the best so far, and the files go to how it left them.'
       : what === 'undo'
         ? 'The files go back to the round kept before it, and what it tried is not tried again.'
         : 'The files go to how this round left them, and the next round takes another way from there.';
-  const button = what === 'keep' ? `Keep round ${r.n}` : what === 'undo' ? `Undo round ${r.n}` : 'Go another way';
+  const button = back ? (r.n === 0 ? 'Back to before round 1' : `Back to round ${r.n}`) : what === 'keep' ? `Keep round ${r.n}` : what === 'undo' ? `Undo round ${r.n}` : 'Go another way';
   return (
     <div className="mt-2 rounded-xl border border-line-2 bg-bg-1 p-3">
       <div className="text-[13.5px] font-semibold">{head}</div>
@@ -171,7 +183,7 @@ function Detail({ g, r }: { g: GoalState; r: GoalRound }) {
         <div>
           <div className="flex flex-wrap items-center gap-1">
             <span className="mr-1 text-[12px] text-fg-3">Your say</span>
-            {r.outcome === 'undone' && r.n > 0 && sayBtn('keep', 'Keep anyway…')}
+            {(((r.outcome === 'undone' || r.outcome === 'stays') && r.n > 0) || backToBest(g, r)) && sayBtn('keep', 'Keep anyway…')}
             {r.outcome === 'kept' && r.n > 0 && sayBtn('undo', 'Undo')}
             {sayBtn('from', 'Another way from here')}
           </div>

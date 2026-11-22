@@ -27351,5 +27351,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Το μέλος «{0}» του σμήνους εργαζόταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {1}: όσα γράψει μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Τα μέλη {0} και «{1}» του σμήνους εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Τα μέλη «{0}» και «{1}» του σμήνους εργάζονταν ακόμη όταν αποθηκεύτηκαν τα αρχεία του γύρου {2}: όσα γράψουν μετά από αυτό βρίσκονται στον φάκελο αλλά όχι στον γύρο.",
-  "You stopped the agent and its subagents. Resume checks what they did.": "Διακόψατε τον πράκτορα και τους υποπράκτορές του. Με το «Συνέχεια» ελέγχεται τι έκαναν."
+  "You stopped the agent and its subagents. Resume checks what they did.": "Διακόψατε τον πράκτορα και τους υποπράκτορές του. Με το «Συνέχεια» ελέγχεται τι έκαναν.",
+  "Back to round {0}": "Επιστροφή στον γύρο {0}",
+  "Put the files back to round {0}?": "Επαναφορά των αρχείων στον γύρο {0};",
+  "Put the files back to the start?": "Επαναφορά των αρχείων στην αρχή;",
+  "The files go to how they were before round 1.": "Τα αρχεία επανέρχονται στην κατάσταση που είχαν πριν από τον γύρο 1.",
+  "Back to before round 1": "Επιστροφή στην κατάσταση πριν από τον γύρο 1",
+  "The files go to how that round left them.": "Τα αρχεία επανέρχονται στην κατάσταση που τα άφησε εκείνος ο γύρος."
 }

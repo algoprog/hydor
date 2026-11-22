@@ -25493,5 +25493,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "O membro do enxame “{0}” ainda estava trabalhando quando os arquivos da rodada {1} foram salvos: o que ele escrever depois disso fica na pasta, mas não entra na rodada.",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os membros do enxame {0} e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Os membros do enxame “{0}” e “{1}” ainda estavam trabalhando quando os arquivos da rodada {2} foram salvos: o que eles escreverem depois disso fica na pasta, mas não entra na rodada.",
-  "You stopped the agent and its subagents. Resume checks what they did.": "Você parou o agente e os subagentes dele. “Retomar” verifica o que eles fizeram."
+  "You stopped the agent and its subagents. Resume checks what they did.": "Você parou o agente e os subagentes dele. “Retomar” verifica o que eles fizeram.",
+  "Back to round {0}": "Voltar à rodada {0}",
+  "Put the files back to round {0}?": "Restaurar os arquivos para a rodada {0}?",
+  "Put the files back to the start?": "Restaurar os arquivos para o início?",
+  "The files go to how they were before round 1.": "Os arquivos voltam ao estado em que estavam antes da rodada 1.",
+  "Back to before round 1": "Voltar ao estado anterior à rodada 1",
+  "The files go to how that round left them.": "Os arquivos voltam ao estado em que essa rodada os deixou."
 }

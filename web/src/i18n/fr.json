@@ -25492,5 +25492,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Le membre de l’essaim « {0} » travaillait encore quand les fichiers du tour {1} ont été enregistrés : ce qu’il écrit après coup se trouve dans le dossier, mais pas dans le tour.",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les membres de l’essaim {0} et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Les membres de l’essaim « {0} » et « {1} » travaillaient encore quand les fichiers du tour {2} ont été enregistrés : ce qu’ils écrivent après coup se trouve dans le dossier, mais pas dans le tour.",
-  "You stopped the agent and its subagents. Resume checks what they did.": "Vous avez arrêté l’agent et ses sous-agents. « Reprendre » vérifie ce qu’ils ont fait."
+  "You stopped the agent and its subagents. Resume checks what they did.": "Vous avez arrêté l’agent et ses sous-agents. « Reprendre » vérifie ce qu’ils ont fait.",
+  "Back to round {0}": "Revenir au tour {0}",
+  "Put the files back to round {0}?": "Remettre les fichiers dans l’état du tour {0} ?",
+  "Put the files back to the start?": "Remettre les fichiers dans leur état de départ ?",
+  "The files go to how they were before round 1.": "Les fichiers reviennent à l’état où ils étaient avant le tour 1.",
+  "Back to before round 1": "Revenir à avant le tour 1",
+  "The files go to how that round left them.": "Les fichiers reviennent dans l’état où ce tour les a laissés."
 }

@@ -25491,5 +25491,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "ラウンド{1}のファイルが保存された時点で、スウォームのメンバー「{0}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、スウォームのメンバー{0}と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "ラウンド{2}のファイルが保存された時点で、スウォームのメンバー「{0}」と「{1}」はまだ作業中でした。その後に書き込まれた内容はフォルダには残りますが、ラウンドには含まれません。",
-  "You stopped the agent and its subagents. Resume checks what they did.": "エージェントとそのサブエージェントを停止しました。「再開」を押すと、それまでの作業内容をチェックします。"
+  "You stopped the agent and its subagents. Resume checks what they did.": "エージェントとそのサブエージェントを停止しました。「再開」を押すと、それまでの作業内容をチェックします。",
+  "Back to round {0}": "ラウンド{0}に戻す",
+  "Put the files back to round {0}?": "ファイルをラウンド{0}の状態に戻しますか？",
+  "Put the files back to the start?": "ファイルを最初の状態に戻しますか？",
+  "The files go to how they were before round 1.": "ファイルは、ラウンド1より前の状態に戻ります。",
+  "Back to before round 1": "ラウンド1の前に戻す",
+  "The files go to how that round left them.": "ファイルは、そのラウンドが終わった時点の状態に戻ります。"
 }

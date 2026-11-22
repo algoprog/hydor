@@ -27348,5 +27348,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "集群成员“{0}”在第 {1} 轮的文件保存时仍在工作：它之后写入的内容在文件夹中，但不在这一轮里。",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "集群成员 {0} 和“{1}”在第 {2} 轮的文件保存时仍在工作：它们之后写入的内容在文件夹中，但不在这一轮里。",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "集群成员“{0}”和“{1}”在第 {2} 轮的文件保存时仍在工作：它们之后写入的内容在文件夹中，但不在这一轮里。",
-  "You stopped the agent and its subagents. Resume checks what they did.": "你已停止智能体及其子智能体。点击“继续”会检查它们做了什么。"
+  "You stopped the agent and its subagents. Resume checks what they did.": "你已停止智能体及其子智能体。点击“继续”会检查它们做了什么。",
+  "Back to round {0}": "回到第 {0} 轮",
+  "Put the files back to round {0}?": "将文件恢复到第 {0} 轮吗？",
+  "Put the files back to the start?": "将文件恢复到起点吗？",
+  "The files go to how they were before round 1.": "文件会恢复到第 1 轮之前的样子。",
+  "Back to before round 1": "回到第 1 轮之前",
+  "The files go to how that round left them.": "文件会恢复到那一轮结束时的样子。"
 }

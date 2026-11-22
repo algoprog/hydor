@@ -26129,5 +26129,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "Das Schwarm-Mitglied „{0}“ war noch bei der Arbeit, als die Dateien von Runde {1} gespeichert wurden: Was es danach schreibt, liegt zwar im Ordner, gehört aber nicht zur Runde.",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Die Schwarm-Mitglieder {0} und „{1}“ waren noch bei der Arbeit, als die Dateien von Runde {2} gespeichert wurden: Was sie danach schreiben, liegt zwar im Ordner, gehört aber nicht zur Runde.",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Die Schwarm-Mitglieder „{0}“ und „{1}“ waren noch bei der Arbeit, als die Dateien von Runde {2} gespeichert wurden: Was sie danach schreiben, liegt zwar im Ordner, gehört aber nicht zur Runde.",
-  "You stopped the agent and its subagents. Resume checks what they did.": "Du hast den Agenten und seine Subagents gestoppt. Mit „Fortsetzen“ wird geprüft, was sie getan haben."
+  "You stopped the agent and its subagents. Resume checks what they did.": "Du hast den Agenten und seine Subagents gestoppt. Mit „Fortsetzen“ wird geprüft, was sie getan haben.",
+  "Back to round {0}": "Zurück zu Runde {0}",
+  "Put the files back to round {0}?": "Dateien auf Runde {0} zurücksetzen?",
+  "Put the files back to the start?": "Dateien auf den Anfang zurücksetzen?",
+  "The files go to how they were before round 1.": "Die Dateien werden auf den Stand vor Runde 1 zurückgesetzt.",
+  "Back to before round 1": "Zurück zum Stand vor Runde 1",
+  "The files go to how that round left them.": "Die Dateien werden auf den Stand zurückgesetzt, in dem diese Runde sie hinterlassen hat."
 }

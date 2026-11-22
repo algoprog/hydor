@@ -25492,5 +25492,11 @@
   "The swarm’s member “{0}” was still at work when round {1}’s files were saved: what it writes after that is in the folder but not in the round.": "El miembro del enjambre “{0}” seguía trabajando cuando se guardaron los archivos de la ronda {1}: lo que escriba después está en la carpeta, pero no en la ronda.",
   "The swarm’s members {0} and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Los miembros del enjambre {0} y “{1}” seguían trabajando cuando se guardaron los archivos de la ronda {2}: lo que escriban después está en la carpeta, pero no en la ronda.",
   "The swarm’s members “{0}” and “{1}” were still at work when round {2}’s files were saved: what they write after that is in the folder but not in the round.": "Los miembros del enjambre “{0}” y “{1}” seguían trabajando cuando se guardaron los archivos de la ronda {2}: lo que escriban después está en la carpeta, pero no en la ronda.",
-  "You stopped the agent and its subagents. Resume checks what they did.": "Detuviste al agente y a sus subagentes. «Reanudar» comprueba lo que hicieron."
+  "You stopped the agent and its subagents. Resume checks what they did.": "Detuviste al agente y a sus subagentes. «Reanudar» comprueba lo que hicieron.",
+  "Back to round {0}": "Volver a la ronda {0}",
+  "Put the files back to round {0}?": "¿Devolver los archivos a la ronda {0}?",
+  "Put the files back to the start?": "¿Devolver los archivos al inicio?",
+  "The files go to how they were before round 1.": "Los archivos vuelven a como estaban antes de la ronda 1.",
+  "Back to before round 1": "Volver a antes de la ronda 1",
+  "The files go to how that round left them.": "Los archivos vuelven a quedar como los dejó esa ronda."
 }
