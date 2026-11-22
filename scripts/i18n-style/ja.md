@@ -88,3 +88,8 @@ Glossary (one translation per concept; keep these exactly):
 - Picture → 画像
 - Paper (scientific) → 論文
 - the rail (the column of icons along the app's left edge) → アイコンバー
+
+Goal mode (the app's own sentences about a goal; keep these exactly):
+- goal → ゴール; round → ラウンド; check → チェック; a check holds → 成立する (成立しました); reviewer → レビュアー; limit → 上限; kept → 残す; undone → 取り消し; swarm → スウォーム; member → メンバー
+- When a sentence tells the person to press a button, quote the button's own label in bold-free corner brackets: Resume → 「再開」, Stop all → 「すべて停止」, Give it more… → 「追加する…」, Keep anyway… → 「それでも保持…」.
+- Words that are names in code (own, forks, every, keep, undo, from, checks, protect, limits, evidence, claim, run, read, slack, timeoutS, diff, files, usd, rounds, minutes) stay as they are.

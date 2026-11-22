@@ -43,4 +43,25 @@ assert.equal(u('Days: Sun, Wed'), '日期：周日, 周三');
 // Whole strings are unchanged: a text that is an entry, in either case of its first letter, is still translated.
 assert.equal(t('Hybrid'), '混合办公');
 assert.equal(t('ready'), '就绪');
+
+// A text of several sentences (a goal's reason joins its parts with ". "): each sentence on its own, and only when every one is
+// known, so a text is never half in one language; a pattern with a value after a colon does not take the next sentence in.
+const g = translator({
+  'It broke a rule of yours: {0}': '它违反了你的一条规则：{0}',
+  'It was not undone: {0}': '它没有被撤销：{0}',
+  'another session (“{0}”) was working in the folder': '另一个会话（“{0}”）曾在该文件夹中工作',
+  '{0} stopped holding': '{0} 不再成立',
+  'Your rules could not be checked this round': '这一轮无法检查你的规则',
+  'Stopped by you.': '已被你停止。',
+  'into your {0}': '到你的{0}',
+  'Closer: {0} → {1}': '更接近：{0} → {1}',
+});
+// Both sentences known: translated one by one, also a sentence the app wrote without its full stop, and a value that is a phrase of the app's own.
+assert.equal(g('It broke a rule of yours: “No new dependencies”. It was not undone: another session (“Fix the login”) was working in the folder'), '它违反了你的一条规则：“No new dependencies”. 它没有被撤销：另一个会话（“Fix the login”）曾在该文件夹中工作');
+assert.equal(g('Tests pass stopped holding. Your rules could not be checked this round'), 'Tests pass 不再成立。这一轮无法检查你的规则');
+assert.equal(g('Stopped by you. Stopped by you.'), '已被你停止。已被你停止。');
+// One of them unknown (a model's words): the pattern as before, nothing is made half of two.
+assert.equal(g('It broke a rule of yours: “X”. The agent wrote a poem about the weather.'), '它违反了你的一条规则：“X”. The agent wrote a poem about the weather.');
+// A weak pattern ("into your {0}") never takes one sentence of a text in.
+assert.equal(g('Sorted 3 bookmarks into your folders. Stopped by you.'), null);
 console.log('Values in sentences: technical and small-letter words left alone, the app’s words translated');

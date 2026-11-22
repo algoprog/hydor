@@ -154,7 +154,7 @@ function Detail({ g, r }: { g: GoalState; r: GoalRound }) {
             {r.why && (
               <>
                 {': '}
-                <span translate="no">{r.why.replace(/[.!?]?$/, '.')}</span>
+                <span>{r.why.replace(/[.!?]?$/, '.')}</span>
               </>
             )}
             {r.outcome === 'undone' && g.undo && ` The files went back to ${was && was.n > 0 ? `round ${was.n}` : 'where they started'}.`}
@@ -195,7 +195,7 @@ function Row({ g, r, open, toggle }: { g: GoalState; r: GoalRound; open: boolean
         </span>
         {g.best === r.n && r.n > 0 && <Badge>Best so far</Badge>}
         {change && (
-          <span translate={r.n === 0 || change === 'No gain' ? undefined : 'no'} className="max-w-[40%] shrink truncate text-right font-mono text-[11.5px] text-fg-3 max-sm:hidden">
+          <span translate={r.n === 0 || change === 'No gain' || change === r.why ? undefined : 'no'} className="max-w-[40%] shrink truncate text-right font-mono text-[11.5px] text-fg-3 max-sm:hidden">
             {change}
           </span>
         )}

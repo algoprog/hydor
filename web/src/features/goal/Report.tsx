@@ -37,12 +37,12 @@ export function Report({ g, rounds, onRounds, className }: { g: GoalState; round
       </div>
       <div className="max-h-[min(60dvh,520px)] overflow-y-auto px-4 py-3 text-[13.5px]">
         {g.reason && !reached && (
-          <p translate="no" className="mb-1 font-medium">
+          <p className="mb-1 font-medium">
             {g.reason}
           </p>
         )}
         {g.report?.summary && (
-          <p translate="no" className="leading-relaxed">
+          <p className="leading-relaxed">
             {g.report.summary}
           </p>
         )}

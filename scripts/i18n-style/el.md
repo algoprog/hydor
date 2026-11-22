@@ -98,3 +98,8 @@ Glossary (the app's own Greek; keep these exactly):
 - Learn more → Μάθετε περισσότερα
 - Picture → Εικόνα
 - Paper → Επιστημονική εργασία
+
+Goal mode (the app's own sentences about a goal; keep these exactly):
+- goal → στόχος; round → γύρος; check → έλεγχος (checks → έλεγχοι); a check holds → ισχύει; reviewer → αξιολογητής; limit → όριο; kept → κρατήθηκε; undone → αναιρέθηκε; swarm → σμήνος; member → μέλος
+- When a sentence tells the person to press a button, quote the button's own label: Resume → «Συνέχεια», Stop all → «Διακοπή όλων», Give it more… → «Δώστε του περισσότερα…», Keep anyway… → «Διατήρηση παρ' όλα αυτά…».
+- Words that are names in code (own, forks, every, keep, undo, from, checks, protect, limits, evidence, claim, run, read, slack, timeoutS, diff, files, usd, rounds, minutes) stay as they are.
