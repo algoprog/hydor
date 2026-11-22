@@ -117,6 +117,7 @@ La app incluye estas habilidades, en los grupos en que las muestra la página. A
 **Escritura**
 
 - **writing**: para cualquier cosa que otras personas vayan a leer (un informe, un artículo, una carta, un discurso). El agente define quién lo lee y para qué, hace un esquema antes de redactar y edita en pasadas separadas.
+- **summaries**: para un resumen, una respuesta o una reflexión de unas pocas frases, como un artículo resumido para una clase. El agente se ciñe a la extensión pedida, dice qué muestra la fuente y por qué, y la relaciona con el curso a través de un caso de la propia fuente en lugar de con definiciones.
 - **creative-writing**: cuentos, novelas, memorias, poemas y guiones: encontrar la historia, planificar, redactar sin atascarse, salir de los bloqueos, revisar en orden, recibir comentarios y publicar (cartas de presentación a editoriales, sinopsis, agentes literarios, autopublicación y las trampas que hay que evitar), siempre conservando la voz propia del autor.
 - **email**: ordena una bandeja de entrada (qué necesita respuesta, qué puede esperar, qué archivar) y escribe los correos que requieren cuidado: respuestas, recordatorios, disculpas, rechazos o negativas, con la extensión y el tono adecuados.
 - **plain-language**: reescribe un texto existente para que se lea con claridad y de forma humana, sin jerga, relleno ni frases rígidas que suenen a IA, con el nivel de lectura adecuado y conservando lo que dice.

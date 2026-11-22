@@ -60,6 +60,10 @@ up in Settings and steer from the terminal.
 - **Goals from the terminal**: `hydor sessions goal <session>` shows a goal with its checks, its round, what it has
   spent and its open question, and takes `--start`, `--answer 1,3`, `--other`, `--note`, `--wait`,
   `--more rounds=8,usd=5,minutes=60` and `--rule`, beside `--pause`, `--resume` and `--clear`.
+- **Short summaries**: a summary, response or reflection of a few sentences, such as an article summed up for a class,
+  has a skill of its own. The agent keeps to the length asked, says what the source shows and why, and ties it to the
+  course through an example from the source rather than definitions. Asking what an article is about no longer brings
+  in the writing skill meant for reports and memos.
 - The goal bar's time runs while a round does, and is right on a page you have just opened.
 - Limits a goal has already used are refused where you set them ("It has spent $0.006: give it more than that.").
 - A round stopped at a limit waits for the commands its agent left running, and says so when one still ran.
@@ -76,6 +80,8 @@ up in Settings and steer from the terminal.
 - A Codex session started without a model (by an agent or through the API) gets the model the start page would pick,
   instead of failing on one the plan does not have.
 - A subagent's reply folded to one line shows a link as its words, not its address.
+- In Ask mode, Custom reads the files you attach to your messages without asking first. It used to ask, calling them
+  files that hold keys or passwords, because the app keeps them with its own data.
 
 ## 0.102.1 · 21 November 2026
 

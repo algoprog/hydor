@@ -91,7 +91,7 @@ Outside Full access, these steps ask you every time, Auto included, whatever you
 
 In Ask, Accept edits and Plan, Custom asks before it reads or changes files outside the session's folder (the temporary folder doesn't count). **Always allow** then covers that folder, for reading or for changes.
 
-Files that hold keys or passwords ask before they are read or changed, inside the folder too: `.env` files (not examples), SSH and other private keys, `.netrc`, `.npmrc`, credentials files, your cloud and password-store folders, the agents' own sign-ins, and the app's own data. Changes to git's own settings and hooks ask too. **Always allow** then covers just that file.
+Files that hold keys or passwords ask before they are read or changed, inside the folder too: `.env` files (not examples), SSH and other private keys, `.netrc`, `.npmrc`, credentials files, your cloud and password-store folders, the agents' own sign-ins, and the app's own data. Files you attach to your messages are the exception: the app keeps them with its own data, but Custom reads them without asking. A file attached in another conversation still asks. Changes to git's own settings and hooks ask too. **Always allow** then covers just that file.
 
 In Auto mode, Auto's rules and its quick check decide about these instead. In Full access they don't ask.
 

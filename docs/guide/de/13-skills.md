@@ -117,6 +117,7 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 **Schreiben**
 
 - **writing**: für Berichte, Artikel, Briefe, Reden und andere Sachtexte. Der Agent klärt Zielgruppe und Zweck, erstellt vor dem Entwurf eine Gliederung und überarbeitet in getrennten Durchgängen.
+- **summaries**: für Zusammenfassungen, Antworten oder Reflexionen in wenigen Sätzen, etwa einen Artikel, den du für einen Kurs zusammenfasst. Der Agent hält die gewünschte Länge ein, sagt, was die Quelle zeigt und warum, und verknüpft sie über ein Beispiel aus der Quelle mit dem Kurs statt über Definitionen.
 - **creative-writing**: für Geschichten, Romane, Memoiren, Gedichte und Drehbücher. Unterstützt Stoffentwicklung, Planung, Schreiben, den Umgang mit Blockaden, systematische Überarbeitung, Feedback und Veröffentlichung einschließlich Anschreiben, Exposés, Literaturagenturen und Selfpublishing. Die eigene Stimme bleibt erhalten.
 - **email**: ordnet Posteingänge nach Antwortbedarf, Wartezeit und Archivierung und formuliert sensible E-Mails wie Antworten, Nachfragen, Erinnerungen, Entschuldigungen und Absagen in passendem Ton und Umfang.
 - **plain-language**: überarbeitet vorhandene Texte verständlich und natürlich, ohne unnötigen Jargon, Füllwörter oder steife KI-Formulierungen. Aussage und passendes Sprachniveau bleiben erhalten.

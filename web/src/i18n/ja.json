@@ -25497,5 +25497,6 @@
   "Put the files back to the start?": "ファイルを最初の状態に戻しますか？",
   "The files go to how they were before round 1.": "ファイルは、ラウンド1より前の状態に戻ります。",
   "Back to before round 1": "ラウンド1の前に戻す",
-  "The files go to how that round left them.": "ファイルは、そのラウンドが終わった時点の状態に戻ります。"
+  "The files go to how that round left them.": "ファイルは、そのラウンドが終わった時点の状態に戻ります。",
+  "Use when asked for a short summary, response or reflection of a few sentences or a paragraph, such as an article summed up for a class with how it relates to the course. Not for a long report or article (writing).": "数文から1段落ほどの短い要約、感想、振り返りを頼まれたときに使います。たとえば、授業のために記事を要約し、授業内容とのつながりを示す場合です。長い報告書や記事（writing）には使いません。"
 }

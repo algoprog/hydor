@@ -26135,5 +26135,6 @@
   "Put the files back to the start?": "Dateien auf den Anfang zurücksetzen?",
   "The files go to how they were before round 1.": "Die Dateien werden auf den Stand vor Runde 1 zurückgesetzt.",
   "Back to before round 1": "Zurück zum Stand vor Runde 1",
-  "The files go to how that round left them.": "Die Dateien werden auf den Stand zurückgesetzt, in dem diese Runde sie hinterlassen hat."
+  "The files go to how that round left them.": "Die Dateien werden auf den Stand zurückgesetzt, in dem diese Runde sie hinterlassen hat.",
+  "Use when asked for a short summary, response or reflection of a few sentences or a paragraph, such as an article summed up for a class with how it relates to the course. Not for a long report or article (writing).": "Verwende diesen Skill für eine kurze Zusammenfassung, Antwort oder Reflexion in ein paar Sätzen oder einem Absatz, etwa wenn du einen Artikel für einen Kurs zusammenfasst und zeigst, wie er mit dem Kurs zusammenhängt. Für einen langen Bericht oder Artikel verwende writing."
 }

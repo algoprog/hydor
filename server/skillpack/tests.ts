@@ -272,7 +272,8 @@ await test('the right skill for real asks', () => {
   assert.equal(firstMatch('Please research heat pumps versus gas boilers for a small flat'), 'research');
   assert.equal(firstMatch('Find papers on sleep and memory from the last five years'), 'research');
   assert.equal(firstMatch('Draft a cover letter for this job posting'), 'writing');
-  assert.equal(firstMatch('Give me a 3-4 sentence summary of this article for our class'), 'writing');
+  assert.equal(firstMatch('Give me a 3-4 sentence summary of this article for our class'), 'summaries');
+  assert.equal(firstMatch('Write a short summary of this chapter for my reading response'), 'summaries');
   assert.equal(firstMatch('Write me an article about home batteries for our newsletter'), 'writing');
   assert.equal(firstMatch('Keep going on the migration while I’m away tonight'), 'decisions-log');
   assert.equal(firstMatch('Fix the bug, then double-check that the export works'), 'evidence-before-done');

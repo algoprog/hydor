@@ -117,6 +117,7 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 **Writing**
 
 - **writing**: for anything people will read (a report, an article, a letter, a speech). The agent settles who reads it and what for, outlines before it drafts, and edits in separate passes.
+- **summaries**: for a summary, response or reflection of a few sentences, such as an article summed up for a class. The agent keeps to the length asked, says what the source shows and why, and ties it to the course through a case from the source rather than definitions.
 - **creative-writing**: stories, novels, memoir, poems and scripts: finding the story, planning, drafting without stalling, getting unstuck, revising in order, feedback, and getting published (query letters, synopses, agents, self-publishing and the traps to avoid), with the writer's voice kept theirs.
 - **email**: sorts an inbox (what needs a reply, what can wait, what to archive) and writes the emails that need care: replies, chasers, apologies, declining or saying no, at the right length and tone.
 - **plain-language**: rewrites an existing text to read clearly and humanly, without jargon, filler or stiff, AI-sounding phrasing, at the right reading level, keeping what it says.

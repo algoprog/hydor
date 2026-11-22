@@ -91,7 +91,7 @@ Fuera de Acceso total, estos pasos te preguntan siempre, incluso en Auto, sea lo
 
 En Preguntar, Aceptar ediciones y Plan, Custom pregunta antes de leer o cambiar archivos fuera de la carpeta de la sesión (la carpeta temporal no cuenta). **Always allow** entonces cubre esa carpeta, para leer o para cambiar.
 
-Los archivos que contienen claves o contraseñas preguntan antes de leerse o cambiarse, también dentro de la carpeta: los archivos `.env` (no los de ejemplo), las claves privadas SSH y otras, `.netrc`, `.npmrc`, los archivos de credenciales, tus carpetas de la nube y de gestores de contraseñas, los inicios de sesión propios de los agentes y los datos propios de la app. Los cambios en la configuración y los hooks propios de git también preguntan. **Always allow** entonces cubre solo ese archivo.
+Los archivos que contienen claves o contraseñas preguntan antes de leerse o cambiarse, también dentro de la carpeta: los archivos `.env` (no los de ejemplo), las claves privadas SSH y otras, `.netrc`, `.npmrc`, los archivos de credenciales, tus carpetas de la nube y de gestores de contraseñas, los inicios de sesión propios de los agentes y los datos propios de la app. Los archivos que adjuntas a tus mensajes son la excepción: la app los guarda con sus datos propios, pero Custom los lee sin preguntar. Un archivo adjuntado en otra conversación sigue preguntando. Los cambios en la configuración y los hooks propios de git también preguntan. **Always allow** entonces cubre solo ese archivo.
 
 En Modo automático, deciden sobre estos casos las reglas de Auto y su comprobación rápida. En Acceso total no preguntan.
 

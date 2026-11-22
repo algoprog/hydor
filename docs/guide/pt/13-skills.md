@@ -117,6 +117,7 @@ O app vem com estas habilidades, nos grupos em que a página as mostra. Abra qua
 **Escrita**
 
 - **writing**: para qualquer coisa que as pessoas vão ler (um relatório, um artigo, uma carta, um discurso). O agente define quem vai ler e para quê, faz um esboço antes de redigir e revisa em etapas separadas.
+- **summaries**: para um resumo, uma resposta ou uma reflexão de poucas frases, como um artigo resumido para uma aula. O agente respeita o tamanho pedido, diz o que a fonte mostra e por quê, e a liga à matéria por meio de um caso da própria fonte, e não de definições.
 - **creative-writing**: contos, romances, memórias, poemas e roteiros: encontrar a história, planejar, redigir sem travar, destravar, revisar em ordem, receber comentários e ser publicado (cartas de apresentação, sinopses, agentes literários, autopublicação e as armadilhas a evitar), mantendo a voz do autor como dele.
 - **email**: organiza uma caixa de entrada (o que precisa de resposta, o que pode esperar, o que arquivar) e escreve os e-mails que exigem cuidado: respostas, cobranças, pedidos de desculpas, recusas e negativas, no tamanho e no tom certos.
 - **plain-language**: reescreve um texto existente para que fique claro e humano, sem jargão, enchimento ou frases rígidas com cara de IA, no nível de leitura certo, mantendo o que o texto diz.

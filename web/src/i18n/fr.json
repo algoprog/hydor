@@ -25498,5 +25498,6 @@
   "Put the files back to the start?": "Remettre les fichiers dans leur état de départ ?",
   "The files go to how they were before round 1.": "Les fichiers reviennent à l’état où ils étaient avant le tour 1.",
   "Back to before round 1": "Revenir à avant le tour 1",
-  "The files go to how that round left them.": "Les fichiers reviennent dans l’état où ce tour les a laissés."
+  "The files go to how that round left them.": "Les fichiers reviennent dans l’état où ce tour les a laissés.",
+  "Use when asked for a short summary, response or reflection of a few sentences or a paragraph, such as an article summed up for a class with how it relates to the course. Not for a long report or article (writing).": "À utiliser pour un résumé, une réponse ou une réflexion courte de quelques phrases ou d’un paragraphe, comme un article résumé pour un cours, avec ce qui le relie à la matière. Pas pour un long rapport ou article (writing)."
 }

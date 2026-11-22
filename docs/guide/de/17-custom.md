@@ -91,7 +91,7 @@ Außerhalb von Voller Zugriff fragen diese Schritte jedes Mal, auch im Modus Aut
 
 In den Modi Fragen, Änderungen akzeptieren und Plan fragt Custom, bevor es Dateien außerhalb des Sitzungsordners liest oder ändert (der temporäre Ordner zählt nicht). **Immer erlauben** gilt dann für diesen Ordner, zum Lesen oder für Änderungen.
 
-Dateien, die Keys oder Passwörter enthalten, fragen vor dem Lesen oder Ändern, auch innerhalb des Ordners: `.env`-Dateien (keine Beispiele), SSH- und andere private Keys, `.netrc`, `.npmrc`, Dateien mit Zugangsdaten, deine Cloud- und Passwortspeicher-Ordner, die Anmeldungen der Agenten selbst und die eigenen Daten der App. Änderungen an den eigenen Einstellungen und Hooks von Git fragen ebenfalls. **Immer erlauben** gilt dann nur für diese Datei.
+Dateien, die Keys oder Passwörter enthalten, fragen vor dem Lesen oder Ändern, auch innerhalb des Ordners: `.env`-Dateien (keine Beispiele), SSH- und andere private Keys, `.netrc`, `.npmrc`, Dateien mit Zugangsdaten, deine Cloud- und Passwortspeicher-Ordner, die Anmeldungen der Agenten selbst und die eigenen Daten der App. Dateien, die du an deine Nachrichten anhängst, sind die Ausnahme: Die App bewahrt sie bei ihren eigenen Daten auf, aber Custom liest sie, ohne zu fragen. Eine Datei, die in einer anderen Unterhaltung angehängt wurde, fragt weiterhin. Änderungen an den eigenen Einstellungen und Hooks von Git fragen ebenfalls. **Immer erlauben** gilt dann nur für diese Datei.
 
 Im Auto-Modus entscheiden stattdessen die Regeln von Automatisch und seine Schnellprüfung darüber. Bei Voller Zugriff fragen sie nicht.
 

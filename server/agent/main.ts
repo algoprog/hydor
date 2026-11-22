@@ -21,7 +21,7 @@ import { McpClient, mcpServers } from './mcp.ts';
 import { describeImages, fitImage, imagePart, keepImage, type Img } from './media.ts';
 import { cutAtCalls, parseCalls, StreamFilter, stripMarkup } from './parse.ts';
 import { parsePatch, shellPatch } from './patch.ts';
-import { alwaysLabel, decide, type Ask } from './permissions.ts';
+import { alwaysLabel, attachedUploads, decide, type Ask } from './permissions.ts';
 import { runningOf } from './procs.ts';
 import { findSkills, MODES, projectOf, promptParts, scaleParts, type AppContext, type Mode, type Skill } from './prompt.ts';
 import { adapt, checkArgs, cleanPath, closeNames, findTool, fitArgs, repairJson } from './repair.ts';
@@ -115,6 +115,8 @@ interface Session {
   inbox?: { prompt: any[]; id?: string }[];
   /** The skills' folders, read without asking (their reference files). */
   skillDirs?: string[];
+  /** Files the person attached to their messages that the app keeps in its uploads folder: read without asking. */
+  attached?: string[];
   /** Files read or written in this run (write_file asks to read an unknown file first). */
   seen?: { read: Set<string>; warned: Set<string> };
   /** Tokens the provider counted at the last reply, and how many messages there were then. */
@@ -216,7 +218,7 @@ function mcpTools(clients: McpClient[]): Tool[] {
 }
 
 async function ask(s: Session, callId: string, r: Ask, force = false): Promise<boolean> {
-  const v = decide(r, { mode: s.mode, allow: s.allow, cwd: s.cwd, readable: [dirOf(s), ...(s.skillDirs ?? [])], requireApproval: force });
+  const v = decide(r, { mode: s.mode, allow: s.allow, cwd: s.cwd, readable: [dirOf(s), ...(s.skillDirs ?? []), ...(s.attached ?? [])], requireApproval: force });
   if (v.ok) return true;
   // Auto: a reviewer lets routine steps through, stops harmful ones (the model hears why) and asks about the
   // rest. A risky step goes to the user straight away.
@@ -327,6 +329,12 @@ function account(s: Session, m: AgentModel, u: Reply['usage'], parts?: Partial<R
 const isSmall = (s: Session, m: AgentModel) => m.provider !== 'openrouter' && window(s, m) <= 33_000;
 
 const textOf = (c: ChatMessage['content']) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (p.type === 'text' ? p.text : '')).join('') : '');
+
+/** Notes the uploads a person attached to a message (listed under it by the app), which the agent then reads without asking. */
+function noteAttached(s: Session, content: unknown) {
+  const found = attachedUploads(textOf(content as ChatMessage['content']));
+  s.attached = [...new Set([...(s.attached ?? []), ...found])].slice(-200);
+}
 
 /**
  * Ask the app to keep a compaction checkpoint (one file per session) in wiki memory. The app says at spawn whether
@@ -873,6 +881,8 @@ async function handle(m: any): Promise<unknown> {
           throw Object.assign(new Error('There is no record of that session'), { code: -32002 });
         }
         if (p.cwd) s.cwd = String(p.cwd);
+        // Kept from before attachments were noted: the ones the conversation still holds.
+        if (!s.attached) for (const m of s.messages) if (m.role === 'user') noteAttached(s, m.content);
         sessions.set(s.id, s);
         connectMcp(s);
       }
@@ -897,6 +907,7 @@ async function handle(m: any): Promise<unknown> {
       if (!s) throw new Error('No such session');
       if (s.abort && !s.abort.signal.aborted) throw new Error('A turn is already running');
       s.turnId = typeof p._meta?.promptId === 'string' ? p._meta.promptId : undefined;
+      noteAttached(s, p.prompt ?? []);
       try {
         return { stopReason: await turn(s, p.prompt ?? []) };
       } finally {
@@ -910,6 +921,7 @@ async function handle(m: any): Promise<unknown> {
       const s = sessions.get(p.sessionId);
       if (!s) throw new Error('No such session');
       if (!s.abort || s.abort.signal.aborted) return { accepted: false };
+      noteAttached(s, p.prompt ?? []);
       (s.inbox ??= []).push({ prompt: p.prompt ?? [], id: typeof p.promptId === 'string' ? p.promptId : undefined });
       save(s);
       return { accepted: true };

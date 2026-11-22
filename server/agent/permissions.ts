@@ -42,6 +42,28 @@ const APP_DATA = (() => {
   return models ? (path.basename(models) === 'models' ? path.dirname(models) : models) : ['.hydor', '.naget-agent', '.web-agent'].map((d) => path.join(HOME, d)).find((d) => fs.existsSync(d)) ?? path.join(HOME, '.hydor');
 })();
 
+/** Where the app keeps the files people attach to their messages (inside its own data). */
+export const UPLOADS = path.join(APP_DATA, 'uploads');
+
+/**
+ * The files a person attached to a message, as the app lists them under it ("Attached files:"), that the app keeps in
+ * its uploads folder: the agent reads those without asking. A path written there that is anywhere else (typed into a
+ * message, say) gets no such pass, and neither does a link or a folder.
+ */
+export function attachedUploads(text: string, uploads = UPLOADS): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/(?:^|\n)Attached files:\n((?:- [^\n]*(?:\n|$))+)/g)) {
+    for (const line of m[1].split('\n')) {
+      const f = line.startsWith('- ') ? line.slice(2).trim() : '';
+      if (!f || !path.isAbsolute(f)) continue;
+      const at = path.resolve(f);
+      if (at === uploads || !within(at, uploads) || !fs.lstatSync(at, { throwIfNoEntry: false })?.isFile()) continue;
+      if (!out.includes(at)) out.push(at);
+    }
+  }
+  return out;
+}
+
 /** Files that hold keys and passwords. */
 export function isSecret(p: string): boolean {
   if (!p) return false;
@@ -115,7 +137,10 @@ export function decide(r: Ask, o: { mode: string; allow: string[]; cwd: string; 
     if (isSecret(p.path) || isSecret(at) || (p.write && gitInternal(at))) {
       if (!o.allow.includes(`secret:${p.path}`)) {
         add(`secret:${p.path}`);
-        why ??= gitInternal(at) && !isSecret(at) ? 'it changes git’s own settings or hooks' : `${p.write ? 'it changes' : 'it reads'} a file that holds keys or passwords`;
+        why ??=
+          gitInternal(at) && !isSecret(at)
+            ? 'it changes git’s own settings or hooks'
+            : `${p.write ? 'it changes' : 'it reads'} ${within(at, real(UPLOADS)) ? 'a file attached in another conversation' : 'a file that holds keys or passwords'}`;
       }
       continue;
     }

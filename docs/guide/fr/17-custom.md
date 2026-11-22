@@ -91,7 +91,7 @@ En dehors d’Accès complet, ces étapes vous demandent à chaque fois, y compr
 
 En modes Demander, Accepter les modifications et Plan, Custom demande avant de lire ou de modifier des fichiers hors du dossier de la session (le dossier temporaire ne compte pas). **Always allow** couvre alors ce dossier, en lecture ou en modification.
 
-Les fichiers qui contiennent des clés ou des mots de passe demandent avant d’être lus ou modifiés, y compris dans le dossier : les fichiers `.env` (pas les exemples), les clés privées SSH et autres, `.netrc`, `.npmrc`, les fichiers d’identifiants, vos dossiers cloud et de gestionnaire de mots de passe, les connexions propres aux agents, et les données propres à l’app. Les modifications des paramètres et des hooks propres à git demandent aussi. **Always allow** ne couvre alors que ce fichier.
+Les fichiers qui contiennent des clés ou des mots de passe demandent avant d’être lus ou modifiés, y compris dans le dossier : les fichiers `.env` (pas les exemples), les clés privées SSH et autres, `.netrc`, `.npmrc`, les fichiers d’identifiants, vos dossiers cloud et de gestionnaire de mots de passe, les connexions propres aux agents, et les données propres à l’app. Les fichiers que vous joignez à vos messages font exception : l’app les conserve avec ses propres données, mais Custom les lit sans demander. Un fichier joint dans une autre conversation demande toujours. Les modifications des paramètres et des hooks propres à git demandent aussi. **Always allow** ne couvre alors que ce fichier.
 
 En mode Automatique, ce sont les règles d’Automatique et sa vérification rapide qui en décident. En Accès complet, rien n’est demandé.
 

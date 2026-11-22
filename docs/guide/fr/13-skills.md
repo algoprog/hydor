@@ -117,6 +117,7 @@ L’app est livrée avec ces compétences, dans les groupes où la page les pré
 **Écriture**
 
 - **writing** : pour tout ce que des gens vont lire (un rapport, un article, une lettre, un discours). L’agent détermine qui lira le texte et dans quel but, fait un plan avant de rédiger, et relit en plusieurs passes distinctes.
+- **summaries** : pour un résumé, une réponse ou une réflexion de quelques phrases, comme un article résumé pour un cours. L’agent respecte la longueur demandée, dit ce que montre la source et pourquoi, et la relie au cours par un cas tiré de la source plutôt que par des définitions.
 - **creative-writing** : histoires, romans, mémoires, poèmes et scénarios : trouver l’histoire, planifier, rédiger sans rester bloqué, se débloquer, réviser dans l’ordre, recueillir des avis et se faire publier (lettres de présentation, synopsis, agents littéraires, autoédition et pièges à éviter), en laissant à l’auteur sa propre voix.
 - **email** : trie une boîte de réception (ce qui demande une réponse, ce qui peut attendre, ce qu’il faut archiver) et rédige les e-mails délicats : réponses, relances, excuses, refus, avec la bonne longueur et le bon ton.
 - **plain-language** : réécrit un texte existant pour qu’il se lise clairement et naturellement, sans jargon, sans remplissage ni formulations raides qui sentent l’IA, au bon niveau de lecture, en conservant son contenu.
