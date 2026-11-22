@@ -4,7 +4,7 @@ import { Bath, BedDouble, Check, ChevronLeft, ChevronRight, ExternalLink, MapPin
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, useWidth } from '../charts';
-import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, MapBox, mapPoints, Md, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useAui, useKept, usePicOk, WithPic, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, MapBox, mapPoints, Md, NameLink, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useAui, useKept, usePicOk, WithPic, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -181,13 +181,9 @@ function ProductTile({ it }: { it: Data }) {
             {off !== null && <Chip tone="good">−{off}%</Chip>}
           </div>
         )}
-        {/^https?:\/\//i.test(url) ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-[13.5px] leading-snug font-semibold text-fg hover:text-accent hover:underline">
-            {name}
-          </a>
-        ) : (
-          <span className="line-clamp-2 text-[13.5px] leading-snug font-semibold text-fg">{name}</span>
-        )}
+        <span className="line-clamp-2 text-[13.5px] leading-snug font-semibold">
+          <NameLink url={url}>{name}</NameLink>
+        </span>
         {num(it.rating) !== null && <Stars value={it.rating} size={11} count={it.reviews} />}
         {str(it.note) && <Md text={it.note} className="text-[12.5px] leading-snug text-fg-2" />}
         <div className="mt-auto pt-1.5">
@@ -262,7 +258,7 @@ function Specs({ data, done }: { data: Data; done: boolean }) {
       <div className="flex items-center gap-4">
         {str(data.image) && <Pic src={data.image} alt={title} fit="contain" className="h-20 w-28 shrink-0 rounded-lg bg-bg-1 @lg:h-24 @lg:w-36" />}
         <div className="min-w-0 flex-1">
-          <Head title={title} sub={data.subtitle} className="mb-0" />
+          <Head title={title} url={data.url} sub={data.subtitle} className="mb-0" />
         </div>
       </div>
       {done && total >= 14 && (
@@ -591,13 +587,7 @@ function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: bo
         )}
         {title && (
           <div className="mt-2 leading-snug font-semibold">
-            {/^https?:\/\//i.test(url) ? (
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
-                {title}
-              </a>
-            ) : (
-              title
-            )}
+            <NameLink url={url}>{title}</NameLink>
           </div>
         )}
         {str(it.address) && str(it.address) !== title && (

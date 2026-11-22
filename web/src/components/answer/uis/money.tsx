@@ -5,7 +5,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, XYChart } from '../charts';
-import { arr, Btn, Card, Chip, Copy, fmtDate, fmtMoney, fmtNum, Head, isObj, KeyValues, LinkOut, Md, Meter, num, parseDate, Section, Seg, seriesColor, str, textOf, useAsk, useKept, yes, type AnswerUiView, type Data } from '../kit';
+import { arr, Btn, Card, Chip, Copy, fmtDate, fmtMoney, fmtNum, Head, isObj, KeyValues, Md, Meter, NameLink, num, parseDate, Section, Seg, seriesColor, str, textOf, useAsk, useKept, yes, type AnswerUiView, type Data } from '../kit';
 import { currencySign, HoverTip, niceStep, shareText, SliderRow, useBoxWidth } from './data';
 
 /** Money as the app's language writes it; whole amounts without cents. */
@@ -232,13 +232,9 @@ function Stock({ data, done }: { data: Data; done: boolean }) {
           <ul className="m-0 list-none space-y-2.5 p-0">
             {news.map((n, i) => (
               <li key={i} className="text-[13.5px] leading-snug">
-                {str(n.url) ? (
-                  <LinkOut url={n.url} icon={false} className="font-medium text-fg">
-                    {textOf(n, 'title', 'headline')}
-                  </LinkOut>
-                ) : (
-                  <span className="font-medium">{textOf(n, 'title', 'headline')}</span>
-                )}
+                <NameLink url={n.url} className="font-medium">
+                  {textOf(n, 'title', 'headline')}
+                </NameLink>
                 {(str(n.source) || str(n.date)) && <div className="mt-0.5 text-[12px] text-fg-3">{[str(n.source), str(n.date) ? fmtDate(n.date) : ''].filter(Boolean).join(' · ')}</div>}
               </li>
             ))}

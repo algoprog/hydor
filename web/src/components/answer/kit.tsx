@@ -525,13 +525,13 @@ export function Card({ children, className, pad = true }: { children: ReactNode;
 }
 
 /** A UI's title, with a line under it and something on its right. */
-export function Head({ title, sub, kicker, aside, className }: { title?: unknown; sub?: unknown; kicker?: unknown; aside?: ReactNode; className?: string }) {
+export function Head({ title, sub, kicker, aside, className, url }: { title?: unknown; sub?: unknown; kicker?: unknown; aside?: ReactNode; className?: string; url?: unknown }) {
   if (!str(title) && !str(sub) && !str(kicker) && !aside) return null;
   return (
     <div className={cx('mb-3 flex min-w-0 items-start justify-between gap-3', className)}>
       <div className="min-w-0">
         {str(kicker) && <div className="mb-0.5 text-[11.5px] font-semibold tracking-wide text-accent uppercase">{str(kicker)}</div>}
-        {str(title) && <h3 className="aui-h3">{str(title)}</h3>}
+        {str(title) && <h3 className="aui-h3">{url ? <NameLink url={url}>{str(title)}</NameLink> : str(title)}</h3>}
         {str(sub) && <Md text={sub} className="mt-0.5 text-[13px] text-fg-3" inline />}
       </div>
       {aside && <div className="shrink-0">{aside}</div>}
@@ -640,6 +640,65 @@ export function LinkOut({ url, children, className, icon = true }: { url: unknow
       {icon && <ExternalLink size={12} className="shrink-0 opacity-70" />}
     </a>
   );
+}
+
+/** An address a link may open (a page on the web, an email); '' for anything else. */
+export const webLink = (url: unknown): string => {
+  const u = str(url).trim();
+  return /^https?:\/\/[^\s"<>]+$/i.test(u) || /^mailto:[^\s"<>]+$/i.test(u) ? u : '';
+};
+
+/**
+ * A thing's name linked to its page (a place's own site, a product's, a paper's…): in the name's own colour and weight,
+ * softly underlined with a small ↗ after it, so it reads as a link without hover (phones have none), and it wraps as
+ * text does, the ↗ kept with the last word. A click opens the page and nothing else (not the card it sits on, which may
+ * be one to pick). Without an address, just the name. Never inside another link or a button.
+ */
+export function NameLink({ url, children, className }: { url: unknown; children?: ReactNode; className?: string }) {
+  const u = webLink(url);
+  if (!u) return children === undefined || children === null || children === '' ? null : <span className={className}>{children}</span>;
+  const text = children === undefined || children === null || children === '' ? hostOf(u) || u : children;
+  // A name in words: its last word goes with the ↗, so the ↗ never wraps onto a line of its own.
+  const words = typeof text === 'string' ? /^([\s\S]*?)(\S+)\s*$/.exec(text) : null;
+  const icon = <ExternalLink aria-hidden className="ml-[0.25em] inline h-[0.8em] w-[0.8em] shrink-0 align-[-0.04em] text-accent opacity-80" />;
+  return (
+    <a
+      href={u}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={hostOf(u) || undefined}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={cx('underline decoration-line-2 decoration-1 underline-offset-[3px] transition-colors hover:text-accent hover:decoration-accent focus-visible:text-accent', className)}
+    >
+      {words ? (
+        <>
+          {words[1]}
+          <span className="whitespace-nowrap">
+            {words[2]}
+            {icon}
+          </span>
+        </>
+      ) : (
+        <>
+          {text}
+          {icon}
+        </>
+      )}
+    </a>
+  );
+}
+
+/** A place on Google Maps, found by its name and address, or else by its position; '' when there is neither. */
+export function mapsLink(p: { name?: unknown; address?: unknown; lat?: unknown; lng?: unknown; lon?: unknown; latitude?: unknown; long?: unknown; longitude?: unknown }): string {
+  const name = str(p.name).trim();
+  const address = str(p.address).trim();
+  // The same names for a position as the maps use, and only one on Earth.
+  const lat = num(p.lat ?? p.latitude);
+  const lng = num(p.lng ?? p.lon ?? p.long ?? p.longitude);
+  const on = lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const query = address ? (name && !address.toLowerCase().includes(name.toLowerCase()) ? `${name}, ${address}` : address) : on ? `${lat},${lng}` : '';
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '';
 }
 
 /** A link's site: "example.com". */

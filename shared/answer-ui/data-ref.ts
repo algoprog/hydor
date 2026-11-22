@@ -1015,7 +1015,7 @@ function rankingFrom(d: Record<string, unknown>, t: DataTable, name: string): Re
   const nameCol = text(f.name) || t.columns[0]?.name;
   if (!nameCol) throw new RefError('The source is empty: it has no columns.');
   const valueCol = text(f.value);
-  const fields = (['detail', 'image', 'tag', 'change'] as const).filter((k) => text(f[k]));
+  const fields = (['detail', 'image', 'tag', 'change', 'url'] as const).filter((k) => text(f[k]));
   const nm = parseMeasure(t, nameCol, name);
   const vm = valueCol ? parseMeasure(t, valueCol, name) : null;
   const grouped = !!vm?.fn || groupsOf(d).length > 0;
@@ -1032,7 +1032,7 @@ function rankingFrom(d: Record<string, unknown>, t: DataTable, name: string): Re
     });
     return it;
   });
-  const data = without(d, 'items', 'name', 'value', 'detail', 'image', 'tag', 'change', 'sort');
+  const data = without(d, 'items', 'name', 'value', 'detail', 'image', 'tag', 'change', 'url', 'sort');
   return { data: { ...data, ...(vm && data.metric === undefined ? { metric: vm.label } : {}), items }, matched: r.matched, ...(r.total > items.length ? { shown: items.length, total: r.total } : {}), notes: [] };
 }
 
@@ -1174,7 +1174,7 @@ export function refProblems(ui: string, data: Record<string, unknown>): string[]
   if (ui === 'ranking') {
     const f = isObj(data.items) ? data.items : data;
     if (!text(f.name)) out.push('items: { name: "Heading", value: "sum(Heading)" }: the column of names');
-    fields.push(f.name, f.value, f.detail, f.image, f.tag, f.change);
+    fields.push(f.name, f.value, f.detail, f.image, f.tag, f.change, f.url);
   }
   if (ui === 'map-values') {
     const f = isObj(data.points) ? data.points : {};

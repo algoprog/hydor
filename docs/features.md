@@ -1650,8 +1650,10 @@ programs shows each program's version and what is out, with Check now, Update no
 - Answer UIs: when part of an answer is something to look at, compare, choose from, follow, try or practise, the agent
   shows it in one of more than 140 ready-made UIs drawn in the app's look as the reply streams, by writing a
   ```` ```ui <name> ```` block of JSON. Agents are told to use one for every such part, which is most of an answer of more
-  than a few lines (conversation, short answers and code changes stay text), to fill their pictures and to play a video
-  where watching helps more. They
+  than a few lines (conversation, short answers and code changes stay text), to fill their pictures, to play a video
+  where watching helps more, and to link whatever they name that you may want to open (a place, a product, a paper, a
+  page) to its own page, in their words and in the cards: a linked name is underlined with a small ↗, so it reads as a
+  link on a phone too, a place's address opens in Google Maps and a table can make a column of names into links. They
   cover summaries and notes (key points, callouts, fact sheets, definitions, glossaries, FAQs, tabs, columns, quotes,
   cards, fact checks that weigh each claim's evidence with a tally of verdicts that filters them, follow-up buttons at
   the end of an answer that send the next question when tapped), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose

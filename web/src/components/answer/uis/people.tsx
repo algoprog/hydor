@@ -4,7 +4,7 @@ import { ArrowLeftRight, Clock, Download, ExternalLink, Globe, Mail, MapPin, Pho
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { Legend, useWidth } from '../charts';
-import { arr, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, usePicOk, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, NameLink, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, usePicOk, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -113,13 +113,9 @@ function People({ data }: { data: Data }) {
             <li key={i} className="flex min-w-0 gap-3">
               <Avatar name={name} image={p.image ?? p.photo} className="h-14 w-14 text-[16px]" />
               <div className="min-w-0 flex-1 pt-0.5">
-                {str(p.url) ? (
-                  <LinkOut url={p.url} icon={false} className="max-w-full font-semibold text-fg">
-                    {name}
-                  </LinkOut>
-                ) : (
-                  <div className="font-semibold">{name}</div>
-                )}
+                <div className="font-semibold">
+                  <NameLink url={p.url}>{name}</NameLink>
+                </div>
                 {str(p.role) && <div className="text-[12.5px] text-fg-3">{str(p.role)}</div>}
                 {str(p.note) && <Md text={p.note} className="mt-1 text-[13px] text-fg-2" />}
               </div>

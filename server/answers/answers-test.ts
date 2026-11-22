@@ -14,7 +14,7 @@ import { kvSet, openDb } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
 import { hashOf, setShippedForTests } from '../find/index.ts';
 import { answerUiText } from '../find/sources.ts';
-import { FORMATTING } from '../formatting/index.ts';
+import { FORMATTING, FORMATTING_LEAN } from '../formatting/index.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as store from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
@@ -342,6 +342,25 @@ test('every agent hears of answer UIs when it starts', () => {
   }
   assert.ok(named.size >= 40, `it names UIs for each kind of answer (${named.size})`);
   for (const n of named) assert.ok(ANSWER_UIS.some((s) => s.id === n), `${n}: the formatting rules name a UI that is in the catalog`);
+});
+
+test('what an answer names links to its page: every agent hears so, and the UIs that name things take its address', async () => {
+  const rule = (t: string) => t.split('\n').find((l) => l.startsWith('- Links: ')) ?? '';
+  assert.match(rule(FORMATTING), /links to its own page/, 'every agent hears of it');
+  assert.match(rule(FORMATTING), /url field/, 'and that a UI takes it in its url field');
+  assert.match(rule(FORMATTING), /never a guessed one/, 'from a search or a page, never guessed');
+  assert.match(rule(FORMATTING_LEAN), /links to its own page/, 'a small model too');
+  assert.doesNotMatch(rule(FORMATTING_LEAN), /answer UI/, 'without the UIs it is not told of');
+  // The UIs that name places, products and other things to open take an address for each, and their examples fill it:
+  // agents write what the example shows.
+  for (const id of ['comparison', 'choices', 'recommendation', 'ranking', 'scorecard', 'versus', 'decision-matrix', 'places', 'itinerary', 'timeline', 'cards', 'media', 'specs', 'table']) {
+    const s = answerUi(id)!;
+    assert.match(s.shape, /\burl\?: url\b|\blink\?: string/, `${id}: takes an address for what it names`);
+    if (id !== 'decision-matrix') assert.match(JSON.stringify(s.example), /"(url|page)":"https:\/\//, `${id}: its example links what it names`);
+  }
+  const tool = findUiTool();
+  const r = await tool.run({ names: ['comparison'] }, ctx);
+  assert.match(typeof r === 'string' ? r : r.text, /url is the address of that thing’s own page[^;]*never a guessed one[^;]*its name links to it/, 'find_ui says what a url is for');
 });
 
 let failed = 0;

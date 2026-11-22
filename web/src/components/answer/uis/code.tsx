@@ -8,7 +8,7 @@ import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { playgroundDoc, type PlayLang } from '../playground-doc';
 import { cx } from '../../ui';
-import { arr, Ask, Btn, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useAsk, useAui, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Ask, Btn, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, NameLink, num, Section, Seg, str, textOf, TONE, TONE_FILL, useAsk, useAui, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 import { CopyMark } from '../../CopyMark';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
@@ -1204,13 +1204,9 @@ function RepoCard({ r, done }: { r: Data; done: boolean }) {
       <div className="flex min-w-0 items-start gap-2">
         <BookMarked size={15} className="mt-[3px] shrink-0 text-fg-3" />
         <div className="min-w-0 flex-1 text-[15px] leading-snug">
-          {/^https?:\/\//i.test(url) ? (
-            <LinkOut url={url} icon={false} className="max-w-full">
-              {title}
-            </LinkOut>
-          ) : (
-            <span className="break-words">{title}</span>
-          )}
+          <NameLink url={url} className="break-words">
+            {title}
+          </NameLink>
         </div>
         {stars !== null && (
           <span className="inline-flex shrink-0 items-center gap-1 pt-px text-[12.5px] font-medium text-fg-2 tabular-nums" title={tr('Stars')}>

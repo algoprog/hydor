@@ -10,7 +10,7 @@ export const COMPARE: AnswerUiSpec[] = [
     keywords: 'compare comparison versus side by side specs differences table features options alternatives which is better laptops phones cameras cars products',
     shape: `{
   title?: string
-  items: { name: string, image?: image, subtitle?: string, badge?: string, url?: url }[]   // the columns, 2 to 6
+  items: { name: string, image?: image, subtitle?: string, badge?: string, url?: url }[]   // the columns, 2 to 6; url: its own page (the place's site, the product's), its name links to it
   rows: {
     label: string
     values: (md | number | boolean | null)[]   // one per item, in order: true/false show as ✓/✗, null as —
@@ -25,9 +25,9 @@ export const COMPARE: AnswerUiSpec[] = [
     example: {
       title: 'E-readers for reading in bed and on the beach',
       items: [
-        { name: 'Kindle Paperwhite', subtitle: '2024, 16 GB', image: 'https://www.zdnet.com/wp-content/uploads/sites/3/Kindle-Paperwhite-1.jpg' },
-        { name: 'Kobo Clara BW', subtitle: '2024, 16 GB', image: 'https://ereader.kobo.com/cdn/shop/files/1-Dual_Device-UK-ANZ_1080x1080_8783d29f-1db3-4f71-a028-fabe94de4892_1200x1200.png?v=1757384449' },
-        { name: 'Kobo Libra Colour', subtitle: '2024, 32 GB', badge: 'Pick', image: 'https://ereader.kobo.com/cdn/shop/products/IO_Dual_EN_1200x1200.jpg?v=1633065973' },
+        { name: 'Kindle Paperwhite', url: 'https://www.amazon.com/dp/B0CFPJYX7P', subtitle: '2024, 16 GB', image: 'https://www.zdnet.com/wp-content/uploads/sites/3/Kindle-Paperwhite-1.jpg' },
+        { name: 'Kobo Clara BW', url: 'https://ereader.kobo.com/en-us/products/kobo-clara-bw', subtitle: '2024, 16 GB', image: 'https://ereader.kobo.com/cdn/shop/files/1-Dual_Device-UK-ANZ_1080x1080_8783d29f-1db3-4f71-a028-fabe94de4892_1200x1200.png?v=1757384449' },
+        { name: 'Kobo Libra Colour', url: 'https://ereader.kobo.com/en-us/products/kobo-libra-colour', subtitle: '2024, 32 GB', badge: 'Pick', image: 'https://ereader.kobo.com/cdn/shop/products/IO_Dual_EN_1200x1200.jpg?v=1633065973' },
       ],
       rows: [
         { label: 'Price', values: [160, 130, 220], prefix: '$', best: 'low' },
@@ -92,7 +92,7 @@ export const COMPARE: AnswerUiSpec[] = [
     keywords: 'decision matrix weighted scoring criteria options score sliders weigh choose decide trade-offs evaluation',
     shape: `{
   title?: string
-  options: string[]                  // 2 to 5
+  options: (string | { name: string, url?: url })[]   // 2 to 5: a name, or a name and its own page
   criteria: {
     name: string
     weight: number                   // how much it matters, 1 to 5 (the user can change it)
@@ -130,16 +130,17 @@ export const COMPARE: AnswerUiSpec[] = [
     tags?: string[]
     price?: string
     recommended?: boolean
+    url?: url                  // its own page (the place's site, the product's): its title links to it
   }[]                          // 2 to 6
   multiple?: boolean           // several may be picked
 }`,
     example: {
       question: 'Which weekend trip from Boston sounds best?',
       options: [
-        { title: 'Acadia National Park', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Acadia_National_Park_02.JPG/500px-Acadia_National_Park_02.JPG', description: 'Granite coast, quiet carriage roads and the sunrise from Cadillac Mountain. **4½ hours** by car.', tags: ['Hiking', 'Coast'], price: 'about $650 for two', recommended: true },
-        { title: 'Cape Cod', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/White_Crest_Beach_Wellfleet.jpg/500px-White_Crest_Beach_Wellfleet.jpg', description: 'Dunes and empty beaches on the National Seashore, lobster rolls and lighthouses. **2 hours**.', tags: ['Beach', 'Seafood'], price: 'about $550 for two' },
-        { title: 'Montreal', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Montreal%2C_Quebec_skyline.jpg/500px-Montreal%2C_Quebec_skyline.jpg', description: 'Cobbled Old Montreal, bagels and the view from Mount Royal. **5 hours**; bring your passport.', tags: ['City', 'Food'], price: 'about $700 for two' },
-        { title: 'White Mountains', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/White_Mountains_12_30_09_81.jpg/500px-White_Mountains_12_30_09_81.jpg', description: 'Waterfall hikes, the Kancamagus Highway and the cog railway up Mount Washington. **2½ hours**.', tags: ['Hiking', 'Scenic drives'], price: 'about $500 for two' },
+        { title: 'Acadia National Park', url: 'https://www.nps.gov/acad/index.htm', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Acadia_National_Park_02.JPG/500px-Acadia_National_Park_02.JPG', description: 'Granite coast, quiet carriage roads and the sunrise from Cadillac Mountain. **4½ hours** by car.', tags: ['Hiking', 'Coast'], price: 'about $650 for two', recommended: true },
+        { title: 'Cape Cod', url: 'https://www.nps.gov/caco/index.htm', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/White_Crest_Beach_Wellfleet.jpg/500px-White_Crest_Beach_Wellfleet.jpg', description: 'Dunes and empty beaches on the National Seashore, lobster rolls and lighthouses. **2 hours**.', tags: ['Beach', 'Seafood'], price: 'about $550 for two' },
+        { title: 'Montreal', url: 'https://www.mtl.org/en', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Montreal%2C_Quebec_skyline.jpg/500px-Montreal%2C_Quebec_skyline.jpg', description: 'Cobbled Old Montreal, bagels and the view from Mount Royal. **5 hours**; bring your passport.', tags: ['City', 'Food'], price: 'about $700 for two' },
+        { title: 'White Mountains', url: 'https://www.fs.usda.gov/r09/whitemountain', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/White_Mountains_12_30_09_81.jpg/500px-White_Mountains_12_30_09_81.jpg', description: 'Waterfall hikes, the Kancamagus Highway and the cog railway up Mount Washington. **2½ hours**.', tags: ['Hiking', 'Scenic drives'], price: 'about $500 for two' },
       ],
     },
   },
@@ -153,7 +154,7 @@ export const COMPARE: AnswerUiSpec[] = [
   title?: string               // what it is a pick for
   pick: { name: string, image?: image, why: md, price?: string, url?: url, rating?: number }   // rating out of 5
   alternatives?: { name: string, why: md, best_for?: string, price?: string, url?: url }[]
-  avoid?: { name: string, why: md }[]
+  avoid?: { name: string, why: md, url?: url }[]
 }`,
     example: {
       title: 'Noise-cancelling headphones for long flights',
@@ -166,11 +167,11 @@ export const COMPARE: AnswerUiSpec[] = [
         url: 'https://www.theguardian.com/technology/2025/jul/09/sony-wh-1000xm6-review-raising-the-bar-for-noise-cancelling-headphones',
       },
       alternatives: [
-        { name: 'Bose QuietComfort Ultra', best_for: 'Comfort', why: 'Lighter on the head and nearly as quiet; the sound is a little less detailed.', price: '$449' },
-        { name: 'Sennheiser Momentum 4', best_for: 'Battery life', why: '**60 hours** on a charge: a week of travel without the cable.', price: '$379' },
-        { name: 'Soundcore Space One', best_for: 'A tight budget', why: 'Good noise cancelling for under a quarter of the price; plasticky, but light.', price: '$99' },
+        { name: 'Bose QuietComfort Ultra', url: 'https://www.bose.com/p/headphones/bose-quietcomfort-ultra-headphones/QCUH-HEADPHONEARN.html', best_for: 'Comfort', why: 'Lighter on the head and nearly as quiet; the sound is a little less detailed.', price: '$449' },
+        { name: 'Sennheiser Momentum 4', url: 'https://us.sennheiser-hearing.com/products/momentum-4-wireless-closedshop', best_for: 'Battery life', why: '**60 hours** on a charge: a week of travel without the cable.', price: '$379' },
+        { name: 'Soundcore Space One', url: 'https://www.soundcore.com/products/space-one-a3035011', best_for: 'A tight budget', why: 'Good noise cancelling for under a quarter of the price; plasticky, but light.', price: '$99' },
       ],
-      avoid: [{ name: 'Apple AirPods Max', why: 'Heavy at 385 g, and its case leaves the headband bare in a bag. Worth it only if everything else you own is Apple.' }],
+      avoid: [{ name: 'Apple AirPods Max', url: 'https://www.apple.com/airpods-max/', why: 'Heavy at 385 g, and its case leaves the headband bare in a bag. Worth it only if everything else you own is Apple.' }],
     },
   },
   {
@@ -191,6 +192,7 @@ export const COMPARE: AnswerUiSpec[] = [
     detail?: md
     change?: number            // places moved since last time: 2 up, -1 down, 0 the same
     tag?: string
+    url?: url                  // its own page: its name links to it
   }[]                          // in rank order: the first is number 1
   note?: md                    // what it is based on; since when the changes are counted
 }`,
@@ -199,7 +201,7 @@ export const COMPARE: AnswerUiSpec[] = [
   title?: string
   metric?: string              // the value's label unless set
   from: { sheet: string, range?: string } | { file: string }
-  items: { name: string, value?: string, detail?: string, image?: string, tag?: string, change?: string }
+  items: { name: string, value?: string, detail?: string, image?: string, tag?: string, change?: string, url?: string }
                                // the column of each: value "sum(Quantity)" for each name, or a column as it is (an item a row)
   where?: string
   sort?: string                // highest value first unless set
@@ -212,14 +214,14 @@ export const COMPARE: AnswerUiSpec[] = [
       title: 'Paris 2024: the medal table',
       metric: 'Gold medals',
       items: [
-        { name: 'United States', value: 40, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/120px-Flag_of_the_United_States.svg.png', detail: '44 silver · 42 bronze · **126** in all', change: 0 },
-        { name: 'China', value: 40, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Flag_of_the_People%27s_Republic_of_China.svg/120px-Flag_of_the_People%27s_Republic_of_China.svg.png', detail: '27 silver · 24 bronze · **91** in all', change: 0 },
-        { name: 'Japan', value: 20, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Flag_of_Japan.svg/120px-Flag_of_Japan.svg.png', detail: '12 silver · 13 bronze · **45** in all', change: 0 },
-        { name: 'Australia', value: 18, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Flag_of_Australia.svg/120px-Flag_of_Australia.svg.png', detail: '19 silver · 16 bronze · **53** in all', change: 2 },
-        { name: 'France', value: 16, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag_of_France.svg/120px-Flag_of_France.svg.png', detail: '26 silver · 22 bronze · **64** in all', change: 3, tag: 'Host' },
-        { name: 'Netherlands', value: 15, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/120px-Flag_of_the_Netherlands.svg.png', detail: '7 silver · 12 bronze · **34** in all', change: 1 },
-        { name: 'Great Britain', value: 14, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Flag_of_the_United_Kingdom_%283-5%29.svg/120px-Flag_of_the_United_Kingdom_%283-5%29.svg.png', detail: '22 silver · 29 bronze · **65** in all', change: -3 },
-        { name: 'South Korea', value: 13, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Flag_of_South_Korea.svg/120px-Flag_of_South_Korea.svg.png', detail: '9 silver · 10 bronze · **32** in all', change: 8 },
+        { name: 'United States', url: 'https://en.wikipedia.org/wiki/United_States_at_the_2024_Summer_Olympics', value: 40, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/120px-Flag_of_the_United_States.svg.png', detail: '44 silver · 42 bronze · **126** in all', change: 0 },
+        { name: 'China', url: 'https://en.wikipedia.org/wiki/China_at_the_2024_Summer_Olympics', value: 40, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Flag_of_the_People%27s_Republic_of_China.svg/120px-Flag_of_the_People%27s_Republic_of_China.svg.png', detail: '27 silver · 24 bronze · **91** in all', change: 0 },
+        { name: 'Japan', url: 'https://en.wikipedia.org/wiki/Japan_at_the_2024_Summer_Olympics', value: 20, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Flag_of_Japan.svg/120px-Flag_of_Japan.svg.png', detail: '12 silver · 13 bronze · **45** in all', change: 0 },
+        { name: 'Australia', url: 'https://en.wikipedia.org/wiki/Australia_at_the_2024_Summer_Olympics', value: 18, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Flag_of_Australia.svg/120px-Flag_of_Australia.svg.png', detail: '19 silver · 16 bronze · **53** in all', change: 2 },
+        { name: 'France', url: 'https://en.wikipedia.org/wiki/France_at_the_2024_Summer_Olympics', value: 16, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag_of_France.svg/120px-Flag_of_France.svg.png', detail: '26 silver · 22 bronze · **64** in all', change: 3, tag: 'Host' },
+        { name: 'Netherlands', url: 'https://en.wikipedia.org/wiki/Netherlands_at_the_2024_Summer_Olympics', value: 15, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/120px-Flag_of_the_Netherlands.svg.png', detail: '7 silver · 12 bronze · **34** in all', change: 1 },
+        { name: 'Great Britain', url: 'https://en.wikipedia.org/wiki/Great_Britain_at_the_2024_Summer_Olympics', value: 14, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Flag_of_the_United_Kingdom_%283-5%29.svg/120px-Flag_of_the_United_Kingdom_%283-5%29.svg.png', detail: '22 silver · 29 bronze · **65** in all', change: -3 },
+        { name: 'South Korea', url: 'https://en.wikipedia.org/wiki/South_Korea_at_the_2024_Summer_Olympics', value: 13, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Flag_of_South_Korea.svg/120px-Flag_of_South_Korea.svg.png', detail: '9 silver · 10 bronze · **32** in all', change: 8 },
       ],
       note: 'Ranked by gold medals, then silver. Places moved since Tokyo 2020.',
     },
@@ -234,6 +236,7 @@ export const COMPARE: AnswerUiSpec[] = [
   subject: string
   subtitle?: string
   image?: image
+  url?: url                    // its own page: the subject links to it
   overall?: number             // the average of the aspects when left out
   max?: number                 // the top of the scale: 10 unless set
   aspects: { name: string, score: number, note?: string }[]
@@ -241,6 +244,7 @@ export const COMPARE: AnswerUiSpec[] = [
 }`,
     example: {
       subject: 'Framework Laptop 13',
+      url: 'https://frame.work/laptop13',
       subtitle: 'AMD Ryzen AI 7 350, 2025',
       image: 'https://img.frontdeskreview.com/products/framework-laptop-13-amd-ryzen-ai-300.jpg?v=74a80dae97',
       overall: 8.2,
@@ -262,8 +266,8 @@ export const COMPARE: AnswerUiSpec[] = [
     use: 'Two things head to head, row by row, with mirrored bars where both sides are numbers, each row’s winner marked and a tally of wins.',
     keywords: 'versus vs head-to-head which is better face-off matchup duel compare two rivals',
     shape: `{
-  left: { name: string, image?: image, subtitle?: string }
-  right: { name: string, image?: image, subtitle?: string }
+  left: { name: string, image?: image, subtitle?: string, url?: url }    // url: its own page, its name links to it
+  right: { name: string, image?: image, subtitle?: string, url?: url }
   rows: {
     label: string
     left: md | number
@@ -275,8 +279,8 @@ export const COMPARE: AnswerUiSpec[] = [
   verdict?: md
 }`,
     example: {
-      left: { name: 'Nintendo Switch 2', subtitle: '2025 · 256 GB', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Nintendo_Switch_2_in_Handheld_Mode.png/500px-Nintendo_Switch_2_in_Handheld_Mode.png' },
-      right: { name: 'Steam Deck OLED', subtitle: '2023 · 512 GB', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Steam_Deck_OLED_framsida_hemsk%C3%A4rm.jpg/500px-Steam_Deck_OLED_framsida_hemsk%C3%A4rm.jpg' },
+      left: { name: 'Nintendo Switch 2', url: 'https://www.nintendo.com/us/gaming-systems/switch-2/features/', subtitle: '2025 · 256 GB', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Nintendo_Switch_2_in_Handheld_Mode.png/500px-Nintendo_Switch_2_in_Handheld_Mode.png' },
+      right: { name: 'Steam Deck OLED', url: 'https://store.steampowered.com/steamdeck', subtitle: '2023 · 512 GB', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Steam_Deck_OLED_framsida_hemsk%C3%A4rm.jpg/500px-Steam_Deck_OLED_framsida_hemsk%C3%A4rm.jpg' },
       rows: [
         { label: 'Price', left: 449, right: 549, prefix: '$', winner: 'left' },
         { label: 'Screen size', left: 7.9, right: 7.4, unit: '″', winner: 'left' },

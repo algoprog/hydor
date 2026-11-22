@@ -6,12 +6,15 @@
 // a terminal, maths as code and diagrams in ASCII. The user's own guidelines come first (server/guidelines) and win.
 // Answer UIs are named by situation (options, numbers, learning…) so an agent thinks of one before it writes: told only
 // to use one "when the answer is something to look at", agents kept to text for nearly everything.
+// Whatever an answer names that the user may want to open links to its page, in text and in answer UIs (their url fields):
+// a comparison of venues whose names led nowhere sent the user back to a search engine for each.
 import type { Feature } from '../features/types.ts';
 
 /** Every agent's rules for its replies, line by line. */
 const LINES = [
   'Formatting your replies: the app shows them as rich text, so write them for reading, not for a terminal.',
   '- Markdown where it helps: short paragraphs; headings for a long answer; numbered steps; bullets for a few short points; **bold** for the key point; code in fenced blocks named by their language. A short answer stays a sentence or two. Comparisons, things each with details and rows of data go in answer UIs (below), not in Markdown tables: keep those for a few short cells that no UI fits.',
+  '- Links: whatever you name that the user may want to open (a place or a business, a product, a paper, a book, a film, an event, a page, a tool) links to its own page, so they never have to search for it again. In text, link the name itself ([the name](https://…)); in an answer UI, fill its url field (its name then links to it), or put a Markdown link in a text field where it has none. Take each address from a search result or a page you read, never a guessed one: its own site first, else the best page about it (its listing, its Wikipedia article), and for a place with no site of its own, its map (https://www.google.com/maps/search/?api=1&query= and its name and town).',
   '- Maths in LaTeX, which the app draws: $…$ inside a sentence, $$…$$ on lines of their own for an equation set apart (aligned, cases and matrices inside it), \\ce{…} for chemistry; never as code or plain text. Write a dollar sign that means money as \\$.',
   '- Diagrams: a ```mermaid block (flowchart, sequence, state, class or ER diagram, timeline, mind map, Gantt, pie or quadrant chart…) is drawn in place, in the app’s colours: give it no theme, colours or %%{init}%% of its own; keep labels short, and run a flowchart of more than five steps top to bottom (flowchart TD).',
   '- Answer UIs: the app draws more than 140 ready-made cards, tables, charts, maps, galleries, timelines and small interactive tools in your replies, in its look, with pictures, maps and controls of their own, filled with your answer’s content. They make an answer quicker to take in and something to use, not only to read, so use one for every part of an answer that is something to look at, compare, choose from, follow, try, practise or keep: in an answer of more than a few lines, that is most of the time. What you would otherwise write as a Markdown table, a list of things each with its details, numbers side by side, steps to follow or a closing offer (“if you tell me X, I can Y”) is such a part. Before you write such an answer, see which of its parts these show best, for example:',
@@ -40,7 +43,7 @@ const answerUiLine = (l: string) => /^- Answer UIs:|^ {2}- |^Call find_ui first/
  * rarely fills well and which cost a fifth of what every agent is told.
  */
 export const FORMATTING_LEAN = LINES.filter((l) => !answerUiLine(l))
-  .map((l) => l.replace(/ Comparisons, things each with details and rows of data go in answer UIs \(below\)[^.]*\./, '').replace(' (when no answer UI fits)', ''))
+  .map((l) => l.replace(/ Comparisons, things each with details and rows of data go in answer UIs \(below\)[^.]*\./, '').replace(/; in an answer UI, [^.]*\./, '.').replace(' (when no answer UI fits)', ''))
   .join('\n');
 
 export const formatting: Feature = {

@@ -6,7 +6,7 @@ import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
 import { dotsAndCorners, placeLabels, quadrantOf, wrapName } from '../quadrant-layout';
-import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, SentNote, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Composed, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, NameLink, num, Pic, Ring, Section, Seg, SentNote, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Composed, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -53,13 +53,9 @@ function Comparison({ data }: { data: Data }) {
                 <th key={i} className={cx('min-w-[120px] px-3 pt-4 pb-3 text-left align-bottom font-normal', i === winner && 'bg-accent-soft/60')}>
                   {anyPic && <Pic src={it.image} alt={str(it.name)} fit="contain" className="mb-2 h-20 w-full rounded-lg bg-bg-1" />}
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {str(it.url) ? (
-                      <LinkOut url={it.url} icon={false} className="font-semibold text-fg">
-                        {str(it.name)}
-                      </LinkOut>
-                    ) : (
-                      <span className="font-semibold text-fg">{str(it.name)}</span>
-                    )}
+                    <NameLink url={it.url} className="font-semibold">
+                      {str(it.name)}
+                    </NameLink>
                     {(str(it.badge) || i === winner) && <Chip tone="accent">{str(it.badge) || tr('Pick')}</Chip>}
                   </div>
                   {str(it.subtitle) && <div className="mt-0.5 text-[12px] text-fg-3">{str(it.subtitle)}</div>}
@@ -168,7 +164,8 @@ function ProsCons({ data, done }: { data: Data; done: boolean }) {
 // ---- a decision matrix -----------------------------------------------------------------------------------------------
 
 function DecisionMatrix({ data, done }: { data: Data; done: boolean }) {
-  const options = arr(data.options).map((o) => textOf(o, 'name', 'title', 'label'));
+  // An option is a name, or a name with the address of its page.
+  const options = arr(data.options).map((o) => ({ name: textOf(o, 'name', 'title', 'label'), url: isObj(o) ? o.url : undefined }));
   const criteria = arr(data.criteria)
     .filter(isObj)
     .map((c) => ({
@@ -195,7 +192,7 @@ function DecisionMatrix({ data, done }: { data: Data; done: boolean }) {
   });
   const known = totals.filter((t): t is number => t !== null);
   const top = known.length ? Math.max(...known) : null;
-  const ranked = options.map((name, j) => ({ name, j, total: totals[j] })).sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
+  const ranked = options.map((o, j) => ({ name: o.name, url: o.url, j, total: totals[j] })).sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
   const one = (n: number | null) => (n === null ? '—' : fmtNum(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
   return (
     <Card>
@@ -220,7 +217,7 @@ function DecisionMatrix({ data, done }: { data: Data; done: boolean }) {
                   <th key={j} className="min-w-[68px] px-1 py-1.5 text-center font-semibold text-fg">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: seriesColor(j) }} />
-                      {o}
+                      <NameLink url={o.url}>{o.name}</NameLink>
                     </span>
                   </th>
                 ))}
@@ -275,7 +272,9 @@ function DecisionMatrix({ data, done }: { data: Data; done: boolean }) {
                 <div key={r.j} className="flex items-center gap-2.5">
                   <span className="flex w-[34%] max-w-44 min-w-0 shrink-0 items-center gap-1.5 text-[13px]">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: seriesColor(r.j) }} />
-                    <span className={cx('truncate', lead ? 'font-semibold text-fg' : 'text-fg-2')}>{r.name}</span>
+                    <span className={cx('truncate', lead ? 'font-semibold text-fg' : 'text-fg-2')}>
+                      <NameLink url={r.url}>{r.name}</NameLink>
+                    </span>
                     {lead && <Trophy size={13} className="shrink-0 text-accent" aria-label={tr('Top score')} />}
                   </span>
                   <span className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-3">
@@ -361,7 +360,9 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
                 <PickMark on={on} multiple={multiple} />
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-semibold text-fg">{title}</span>
+                    <NameLink url={o.url} className="font-semibold">
+                      {title}
+                    </NameLink>
                     {yes(o.recommended) && !hasPic && <Chip tone="accent">{tr('Recommended')}</Chip>}
                   </div>
                   {str(o.description) && <Md text={o.description} className="mt-0.5 text-[13px] text-fg-2" />}
@@ -393,14 +394,11 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
 
 // ---- a recommendation -----------------------------------------------------------------------------------------------------
 
-function NameLink({ x, className }: { x: Data; className?: string }) {
-  const name = textOf(x, 'name', 'title', 'label');
-  return str(x.url) ? (
-    <LinkOut url={x.url} className={cx('font-semibold text-fg', className)}>
-      {name}
-    </LinkOut>
-  ) : (
-    <span className={cx('font-semibold text-fg', className)}>{name}</span>
+function Named({ x, className }: { x: Data; className?: string }) {
+  return (
+    <NameLink url={x.url} className={cx('font-semibold', className)}>
+      {textOf(x, 'name', 'title', 'label')}
+    </NameLink>
   );
 }
 
@@ -422,7 +420,7 @@ function Recommendation({ data }: { data: Data }) {
               {tr('Top pick')}
             </Chip>
             <div className="mt-1.5 text-[20px] leading-tight font-semibold tracking-tight">
-              <NameLink x={{ ...pick, name }} />
+              <Named x={{ ...pick, name }} />
             </div>
             {(num(pick.rating) !== null || str(pick.price)) && (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -441,7 +439,7 @@ function Recommendation({ data }: { data: Data }) {
               {alts.map((a, i) => (
                 <li key={i} className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <NameLink x={a} className="text-[14px]" />
+                    <Named x={a} className="text-[14px]" />
                     {str(a.best_for ?? a.bestFor) && <Chip>{tr('Best for: {0}').replace('{0}', str(a.best_for ?? a.bestFor))}</Chip>}
                     {str(a.price) && <span className="ml-auto text-[13px] font-semibold whitespace-nowrap">{str(a.price)}</span>}
                   </div>
@@ -460,7 +458,9 @@ function Recommendation({ data }: { data: Data }) {
                 <li key={i} className="flex min-w-0 gap-2 text-[13px]">
                   <X size={15} strokeWidth={2.5} className="mt-px shrink-0 text-err" />
                   <div className="min-w-0">
-                    <span className="font-semibold text-fg">{textOf(a, 'name', 'title', 'label')}</span>
+                    <NameLink url={a.url} className="font-semibold">
+                      {textOf(a, 'name', 'title', 'label')}
+                    </NameLink>
                     {str(a.why) && (
                       <>
                         <span className="text-fg-3"> · </span>
@@ -524,7 +524,9 @@ function Ranking({ data }: { data: Data }) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline justify-between gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="font-semibold text-fg">{textOf(it, 'name', 'title', 'label')}</span>
+                    <NameLink url={it.url} className="font-semibold">
+                      {textOf(it, 'name', 'title', 'label')}
+                    </NameLink>
                     {str(it.tag) && <Chip>{str(it.tag)}</Chip>}
                   </div>
                   {v !== null && <span className="shrink-0 font-semibold text-fg tabular-nums">{withUnit(v, unit, prefix)}</span>}
@@ -564,7 +566,7 @@ function Scorecard({ data }: { data: Data }) {
       <div className="flex items-center gap-3.5">
         {str(data.image) && <Pic src={data.image} alt={subject} className="h-16 w-20 shrink-0 rounded-lg @lg:h-20 @lg:w-28" />}
         <div className="min-w-0 flex-1">
-          <Head title={subject} sub={data.subtitle} className="mb-0" />
+          <Head title={subject} url={data.url} sub={data.subtitle} className="mb-0" />
         </div>
         {overall !== null && (
           <Ring value={overall} max={max} size={74} stroke={7} tone={tone}>
@@ -616,7 +618,9 @@ function VsHead({ s, color, wins, lead, right }: { s: Data; color: string; wins:
       {str(s.image) && <Pic src={s.image} alt={str(s.name)} fit="contain" className="mb-2 h-20 w-full rounded-lg bg-bg-1 @lg:h-28" />}
       <div className={cx('flex min-w-0 items-center gap-1.5', right && 'flex-row-reverse')}>
         <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: color }} />
-        <span className="text-[15px] leading-snug font-semibold text-fg">{str(s.name)}</span>
+        <NameLink url={s.url} className="text-[15px] leading-snug font-semibold">
+          {str(s.name)}
+        </NameLink>
       </div>
       {str(s.subtitle) && <div className="text-[12px] text-fg-3">{str(s.subtitle)}</div>}
       {wins !== null && <div className={cx('mt-1 text-[12px]', lead ? 'font-semibold text-fg' : 'text-fg-3')}>{wins === 1 ? tr('1 win') : tr('{0} wins').replace('{0}', String(wins))}</div>}

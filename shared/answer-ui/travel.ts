@@ -28,12 +28,12 @@ export const TRAVEL: AnswerUiSpec[] = [
       title: 'A day of Lisbon’s sights, west to east',
       route: true,
       places: [
-        { name: 'Belém Tower', lat: 38.6916, lng: -9.216, kind: 'Monument', rating: 4.6, image: 'https://thespotguide.com/media/CACHE/images/articles/covers/belem_tower_lisbon_river_1/5fa0c5eef8cc65c183a110b939760b36.webp', note: 'Go at opening (10:00) to beat the queue.' },
-        { name: 'Jerónimos Monastery', lat: 38.6979, lng: -9.2068, kind: 'Monastery', rating: 4.7, image: 'https://2gbzzxp7mkrqpgpz.public.blob.vercel-storage.com/lisbon-jeronimos/exterior_00.webp', note: 'Then a pastel de nata at Pastéis de Belém, next door.' },
-        { name: 'LX Factory', lat: 38.7034, lng: -9.1784, kind: 'Market and shops', rating: 4.5, image: 'https://www.novo-monde.com/app/uploads/2026/02/lx-factory-1-1024x536.jpg', note: 'Lunch, and the Ler Devagar bookshop.' },
-        { name: 'Time Out Market', lat: 38.7069, lng: -9.1459, kind: 'Food hall', rating: 4.4, price: '€€', image: 'https://media.timeout.com/images/106331852/image.jpg' },
-        { name: 'Praça do Comércio', lat: 38.7075, lng: -9.1364, kind: 'Square', rating: 4.7, image: 'https://www.lisbontourism.org/wp-content/uploads/2026/10/rua-augusta-arch-jos-i-statue-stand-before.jpg' },
-        { name: 'São Jorge Castle', lat: 38.7139, lng: -9.1335, kind: 'Castle', rating: 4.5, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Castelo_Sao_Jorge_Lisboa_1.JPG/960px-Castelo_Sao_Jorge_Lisboa_1.JPG', note: 'Sunset over the river from its walls.' },
+        { name: 'Belém Tower', url: 'https://en.wikipedia.org/wiki/Bel%C3%A9m_Tower', lat: 38.6916, lng: -9.216, kind: 'Monument', rating: 4.6, image: 'https://thespotguide.com/media/CACHE/images/articles/covers/belem_tower_lisbon_river_1/5fa0c5eef8cc65c183a110b939760b36.webp', note: 'Go at opening (10:00) to beat the queue.' },
+        { name: 'Jerónimos Monastery', url: 'https://en.wikipedia.org/wiki/Jer%C3%B3nimos_Monastery', lat: 38.6979, lng: -9.2068, kind: 'Monastery', rating: 4.7, image: 'https://2gbzzxp7mkrqpgpz.public.blob.vercel-storage.com/lisbon-jeronimos/exterior_00.webp', note: 'Then a pastel de nata at Pastéis de Belém, next door.' },
+        { name: 'LX Factory', url: 'https://www.lxfactory.com/', lat: 38.7034, lng: -9.1784, kind: 'Market and shops', rating: 4.5, image: 'https://www.novo-monde.com/app/uploads/2026/02/lx-factory-1-1024x536.jpg', note: 'Lunch, and the Ler Devagar bookshop.' },
+        { name: 'Time Out Market', url: 'https://www.timeout.pt/time-out-market-lisboa/pt', lat: 38.7069, lng: -9.1459, kind: 'Food hall', rating: 4.4, price: '€€', image: 'https://media.timeout.com/images/106331852/image.jpg' },
+        { name: 'Praça do Comércio', url: 'https://en.wikipedia.org/wiki/Pra%C3%A7a_do_Com%C3%A9rcio', lat: 38.7075, lng: -9.1364, kind: 'Square', rating: 4.7, image: 'https://www.lisbontourism.org/wp-content/uploads/2026/10/rua-augusta-arch-jos-i-statue-stand-before.jpg' },
+        { name: 'São Jorge Castle', url: 'https://castelodesaojorge.pt/', lat: 38.7139, lng: -9.1335, kind: 'Castle', rating: 4.5, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Castelo_Sao_Jorge_Lisboa_1.JPG/960px-Castelo_Sao_Jorge_Lisboa_1.JPG', note: 'Sunset over the river from its walls.' },
       ],
     },
   },
@@ -156,6 +156,7 @@ Icon = "sun" | "partly" | "cloud" | "rain" | "showers" | "storm" | "snow" | "sle
       lat?: number
       lng?: number             // the day's stops with a position go on its map, joined in order
       image?: image
+      url?: url                // its own page (the sight's, the restaurant's, where to book): its title links to it
     }[]
   }[]
 }`,
@@ -166,11 +167,11 @@ Icon = "sun" | "partly" | "cloud" | "rain" | "showers" | "storm" | "snow" | "sle
           date: '2026-11-20',
           title: 'Fushimi Inari and Higashiyama',
           items: [
-            { time: '07:30', title: 'Fushimi Inari Taisha', kind: 'sight', duration: '2 h', cost: 'Free', lat: 34.9671, lng: 135.7727, note: 'Start early: the torii tunnels are quiet before 9. The **Yotsutsuji** crossroads has the view.' },
-            { time: '10:15', title: 'Tōfuku-ji', kind: 'sight', duration: '1 h', cost: '¥1,000', lat: 34.9772, lng: 135.7746, note: 'Its Tsūten-kyō bridge looks over a valley of maples, reddest in late November.' },
+            { time: '07:30', title: 'Fushimi Inari Taisha', url: 'https://inari.jp/', kind: 'sight', duration: '2 h', cost: 'Free', lat: 34.9671, lng: 135.7727, note: 'Start early: the torii tunnels are quiet before 9. The **Yotsutsuji** crossroads has the view.' },
+            { time: '10:15', title: 'Tōfuku-ji', url: 'https://tofukuji.jp/', kind: 'sight', duration: '1 h', cost: '¥1,000', lat: 34.9772, lng: 135.7746, note: 'Its Tsūten-kyō bridge looks over a valley of maples, reddest in late November.' },
             { time: '12:30', title: 'Lunch at Okutan', place: 'Kiyomizu', kind: 'food', duration: '1 h', cost: '¥4,400', lat: 34.9978, lng: 135.7809, note: 'Simmered tofu in a garden, served here since 1635.' },
-            { time: '14:00', title: 'Kiyomizu-dera', kind: 'sight', duration: '1 h 30 min', cost: '¥500', lat: 34.9943, lng: 135.7844 },
-            { time: '15:45', title: 'Sannenzaka and Ninenzaka', kind: 'activity', duration: '1 h', lat: 34.9965, lng: 135.7813, note: 'Stone lanes of tea houses and craft shops, down to Yasaka Shrine.' },
+            { time: '14:00', title: 'Kiyomizu-dera', url: 'https://www.kiyomizudera.or.jp/', kind: 'sight', duration: '1 h 30 min', cost: '¥500', lat: 34.9943, lng: 135.7844 },
+            { time: '15:45', title: 'Sannenzaka and Ninenzaka', url: 'https://en.wikipedia.org/wiki/Sannenzaka', kind: 'activity', duration: '1 h', lat: 34.9965, lng: 135.7813, note: 'Stone lanes of tea houses and craft shops, down to Yasaka Shrine.' },
             { time: '19:00', title: 'Dinner in Pontochō', kind: 'food', lat: 35.0042, lng: 135.7712, note: 'A lantern-lit alley by the Kamo River: book on Fridays.' },
           ],
         },
@@ -179,10 +180,10 @@ Icon = "sun" | "partly" | "cloud" | "rain" | "showers" | "storm" | "snow" | "sle
           title: 'Arashiyama',
           items: [
             { time: '07:45', title: 'Train to Saga-Arashiyama', place: 'JR Sagano Line from Kyoto Station', kind: 'travel', duration: '15 min', cost: '¥240', lat: 35.0207, lng: 135.681 },
-            { time: '08:15', title: 'Bamboo Grove', kind: 'sight', duration: '45 min', cost: 'Free', lat: 35.0167, lng: 135.6711, note: 'Walk it uphill before the tour groups arrive.' },
-            { time: '09:15', title: 'Tenryū-ji', kind: 'sight', duration: '1 h 15 min', cost: '¥800', lat: 35.0162, lng: 135.6729, note: 'A pond garden laid out in the 14th century.' },
-            { time: '11:30', title: 'Lunch at Shigetsu', place: 'Inside Tenryū-ji', kind: 'food', cost: '¥3,300', note: 'Buddhist vegetarian cooking, *shōjin ryōri*.' },
-            { time: '13:00', title: 'Ōkōchi Sansō', kind: 'sight', duration: '1 h', cost: '¥1,000', lat: 35.0166, lng: 135.6696, note: 'An actor’s hillside villa; matcha and a sweet come with the ticket.' },
+            { time: '08:15', title: 'Bamboo Grove', url: 'https://en.wikipedia.org/wiki/Sagano_Bamboo_Forest', kind: 'sight', duration: '45 min', cost: 'Free', lat: 35.0167, lng: 135.6711, note: 'Walk it uphill before the tour groups arrive.' },
+            { time: '09:15', title: 'Tenryū-ji', url: 'https://www.tenryuji.com/', kind: 'sight', duration: '1 h 15 min', cost: '¥800', lat: 35.0162, lng: 135.6729, note: 'A pond garden laid out in the 14th century.' },
+            { time: '11:30', title: 'Lunch at Shigetsu', url: 'https://www.tenryuji.com/shigetsu/', place: 'Inside Tenryū-ji', kind: 'food', cost: '¥3,300', note: 'Buddhist vegetarian cooking, *shōjin ryōri*.' },
+            { time: '13:00', title: 'Ōkōchi Sansō', url: 'https://en.wikipedia.org/wiki/%C5%8Ck%C5%8Dchi_Sans%C5%8D', kind: 'sight', duration: '1 h', cost: '¥1,000', lat: 35.0166, lng: 135.6696, note: 'An actor’s hillside villa; matcha and a sweet come with the ticket.' },
             { time: '17:30', title: 'Hōgon-in by night', kind: 'activity', duration: '1 h', cost: '¥1,000', lat: 35.0142, lng: 135.674, note: 'The moss garden lit up for the autumn colours.' },
           ],
         },
@@ -190,12 +191,12 @@ Icon = "sun" | "partly" | "cloud" | "rain" | "showers" | "storm" | "snow" | "sle
           date: '2026-11-22',
           title: 'The Golden and Silver Pavilions',
           items: [
-            { time: '09:00', title: 'Kinkaku-ji', kind: 'sight', duration: '45 min', cost: '¥500', lat: 35.0395, lng: 135.7295 },
-            { time: '10:15', title: 'Ryōan-ji', kind: 'sight', duration: '1 h', cost: '¥600', lat: 35.0335, lng: 135.7181, note: 'Fifteen stones: from any seat you see only fourteen.' },
-            { time: '12:30', title: 'Nishiki Market', kind: 'food', duration: '1 h', lat: 35.005, lng: 135.7656, note: 'Graze: tamagoyaki, yuba, pickles, grilled mochi.' },
-            { time: '14:30', title: 'Ginkaku-ji', kind: 'sight', duration: '1 h', cost: '¥500', lat: 35.0269, lng: 135.7984 },
-            { time: '15:45', title: 'Philosopher’s Path', kind: 'activity', duration: '45 min', lat: 35.0225, lng: 135.7948, note: '2 km along a canal under maples.' },
-            { time: '17:00', title: 'Eikan-dō at dusk', kind: 'sight', duration: '1 h 30 min', cost: '¥1,000', lat: 35.0147, lng: 135.7938, note: 'Kyoto’s most famous maples, lit up after dark.' },
+            { time: '09:00', title: 'Kinkaku-ji', url: 'https://www.shokoku-ji.jp/kinkakuji/', kind: 'sight', duration: '45 min', cost: '¥500', lat: 35.0395, lng: 135.7295 },
+            { time: '10:15', title: 'Ryōan-ji', url: 'https://en.wikipedia.org/wiki/Ry%C5%8Dan-ji', kind: 'sight', duration: '1 h', cost: '¥600', lat: 35.0335, lng: 135.7181, note: 'Fifteen stones: from any seat you see only fourteen.' },
+            { time: '12:30', title: 'Nishiki Market', url: 'https://www.nishikimarket.com/', kind: 'food', duration: '1 h', lat: 35.005, lng: 135.7656, note: 'Graze: tamagoyaki, yuba, pickles, grilled mochi.' },
+            { time: '14:30', title: 'Ginkaku-ji', url: 'https://www.shokoku-ji.jp/ginkakuji/', kind: 'sight', duration: '1 h', cost: '¥500', lat: 35.0269, lng: 135.7984 },
+            { time: '15:45', title: 'Philosopher’s Path', url: 'https://en.wikipedia.org/wiki/Philosopher%27s_Walk', kind: 'activity', duration: '45 min', lat: 35.0225, lng: 135.7948, note: '2 km along a canal under maples.' },
+            { time: '17:00', title: 'Eikan-dō at dusk', url: 'https://www.eikando.or.jp/', kind: 'sight', duration: '1 h 30 min', cost: '¥1,000', lat: 35.0147, lng: 135.7938, note: 'Kyoto’s most famous maples, lit up after dark.' },
           ],
         },
       ],

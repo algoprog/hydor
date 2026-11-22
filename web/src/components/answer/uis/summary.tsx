@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, CircleHelp, CircleX, CornerDownRight, Info, Lightbulb, MessageSquareWarning, OctagonAlert, Search, X } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
-import { arr, Card, Chip, fmtDate, Head, hostOf, isObj, KeyValues, LinkOut, Md, num, Pic, Section, SpeakBtn, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Card, Chip, fmtDate, Head, hostOf, isObj, KeyValues, LinkOut, Md, NameLink, num, Pic, Section, SpeakBtn, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -507,12 +507,10 @@ function QuoteView({ data }: { data: Data }) {
 
 function CardTitle({ c }: { c: Data }) {
   const title = textOf(c, 'title', 'name', 'label');
-  return str(c.url) ? (
-    <LinkOut url={c.url} className="font-semibold text-fg">
+  return (
+    <NameLink url={c.url} className="font-semibold">
       {title}
-    </LinkOut>
-  ) : (
-    <span className="font-semibold text-fg">{title}</span>
+    </NameLink>
   );
 }
 

@@ -69,6 +69,7 @@ export const DATA: AnswerUiSpec[] = [
     type?: "text" | "number" | "money" | "percent" | "date" | "link" | "image" | "tag" | "bar" | "rating" | "md"
     unit?: string              // after numbers
     currency?: string          // money: "USD", "EUR"
+    link?: string              // the key of a field holding each row's address: this column's text links to it
   }[]
   rows: Record<string, string | number | boolean | null>[]   // values by column key; percent as 0.25 for 25%
   sort?: string                // the column to sort by first ("-key": highest first)
@@ -93,23 +94,23 @@ export const DATA: AnswerUiSpec[] = [
     example: {
       title: 'The ten largest moons in the Solar System',
       columns: [
-        { key: 'moon', label: 'Moon' },
+        { key: 'moon', label: 'Moon', link: 'page' },
         { key: 'planet', label: 'Planet', type: 'tag' },
         { key: 'diameter', label: 'Diameter', type: 'bar', unit: 'km' },
         { key: 'gravity', label: 'Surface gravity', type: 'number', unit: 'm/s²' },
         { key: 'discovered', label: 'Discovered' },
       ],
       rows: [
-        { moon: 'Ganymede', planet: 'Jupiter', diameter: 5268, gravity: 1.43, discovered: '1610' },
-        { moon: 'Titan', planet: 'Saturn', diameter: 5150, gravity: 1.35, discovered: '1655' },
-        { moon: 'Callisto', planet: 'Jupiter', diameter: 4821, gravity: 1.24, discovered: '1610' },
-        { moon: 'Io', planet: 'Jupiter', diameter: 3643, gravity: 1.8, discovered: '1610' },
-        { moon: 'The Moon', planet: 'Earth', diameter: 3475, gravity: 1.62, discovered: '—' },
-        { moon: 'Europa', planet: 'Jupiter', diameter: 3122, gravity: 1.31, discovered: '1610' },
-        { moon: 'Triton', planet: 'Neptune', diameter: 2707, gravity: 0.78, discovered: '1846' },
-        { moon: 'Titania', planet: 'Uranus', diameter: 1578, gravity: 0.37, discovered: '1787' },
-        { moon: 'Rhea', planet: 'Saturn', diameter: 1527, gravity: 0.26, discovered: '1672' },
-        { moon: 'Oberon', planet: 'Uranus', diameter: 1523, gravity: 0.35, discovered: '1787' },
+        { moon: 'Ganymede', page: 'https://en.wikipedia.org/wiki/Ganymede_(moon)', planet: 'Jupiter', diameter: 5268, gravity: 1.43, discovered: '1610' },
+        { moon: 'Titan', page: 'https://en.wikipedia.org/wiki/Titan_(moon)', planet: 'Saturn', diameter: 5150, gravity: 1.35, discovered: '1655' },
+        { moon: 'Callisto', page: 'https://en.wikipedia.org/wiki/Callisto_(moon)', planet: 'Jupiter', diameter: 4821, gravity: 1.24, discovered: '1610' },
+        { moon: 'Io', page: 'https://en.wikipedia.org/wiki/Io_(moon)', planet: 'Jupiter', diameter: 3643, gravity: 1.8, discovered: '1610' },
+        { moon: 'The Moon', page: 'https://en.wikipedia.org/wiki/Moon', planet: 'Earth', diameter: 3475, gravity: 1.62, discovered: '—' },
+        { moon: 'Europa', page: 'https://en.wikipedia.org/wiki/Europa_(moon)', planet: 'Jupiter', diameter: 3122, gravity: 1.31, discovered: '1610' },
+        { moon: 'Triton', page: 'https://en.wikipedia.org/wiki/Triton_(moon)', planet: 'Neptune', diameter: 2707, gravity: 0.78, discovered: '1846' },
+        { moon: 'Titania', page: 'https://en.wikipedia.org/wiki/Titania_(moon)', planet: 'Uranus', diameter: 1578, gravity: 0.37, discovered: '1787' },
+        { moon: 'Rhea', page: 'https://en.wikipedia.org/wiki/Rhea_(moon)', planet: 'Saturn', diameter: 1527, gravity: 0.26, discovered: '1672' },
+        { moon: 'Oberon', page: 'https://en.wikipedia.org/wiki/Oberon_(moon)', planet: 'Uranus', diameter: 1523, gravity: 0.35, discovered: '1787' },
       ],
       sort: '-diameter',
       note: 'Ganymede is wider than the planet Mercury, though only half as massive.',

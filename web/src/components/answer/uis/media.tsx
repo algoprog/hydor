@@ -31,7 +31,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { mu } from '../../../lib/machine';
 import { cx } from '../../ui';
-import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, num, obj, parseDate, Pic, Seg, Stars, str, textOf, useAui, useKept, usePicOk, usePicsOk, Video, WithPic, words, youTubeId, type AnswerUiView, type Data } from '../kit';
+import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, NameLink, num, obj, parseDate, Pic, Seg, Stars, str, textOf, useAui, useKept, usePicOk, usePicsOk, Video, WithPic, words, youTubeId, type AnswerUiView, type Data } from '../kit';
 
 // ---- small parts these views share ------------------------------------------------------------------------------------
 
@@ -601,13 +601,7 @@ function MediaItem({ it, kind, done }: { it: Data; kind: string; done: boolean }
         <Pic src={it.image ?? it.poster ?? it.cover} alt={title} className={cx('shrink-0 self-start rounded-lg', course ? 'w-[120px] @md:w-[148px]' : 'w-[84px] @md:w-[104px]', K.poster)} />
         <div className="min-w-0 flex-1">
           <h4 className="m-0 text-[15.5px] leading-snug font-semibold">
-            {isWeb(url) ? (
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
-                {title}
-              </a>
-            ) : (
-              title
-            )}
+            <NameLink url={url}>{title}</NameLink>
             {str(it.year) && <span className="ml-1.5 text-[13.5px] font-normal text-fg-3">{str(it.year)}</span>}
           </h4>
           {facts.length > 0 && <div className="mt-0.5 text-[12.5px] text-fg-2">{facts.join(' · ')}</div>}
@@ -884,13 +878,9 @@ function Events({ data, done }: { data: Data; done: boolean }) {
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className={cx('text-[15px] leading-snug font-semibold', over && 'text-fg-2')}>
-                      {isWeb(e.url) ? (
-                        <a href={e.url} target="_blank" rel="noopener noreferrer" className="text-inherit hover:text-accent hover:underline">
-                          <Md text={e.title} inline />
-                        </a>
-                      ) : (
+                      <NameLink url={e.url}>
                         <Md text={e.title} inline />
-                      )}
+                      </NameLink>
                     </div>
                     {when && (
                       <div className="mt-1 flex items-center gap-1.5 text-[12.5px] text-fg-2 tabular-nums">
@@ -1117,13 +1107,7 @@ function StoryMeta({ s }: { s: Story }) {
 function StoryTitle({ s, className }: { s: Story; className: string }) {
   return (
     <h4 className={cx('m-0 leading-snug font-semibold', className)}>
-      {isWeb(s.url) ? (
-        <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
-          {s.title}
-        </a>
-      ) : (
-        s.title
-      )}
+      <NameLink url={s.url}>{s.title}</NameLink>
     </h4>
   );
 }

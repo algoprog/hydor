@@ -50,7 +50,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, useWidth } from '../charts';
-import { arr, Card, Chip, compact, fmtDate, fmtMinutes, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, Md, num, obj, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, usePicOk, usePicsOk, WithPic, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
+import { arr, Card, Chip, compact, fmtDate, fmtMinutes, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, mapsLink, Md, NameLink, num, obj, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, usePicOk, usePicsOk, WithPic, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
 import { HoverTip } from './data';
 
 // ---- places on a map --------------------------------------------------------------------------------------------------
@@ -84,23 +84,22 @@ function Places({ data }: { data: Data }) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline gap-2">
                   {num_ !== null && <NoPicNumber src={p.image} n={num_} />}
-                  {str(p.url) ? (
-                    <LinkOut url={p.url} icon={false} className="line-clamp-2 font-semibold text-fg">
-                      {str(p.name)}
-                    </LinkOut>
-                  ) : (
-                    <span className="line-clamp-2 font-semibold">{str(p.name)}</span>
-                  )}
+                  <span className="line-clamp-2 font-semibold">
+                    <NameLink url={p.url}>{str(p.name)}</NameLink>
+                  </span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-fg-3">
                   {str(p.kind) && <span>{str(p.kind)}</span>}
                   {num(p.rating) !== null && <Stars value={p.rating} size={11} />}
                   {str(p.price) && <span className="font-medium text-fg-2">{str(p.price)}</span>}
                 </div>
-                {str(p.address) && (
-                  <div className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-fg-3">
-                    <MapPin size={11} className="shrink-0" />
-                    <span className="truncate">{str(p.address)}</span>
+                {(str(p.address) || mapsLink(p)) && (
+                  <div className="mt-0.5 flex items-start gap-1 text-[12px] text-fg-3">
+                    <MapPin size={11} className="mt-[3px] shrink-0" />
+                    <span className="min-w-0">
+                      {/* On Google Maps by its address, or by its position when it has no address. */}
+                      <NameLink url={mapsLink(p)}>{str(p.address) || 'Google Maps'}</NameLink>
+                    </span>
                   </div>
                 )}
                 {str(p.note) && <Md text={p.note} className="mt-1 text-[12.5px] text-fg-2" />}
@@ -448,7 +447,9 @@ function Place({ data }: { data: Data }) {
                 {str(data.address) && (
                   <div className={row}>
                     <MapPin size={14} className={icon} />
-                    <span className="min-w-0 text-fg-2">{str(data.address)}</span>
+                    <span className="min-w-0 text-fg-2">
+                      <NameLink url={mapsLink({ ...data, name })}>{str(data.address)}</NameLink>
+                    </span>
                   </div>
                 )}
                 {(hours.length > 0 || hoursLine) && (
@@ -594,7 +595,9 @@ function Itinerary({ data, done }: { data: Data; done: boolean }) {
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="leading-snug font-semibold">{textOf(it, 'title', 'name')}</div>
+                    <div className="leading-snug font-semibold">
+                      <NameLink url={it.url}>{textOf(it, 'title', 'name')}</NameLink>
+                    </div>
                     {str(it.place) && <div className="text-[12.5px] text-fg-3">{str(it.place)}</div>}
                   </div>
                   {!offline && <Pic src={it.image} alt={textOf(it, 'title', 'name')} className="h-12 w-16 shrink-0 rounded-md" />}
@@ -955,13 +958,7 @@ function StayCard({ s, pin, cur }: { s: Data; pin: number | null; cur: string })
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-1.5 leading-snug font-semibold">
               {pin !== null && !hasPic && <span className="grid h-5 w-5 place-items-center rounded-full bg-accent text-[10.5px] text-accent-fg">{pin}</span>}
-              {/^https?:\/\//i.test(str(s.url).trim()) ? (
-                <a href={str(s.url).trim()} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
-                  {name}
-                </a>
-              ) : (
-                <span>{name}</span>
-              )}
+              <NameLink url={s.url}>{name}</NameLink>
               {stars > 0 && (
                 <span className="inline-flex text-fg-3" title={tr('{0} stars').replace('{0}', String(stars))}>
                   {Array.from({ length: stars }, (_, k) => (

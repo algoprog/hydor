@@ -26,6 +26,7 @@ import {
   Md,
   Meter,
   More,
+  NameLink,
   num,
   obj,
   parseDate,
@@ -41,6 +42,7 @@ import {
   toneOf,
   useKept,
   usePicOk,
+  webLink,
   withUnit,
   yes,
   type AnswerUiView,
@@ -145,6 +147,8 @@ interface Col {
   type: string;
   unit: string;
   currency: string;
+  /** The key of the row's field holding the address this column's text links to ('' for none). */
+  link: string;
 }
 
 const NUMERIC = new Set(['number', 'money', 'percent', 'bar', 'rating']);
@@ -171,7 +175,7 @@ function CellPic({ v }: { v: unknown }) {
   );
 }
 
-function TableCell({ c, v, max }: { c: Col; v: unknown; max: number }) {
+function TableCell({ c, v, max, href }: { c: Col; v: unknown; max: number; href?: unknown }) {
   if (v === null || v === undefined || v === '') return <span className="text-fg-3">—</span>;
   switch (c.type) {
     case 'link':
@@ -192,9 +196,15 @@ function TableCell({ c, v, max }: { c: Col; v: unknown; max: number }) {
       );
     }
     case 'md':
-      return <Md text={v} inline />;
+      return webLink(href) ? (
+        <NameLink url={href}>
+          <Md text={v} inline />
+        </NameLink>
+      ) : (
+        <Md text={v} inline />
+      );
     default:
-      return <>{cellText(c, v)}</>;
+      return webLink(href) ? <NameLink url={href}>{cellText(c, v)}</NameLink> : <>{cellText(c, v)}</>;
   }
 }
 
@@ -203,7 +213,7 @@ function DataTable({ data, done }: { data: Data; done: boolean }) {
     const given: Data[] = arr(data.columns).map((c) => (isObj(c) ? c : { key: str(c), label: str(c) }));
     const rows = arr(data.rows).filter(isObj);
     const list: Data[] = given.length ? given : Object.keys(rows[0] ?? {}).map((k) => ({ key: k, label: k }));
-    return list.map((c) => ({ key: str(c.key ?? c.label), label: str(c.label ?? c.key), type: str(c.type).toLowerCase() || 'text', unit: str(c.unit), currency: str(c.currency) }));
+    return list.map((c) => ({ key: str(c.key ?? c.label), label: str(c.label ?? c.key), type: str(c.type).toLowerCase() || 'text', unit: str(c.unit), currency: str(c.currency), link: str(c.link) }));
   }, [data.columns, data.rows]);
   const rows = arr(data.rows).filter(isObj);
   const first = str(data.sort);
@@ -274,7 +284,7 @@ function DataTable({ data, done }: { data: Data; done: boolean }) {
               <tr key={i} className="border-b border-line/60 last:border-b-0 hover:bg-bg-1/60">
                 {cols.map((c) => (
                   <td key={c.key} className={cx('px-3 py-1.5 align-middle first:pl-4 last:pr-4 @lg:first:pl-5 @lg:last:pr-5', NUMERIC.has(c.type) && c.type !== 'bar' && c.type !== 'rating' && 'text-right whitespace-nowrap tabular-nums')}>
-                    <TableCell c={c} v={r[c.key]} max={maxOf[c.key] ?? 0} />
+                    <TableCell c={c} v={r[c.key]} max={maxOf[c.key] ?? 0} href={c.link ? r[c.link] : undefined} />
                   </td>
                 ))}
               </tr>

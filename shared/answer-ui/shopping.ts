@@ -103,11 +103,13 @@ export const SHOPPING: AnswerUiSpec[] = [
   title: string
   subtitle?: string
   image?: image
+  url?: url                    // its own page: the title links to it
   groups: { name: string, specs: { label: string, value: md }[] }[]
   note?: md
 }`,
     example: {
       title: 'MacBook Air 13-inch',
+      url: 'https://www.apple.com/macbook-air/',
       subtitle: 'M4, 2025 · from $999',
       image: 'https://cdn.mos.cms.futurecdn.net/WcS4jaahBp6jrbiU8acZsQ-2501-80.jpg',
       groups: [

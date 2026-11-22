@@ -8,7 +8,7 @@ import { toast } from '../../../lib/store';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
-import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, hostOf, isObj, LinkOut, Md, Meter, num, parseDate, Pic, Ring, Seg, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, useAui, useKept, useNow, WithPic, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, hostOf, isObj, LinkOut, Md, Meter, NameLink, num, parseDate, Pic, Ring, Seg, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, useAui, useKept, useNow, WithPic, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
 
@@ -120,7 +120,9 @@ function Timeline({ data }: { data: Data }) {
               <div className={cx('min-w-0', i < events.length - 1 && 'pb-5')}>
                 {date && <div className="text-[12px] font-semibold text-fg-2 @md:hidden">{date}</div>}
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="leading-snug font-semibold">{title}</span>
+                  <span className="leading-snug font-semibold">
+                    <NameLink url={e.url}>{title}</NameLink>
+                  </span>
                   {str(e.tag) && <Chip tone={tone ?? 'neutral'}>{str(e.tag)}</Chip>}
                 </div>
                 {(str(e.text) || pic) && (

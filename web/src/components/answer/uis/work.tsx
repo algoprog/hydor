@@ -36,7 +36,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
-import { arr, Ask, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtMoney, fmtNum, Head, hostOf, initials, isObj, Md, Meter, num, obj, Pic, Section, Seg, str, textOf, TONE, useKept, usePicOk, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Ask, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtMoney, fmtNum, Head, hostOf, initials, isObj, Md, Meter, NameLink, num, obj, Pic, Section, Seg, str, textOf, TONE, useKept, usePicOk, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 import { CopyMark } from '../../CopyMark';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
@@ -1123,13 +1123,9 @@ function JobCard({ j, done }: { j: Job; done: boolean }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              {link ? (
-                <a href={link} target="_blank" rel="noopener noreferrer" className="text-[15px] leading-snug font-semibold text-fg hover:text-accent hover:underline">
-                  {j.title}
-                </a>
-              ) : (
-                <span className="text-[15px] leading-snug font-semibold text-fg">{j.title}</span>
-              )}
+              <NameLink url={link} className="text-[15px] leading-snug font-semibold">
+                {j.title}
+              </NameLink>
               {(j.company || j.location) && (
                 <div className="mt-0.5 text-[13px] text-fg-2">
                   {j.company}

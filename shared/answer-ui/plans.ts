@@ -17,6 +17,7 @@ export const PLANS: AnswerUiSpec[] = [
     image?: image
     tag?: string
     tone?: tone                // the dot's colour
+    url?: url                  // where to read more: its title links to it
   }[]                          // in order
 }`,
     example: {
@@ -24,11 +25,11 @@ export const PLANS: AnswerUiSpec[] = [
       events: [
         { date: 'c. 1250 BCE', title: 'A Mycenaean citadel', text: 'Cyclopean walls ring the rock, with a palace on its top.', tag: 'Bronze Age' },
         { date: '480 BCE', title: 'The Persians burn it', text: 'Xerxes’ army sacks the old temples; the Athenians later bury the broken statues.', tone: 'bad' },
-        { date: '447–432 BCE', title: 'The Parthenon is built', text: 'Under Pericles, Ictinus and Callicrates build it and Phidias oversees its sculptures.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/The_Parthenon_in_Athens.jpg/500px-The_Parthenon_in_Athens.jpg', tag: 'Classical', tone: 'good' },
+        { date: '447–432 BCE', title: 'The Parthenon is built', url: 'https://en.wikipedia.org/wiki/Parthenon', text: 'Under Pericles, Ictinus and Callicrates build it and Phidias oversees its sculptures.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/The_Parthenon_in_Athens.jpg/500px-The_Parthenon_in_Athens.jpg', tag: 'Classical', tone: 'good' },
         { date: '1458', title: 'The Ottomans take the rock', text: 'The Parthenon becomes a mosque, with a minaret in its corner.' },
         { date: '26 September 1687', title: 'The great explosion', text: 'A Venetian shell ignites Ottoman gunpowder stored in the Parthenon and blows out its middle.', tone: 'bad' },
-        { date: '1801–1812', title: 'Elgin takes the marbles', text: 'About half the surviving sculptures are shipped to Britain; they are in the British Museum today.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Elgin-marbles-jan-2024.jpg/500px-Elgin-marbles-jan-2024.jpg' },
-        { date: '20 June 2009', title: 'The Acropolis Museum opens', text: 'Its top floor shows the frieze facing the temple, with gaps left for what is in London.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Acropolis_and_Acropolis_Museum.jpg/500px-Acropolis_and_Acropolis_Museum.jpg', tone: 'info' },
+        { date: '1801–1812', title: 'Elgin takes the marbles', url: 'https://en.wikipedia.org/wiki/Elgin_Marbles', text: 'About half the surviving sculptures are shipped to Britain; they are in the British Museum today.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Elgin-marbles-jan-2024.jpg/500px-Elgin-marbles-jan-2024.jpg' },
+        { date: '20 June 2009', title: 'The Acropolis Museum opens', url: 'https://en.wikipedia.org/wiki/Acropolis_Museum', text: 'Its top floor shows the frieze facing the temple, with gaps left for what is in London.', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Acropolis_and_Acropolis_Museum.jpg/500px-Acropolis_and_Acropolis_Museum.jpg', tone: 'info' },
       ],
     },
   },

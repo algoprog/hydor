@@ -63,7 +63,7 @@ import { tr, trIn } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { normalizeMath } from '../../markdown-math';
 import { cx } from '../../ui';
-import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, SentNote, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Composed, type Data } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, NameLink, num, Pic, Ring, Section, Seg, SentNote, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Composed, type Data } from '../kit';
 import { useWidth } from '../charts';
 
 const LETTERS = 'ABCDEFGH';
@@ -875,13 +875,7 @@ function PaperItem({ p, done }: { p: Data; done: boolean }) {
   return (
     <article className="px-4 py-4 @lg:px-5">
       <h4 className="m-0 text-[15px] leading-snug font-semibold">
-        {/^https?:\/\//i.test(url) ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
-            {title}
-          </a>
-        ) : (
-          title
-        )}
+        <NameLink url={url}>{title}</NameLink>
       </h4>
       {shownAuthors && (
         <div className="mt-0.5 text-[12.5px] text-fg-2" title={authors.length > 6 ? authors.join(', ') : undefined}>
@@ -1208,13 +1202,9 @@ function Links({ data, done }: { data: Data; done: boolean }) {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  {/^https?:\/\//i.test(l.url) ? (
-                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-fg hover:text-accent hover:underline">
-                      {l.title || site}
-                    </a>
-                  ) : (
-                    <span className="font-semibold">{l.title}</span>
-                  )}
+                  <NameLink url={l.url} className="font-semibold">
+                    {l.title || site}
+                  </NameLink>
                   {site && <span className="text-[12px] text-fg-3">{site}</span>}
                 </div>
                 {l.description && <Md text={l.description} className="mt-0.5 text-[13px] text-fg-2" />}
