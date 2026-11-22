@@ -396,7 +396,7 @@ A bar above the message box shows the goal, what it is doing ("round 7 of 12 · 
 
 A check that held and now cannot run (a reviewer that is down, a timeout, a missing tool) has not stopped holding: it runs once more, and if it still cannot, the goal pauses ("“Tests pass” could not run: … Resume to check the round again") and the round is neither kept nor undone. If the reviewer cannot read your rules, the round goes on and its row says "Your rules could not be checked this round".
 
-When every check holds, the app does not trust it at once: it runs the commands and numbers a second time, and a reviewer reads the whole change to see that no test was weakened or skipped, no answer was written into the code and the goal is really met. Only then is the goal reached. If that fails, the next round is told what the final check found, and from then on a round is kept when nothing broke and the files changed, and undone as "No change" when they did not. A **You** check then asks you: **It holds** or **Not yet**, with a note, and "Not yet" works the same way.
+When every check holds, the app does not trust it at once: it runs the commands and numbers a second time, and a reviewer reads the whole change (and the files the checks' reviewers asked for) to see that no test was weakened or skipped, no answer was written into the code and the goal is really met. Only then is the goal reached. If that fails, the next round is told what the final check found, and from then on a round is kept when nothing broke and the files changed, and undone as "No change" when they did not. A **You** check then asks you: **It holds** or **Not yet**, with a note, and "Not yet" works the same way.
 
 ### How much it asks you
 
