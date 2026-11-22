@@ -440,7 +440,10 @@ const salesTask = refreshTaskId(shop.id, 'csales1');
 
 // ---- Schedules' week view ----------------------------------------------------------------------------------------------------
 {
-  const w = (await req('GET', '/api/automations/week')).json() as ScheduleWeek;
+  // From yesterday for nine days, not "this week": on a Sunday after 07:00 the week from its Monday has no run of a daily
+  // task left to come, and in any time zone the range holds today's runs and tomorrow's 07:00.
+  const from = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const w = (await req('GET', `/api/automations/week?start=${from}&days=9`)).json() as ScheduleWeek;
   const it = w.items.find((x) => x.id === salesTask);
   ok(it?.source === 'board' && it.board?.name === 'Shop' && it.board.card === 'Weekly sales' && it.edit === `/pages/${shop.id}?card=csales1` && it.when === 'Daily at 07:00', `a card’s refreshes show as the board’s, opening the board (${JSON.stringify(it)})`);
   const runs = w.runs.filter((x) => x.task === salesTask);
