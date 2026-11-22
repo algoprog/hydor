@@ -103,6 +103,8 @@ export interface GoalPrivate {
   wentOn?: number;
   /** What its session's queue held for it goes before the loop's next message (R5: Resume while a step still ran). */
   releaseHeld?: boolean;
+  /** S4: the swarm's members its limit marked stopped while they were not at work (and when): Give it more… takes those marks back. */
+  limitMarked?: { key: string; at: number }[];
   /**
    * M7b: when the stop of its team at a limit began (its subagents at work stopped, the lead marked as stopped): set until
    * that is done, so a restart that cuts it has the tick finish it.

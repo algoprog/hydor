@@ -58,7 +58,8 @@ export const reportOnItsWay = (key: string) => reporting.has(key);
  * Whether news for a lead (a Hydor subagent's report, its swarm board's batch) about work begun at `since` waits in its
  * held queue instead of waking it, which could set a stopped member to work again and spend after the stop:
  * - the lead was stopped at or after then (Stop all, the board's Stop all, or its goal's limit, which marks it so:
- *   stoppedAll), unless its goal went on since (R2: Resume, Give it more…, wentOn), when the stop is over;
+ *   stoppedAll), unless its goal went on since (R2: Resume, Give it more…, wentOn) or was set since (S5), when the stop
+ *   is over for it;
  * - its goal (server/goals) is paused, since a pause at or after then;
  * - its goal waits at its limit, reached at or after then (R1: one the person stopped, or reached, holds nothing).
  * News of work begun later (the person set it going again) goes as before. What was held goes when the person resumes
@@ -67,7 +68,8 @@ export const reportOnItsWay = (key: string) => reporting.has(key);
 export function holdsNewsFor(db: DB, lead: string, since: number): boolean {
   const g = loadGoal(db, lead);
   const stopped = sessionExtra(db, lead).stoppedAll;
-  if (typeof stopped === 'number' && stopped > 0 && stopped >= since && stopped > (g?._.wentOn ?? 0)) return true;
+  // A stop from before the goal went on, or (S5) from before the goal was set, is over for that goal.
+  if (typeof stopped === 'number' && stopped > 0 && stopped >= since && stopped > (g?._.wentOn ?? 0) && stopped >= (g?.startedAt ?? 0)) return true;
   if (!g) return false;
   if (g.status === 'paused') return (g._.pausedAt ?? Infinity) >= since;
   return g.status === 'limit' && (g.endedAt ?? Infinity) >= since;

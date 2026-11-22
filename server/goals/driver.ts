@@ -383,10 +383,28 @@ export async function checkRunner(d: Deps, key: string, cwd: string): Promise<{ 
 async function say(d: Deps, g: StoredGoal, text: string, o: { again?: boolean } = {}): Promise<boolean> {
   // Kept to send again once if a restart of the app cuts the agent's turn short (the original, not the copy sent again).
   if (!o.again) remember(d, g, (f) => (f._.lastMessage = text));
-  // What its queue held while the goal was stopped or paused goes first (releaseHeldNews), then this message after it.
+  // What its queue held while the goal was stopped or paused goes first, then this message after it (R5). S2: queued
+  // behind what was held, and the queue let go once, so the session manager sends them in order, one a turn. Sent beside
+  // the queue's dispatch (which takes a moment, the agent still idle meanwhile), this message could go first or with the
+  // news, and the end of the turn on the news be taken for the round's. While it waits in the queue the session is not
+  // idle, so nothing takes it for a message that never went out (quiet's two minutes count once the queue is empty).
+  // Only where the agent runs: a queue goes to a running agent, so one that is not running starts with this message
+  // (sent below) and takes what was held at that turn's end.
   if (fresh(d, g)?._.releaseHeld) {
     remember(d, g, (f) => (f._.releaseHeld = undefined));
-    releaseHeldNews(d, g.key);
+    if (heldNewsOnly(d, g.key)) {
+      let queued = false;
+      if (d.sessions.summary(g.key)?.live) {
+        try {
+          d.sessions.enqueue(g.key, text, [], [], true);
+          queued = true;
+        } catch {
+          // Not queued: sent as any message below.
+        }
+      }
+      d.sessions.resumeQueue(g.key);
+      if (queued) return true;
+    }
   }
   try {
     await d.sessions.deliverOrQueue(g.key, text);
@@ -1118,13 +1136,24 @@ async function stopChild(d: Deps, k: string, swarm: boolean) {
  * (stopChild), those that appear meanwhile too (a start_child_session in flight: `again` looks for them). The goal is
  * marked while this is under way (teamStop), so a restart that cuts it has the tick finish it.
  */
-async function stopTeam(d: Deps, key: string, stopped = new Set<string>()) {
+async function stopTeam(d: Deps, g: Pick<StoredGoal, 'key' | 'id'>, stopped = new Set<string>()) {
+  const key = g.key;
   const swarm = leadsSwarm(d, key);
   const now = Date.now();
   setSessionExtra(d.db, key, { stoppedAll: now });
   // R4: every member of a swarm is marked stopped, those not at work too (nothing is stopped in them), so a post on the
-  // board wakes none of them after the limit; message_child still reaches one after Give it more…
-  if (swarm) for (const k of childKeys(d.db, key)) if (!sessionExtra(d.db, k).swarmStopped) setSessionExtra(d.db, k, { swarmStopped: now });
+  // board wakes none of them after the limit; message_child still reaches one after Give it more… S4: the idle ones
+  // marked so are kept in the goal (limitMarked), and Give it more… takes those marks back; those at work keep theirs.
+  if (swarm) {
+    const atWork = new Set(childrenAtWork(d, key));
+    const marked: { key: string; at: number }[] = [];
+    for (const k of childKeys(d.db, key))
+      if (!atWork.has(k) && !sessionExtra(d.db, k).swarmStopped) {
+        setSessionExtra(d.db, k, { swarmStopped: now });
+        marked.push({ key: k, at: now });
+      }
+    if (marked.length) remember(d, g, (x) => (x._.limitMarked = [...(x._.limitMarked ?? []), ...marked]));
+  }
   const st = d.sessions.summary(key)?.live?.status;
   if (st === 'working' || st === 'waiting' || st === 'starting') await d.sessions.interrupt(key).catch(() => {});
   const again = async () => {
@@ -1210,10 +1239,10 @@ async function startRound(d: Deps, g: StoredGoal, o: { changeApproach?: boolean 
   let crew: Awaited<ReturnType<typeof swarmMembers>> | undefined;
   if (g.undo || team) {
     // Marked, so a Pause in that moment leaves a round to start on Resume rather than going back over the last one.
-    if (g.undo) {
-      g._.starting = { ...(o.changeApproach ? { changeApproach: true } : {}) };
-      commit(d, g);
-    }
+    if (g.undo) g._.starting = { ...(o.changeApproach ? { changeApproach: true } : {}) };
+    // S1: saved before the await, whenever there is one: what the caller changed and has not saved (the start measured,
+    // a round just recorded, an answer, Resume's marks) would be lost when the goal is read again after it.
+    commit(d, g);
     const w = g.undo ? place(d, g.key, g)?.w : undefined;
     const status = g.status;
     const [ckpt, members] = await Promise.all([w ? checkpoint(w).catch(() => null) : null, team ? swarmMembers(d, g.key).catch(() => []) : undefined]);
@@ -2214,6 +2243,11 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
     // since goes right before the loop's next message (never while the final check runs).
     f._.wentOn = Date.now();
     f._.releaseHeld = true;
+    // S4: the members the limit marked stopped while they were not at work are members again (a swarm_post to everyone
+    // wakes them, the round message lists them as waiting), unless marked since by someone else; those it stopped at work
+    // stay stopped until the lead gives them more to do.
+    for (const m of f._.limitMarked ?? []) if (sessionExtra(d.db, m.key).swarmStopped === m.at) setSessionExtra(d.db, m.key, { swarmStopped: null });
+    f._.limitMarked = undefined;
     // J2: a half round whose checkpoint a restart kept from being taken gets it below (where the files are left as well).
     const half = halfWithout(f);
     f.contract = { ...f.contract, limits };
@@ -2243,10 +2277,13 @@ async function reopen(d: Deps, key: string, g: StoredGoal, a: Extract<GoalAction
  * ran, R5) it goes right before the loop's next message (say), never while checks or measuring run.
  */
 function releaseHeldNews(d: Deps, key: string) {
+  if (heldNewsOnly(d, key)) d.sessions.resumeQueue(key);
+}
+
+/** Whether the session's queue is held with nothing in it but what agents sent it or the loop's own messages (releaseHeldNews). */
+function heldNewsOnly(d: Deps, key: string): boolean {
   const s = d.sessions.summary(key);
-  if (!s?.queueHeld || !s.queue?.length) return;
-  if (!s.queue.every((m) => betweenAgents(m.text) || !!goalMessageOf(m.text))) return;
-  d.sessions.resumeQueue(key);
+  return !!s?.queueHeld && !!s.queue?.length && s.queue.every((m) => betweenAgents(m.text) || !!goalMessageOf(m.text));
 }
 
 /** Where the loop leaves the files, from the folder as it is. */
@@ -2557,7 +2594,7 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
       drive(key, async () => {
         const f = fresh(d, g);
         if (!f?._.teamStop) return;
-        const again = await stopTeam(d, key);
+        const again = await stopTeam(d, f);
         await again();
         remember(d, f, (x) => (x._.teamStop = undefined));
       }),
@@ -2612,7 +2649,7 @@ function tickOne(d: Deps, g: Readonly<StoredGoal>, now: number) {
           // goal stopped, and news of it wakes the session no more (held); what does not stop when told (a subagent slow to
           // answer, a command Codex runs on) is waited for, then named in the report. Marked in the goal until done (M7b).
           remember(d, f, (x) => (x._.teamStop = Date.now()));
-          const again = await stopTeam(d, key);
+          const again = await stopTeam(d, f);
           // The round stopped midway stays as the team left it: its checkpoint once the agent and its subagents stopped, a
           // while at most. One still at work then is named in the report.
           // L2: and once the commands its turn started have ended too (Codex runs them on after an interrupt, and nothing
