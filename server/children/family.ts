@@ -1,8 +1,9 @@
 // Who started whom: a child session keeps its parent's key in its settings (extra.parent).
 import type { SessionExtra } from '../../shared/features.ts';
-import { goalMessageOf } from '../../shared/goals.ts';
+import { goalMessageOf, goalOver } from '../../shared/goals.ts';
 import type { BackgroundTask, LiveState, SessionSummary } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
+import { loadGoal } from '../goals/store.ts';
 import { parseExtra, sessionExtra } from '../sessionExtra.ts';
 
 /** The session that started this one, when it is a child session. */
@@ -51,6 +52,22 @@ export function reportEnds(key: string) {
 }
 /** Whether a child's report is being written now (reportBegins … reportEnds). */
 export const reportOnItsWay = (key: string) => reporting.has(key);
+
+/**
+ * Whether news for a lead (a Hydor subagent's report, its swarm board's batch) about work begun at `since` waits in its
+ * held queue instead of waking it: the lead was stopped at or after then (Stop all, the board's Stop all, its goal's
+ * limit: stoppedAll), or its goal (server/goals) was paused or ended at or after then. A lead woken by it could set a
+ * stopped member to work again and spend after the stop. News of work begun later (the person set it going again) goes
+ * as before; what was held goes when the person resumes the queue, or when the goal goes on (it releases it).
+ */
+export function holdsNewsFor(db: DB, lead: string, since: number): boolean {
+  const stopped = sessionExtra(db, lead).stoppedAll;
+  if (typeof stopped === 'number' && stopped > 0 && stopped >= since) return true;
+  const g = loadGoal(db, lead);
+  if (!g) return false;
+  if (g.status === 'paused') return (g._.pausedAt ?? Infinity) >= since;
+  return goalOver(g.status) && (g.endedAt ?? Infinity) >= since;
+}
 
 /**
  * Whether the queue of a session still at work when the app restarted goes out when its turn ends, as it would have

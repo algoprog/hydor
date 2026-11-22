@@ -23,7 +23,7 @@ import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, turnAt, turnsOf, type Turn } from '../opinion/turns.ts';
-import { childKeys, FROM_LEAD, parentOf, reportBegins, reportEnds, stillAtWork, stillRunning } from './family.ts';
+import { childKeys, FROM_LEAD, holdsNewsFor, parentOf, reportBegins, reportEnds, stillAtWork, stillRunning } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
@@ -614,7 +614,8 @@ const markedSince = (d: Deps, key: string, field: 'stoppedAll' | 'stoppedWithPar
  * its held queue, so it does not wake the parent that was just stopped; the user sees it there and resumes it.
  */
 async function tellParent(d: Deps, parent: string, startedAt: number, text: string) {
-  if (markedSince(d, parent, 'stoppedAll', startedAt)) {
+  // Stopped since the turn began, or its goal paused or ended since (holdsNewsFor): held, not waking it.
+  if (holdsNewsFor(d.db, parent, startedAt)) {
     try {
       d.sessions.enqueue(parent, text, [], [], true);
     } catch {}
@@ -688,19 +689,23 @@ async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'exter
   // A turn its plan's usage limit stopped: first, how the child carries on is settled (with another account, on API
   // credit, or once the limit lifts), and the parent hears that instead of an error. One that stays stopped is
   // reported as any other turn.
+  // Two marks kept with the child (M7a): its report is being made (reporting), and it was handed over to be sent
+  // (reported, only then). A restart between them reports the turn again (catchUp looks for a turn not reported), and
+  // until then its lead's goal counts it as on its way: a rare report twice is better than one lost.
+  const prompt = turn.prompt.id;
+  setSessionExtra(d.db, t.key, { reporting: prompt });
+  const sent = () => setSessionExtra(d.db, t.key, { reported: prompt });
   const after = await limitAfter(d, t.key, t.startedAt);
-  // Kept with the child, so a restart neither repeats it nor loses it (catchUp): only now, so a restart while it was
-  // settled still reports it.
-  setSessionExtra(d.db, t.key, { reported: turn.prompt.id });
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
-  if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
+  if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return sent();
   // A child stopped with its parent (Stop all): the stop was the parent's own doing, so it is not told of it.
-  if (turn.status === 'interrupted' && markedSince(d, t.key, 'stoppedWithParent', t.startedAt)) return;
+  if (turn.status === 'interrupted' && markedSince(d, t.key, 'stoppedWithParent', t.startedAt)) return sent();
   // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
   const up = after ? null : await stepUpCheck(d, t.key, turn, t.startedAt);
   if (up) {
     try {
       await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why));
+      sent();
       return;
     } catch {
       // It could not start again (the most at once, an agent gone): its reply goes as it is.
@@ -725,6 +730,7 @@ async function reportNow(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' | 'exter
     goneOn: (!!latest?.prompt && latest.prompt.id !== turn.prompt.id) || undefined,
   });
   await tellParent(d, parent, t.startedAt, msg);
+  sent();
 }
 
 // ---- stepping up ---------------------------------------------------------------------------------

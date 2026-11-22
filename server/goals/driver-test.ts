@@ -68,8 +68,8 @@ import { checkpoint, restoreCheckpoint, setGitVersionReader } from '../worktrees
 import { draftMessage, RESTARTED } from './brief.ts';
 import { BACKGROUND_GRACE_MS, changedChecks, checkRunner, retargeted, goalAction, goalOnCreate, goalResetRefusal, goalStartIgnored, goalStartRefusal, goalStopAll, goalTeamChange, isDriving, LEADS_GOAL, LIMIT_GRACE_MS, NO_SANDBOX, restoreSettled, reviewerDown, runsCommand, runsUnasked, setCheckpointer, setCheckSandbox, setLimitWaitStep, setRestorer, settled, stopTick, STOPPED_SWARM, teamRefusal, tick as tickOnce, UNPRICED, UNSENT_MS } from './driver.ts';
 import { childKeys, reportBegins, reportEnds, reportOnItsWay } from '../children/family.ts';
-import { reportTurn } from '../children/index.ts';
-import { addPost, members as swarmMembers, postsOf } from '../swarm/index.ts';
+import { catchUp, reportTurn } from '../children/index.ts';
+import { addPost, members as swarmMembers, postsOf, stopMember, tellLead } from '../swarm/index.ts';
 import { goals } from './index.ts';
 import { setReviewer } from './review.ts';
 import { goalHoldsNotices, goalInfo, loadGoal, saveGoal, type RestoreMark } from './store.ts';
@@ -161,9 +161,12 @@ class Sessions extends EventEmitter {
     // As create() stores it: its folder always, its worktree only when it has one of its own (a fork has none).
     db.prepare('insert or ignore into app_sessions (key, agent, cwd, worktree, created_at, updated_at) values (?, ?, ?, ?, ?, ?)').run(key, f.agent ?? 'claude', f.cwd, f.worktree ? JSON.stringify(f.worktree) : null, Date.now(), Date.now());
   }
-  /** How many of a session's child sessions are in a turn. */
+  /** How many of a session's child sessions are running, as the session manager counts them (workStatus: in a turn, or between turns with background tasks running). */
   running(key: string): number {
-    return childKeys(db, key).filter((k) => ['starting', 'working', 'waiting'].includes(this.all.get(k)?.live ?? '')).length;
+    return childKeys(db, key).filter((k) => {
+      const c = this.all.get(k);
+      return ['starting', 'working', 'waiting'].includes(c?.live ?? '') || (c?.live === 'idle' && !!c.tasks?.some((t) => t.status === 'running'));
+    }).length;
   }
   /** How often each session's summary was asked for. */
   asked = new Map<string, number>();
@@ -216,6 +219,32 @@ class Sessions extends EventEmitter {
     // The agent stops when told to.
     const f = this.all.get(key);
     if (f) f.live = 'idle';
+  }
+  /** Messages queued, and whether each was queued held (it waits for Resume and wakes nobody). */
+  queued: { key: string; text: string; held: boolean }[] = [];
+  enqueue(key: string, text: string, _images: unknown[] = [], _files: unknown[] = [], hold = false) {
+    const f = this.all.get(key)!;
+    this.queued.push({ key, text, held: hold });
+    f.queue.push(text);
+    if (hold) f.queueHeld = true;
+  }
+  /** The person's Resume on a held queue: what waited goes to the agent. */
+  resumed: string[] = [];
+  resumeQueue(key: string) {
+    const f = this.all.get(key)!;
+    this.resumed.push(key);
+    f.queueHeld = false;
+    for (const text of f.queue.splice(0)) this.delivered.push({ key, text });
+  }
+  /** Stop all (SessionManager.stopAll) as asked of each session: its turn, its background tasks and what it started. */
+  stoppedAll: string[] = [];
+  async stopAll(key: string) {
+    this.stoppedAll.push(key);
+    setSessionExtra(db, key, { stoppedAll: Date.now() });
+    const f = this.all.get(key);
+    if (f && f.live && f.live !== 'idle') await this.interrupt(key);
+    if (f?.tasks) f.tasks = f.tasks.map((t) => ({ ...t, status: 'stopped' as const }));
+    return { turn: true, tasks: 0, children: 0 };
   }
   queueSummary() {}
   stoppedAtLimit(key: string) {
@@ -1166,6 +1195,12 @@ test('S1: a session that leads a swarm may have a goal (its draft says the membe
   assert.equal(goal(SW).status, 'drafting');
   assert.match(last(SW), /Do no work on it yet\. Do not start your swarm’s members yet: they come with the first round\.\nRead the project/);
   await act(SW, { action: 'stop' });
+  // Started with a goal: what goes with its first message says the same.
+  const SN = 'claude:goal-g1-swarm-start';
+  sessions.add(SN, { cwd: PLAIN });
+  setSessionExtra(db, SN, { swarm: true });
+  assert.match((await goalOnCreate(deps, SN, 'Make it fast', { asks: 'own', noAnswerMin: 0 }))!, /Do no work on it yet\. Do not start your swarm’s members yet: they come with the first round\.\nRead the project/);
+  await act(SN, { action: 'stop' });
   const cases: [string, Record<string, unknown>, string][] = [
     ['claude:goal-g1-campaign', { swarm: 'campaign' }, 'This session leads a campaign: a goal works with a swarm, not with a campaign yet.'],
     ['claude:goal-g1-research', { research: { depth: 'quick' } }, 'This session leads a deep research: a goal does not go with it.'],
@@ -4000,21 +4035,46 @@ test('S2.1, the board through the tick: a round to be checked again (a member wo
   await act(B2, { action: 'stop' });
 });
 
-test('S2.1: a member being stopped (its status stopping, not yet counted among the running) holds the round; stopped, its cut turn is not reported and the round is checked', async () => {
+test('S2.1, M5: a member stopped with swarm_stop stays in its turn until its program ends it (an interrupt does not stop it at once): the round waits, its cut turn is reported to nobody, then the round is checked; a subagent whose process is being stopped (SessionManager.stop: stopping) holds a round too, without a swarm as well', async () => {
   const S = 'claude:goal-sw-stopping';
   const { w, crew } = await swarmGoal(S, ['Speed']);
   const [m1] = crew;
   write(w.path, 'score.txt', '6\n');
-  sessions.all.get(m1)!.live = 'stopping';
+  sessions.all.get(m1)!.live = 'working';
   await turn(S);
-  assert.equal(goal(S).rounds.length, 1, 'not checked while a member is stopping');
-  setSessionExtra(db, m1, { swarmStopped: Date.now() });
+  assert.equal(goal(S).rounds.length, 1, 'not checked while a member works');
+  // The lead stops it (swarm_stop): marked, and interrupted; its program ends the turn a moment later.
+  const interrupt = sessions.interrupt.bind(sessions);
+  sessions.interrupt = async (k: string) => (k === m1 ? void sessions.interrupted.push(k) : interrupt(k));
+  try {
+    await stopMember(deps, m1);
+  } finally {
+    sessions.interrupt = interrupt;
+  }
+  assert.ok(sessions.interrupted.includes(m1));
+  await tick(deps);
+  assert.equal(goal(S).rounds.length, 1, 'still in its turn');
   const n = toLead(S).length;
   await memberTurn(m1, () => {}, { status: 'interrupted' });
   assert.equal(toLead(S).length, n, 'a stopped member’s cut turn is reported to nobody');
   await tick(deps);
   assert.equal(goal(S).rounds[1].outcome, 'kept');
   await act(S, { action: 'stop' });
+  // A session without a swarm whose subagent's process is being stopped.
+  const P = 'claude:goal-m5-stopping';
+  const w2 = worktree();
+  sessions.add(P, { cwd: w2.path, worktree: w2 });
+  await agreed(P, { settings: { asks: 'own' } });
+  const kid = 'claude:goal-m5-stopping-kid';
+  sessions.add(kid, { cwd: w2.path, title: 'Helper', live: 'stopping' });
+  setSessionExtra(db, kid, { parent: P });
+  await sleep(5);
+  await turn(P, () => write(w2.path, 'score.txt', '5\n'));
+  assert.equal(goal(P).rounds.length, 1, 'not checked while its subagent is being stopped');
+  sessions.all.get(kid)!.live = 'idle';
+  await tick(deps);
+  assert.equal(goal(P).rounds[1].outcome, 'kept');
+  await act(P, { action: 'stop' });
 });
 
 test('S3: an undone round takes the members’ changes with it (the files go back); a member at work while the checks run holds the undo, as the session’s own subagent does', async () => {
@@ -4095,15 +4155,29 @@ test('S2.3: a swarm lead’s round message names its members (how each stands, t
   await act(M, { action: 'stop' });
 });
 
-test('S4.2: a money limit in the middle of a swarm’s round stops its members at work too (none goes on spending); the half round is recorded once they stopped, and a member still at work after the wait is said in the report', async () => {
+test('S4.2, M3, M1: a money limit in the middle of a swarm’s round stops every member at work in any sense (in a turn, with a background task, waiting to carry on after a usage limit, one that appears while it stops), as Stop all stops one; the half round waits for them and names one still at work; one that finishes later wakes nobody', async () => {
   const L = 'claude:goal-sw-limit';
-  const { w, crew } = await swarmGoal(L, ['Speed', 'Cache', 'Idle'], { limits: { rounds: 8, usd: 1 } });
-  const [m1, m2, m3] = crew;
+  const { w, crew } = await swarmGoal(L, ['Speed', 'Cache', 'Idle', 'Server', 'Resumes'], { limits: { rounds: 8, usd: 1 } });
+  const [m1, m2, m3, m4, m5] = crew;
+  const m6 = `${L}-m6`;
   sessions.all.get(L)!.live = 'working';
   sessions.all.get(m1)!.live = 'working';
+  // m2's turn began before the limit.
+  const m2began = Date.now();
   sessions.all.get(m2)!.live = 'working';
+  sessions.all.get(m2)!.items.push({ kind: 'user', id: 'm2-angle', seq: 0, ts: m2began, text: 'Your angle' } as TimelineItem);
+  await sleep(3);
+  sessions.all.get(m4)!.tasks = [{ id: 'srv', description: 'npm run dev', kind: 'local_bash', status: 'running' }];
+  sessions.all.get(m5)!.resumeAt = Date.now() + 3600_000;
+  const cancelled: string[] = [];
+  const onCancel = (k: string) => {
+    cancelled.push(k);
+    if (sessions.all.get(k)) sessions.all.get(k)!.resumeAt = undefined;
+  };
+  sessions.on('resumeCancelled', onCancel);
   write(w.path, 'half.txt', 'half done\n');
-  // m1 writes once more as it stops, a moment after it is told to; m2 does not stop at all (its program is slow to answer).
+  // m1 writes once more as it stops, a moment after it is told to, while m6 is being started (a start_child_session in
+  // flight); m2 does not stop at all (its program is slow to answer).
   const interrupt = sessions.interrupt.bind(sessions);
   sessions.interrupt = async (k: string) => {
     if (k === m2) return void sessions.interrupted.push(k);
@@ -4112,33 +4186,139 @@ test('S4.2: a money limit in the middle of a swarm’s round stops its members a
       setTimeout(() => {
         write(w.path, 'last.txt', 'its last write\n');
         sessions.all.get(m1)!.live = 'idle';
+        sessions.add(m6, { cwd: w.path, title: 'Late', live: 'starting' });
+        setSessionExtra(db, m6, { parent: L });
       }, 40);
       return;
     }
     return interrupt(k);
   };
   setLimitWaitStep(5);
-  const before = sessions.interrupted.length;
-  db.prepare("insert into sessions (key, agent, id, path, cost_usd) values (?, 'claude', ?, '/nowhere', 2.5) on conflict(key) do update set cost_usd = excluded.cost_usd").run(L, L);
+  const n = toLead(L).length;
+  spend(L, 2.5);
+  try {
+    await tick(deps);
+  } finally {
+    sessions.interrupt = interrupt;
+    sessions.off('resumeCancelled', onCancel);
+    setLimitWaitStep(null);
+  }
+  const g = goal(L);
+  assert.equal(g.status, 'limit');
+  assert.deepEqual(sessions.stoppedAll.filter((k) => k.startsWith(L)).sort(), [m1, m2, m4, m5, m6].sort(), 'every member at work in any sense, the one that appeared meanwhile too; not the idle one');
+  assert.ok(cancelled.includes(m5), 'its resume after the usage limit is cancelled');
+  assert.equal(sessions.all.get(m4)!.tasks![0].status, 'stopped', 'its background task stopped');
+  for (const k of [m1, m2, m4, m5, m6]) {
+    assert.ok(sessionExtra(db, k).stoppedWithParent, 'stopped with its lead: its cut turn is reported to nobody');
+    assert.ok(sessionExtra(db, k).swarmStopped, 'and messages no longer wake it');
+  }
+  assert.equal(sessionExtra(db, m3).stoppedWithParent, undefined);
+  assert.ok(sessionExtra(db, L).stoppedAll, 'the lead marked as Stop all marks it');
+  assert.equal(loadGoal(db, L)!._.teamStop, undefined, 'the stop is done');
+  const half = g.rounds.at(-1)!;
+  assert.deepEqual([half.n, half.why], [1, 'Stopped at the limit midway']);
+  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'half.txt'), 'half done\n');
+  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'last.txt'), 'its last write\n', 'taken once the member that could stop had stopped');
+  assert.match(g.report!.summary, /The swarm’s member “Cache” was still at work when round 1’s files were saved: what it writes after that is in the folder but not in the round\.$/);
+  // m2 finishes after all, posting as its last act (in the turn it began before the limit): its cut turn is reported to
+  // nobody, and the board's batch waits in the lead's held queue instead of waking it.
+  addPost(db, { swarm: L, from: m2, kind: 'finding', text: 'The cache halves it.' });
+  const m2f = sessions.all.get(m2)!;
+  m2f.live = 'idle';
+  m2f.items.push({ kind: 'turn', id: 'm2-end', seq: 0, ts: Date.now(), status: 'interrupted' } as TimelineItem);
+  m2f.endedAt = Date.now();
+  await sleep(2);
+  await reportTurn(deps, { key: m2, startedAt: m2began, endedAt: m2f.endedAt, external: false });
+  await tellLead(deps, L);
+  assert.equal(toLead(L).length, n, 'nothing woke the lead');
+  assert.deepEqual(sessions.queued.filter((q) => q.key === L).map((q) => [q.text.split('\n')[0], q.held]), [['[Swarm board · 1 new post]', true]]);
+  // Given more: what was held goes to the lead first, and the goal goes on.
+  await act(L, { action: 'change', contract: { limits: { rounds: 8, usd: 10 } } });
+  assert.ok(sessions.resumed.includes(L), 'Give it more sent what was held');
+  assert.match(toLead(L)[n].text, /^\[Swarm board · 1 new post\]/);
+  // A member the person sets going again after the stop: its news is not held (as a report of work begun after a stop).
+  const m3f = sessions.all.get(m3)!;
+  m3f.items.push({ kind: 'user', id: 'm3-later', seq: 0, ts: Date.now(), text: 'Look at the index' } as TimelineItem);
+  await sleep(2);
+  addPost(db, { swarm: L, from: m3, kind: 'finding', text: 'The index helps.' });
+  sessions.all.get(L)!.live = 'idle';
+  const k = toLead(L).length;
+  await tellLead(deps, L);
+  assert.equal(toLead(L).length, k + 1);
+  db.prepare('delete from sessions where key = ?').run(L);
+  await act(L, { action: 'stop' });
+});
+
+test('M1: a goal that is over (reached): a subagent’s report of work begun before it ended waits in the lead’s held queue; one begun after goes as before', async () => {
+  const B = 'claude:goal-m1-over';
+  const w = worktree();
+  sessions.add(B, { cwd: w.path, worktree: w });
+  await agreed(B, { settings: { asks: 'own' } });
+  const kid = 'claude:goal-m1-over-kid';
+  sessions.add(kid, { cwd: w.path, title: 'Helper' });
+  setSessionExtra(db, kid, { parent: B });
+  const n = toLead(B).length;
+  await memberTurn(kid, () =>
+    remember(B, (x) => {
+      x.status = 'reached';
+      x.endedAt = Date.now();
+    }),
+  );
+  assert.equal(toLead(B).length, n, 'nothing woke the lead');
+  assert.equal(sessions.queued.filter((q) => q.key === B && q.held).length, 1);
+  await sleep(2);
+  await memberTurn(kid, () => {});
+  assert.equal(toLead(B).length, n + 1, 'work begun after the goal ended: as before');
+  await act(B, { action: 'stop' });
+});
+
+test('M5, M3: a session that does not lead a swarm but started Hydor subagents itself: a limit stops the one at work, named in the report as a subagent', async () => {
+  const PL = 'claude:goal-m5-limit';
+  const w = worktree();
+  sessions.add(PL, { cwd: w.path, worktree: w });
+  await agreed(PL, { limits: { rounds: 8, usd: 1 }, settings: { asks: 'own' } });
+  const kid = 'claude:goal-m5-limit-kid';
+  sessions.add(kid, { cwd: w.path, title: 'Helper', live: 'working' });
+  setSessionExtra(db, kid, { parent: PL });
+  sessions.all.get(PL)!.live = 'working';
+  const interrupt = sessions.interrupt.bind(sessions);
+  sessions.interrupt = async (k: string) => (k === kid ? void sessions.interrupted.push(k) : interrupt(k));
+  setLimitWaitStep(5);
+  spend(PL, 2.5);
   try {
     await tick(deps);
   } finally {
     sessions.interrupt = interrupt;
     setLimitWaitStep(null);
   }
-  const g = goal(L);
-  assert.equal(g.status, 'limit');
-  assert.deepEqual(sessions.interrupted.slice(before).sort(), [L, m1, m2].sort(), 'the lead and the members at work; not the idle one');
-  for (const k of [m1, m2]) assert.ok(sessionExtra(db, k).swarmStopped, 'stopped as swarm_stop stops one: its cut turn wakes nobody');
-  assert.equal(sessionExtra(db, m3).swarmStopped, undefined);
-  const half = g.rounds.at(-1)!;
-  assert.deepEqual([half.n, half.why], [1, 'Stopped at the limit midway']);
-  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'half.txt'), 'half done\n');
-  assert.equal(inCheckpoint(w.path, half.checkpoint!, 'last.txt'), 'its last write\n', 'taken once the member that could stop had stopped');
-  assert.match(g.report!.summary, /A member of the swarm was still at work when round 1’s files were saved: what it wrote after that is in the folder but not in the round\.$/);
-  db.prepare('delete from sessions where key = ?').run(L);
-  sessions.all.get(m2)!.live = 'idle';
-  await act(L, { action: 'stop' });
+  assert.equal(goal(PL).status, 'limit');
+  assert.ok(sessions.stoppedAll.includes(kid));
+  assert.ok(sessionExtra(db, kid).stoppedWithParent);
+  assert.equal(sessionExtra(db, kid).swarmStopped, undefined, 'a swarm’s mark only for a swarm');
+  assert.match(goal(PL).report!.summary, /The subagent “Helper” was still at work when round 1’s files were saved: what it writes after that is in the folder but not in the round\.$/);
+  sessions.all.get(kid)!.live = 'idle';
+  db.prepare('delete from sessions where key = ?').run(PL);
+  await act(PL, { action: 'stop' });
+});
+
+test('M7b: a restart between the limit and the stop of its team: the tick finishes it (the subagent at work stopped, the lead marked), and clears the mark', async () => {
+  const RB = 'claude:goal-m7b';
+  const { crew } = await swarmGoal(RB, ['Speed'], { limits: { rounds: 8, usd: 1 } });
+  const [m1] = crew;
+  // The tick's hourly look at goals that are over is done already: only the mark brings this one to it.
+  await tick(deps);
+  // As stored when the app restarted right after the limit's commit: over, the stop marked and not done.
+  remember(RB, (x) => {
+    x.status = 'limit';
+    x._.teamStop = Date.now();
+  });
+  sessions.all.get(m1)!.live = 'working';
+  await tick(deps);
+  assert.ok(sessions.stoppedAll.includes(m1), 'stopped now');
+  assert.ok(sessionExtra(db, RB).stoppedAll, 'the lead marked');
+  assert.equal(loadGoal(db, RB)!._.teamStop, undefined);
+  sessions.all.get(m1)!.live = 'idle';
+  await act(RB, { action: 'stop' });
 });
 
 test('S5.2: Stop all on a swarm’s lead pauses its goal, also while the lead waited for its members (no turn of its ends then); the members’ cut turns are not reported; Resume checks the round. A turn of the lead’s that Stop all cut pauses it too', async () => {
@@ -4164,20 +4344,31 @@ test('S5.2: Stop all on a swarm’s lead pauses its goal, also while the lead wa
   assert.equal(toLead(SA).length, n, 'nothing woke the lead');
   await act(SA, { action: 'resume' });
   assert.equal(goal(SA).rounds[1].outcome, 'kept', 'Resume checks what it did');
-  // The lead in a turn: Stop all cuts it, and that turn's end pauses the goal as when the person stops the agent.
+  // The lead in a turn: Stop all pauses the goal (as SessionManager.stopAll calls goalStopAll) and cuts the turn, whose
+  // end then finds the goal paused: the reason stays the swarm's.
   await memberTurn(m1, () => setSessionExtra(db, m1, { stoppedWithParent: Date.now() }), { status: 'interrupted' });
-  await turn(SA, () => {}, { status: 'interrupted' });
+  await turn(SA, () => goalStopAll(deps, SA), { status: 'interrupted' });
   g = goal(SA);
-  assert.deepEqual([g.status, g.reason], ['paused', 'You stopped the agent.']);
+  assert.deepEqual([g.status, g.reason], ['paused', STOPPED_SWARM]);
   await act(SA, { action: 'stop' });
-  // Not a swarm's lead: Stop all leaves its goal to its own turn's end, as before.
+  // M5: a session that does not lead a swarm but started a Hydor subagent: Stop all pauses its goal too, with its own sentence.
   const P = 'claude:goal-sw-stopall-plain';
   const w2 = worktree();
   sessions.add(P, { cwd: w2.path, worktree: w2 });
   await agreed(P, { settings: { asks: 'own' } });
+  sessions.add('claude:goal-sw-stopall-plain-kid', { cwd: w2.path, title: 'Helper' });
+  setSessionExtra(db, 'claude:goal-sw-stopall-plain-kid', { parent: P });
   goalStopAll(deps, P);
-  assert.equal(goal(P).status, 'working');
+  assert.deepEqual([goal(P).status, goal(P).reason], ['paused', 'You stopped the agent and its subagents. Resume checks what they did.']);
   await act(P, { action: 'stop' });
+  // One with no subagent: its own turn's end says it, as before (nothing else is at work to stop).
+  const P2 = 'claude:goal-sw-stopall-alone';
+  const w3 = worktree();
+  sessions.add(P2, { cwd: w3.path, worktree: w3 });
+  await agreed(P2, { settings: { asks: 'own' } });
+  goalStopAll(deps, P2);
+  assert.equal(goal(P2).status, 'working');
+  await act(P2, { action: 'stop' });
 });
 
 test('S3, S6: a say while a member is at work is refused with the swarm’s sentence; a member that calls a goal tool hears the goal is its lead’s (a plain subagent: no goal)', async () => {
@@ -4414,6 +4605,162 @@ test('L2: a round’s turn that ended while a command it started still runs is n
   assert.equal(goal(O).rounds[2].outcome, 'kept');
   f.commands = 0;
   await act(O, { action: 'stop' });
+});
+
+// ---- the review of swarm rounds (M1 to M8) ------------------------------------------------------------------------------
+
+test('M2: a member whose only work left is a background command (a dev server it left running) holds the round no longer than the background grace from its last turn’s end', async () => {
+  const B = 'claude:goal-m2';
+  const { w, crew } = await swarmGoal(B, ['Server']);
+  const [m1] = crew;
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  const mf = sessions.all.get(m1)!;
+  mf.tasks = [{ id: 'dev', description: 'npm run dev', kind: 'local_bash', status: 'running' }];
+  await turn(B);
+  assert.equal(goal(B).rounds.length, 1, 'within the grace: waited for');
+  await tick(deps, Date.now() + 60_000);
+  assert.equal(goal(B).rounds.length, 1);
+  await tick(deps, Date.now() + BACKGROUND_GRACE_MS + 60_000);
+  assert.equal(goal(B).rounds[1].outcome, 'kept', 'checked once the grace is over');
+  mf.tasks = [];
+  await act(B, { action: 'stop' });
+});
+
+test('M4: the lead woken while its turn’s end was being read (the board’s own timer delivered a batch): the round is not checked with the lead at work; its next turn’s end checks it', async () => {
+  const B = 'claude:goal-m4';
+  const { w, crew } = await swarmGoal(B, ['Speed']);
+  const [m1] = crew;
+  await memberTurn(m1, () => write(w.path, 'score.txt', '6\n'));
+  let woke = false;
+  sessions.timelineHook = (k) => {
+    if (k === B && !woke && sessions.all.get(B)!.live === 'idle') {
+      woke = true;
+      sessions.all.get(B)!.live = 'working';
+    }
+  };
+  try {
+    await turn(B);
+  } finally {
+    sessions.timelineHook = undefined;
+  }
+  assert.ok(woke);
+  assert.deepEqual([goal(B).status, goal(B).rounds.length], ['working', 1], 'not checked: the lead is at work on the batch');
+  await turn(B);
+  assert.equal(goal(B).rounds[1].outcome, 'kept');
+  await act(B, { action: 'stop' });
+});
+
+test('M6: a goal stopped at its limit is not over for a change of team: a campaign, a deep research or an arena turned on is refused; and Give it more refuses a session that became one', async () => {
+  const B = 'claude:goal-m6';
+  const w = worktree();
+  sessions.add(B, { cwd: w.path, worktree: w });
+  await agreed(B, { limits: { rounds: 1 }, settings: { asks: 'own' } });
+  await turn(B, () => write(w.path, 'score.txt', '5\n'));
+  assert.equal(goal(B).status, 'limit');
+  const no = 'This session has a goal: stop the goal first, or lead a swarm with it.';
+  assert.equal(goalTeamChange(db, B, { swarm: 'campaign' }), no);
+  assert.equal(goalTeamChange(db, B, { research: { depth: 'quick' } }), no);
+  assert.equal(goalTeamChange(db, B, { swarm: true }), null);
+  // As an older app let it become one.
+  setSessionExtra(db, B, { swarm: 'campaign' });
+  await rejects(act(B, { action: 'change', contract: { limits: { rounds: 3 } } }), 409, /^This session leads a campaign: a goal works with a swarm, not with a campaign yet\.$/);
+  assert.equal(goal(B).status, 'limit');
+  setSessionExtra(db, B, { swarm: null });
+  await act(B, { action: 'change', contract: { limits: { rounds: 3 } } });
+  assert.equal(goal(B).status, 'working');
+  await act(B, { action: 'stop' });
+});
+
+test('M7a: a subagent’s report is marked as being made first and as sent only once handed over; a restart between the two reports it again, and meanwhile the goal counts it as on its way', async () => {
+  const B = 'claude:goal-m7a';
+  const w = worktree();
+  sessions.add(B, { cwd: w.path, worktree: w });
+  await agreed(B, { settings: { asks: 'own' } });
+  const kid = 'claude:goal-m7a-kid';
+  sessions.add(kid, { cwd: w.path, title: 'Helper' });
+  setSessionExtra(db, kid, { parent: B });
+  let at: unknown = null;
+  const deliver = sessions.deliverOrQueue.bind(sessions);
+  sessions.deliverOrQueue = async (k: string, text: string) => {
+    if (k === B && text.includes('Hydor subagent')) at = { reporting: sessionExtra(db, kid).reporting, reported: sessionExtra(db, kid).reported };
+    return deliver(k, text);
+  };
+  let id: string;
+  try {
+    id = await memberTurn(kid, () => write(w.path, 'score.txt', '5\n'));
+  } finally {
+    sessions.deliverOrQueue = deliver;
+  }
+  assert.deepEqual(at, { reporting: id, reported: undefined }, 'handed over: being made, not yet marked sent');
+  assert.equal(sessionExtra(db, kid).reported, id, 'marked sent once handed over');
+  await turn(B);
+  assert.equal(goal(B).rounds[1].outcome, 'kept');
+  // A restart came after the first mark and before the second: as stored then.
+  const id2 = await memberTurn(kid, () => write(w.path, 'score.txt', '6\n'), { report: false });
+  setSessionExtra(db, kid, { reporting: id2 });
+  await turn(B);
+  assert.equal(goal(B).rounds.length, 2, 'its report counts as on its way');
+  const n = toLead(B).length;
+  await catchUp(deps);
+  assert.equal(toLead(B).length, n + 1, 'reported again after the restart');
+  assert.equal(sessionExtra(db, kid).reported, id2);
+  await turn(B);
+  assert.equal(goal(B).rounds[2].outcome, 'kept');
+  await act(B, { action: 'stop' });
+});
+
+test('M8: a message to a subagent waits while its lead’s files are being put back (it works in that folder)', async () => {
+  const B = 'claude:goal-m8';
+  const w = await atRound2(B);
+  const kid = 'claude:goal-m8-kid';
+  sessions.add(kid, { cwd: w.path, title: 'Helper' });
+  setSessionExtra(db, kid, { parent: B });
+  let waited: boolean | null = null;
+  setRestorer(async (wt, c) => {
+    await sleep(10);
+    let through = false;
+    const p = goals.beforeSend!(kid, deps)!.then(() => (through = true));
+    await sleep(60);
+    waited = !through;
+    await restoreCheckpoint(wt, c);
+    void p;
+  });
+  try {
+    await turn(B, () => write(w.path, 'score.txt', '3\n'));
+  } finally {
+    setRestorer(null);
+  }
+  assert.equal(goal(B).rounds[2].outcome, 'undone');
+  assert.equal(waited, true, 'the member’s message waited for the reset');
+  await act(B, { action: 'stop' });
+});
+
+test('M1: while the goal is paused, a member’s report of work begun before the pause waits in the lead’s held queue instead of waking it; Resume sends it first; news of work begun after goes as before', async () => {
+  const B = 'claude:goal-m1';
+  const { w, crew } = await swarmGoal(B, ['Speed']);
+  const [m1] = crew;
+  const n = toLead(B).length;
+  // The member's turn began before the goal paused (here Stop all paused it), and ends after.
+  await memberTurn(m1, () => {
+    write(w.path, 'score.txt', '6\n');
+    goalStopAll(deps, B);
+  });
+  assert.equal(goal(B).status, 'paused');
+  assert.equal(toLead(B).length, n, 'nothing woke the lead');
+  assert.match(sessions.queued.filter((q) => q.key === B && q.held).at(-1)!.text, /^\[Reply from the Hydor subagent "Speed"/);
+  // Work begun after the pause (the person set the member going): its report is not held.
+  await sleep(2);
+  await memberTurn(m1, () => {}, { reply: 'Looked again, as you asked.' });
+  assert.equal(toLead(B).length, n + 1);
+  assert.match(toLead(B).at(-1)!.text, /Looked again, as you asked\.$/);
+  await act(B, { action: 'resume' });
+  assert.ok(sessions.resumed.includes(B), 'Resume sent what was held');
+  assert.match(toLead(B)[n + 1].text, /^\[Reply from the Hydor subagent "Speed"/);
+  // News of work begun once the goal went on: delivered as before.
+  const k = toLead(B).length;
+  await memberTurn(m1, () => {});
+  assert.equal(toLead(B).length, k + 1);
+  await act(B, { action: 'stop' });
 });
 
 // Last: the tick it starts looks at every goal.

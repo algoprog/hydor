@@ -27,8 +27,8 @@ export const goals: Feature = {
 
   // A message to the session's agent waits while the loop puts its files back (git's reset and clean take a moment):
   // the agent must not start working on files that are being replaced under it.
-  beforeSend(key) {
-    return restoreSettled(key);
+  beforeSend(key, d) {
+    return restoreSettled(key, d.db);
   },
 
   start(d) {

@@ -103,7 +103,7 @@ import { goalDefaults, setGoalDefaults } from './goals/settings.ts';
 import { parseGoalAction } from './goals/validate.ts';
 import { loadGoal } from './goals/store.ts';
 import { goalOver } from '../shared/goals.ts';
-import { goalTeamChange } from './goals/driver.ts';
+import { sessionExtraRoutes } from './sessions-extra.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
 
@@ -2125,21 +2125,8 @@ registerAway(app, {
 app.get('/api/sessions/:key/notes', async (req) => ({ notes: notesOf(db, (req.params as { key: string }).key) }));
 noteEvents.on('note', (note) => toSubscribers(note.key, { t: 'note', key: note.key, note }));
 noteEvents.on('removed', (note) => toSubscribers(note.key, { t: 'note', key: note.key, note, removed: true }));
-app.get('/api/sessions/:key/extra', async (req) => ({ extra: sessionExtra(db, (req.params as { key: string }).key) }));
-app.patch('/api/sessions/:key/extra', async (req) => {
-  const key = (req.params as { key: string }).key;
-  const patch = (req.body ?? {}) as Record<string, unknown>;
-  // Confidential is set when a session starts and stays; memory stays off in one (server/confidential).
-  checkExtraChange(db, key, patch);
-  // Browser-only (Do this here) is set when a session starts and stays (server/browser/handoff.ts).
-  checkBrowserOnlyChange(db, key, patch);
-  // A goal that is not over goes with a swarm, not with a campaign, a deep research or an arena match (server/goals).
-  const team = goalTeamChange(db, key, patch);
-  if (team) throw new HttpError(409, team);
-  const extra = setSessionExtra(db, key, patch);
-  sessions.queueSummary(key);
-  return { extra };
-});
+// A session's own settings (server/sessions-extra.ts): what may not change once it started, and what goes with its goal.
+sessionExtraRoutes(app, db, sessions);
 // The helper model: small jobs outside sessions (memory notes, Auto mode's checks, second opinions).
 app.get('/api/helper', async () => helperOptions(db));
 app.put('/api/helper', async (req) => {

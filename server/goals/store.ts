@@ -97,6 +97,13 @@ export interface GoalPrivate {
   pausedFrom?: GoalState['status'];
   /** By check id, the files a reviewer asked for that the app could read (at most 8 each): part of that check's evidence from the start (checks.ts). */
   asked?: Record<string, string[]>;
+  /** When it was last paused (M1: news for its lead from work begun before then waits in the lead's held queue). */
+  pausedAt?: number;
+  /**
+   * M7b: when the stop of its team at a limit began (its subagents at work stopped, the lead marked as stopped): set until
+   * that is done, so a restart that cuts it has the tick finish it.
+   */
+  teamStop?: number;
 }
 
 /**

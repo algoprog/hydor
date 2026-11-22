@@ -12,12 +12,12 @@
 import { CAMPAIGN_KINDS, campaignParts, partNamed, partsTally, SWARM_KINDS, swarmMode, type CampaignPart, type SwarmBoard, type SwarmKind, type SwarmMode, type SwarmPost } from '../../shared/swarm.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
-import { childKeys, stillRunning } from '../children/family.ts';
+import { childKeys, holdsNewsFor, stillRunning } from '../children/family.ts';
 import { swarmSize } from '../children/index.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { goalInfo } from '../goals/store.ts';
-import { findTurn } from '../opinion/turns.ts';
+import { findTurn, turnAt } from '../opinion/turns.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { CAMPAIGN_MEMBER_INSTRUCTIONS, campaignLeadInstructions, leadInstructions, MEMBER_INSTRUCTIONS } from './instructions.ts';
 import { givenRole, noteRun, roleFromExtra, roleOf, roleWords } from './roles.ts';
@@ -208,7 +208,27 @@ export async function tellLead(d: Deps, swarm: string) {
     ...lines(d, news, swarm),
     '(swarm_read shows the members and the whole board; swarm_post answers everyone or one member.)',
   ].join('\n');
+  // A lead stopped (Stop all, its goal's limit) or whose goal was paused or ended since the work these posts tell of
+  // began (the turn each was posted in): they wait in its held queue, as a member's report does then
+  // (children/family.ts holdsNewsFor), so nothing wakes it to spend.
+  if (holdsNewsFor(d.db, swarm, await workBegan(d, news))) {
+    try {
+      d.sessions.enqueue(swarm, text, [], [], true);
+    } catch {}
+    return;
+  }
   await d.sessions.deliverOrQueue(swarm, text);
+}
+
+/** When the work some posts tell of began: the earliest start of the turn each was posted in (its time, without one). */
+async function workBegan(d: Deps, posts: SwarmPost[]): Promise<number> {
+  let began = Infinity;
+  const items = new Map<string, Awaited<ReturnType<Deps['sessions']['timeline']>>['parser']['items']>();
+  for (const p of posts) {
+    if (!items.has(p.from)) items.set(p.from, (await d.sessions.timeline(p.from).catch(() => null))?.parser.items ?? []);
+    began = Math.min(began, turnAt(items.get(p.from)!, p.at)?.prompt?.ts ?? p.at);
+  }
+  return began;
 }
 
 /**
@@ -257,7 +277,9 @@ export async function stopMember(d: Deps, member: string) {
 
 /**
  * Whether the board holds posts its lead has not had yet: a batch for it is on its way (its timer runs, it waits for the
- * lead's turn to end, or the lead's next turn end schedules it). Read from the board itself, so it holds across a restart
+ * lead's turn to end, or the lead's next turn end schedules it: turnEnd below schedules one for any post it has not read,
+ * those between members too, so they reach it within five minutes either way; counted here, they reach it before the
+ * round's checks rather than in the middle of the next round). Read from the board itself, so it holds across a restart
  * (which loses the timers); a lead that read the board with swarm_read has nothing waiting.
  */
 export function boardWaits(db: DB, swarm: string): boolean {
