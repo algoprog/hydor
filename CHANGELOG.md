@@ -3,6 +3,80 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.103.0 · 22 November 2026
+
+Apps that start from what they know about you and answer in your language, a goal for a whole swarm, and goals you set
+up in Settings and steer from the terminal.
+
+- **About you, for apps**: **Settings → Apps → About you** keeps where you live, your country, language, units and
+  currency, your diet and the people at home, your streaming services and teams, and for research your fields, topics,
+  conferences and journals, yourself as an author and what you can run on. Apps start their questions from it, or from
+  your last answer, instead of asking every time. What it answers folds into one line under an app's form with
+  **Change**, and a question it has nothing for offers **Remember for all apps**.
+- **Apps answer in your language**: every ready-made app answers in the language you use Hydor in, and their
+  English-only parts are gone: a fridge list in Greek, weekdays and money as you write them, Wikipedia in your language,
+  Japanese documents in Document Q&A.
+- **Do this again…**: under a reply that used a tool, **Make it an app** or **Run it every…**. The app is drafted from
+  that turn: it reads your corrections, keeps the reply's cards and the session as its first example, and opens with
+  **What changes each time?**
+- **Cards in an app's answer**: an answer field can be a card, one of the cards a chat shows (**A card…** in the
+  builder's **Answer** tab).
+- **The App builder sketches first**: describing an app starts its session at once. It shows a sketch card with what the
+  app asks, what it does, a made-up answer and a rough time and cost, with **Build it** and **Change it…**. It thinks
+  with Best, reads the ready-made apps as examples and looks at the view it made.
+- **A run shows its answer as it comes**: an app's answer fills in as its steps end (the Trip planner opens on **Good to
+  know** after its first steps). Asking for a change to the result now works for apps with steps, which is every
+  ready-made app: on the run's page and in a chat, where the app's card updates.
+- **Apps cope with the web letting a step down**: a failed look-up is tried again after a pause, calls to one service
+  are spaced, look-ups are kept a few minutes, and a page that keeps programs out is read in the app's own browser. A
+  run says "N things could not be had", and a step it went on without says so.
+- **Ready-made apps**: Trip planner shows the weather, how to get around and what is on (real events for your dates,
+  read from the city's listings), looks places up for its map and takes the exchange rate from a service. Meal plan
+  scales amounts to the people at home and replaces dinners that do not fit your diet. Deadline radar keeps the call for
+  papers and finds conferences outside its lists. Citation alerts says when the citing sentences could not be read, and
+  finds you by ORCID or OpenAlex id. Game finder no longer shows another game's price, the news digest gives every topic
+  a story, Paper radar marks only what it showed, Explore stops repeating stories, and Explain a contract no longer
+  merges Greek or Japanese terms. Each app with an agent step has a tier of its own, and its page remembers your pick
+  per app.
+- Stopping an app's run right as one of its programs starts now always stops it, and a step taken over from an earlier
+  run (**Run again from here**) is not counted in the new run's cost again.
+- **A goal for a swarm**: a session that leads a swarm can have a goal (**Options → Goal** and **Swarm** together on
+  the start page, or **Set a goal** in a swarm's session). A round is then the whole swarm's work: the lead puts its
+  members on what does not hold yet, they work in the lead's folder, and the app runs the checks once the lead and
+  every member have finished. Members stay between rounds and remember their work. The bar says "waiting for 2
+  members" while the lead waits, and a round's row says how many members worked in it. The limits on money and time
+  count for the whole swarm. A campaign, a deep research and an arena match still cannot have a goal.
+- **Stop, limits and subagents**: in any session with a goal, the **Stop** button by the message box (and a swarm
+  board's **Stop all**) pauses the goal, and **Resume** checks what the round did. A money or time limit stops the
+  subagents the agent started as well as the agent, and names in its report any that were still at work. What
+  subagents still report after a stop, a pause or a limit waits in the session's queue instead of setting it to work
+  again, and goes to the agent when the goal goes on.
+- **Goals have their own settings**: **Settings → Capabilities → Goals** sets what a new goal starts from: how many
+  rounds it may run, how much it asks you, and how long it waits for your answer before it goes on with its own pick.
+- **A reviewer gets what it needs to judge**: a check that a reviewer judges no longer ends with "I cannot tell" for
+  lack of a file. The reviewer names the files it needs (up to five), the app shows it those it may read and asks once
+  more, and keeps them for that check; the check's line says which were read. A folder named as a check's evidence
+  shows its files, a file of a few pages is read whole, and the last review of the whole change reads the same files.
+- **Goals from the terminal**: `hydor sessions goal <session>` shows a goal with its checks, its round, what it has
+  spent and its open question, and takes `--start`, `--answer 1,3`, `--other`, `--note`, `--wait`,
+  `--more rounds=8,usd=5,minutes=60` and `--rule`, beside `--pause`, `--resume` and `--clear`.
+- The goal bar's time runs while a round does, and is right on a page you have just opened.
+- Limits a goal has already used are refused where you set them ("It has spent $0.006: give it more than that.").
+- A round stopped at a limit waits for the commands its agent left running, and says so when one still ran.
+- After a limit cut a round midway, **Keep anyway…** is offered where the report points to it: on the best round (or
+  the start) to put the files back, and on the cut round to keep its work. The report no longer says the files stand
+  at the best round while the cut round's work is still in the folder.
+- A subagent's report that is still on its way holds a goal's round until it has arrived.
+- The goal's own sentences (why it paused, a round's outcome, the report, the refusals) are in your language.
+- Custom always shows the goal's tools while its session has a goal.
+- Spending: the calls Claude Code's subagents make after its last saved total are counted, and a scheduled run's and
+  an app run's cost show the figure the caps count.
+- A Hydor subagent is no longer run again a tier up while its own background work is still going, or because its
+  reply did not mention a part of the brief.
+- A Codex session started without a model (by an agent or through the API) gets the model the start page would pick,
+  instead of failing on one the plan does not have.
+- A subagent's reply folded to one line shows a link as its words, not its address.
+
 ## 0.102.1 · 21 November 2026
 
 One goal bar again instead of a growing stack, a Pause that lets the round finish, and spending that keeps counting
