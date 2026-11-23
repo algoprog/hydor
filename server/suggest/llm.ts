@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import type { SuggestStatus } from '../../shared/suggest.ts';
+import { track } from './procs.ts';
 
 export const LLM_IDLE_MS = 30 * 60_000;
 const LOAD_MS = 2 * 60_000;
@@ -27,6 +28,8 @@ export class LlamaServer {
   url: string | null = null;
   private proc: ChildProcess | null = null;
   private starting: Promise<string | null> | null = null;
+  /** Counts the stops: a start that began before one gives up at its next step (a stop during an await must not leave a process or a state behind). */
+  private gen = 0;
   private lastStart = 0;
   private idle?: NodeJS.Timeout;
   private lastUsed = 0;
@@ -49,26 +52,30 @@ export class LlamaServer {
   /** The server's address, started when it is not running: null when it could not be (state says why). */
   start(o: { binary: string; gguf: string; threads: number; idleMs?: number }): Promise<string | null> {
     if (this.url && this.proc) return Promise.resolve(this.url);
+    // (A start that a stop has since passed over is not the one asked for now: it ends by itself.)
     if (this.starting) return this.starting;
     const wait = this.lastStart + RESTART_GAP_MS - Date.now();
     if (wait > 0 && this.state.state === 'failed') return Promise.resolve(null);
     this.lastStart = Date.now();
-    this.starting = this.launch(o).finally(() => {
-      this.starting = null;
+    const p: Promise<string | null> = this.launch(o, this.gen).finally(() => {
+      if (this.starting === p) this.starting = null;
     });
-    return this.starting;
+    this.starting = p;
+    return p;
   }
 
-  private async launch(o: { binary: string; gguf: string; threads: number; idleMs?: number }): Promise<string | null> {
+  private async launch(o: { binary: string; gguf: string; threads: number; idleMs?: number }, gen: number): Promise<string | null> {
     this.set({ state: 'starting' });
     this.err = [];
     let port: number;
     try {
       port = await freePort();
     } catch (e) {
-      this.set({ state: 'failed', detail: `No free port on this computer: ${(e as Error).message}` });
+      if (gen === this.gen) this.set({ state: 'failed', detail: `No free port on this computer: ${(e as Error).message}` });
       return null;
     }
+    // Stopped while a port was found: nothing was started, and the stop's state stands.
+    if (gen !== this.gen) return null;
     const env: NodeJS.ProcessEnv = {};
     for (const k of ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'SYSTEMROOT']) if (process.env[k] != null) env[k] = process.env[k];
     env.CUDA_VISIBLE_DEVICES = '';
@@ -77,6 +84,7 @@ export class LlamaServer {
     const args = ['-m', o.gguf, '-t', String(o.threads), '-np', '1', '-c', '2048', '--host', '127.0.0.1', '--port', String(port), '--no-webui'];
     const proc = spawn(o.binary, args, { cwd: path.dirname(o.binary), stdio: ['ignore', 'ignore', 'pipe'], env });
     this.proc = proc;
+    track('llama', proc, o.gguf);
     let stopped = false;
     let exited: string | null = null;
     proc.stderr!.on('data', (b: Buffer) => {
@@ -101,15 +109,19 @@ export class LlamaServer {
     const deadline = Date.now() + LOAD_MS;
     const base = `http://127.0.0.1:${port}`;
     while (Date.now() < deadline) {
+      if (gen !== this.gen) return null;
       if (exited != null) {
-        this.proc = null;
+        if (this.proc === proc) this.proc = null;
         this.set({ state: 'failed', detail: `The language model did not start (${exited})${this.err.length ? `: ${this.err.slice(-2).join(' ')}` : ''}` });
         return null;
       }
-      if (this.proc !== proc) return null;
+      if (this.proc !== proc || gen !== this.gen) return null;
       try {
         const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(2000) });
-        if (r.ok && ((await r.json().catch(() => ({}))) as { status?: string }).status === 'ok') {
+        const ok = r.ok && ((await r.json().catch(() => ({}))) as { status?: string }).status === 'ok';
+        // Stopped during that answer: the process is gone (or going), and the state must not say it is ready.
+        if (this.proc !== proc || gen !== this.gen) return null;
+        if (ok) {
           this.url = base;
           this.lastUsed = Date.now();
           this.watchIdle(o.idleMs ?? LLM_IDLE_MS);
@@ -120,8 +132,10 @@ export class LlamaServer {
       await new Promise((r) => setTimeout(r, 300));
     }
     stopHere();
-    this.proc = null;
-    this.set({ state: 'failed', detail: 'The language model took too long to load' });
+    if (this.proc === proc) {
+      this.proc = null;
+      this.set({ state: 'failed', detail: 'The language model took too long to load' });
+    }
     return null;
   }
 
@@ -158,15 +172,13 @@ export class LlamaServer {
 
   /** Stops it (by its process, never by name); `why` is what the status then says. */
   stop(why?: string, state: LlmState['state'] = 'off') {
+    this.gen++;
+    this.starting = null;
     clearTimeout(this.idle);
     const p = this.proc;
     this.proc = null;
     this.url = null;
-    if (p) {
-      p.removeAllListeners('exit');
-      p.once('exit', () => {});
-      this.kill(p);
-    }
+    if (p) this.kill(p);
     this.set({ state, ...(why ? { detail: why } : {}) });
   }
 

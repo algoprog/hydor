@@ -502,7 +502,7 @@ async function sha256Of(file: string): Promise<string> {
  * stopped), checked against its SHA-256 before it takes its name; `mark` is written last, to say they are complete.
  * `progress` hears the bytes there are of all of them.
  */
-export async function downloadFiles(to: string, files: ModelFile[], o: { url: (from: string) => string; mark: string; progress?: (done: number, total: number) => void }) {
+export async function downloadFiles(to: string, files: ModelFile[], o: { url: (from: string) => string; mark: string; progress?: (done: number, total: number) => void; signal?: AbortSignal }) {
   fs.mkdirSync(to, { recursive: true });
   const total = files.reduce((n, f) => n + f.bytes, 0);
   let done = files.filter((f) => fs.existsSync(path.join(to, f.name))).reduce((n, f) => n + f.bytes, 0);
@@ -512,7 +512,7 @@ export async function downloadFiles(to: string, files: ModelFile[], o: { url: (f
     const part = `${dest}.part`;
     let have = fs.existsSync(part) ? fs.statSync(part).size : 0;
     if (have >= f.bytes) fs.rmSync(part, { force: true }), (have = 0);
-    const res = await fetch(o.url(f.from), { headers: have ? { Range: `bytes=${have}-` } : {}, redirect: 'follow', signal: AbortSignal.timeout(60 * 60_000) });
+    const res = await fetch(o.url(f.from), { headers: have ? { Range: `bytes=${have}-` } : {}, redirect: 'follow', signal: o.signal ? AbortSignal.any([o.signal, AbortSignal.timeout(60 * 60_000)]) : AbortSignal.timeout(60 * 60_000) });
     if (!res.ok || !res.body) throw new Error(`The model could not be downloaded (${f.from}: HTTP ${res.status})`);
     // A server that sends the whole file again: start it over.
     if (have && res.status !== 206) have = 0;
@@ -525,7 +525,7 @@ export async function downloadFiles(to: string, files: ModelFile[], o: { url: (f
         next(null, chunk);
       },
     });
-    await pipeline(Readable.fromWeb(res.body as never), count, fs.createWriteStream(part, { flags: have ? 'a' : 'w' }));
+    await pipeline(Readable.fromWeb(res.body as never), count, fs.createWriteStream(part, { flags: have ? 'a' : 'w' }), ...(o.signal ? [{ signal: o.signal }] : []));
     if ((await sha256Of(part)) !== f.sha256) {
       fs.rmSync(part, { force: true });
       throw new Error(`The model's ${f.name} did not arrive whole (its checksum differs): try again`);

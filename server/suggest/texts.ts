@@ -222,21 +222,38 @@ export function lastTyped(db: DB): number {
   return r?.t ?? 0;
 }
 
-/** The texts since `since` (a time in ms; 0: all) from the sources switched on. */
-export async function extractTexts(db: DB, o: { since: number; sources: SuggestSettings['sources'] }): Promise<TextLine[]> {
+/** Lets the event loop breathe (the database is read in one thread, in big steps otherwise). */
+const yieldNow = () => new Promise<void>((r) => setImmediate(r));
+
+/**
+ * The texts after `since` (a time in ms; 0: all) and up to `until` (a run that goes on from where it stopped reads the
+ * same texts again: nothing newer than when it began) from the sources switched on. Only what is newer than `since` is
+ * read from the database, and it is read in steps with the event loop let through between them.
+ */
+export async function extractTexts(db: DB, o: { since: number; until?: number; sources: SuggestSettings['sources'] }): Promise<TextLine[]> {
   const out: TextLine[] = [];
   const { since, sources } = o;
+  const until = o.until ?? Infinity;
+  const inRange = (ts: number) => ts > since && ts <= until;
   const seenUser = new Set<string>();
   const seenAgent = new Set<string>();
+  const sessions = sessionsOf(db);
   if (sources.messages || sources.replies) {
+    // Sessions with something new: the person's messages after `since` are found by an index; a session without one has no
+    // turn to learn from (a reply to an older message, finished after `since`, waits for the next run's newer message).
+    const keys = new Set((all<{ key: string }>(db, `select distinct key from chunk_text where kind = 'user' and ts > ${Number(since) || 0}`) as { key: string }[]).map((r) => r.key));
     // The earliest session first, so the original keeps a message and a fork's copy of it goes.
-    const sessions = sessionsOf(db)
-      .filter((s) => s.usable)
+    const usable = sessions
+      .filter((s) => s.usable && keys.has(s.key))
       .sort((a, b) => a.created - b.created || (a.key < b.key ? -1 : 1));
-    const chunks = db.prepare("select id, kind, coalesce(ts, 0) as ts, text from chunk_text where key = ? and kind in ('user', 'assistant') order by id");
-    for (const s of sessions) {
-      const rows = chunks.all(s.key) as { id: number; kind: 'user' | 'assistant'; ts: number; text: string }[];
-      if (!rows.some((r) => r.ts > since)) continue;
+    const first = db.prepare("select min(id) as id from chunk_text where key = ? and kind in ('user', 'assistant') and ts > ?");
+    // From the last message before the first new one, so the reply it was given is there too.
+    const chunks = db.prepare("select id, kind, coalesce(ts, 0) as ts, text from chunk_text where key = ? and kind in ('user', 'assistant') and id >= coalesce((select max(id) from chunk_text where key = ? and kind = 'user' and id < ?), ?) order by id");
+    let rowsRead = 0;
+    for (const s of usable) {
+      const from = (first.get(s.key, since) as { id: number | null }).id;
+      if (from == null) continue;
+      const rows = chunks.all(s.key, s.key, from, from) as { id: number; kind: 'user' | 'assistant'; ts: number; text: string }[];
       // An ACP agent streams a reply in pieces that the index keeps one by one: one reply again.
       const seq: { kind: 'user' | 'assistant'; ts: number; text: string }[] = [];
       for (const r of rows) {
@@ -244,13 +261,13 @@ export async function extractTexts(db: DB, o: { since: number; sources: SuggestS
         if (s.agent === 'acp' && r.kind === 'assistant' && last?.kind === 'assistant') last.text = `${last.text} ${r.text}`.replace(/ ,/g, ',').replace(/ \./g, '.');
         else seq.push({ kind: r.kind, ts: r.ts, text: r.text });
       }
-      const peers = sources.messages && s.agent === 'claude' && s.path && seq.some((r) => r.kind === 'user' && r.ts > since) ? await peerMessages(s.path) : new Set<string>();
+      const peers = sources.messages && s.agent === 'claude' && s.path && seq.some((r) => r.kind === 'user' && inRange(r.ts)) ? await peerMessages(s.path) : new Set<string>();
       let block: string[] = [];
       let prevReply = '';
       for (const r of seq) {
         if (r.kind === 'assistant') {
           block.push(r.text);
-          if (sources.replies && r.ts > since && r.text.trim().length >= MIN_PROSE) {
+          if (sources.replies && inRange(r.ts) && r.text.trim().length >= MIN_PROSE) {
             const k = `${r.ts}\u0000${r.text.slice(0, 200)}\u0000${r.text.length}`;
             if (!seenAgent.has(k)) {
               seenAgent.add(k);
@@ -263,7 +280,7 @@ export async function extractTexts(db: DB, o: { since: number; sources: SuggestS
           prevReply = block.join('\n\n').trim();
           block = [];
         }
-        if (!sources.messages || r.ts <= since) continue;
+        if (!sources.messages || !inRange(r.ts)) continue;
         if (splitRunMessage(r.text) || peers.has(r.text.trim().slice(0, 300))) continue;
         const typed = cleanUser(r.text);
         if (!typed || r.text.length >= CHUNK_CAP - 5) continue;
@@ -272,32 +289,39 @@ export async function extractTexts(db: DB, o: { since: number; sources: SuggestS
         seenUser.add(k);
         out.push({ kind: 'user', text: typed, ts: r.ts, session: s.key, ...(prevReply ? { reply: prevReply.slice(-MAX_REPLY) } : {}) });
       }
+      rowsRead += rows.length;
+      if (rowsRead >= 300) (rowsRead = 0), await yieldNow();
     }
   }
   if (sources.notes) {
     // Notes the person wrote themselves (not those an agent or the tidy-up made).
     for (const r of all<{ text: string; updated_at: number }>(db, `select text, updated_at from memory_entries where status = 'active' and source = 'user' and updated_at > ${Number(since) || 0}`)) {
       const t = r.text.trim();
-      if (t.length >= MIN_PROSE) out.push({ kind: 'doc', text: t.slice(0, MAX_DOC), ts: r.updated_at });
+      if (inRange(r.updated_at) && t.length >= MIN_PROSE) out.push({ kind: 'doc', text: t.slice(0, MAX_DOC), ts: r.updated_at });
     }
   }
   if (sources.docs) {
     // The newest version of each page, when the person saved it (typed in its editor), in a session that may be learned from.
-    const blocked = new Set(sessionsOf(db).filter((s) => s.blocked).map((s) => s.key));
-    for (const r of all<{ kind: string | null; html: string; created_at: number; session_key: string | null }>(
+    // Which pages first (no text), then each one's text in its own step.
+    const blocked = new Set(sessions.filter((s) => s.blocked).map((s) => s.key));
+    const pages = all<{ id: string; version: number; kind: string | null; created_at: number; session_key: string | null }>(
       db,
-      `select p.kind, pv.html, pv.created_at, p.session_key from pages p join page_versions pv on pv.page_id = p.id and pv.version = p.version where pv.by in ('user', 'edit') and pv.created_at > ${Number(since) || 0}`,
-    )) {
-      if (r.session_key && blocked.has(r.session_key)) continue;
-      const t = pageText(r.kind, r.html).trim();
-      if (t.length >= MIN_PROSE) out.push({ kind: 'doc', text: t.slice(0, MAX_DOC), ts: r.created_at });
+      `select p.id, p.version, p.kind, pv.created_at, p.session_key from pages p join page_versions pv on pv.page_id = p.id and pv.version = p.version where pv.by in ('user', 'edit') and pv.created_at > ${Number(since) || 0}`,
+    );
+    const html = db.prepare('select html from page_versions where page_id = ? and version = ?');
+    for (const p of pages) {
+      if (!inRange(p.created_at) || (p.session_key && blocked.has(p.session_key))) continue;
+      const row = html.get(p.id, p.version) as { html: string } | undefined;
+      const t = row ? pageText(p.kind, row.html).trim() : '';
+      if (t.length >= MIN_PROSE) out.push({ kind: 'doc', text: t.slice(0, MAX_DOC), ts: p.created_at });
+      await yieldNow();
     }
   }
   return out;
 }
 
 /** Writes the texts as JSON lines, readable by the owner alone; returns how many of each kind. */
-export async function writeTexts(db: DB, file: string, o: { since: number; sources: SuggestSettings['sources'] }): Promise<{ user: number; agent: number; doc: number }> {
+export async function writeTexts(db: DB, file: string, o: { since: number; until?: number; sources: SuggestSettings['sources'] }): Promise<{ user: number; agent: number; doc: number }> {
   const lines = await extractTexts(db, o);
   const fd = fs.openSync(file, 'w', 0o600);
   const n = { user: 0, agent: 0, doc: 0 };
