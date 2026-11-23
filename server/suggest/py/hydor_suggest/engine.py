@@ -7,10 +7,10 @@ threshold for the asked precision.
 from __future__ import annotations
 
 import json
-import math
 import os
 import time
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np
@@ -19,7 +19,7 @@ import torch
 from . import cache as cache_mod
 from . import mix as mix_mod
 from . import vocab as V
-from .decode import Cancelled, Decoded, decode, next_word_text, text_after
+from .decode import decode, next_word_text, text_after
 from .lid import Lid
 from .llm import LlamaClient, LlmError, dense_from_top
 from .model import SLM, State, build_model, config_from_dict, last_logits
@@ -96,6 +96,20 @@ class SlmRunner:
             hit = self._steps[path] = (torch.log_softmax(row, -1), st)
             self.fed += 1
         return hit[0]
+
+
+@dataclass
+class Prepared:
+    surface: str
+    R: bytes                  # the word being typed with the whitespace before it
+    target_text: str          # the typed text before R (its last words)
+    agent_ctx: str
+    doc_ctx: str
+    agent_ids: np.ndarray     # Qwen ids
+    doc_ids: np.ndarray
+    target_ids: np.ndarray
+    llm_prompt: list          # what the language model reads before the next token
+    slm_ids: list             # what the small model reads (its own ids)
 
 
 class Release:
@@ -245,10 +259,8 @@ class Engine:
         return 'mix', lang
 
     # ---- suggest ----------------------------------------------------------------------------------------------------------
-    def suggest(self, req: dict, cancelled: Optional[Callable] = None) -> dict:
-        if self.release is None:
-            raise RuntimeError('no model is loaded')
-        t0 = time.perf_counter()
+    def prepare(self, req: dict) -> 'Prepared':
+        """Cut a request into the contexts and the typed bytes, and tokenize what both models read."""
         rel, o = self.release, self.opts
         surface = req.get('surface') or 'text'
         if surface not in ('chat', 'doc', 'text'):
@@ -257,15 +269,11 @@ class Engine:
         typed_words = int(req.get('typed_words') or o['typed_words'])
         ctx_words = int(req['context_words']) if req.get('context_words') is not None else int(o['context_words'])
         ctx_text, R_str = V.split_typed(text)
-        R = R_str.encode('utf-8')
-        if len(R) > MAX_TYPED_BYTES:
-            return self._empty(t0, req)
         target_text = V.last_words(ctx_text, typed_words)
         agent_ctx = V.last_words(V.nfc(req.get('reply') or ''), ctx_words) if surface == 'chat' else ''
         doc_ctx = V.last_words(V.nfc(req.get('doc') or ''), ctx_words) if surface == 'doc' else ''
         agent_ids, doc_ids, target_ids = self.encode(agent_ctx), self.encode(doc_ctx), self.encode(target_text)
-        prefix_text = V.build_prefix(agent_ctx, '', doc_ctx)
-        llm_prefix = self.encode(prefix_text)
+        llm_prefix = self.encode(V.build_prefix(agent_ctx, '', doc_ctx))
         if not len(llm_prefix):
             llm_prefix = np.array([max(rel.eos, 0)], dtype=np.int64)
         llm_prompt = np.concatenate([llm_prefix, target_ids]).tolist()
@@ -274,7 +282,18 @@ class Engine:
         room = rel.slm_config.max_len - len(slm_prefix) - int(o['max_tokens']) * 2 - 1
         slm_target = V.to_slm(target_ids)[-room:] if room > 0 else V.to_slm(target_ids)[:0]
         slm_ids = slm_prefix + [int(t) for t in slm_target]
-        plan, lang = self.choose_plan(surface, target_ids, np.concatenate([agent_ids, doc_ids]), bool(req.get('switch', True)))
+        return Prepared(surface, R_str.encode('utf-8'), target_text, agent_ctx, doc_ctx, agent_ids, doc_ids, target_ids, llm_prompt, slm_ids)
+
+    def suggest(self, req: dict, cancelled: Optional[Callable] = None) -> dict:
+        if self.release is None:
+            raise RuntimeError('no model is loaded')
+        t0 = time.perf_counter()
+        rel = self.release
+        pr = self.prepare(req)
+        surface, R, target_ids, llm_prompt, slm_ids = pr.surface, pr.R, pr.target_ids, pr.llm_prompt, pr.slm_ids
+        if len(R) > MAX_TYPED_BYTES:
+            return self._empty(t0, req)
+        plan, lang = self.choose_plan(surface, target_ids, np.concatenate([pr.agent_ids, pr.doc_ids]), bool(req.get('switch', True)))
         want_cache = bool(req.get('cache', True)) and surface == 'chat' and self.caches is not None
         extras, extra_key = [], None
         if want_cache:
@@ -285,24 +304,18 @@ class Engine:
             extra_key = tuple(hash(t) for t in texts)
         precision = float(req.get('precision') or 0.4)
         want_next = bool(req.get('next', True))
-        t_llm = t_slm = 0.0
-        result = None
         used = plan
-        for attempt in (plan, 'slm'):
-            if attempt == 'slm' and plan == 'slm' and result is not None:
-                break
-            used = attempt
-            stats = {'llm': 0.0, 'slm': 0.0}
-            try:
-                result = self._decode(attempt, slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache,
-                                      precision, want_next, cancelled, stats)
-                t_llm, t_slm = stats['llm'], stats['slm']
-                break
-            except LlmError as e:
-                self.llm_error = str(e)
-                if attempt == 'slm':
-                    raise
-                continue
+        stats = {'llm': 0.0, 'slm': 0.0}
+        args = (slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache, precision, want_next, cancelled)
+        try:
+            result = self._decode(plan, *args, stats)
+        except LlmError as e:                       # the language model stopped answering: this suggestion comes from the small model
+            if plan == 'slm':
+                raise
+            self.llm_error = str(e)
+            used, stats = 'slm', {'llm': stats['llm'], 'slm': 0.0}
+            result = self._decode('slm', *args, stats)
+        t_llm, t_slm = stats['llm'], stats['slm']
         word, nxt, conf, conf_next = result
         theta = theta_for(rel.calibration, used, precision)
         show = bool(conf >= theta)

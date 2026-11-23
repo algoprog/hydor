@@ -5,7 +5,6 @@ import signal
 import subprocess
 import sys
 import threading
-import time
 import unittest
 
 import helpers
@@ -120,6 +119,41 @@ class SequenceTests(unittest.TestCase):
         batches = T.make_batches(lengths, 300, np.random.RandomState(1))
         self.assertEqual(sorted(np.concatenate(batches).tolist()), list(range(200)))
         self.assertTrue(all(lengths[b].max() * len(b) <= 300 or len(b) == 1 for b in batches))
+
+
+class MicroBatchTests(unittest.TestCase):
+    def test_micro_batches_give_the_gradient_of_the_whole_batch(self):
+        from hydor_suggest.model import SLM, SLMConfig
+        torch.manual_seed(3)
+        cfg = SLMConfig(arch='lfm', vocab=200, d=32, n_layers=4, ffn=64, heads=4, kv_heads=2, emb_rank=16, max_len=128)
+        rng = np.random.RandomState(0)
+        batch = []
+        for L in (9, 14, 23, 31, 12, 40, 7, 18):
+            ids = rng.randint(6, 200, size=L).astype(np.int32)
+            w = np.zeros(L, dtype=np.float32)
+            w[L // 3:] = rng.choice([1.0, 4.0], size=L - L // 3)
+            batch.append(T.Seq(ids, w, 'chat', 0, 0))
+        grads, losses = [], []
+        for micro in (10 ** 6, 64, 1):
+            m = SLM(cfg)
+            torch.manual_seed(3)
+            m = SLM(cfg)
+            m.train()
+            loss, ntok = T.train_step(m, batch, micro, False, 'cpu')
+            losses.append(loss)
+            grads.append(torch.cat([p.grad.flatten() for p in m.parameters() if p.grad is not None]))
+        self.assertGreater(len(T.micro_groups(batch, 64)), 2)
+        self.assertEqual(len(T.micro_groups(batch, 10 ** 6)), 1)
+        for l, g in zip(losses[1:], grads[1:]):
+            self.assertAlmostEqual(l, losses[0], places=5)
+            self.assertLess(float((g - grads[0]).abs().max()), 1e-5)
+
+    def test_groups_hold_every_sequence_once_within_the_size(self):
+        batch = [T.Seq(np.zeros(L, dtype=np.int32), np.ones(L, dtype=np.float32), 'chat', 0, 0) for L in (5, 50, 7, 30, 12, 90)]
+        groups = T.micro_groups(batch, 100)
+        self.assertEqual(sorted(len(s.ids) for g in groups for s in g), sorted(len(s.ids) for s in batch))
+        for g in groups:
+            self.assertTrue(max(len(s.ids) for s in g) * len(g) <= 100 or len(g) == 1)
 
 
 class ReplayTests(unittest.TestCase):

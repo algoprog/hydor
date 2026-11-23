@@ -1,8 +1,7 @@
-import json
 import math
 import unittest
 
-import helpers  # noqa: F401
+import helpers  # noqa: F401  (sets the import path)
 import numpy as np
 
 from hydor_suggest.mix import FEATURES, Gate, Switch, entropy_maxp, gate_features, linear

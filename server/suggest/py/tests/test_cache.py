@@ -1,7 +1,7 @@
 import math
 import unittest
 
-import helpers  # noqa: F401
+import helpers  # noqa: F401  (sets the import path)
 import numpy as np
 
 from hydor_suggest.cache import CacheBase, CacheFit, CacheState, SessionCaches

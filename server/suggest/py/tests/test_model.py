@@ -1,6 +1,6 @@
 import unittest
 
-import helpers  # noqa: F401  (sets the path)
+import helpers  # noqa: F401  (sets the import path)  (sets the path)
 import torch
 
 from hydor_suggest import vocab as V

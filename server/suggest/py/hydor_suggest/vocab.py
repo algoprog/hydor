@@ -101,7 +101,6 @@ def segments(text: str, size: int = 100) -> list:
     """Character ranges (first word's start to the last word's end) of chunks of at most `size` words."""
     starts = word_starts(text)
     ends = []
-    pos = 0
     n = len(text)
     # the end of each word: the next whitespace after its start
     for s in starts:
@@ -109,7 +108,6 @@ def segments(text: str, size: int = 100) -> list:
         while e < n and not text[e].isspace():
             e += 1
         ends.append(e)
-        pos = e
     return [(starts[i], ends[min(i + size, len(starts)) - 1]) for i in range(0, len(starts), size)]
 
 

@@ -8,7 +8,6 @@ import time
 import unittest
 
 import helpers
-import numpy as np
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

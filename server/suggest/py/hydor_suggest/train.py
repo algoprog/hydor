@@ -303,6 +303,38 @@ class Settings:
     bf16: bool = True
 
 
+def micro_groups(batch: list, micro_tokens: int) -> list:
+    """The sequences of a batch in groups of about micro_tokens padded tokens (a sequence longer than that is a group of its own)."""
+    order = sorted(range(len(batch)), key=lambda i: len(batch[i].ids))
+    groups, cur, cur_max = [], [], 0
+    for i in order:
+        m = max(cur_max, len(batch[i].ids))
+        if cur and m * (len(cur) + 1) > micro_tokens:
+            groups.append(cur)
+            cur, m = [], len(batch[i].ids)
+        cur.append(i)
+        cur_max = m
+    if cur:
+        groups.append(cur)
+    return [[batch[i] for i in g] for g in groups]
+
+
+def train_step(model: SLM, batch: list, micro_tokens: int, bf16: bool, device) -> tuple:
+    """Forward and backward of one batch, in micro-batches whose gradients add up to the batch's: the loss is the weighted mean over the
+    whole batch (each micro-batch's weighted sum divided by the batch's total weight), so the gradient is the one a single pass would give,
+    with the activations of one micro-batch in memory at a time. Returns (the batch's loss, its input tokens)."""
+    total = max(sum(float(s.w[1:].sum()) for s in batch), 1e-8)
+    loss, tokens = 0.0, 0
+    for group in micro_groups(batch, micro_tokens):
+        ids, tg, w = (x.to(device) for x in collate(group))
+        with torch.autocast(torch.device(device).type, dtype=torch.bfloat16, enabled=bf16):
+            sw, _, _ = model.loss(ids, tg, w)
+        (sw / total).backward()
+        loss += float(sw.detach()) / total
+        tokens += int(ids.numel())
+    return loss, tokens
+
+
 def pick_device(name: str) -> str:
     if name != 'auto':
         return name
@@ -356,6 +388,7 @@ def main(argv=None) -> None:
     p.add_argument('--threads', type=int, default=0)
     p.add_argument('--device', default='auto')
     p.add_argument('--resume', action='store_true')
+    p.add_argument('--micro-tokens', type=int, default=1024, help='padded tokens of one forward and backward (a batch is run in pieces of this size: the same gradient, less memory)')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--warmup', type=int, default=50)
     p.add_argument('--holdout', type=float, default=0.05, help="the share of the person's messages, the latest, kept out for the dev loss")
@@ -474,17 +507,13 @@ def main(argv=None) -> None:
             b = b + extra
         for g in opt.param_groups:
             g['lr'] = lr_at(step, total, st.lr, warmup)
-        ids, tg, w = (x.to(device) for x in collate(b))
-        with torch.autocast(torch.device(device).type, dtype=torch.bfloat16, enabled=st.bf16):
-            sw, sws, _ = model.loss(ids, tg, w)
-        loss = sw / sws.clamp(min=1e-8)
         opt.zero_grad(set_to_none=True)
-        loss.backward()
+        loss, ntok = train_step(model, b, a.micro_tokens, st.bf16, device)
         torch.nn.utils.clip_grad_norm_(model.parameters(), st.clip)
         opt.step()
         step += 1
-        trained_tokens += int(ids.numel())
-        say({'progress': {'done': step, 'total': total}, 'loss': round(float(loss.detach()), 5)})
+        trained_tokens += ntok
+        say({'progress': {'done': step, 'total': total}, 'loss': round(loss, 5)})
         if time.time() - last_save >= resume_every and step < total:
             save_resume()
             last_save = time.time()
