@@ -10,8 +10,9 @@ after it dimmer still. **Tab** takes the word (pressed again, the next one), **�
 parameters, 200 languages, kept learning from what this person writes) mixed with Qwen3.5-0.8B-Base (8-bit, through
 llama.cpp) when the computer has the memory for it. Nothing typed leaves the machine.
 
-It is off until turned on (it downloads about 1.3 GB the first time): **Settings → Capabilities → Word
-suggestions**, where every part of it can be set.
+It is on from the start, and sets itself up the first time someone types in a message box or a document (it
+downloads about 1.3 GB then; a server no one types on downloads nothing): **Settings → Capabilities → Word
+suggestions**, where every part of it can be set, and where it is turned off.
 
 Where the numbers come from: the experiments behind it (FLORES-200 in 193 spaced languages and a test set of real
 chat messages, judged by decoding each suggestion as the app would and counting the keystrokes it saves at a given
@@ -152,8 +153,11 @@ text (`--init` the personal model) and take minutes.
 ## The server (Node)
 
 - **A Feature** (`server/features/`): routes and a `start` that schedules setup and training. Nothing starts while
-  the setting is off; turning it on starts the setup (status `setting-up` with a `detail` line such as "Downloading
-  the language model: 320 of 834 MB"); turning it off stops both processes.
+  the setting is off, nor while it is on but never used (status `waiting`): the first warm-up (a message box got the
+  focus) or request, or turning it on by hand, starts the setup (status `setting-up` with a `detail` line such as
+  "Downloading the language model: 320 of 834 MB"), and from then on a start of the server carries on a setup a stop
+  cut short and the schedule of learning runs. A setup that fails is tried again after ten minutes, then twenty,
+  forty, at most a day. Turning it off stops both processes.
 - **The LLM** (`llama-server`): started only when the LLM setting allows it: `on`, or `auto` with at least 8 GB of
   memory in the computer and 2.5 GB available now (`server/models/machine.ts`); otherwise the small model alone, and
   the status says why. Flags: `-m <gguf> -t <threads> -np 1 -c 2048 --host 127.0.0.1 --port <free> --no-webui`.

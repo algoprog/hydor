@@ -41,6 +41,7 @@ const envFor = (name) => ({
   DATA_DIR: path.join(tmp, `data-${name}`),
   HYDOR_DESKTOP_NO_COMMAND: '1',
   HYDOR_EMBED: 'off',
+  HYDOR_SUGGEST: 'off',
 });
 
 /** Runs the dev app with these arguments (on a screen of its own without a display); resolves with its exit code and what it printed. */

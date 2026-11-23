@@ -1460,10 +1460,12 @@ agents that speak ACP and take MCP servers.
   headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
   answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
 - **Word suggestions**: while you type, the rest of the word shows in grey after the caret and the next word dimmer; Tab takes
-  the word (again, the next one), → at the end of the text takes both, Esc hides them until the next word. Settings →
-  Capabilities → Word suggestions turns it on (it is off at first, and the first time it installs its Python libraries and
-  downloads about 1.3 GB: llama.cpp from GitHub, the language model and the small model from Hugging Face); everything
-  runs on this computer, and what you type never leaves it. A small model of the app's own (49M parameters, 200 languages)
+  the word (again, the next one), → at the end of the text takes both, Esc hides them until the next word. It is on from
+  the start and sets itself up the first time you type in a message box or a document: it installs its Python libraries
+  and downloads about 1.3 GB then (llama.cpp from GitHub, the language model and the small model from Hugging Face), and
+  nothing before (Settings says Not set up yet); a setup that fails is tried again later, waiting longer each time.
+  Settings → Capabilities → Word suggestions turns it off. Everything runs on this computer, and what you type never
+  leaves it. A small model of the app's own (49M parameters, 200 languages)
   is mixed with Qwen3.5-0.8B (8-bit or 4-bit, through llama.cpp), which runs when the computer has at least 8 GB of memory
   and 2.5 GB of it free (Automatic, On or Off; without it the small model alone makes the suggestions, and the section says
   why); Choose by language picks, for the language of the text, the better of the two. It shows in message boxes, in

@@ -322,11 +322,13 @@ Enquanto você digita, o Hydor pode mostrar em cinza, depois do cursor, o resto 
 - **Esc** as esconde até a próxima palavra. Continue digitando e elas somem sozinhas; digite as letras que elas mostram e elas continuam, mais curtas.
 - Na caixa de mensagem, um menu `@` ou `/` aberto fica com Tab e Esc para si, e **Shift+Tab** continua mudando o modo de permissão. Quando não há nada em cinza, cada tecla faz o que sempre fez.
 
-Nada do que você digita sai do seu computador: os palpites são feitos por modelos que rodam nele. O recurso fica desativado até você ativá-lo.
+Nada do que você digita sai do seu computador: os palpites são feitos por modelos que rodam nele. Ele vem ativado desde o início e se configura sozinho na primeira vez que você digita.
 
-### Ativar
+### A primeira vez e como desativar
 
-Abra **[Configurações → Recursos → Sugestões de palavras](/settings?s=suggest)** e ative **[Sugestões de palavras](/settings?s=suggest&find=Word%20suggestions)**. Na primeira vez, ele instala e baixa o que precisa, cerca de 1,3 GB no total, com uma linha embaixo do interruptor que mostra o andamento: as bibliotecas Python em que ele roda (do PyPI e do endereço de download do próprio PyTorch), o llama.cpp (do GitHub), o modelo de linguagem e o modelo pequeno (do Hugging Face). Nada é baixado antes de você ativar, e nada é baixado de novo depois. Quando a linha disser **Pronto: as sugestões aparecem enquanto você digita**, está funcionando; a primeira sugestão depois de uma pausa longa demora um pouco mais enquanto os modelos carregam, porque eles são liberados de novo depois de um tempo sem digitar. Desativar interrompe os modelos; o que foi baixado fica. Tudo roda no processador, então não precisa de placa de vídeo.
+As sugestões de palavras vêm ativadas, mas nada é baixado até você usá-las: na primeira vez que você digita em uma caixa de mensagem ou em um documento, elas instalam e baixam o que precisam, cerca de 1,3 GB no total: as bibliotecas Python em que rodam (do PyPI e do endereço de download do próprio PyTorch), o llama.cpp (do GitHub), o modelo de linguagem e o modelo pequeno (do Hugging Face). Até lá, **[Configurações → Recursos → Sugestões de palavras](/settings?s=suggest)** mostra **Ainda não configurado** embaixo do interruptor; enquanto elas se configuram, a linha ali mostra o andamento, e nada é baixado de novo depois. Quando a linha disser **Pronto: as sugestões aparecem enquanto você digita**, estão funcionando; a primeira sugestão depois de uma pausa longa demora um pouco mais enquanto os modelos carregam, porque eles são liberados de novo depois de um tempo sem digitar. Tudo roda no processador, então não precisa de placa de vídeo.
+
+Se não quiser usá-las, desative ali **[Sugestões de palavras](/settings?s=suggest&find=Word%20suggestions)**: elas param, e, se forem desativadas antes da primeira vez, não baixam nada; o que foi baixado fica. Se a configuração falhar (sem conexão com a internet, por exemplo), a linha diz por quê, e elas tentam de novo mais tarde, esperando mais após cada falha; desativar o interruptor e ativá-lo de novo tenta na hora.
 
 ### Os dois modelos e a memória de que precisam
 
@@ -503,7 +505,7 @@ Ele para de escutar para dizer isso e depois escuta de novo. Sessões em suas ou
 - "Preencha o formulário ~/Downloads/visa-application.pdf com meus dados do meu perfil e me pergunte o resto."
 - "Escreva a data de hoje e meu nome nas linhas de ~/Documents/permission-slip.pdf e marque Sim."
 - "Tire as páginas 3 a 5 de ~/Documents/contract.pdf e coloque em um arquivo separado."
-- "Ative as sugestões de palavras e me avise quando estiverem prontas."
+- "Configure as sugestões de palavras agora, antes de eu digitar, e me avise quando estiverem prontas."
 - "Faça as sugestões de palavras mostrarem só aquelas de que você tem mais certeza, e não a próxima palavra."
 - "Impeça as sugestões de palavras de aprenderem com as respostas dos agentes e faça-as aprender só quando eu pedir."
 - "O modelo de linguagem das sugestões de palavras está em execução? Se não, por quê?"

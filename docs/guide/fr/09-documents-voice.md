@@ -322,11 +322,13 @@ Pendant que vous écrivez, Hydor peut afficher en gris, après le curseur, la fi
 - **Esc** les masque jusqu’au mot suivant. Continuez à écrire et ils disparaissent d’eux-mêmes ; tapez les lettres qu’ils montrent et ils restent, raccourcis.
 - Dans la zone de message, un menu `@` ou `/` ouvert garde Tab et Esc pour lui, et **Maj+Tab** change toujours le mode d’autorisation. Quand rien de gris n’est affiché, chaque touche fait ce qu’elle a toujours fait.
 
-Rien de ce que vous tapez ne quitte votre ordinateur : les suggestions sont produites par des modèles qui s’exécutent dessus. La fonction est désactivée tant que vous ne l’activez pas.
+Rien de ce que vous tapez ne quitte votre ordinateur : les suggestions sont produites par des modèles qui s’exécutent dessus. Elle est activée dès le départ et s’installe d’elle-même la première fois que vous tapez.
 
-### L’activer
+### La première fois, et pour la désactiver
 
-Ouvrez **[Paramètres → Capacités → Suggestions de mots](/settings?s=suggest)** et activez **[Suggestions de mots](/settings?s=suggest&find=Word%20suggestions)**. La première fois, Hydor installe et télécharge ce dont il a besoin, environ 1,3 Go au total, avec une ligne sous l’interrupteur qui indique l’avancement : les bibliothèques Python sur lesquelles il repose (depuis PyPI et l’adresse de téléchargement propre à PyTorch), llama.cpp (depuis GitHub), le modèle de langage et le petit modèle (depuis Hugging Face). Rien n’est téléchargé avant que vous l’activiez, et rien de plus ensuite. Quand la ligne affiche **Prêt : les suggestions s’affichent pendant la saisie**, c’est opérationnel ; la première suggestion après une longue pause prend un peu plus de temps, le temps que les modèles se chargent, car ils sont libérés après un moment sans saisie. Désactiver la fonction les arrête ; ce qui a été téléchargé reste. Tout s’exécute sur le processeur, donc aucune carte graphique n’est nécessaire.
+Les suggestions de mots sont activées dès le départ, mais rien n’est téléchargé tant que vous ne les utilisez pas : la première fois que vous tapez dans une zone de message ou un document, elles installent et téléchargent ce dont elles ont besoin, environ 1,3 Go au total : les bibliothèques Python sur lesquelles elles reposent (depuis PyPI et l’adresse de téléchargement propre à PyTorch), llama.cpp (depuis GitHub), le modèle de langage et le petit modèle (depuis Hugging Face). Jusque-là, **[Paramètres → Capacités → Suggestions de mots](/settings?s=suggest)** indique **Pas encore installé** sous l’interrupteur ; pendant l’installation, la ligne affiche l’avancement, et rien n’est téléchargé de nouveau ensuite. Quand elle affiche **Prêt : les suggestions s’affichent pendant la saisie**, elles fonctionnent ; la première suggestion après une longue pause prend un peu plus de temps, le temps que les modèles se chargent, car ils sont libérés après un moment sans saisie. Tout s’exécute sur le processeur, donc aucune carte graphique n’est nécessaire.
+
+Pour vous en passer, désactivez au même endroit **[Suggestions de mots](/settings?s=suggest&find=Word%20suggestions)** : elles s’arrêtent, et désactivées avant la première fois, elles ne téléchargent rien du tout ; ce qui a été téléchargé reste. Si l’installation échoue (sans connexion internet, par exemple), la ligne en donne la raison et elles réessaient plus tard, en attendant plus longtemps après chaque échec ; désactiver puis réactiver l’interrupteur relance aussitôt.
 
 ### Les deux modèles et la mémoire dont ils ont besoin
 
@@ -503,7 +505,7 @@ Il cesse d’écouter pour dire ces messages, puis écoute de nouveau. Les sessi
 - « Remplis le formulaire ~/Downloads/visa-application.pdf avec mes informations de mon profil, et demande-moi le reste. »
 - « Écris la date du jour et mon nom sur les lignes de ~/Documents/permission-slip.pdf, et coche Oui. »
 - « Extrais les pages 3 à 5 de ~/Documents/contract.pdf dans un fichier à part. »
-- « Active les suggestions de mots, et préviens-moi quand elles sont prêtes. »
+- « Installe dès maintenant les suggestions de mots, avant que je tape, et préviens-moi quand elles sont prêtes. »
 - « Fais en sorte que les suggestions de mots n’affichent que celles dont tu es le plus sûr, et pas le mot suivant. »
 - « Empêche les suggestions de mots d’apprendre à partir des réponses des agents, et fais-les apprendre uniquement quand je le demande. »
 - « Le modèle de langage tourne-t-il pour les suggestions de mots ? Sinon, pourquoi ? »

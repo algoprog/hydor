@@ -322,11 +322,13 @@ Beim Tippen kann Hydor den Rest des Wortes, das du gerade schreibst, grau hinter
 - **Esc** blendet sie bis zum nächsten Wort aus. Tippe einfach weiter, dann verschwinden sie von selbst; tippst du die Buchstaben, die sie zeigen, bleiben sie bestehen, nur kürzer.
 - Im Nachrichtenfeld behält ein geöffnetes `@`- oder `/`-Menü Tab und Esc für sich, und **Shift+Tab** ändert weiterhin den Berechtigungsmodus. Wenn nichts Graues angezeigt wird, macht jede Taste das, was sie immer gemacht hat.
 
-Nichts, was du tippst, verlässt deinen Computer: Die Vorschläge kommen von Modellen, die auf ihm laufen. Die Funktion ist aus, bis du sie einschaltest.
+Nichts, was du tippst, verlässt deinen Computer: Die Vorschläge kommen von Modellen, die auf ihm laufen. Sie ist von Anfang an eingeschaltet und richtet sich beim ersten Tippen von selbst ein.
 
-### Einschalten
+### Das erste Mal und das Ausschalten
 
-Öffne **[Einstellungen → Funktionen → Wortvorschläge](/settings?s=suggest)** und schalte **[Wortvorschläge](/settings?s=suggest&find=Word%20suggestions)** ein. Beim ersten Mal installiert und lädt Hydor, was dafür nötig ist, insgesamt etwa 1,3 GB. Unter dem Schalter zeigt eine Zeile, wie weit der Vorgang ist. Geladen werden die Python-Bibliotheken, auf denen es läuft (von PyPI und von PyTorchs eigener Download-Adresse), llama.cpp (von GitHub), das Sprachmodell und das kleine Modell (von Hugging Face). Vor dem Einschalten wird nichts heruntergeladen, und danach nichts mehr erneut. Wenn die Zeile **Bereit: Vorschläge erscheinen beim Tippen** zeigt, funktioniert es. Der erste Vorschlag nach einer längeren Pause dauert etwas länger, weil die Modelle erst geladen werden; nach einer Weile ohne Tippen werden sie nämlich wieder freigegeben. Beim Ausschalten werden sie gestoppt; was heruntergeladen wurde, bleibt erhalten. Alles läuft auf dem Prozessor, du brauchst also keine Grafikkarte.
+Wortvorschläge sind von Anfang an eingeschaltet, aber es wird nichts heruntergeladen, bis du sie benutzt: Beim ersten Mal, wenn du in einem Nachrichtenfeld oder einem Dokument tippst, installieren und laden sie, was sie brauchen, insgesamt etwa 1,3 GB. Geladen werden die Python-Bibliotheken, auf denen sie laufen (von PyPI und von PyTorchs eigener Download-Adresse), llama.cpp (von GitHub), das Sprachmodell und das kleine Modell (von Hugging Face). Bis dahin steht unter dem Schalter in **[Einstellungen → Funktionen → Wortvorschläge](/settings?s=suggest)** **Noch nicht eingerichtet**; während sie sich einrichten, zeigt die Zeile dort, wie weit der Vorgang ist, und danach wird nichts mehr erneut heruntergeladen. Wenn sie **Bereit: Vorschläge erscheinen beim Tippen** zeigt, funktionieren sie. Der erste Vorschlag nach einer längeren Pause dauert etwas länger, weil die Modelle erst geladen werden; nach einer Weile ohne Tippen werden sie nämlich wieder freigegeben. Alles läuft auf dem Prozessor, du brauchst also keine Grafikkarte.
+
+Wenn du sie nicht willst, schalte dort **[Wortvorschläge](/settings?s=suggest&find=Word%20suggestions)** aus: Sie werden gestoppt, und wenn du sie vor dem ersten Mal ausschaltest, wird gar nichts heruntergeladen; was heruntergeladen wurde, bleibt erhalten. Schlägt die Einrichtung fehl (zum Beispiel ohne Internetverbindung), sagt die Zeile, warum, und sie versuchen es später erneut, nach jedem Fehlschlag mit längerem Abstand; schaltest du den Schalter aus und wieder ein, wird sofort neu versucht.
 
 ### Die beiden Modelle und der Speicher, den sie brauchen
 
@@ -503,7 +505,7 @@ Sie hört dafür auf zuzuhören, um das zu sagen, und hört danach wieder zu. Si
 - „Füll das Formular ~/Downloads/visa-application.pdf mit meinen Angaben aus meinem Profil aus und frag mich nach dem Rest.“
 - „Schreib das heutige Datum und meinen Namen auf die Zeilen von ~/Documents/permission-slip.pdf und kreuz Ja an.“
 - „Nimm die Seiten 3 bis 5 aus ~/Documents/contract.pdf heraus und speichere sie in einer eigenen Datei.“
-- „Schalte die Wortvorschläge ein und sag mir, wenn sie bereit sind.“
+- „Richte die Wortvorschläge jetzt ein, bevor ich tippe, und sag mir, wenn sie bereit sind.“
 - „Lass die Wortvorschläge nur die anzeigen, bei denen du dir sicherer bist, und nicht das nächste Wort.“
 - „Sorge dafür, dass die Wortvorschläge nicht aus den Antworten von Agenten lernen, sondern nur, wenn ich es verlange.“
 - „Läuft das Sprachmodell für die Wortvorschläge? Wenn nicht, warum?“

@@ -322,11 +322,13 @@ Mientras escribes, Hydor puede mostrar en gris, después del cursor, el resto de
 - **Esc** las oculta hasta la palabra siguiente. Sigue escribiendo y desaparecen solas; escribe las letras que muestran y se quedan, más cortas.
 - En el cuadro de mensaje, un menú `@` o `/` abierto se queda con Tab y Esc, y **Shift+Tab** sigue cambiando el modo de permisos. Cuando no se muestra nada en gris, cada tecla hace lo de siempre.
 
-Nada de lo que escribes sale de tu computadora: las predicciones las hacen modelos que se ejecutan en ella. Está desactivado hasta que lo actives.
+Nada de lo que escribes sale de tu computadora: las predicciones las hacen modelos que se ejecutan en ella. Está activado desde el principio y se configura solo la primera vez que escribes.
 
-### Activarlo
+### La primera vez y cómo desactivarlo
 
-Abre **[Configuración → Capacidades → Sugerencias de palabras](/settings?s=suggest)** y activa **[Sugerencias de palabras](/settings?s=suggest&find=Word%20suggestions)**. La primera vez, instala y descarga lo que necesita, unos 1,3 GB en total, con una línea bajo el interruptor que indica cuánto falta: las bibliotecas de Python en las que funciona (desde PyPI y la dirección de descarga propia de PyTorch), llama.cpp (desde GitHub), el modelo de lenguaje y el modelo pequeño (desde Hugging Face). No se descarga nada antes de que lo actives, ni se vuelve a descargar después. Cuando la línea dice **Listo: las sugerencias aparecen mientras escribes**, ya funciona; la primera sugerencia tras una pausa larga tarda un poco más mientras se cargan los modelos, porque se liberan de nuevo tras un tiempo sin escribir. Al desactivarlo se detienen; lo que se descargó se conserva. Todo se ejecuta en el procesador, así que no hace falta tarjeta gráfica.
+Las sugerencias de palabras vienen activadas, pero no se descarga nada hasta que las usas: la primera vez que escribes en un cuadro de mensaje o en un documento, instalan y descargan lo que necesitan, unos 1,3 GB en total: las bibliotecas de Python en las que funcionan (desde PyPI y la dirección de descarga propia de PyTorch), llama.cpp (desde GitHub), el modelo de lenguaje y el modelo pequeño (desde Hugging Face). Hasta entonces, **[Configuración → Capacidades → Sugerencias de palabras](/settings?s=suggest)** dice **Aún no está configurado** bajo el interruptor; mientras se configuran, la línea de ahí indica cuánto falta, y después no se vuelve a descargar nada. Cuando dice **Listo: las sugerencias aparecen mientras escribes**, ya funcionan; la primera sugerencia tras una pausa larga tarda un poco más mientras se cargan los modelos, porque se liberan de nuevo tras un tiempo sin escribir. Todo se ejecuta en el procesador, así que no hace falta tarjeta gráfica.
+
+Si prefieres no usarlas, desactiva ahí **[Sugerencias de palabras](/settings?s=suggest&find=Word%20suggestions)**: se detienen, y si las desactivas antes de la primera vez, no descargan nada en absoluto; lo que se descargó se conserva. Si la configuración falla (por ejemplo, sin conexión a internet), la línea dice por qué, y lo vuelven a intentar más tarde, esperando más tras cada fallo; si desactivas el interruptor y lo vuelves a activar, lo intenta de inmediato.
 
 ### Los dos modelos y la memoria que necesitan
 
@@ -503,7 +505,7 @@ Deja de escuchar para decir esto, y luego vuelve a escuchar. Las sesiones de tus
 - «Rellena el formulario ~/Downloads/visa-application.pdf con mis datos de mi perfil, y pídeme el resto.»
 - «Escribe la fecha de hoy y mi nombre en las líneas de ~/Documents/permission-slip.pdf, y marca Sí.»
 - «Saca las páginas 3 a 5 de ~/Documents/contract.pdf a un archivo aparte.»
-- «Activa las sugerencias de palabras y avísame cuando estén listas.»
+- «Configura ya las sugerencias de palabras, antes de que escriba, y avísame cuando estén listas.»
 - «Haz que las sugerencias de palabras muestren solo aquellas de las que estés más seguro, y no la palabra siguiente.»
 - «Haz que las sugerencias de palabras dejen de aprender de las respuestas de los agentes, y que aprendan solo cuando yo lo pida.»
 - «¿Está funcionando el modelo de lenguaje de las sugerencias de palabras? Si no, ¿por qué?»

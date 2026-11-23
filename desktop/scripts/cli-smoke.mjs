@@ -38,7 +38,7 @@ fs.mkdirSync(data);
 
 /** Runs `hydor help` the way a terminal would: `line` is what is typed, run by the system's own shell with this environment. */
 function typed(line, env) {
-  const all = { ...process.env, ...env, DATA_DIR: data, HYDOR_EMBED: 'off', CUDA_VISIBLE_DEVICES: '' };
+  const all = { ...process.env, ...env, DATA_DIR: data, HYDOR_EMBED: 'off', HYDOR_SUGGEST: 'off', CUDA_VISIBLE_DEVICES: '' };
   delete all.HYDOR_APP_OPEN;
   const opts = { cwd: tmp, env: all, encoding: 'utf8', timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true };
   // cmd.exe reads the whole line in its outer quotes (/s), as a console does; /d leaves its AutoRun out.

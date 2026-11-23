@@ -92,7 +92,10 @@ async function startServer() {
     ...(process.env.HYDOR_VIDEO_GPU ? { HYDOR_VIDEO_GPU: process.env.HYDOR_VIDEO_GPU } : {}),
     ...(process.env.CUDA_VISIBLE_DEVICES !== undefined ? { CUDA_VISIBLE_DEVICES: process.env.CUDA_VISIBLE_DEVICES } : {}),
     // Word suggestions with what is already on this computer (a Python with its libraries, the model files, the GGUF,
-    // llama-server), so a picture can show them without the demo downloading anything; without these they stay off.
+    // llama-server), so a picture can show them without the demo downloading anything; without a Python of its own they
+    // are off (on by default, they would set themselves up when a message box got the focus). HYDOR_SUGGEST=on shows them
+    // as a new install has them, set up at first use: then no message box may get the focus.
+    HYDOR_SUGGEST: process.env.HYDOR_SUGGEST_PYTHON ? 'on' : 'off',
     ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^HYDOR_SUGGEST(_|$)/.test(k))),
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');

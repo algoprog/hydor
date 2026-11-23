@@ -70,7 +70,7 @@ None of these happens until you do the thing in the first column.
 | Add another model service or a server of your own to Custom | The address you give | The conversation and the key you gave. |
 | Look at, install or run Hugging Face models | `huggingface.co` | Model names, and your token if you gave one, to read sizes and to download files. |
 | Turn on speech recognition on the server, "On this machine" | `github.com`, `huggingface.co` | Downloads of whisper.cpp and the model, once. Your voice stays on your computer. |
-| Turn on word suggestions | `pypi.org`, `files.pythonhosted.org`, `download.pytorch.org`, `github.com`, `huggingface.co` | Downloads, once: the Python libraries it runs on (from PyPI, and on Linux and Windows PyTorch's own address for its processor build), llama.cpp (from GitHub) and the language model and the small model (from Hugging Face). Nothing you type, and nothing it learns from what you write, leaves your computer: the models run on it. |
+| Type in a message box or a document for the first time, with word suggestions on (they are on at first) | `pypi.org`, `files.pythonhosted.org`, `download.pytorch.org`, `github.com`, `huggingface.co` | Downloads, once: the Python libraries it runs on (from PyPI, and on Linux and Windows PyTorch's own address for its processor build), llama.cpp (from GitHub) and the language model and the small model (from Hugging Face). Nothing you type, and nothing it learns from what you write, leaves your computer: the models run on it. |
 | Pick "A service" for speech recognition | The address you give | Your recordings, and the key you gave. |
 | Press the download in the Browser settings | `googlechromelabs.github.io`, `storage.googleapis.com` | A request for Chrome for Testing, once. |
 | Add a Chrome extension from the Chrome Web Store (a link, an id, or **Add to Hydor**) | `clients2.google.com`, and the address it sends the download to | The extension's id, and a request for its file, once for each time you add it. |
@@ -129,6 +129,10 @@ or put your own SearXNG first.
   is on, the titles and addresses (without query strings) of your own browser's history, bookmarks and downloads are
   also made into vectors on your computer, kept apart in the app's database; nothing of them is sent anywhere, and agents
   never see them.
+- **Word suggestions.** Turn off **Word suggestions** in Settings → Capabilities → Word suggestions before you first
+  type, or start with `HYDOR_SUGGEST=off` to never set them up. `HF_ENDPOINT` sends the models' download to a mirror,
+  and `HYDOR_SUGGEST_PYTHON`, `HYDOR_SUGGEST_MODEL_DIR`, `HYDOR_SUGGEST_GGUF` and `HYDOR_SUGGEST_LLAMA_SERVER` use
+  what you already have, so nothing is downloaded.
 - **Helper model.** Pick a model on your computer under Settings → Agents → Models → Helper model. Then titles,
   memory notes, Auto mode's checks and the rest stay on your computer. Turn **Memory** off in Settings →
   Capabilities → Memory to send no conversation to it for notes.
@@ -152,7 +156,7 @@ agents in other sessions cannot read it. The guide, under "Keep a session confid
 
 ## Running with no connection to the outside
 
-Hydor works with no internet at all if you use a model on your computer. Start with `HYDOR_EMBED=off`,
+Hydor works with no internet at all if you use a model on your computer. Start with `HYDOR_EMBED=off`, `HYDOR_SUGGEST=off`,
 `PRICES_URL=` (empty) and `HYDOR_UPDATE_FEED` pointing nowhere; choose a helper model on your computer; use
 Ollama or vLLM for Custom; and block the host list above with your firewall. Each of the checks, lists and downloads is something the app
 can do without: a refused one fails and the app carries on.

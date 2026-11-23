@@ -741,7 +741,7 @@ row('voice', 'Read aloud', 'device', { device: { key: 'read-aloud' }, note: 'Eac
 row('suggest', 'Word suggestions', 'switch', {
   read: rd('/api/suggest', 'settings.enabled'),
   write: put('/api/suggest', (v) => ({ enabled: v })),
-  note: 'Turning it on downloads about 1.3 GB the first time (the small model, llama.cpp and Qwen3.5-0.8B); nothing you type leaves this computer.',
+  note: 'On from the start: it sets itself up the first time someone types in a message box or a document, downloading about 1.3 GB then (the small model, llama.cpp and Qwen3.5-0.8B); nothing you type leaves this computer.',
 });
 row('suggest', 'Show in this browser', 'device', { device: { key: 'word-suggestions' }, note: 'Each browser keeps its own: whether it shows the grey suggestions.' });
 row('suggest', 'Language model', 'choice', {

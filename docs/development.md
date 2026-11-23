@@ -51,6 +51,9 @@ To run the engine in a scratch copy of the app without downloading its model ([a
 at the revision `server/suggest/pins.ts` pins) or with one of your own, point `HYDOR_SUGGEST_MODEL_DIR` at a folder holding the model's files, `HYDOR_SUGGEST_PYTHON` at that Python and, when you have
 them, `HYDOR_SUGGEST_GGUF` and `HYDOR_SUGGEST_LLAMA_SERVER` at the language model and a `llama-server`: nothing is then downloaded
 ([configuration](configuration.md)). Do not put PyTorch into search by meaning's private environment (`memory/venv`): the app rebuilds it whenever its packages differ.
+Word suggestions are on by default and set themselves up (about 1.3 GB) the first time a message box gets the focus, so
+a scratch copy driven in a browser needs `HYDOR_SUGGEST=off` unless it has all of these; `scripts/guide-shots` and the
+desktop app's tests set it.
 
 Use on your phone (`server/phone/`) never runs the computer's own `tailscale` in tests: `phone-test.ts` plays it with
 `server/phone/fake-tailscale.mjs`, a stand-in that answers `version`, `status --json` and `serve` from a state file

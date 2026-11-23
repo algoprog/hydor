@@ -46,6 +46,7 @@ ok(!allowed(on, 'docs'), 'a place turned off');
 ok(!allowed({ ...on, enabled: false }, 'chat'), 'turned off');
 ok(!allowed({ ...on, browser: false }, 'chat'), 'off in this browser');
 ok(!allowed({ ...on, state: 'setting-up' }, 'chat'), 'still setting up');
+ok(!allowed({ ...on, state: 'waiting' }, 'chat'), 'not set up yet: only the focus (warm) starts it');
 ok(!allowed({ ...on, state: 'failed' }, 'chat'), 'failed');
 ok(!allowed({ ...on, state: undefined }, 'chat'), 'status not known yet');
 ok(allowed({ ...on, state: 'starting' }, 'chat'), 'loading');

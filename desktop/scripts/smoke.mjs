@@ -86,7 +86,7 @@ const out = fs.openSync(log, 'a');
 const PATH = [path.dirname(node), WIN ? null : path.join(tmp, 'bin'), process.env.PATH].filter(Boolean).join(path.delimiter);
 server = spawn(node, [path.join(tmp, 'server/dist/server/index.js')], {
   cwd: tmp,
-  env: { ...process.env, DATA_DIR: data, PORT: String(port), NODE_ENV: 'production', HYDOR_ROOT: path.join(tmp, 'server'), PATH, HYDOR_EMBED: 'off' },
+  env: { ...process.env, DATA_DIR: data, PORT: String(port), NODE_ENV: 'production', HYDOR_ROOT: path.join(tmp, 'server'), PATH, HYDOR_EMBED: 'off', HYDOR_SUGGEST: 'off' },
   stdio: ['ignore', out, out],
   windowsHide: true,
 });

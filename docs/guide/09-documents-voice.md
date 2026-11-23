@@ -322,11 +322,13 @@ While you type, Hydor can show the rest of the word you are writing in grey afte
 - **Esc** hides them until the next word. Keep typing and they go away by themselves; type the letters they show and they stay, shorter.
 - In the message box, an open `@` or `/` menu keeps Tab and Esc for itself, and **Shift+Tab** still changes the permission mode. When nothing grey is showing, every key does what it always did.
 
-Nothing you type leaves your computer: the guesses are made by models that run on it. It is off until you turn it on.
+Nothing you type leaves your computer: the guesses are made by models that run on it. It is on from the start, and sets itself up the first time you type.
 
-### Turn it on
+### The first time, and turning it off
 
-Open **[Settings → Capabilities → Word suggestions](/settings?s=suggest)** and turn on **[Word suggestions](/settings?s=suggest&find=Word%20suggestions)**. The first time, it installs and downloads what it needs, about 1.3 GB in all, with a line under the switch that says how far it is: the Python libraries it runs on (from PyPI and PyTorch's own download address), llama.cpp (from GitHub), the language model and the small model (from Hugging Face). Nothing is downloaded before you turn it on, and nothing again afterwards. When the line says **Ready: suggestions show as you type**, it works; the first suggestion after a long pause takes a moment longer while the models load, because they are let go again after a while without typing. Turning it off stops them; what was downloaded stays. Everything runs on the processor, so it needs no graphics card.
+Word suggestions are on from the start, but nothing is downloaded until you use them: the first time you type in a message box or a document, they install and download what they need, about 1.3 GB in all: the Python libraries they run on (from PyPI and PyTorch's own download address), llama.cpp (from GitHub), the language model and the small model (from Hugging Face). Until then, **[Settings → Capabilities → Word suggestions](/settings?s=suggest)** says **Not set up yet** under the switch; while they set themselves up, the line there says how far they are, and nothing is downloaded again afterwards. When it says **Ready: suggestions show as you type**, they work; the first suggestion after a long pause takes a moment longer while the models load, because they are let go again after a while without typing. Everything runs on the processor, so they need no graphics card.
+
+To do without them, turn off **[Word suggestions](/settings?s=suggest&find=Word%20suggestions)** there: they stop, and turned off before the first time, they download nothing at all; what was downloaded stays. If setting up fails (with no internet connection, say), the line says why, and they try again later, waiting longer after each failure; turning the switch off and on again tries at once.
 
 ### The two models, and the memory they need
 
@@ -503,7 +505,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Fill in the form ~/Downloads/visa-application.pdf with my details from my profile, and ask me for the rest."
 - "Write today's date and my name on the lines of ~/Documents/permission-slip.pdf, and tick Yes."
 - "Take pages 3 to 5 out of ~/Documents/contract.pdf into a file of their own."
-- "Turn on word suggestions, and tell me when they are ready."
+- "Set up word suggestions now, before I type, and tell me when they are ready."
 - "Make word suggestions show only the ones you are surer of, and not the next word."
 - "Stop word suggestions from learning from agents' replies, and make it learn only when I ask."
 - "Is the language model running for word suggestions? If not, why?"

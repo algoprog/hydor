@@ -144,8 +144,12 @@ export interface SuggestUsage {
 
 /** What word suggestions are doing (GET /api/suggest). */
 export interface SuggestStatus {
-  /** off: not turned on; setting-up: installing Python libraries and downloading models; starting: loading them; ready; failed. */
-  state: 'off' | 'setting-up' | 'starting' | 'ready' | 'failed';
+  /**
+   * off: turned off; waiting: on but never used here, so nothing is downloaded yet (it sets itself up the first time a box
+   * where it shows gets the focus); setting-up: installing Python libraries and downloading models; starting: loading
+   * them; ready; failed.
+   */
+  state: 'off' | 'waiting' | 'setting-up' | 'starting' | 'ready' | 'failed';
   /** Progress while setting up, or why it failed. */
   detail?: string;
   /**

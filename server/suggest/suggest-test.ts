@@ -20,7 +20,7 @@ import { downloadFiles } from '../memory/embed.ts';
 import { suggest, suggestService, cleanRequest } from './index.ts';
 import { LlamaServer } from './llm.ts';
 import { killAll, reapLeftovers, track } from './procs.ts';
-import { SuggestService } from './service.ts';
+import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
 import { personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
@@ -203,6 +203,46 @@ test('on by default, it waits to be used: no personalising scheduled until a mes
     assert.equal(own.trainDue(later), true, 'from then on the schedule runs');
   } finally {
     own.stop();
+  }
+});
+
+test('before first use it is waiting (nothing downloaded), and a setup that fails waits longer each time to be tried again', async () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 8, 9, 50].map(retryAfter), [10, 10, 20, 40, 80, 1280, 1440, 1440].map((m) => m * 60_000));
+  const was = process.env.HYDOR_SUGGEST_PYTHON;
+  // A Python that is not there: the setup fails at once, as one that cannot download would.
+  process.env.HYDOR_SUGGEST_PYTHON = path.join(tmp, 'no-such-python');
+  const db3 = openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-suggest-retry-')), 'retry.db'));
+  memorySchema(db3);
+  initPages(db3);
+  const own = new SuggestService(db3);
+  const priv = own as unknown as { failure: { at: number } | null; failedTimes: number };
+  try {
+    const first = own.state().status;
+    assert.equal(first.state, 'waiting', 'on, never used, not set up');
+    assert.match(first.detail ?? '', /first time you type/);
+    own.warm();
+    await until('the setup to fail', () => own.state().status.state === 'failed');
+    assert.equal(priv.failedTimes, 1);
+    assert.equal(own.state().status.training.next, undefined, 'no learning run promised while it is not set up');
+    // Within its wait a message box used again does not try again.
+    own.warm();
+    await sleep(100);
+    assert.equal(priv.failedTimes, 1, 'not again within ten minutes');
+    priv.failure!.at -= retryAfter(1) + 1000;
+    own.warm();
+    await until('the second try to fail', () => priv.failedTimes === 2);
+    // Ten minutes after the second failure is not enough: it waits twenty.
+    priv.failure!.at -= retryAfter(1) + 1000;
+    own.warm();
+    await sleep(100);
+    assert.equal(priv.failedTimes, 2, 'the second failure waits twenty minutes');
+    // Turning it off and on tries at once, counting from the start again.
+    own.configure({ enabled: false });
+    own.configure({ enabled: true });
+    await until('the try the switch started to fail', () => own.state().status.state === 'failed' && priv.failedTimes === 1);
+  } finally {
+    own.stop();
+    process.env.HYDOR_SUGGEST_PYTHON = was;
   }
 });
 

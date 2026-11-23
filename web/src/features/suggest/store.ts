@@ -99,13 +99,27 @@ export function gateNow(): Gate {
 }
 
 let warmedAt = 0;
-/** A text box got the focus: start what is set up (the models take seconds to load), at most once a minute. */
+/**
+ * A text box got the focus: start what is set up (the models take seconds to load), at most once a minute. On by default,
+ * the first one used also sets it up, so a box that has the focus before the settings are loaded (one that takes it as
+ * it opens) warms once they are, and the answer is kept: the page follows the set-up from then on.
+ */
 export function warmSuggest() {
   if (viaLink) return;
+  if (!useSuggest.getState().settings) return void loadSuggest().then(warmNow);
   ensureSuggest();
+  warmNow();
+}
+
+function warmNow() {
   const { settings } = useSuggest.getState();
   if (!settings?.enabled || useUI.getState().wordSuggestions === false) return;
   if (Date.now() - warmedAt < 60_000) return;
   warmedAt = Date.now();
-  post('/api/suggest/warm').catch(() => {});
+  post<SuggestState>('/api/suggest/warm')
+    .then((r) => {
+      take(r);
+      if (busy(r.status)) void loadSuggest();
+    })
+    .catch(() => {});
 }

@@ -38,8 +38,11 @@ const ATTEMPT_KEY = 'suggest.train.at';
  * small model is never personalised for hours on a computer whose person never used them.
  */
 const USED_KEY = 'suggest.used';
-/** A failed download of the language model is not tried again for this long (a request that wants it would otherwise start it again and again). */
-export const PREPARE_COOLDOWN_MS = 10 * 60_000;
+/**
+ * How long the n-th failure in a row waits to be tried again: ten minutes, doubled each time, at most a day. A failed setup
+ * or download of the language model would otherwise start again with every request that wants it.
+ */
+export const retryAfter = (n: number) => Math.min(10 * 60_000 * 2 ** Math.max(0, n - 1), 24 * 3600_000);
 /** Memory found short is not asked about again for this long (every keystroke asks for a suggestion). */
 const SHORT_MEMORY_MS = 30_000;
 
@@ -62,6 +65,8 @@ export class SuggestService {
   private setupDone = false;
   private abort = new AbortController();
   private failure: { why: string; at: number } | null = null;
+  /** Failures in a row since it last worked: each waits twice as long as the one before to be tried again (retryAfter). */
+  private failedTimes = 0;
   private crashes: number[] = [];
   private short: { free: number; need: number } | null = null;
   private idleTimer?: NodeJS.Timeout;
@@ -77,7 +82,7 @@ export class SuggestService {
   /** The worker's process while it starts (it is not yet used for requests, but a stop must reach it). */
   private pendingWorker: PyWorker | null = null;
   private llmPrep = new Map<string, Promise<boolean>>();
-  private llmPrepFailed = new Map<string, number>();
+  private llmPrepFailed = new Map<string, { at: number; n: number }>();
   private memShortUntil = 0;
   private loading: Promise<void> | null = null;
   private loadInfo: { kind: 'base' | 'personal'; languages?: Record<string, number> } | null = null;
@@ -130,7 +135,8 @@ export class SuggestService {
   /** When the schedule says the next run may start (ms): the gap since the last run. */
   private dueAt(): number | undefined {
     const s = this.st;
-    if (!s.enabled || !s.personalise || s.schedule === 'manual' || !this.used()) return undefined;
+    // Not set up (or a setup that failed): nothing could learn yet, so no run is promised.
+    if (!s.enabled || !s.personalise || s.schedule === 'manual' || !this.used() || !this.isSetUp()) return undefined;
     return this.lastAttempt() + GAP_MS[s.schedule];
   }
 
@@ -171,7 +177,12 @@ export class SuggestService {
       else if (this.failure) Object.assign(status, { state: 'failed', detail: this.failure.why });
       else if (this.startingWorker) Object.assign(status, { state: 'starting', detail: 'Loading the language models' });
       else if (!this.setupDone && !this.isSetUp())
-        Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? (this.used() ? 'Getting ready' : 'Sets itself up the first time you type in a message box (it downloads about 1.3 GB)') });
+        Object.assign(
+          status,
+          this.used()
+            ? { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' }
+            : { state: 'waiting', detail: 'Sets itself up the first time you type in a message box (it downloads about 1.3 GB)' },
+        );
       else
         Object.assign(status, {
           state: 'ready',
@@ -243,6 +254,7 @@ export class SuggestService {
       if (!before.enabled) {
         this.markUsed();
         this.failure = null;
+        this.failedTimes = 0;
         this.crashes = [];
         this.llmTried = 0;
         this.llmPrepFailed.clear();
@@ -335,13 +347,13 @@ export class SuggestService {
 
   /**
    * llama.cpp and the language model's file, one download at a time for each size, and not again for ten minutes after a
-   * failure (which is in the language model's state).
+   * failure, twice as long after each failure in a row (retryAfter); the failure is in the language model's state.
    */
   private prepareLlm(): Promise<boolean> {
     if (this.llmFilesReady()) return Promise.resolve(true);
     const quant = this.st.quant;
     const failed = this.llmPrepFailed.get(quant);
-    if (failed && Date.now() - failed < PREPARE_COOLDOWN_MS) return Promise.resolve(false);
+    if (failed && Date.now() - failed.at < retryAfter(failed.n)) return Promise.resolve(false);
     const going = this.llmPrep.get(quant);
     if (going) return going;
     const signal = this.abort.signal;
@@ -350,10 +362,11 @@ export class SuggestService {
       try {
         await setupLlama(say, signal);
         await setupGguf(quant, say, signal);
+        this.llmPrepFailed.delete(quant);
         return true;
       } catch (e) {
         if (signal.aborted) return false;
-        this.llmPrepFailed.set(quant, Date.now());
+        this.llmPrepFailed.set(quant, { at: Date.now(), n: (this.llmPrepFailed.get(quant)?.n ?? 0) + 1 });
         this.llm.note({ state: 'failed', detail: (e as Error).message });
         return false;
       } finally {
@@ -369,6 +382,7 @@ export class SuggestService {
 
   private fail(why: string) {
     this.failure = { why, at: Date.now() };
+    this.failedTimes++;
     this.changed();
   }
 
@@ -451,8 +465,9 @@ export class SuggestService {
     if (this.startingWorker) return this.startingWorker;
     if (!this.st.enabled || suggestDisabled()) return Promise.resolve(null);
     if (this.failure) {
-      // A failure is tried again after ten minutes.
-      if (Date.now() - this.failure.at < 10 * 60_000) return Promise.resolve(null);
+      // A failure is tried again after ten minutes, then twenty, forty… at most a day: on by default, a computer where it
+      // keeps failing (a full disk, say) must not download again every ten minutes. Turning it off and on tries at once.
+      if (Date.now() - this.failure.at < retryAfter(this.failedTimes)) return Promise.resolve(null);
       this.failure = null;
       this.crashes = [];
     }
@@ -496,6 +511,7 @@ export class SuggestService {
       // The worker takes requests only once it has its models.
       if (!(await this.loadInto(r)) || gone()) return void r.stop(), null;
       this.worker = r;
+      this.failedTimes = 0;
       this.idleLater();
       // (The language model may have come up, or gone, while it loaded.)
       void this.syncLoad();
