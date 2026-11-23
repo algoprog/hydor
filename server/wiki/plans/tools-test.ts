@@ -53,28 +53,28 @@ try {
   await assert.rejects(() => adopt.run({ ...args, sha256: planned.sha256 }, ctx), /preview changed/i);
   assert.equal(fs.existsSync(path.join(root, planned.path)), false, 'a concurrent register change must abort');
   mutate = null;
-  const fresh = previewPlan(root, args);
+  const fresh = await previewPlan(root, args);
   const saved = JSON.parse(String(await adopt.run({ ...args, sha256: fresh.sha256 }, ctx)));
   assert.equal(saved.registerPath, args.registerPath);
   assert.equal(saved.implementation, 'not authorized by plan adoption');
   assert.equal(fs.readFileSync(path.join(root, fresh.path), 'utf8'), fresh.content);
   assert.equal(fs.readFileSync(sourcePath, 'utf8'), source, 'adoption leaves source unchanged');
   assert.equal(fs.readFileSync(registerPath, 'utf8'), '# Changed evidence\n', 'adoption leaves the chosen register unchanged');
-  assert.throws(() => previewPlan(root, args), /already exists/);
+  await assert.rejects(() => previewPlan(root, args), /already exists/);
   const registerContent = '## Execution control\n\nImplementation: not started.\nDeployment: not requested.\nAcceptance: not started.';
-  const combined = previewPlan(root, { slug: 'combined', origin: 'Chat', content: '# Plan\n\nWP-02: test.\n', registerContent });
+  const combined = await previewPlan(root, { slug: 'combined', origin: 'Chat', content: '# Plan\n\nWP-02: test.\n', registerContent });
   assert.equal(combined.registerPath, combined.path);
   assert.match(combined.content, /Implementation: not started/);
   assert.match(combined.content, /Deployment: not requested/);
   assert.match(combined.content, /Acceptance: not started/);
-  const translated = previewPlan(root, { slug: 'deutsch', origin: 'Chat', content: '# Plan\nWP-03: Prüfen.\n', registerContent: '## Umsetzungskontrolle\nUmsetzung: offen.\nAuslieferung: nicht beauftragt.\nAbnahme: offen.' });
+  const translated = await previewPlan(root, { slug: 'deutsch', origin: 'Chat', content: '# Plan\nWP-03: Prüfen.\n', registerContent: '## Umsetzungskontrolle\nUmsetzung: offen.\nAuslieferung: nicht beauftragt.\nAbnahme: offen.' });
   assert.match(translated.content, /## Umsetzungskontrolle/);
   assert.doesNotMatch(translated.content, /Implementation: not started/);
   // The register is evidence, never inside the plans area (where only these tools write).
-  for (const bad of ['output/projects/existing/evidence.md', 'wiki/references/proposal.md', 'output/evidence/../projects/existing/evidence.md', 'output/evidence/existing/missing.md']) assert.throws(() => previewPlan(root, { ...args, slug: 'other', registerPath: bad }), /execution register|not an active|Missing|ENOENT/, bad);
-  assert.throws(() => previewPlan(root, { slug: 'wrong', origin: 'Chat', content: '# Plan\n## Evidence\nExisting\n' }), /appears to contain a register/);
-  assert.throws(() => previewPlan(root, { slug: '../escape', origin: 'Chat', content: 'No' }), /valid plan folder/);
-  assert.throws(() => previewPlan(root, { slug: 'wrong', origin: 'https://example.test/?token=secret', content: 'No' }), /origin/i);
+  for (const bad of ['output/projects/existing/evidence.md', 'wiki/references/proposal.md', 'output/evidence/../projects/existing/evidence.md', 'output/evidence/existing/missing.md']) await assert.rejects(() => previewPlan(root, { ...args, slug: 'other', registerPath: bad }), /execution register|not an active|Missing|ENOENT/, bad);
+  await assert.rejects(() => previewPlan(root, { slug: 'wrong', origin: 'Chat', content: '# Plan\n## Evidence\nExisting\n' }), /appears to contain a register/);
+  await assert.rejects(() => previewPlan(root, { slug: '../escape', origin: 'Chat', content: 'No' }), /valid plan folder/);
+  await assert.rejects(() => previewPlan(root, { slug: 'wrong', origin: 'https://example.test/?token=secret', content: 'No' }), /origin/i);
   console.log('Plan preview, approval and concurrent-change tests passed');
 } finally {
   db.close();

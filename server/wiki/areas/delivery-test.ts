@@ -66,8 +66,8 @@ fs.mkdirSync(path.join(root, '.structure'));
 fs.writeFileSync(path.join(root, '.structure', 'areas.json'), registryText(r));
 await writeIndex(root);
 
-test('the areas line: top-level areas with their articles, Other last, at most 400 characters', () => {
-  assert.equal(areasLine(root), 'Wiki areas: Payments (4) · Catalogue (3) · Shipping (3) · Other (1)');
+test('the areas line: top-level areas with their articles, Other last, at most 400 characters', async () => {
+  assert.equal(await areasLine(root), 'Wiki areas: Payments (4) · Catalogue (3) · Shipping (3) · Other (1)');
   const many = emptyRegistry();
   for (let i = 0; i < 40; i++) many.areas.unshift({ id: `a${i}`, name: `A rather long area name ${i}`, about: '', parent: null, aliases: [], createdAt: '', updatedAt: '' });
   const other = path.join(temp, 'many');
@@ -75,9 +75,9 @@ test('the areas line: top-level areas with their articles, Other last, at most 4
   fs.mkdirSync(path.join(other, '.structure'));
   for (let i = 0; i < 40; i++) fs.writeFileSync(path.join(other, 'wiki', `x${i}.md`), `---\ntitle: X${i}\nareas: [a${i}]\n---\n\n# X\n`);
   fs.writeFileSync(path.join(other, '.structure', 'areas.json'), registryText(many));
-  const line = areasLine(other)!;
+  const line = (await areasLine(other))!;
   assert.ok(line.length <= AREAS_LINE_MAX && line.endsWith(' …'), line);
-  assert.equal(areasLine(path.join(temp, 'hub')), null, 'no areas: no line');
+  assert.equal(await areasLine(path.join(temp, 'hub')), null, 'no areas: no line');
 });
 
 test('a starting agent gets the line, and the hint about index.md and hubs; not with a model of a small context', async () => {

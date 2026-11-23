@@ -131,7 +131,7 @@ test('a long article is split: hub at the same path, parts beside it, the text k
   const index = readWiki(root, 'index.md').content;
   for (const p of ['operations.md', 'operations/billing.md', 'operations/support.md']) assert.ok(index.includes(`(wiki/${p})`), p);
   assert.deepEqual(checkWiki(root).issues.filter((i) => !/no incoming|Missing or excluded source: raw\/articles\/old\.md/.test(i.detail)), []);
-  assert.equal(browseWiki(root).articles.length, 5);
+  assert.equal((await browseWiki(root)).articles.length, 5);
   assert.equal(asked.filter((a) => a.system === SPLIT_SYSTEM).length, 1);
 });
 

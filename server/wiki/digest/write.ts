@@ -2,7 +2,7 @@
 // frontmatter, the model only the body), `index.md` and `log.md`. Only paths wiki/**/*.md, index.md and log.md.
 import path from 'node:path';
 import { applyWikiChanges, readWiki, redirectOf, wikiHash } from '../core.ts';
-import { browseWiki } from '../browse.ts';
+import { walkWiki } from '../browse.ts';
 import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath, placedIn } from '../areas/registry.ts';
 import { snapshotArticle, type Removed } from './history.ts';
 
@@ -300,11 +300,12 @@ function indexLine(root: string, a: { path: string; title: string }, content?: s
  * the wiki has areas and at least GROUP_FROM articles: a heading for each area (linking its hub when it has one), what
  * it holds, then its articles, in its hub's reading order; an article in two areas is under both; Other last.
  */
-export function indexBlock(root: string): string {
-  const articles = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+export async function indexBlock(root: string): Promise<string> {
+  const walk = await walkWiki(root, ['articles'], true);
+  const articles = walk.articles.filter((a) => !isHubPath(a.path));
   const registry = loadRegistry(root);
-  if (!hasAreas(registry) || articles.length < GROUP_FROM) return articles.map((a) => indexLine(root, a)).join('\n') || '(no articles yet)';
-  const texts = new Map(articles.map((a) => [a.path, readOrNull(root, a.path)?.content ?? '']));
+  if (!hasAreas(registry) || articles.length < GROUP_FROM) return articles.map((a) => indexLine(root, a, a.content)).join('\n') || '(no articles yet)';
+  const texts = new Map(articles.map((a) => [a.path, a.content]));
   const members = new Map<string, { path: string; title: string }[]>();
   for (const a of articles) for (const id of placedIn(areasOfArticle(texts.get(a.path)!), registry)) members.set(id, [...(members.get(id) ?? []), a]);
   const out: string[] = [];
@@ -324,16 +325,27 @@ export function indexBlock(root: string): string {
   return out.join('\n').trim();
 }
 
-/** `index.md`: every article with its title, link and summary, grouped by area when the wiki has them, in a block the code owns (what else is in the file stays). */
-export async function writeIndex(root: string): Promise<void> {
-  await writeFile(root, 'index.md', (cur) => {
-    const block = `${START}\n${indexBlock(root)}\n${END}`;
-    if (cur == null) return `# Wiki index\n\nEvery article, by title.\n\n${block}\n`;
-    const a = cur.indexOf(START);
-    const b = cur.indexOf(END);
-    if (a >= 0 && b > a) return cur.slice(0, a) + block + cur.slice(b + END.length);
-    return `${cur.replace(/\s*$/, '')}\n\n${block}\n`;
+const indexing = new Map<string, Promise<void>>();
+
+/**
+ * `index.md`: every article with its title, link and summary, grouped by area when the wiki has them, in a block the code owns (what else is in the file stays).
+ * The articles are read before the file is written, so one index at a time for each wiki: the last one to start has the newest view.
+ */
+export function writeIndex(root: string): Promise<void> {
+  const run = (indexing.get(root) ?? Promise.resolve()).then(async () => {
+    const block = `${START}\n${await indexBlock(root)}\n${END}`;
+    await writeFile(root, 'index.md', (cur) => {
+      if (cur == null) return `# Wiki index\n\nEvery article, by title.\n\n${block}\n`;
+      const a = cur.indexOf(START);
+      const b = cur.indexOf(END);
+      if (a >= 0 && b > a) return cur.slice(0, a) + block + cur.slice(b + END.length);
+      return `${cur.replace(/\s*$/, '')}\n\n${block}\n`;
+    });
   });
+  const last = run.catch(() => {});
+  indexing.set(root, last);
+  void last.then(() => { if (indexing.get(root) === last) indexing.delete(root); });
+  return run;
 }
 
 /** `log.md`: one line added: the day, the document, the articles it changed. */

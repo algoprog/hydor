@@ -37,12 +37,12 @@ try {
   const root = wikiRoot(db, space.id, { create: true })!;
   fs.writeFileSync(path.join(root, 'wiki', 'deploys.md'), '---\ntitle: Deploys\n---\n\n# Deploys\n\nWe deploy on Fridays.\n');
   const d = { db } as unknown as Deps;
-  const told = (cwd: string, extra: Record<string, unknown>) =>
-    ((wiki.spawn!({ agent: 'codex', cwd, runId: 'r', resume: false, extra }, d) as SpawnAdditions | undefined)?.instructions ?? []).some((line) => line.startsWith('Wiki memory is on'));
-  assert.equal(told(elsewhere, { space: space.id }), true, 'picked on the start page, working elsewhere, no key yet: its project’s wiki');
-  assert.equal(told(folder, {}), true, 'in the project’s folder: found by its folder, as before');
-  assert.equal(told(elsewhere, {}), false, 'neither: no project wiki to tell of');
-  assert.equal(told(elsewhere, { space: 'spgone' }), false, 'a project that no longer exists is not one');
+  const told = async (cwd: string, extra: Record<string, unknown>) =>
+    (((await wiki.spawn!({ agent: 'codex', cwd, runId: 'r', resume: false, extra }, d)) as SpawnAdditions | undefined)?.instructions ?? []).some((line) => line.startsWith('Wiki memory is on'));
+  assert.equal(await told(elsewhere, { space: space.id }), true, 'picked on the start page, working elsewhere, no key yet: its project’s wiki');
+  assert.equal(await told(folder, {}), true, 'in the project’s folder: found by its folder, as before');
+  assert.equal(await told(elsewhere, {}), false, 'neither: no project wiki to tell of');
+  assert.equal(await told(elsewhere, { space: 'spgone' }), false, 'a project that no longer exists is not one');
   for (let i = 0; i < 300 && (indexed.size < 2 || progress.size || Date.now() - lastIndexed < 250); i++) await new Promise((r) => setTimeout(r, 20));
   console.log('A new session picked into a project is told of its wiki before it has a key');
 } finally {

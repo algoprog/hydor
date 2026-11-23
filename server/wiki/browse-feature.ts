@@ -14,10 +14,10 @@ import { memorySearchRoutes } from './memory-search.ts';
 import { wikiMemoryOn, wikiRoot } from './roots.ts';
 
 /** The wiki's areas with their articles, for the Memory tab; undefined while it has none. */
-function areasOf(root: string): WikiArea[] | undefined {
+async function areasOf(root: string): Promise<WikiArea[] | undefined> {
   const r = loadRegistry(root);
   if (!hasAreas(r)) return undefined;
-  const members = membersByArea(areaArticles(root), r);
+  const members = membersByArea(await areaArticles(root), r);
   const out: WikiArea[] = [];
   for (const { area } of areaOrder(r)) {
     const hub = readOrNull(root, hubPath(area.id));
@@ -50,8 +50,8 @@ export const wikiBrowse: Feature = {
         const { on, root } = target(p.id);
         if (!on) return { status: 'off', on, inherited };
         if (!root) return { status: 'empty', on, inherited };
-        const view = browseWiki(root);
-        const areas = areasOf(root);
+        const view = await browseWiki(root);
+        const areas = await areasOf(root);
         if (areas) view.articles = view.articles.filter((a) => !isHubPath(a.path));
         return { status: view.articles.length || view.sources.length || view.plans.length ? 'ready' : 'empty', on, inherited, root, ...view, ...(areas ? { areas } : {}) };
       } catch {

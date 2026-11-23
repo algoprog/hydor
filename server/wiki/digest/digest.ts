@@ -103,7 +103,7 @@ async function byMeaning(db: DB, root: string, space: string | null, doc: { titl
  */
 export async function listArticles(db: DB, root: string, space: string | null, doc: { title: string; text: string }): Promise<{ lines: ArticleLine[]; all: Set<string>; more: number; titles: Map<string, string> }> {
   // Hubs are kept from their articles, never written by the digest; redirects are not listed at all.
-  const all = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+  const all = (await browseWiki(root, { trees: ['articles'] })).articles.filter((a) => !isHubPath(a.path));
   const registry = loadRegistry(root);
   const names = hasAreas(registry) ? new Map(registry.areas.map((a) => [a.id, a.name])) : null;
   const hay = doc.text.toLowerCase();

@@ -1,8 +1,8 @@
 // The articles of a wiki as the areas see them: every active article under wiki/ (not hubs, not redirects), with
 // its title, summary, headings, the areas its front matter names and a hash of its body (what changed since).
-import { browseWiki } from '../browse.ts';
+import { walkWiki } from '../browse.ts';
 import { wikiHash } from '../core.ts';
-import { areasOfArticle, frontValue, headingsOf, readOrNull, splitFront, summaryOf, titleOfArticle } from '../digest/write.ts';
+import { areasOfArticle, frontValue, headingsOf, splitFront, summaryOf, titleOfArticle } from '../digest/write.ts';
 import { isHubPath, OTHER, placedIn, type Area, type Registry } from './registry.ts';
 
 export interface AreaArticle {
@@ -20,23 +20,21 @@ export interface AreaArticle {
   body: string;
 }
 
-/** Every article of the wiki (not a hub, not a redirect), by path. */
-export function areaArticles(root: string): AreaArticle[] {
+/** Every article of the wiki (not a hub, not a redirect), by path. It walks wiki/ only, and reads each article once. */
+export async function areaArticles(root: string): Promise<AreaArticle[]> {
   const out: AreaArticle[] = [];
-  for (const a of browseWiki(root).articles) {
+  for (const a of (await walkWiki(root, ['articles'], true)).articles) {
     if (isHubPath(a.path)) continue;
-    const cur = readOrNull(root, a.path);
-    if (!cur) continue;
-    const f = splitFront(cur.content);
+    const f = splitFront(a.content);
     out.push({
       path: a.path,
-      title: titleOfArticle(cur.content, a.title),
-      summary: summaryOf(cur.content),
+      title: titleOfArticle(a.content, a.title),
+      summary: summaryOf(a.content),
       headings: headingsOf(f.body),
-      raw: areasOfArticle(cur.content),
+      raw: areasOfArticle(a.content),
       hash: wikiHash(f.body.trim()).slice(0, 12),
       updated: frontValue(f, 'updated') ?? '',
-      content: cur.content,
+      content: a.content,
       body: f.body,
     });
   }

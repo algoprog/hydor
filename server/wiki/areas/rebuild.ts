@@ -17,7 +17,7 @@ import { helperCost, helperParallel } from '../../helper.ts';
 import { searchKnowledge } from '../../knowledge/search.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { archiveWiki, dropArchive, redirectOf, restoreWiki, wikiArchives, wikiHash } from '../core.ts';
-import { browseWiki } from '../browse.ts';
+import { browseWiki, walkWiki } from '../browse.ts';
 import { wikiBase } from '../deliver.ts';
 import { MAX_DOC_CHARS } from '../digest/digest.ts';
 import { changeUpdate, recordUpdate } from '../digest/store.ts';
@@ -66,26 +66,18 @@ const nameOf = (at: string) => (/T\d\d:\d\d/.test(at) ? at.replace(/[:.]/g, '-')
  * no source. `skip`: origins that are read fresh instead (a rebuild makes the project's files and notes again, and reads all its
  * commits from the repository: their kept sources are left out, but only when the fresh ones exist).
  */
-export function rebuildSources(root: string, o: { skip?: string[] } = {}): { path: string; chars: number }[] {
+export async function rebuildSources(root: string, o: { skip?: string[] } = {}): Promise<{ path: string; chars: number }[]> {
   const notes: { path: string; day: string; mtime: number; chars: number }[] = [];
-  for (const s of browseWiki(root).sources) {
-    const cur = readOrNull(root, s.path);
-    if (!cur) continue;
-    const f = splitFront(cur.content);
+  for (const s of (await walkWiki(root, ['sources'], true)).sources) {
+    const f = splitFront(s.content);
     const origin = frontValue(f, 'source');
     if (!origin) continue;
     if (o.skip?.some((p) => origin.startsWith(p))) continue;
-    let mtime = 0;
-    try {
-      mtime = fs.statSync(path.join(root, ...s.path.split('/'))).mtimeMs;
-    } catch {
-      /* gone meanwhile */
-    }
-    notes.push({ path: s.path, day: frontValue(f, 'ingested') ?? '', mtime, chars: Math.min(MAX_DOC_CHARS, f.body.trim().length) });
+    notes.push({ path: s.path, day: frontValue(f, 'ingested') ?? '', mtime: s.updated ?? 0, chars: Math.min(MAX_DOC_CHARS, f.body.trim().length) });
   }
   notes.sort((a, b) => a.day.localeCompare(b.day) || a.mtime - b.mtime || a.path.localeCompare(b.path));
   const kept = new Set(notes.map((n) => n.path));
-  const loose = areaArticles(root)
+  const loose = (await areaArticles(root))
     .filter((a) => !listOf(splitFront(a.content), 'sources').some((s) => kept.has(s)))
     .map((a) => ({ path: a.path, chars: Math.min(MAX_DOC_CHARS, a.body.trim().length) }));
   return [...notes.map((n) => ({ path: n.path, chars: n.chars })), ...loose];
@@ -126,8 +118,9 @@ export async function rebuildEstimate(db: DB, root: string, space: string | null
   const history = project ? await historyCounts(db, project, { exactDocuments: true }) : { files: [], anyFiles: false, notes: 0, commits: 0, commitBatches: 0, documents: 0, sessions: 0 };
   const noteSources = project ? noteTexts(db, project).length : 0;
   const commitSources = history.commitBatches;
-  const sources = rebuildSources(root, { skip: freshOrigins({ files: history.anyFiles, notes: noteSources > 0, commits: history.commits > 0 }) });
-  const articles = areaArticles(root).length;
+  const sources = await rebuildSources(root, { skip: freshOrigins({ files: history.anyFiles, notes: noteSources > 0, commits: history.commits > 0 }) });
+  const articleList = await areaArticles(root);
+  const articles = articleList.length;
   const fresh = (history.anyFiles ? 1 : 0) + noteSources + commitSources + history.documents + history.sessions;
   const total = sources.length + fresh;
   const chars = sources.reduce((n, s) => n + s.chars, 0) + (history.anyFiles ? CHARS.f : 0) + noteSources * 10_000 + commitSources * CHARS.c + history.documents * CHARS.d + history.sessions * CHARS.s;
@@ -142,7 +135,7 @@ export async function rebuildEstimate(db: DB, root: string, space: string | null
   const tokensOut = Math.round((total * 5_000 + expected * 120 + hubs * 1_200) / 4);
   const cost = helperCost(db, { tokensIn, tokensOut });
   // Each article read again (no new one holds it) costs about what a source of its size does.
-  const articleChars = areaArticles(root).reduce((n, a) => n + Math.min(MAX_DOC_CHARS, a.body.length), 0);
+  const articleChars = articleList.reduce((n, a) => n + Math.min(MAX_DOC_CHARS, a.body.length), 0);
   const most = helperCost(db, { tokensIn: tokensIn + Math.round((2 * articleChars + articles * 14_000) / 4), tokensOut: tokensOut + Math.round((articles * 5_000) / 4) });
   const helper = cost.model === 'auto' ? { ...cost, note: 'Automatic uses your Claude account’s usage: Claude Haiku, and Sonnet for the areas' } : { ...cost, ...(most.usd != null ? { usdMax: most.usd } : {}) };
   const workers = helperParallel(db);
@@ -255,7 +248,7 @@ function archivedFiles(dir: string): { rel: string; content: string }[] {
  * new hub) that matches it best, else to index.md. A redirect of the old wiki leads where its target leads now.
  */
 /** The new wiki's articles as matching sees them: title, summary, and the headings and beginning of their text. */
-const matchable = (root: string) => areaArticles(root).map((a) => ({ path: a.path, title: a.title, summary: a.summary, text: `${a.headings.join(' ')} ${a.body.slice(0, 4000)}` }));
+const matchable = async (root: string) => (await areaArticles(root)).map((a) => ({ path: a.path, title: a.title, summary: a.summary, text: `${a.headings.join(' ')} ${a.body.slice(0, 4000)}` }));
 
 /** A word's stem for "is it in there": its first five letters (a plural or another form of it counts). */
 const stem = (w: string) => w.slice(0, 5);
@@ -277,8 +270,8 @@ export function holds(oldTitle: string, c: { title: string; summary: string; tex
 export const TITLE_COVER = 0.6;
 
 /** The earlier wiki's articles (not hubs, not redirects) that no new article holds: read again as sources, so a rebuild drops nothing. */
-export function uncovered(root: string, archiveDir: string, skip: Set<string>): string[] {
-  const now = matchable(root);
+export async function uncovered(root: string, archiveDir: string, skip: Set<string>): Promise<string[]> {
+  const now = await matchable(root);
   return archivedFiles(archiveDir)
     .filter((o) => !isHubPath(o.rel) && redirectOf(o.content) == null && !skip.has(o.rel))
     .filter((o) => {
@@ -291,8 +284,8 @@ export function uncovered(root: string, archiveDir: string, skip: Set<string>): 
 
 export async function redirectOldPaths(db: DB | null, space: string | null, root: string, archiveDir: string, now: number): Promise<{ matched: number; toIndex: number }> {
   const out = { matched: 0, toIndex: 0 };
-  const articles = matchable(root);
-  const hubs = browseWiki(root)
+  const articles = await matchable(root);
+  const hubs = (await browseWiki(root, { trees: ['articles'] }))
     .articles.filter((a) => isHubPath(a.path))
     .map((a) => {
       const c = readOrNull(root, a.path)?.content ?? '';
@@ -373,7 +366,7 @@ export async function startRebuild(db: DB, space: string | null, options: Rebuil
     const project = space ? spaceById(db, space) : null;
     const history = project ? await gatherHistory(db, project, root, { order: 'rebuild', now }) : null;
     const skip = history ? freshOrigins({ files: history.byCat.f.length > 0, notes: history.byCat.n.length > 0, commits: history.byCat.c.length > 0 }) : [];
-    const kept = rebuildSources(root, { skip }).map((s) => s.path);
+    const kept = (await rebuildSources(root, { skip })).map((s) => s.path);
     const by = history?.byCat;
     const list: { id: string; cat: Cat }[] = [...(by?.f ?? []), ...kept.map((id) => ({ id, cat: 'k' as const })), ...(by?.c ?? []), ...(by?.d ?? []), ...(by?.s ?? []), ...(by?.n ?? [])];
     if (!list.length) throw new HttpError(409, 'The wiki has no sources to rebuild from');
@@ -437,7 +430,7 @@ export async function runRebuild(db: DB, space: string | null, root: string, job
         // What the earlier wiki said that no new article holds (the helper keeps a little of each source, and may have
         // left a topic out): those articles, from the archive, are read as sources too.
         const sources = job.sources ?? [];
-        const extra = uncovered(root, archiveDir, new Set(sources));
+        const extra = await uncovered(root, archiveDir, new Set(sources));
         job.carried = extra.length;
         job.sources = [...sources, ...extra];
         job.cats = `${job.cats ?? ''}${'k'.repeat(extra.length)}`;
@@ -471,7 +464,7 @@ export async function runRebuild(db: DB, space: string | null, root: string, job
       job.did = [...(job.did ?? []), `${r.matched + r.toIndex} old path${r.matched + r.toIndex === 1 ? '' : 's'} now lead to the new articles (${r.toIndex} to the index)`];
     }
     await writeIndex(root).catch(() => {});
-    const articles = areaArticles(root);
+    const articles = await areaArticles(root);
     const reg = loadRegistry(root);
     const areas = hasAreas(reg) ? reg.areas.length - 1 : 0;
     const failed = job.failed?.length ?? 0;
@@ -515,7 +508,7 @@ export async function restoreArchive(db: DB, space: string | null, at: string, o
     if (keepAs === name) keepAs = archiveName(now + 1);
     await restoreWiki(root, name, keepAs);
     pruneArchives(root, keepAs);
-    const articles = areaArticles(root).length;
+    const articles = (await areaArticles(root)).length;
     recordUpdate(db, { space, base: 'rebuild', document: `Restored the wiki archived on ${archiveTime(name).slice(0, 16).replace('T', ' ')} (${articles} article${articles === 1 ? '' : 's'}); the one it replaced is archived`, path: `restore:${archiveTime(name)}`, articles: [], notes: 0 }, now);
     const job = jobState(db, space);
     if (job && job.state !== 'running') saveJob(db, space, { ...job, did: [`Restored the wiki archived on ${archiveTime(name)}`, ...(job.did ?? [])].slice(0, 10) });

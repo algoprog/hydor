@@ -8,7 +8,7 @@ import { kvGet, kvSet, type DB } from '../../db.ts';
 import { memoryOn, repoRoot } from '../../memory/store.ts';
 import { redactSecrets, secretIn } from '../../memory/secrets.ts';
 import { allSpaces } from '../../spaces/index.ts';
-import { browseWiki } from '../browse.ts';
+import { browseWiki, walkWiki } from '../browse.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { gitHead } from './anchors.ts';
 import { DRIFT_SYSTEM, driftPrompt, helperDigestAsk, type DigestAsk } from './plan.ts';
@@ -76,9 +76,8 @@ async function checkOne(db: DB, space: string, o: Required<Pick<DriftOptions, 'n
   // Which articles name files that changed since their commit.
   const changes = new Map<string, string[] | null>();
   const stale: { path: string; title: string; commit: string; paths: string[] }[] = [];
-  for (const a of browseWiki(root).articles) {
-    const cur = readOrNull(root, a.path);
-    if (!cur) continue;
+  for (const a of (await walkWiki(root, ['articles'], true)).articles) {
+    const cur = { content: a.content };
     const t = trackingOf(cur.content);
     if (!t.anchors.length || !t.commit) continue;
     if (!changes.has(t.commit)) changes.set(t.commit, t.commit === head ? [] : await changedSince(repo, t.commit));
@@ -125,7 +124,7 @@ async function checkOne(db: DB, space: string, o: Required<Pick<DriftOptions, 'n
         problems.push(`${s.path}: left as it was, the new text was empty or held a secret`);
         continue;
       }
-      const known = new Set<string>([...browseWiki(root).articles.map((a) => a.path), 'index.md', 'log.md']);
+      const known = new Set<string>([...(await browseWiki(root, { trees: ['articles'] })).articles.map((a) => a.path), 'index.md', 'log.md']);
       const text = cleanLinks(body, s.path, known);
       const stored = await storeArticle(root, {
         path: s.path,

@@ -222,7 +222,7 @@ export async function organisePhase(db: DB, space: string | null, root: string, 
   const signal = jobSignal(space);
   for (let i = 0; i < 60 && reorganising() && !signal?.aborted; i++) await sleep(5_000, signal);
   if (signal?.aborted) return;
-  if (minArticles && areaArticles(root).length < minArticles) return;
+  if (minArticles && (await areaArticles(root)).length < minArticles) return;
   const p = space ? spaceById(db, space) : null;
   const r = await reorganiseWiki(root, {
     db,

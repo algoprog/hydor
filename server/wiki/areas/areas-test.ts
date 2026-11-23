@@ -100,7 +100,7 @@ const ask: DigestAsk = async (q) => {
 const at = Date.parse('2026-11-17T09:00:00Z');
 
 test('the first organisation of 15 articles: every article placed, the rules held, the fit check overruling the proposal', async () => {
-  assert.equal(reorganiseDue(null, areaArticles(root), at), 'first organisation');
+  assert.equal(reorganiseDue(null, (await areaArticles(root)), at), 'first organisation');
   proposal = {
     areas: [
       { key: 'crawling', name: 'Crawling', about: 'How the crawler fetches, schedules and prunes the web' },
@@ -195,10 +195,10 @@ test('the first organisation of 15 articles: every article placed, the rules hel
   assert.equal(u.articles.length, 15);
   // The structure is hidden: the wiki tools never reach it.
   assert.ok(fs.existsSync(path.join(root, '.structure', 'areas.json')));
-  assert.equal(reorganiseDue(loadRegistry(root), areaArticles(root), at + 86400_000), null, 'not again within 7 days');
+  assert.equal(reorganiseDue(loadRegistry(root), (await areaArticles(root)), at + 86400_000), null, 'not again within 7 days');
 });
 
-test('the index is grouped by area once there are 10 articles, Other last, an article in two areas under both', () => {
+test('the index is grouped by area once there are 10 articles, Other last, an article in two areas under both', async () => {
   const index = read('index.md');
   const heads = [...index.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   assert.deepEqual(heads, ['Crawling', 'Ranking', 'Rank fusion', 'Releases', 'Other'], 'no hub yet: plain headings');
@@ -214,7 +214,7 @@ test('the index is grouped by area once there are 10 articles, Other last, an ar
   const r = emptyRegistry(at);
   r.areas.unshift({ id: 'crawling', name: 'Crawling', about: '', parent: null, aliases: [], createdAt: '', updatedAt: '' });
   fs.writeFileSync(path.join(small, '.structure', 'areas.json'), registryText(r, at));
-  const block = indexBlock(small);
+  const block = await indexBlock(small);
   assert.ok(!block.includes('## '), block);
   assert.equal(block.split('\n').length, 5);
 });
@@ -357,7 +357,7 @@ test('the triggers and the 7-day spacing', () => {
 
 test('hubs: facts must cite an article of the area that says them; the code renders the links and caps every length', async () => {
   const reg = loadRegistry(root)!;
-  const plans = hubPlans(reg, membersByArea(areaArticles(root), reg));
+  const plans = hubPlans(reg, membersByArea((await areaArticles(root)), reg));
   assert.deepEqual(
     plans.map((h) => h.area.id),
     ['crawling', 'ranking', 'rank-fusion', 'releases'],
@@ -410,20 +410,20 @@ test('hubs: facts must cite an article of the area that says them; the code rend
 });
 
 test('hubs are written again only when stale, and at most six an hour in all', async () => {
-  const plansNow = () => {
+  const plansNow = async () => {
     const reg = loadRegistry(root)!;
-    return hubPlans(reg, membersByArea(areaArticles(root), reg));
+    return hubPlans(reg, membersByArea(await areaArticles(root), reg));
   };
-  const crawling = () => plansNow().find((h) => h.area.id === 'crawling')!;
-  assert.equal(hubStale(root, crawling(), at), null, 'just written');
+  const crawling = async () => (await plansNow()).find((h) => h.area.id === 'crawling')!;
+  assert.equal(hubStale(root, await crawling(), at), null, 'just written');
   // What an article says changed: the hub waits until it has stood an hour.
   fs.appendFileSync(path.join(root, 'wiki/robots.md'), '\nIt also reads the sitemap.\n');
-  assert.equal(hubStale(root, crawling(), Date.now()), null, 'debounced');
-  assert.equal(hubStale(root, crawling(), Date.now() + 2 * 3600_000), 'changed');
-  assert.equal(hubStale(root, plansNow().find((h) => h.area.id === 'releases')!, at), 'new');
+  assert.equal(hubStale(root, await crawling(), Date.now()), null, 'debounced');
+  assert.equal(hubStale(root, await crawling(), Date.now() + 2 * 3600_000), 'changed');
+  assert.equal(hubStale(root, (await plansNow()).find((h) => h.area.id === 'releases')!, at), 'new');
   // An article came: written again at once.
   fs.writeFileSync(path.join(root, 'wiki/crawl-budget.md'), '---\ntitle: "Crawl budget"\nareas: [crawling]\nupdated: 2026-11-12\n---\n\n# Crawl budget\n\nEach host gets a budget of pages a day.\n');
-  assert.equal(hubStale(root, crawling(), at), 'members');
+  assert.equal(hubStale(root, await crawling(), at), 'members');
   // The hour's budget: five spent, one left.
   kvSet(db, 'wiki.hubs.writes', JSON.stringify(Array.from({ length: 5 }, () => Date.now() - 60_000)));
   assert.equal(hubBudget(db), 1);
@@ -454,7 +454,7 @@ test('articles that name no area are placed by the helper in one call, else in O
   // An id written plainly, without brackets, counts too, and a rewrite keeps it.
   put(root, 'wiki/plain.md', 'Plain areas', 'An agent wrote it', 'Written by hand.', 'areas: crawling\n');
   assert.equal(await placeArticles(root, ask, loadRegistry(root)!), 0, 'placed already: nothing to write');
-  assert.deepEqual(areaArticles(root).find((a) => a.path === 'wiki/plain.md')!.raw, ['crawling']);
+  assert.deepEqual((await areaArticles(root)).find((a) => a.path === 'wiki/plain.md')!.raw, ['crawling']);
   assert.match(composeArticle(read('wiki/plain.md'), '# Plain areas\n\nRewritten.', { title: 'Plain areas', now: at }), /^areas: \[crawling\]$/m, 'a rewrite keeps it');
 });
 
@@ -475,7 +475,7 @@ test('a later pass: a rename keeps the id, a merged area’s name becomes an ali
   // Rank fusion's hub, so that its removal leaves a redirect.
   hub = (prompt) => ({ overview: 'x', facts: [], order: [...prompt.matchAll(/^Article (wiki\/\S+) /gm)].map((m) => m[1]) });
   assert.ok(fs.existsSync(path.join(root, hubPath('rank-fusion'))));
-  const before = areaArticles(root).length;
+  const before = (await areaArticles(root)).length;
   proposal = {
     areas: [
       { key: 'crawling', name: 'Web crawling', about: 'How the crawler fetches the web' },
@@ -509,7 +509,7 @@ test('a later pass: a rename keeps the id, a merged area’s name becomes an ali
   const stub = read(hubPath('rank-fusion'));
   assert.match(stub, /^---\ntitle: "Rank fusion"\nredirect: wiki\/areas\/ranking\.md\n/);
   assert.equal(readFollowing(root, hubPath('rank-fusion')).path, hubPath('ranking'));
-  assert.equal(areaArticles(root).length, before, 'no article lost');
+  assert.equal((await areaArticles(root)).length, before, 'no article lost');
   assert.match(read('log.md'), /reorganised: merged Rank fusion into Ranking; renamed Crawling to Web crawling/);
 });
 
@@ -550,7 +550,7 @@ test('folds and merges: the revise path, the fallback, redirects, snapshots, two
   assert.equal(updatesOf(db, space.id).filter((u) => u.path.startsWith('merge:')).length, 2);
   // Stubs are out of the index, the areas and the hubs, and the check accepts them.
   assert.ok(!read('index.md').includes('wiki/crawl-31-memory.md'));
-  assert.ok(!areaArticles(root).some((a) => a.path === 'wiki/crawl-31-memory.md'));
+  assert.ok(!(await areaArticles(root)).some((a) => a.path === 'wiki/crawl-31-memory.md'));
   assert.deepEqual(checkWiki(root).issues.filter((i) => /crawl-31|editors-0-34/.test(i.path) || /crawl-31|editors-0-34/.test(i.detail)), []);
   assert.deepEqual(await runMerges(root, ask, { db, space: space.id, now: day1 + 3600_000 }), [], 'not a third that day');
   merge = () => ({ summary: 'RRF', content: '# Rank fusion\n\nWords and meaning are fused with reciprocal rank fusion, k of 60.\n\nRRF uses k = 60 for both lists.', removed: [{ text: 'as the fusion article says', why: 'said twice: kept once' }] });
@@ -607,7 +607,7 @@ test('the route: POST /api/projects/:id/wiki/reorganise runs a pass now and says
   setAreasHelper(null);
   // Nothing lost along the way: every article is in an area.
   const reg = loadRegistry(root)!;
-  for (const a of areaArticles(root)) assert.ok(a.raw.length && a.raw.every((id) => reg.areas.some((x) => x.id === id)), a.path);
+  for (const a of (await areaArticles(root))) assert.ok(a.raw.length && a.raw.every((id) => reg.areas.some((x) => x.id === id)), a.path);
   await updateRegistry(root, () => false);
 });
 
@@ -628,9 +628,24 @@ test('the ten-minute check: the first organisation only while nobody is writing,
   assert.ok(quiet.hubs >= 2, `hubs written in the same check: ${quiet.hubs}`);
   assert.ok(fs.existsSync(path.join(r2, hubPath('crawling'))) && fs.existsSync(path.join(r2, hubPath('ranking'))));
   assert.match(fs.readFileSync(path.join(r2, 'index.md'), 'utf8'), /## \[Crawling\]\(wiki\/areas\/crawling\.md\)/);
-  const again = await tendAreas(db, { ask, quiet: true });
+  // A tick in which nothing is written walks each wiki once (a wiki on a network share is slow to walk), not once for each step.
+  const walked: string[] = [];
+  const readdir = fs.promises.readdir;
+  fs.promises.readdir = ((dir: unknown, ...rest: unknown[]) => {
+    walked.push(String(dir));
+    return (readdir as (...a: unknown[]) => unknown)(dir, ...rest);
+  }) as typeof fs.promises.readdir;
+  let again: Awaited<ReturnType<typeof tendAreas>>;
+  try {
+    again = await tendAreas(db, { ask, quiet: true });
+  } finally {
+    fs.promises.readdir = readdir;
+  }
   assert.equal(again.reorganised, null, 'not due again');
   assert.equal(again.hubs, 0, 'nothing stale');
+  assert.equal(again.placed + again.removed + again.merged, 0, 'nothing written');
+  assert.equal(walked.filter((d) => d === path.join(r2, 'wiki')).length, 1, 'the wiki is walked once in the tick');
+  assert.equal(walked.filter((d) => d === path.join(root, 'wiki')).length, 1, 'the other wiki too');
 });
 
 for (const [name, fn] of tests) {

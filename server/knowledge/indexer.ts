@@ -3,6 +3,7 @@
 // slide, sheet or heading they came from, and indexed by their words at once. Their vectors for search by
 // meaning follow in the background, while it is on, so a big folder never holds anything up.
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { TEXT_EXTS } from '../../shared/knowledge.ts';
 import type { DB } from '../db.ts';
@@ -12,7 +13,7 @@ import { keep, release, searchBudget, used, type Kept } from '../memory/ram.ts';
 import { BYTES, quantize, VECTOR_MODEL } from '../memory/vectors.ts';
 import { htmlMarkdown } from '../web/fetch.ts';
 import { baseRow, baseRows, docsOf, dropDoc, knowledgeSchema, saveDoc, sourcesOf } from './store.ts';
-import { wikiFileActive, wikiSourceRoot } from '../wiki/knowledge/bindings.ts';
+import { wikiActiveChecker, wikiSourceRoot } from '../wiki/knowledge/bindings.ts';
 import { emitIndexed } from './events.ts';
 
 /** Folders never read: tools' caches, dependencies, version control. */
@@ -26,14 +27,14 @@ const isText = (f: string) => TEXT.has(path.extname(f).slice(1).toLowerCase());
 /** Whether a file can go into a knowledge base. */
 export const readable = (f: string) => canRead(f) || isText(f);
 
-/** The files of a source to read: under the folder, skipping hidden and tool folders, at most MAX_FILES. */
-export function filesUnder(dir: string): string[] {
+/** The files of a source to read: under the folder, skipping hidden and tool folders, at most MAX_FILES. A folder on a network share is slow to walk, so it never blocks the server. */
+export async function filesUnder(dir: string): Promise<string[]> {
   const out: string[] = [];
-  const walk = (d: string, depth: number) => {
+  const walk = async (d: string, depth: number): Promise<void> => {
     if (out.length >= MAX_FILES || depth > 12) return;
     let list: fs.Dirent[];
     try {
-      list = fs.readdirSync(d, { withFileTypes: true });
+      list = await fsp.readdir(d, { withFileTypes: true });
     } catch {
       return;
     }
@@ -41,11 +42,21 @@ export function filesUnder(dir: string): string[] {
       if (e.name.startsWith('.') || out.length >= MAX_FILES) continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) {
-        if (!SKIP_DIRS.has(e.name)) walk(p, depth + 1);
+        if (!SKIP_DIRS.has(e.name)) await walk(p, depth + 1);
       } else if (e.isFile() && readable(p)) out.push(p);
     }
   };
-  walk(dir, 0);
+  await walk(dir, 0);
+  return out;
+}
+
+/**
+ * `fn` over the items, a few at a time (a network share answers each call slowly, not all at once); the results in
+ * order. Node does file calls on a pool of four threads that the whole app shares: a share that stalls holds two at most.
+ */
+async function inBatches<T, R>(items: T[], fn: (item: T) => Promise<R>, size = 2): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
   return out;
 }
 
@@ -204,25 +215,30 @@ async function scan(db: DB, base: string) {
   const known = new Map(docsOf(db, base).map((d) => [d.path, d]));
   const found: { file: string; source: string }[] = [];
   for (const s of sources) {
-    if (!fs.existsSync(s.path)) continue;
+    if (!(await fsp.access(s.path).then(() => true, () => false))) continue;
     const wiki = wikiSourceRoot(db, s.id);
     if (wiki && !wiki.active) continue;
-    for (const file of filesUnder(s.path)) if (!wiki || wikiFileActive(wiki.root, file)) found.push({ file, source: s.id });
+    const files = await filesUnder(s.path);
+    // One checker for the scan of a wiki: what its files share is asked once.
+    const active = wiki ? wikiActiveChecker(wiki.root) : null;
+    const keep = active ? await inBatches(files, (file) => active(file)) : files.map(() => true);
+    files.forEach((file, i) => keep[i] && found.push({ file, source: s.id }));
   }
   const seen = new Set(found.map((f) => f.file));
   // Gone from the folder (or the folder is gone): out of the base.
   for (const [p, d] of known) if (!seen.has(p)) dropDoc(db, d.id);
   const failed = retry.delete(base);
-  const todo = found.filter(({ file }) => {
+  const changed = await inBatches(found, async ({ file }) => {
     const d = known.get(file);
     if (!d || (failed && d.status === 'error')) return true;
     try {
-      const st = fs.statSync(file);
+      const st = await fsp.stat(file);
       return st.size !== d.size || Math.abs(st.mtimeMs - d.mtime) > 1;
     } catch {
       return false;
     }
   });
+  const todo = found.filter((_, i) => changed[i]);
   let last = 0;
   progress.set(base, { done: 0, total: todo.length });
   for (const [i, { file, source }] of todo.entries()) {
@@ -240,7 +256,7 @@ async function scan(db: DB, base: string) {
 async function indexFile(db: DB, base: string, source: string, file: string) {
   let st: fs.Stats;
   try {
-    st = fs.statSync(file);
+    st = await fsp.stat(file);
   } catch {
     return;
   }

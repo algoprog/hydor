@@ -49,7 +49,7 @@ function real(p: string): string {
 
 /** The wiki's articles and sources that match: by the passages its index found, then by title or summary. */
 async function articlesOf(d: Deps, space: string, root: string, query: string, limit: number, vector: Float32Array | null): Promise<{ hits: ProjectMemoryArticleHit[]; meaning: boolean }> {
-  const view = browseWiki(root);
+  const view = await browseWiki(root, { trees: ['articles', 'sources'] });
   const known = new Map<string, WikiEntry>();
   for (const e of view.articles) if (!isHubPath(e.path)) known.set(e.path, e);
   for (const e of view.sources) known.set(e.path, e);

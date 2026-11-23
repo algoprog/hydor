@@ -53,9 +53,9 @@ const mk = (name: string, o: Record<string, unknown> = {}) => {
   // Every project has a limit of its own, so one test's small limit never reaches another's project.
   return { space: createSpace(db, { name, description: `The ${name} project`, folder, wikiDocumentLimit: 100, ...o }), folder };
 };
-const articlesOf = (space: string) => {
+const articlesOf = async (space: string) => {
   const root = wikiRoot(db, space);
-  return root ? browseWiki(root).articles : [];
+  return root ? (await browseWiki(root)).articles : [];
 };
 
 // ---- the stand-in helper --------------------------------------------------------------------------------------------
@@ -168,7 +168,7 @@ test('an overview for each folder of unread documents: from titles and first lin
   assert.match(papers, /<folder>[\s\S]*<\/folder>/, 'the list is data in its own tag');
 
   const root = wikiRoot(db, p.space.id)!;
-  const list = articlesOf(p.space.id).filter((a) => a.path.startsWith('wiki/overviews/'));
+  const list = (await articlesOf(p.space.id)).filter((a) => a.path.startsWith('wiki/overviews/'));
   assert.equal(list.length, 3);
   const art = readWiki(root, `wiki/overviews/${list.find((a) => /papers/.test(a.path))!.path.split('/').pop()}`).content;
   assert.match(art, /^---\ntitle: "Overview: .*papers"/);
@@ -187,7 +187,7 @@ test('an overview for each folder of unread documents: from titles and first lin
   assert.equal(await writeOverviews(db, ask, now + 3 * 3600_000), 1);
   assert.equal(prompts(c, OVERVIEW_SYSTEM).length, 1);
   assert.match(prompts(c, OVERVIEW_SYSTEM)[0], /7 documents/);
-  assert.equal(articlesOf(p.space.id).filter((a) => a.path.startsWith('wiki/overviews/')).length, 3, 'the same article, written again');
+  assert.equal((await articlesOf(p.space.id)).filter((a) => a.path.startsWith('wiki/overviews/')).length, 3, 'the same article, written again');
 });
 
 test('at most three overviews an hour in all; a helper failure is listed and tried again in a later hour; off when wiki memory or documents are off', async () => {
@@ -367,7 +367,7 @@ test('commit messages: once a day, since the last time, redacted, as data; "Comm
   const src = fs.readdirSync(path.join(root, 'raw', 'articles')).map((f) => fs.readFileSync(path.join(root, 'raw', 'articles', f), 'utf8'));
   assert.ok(src.some((t) => t.includes('commits:Repo')), 'kept as a source with its origin');
   assert.ok(src.every((t) => !t.includes(SECRET)));
-  assert.equal(articlesOf(p.space.id).length, 1);
+  assert.equal((await articlesOf(p.space.id)).length, 1);
 
   // Not again within a day; after a day with nothing new, nothing; with new commits, only those.
   const asks = asked.length;

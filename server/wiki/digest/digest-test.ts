@@ -231,7 +231,7 @@ test('changed text: the article is updated and keeps what it said', async () => 
   assert.match(after, /Flights over 500 euros need approval\./);
   assert.match(after, /Trains are preferred under 4 hours\./);
   assert.equal((after.match(/ {2}- raw\/articles\//g) ?? []).length, 2);
-  assert.equal(browseWiki(root).articles.length, 1);
+  assert.equal((await browseWiki(root)).articles.length, 1);
   assert.equal((readWiki(root, 'log.md').content.match(/ · policy\.md/g) ?? []).length, 2);
   const [latest] = await updates();
   assert.deepEqual([latest.articles, latest.notes], [['wiki/travel-policy.md'], 0]);

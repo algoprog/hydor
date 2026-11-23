@@ -76,7 +76,7 @@ export async function mergeOne(root: string, ask: DigestAsk, q: QueuedMerge, now
   try {
     const from = q.from.map((p) => partOf(root, p)).filter((p): p is Part => !!p);
     if (!from.length) return { ok: false, error: 'its articles are gone or merged already' };
-    const known = new Set([...browseWiki(root).articles.map((a) => a.path), 'index.md', 'log.md']);
+    const known = new Set([...(await browseWiki(root, { trees: ['articles'] })).articles.map((a) => a.path), 'index.md', 'log.md']);
     let into: Part | null = null;
     let target: string;
     let title: string;

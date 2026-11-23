@@ -40,12 +40,12 @@ const same = (a: string[], b: string[]) => a.length === b.length && [...a].sort(
 /**
  * Keeps every article in an area it can be in: unknown ids dropped, at most two; an article left with none is placed
  * by the helper (one call for up to PLACE_BATCH), else in Other. Front matter only, and only over the text it read.
- * Returns how many articles it wrote.
+ * Returns how many articles it wrote. `have` is the articles the caller has read already (else it reads them).
  */
-export async function placeArticles(root: string, ask: DigestAsk, r: Registry): Promise<number> {
+export async function placeArticles(root: string, ask: DigestAsk, r: Registry, have?: AreaArticle[]): Promise<number> {
   if (!hasAreas(r)) return 0;
   const known = new Set(r.areas.map((a) => a.id));
-  const articles = areaArticles(root);
+  const articles = have ?? (await areaArticles(root));
   const want = new Map<string, string[]>();
   const ask4: AreaArticle[] = [];
   for (const a of articles) {
@@ -89,10 +89,10 @@ export async function placeArticles(root: string, ask: DigestAsk, r: Registry): 
 }
 
 /** Areas left with no article (and no sub-area with one) go: their names stay as aliases of none, their hub becomes a redirect. */
-export async function dropEmptyAreas(root: string, now = Date.now()): Promise<string[]> {
+export async function dropEmptyAreas(root: string, now = Date.now(), have?: AreaArticle[]): Promise<string[]> {
   const r = loadRegistry(root);
   if (!hasAreas(r)) return [];
-  const articles = areaArticles(root);
+  const articles = have ?? (await areaArticles(root));
   const members = membersByArea(articles, r);
   const empty = r.areas.filter((a) => a.id !== OTHER && !(members.get(a.id)?.length) && !r.areas.some((c) => c.parent === a.id && members.get(c.id)?.length));
   if (!empty.length) return [];
@@ -128,10 +128,10 @@ export async function dropEmptyAreas(root: string, now = Date.now()): Promise<st
 }
 
 /** The hubs of a wiki that need writing, the ones whose articles came or went first. */
-export function staleHubs(root: string, now = Date.now()): { plan: HubPlan; why: 'new' | 'members' | 'changed' }[] {
+export async function staleHubs(root: string, now = Date.now(), have?: AreaArticle[]): Promise<{ plan: HubPlan; why: 'new' | 'members' | 'changed' }[]> {
   const r = loadRegistry(root);
   if (!hasAreas(r)) return [];
-  const members = membersByArea(areaArticles(root), r);
+  const members = membersByArea(have ?? (await areaArticles(root)), r);
   const out: { plan: HubPlan; why: 'new' | 'members' | 'changed' }[] = [];
   for (const plan of hubPlans(r, members)) {
     const why = hubStale(root, plan, now);
@@ -140,15 +140,18 @@ export function staleHubs(root: string, now = Date.now()): { plan: HubPlan; why:
   return out.sort((x, y) => (x.why === 'changed' ? 1 : 0) - (y.why === 'changed' ? 1 : 0));
 }
 
-/** Writes stale hubs of the given wikis, within the hour's budget (all of them: `max`). Returns how many it wrote. */
-export async function refreshHubs(db: DB | null, ask: DigestAsk, roots: string[], o: { now?: number; max?: number } = {}): Promise<number> {
+/**
+ * Writes stale hubs of the given wikis, within the hour's budget (all of them: `max`). Returns how many it wrote.
+ * `articles` holds the articles a caller has read already, by wiki root.
+ */
+export async function refreshHubs(db: DB | null, ask: DigestAsk, roots: string[], o: { now?: number; max?: number; articles?: Map<string, AreaArticle[]> } = {}): Promise<number> {
   const now = o.now ?? Date.now();
   let left = o.max ?? (db ? hubBudget(db, now) : Infinity);
   let wrote = 0;
   for (const root of roots) {
     if (left <= 0) break;
     let any = false;
-    for (const { plan } of staleHubs(root, now)) {
+    for (const { plan } of await staleHubs(root, now, o.articles?.get(root))) {
       if (left <= 0) break;
       left--;
       const r = await writeHub(db, root, ask, plan, now);
@@ -220,12 +223,20 @@ async function tendAll(db: DB, o: TendOptions, out: Awaited<ReturnType<typeof te
       console.warn(`[wiki] ${what}: ${(e as Error).message}`);
     }
   };
+  // Each wiki is walked once in a tick (a wiki on a network share is slow to walk), and again only after a step wrote articles to it.
+  const walked = new Map<string, AreaArticle[]>();
+  const articlesOf = async (root: string) => {
+    let have = walked.get(root);
+    if (!have) walked.set(root, (have = await areaArticles(root)));
+    return have;
+  };
   for (const { space, root } of all) {
     await guarded('placing articles in areas', async () => {
       const r = loadRegistry(root);
       if (!hasAreas(r)) return;
-      const placed = await placeArticles(root, ask, r);
-      const removed = await dropEmptyAreas(root, now);
+      const placed = await placeArticles(root, ask, r, await articlesOf(root));
+      if (placed) walked.delete(root);
+      const removed = await dropEmptyAreas(root, now, await articlesOf(root));
       out.placed += placed;
       out.removed += removed.length;
       if (placed || removed.length) {
@@ -237,8 +248,9 @@ async function tendAll(db: DB, o: TendOptions, out: Awaited<ReturnType<typeof te
   // The reorganising pass: the first wiki that is due, while nobody is writing to an agent.
   if (o.quiet !== false && !reorganising()) {
     for (const { space, root } of all) {
-      const due = reorganiseDue(loadRegistry(root), areaArticles(root), now);
+      const due = reorganiseDue(loadRegistry(root), await articlesOf(root), now);
       if (!due) continue;
+      walked.delete(root);
       await guarded('reorganising a wiki', async () => {
         out.reorganised = await reorganiseWiki(root, { db, space, propose: strong, check: ask, project: projectOf(db, space), now, onUpdate: o.onUpdate });
         if (!out.reorganised.ran) console.warn(`[wiki] reorganising a wiki (${due}): ${out.reorganised.error}`);
@@ -249,11 +261,13 @@ async function tendAll(db: DB, o: TendOptions, out: Awaited<ReturnType<typeof te
   for (const { space, root } of all) {
     await guarded('merging articles', async () => {
       const done = await runMerges(root, ask, { db, space, now, onUpdate: o.onUpdate });
-      out.merged += done.filter((d) => d.ok).length;
+      const merged = done.filter((d) => d.ok).length;
+      out.merged += merged;
+      if (merged) walked.delete(root);
     });
   }
   await guarded('writing hubs', async () => {
-    out.hubs = await refreshHubs(db, ask, all.map((p) => p.root), { now });
+    out.hubs = await refreshHubs(db, ask, all.map((p) => p.root), { now, articles: walked });
     if (out.hubs) for (const p of all) o.onUpdate?.(p.space);
   });
   return out;
@@ -293,10 +307,10 @@ export async function reorganiseNow(db: DB, space: string | null, options: { ask
 }
 
 /** The line agents get while a wiki has areas: `Wiki areas: Name (n) · …` (top-level areas, at most AREAS_LINE_MAX characters); null without areas. */
-export function areasLine(root: string): string | null {
+export async function areasLine(root: string): Promise<string | null> {
   const r = loadRegistry(root);
   if (!hasAreas(r)) return null;
-  const counts = areaCounts(r, membersByArea(areaArticles(root), r)).filter((x) => x.count > 0);
+  const counts = areaCounts(r, membersByArea(await areaArticles(root), r)).filter((x) => x.count > 0);
   if (!counts.length) return null;
   let line = 'Wiki areas:';
   for (const [i, { area, count }] of counts.entries()) {
@@ -308,4 +322,45 @@ export function areasLine(root: string): string | null {
     line += part;
   }
   return line;
+}
+
+/** How long a wiki's areas line is kept for the sessions that start, and how long a session start waits for a new one. */
+export const AREAS_LINE_KEEP_MS = 10 * 60_000;
+export const AREAS_LINE_WAIT_MS = 2000;
+
+const lines = new Map<string, { line: string | null; at: number }>();
+const walking = new Map<string, Promise<string | null>>();
+
+/**
+ * The areas line for a session that starts: the one kept for 10 minutes, else a new one, which the session waits at
+ * most 2 seconds for (a wiki on a slow disk): it goes on without when the walk is slower, and the walk finishes in the
+ * background for the next session. One walk at a time for each wiki.
+ */
+export async function areasLineForSpawn(root: string, o: { keepMs?: number; waitMs?: number; now?: number } = {}): Promise<string | null> {
+  const kept = lines.get(root);
+  if (kept && (o.now ?? Date.now()) - kept.at < (o.keepMs ?? AREAS_LINE_KEEP_MS)) return kept.line;
+  let walk = walking.get(root);
+  if (!walk) {
+    walk = areasLine(root).then((line) => {
+      lines.set(root, { line, at: Date.now() });
+      return line;
+    });
+    walking.set(root, walk);
+    const done = () => walking.delete(root);
+    walk.then(done, done);
+  }
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      walk,
+      new Promise<string | null>((resolve) => {
+        timer = setTimeout(() => resolve(kept?.line ?? null), o.waitMs ?? AREAS_LINE_WAIT_MS);
+      }),
+    ]);
+  } catch (e) {
+    console.warn(`[wiki] the areas line: ${(e as Error).message}`);
+    return kept?.line ?? null;
+  } finally {
+    clearTimeout(timer);
+  }
 }

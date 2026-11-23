@@ -210,7 +210,7 @@ test('another writer grows the article while the helper writes: the rule is judg
   assert.ok(big.length > 0);
 });
 
-test('the history folder is hidden: never read, listed, written or checked through the wiki', () => {
+test('the history folder is hidden: never read, listed, written or checked through the wiki', async () => {
   const snap = snapshotsOf(root, 'wiki/pricing.md')[0].path;
   assert.ok(fs.existsSync(path.join(root, snap)));
   assert.throws(() => readWiki(root, snap), /hidden/i);
@@ -218,7 +218,8 @@ test('the history folder is hidden: never read, listed, written or checked throu
   assert.throws(() => applyWikiChanges(root, [{ path: snap, content: 'x', expectedSha256: null }]), /written only|Invalid|hidden/i);
   assert.throws(() => applyWikiChanges(root, [{ path: '.history/wiki/new.md/x.md', content: 'x', expectedSha256: null }]), /written only|Invalid|hidden/i);
   assert.equal(wikiFileActive(root, path.join(root, snap)), false);
-  const all = [...browseWiki(root).articles, ...browseWiki(root).sources].map((e) => e.path);
+  const walk = await browseWiki(root);
+  const all = [...walk.articles, ...walk.sources].map((e) => e.path);
   assert.ok(!all.some((p) => p.includes('.history')));
   assert.ok(checkWiki(root).issues.every((i) => !i.path.includes('.history')));
   assert.throws(() => snapshotArticle(root, 'wiki/../../etc/x.md', 'x', 1), /Not an article path/);

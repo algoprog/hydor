@@ -403,7 +403,7 @@ async function pass(root: string, o: PassOptions): Promise<ReorganiseResult> {
   const now = o.now ?? Date.now();
   const before = readRegistry(root)?.registry ?? null;
   const first = !hasAreas(before);
-  const articles = areaArticles(root);
+  const articles = await areaArticles(root);
   if (articles.length < 2) return { ran: false, error: `Nothing to organise: the wiki has ${articles.length} article${articles.length === 1 ? '' : 's'}` };
   const exists = (id: string) => fs.existsSync(path.join(root, ...hubPath(id).split('/')));
   const raw = await o.propose({ system: PROPOSE_SYSTEM, prompt: proposePrompt(before, articles, o.project), maxTokens: 16_000, strong: true });

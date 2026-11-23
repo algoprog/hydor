@@ -5,6 +5,8 @@ import path from 'node:path';
 import { secretIn } from '../memory/secrets.ts';
 
 const MAX_BYTES = 4 * 1024 * 1024;
+/** The largest wiki file that is read. */
+export const WIKI_MAX_BYTES = MAX_BYTES;
 const LOCK = '.hydor-wiki-write.lock';
 
 /** A digest of exact bytes, used to detect stale edits and identify unchanged sources. */
@@ -43,16 +45,26 @@ function noSymlinks(root: string, target: string): void {
 }
 
 /**
- * Resolve a bounded active file path without following wiki-internal symlinks. Hidden names (a part starting with a
- * dot: .git, .sessions, .archive, locks) are never reachable. Project planning Markdown is bounded to
- * output/projects/; a hub's separate projects/ directory remains inaccessible from this wiki.
+ * The parts of a relative path the wiki reads and lists, or an error when it is not one: no hidden names, nothing
+ * outside wiki/, raw/, the root's own Markdown files and project plans (output/projects/ and output/evidence/, at
+ * least one folder deep).
  */
-function filePath(root: string, relative: string, missing = false): string {
+export function wikiRelativeParts(relative: string): string[] {
   if (!relative || relative.includes('\0') || relative.includes('\\') || path.posix.isAbsolute(relative)) throw new Error('Expected a relative wiki path');
   const parts = relative.split('/');
   if (parts.some((p) => !p || p.startsWith('.'))) throw new Error('Invalid or hidden wiki path');
   const projectDocument = parts.length >= 4 && parts[0] === 'output' && (parts[1] === 'projects' || parts[1] === 'evidence') && /\.md$/i.test(relative);
   if (!projectDocument && (parts.length === 1 ? !/\.md$/i.test(parts[0]) : !['wiki', 'raw'].includes(parts[0]))) throw new Error('A wiki holds its files in wiki/, raw/, project plans and Markdown files at its root');
+  return parts;
+}
+
+/**
+ * Resolve a bounded active file path without following wiki-internal symlinks. Hidden names (a part starting with a
+ * dot: .git, .sessions, .archive, locks) are never reachable. Project planning Markdown is bounded to
+ * output/projects/; a hub's separate projects/ directory remains inaccessible from this wiki.
+ */
+function filePath(root: string, relative: string, missing = false): string {
+  const parts = wikiRelativeParts(relative);
   const target = path.resolve(root, ...parts);
   noSymlinks(root, target);
   if (fs.existsSync(target)) {
@@ -72,13 +84,18 @@ function writable(relative: string, plans = false): boolean {
   return ['wiki', 'raw'].includes(parts[0]) && /\.md$/i.test(relative);
 }
 
+/** The text of a file's bytes: bounded, never binary, valid UTF-8 (an error otherwise). */
+export function wikiTextOf(data: Buffer, size = data.length): string {
+  if (size > MAX_BYTES) throw new Error('Wiki file is too large');
+  if (data.includes(0)) throw new Error('Wiki file is binary');
+  return new TextDecoder('utf-8', { fatal: true }).decode(data);
+}
+
 /** Read bounded UTF-8 content without accepting binary files. */
 function readText(file: string): string {
   const st = fs.statSync(file);
   if (st.size > MAX_BYTES) throw new Error('Wiki file is too large');
-  const data = fs.readFileSync(file);
-  if (data.includes(0)) throw new Error('Wiki file is binary');
-  return new TextDecoder('utf-8', { fatal: true }).decode(data);
+  return wikiTextOf(fs.readFileSync(file), st.size);
 }
 
 /** Read a document and return the hash needed for a conflict-checked update. */

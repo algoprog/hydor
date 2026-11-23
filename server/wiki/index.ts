@@ -10,7 +10,7 @@ import { LANGS } from '../../shared/i18n.ts';
 import { userLang } from '../language/index.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
-import { areasLine } from './areas/tend.ts';
+import { areasLineForSpawn } from './areas/tend.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { spaceById } from '../spaces/index.ts';
 import { wikiHasArticles } from './has-articles.ts';
@@ -42,7 +42,7 @@ export const wiki: Feature = {
   tools: (ctx) => !confidentialRun(ctx) && wikiEnabledForSession(ctx.deps.db, ctx.key, ctx.cwd)
     ? [...wikiTools(), ...planTools(projectWikiTarget, guardProject), ...revisionTools(projectWikiTarget, guardProject)]
     : [],
-  spawn: (s, d) => {
+  spawn: async (s, d) => {
     if (!wikiChatEnabled(s.extra)) return undefined;
     // A new Codex session has no key yet: the project picked for it on the start page is its project, wherever it works.
     const picked = !s.key && typeof s.extra.space === 'string' ? spaceById(d.db, s.extra.space) : null;
@@ -69,7 +69,7 @@ export const wiki: Feature = {
     try {
       const root = wikiRoot(d.db, space);
       has ||= wikiHasArticles(root);
-      if (!s.lean && root) areas = areasLine(root);
+      if (!s.lean && root) areas = await areasLineForSpawn(root);
     } catch {
       /* a wiki that cannot be read gives no line */
     }

@@ -202,7 +202,7 @@ export async function runBuild(db: DB, space: string, root: string, job: JobStat
       save();
     }
     if (job.phase === 'organise') {
-      row(`Building from history: organising ${plural(areaArticles(root).length, 'article')}`, [...written].slice(0, 50));
+      row(`Building from history: organising ${plural((await areaArticles(root)).length, 'article')}`, [...written].slice(0, 50));
       await organisePhase(db, space, root, job, o, MIN_ARTICLES);
       if (stoppedNow(space)) return stopped();
       job.phase = 'hubs';
@@ -214,7 +214,7 @@ export async function runBuild(db: DB, space: string, root: string, job: JobStat
       if (stoppedNow(space)) return stopped();
     }
     await writeIndex(root).catch(() => {});
-    const articles = areaArticles(root);
+    const articles = await areaArticles(root);
     const reg = loadRegistry(root);
     const areas = hasAreas(reg) ? reg.areas.length - 1 : 0;
     const failed = job.failed?.length ?? 0;

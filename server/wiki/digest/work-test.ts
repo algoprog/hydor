@@ -78,9 +78,9 @@ const sources = (space: string) => {
   const dir = root && path.join(root, 'raw', 'articles');
   return dir && fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => fs.readFileSync(path.join(dir, f), 'utf8')) : [];
 };
-const articles = (space: string) => {
+const articles = async (space: string) => {
   const root = wikiRoot(db, space);
-  return root ? browseWiki(root).articles : [];
+  return root ? (await browseWiki(root)).articles : [];
 };
 
 test('a conversation is read as the user and the agent said it, within its share', () => {
@@ -120,7 +120,7 @@ test('one pass: a project conversation becomes a source, an article and an updat
   const src = sources(alpha.space.id);
   assert.ok(src.length >= 1 && src.some((t) => t.includes('session:Plan the refunds ·')), 'kept as a source with its origin');
   assert.ok(!src.some((t) => t.includes('sk-ant-abcdefghijklmnopqrstuvwx')));
-  const list = articles(alpha.space.id);
+  const list = await articles(alpha.space.id);
   assert.equal(list.length, 1);
   const root = wikiRoot(db, alpha.space.id)!;
   assert.match(readWiki(root, list[0].path).content, /keep the booking flow in one place/);

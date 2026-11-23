@@ -159,7 +159,7 @@ const settled = async () => {
 
 test('the estimate: the sources (an article that cites none counts), the calls, the characters, the helper', async () => {
   assert.deepEqual(
-    rebuildSources(root).map((s) => s.path),
+    (await rebuildSources(root)).map((s) => s.path),
     [doc, session, commits, notes, 'wiki/team-lunch.md'],
   );
   const res = await call('POST', '/wiki/rebuild', {});
@@ -283,7 +283,7 @@ test('the three latest archives are kept, and always the oldest: the wiki before
 });
 
 test('a rebuild a restart cut short goes on where it stopped', async () => {
-  const sources = rebuildSources(root).map((s) => s.path);
+  const sources = (await rebuildSources(root)).map((s) => s.path);
   const name = archiveName(Date.now() + 5000);
   await archiveWiki(root, name);
   saveJob(db, space.id, { kind: 'rebuild', state: 'running', phase: 'sources', done: 3, total: sources.length, startedAt: Date.now(), archive: name, sources, failed: [], did: [], starts: [], carried: 0 });

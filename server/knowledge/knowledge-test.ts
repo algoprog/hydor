@@ -95,8 +95,8 @@ test('passages keep the page, slide, sheet or heading they are in, and long text
   assert.equal(passages('## Sheet: Budget (first 2000 rows of about 9000)\n\n| a |')[0].part, 'sheet Budget');
 });
 
-test('a folder: documents and text files, never dependencies, version control or pictures', () => {
-  const files = filesUnder(folder).map((f) => path.relative(folder, f));
+test('a folder: documents and text files, never dependencies, version control or pictures', async () => {
+  const files = (await filesUnder(folder)).map((f) => path.relative(folder, f));
   assert.deepEqual(files, ['expenses.txt', 'office.html', 'policies/leave.md']);
 });
 
