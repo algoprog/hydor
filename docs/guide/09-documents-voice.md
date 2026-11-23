@@ -352,7 +352,7 @@ These are set once for the app. **[Show in this browser](/settings?s=suggest&fin
 
 ### How sure it must be
 
-Every guess has a chance of being right, and a guess is shown only when that chance is high enough. **[How sure before showing](/settings?s=suggest&find=How%20sure%20before%20showing)** sets the bar: **More** shows more guesses, and more of them are wrong; **Balanced** is the middle, aiming at about four right guesses in ten shown; **Surer** shows fewer, and more of those are right. An agent can also set the bar higher still, for the surest ones only. **[Show the next word](/settings?s=suggest&find=Show%20the%20next%20word)** turns the dimmer second word off, so only the rest of the word you are typing shows.
+Every guess has a chance of being right, and a guess is shown only when that chance is high enough. **[How sure before showing](/settings?s=suggest&find=How%20sure%20before%20showing)** sets the bar: **More** (the default) shows more guesses, and more of them are wrong; **Balanced** is the middle, aiming at about four right guesses in ten shown; **Surer** shows fewer, and more of those are right. An agent can also set the bar higher still, for the surest ones only. **[Show the next word](/settings?s=suggest&find=Show%20the%20next%20word)** turns the dimmer second word off, so only the rest of the word you are typing shows.
 
 ### What it reads
 

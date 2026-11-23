@@ -352,7 +352,7 @@ Isso é definido uma vez para o app. **[Mostrar neste navegador](/settings?s=sug
 
 ### Qual a certeza necessária
 
-Cada palpite tem uma chance de estar certo, e ele só é mostrado quando essa chance é alta o bastante. **[Segurança antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** define o limite: **Mais** mostra mais palpites, e mais deles errados; **Equilibrado** é o meio-termo, visando a cerca de quatro acertos em cada dez palpites mostrados; **Mais seguro** mostra menos, e mais deles certos. Um agente também pode definir o limite ainda mais alto, só para os mais certeiros. **[Mostrar a palavra seguinte](/settings?s=suggest&find=Show%20the%20next%20word)** desativa a segunda palavra, mais apagada, de modo que só o resto da palavra que você está digitando apareça.
+Cada palpite tem uma chance de estar certo, e ele só é mostrado quando essa chance é alta o bastante. **[Segurança antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** define o limite: **Mais** (o padrão) mostra mais palpites, e mais deles errados; **Equilibrado** é o meio-termo, visando a cerca de quatro acertos em cada dez palpites mostrados; **Mais seguro** mostra menos, e mais deles certos. Um agente também pode definir o limite ainda mais alto, só para os mais certeiros. **[Mostrar a palavra seguinte](/settings?s=suggest&find=Show%20the%20next%20word)** desativa a segunda palavra, mais apagada, de modo que só o resto da palavra que você está digitando apareça.
 
 ### O que ele lê
 

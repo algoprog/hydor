@@ -278,7 +278,7 @@ test('routes: not ready is 204 and starts the worker; then a suggestion comes ba
   const sug = logLines().filter((l) => l.op === 'suggest').pop();
   assert.deepEqual(
     { ...sug, id: undefined },
-    { id: undefined, op: 'suggest', surface: 'chat', text: 'Hello wor', reply: 'The previous reply', prev: 'before', precision: 0.4, next: true, cache: false, switch: true, typed_words: 100, context_words: 100 },
+    { id: undefined, op: 'suggest', surface: 'chat', text: 'Hello wor', reply: 'The previous reply', prev: 'before', precision: 0.3, next: true, cache: false, switch: true, typed_words: 100, context_words: 100 },
   );
   // The settings go with each request: the next word off hides it.
   await app.inject({ method: 'PUT', url: '/api/suggest', payload: { nextWord: false, precision: 0.5, typedWords: 50, contextWords: 20 } });
@@ -286,7 +286,7 @@ test('routes: not ready is 204 and starts the worker; then a suggestion comes ba
   assert.deepEqual([r2.next, r2.showNext, r2.confNext], ['', false, 0]);
   const sug2 = logLines().filter((l) => l.op === 'suggest').pop();
   assert.deepEqual([sug2.precision, sug2.next, sug2.typed_words, sug2.context_words], [0.5, false, 50, 20]);
-  await app.inject({ method: 'PUT', url: '/api/suggest', payload: { nextWord: true, precision: 0.4, typedWords: 100, contextWords: 100 } });
+  await app.inject({ method: 'PUT', url: '/api/suggest', payload: { nextWord: true, precision: 0.3, typedWords: 100, contextWords: 100 } });
   // A worker's error line is nothing to show.
   assert.equal((await ask({ surface: 'chat', text: 'broken' })).statusCode, 204);
   assert.ok((await get()).status.stats!.requests >= 2);

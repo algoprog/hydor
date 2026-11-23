@@ -352,7 +352,7 @@ Ces réglages sont définis une fois pour toute l’app. **[Afficher dans ce nav
 
 ### Le degré de certitude requis
 
-Chaque suggestion a une chance d’être juste, et elle n’est affichée que si cette chance est assez élevée. **[Certitude avant d’afficher](/settings?s=suggest&find=How%20sure%20before%20showing)** fixe le seuil : **Plus** affiche davantage de suggestions, dont plus d’erreurs ; **Équilibré** est le juste milieu, visant environ quatre suggestions justes sur dix affichées ; **Plus sûr** en affiche moins, mais davantage sont justes. Un agent peut aussi placer le seuil encore plus haut, pour ne garder que les plus sûres. **[Afficher le mot suivant](/settings?s=suggest&find=Show%20the%20next%20word)** désactive le second mot, plus pâle, de sorte que seule la fin du mot en cours de saisie s’affiche.
+Chaque suggestion a une chance d’être juste, et elle n’est affichée que si cette chance est assez élevée. **[Certitude avant d’afficher](/settings?s=suggest&find=How%20sure%20before%20showing)** fixe le seuil : **Plus** (par défaut) affiche davantage de suggestions, dont plus d’erreurs ; **Équilibré** est le juste milieu, visant environ quatre suggestions justes sur dix affichées ; **Plus sûr** en affiche moins, mais davantage sont justes. Un agent peut aussi placer le seuil encore plus haut, pour ne garder que les plus sûres. **[Afficher le mot suivant](/settings?s=suggest&find=Show%20the%20next%20word)** désactive le second mot, plus pâle, de sorte que seule la fin du mot en cours de saisie s’affiche.
 
 ### Ce qu’il lit
 

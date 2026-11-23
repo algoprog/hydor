@@ -352,7 +352,7 @@ Diese Einstellungen gelten einmal für die ganze App. Eine Ausnahme ist **[In di
 
 ### Wie sicher es sein muss
 
-Jeder Vorschlag hat eine gewisse Wahrscheinlichkeit, richtig zu sein, und er wird nur angezeigt, wenn diese Wahrscheinlichkeit hoch genug ist. **[Wie sicher, bevor angezeigt wird](/settings?s=suggest&find=How%20sure%20before%20showing)** legt die Schwelle fest: **Mehr** zeigt mehr Vorschläge, und mehr davon sind falsch; **Ausgewogen** liegt in der Mitte und zielt auf etwa vier richtige von zehn angezeigten Vorschlägen; **Sicherer** zeigt weniger, und mehr davon sind richtig. Ein Agent kann die Schwelle auch noch höher setzen, sodass nur die sichersten Vorschläge erscheinen. Mit **[Nächstes Wort anzeigen](/settings?s=suggest&find=Show%20the%20next%20word)** schaltest du das blassere zweite Wort aus, sodass nur der Rest des Wortes erscheint, das du gerade tippst.
+Jeder Vorschlag hat eine gewisse Wahrscheinlichkeit, richtig zu sein, und er wird nur angezeigt, wenn diese Wahrscheinlichkeit hoch genug ist. **[Wie sicher, bevor angezeigt wird](/settings?s=suggest&find=How%20sure%20before%20showing)** legt die Schwelle fest: **Mehr** (die Voreinstellung) zeigt mehr Vorschläge, und mehr davon sind falsch; **Ausgewogen** liegt in der Mitte und zielt auf etwa vier richtige von zehn angezeigten Vorschlägen; **Sicherer** zeigt weniger, und mehr davon sind richtig. Ein Agent kann die Schwelle auch noch höher setzen, sodass nur die sichersten Vorschläge erscheinen. Mit **[Nächstes Wort anzeigen](/settings?s=suggest&find=Show%20the%20next%20word)** schaltest du das blassere zweite Wort aus, sodass nur der Rest des Wortes erscheint, das du gerade tippst.
 
 ### Was es liest
 

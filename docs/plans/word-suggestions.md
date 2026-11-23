@@ -86,7 +86,7 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
   "options": {"k": 1000}}` → `{"id", "ok": true, "model": "base"|"personal", "languages": {…user token counts…}}`.
   Sent first and again after training or when the LLM starts or stops (a `null` llm_url: the small model alone).
 - `{"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?,
-  "precision": 0.4, "next": true, "cache": true, "switch": true}` → `{"id", "word", "next", "conf", "conf_next",
+  "precision": 0.3, "next": true, "cache": true, "switch": true}` → `{"id", "word", "next", "conf", "conf_next",
   "theta", "show", "show_next", "plan", "lang", "ms": {"total", "llm", "slm"}}`.
 - `{"id", "op": "session", "session", "texts": [str]}`: the session's earlier text for its cache (Node sends it once
   per session and when it grows); the worker keeps the last 20 sessions' caches.
@@ -173,7 +173,7 @@ text (`--init` the personal model) and take minutes.
 ## Settings (`shared/suggest.ts`)
 
 Kept on the server (`kv`, key `suggest.settings`): on/off; the language model (`auto` / `on` / `off`) and its size
-(8-bit / 4-bit); how sure (`precision`: 0.3 more suggestions … 0.5 surer ones); the next word; where (message boxes,
+(8-bit / 4-bit); how sure (`precision`: 0.3 more suggestions, the default … 0.5 surer ones); the next word; where (message boxes,
 documents, notes, other text boxes); words read (typed: 100; the reply or the document: 100); per-language switch;
 session cache; threads; personalise (on/off, schedule, sources, the weight of the person's own words, training
 threads). Kept by each browser (`shared/device.ts`): show word suggestions in this browser. Every option has its row in

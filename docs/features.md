@@ -1468,7 +1468,7 @@ agents that speak ACP and take MCP servers.
   and 2.5 GB of it free (Automatic, On or Off; without it the small model alone makes the suggestions, and the section says
   why); Choose by language picks, for the language of the text, the better of the two. It shows in message boxes, in
   Docs, in notes and in other text boxes (follow-ups, the queue, the Ask panels), each with its switch, and each browser
-  can turn it off for itself. How sure before showing (more, balanced, surer; an agent can set up to 60%), the next word,
+  can turn it off for itself. How sure before showing (more, the default; balanced; surer; an agent can set up to 60%), the next word,
   and how many words it reads of what you typed and of the agent's reply or the document above the paragraph are set
   there too, and the session's earlier words feed its guesses as you type a message. The small model learns from what you
   write: your messages to agents (not in sessions with memory off or confidential, and not the text apps, scheduled tasks

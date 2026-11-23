@@ -352,7 +352,7 @@ Estos ajustes se definen una sola vez para toda la app. **[Mostrar en este naveg
 
 ### Qué tan segura debe estar
 
-Cada predicción tiene una probabilidad de ser correcta, y solo se muestra cuando esa probabilidad es lo bastante alta. **[Seguridad antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** fija el umbral: **Más** muestra más predicciones, y más de ellas son erróneas; **Equilibrado** es el punto medio, con el objetivo de unas cuatro predicciones correctas de cada diez mostradas; **Más segura** muestra menos, y más de ellas son correctas. Un agente también puede subir el umbral aún más, para mostrar solo las más seguras. **[Mostrar la palabra siguiente](/settings?s=suggest&find=Show%20the%20next%20word)** desactiva la segunda palabra, más tenue, de modo que solo se muestre el resto de la palabra que estás escribiendo.
+Cada predicción tiene una probabilidad de ser correcta, y solo se muestra cuando esa probabilidad es lo bastante alta. **[Seguridad antes de mostrar](/settings?s=suggest&find=How%20sure%20before%20showing)** fija el umbral: **Más** (la opción predeterminada) muestra más predicciones, y más de ellas son erróneas; **Equilibrado** es el punto medio, con el objetivo de unas cuatro predicciones correctas de cada diez mostradas; **Más segura** muestra menos, y más de ellas son correctas. Un agente también puede subir el umbral aún más, para mostrar solo las más seguras. **[Mostrar la palabra siguiente](/settings?s=suggest&find=Show%20the%20next%20word)** desactiva la segunda palabra, más tenue, de modo que solo se muestre el resto de la palabra que estás escribiendo.
 
 ### Qué lee
 

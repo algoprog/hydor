@@ -85,7 +85,7 @@ export const SUGGEST_DEFAULTS: SuggestSettings = {
   enabled: false,
   llm: 'auto',
   quant: 'q8',
-  precision: 0.4,
+  precision: 0.3,
   nextWord: true,
   where: { chat: true, docs: true, notes: true, other: true },
   typedWords: 100,

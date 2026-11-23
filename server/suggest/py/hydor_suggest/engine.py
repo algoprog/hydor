@@ -340,7 +340,7 @@ class Engine:
             texts = [t for t in (V.nfc(req.get('reply') or ''), V.nfc(req.get('prev') or '')) if t and hash(t) not in known]
             extras = [self.encode(t) for t in texts]
             extra_key = tuple(hash(t) for t in texts)
-        precision = float(req.get('precision') or 0.4)
+        precision = float(req.get('precision') or 0.3)
         want_next = bool(req.get('next', True))
         used = plan
         stats = {'llm': 0.0, 'slm': 0.0}

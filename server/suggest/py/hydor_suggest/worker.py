@@ -5,7 +5,7 @@ It reads requests as JSON lines on stdin and answers each with one JSON line on 
 
   {"id", "op": "load", "model_dir", "personal_dir": str|null, "llm_url": str|null, "threads": int, "options": {"k": 1000}}
         -> {"id", "ok": true, "model": "base"|"personal", "languages": {lang: the person's tokens}}
-  {"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?, "precision": 0.4,
+  {"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?, "precision": 0.3,
         "next": true, "cache": true, "switch": true, "typed_words": 100, "context_words": 100}
         (typed_words: how many words of the typed text before the caret are read; context_words: how many of the reply (chat) or the
         document (doc); 0 reads none of the context; both default to the load options', else 100)
