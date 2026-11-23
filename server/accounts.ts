@@ -262,14 +262,38 @@ export function accountPool(db: DB, agent: AccountAgent): (string | undefined)[]
  */
 export function historyMoves(db: DB, agent: Agent, sessionId: string, file: string, from: string | undefined, to: string | undefined): [string, string][] {
   const [a, b] = agent === 'claude' ? [claudeProjectsOf(db, from), claudeProjectsOf(db, to)] : [codexHomeOf(db, from), codexHomeOf(db, to)];
-  if (!file.startsWith(a + path.sep)) throw new HttpError(409, 'Its history is not in its account’s folder');
-  const rel = path.relative(a, file);
-  const moves: [string, string][] = [[file, path.join(b, rel)]];
+  // The index may know the session by a copy of its history in the other account's folder (one an earlier move left
+  // behind): what moves is what its own account's folder holds.
+  const under = [a, b].find((r) => file.startsWith(r + path.sep));
+  if (!under) throw new HttpError(409, 'Its history is not in its account’s folder');
+  const rel = path.relative(under, file);
+  const moves: [string, string][] = [[path.join(a, rel), path.join(b, rel)]];
   if (agent === 'claude') {
-    moves.push([file.replace(/\.jsonl$/, ''), path.join(b, rel.replace(/\.jsonl$/, ''))]);
+    moves.push([path.join(a, rel.replace(/\.jsonl$/, '')), path.join(b, rel.replace(/\.jsonl$/, ''))]);
     moves.push([path.join(path.dirname(a), 'file-history', sessionId), path.join(path.dirname(b), 'file-history', sessionId)]);
   }
   return moves.filter(([src]) => fs.existsSync(src));
+}
+
+/**
+ * Makes room in the other account's folder for history that moves there, where a copy of it already is: one an earlier
+ * move left behind, or one the indexer put back from the app's own link (indexer/copies.ts). The history that moves is
+ * the one its agent writes, so it takes the place: a copy that is only other names for the same files goes, and
+ * anything else there is set aside (`aside`: to the app's Trash), not lost.
+ */
+export async function clearWay(src: string, dst: string, aside: (p: string) => Promise<unknown>): Promise<void> {
+  if (!fs.lstatSync(dst, { throwIfNoEntry: false })) return;
+  if (sameFiles(src, dst)) fs.rmSync(dst, { recursive: true, force: true });
+  else await aside(dst);
+}
+
+/** Whether every file under `dst` is the very file (a hard link) at the same place under `src`. */
+function sameFiles(src: string, dst: string): boolean {
+  const a = fs.lstatSync(src, { throwIfNoEntry: false });
+  const b = fs.lstatSync(dst, { throwIfNoEntry: false });
+  if (!a || !b) return false;
+  if (b.isDirectory()) return a.isDirectory() && fs.readdirSync(dst).every((n) => sameFiles(path.join(src, n), path.join(dst, n)));
+  return a.isFile() && b.isFile() && a.dev === b.dev && a.ino === b.ino;
 }
 
 /** Moves a file or folder, copying when the two places are on different disks. */
@@ -277,6 +301,8 @@ export function moveAcross(src: string, dst: string) {
   fs.mkdirSync(path.dirname(dst), { recursive: true, mode: 0o700 });
   try {
     fs.renameSync(src, dst);
+    // Already two names of one file: the rename leaves both, so the old one goes here.
+    if (sameFiles(dst, src)) fs.rmSync(src, { force: true });
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
     fs.cpSync(src, dst, { recursive: true, preserveTimestamps: true });

@@ -1,7 +1,8 @@
 // Script tests for added accounts: where a Claude session's transcript is, found in any account's folder once
 // written and, before the CLI has written it (a session just started), expected in the folder of the account
 // the session runs as, so its timeline follows the file the CLI writes; and the folders an added account trusts
-// (shareTrust); and Grok Build's accounts (GROK_HOME, the settings linked in and the sign-in not, the mismatch errors). Build and run with scratch folders:
+// (shareTrust); and Grok Build's accounts (GROK_HOME, the settings linked in and the sign-in not, the mismatch errors); and moving a session's history between
+// accounts (historyMoves, clearWay, moveAcross), above all over a stale copy the other account already holds. Build and run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/accounts-test.ts
 //   DATA_DIR=/tmp/hydor-test-accounts CLAUDE_CONFIG_DIR=/tmp/hydor-test-accounts/claude node dist/dev/accounts-test.js
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountById, accountEnv, accountPool, addAccount, claudeTranscriptOf, grokHome, grokHomeOf, grokSessionMove, moveAcross, removeAccount, shareTrust } from './accounts.ts';
+import { accountById, accountEnv, accountPool, addAccount, claudeTranscriptOf, clearWay, grokHome, grokHomeOf, grokSessionMove, historyMoves, moveAcross, removeAccount, shareTrust } from './accounts.ts';
 import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { openDb } from './db.ts';
@@ -181,6 +182,154 @@ removeAccount(db, work.id, true);
   if (was === undefined) delete process.env.GROK_HOME;
   else process.env.GROK_HOME = was;
   fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// clearWay: makes room for history that moves where a copy of it already is. Missing: nothing to do; only other names
+// (hard links) of the very files that move: removed; anything else: handed to `aside` (the app's Trash), not removed here.
+{
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-clearway-test-'));
+  const put = (file: string, text: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  };
+  const stub = () => {
+    const calls: string[] = [];
+    return { calls, aside: async (p: string) => void calls.push(p) };
+  };
+
+  // 1. Nothing at the destination.
+  {
+    const src = path.join(scratch, '1', 'a', 's.jsonl');
+    const dst = path.join(scratch, '1', 'b', 's.jsonl');
+    put(src, 'mine\n');
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.deepEqual(calls, [], 'nothing at the destination: nothing set aside');
+    assert.equal(fs.readFileSync(src, 'utf8'), 'mine\n');
+  }
+  // 2. A file that is another name of the file that moves: removed, the original stays.
+  {
+    const src = path.join(scratch, '2', 'a', 's.jsonl');
+    const dst = path.join(scratch, '2', 'b', 's.jsonl');
+    put(src, 'mine\n');
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.linkSync(src, dst);
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.equal(fs.existsSync(dst), false, 'a hard link of the history goes');
+    assert.equal(fs.readFileSync(src, 'utf8'), 'mine\n', 'the history itself stays');
+    assert.deepEqual(calls, [], 'a link is not set aside');
+  }
+  // 3. A folder whose files, nested too, are all links of the files at the same places: removed.
+  {
+    const src = path.join(scratch, '3', 'a', 'id');
+    const dst = path.join(scratch, '3', 'b', 'id');
+    put(path.join(src, 'subagents', 'agent-x.jsonl'), 'sub\n');
+    put(path.join(src, 'notes.txt'), 'n\n');
+    fs.mkdirSync(path.join(dst, 'subagents'), { recursive: true });
+    fs.linkSync(path.join(src, 'subagents', 'agent-x.jsonl'), path.join(dst, 'subagents', 'agent-x.jsonl'));
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.equal(fs.existsSync(dst), false, 'a folder of links of the folder’s own files goes');
+    assert.equal(fs.readFileSync(path.join(src, 'subagents', 'agent-x.jsonl'), 'utf8'), 'sub\n', 'the files that move stay');
+    assert.deepEqual(calls, []);
+  }
+  // 4. A different file (a separate copy, not a link): set aside by `aside`, and clearWay itself leaves it.
+  {
+    const src = path.join(scratch, '4', 'a', 's.jsonl');
+    const dst = path.join(scratch, '4', 'b', 's.jsonl');
+    put(src, 'mine\n');
+    put(dst, 'theirs\n');
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.deepEqual(calls, [dst], 'a different file is set aside, once');
+    assert.equal(fs.readFileSync(dst, 'utf8'), 'theirs\n', 'clearWay does not remove it itself');
+    // A file with the same content that is not a link is a different file too.
+    put(dst, 'mine\n');
+    await clearWay(src, dst, aside);
+    assert.deepEqual(calls, [dst, dst], 'same words, not the same file: set aside');
+  }
+  // 5. A folder with a file the history lacks: set aside whole.
+  {
+    const src = path.join(scratch, '5', 'a', 'id');
+    const dst = path.join(scratch, '5', 'b', 'id');
+    put(path.join(src, 'subagents', 'agent-x.jsonl'), 'sub\n');
+    fs.mkdirSync(path.join(dst, 'subagents'), { recursive: true });
+    fs.linkSync(path.join(src, 'subagents', 'agent-x.jsonl'), path.join(dst, 'subagents', 'agent-x.jsonl'));
+    put(path.join(dst, 'subagents', 'agent-extra.jsonl'), 'only there\n');
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.deepEqual(calls, [dst], 'the folder is set aside when it holds a file the history lacks');
+    assert.ok(fs.existsSync(path.join(dst, 'subagents', 'agent-extra.jsonl')), 'and left in place by clearWay');
+  }
+  // 6. A file where the history has a folder: set aside.
+  {
+    const src = path.join(scratch, '6', 'a', 'id');
+    const dst = path.join(scratch, '6', 'b', 'id');
+    put(path.join(src, 'x.jsonl'), 'x\n');
+    put(dst, 'a file\n');
+    const { calls, aside } = stub();
+    await clearWay(src, dst, aside);
+    assert.deepEqual(calls, [dst]);
+  }
+
+  // moveAcross where the destination is already another name of the file: the source goes, the destination holds the content.
+  {
+    const src = path.join(scratch, '7', 'a', 's.jsonl');
+    const dst = path.join(scratch, '7', 'b', 's.jsonl');
+    put(src, 'content\n');
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.linkSync(src, dst);
+    moveAcross(src, dst);
+    assert.equal(fs.existsSync(src), false, 'the old name goes');
+    assert.equal(fs.readFileSync(dst, 'utf8'), 'content\n', 'the new name holds the content');
+  }
+  // And an ordinary move still moves.
+  {
+    const src = path.join(scratch, '8', 'a', 's.jsonl');
+    const dst = path.join(scratch, '8', 'b', 's.jsonl');
+    put(src, 'content\n');
+    moveAcross(src, dst);
+    assert.equal(fs.existsSync(src), false);
+    assert.equal(fs.readFileSync(dst, 'utf8'), 'content\n');
+  }
+  fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// historyMoves between two added Claude accounts: always built from the from-account's folder, even when the index knows
+// the session by a copy in the to-account's folder; only what exists moves; a file in neither folder is refused.
+{
+  const from = addAccount(db, 'claude', 'From');
+  const to = addAccount(db, 'claude', 'To');
+  const root = (a: { id: string }) => path.join(accountById(db, a.id)!.dir, 'projects');
+  const [pa, pb] = [root(from), root(to)];
+  const sid = crypto.randomUUID();
+  const rel = path.join('-home-u-app', `${sid}.jsonl`);
+  const transcript = path.join(pa, rel);
+  const sub = path.join(pa, '-home-u-app', sid);
+  fs.mkdirSync(path.join(sub, 'subagents'), { recursive: true });
+  fs.writeFileSync(transcript, '{}\n');
+  fs.writeFileSync(path.join(sub, 'subagents', 'agent-x.jsonl'), '{}\n');
+
+  const moves = historyMoves(db, 'claude', sid, transcript, from.id, to.id);
+  assert.deepEqual(moves, [[transcript, path.join(pb, rel)], [sub, path.join(pb, '-home-u-app', sid)]], 'the transcript and its folder move, and no file-history that is not there');
+
+  fs.rmSync(sub, { recursive: true, force: true });
+  assert.deepEqual(historyMoves(db, 'claude', sid, transcript, from.id, to.id), [[transcript, path.join(pb, rel)]], 'only sources that exist');
+
+  // The index knows the session by a copy in the to-account's folder: the move still comes from the from-account's folder.
+  const stale = path.join(pb, rel);
+  fs.mkdirSync(path.dirname(stale), { recursive: true });
+  fs.writeFileSync(stale, '{}\n');
+  const viaStale = historyMoves(db, 'claude', sid, stale, from.id, to.id);
+  assert.equal(viaStale[0][0], transcript, 'a file given under the other account’s folder: the move’s source is still the from-account’s path');
+  assert.equal(viaStale[0][1], stale);
+
+  // A history that exists in neither account's folder.
+  assert.throws(() => historyMoves(db, 'claude', sid, path.join(tmp, 'elsewhere', `${sid}.jsonl`), from.id, to.id), (e) => e instanceof HttpError && e.status === 409, 'a file under neither account’s folder is refused');
+
+  removeAccount(db, from.id, true);
+  removeAccount(db, to.id, true);
 }
 
 db.close();

@@ -10,7 +10,7 @@ import { CodexParser } from '../history/codex.ts';
 import { AcpParser } from '../history/acp.ts';
 import { PARSE_VERSION } from '../history/common.ts';
 import { LineSplitter } from '../runner/frames.ts';
-import { onePerSession } from './copies.ts';
+import { goneRows, onePerSession } from './copies.ts';
 import { keep, keptPath, restore } from './kept.ts';
 import { searchSessions } from './search.ts';
 import type { SearchHit } from '../../shared/types.ts';
@@ -313,7 +313,6 @@ async function pass(initial: boolean) {
   try {
     const namesChanged = refreshCodexNames();
     const files = listFiles();
-    const known = new Set(files.map((f) => f.path));
     // The app keeps its own link to every transcript, whatever the agent's program later deletes.
     const roots = [...opts.claudeProjectsDirs, ...opts.codexHomes];
     const keptOf = (p: string) => (opts.keptDir ? keptPath(p, roots, opts.keptDir) : null);
@@ -357,11 +356,9 @@ async function pass(initial: boolean) {
     // back from the app's own link. One the app never kept: the session leaves the list, but its activity stays
     // for the stats, with its folder and model.
     const rows = db.prepare('select key, path from sessions').all() as { key: string; path: string }[];
-    const gone = rows.filter((r) => {
-      // Listed, or put there since the listing (a session moved to another account).
-      if (known.has(r.path) || fs.existsSync(r.path)) return false;
-      const k = keptOf(r.path);
-      return !(k && restore(r.path, k));
+    const gone = goneRows(rows, files, (p) => {
+      const k = keptOf(p);
+      return !!k && restore(p, k);
     });
     if (gone.length && files.length) {
       const retire = db.prepare('insert or replace into retired (key, cwd, model, acp_agent) select s.key, s.cwd, s.model, a.acp_agent from sessions s left join app_sessions a on a.key = s.key where s.key = ?');

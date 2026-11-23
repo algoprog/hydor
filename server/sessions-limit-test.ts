@@ -2,7 +2,9 @@
 // switchAtLimit, switchForSubagents, beforeResume), above all for its own background subagents the limit stopped:
 // a turn the agent starts by itself on a subagent's notice and the limit refuses at once is a "quick turn" that still
 // counts; the move waits for subagents still at work; a session that is idle with subagents stopped at the limit moves
-// too; and what it tells the agent names them.
+// too; and what it tells the agent names them. Also what happens when that move fails (the error toast, and the
+// continue at the reset with Resume after usage limits on), and moveToAccount over a stale copy of the history the
+// other account already holds (cleared before the agent stops, or refused with the agent left running).
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sessions-limit-test.ts
 //   DATA_DIR=/tmp/hydor-test-limit CLAUDE_CONFIG_DIR=/tmp/hydor-test-limit/claude CODEX_HOME=/tmp/hydor-test-limit/codex GROK_HOME=/tmp/hydor-test-limit/grok node dist/dev/sessions-limit-test.js
@@ -10,8 +12,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { addAccount, removeAccount } from './accounts.ts';
-import { kvSet, openDb } from './db.ts';
+import { accountById, addAccount, removeAccount } from './accounts.ts';
+import { config } from './config.ts';
+import { HttpError } from './auth.ts';
+import { kvGet, kvSet, openDb } from './db.ts';
 import { SessionManager, subagentsLine } from './sessions.ts';
 import { isSignedOut, markSignedIn, markSignedOut, needSignIn, onSignedIn, resetSignIn, signInNeeds } from './signin.ts';
 
@@ -1023,6 +1027,167 @@ signedOutTest('the lead of a subagent that moved for a sign-out hears so, not of
   const { resultMessage } = await import('./children/index.ts');
   const text = resultMessage({ key: 'claude:c', title: 'T', label: 'Claude Code', link: '/s/c', turn: { reply: '' } as any, after: { goes: 'account', to: 'Work', signedOut: true } });
   assert.match(text, /^\[The Hydor subagent "T" \(claude:c, Claude Code\) found its account signed out and carries on with Work, another account\.\]/);
+});
+
+// ---- afterTurn: a move that fails -----------------------------------------------------------
+
+/** Sets a kv value for the test (undefined: none), giving back what undoes it. */
+function kvTemp(k: string, v: string | undefined) {
+  const was = kvGet(db, k);
+  const put = (x: string | undefined) => (x === undefined ? db.prepare('delete from kv where k = ?').run(k) : kvSet(db, k, x));
+  put(v);
+  return () => put(was);
+}
+
+/** A session at its limit whose move to another account fails with 'boom', its account's usage saying when it lifts. */
+async function failedMove(autoResume: string, resetsAt: number) {
+  const restore = kvTemp('auto_resume', autoResume);
+  try {
+    const t = manager();
+    const scheduled: [string, number][] = [];
+    t.m.switchAtLimit = async () => {
+      throw new Error('boom');
+    };
+    // The real resumeAfterLimit, with the scheduling stood in for.
+    t.m.resumeAfterLimit = proto.resumeAfterLimit.bind(t.m);
+    t.m.limitLiftsAt = () => undefined;
+    t.m.onLimited = (key: string, at: number) => scheduled.push([key, at]);
+    t.m.resumeLookup = (key: string) => scheduled.find((x) => x[0] === key)?.[1];
+    t.m.controlFor = () => ({ lastUsage: { ok: true, windows: [], limited: { label: 'x', resetsAt } } });
+    t.m.afterTurn({ key: KEY, agent: 'claude', cwd: tmp, title: 'A session', account: 'a' }, true, Date.now());
+    const after = await t.m.limitAfter.get(KEY).after;
+    return { t, scheduled, after };
+  } finally {
+    restore();
+  }
+}
+
+test('a move at the limit that fails tells you why, and with Resume after usage limits on continues at the reset', async () => {
+  const resetsAt = Date.now() + 3_600_000;
+  const { t, scheduled, after } = await failedMove('1', resetsAt);
+  assert.equal(t.calls.toasts.length, 1);
+  const toast = t.calls.toasts[0] as { level: string; text: string };
+  assert.equal(toast.level, 'error');
+  assert.ok(toast.text.includes('could not switch accounts: boom'), toast.text);
+  assert.deepEqual(scheduled, [[KEY, resetsAt + 60_000]], 'it continues a minute after its own account resets');
+  assert.deepEqual(after, { goes: 'resume', at: resetsAt + 60_000 });
+});
+
+test('a move at the limit that fails with Resume after usage limits off only tells you why', async () => {
+  const { t, scheduled, after } = await failedMove('0', Date.now() + 3_600_000);
+  assert.equal(t.calls.toasts.length, 1);
+  assert.ok((t.calls.toasts[0] as { text: string }).text.includes('could not switch accounts: boom'));
+  assert.deepEqual(scheduled, [], 'nothing continues by itself');
+  assert.equal(after, null);
+});
+
+// ---- moveToAccount ------------------------------------------------------------------------------
+
+const MOVE_ID = KEY.slice('claude:'.length);
+
+/** Two Claude accounts, the session's history in the first one's projects folder, and what moveToAccount touches of the manager. */
+function moving(opts: { transcript?: (file: string) => string } = {}) {
+  const a = addAccount(db, 'claude', `From ${Math.random().toString(36).slice(2, 8)}`);
+  const b = addAccount(db, 'claude', `To ${Math.random().toString(36).slice(2, 8)}`);
+  const projects = (id: string) => path.join(accountById(db, id)!.dir, 'projects');
+  const rel = path.join('-tmp-proj', `${MOVE_ID}.jsonl`);
+  const subRel = path.join('-tmp-proj', MOVE_ID, 'subagents', 'agent-x.jsonl');
+  const inA = { file: path.join(projects(a.id), rel), sub: path.join(projects(a.id), subRel), folder: path.join(projects(a.id), '-tmp-proj', MOVE_ID) };
+  const inB = { file: path.join(projects(b.id), rel), sub: path.join(projects(b.id), subRel), folder: path.join(projects(b.id), '-tmp-proj', MOVE_ID) };
+  for (const f of [inA.file, inA.sub]) {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, `history of ${path.basename(f)}\n`);
+  }
+  db.prepare('insert or replace into app_sessions (key, agent, account) values (?, ?, ?)').run(KEY, 'claude', a.id);
+  db.prepare('insert or replace into sessions (key, agent, id, path) values (?, ?, ?, ?)').run(KEY, 'claude', MOVE_ID, inA.file);
+  const calls = { stopped: 0, poked: [] as unknown[], stoppedWith: [] as boolean[] };
+  const m: any = {
+    db,
+    lives: new Map(),
+    external: { get: () => null },
+    timelines: new Map(),
+    indexer: { poke: (files: unknown) => calls.poked.push(files) },
+    queueSummary: () => {},
+    accountOf: () => a.id,
+    transcriptFor: () => (opts.transcript ? opts.transcript(inA.file) : inA.file),
+    stopAndWait: async () => {
+      calls.stopped++;
+      // What the other account held of the history when the agent was stopped.
+      calls.stoppedWith.push(fs.existsSync(inB.file) || fs.existsSync(inB.folder));
+    },
+  };
+  const move = () => proto.moveToAccount.call(m, KEY, b.id) as Promise<void>;
+  const done = () => {
+    db.prepare('delete from app_sessions where key = ?').run(KEY);
+    db.prepare('delete from sessions where key = ?').run(KEY);
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  };
+  return { a, b, inA, inB, calls, move, done };
+}
+
+/** The Trash entries (in the app's data folder) that end with a name; removed when `take`. */
+function trashed(suffix: string, take = false) {
+  const dir = path.join(config.dataDir, 'trash');
+  const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => n.endsWith(suffix)) : [];
+  const found = names.map((n) => ({ name: n, text: fs.readFileSync(path.join(dir, n), 'utf8') }));
+  if (take) for (const n of names) fs.rmSync(path.join(dir, n), { recursive: true, force: true });
+  return found;
+}
+
+test('moveToAccount over a stale copy that is only links of the history: the copy goes before the agent stops, the history moves', async () => {
+  const t = moving();
+  try {
+    // The stale copy: hard links of the transcript and of its subagent's, as the app's own kept links were.
+    fs.mkdirSync(path.dirname(t.inB.file), { recursive: true });
+    fs.linkSync(t.inA.file, t.inB.file);
+    fs.mkdirSync(path.dirname(t.inB.sub), { recursive: true });
+    fs.linkSync(t.inA.sub, t.inB.sub);
+    await t.move();
+    assert.equal(fs.readFileSync(t.inB.file, 'utf8'), `history of ${path.basename(t.inA.file)}\n`, 'the other account holds the transcript');
+    assert.equal(fs.readFileSync(t.inB.sub, 'utf8'), 'history of agent-x.jsonl\n', 'and its subagent’s');
+    assert.equal(fs.existsSync(t.inA.file), false, 'the old transcript is gone');
+    assert.equal(fs.existsSync(t.inA.folder), false, 'and the old folder');
+    assert.equal(t.calls.stopped, 1, 'the agent stopped once');
+    assert.deepEqual(t.calls.stoppedWith, [false], 'the stale copy was cleared before the agent stopped');
+    assert.equal((db.prepare('select account from app_sessions where key = ?').get(KEY) as { account: string }).account, t.b.id, 'the session runs as the other account');
+    assert.equal((db.prepare('select path from sessions where key = ?').get(KEY) as { path: string }).path, t.inB.file, 'the index follows the history');
+    assert.deepEqual(trashed(`-${MOVE_ID}.jsonl`), [], 'a copy that is only links is not kept in the Trash');
+  } finally {
+    t.done();
+  }
+});
+
+test('moveToAccount over a different file at the transcript’s place: the history takes it, the old file is in the Trash', async () => {
+  const t = moving();
+  try {
+    fs.mkdirSync(path.dirname(t.inB.file), { recursive: true });
+    fs.writeFileSync(t.inB.file, 'an older, different copy\n');
+    await t.move();
+    assert.equal(fs.readFileSync(t.inB.file, 'utf8'), `history of ${path.basename(t.inA.file)}\n`, 'the other account holds the history that moved');
+    assert.equal(fs.existsSync(t.inA.file), false);
+    assert.equal(t.calls.stopped, 1);
+    const set = trashed(`-${MOVE_ID}.jsonl`, true);
+    assert.equal(set.length, 1, 'the old file is in the Trash');
+    assert.equal(set[0].text, 'an older, different copy\n');
+    assert.ok(set[0].name.endsWith(`-${MOVE_ID}.jsonl`));
+  } finally {
+    t.done();
+  }
+});
+
+test('moveToAccount that cannot be made says so and leaves the agent running', async () => {
+  const stray = path.join(tmp, 'elsewhere', `${MOVE_ID}.jsonl`);
+  fs.mkdirSync(path.dirname(stray), { recursive: true });
+  fs.writeFileSync(stray, 'x\n');
+  const t = moving({ transcript: () => stray });
+  try {
+    await assert.rejects(t.move(), (e) => e instanceof HttpError && e.status === 409);
+    assert.equal(t.calls.stopped, 0, 'the agent was not stopped');
+    assert.equal((db.prepare('select account from app_sessions where key = ?').get(KEY) as { account: string }).account, t.a.id, 'the session stays on its account');
+    assert.ok(fs.existsSync(t.inA.file), 'its history stays');
+  } finally {
+    t.done();
+  }
 });
 
 // ---- subagentsLine --------------------------------------------------------------------

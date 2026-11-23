@@ -38,7 +38,8 @@ import { addNote, dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, grokSessionMove, historyMoves, moveAcross, shareTrust } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, clearWay, grokSessionMove, historyMoves, moveAcross, shareTrust } from './accounts.ts';
+import { deletePath } from './files.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -948,7 +949,8 @@ export class SessionManager extends EventEmitter {
       return switching
         ? this.switchAtLimit(s.key, resetsAt).catch((e: Error) => {
             failed(e);
-            return null;
+            // It stays on its account, so it continues when that resets, as when no other account has usage left.
+            return kvGet(this.db, 'auto_resume') === '1' ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null) : null;
           })
         : kvGet(this.db, 'auto_resume') === '1'
           ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
@@ -2424,22 +2426,34 @@ export class SessionManager extends EventEmitter {
     if (this.external.get(key)) throw new HttpError(409, 'This session is running in another program');
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') throw new HttpError(409, 'Wait for the turn to end, or stop it');
-    await this.stopAndWait(key);
+    // Whether it can move is settled before its agent process stops: a move that cannot be made leaves the session
+    // running, with the commands and subagents it runs in the background.
     if (agent === 'acp') {
       // Grok keeps its own copy of the conversation in its home, so it goes along; with none (never started, or it is gone) the next start begins afresh.
       const grokId = acpSessionOf(acpTranscriptPath(key.slice(4)));
       const move = grokId ? grokSessionMove(this.db, grokId, from, to) : null;
+      await this.stopAndWait(key);
       if (move) moveAcross(...move);
       this.db.prepare('update app_sessions set account = ? where key = ?').run(to ?? null, key);
       this.queueSummary(key);
       return;
     }
-    const file = this.transcriptFor(key);
-    const moves = file && fs.existsSync(file) ? historyMoves(this.db, agent, key.slice(key.indexOf(':') + 1), file, from, to) : [];
+    const history = () => {
+      const file = this.transcriptFor(key);
+      return file && fs.existsSync(file) ? historyMoves(this.db, agent, key.slice(key.indexOf(':') + 1), file, from, to) : [];
+    };
+    // A copy of its history the other account has already (one an earlier move left behind) gives way to it.
+    const makeRoom = async (list: [string, string][]) => {
+      for (const [src, dst] of list) await clearWay(src, dst, (p) => deletePath(p));
+    };
+    let moves = history();
     // Codex finds a thread only in its account's folder; a Claude session with no transcript has nothing to move.
     if (agent === 'codex' && !moves.length) throw new HttpError(409, 'Its history was not found');
-    const taken = moves.find(([, dst]) => fs.existsSync(dst));
-    if (taken) throw new HttpError(409, `The other account already has ${taken[1]}`);
+    await makeRoom(moves);
+    await this.stopAndWait(key);
+    // What its agent wrote as it stopped counts too (a transcript begun meanwhile).
+    moves = history();
+    await makeRoom(moves);
     // The app's own links to the old place go first, or the indexer could bring the history back there.
     for (const [src] of moves) {
       const kept = keptOfTranscript(src);
