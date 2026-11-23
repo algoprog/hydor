@@ -1739,8 +1739,10 @@ html:not([data-motion=off]) .update-words {
 /* ---- answer UIs (components/answer) -------------------------------------------------------------------
    A UI sits inside a reply's .md, whose rules are for text (lists with bullets, bordered tables, spaced paragraphs):
    inside the UI they give way to its own classes (its utilities and the rules below), except in the agent's own
-   Markdown inside it (.aui-md), in maths and in code blocks, which read as the reply does. */
-.md .aui :where(:not(.katex, .katex *, .katex-display, .aui-md *, .code-block, .code-block *, .breathe)) {
+   Markdown inside it (.aui-md), in maths and in code blocks, which read as the reply does. The app's own pieces whose
+   rules are outside a layer keep them too: the live dot's breathing, and a copy button's icon (.copy-swap), whose copy
+   and check lay over each other in one cell (without it they stack, and the copy rises half its height in the bar). */
+.md .aui :where(:not(.katex, .katex *, .katex-display, .aui-md *, .code-block, .code-block *, .breathe, .copy-swap, .copy-swap *)) {
   all: revert-layer;
 }
 .md .aui .aui-md > :first-child {
