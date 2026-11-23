@@ -22,7 +22,7 @@ import { LlamaServer } from './llm.ts';
 import { killAll, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
-import { chooseDevice, bestGpu, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
+import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
 import { GRACE, gpuHold, personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
@@ -1227,6 +1227,27 @@ test('the graphics card: the setting, a Mac, and the card with the most memory f
   assert.match((await choose({ smi: smiOf(null) })).why!, /No NVIDIA/, 'no nvidia-smi: no card');
   assert.match((await choose({ smi: smiOf('') })).why!, /No NVIDIA/, 'no card listed');
   assert.match((await choose({ smi: smiOf('garbage\n0, Card, [N/A], [N/A]') })).why!, /No NVIDIA/, 'a card that says nothing of its memory is left out');
+});
+
+test('the graphics card: one another program already uses (a model server) is left alone, and HYDOR_SUGGEST_GPUS limits the cards', async () => {
+  const uuids = ['0, GPU-aaaa-0000', '1, GPU-bbbb-1111', '2, GPU-cccc-2222', '3, GPU-dddd-3333'].join('\n');
+  // Each question answered as nvidia-smi would: the cards, their UUIDs, the programs on them, or the driver's header.
+  const smiWith = (apps: string) => async (args: string[]) =>
+    !args.length ? '| NVIDIA-SMI 550.54  Driver Version: 550.54  CUDA Version: 12.4 |' : args[0].startsWith('--query-compute-apps') ? apps : args[0] === '--query-gpu=index,uuid' ? uuids : cards;
+  assert.deepEqual([...othersByCard(uuids, 'GPU-bbbb-1111, 1530\nGPU-bbbb-1111, 386\nGPU-aaaa-0000, 200\nnonsense\nGPU-zzzz, 9000')], [[1, 1530], [0, 200]], 'the largest program on each card; unknown cards and lines passed over');
+  const vllm = await choose({ smi: smiWith('GPU-bbbb-1111, 1530') });
+  assert.equal(vllm.device.index, 0, 'card 1 holds a model server: the next card with room');
+  const small = await choose({ smi: smiWith('GPU-bbbb-1111, 300') });
+  assert.equal(small.device.index, 1, "a desktop's small use leaves the card in");
+  const taken = await choose({ smi: smiWith('GPU-aaaa-0000, 4000\nGPU-bbbb-1111, 1024') });
+  assert.equal(taken.device.kind, 'cpu', 'every card with room is in use');
+  assert.match(taken.why!, /in use by another program/);
+  assert.equal((await choose({ smi: smiWith('') })).device.index, 1, 'no programs: as before');
+  // HYDOR_SUGGEST_GPUS: only the cards it lists, together with the server's CUDA_VISIBLE_DEVICES.
+  assert.equal((await choose({ env: { HYDOR_SUGGEST_GPUS: '0' } })).device.index, 0);
+  assert.match((await choose({ env: { HYDOR_SUGGEST_GPUS: '2,3' } })).why!, /4 GB free/, 'the listed cards are too full or too busy');
+  assert.match((await choose({ env: { HYDOR_SUGGEST_GPUS: '1', CUDA_VISIBLE_DEVICES: '0,3' } })).why!, /HYDOR_SUGGEST_GPUS/, 'the two lists leave nothing');
+  assert.equal((await choose({ env: { HYDOR_SUGGEST_GPUS: '0,1', CUDA_VISIBLE_DEVICES: '0,3' } })).device.index, 0, 'what both lists leave');
 });
 
 test('the graphics card: the newest PyTorch build the driver supports', async () => {

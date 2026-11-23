@@ -14,6 +14,11 @@ export const GPU_BUSY_MAX = 50;
  * card with less does it in pieces of 1,024 tokens (the same gradient, under 4 GB at its peak, a little slower).
  */
 export const GPU_ROOMY_MB = 6144;
+/**
+ * A card where another program already holds this much memory (MiB) is left alone: a model server on it (vLLM, Ollama,
+ * llama.cpp) would be slowed while learning ran beside it. A desktop's own use of a card is far below this.
+ */
+export const GPU_OTHERS_MAX_MB = 1024;
 
 export interface GpuInfo {
   index: number;
@@ -86,18 +91,51 @@ export function visibleCards(env: string | undefined): number[] | null {
   return out;
 }
 
-/** The card to learn on, or why none: the one with the most memory free among those with room and less than half busy. */
-export function bestGpu(gpus: GpuInfo[], visible: number[] | null): { gpu: GpuInfo } | { why: string } {
+/**
+ * The memory the largest program on each card holds (MiB), by the card's number: from
+ * `--query-gpu=index,uuid` and `--query-compute-apps=gpu_uuid,used_memory` (both csv, noheader, nounits). Lines that
+ * are not of that shape are passed over.
+ */
+export function othersByCard(uuids: string, apps: string): Map<number, number> {
+  const byUuid = new Map<string, number>();
+  for (const line of uuids.split('\n')) {
+    const [i, u] = line.split(',').map((x) => x.trim());
+    if (/^\d+$/.test(i ?? '') && /^GPU-/i.test(u ?? '')) byUuid.set(u, Number(i));
+  }
+  const out = new Map<number, number>();
+  for (const line of apps.split('\n')) {
+    const [u, mb] = line.split(',').map((x) => x.trim());
+    const i = byUuid.get(u ?? '');
+    const m = Number(mb);
+    if (i == null || !Number.isFinite(m)) continue;
+    out.set(i, Math.max(out.get(i) ?? 0, m));
+  }
+  return out;
+}
+
+/**
+ * The card to learn on, or why none: the one with the most memory free among those with room, less than half busy and
+ * with no other program holding GPU_OTHERS_MAX_MB or more on it.
+ */
+export function bestGpu(gpus: GpuInfo[], visible: number[] | null, others: Map<number, number> = new Map()): { gpu: GpuInfo } | { why: string } {
   if (!gpus.length) return { why: 'No NVIDIA graphics card was found' };
   const mine = visible ? gpus.filter((g) => visible.includes(g.index)) : gpus;
-  if (!mine.length) return { why: 'CUDA_VISIBLE_DEVICES leaves no graphics card for this app' };
-  const ok = mine.filter((g) => g.freeMb >= GPU_NEED_MB && g.util < GPU_BUSY_MAX);
-  if (!ok.length) {
+  if (!mine.length) return { why: 'CUDA_VISIBLE_DEVICES or HYDOR_SUGGEST_GPUS leaves no graphics card for this app' };
+  const roomy = mine.filter((g) => g.freeMb >= GPU_NEED_MB && g.util < GPU_BUSY_MAX);
+  if (!roomy.length) {
     const top = [...mine].sort((a, b) => b.freeMb - a.freeMb)[0];
     return { why: `No graphics card has ${GPU_NEED_MB / 1024} GB free and is less than half busy (${top.name} has ${(top.freeMb / 1024).toFixed(1)} GB free and is ${top.util}% busy)` };
   }
+  const ok = roomy.filter((g) => (others.get(g.index) ?? 0) < GPU_OTHERS_MAX_MB);
+  if (!ok.length) {
+    const g = roomy[0];
+    return { why: `Every graphics card with room is in use by another program (one holds ${((others.get(g.index) ?? 0) / 1024).toFixed(1)} GB on ${g.name} ${g.index})` };
+  }
   return { gpu: ok.reduce((a, b) => (b.freeMb > a.freeMb ? b : a)) };
 }
+
+/** The cards both lists leave (a list that is null leaves all). */
+const both = (a: number[] | null, b: number[] | null): number[] | null => (a == null ? b : b == null ? a : a.filter((i) => b.includes(i)));
 
 /** Runs nvidia-smi (or the program HYDOR_SUGGEST_NVIDIA_SMI names, for a test) with arguments; its output, or null when it is not there or fails. */
 export function nvidiaSmi(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<string | null> {
@@ -134,7 +172,11 @@ export async function chooseDevice(o: ChooseOptions): Promise<DevicePick> {
   const smi = o.smi ?? ((args: string[]) => nvidiaSmi(args, env));
   const list = await smi(['--query-gpu=index,name,memory.free,utilization.gpu', '--format=csv,noheader,nounits']);
   if (list == null) return { ...cpu, why: 'No NVIDIA graphics card was found' };
-  const best = bestGpu(parseGpus(list), visibleCards(env.CUDA_VISIBLE_DEVICES));
+  const gpus = parseGpus(list);
+  // What other programs hold on each card (a card they use is left alone); an answer that cannot be read leaves all cards in.
+  const others = gpus.length ? othersByCard((await smi(['--query-gpu=index,uuid', '--format=csv,noheader,nounits'])) ?? '', (await smi(['--query-compute-apps=gpu_uuid,used_memory', '--format=csv,noheader,nounits'])) ?? '') : new Map<number, number>();
+  // The server's own CUDA_VISIBLE_DEVICES, and HYDOR_SUGGEST_GPUS: the cards learning may use (both by number).
+  const best = bestGpu(gpus, both(visibleCards(env.CUDA_VISIBLE_DEVICES), visibleCards(env.HYDOR_SUGGEST_GPUS)), others);
   if ('why' in best) return { ...cpu, why: best.why };
   const cuda = parseCuda((await smi([])) ?? '');
   if (!cuda) return { ...cpu, why: 'The graphics card driver did not say which CUDA version it supports' };
