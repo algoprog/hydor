@@ -5,10 +5,10 @@ Release notes, and says what is new after it updates.
 
 ## 0.107.0 · 23 November 2026
 
-Word suggestions that run two to three times faster with less to download, and that learn from your writing about four
+Word suggestions that run about three times faster with less to download, and that learn from your writing about four
 times faster on the processor, keeping their place across restarts.
 
-- **Faster suggestions, less to download**: word suggestions now run on ONNX Runtime instead of PyTorch, two to three
+- **Faster suggestions, less to download**: word suggestions now run on ONNX Runtime instead of PyTorch, about three
   times faster on the processor and in much less memory, with the same suggestions as before. The first download is
   about 1.2 GB, and PyTorch (about 200 MB) comes only the first time they learn from your writing. A setup made by an
   earlier version is brought up to date the first time it is used, with nothing for you to do.
