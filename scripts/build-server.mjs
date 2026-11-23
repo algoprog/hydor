@@ -1,4 +1,6 @@
 // Bundles the server entry points into dist/server (node_modules stay external).
+import { cpSync, existsSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import { build } from 'esbuild';
 
 const entries = {
@@ -41,3 +43,12 @@ await build({
   define: { __SLIDES_RUNTIME__: JSON.stringify(runtimeSrc) },
   banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
 });
+
+// Word suggestions' Python engine (the worker and personalising) runs from its own scripts, which sit beside the bundle:
+// dist/server/suggest/py (not the bytecode caches or the engine's tests).
+const py = 'server/suggest/py';
+if (existsSync(py)) {
+  const to = path.join(process.env.OUTDIR ?? 'dist/server', 'suggest', 'py');
+  rmSync(to, { recursive: true, force: true });
+  cpSync(py, to, { recursive: true, filter: (src) => !/(^|[\\/])(__pycache__|tests)([\\/]|$)/.test(src) && !src.endsWith('.pyc') });
+}
