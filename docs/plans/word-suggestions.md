@@ -115,7 +115,7 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
      the person's own tokens → `mix` (personalisation is what helps there, and the base switch would turn it off: it
      gives English, Greek and every major language to the LLM); else, with `switch` on and a language guessed, the
      switch's choice; else `mix`.
-   - `mix` = per step `(1 − λ)·P_llm + λ·P_slm`, λ from the gate (the personal gate when personalisation made one,
+   - `mix` = per step `λ·P_llm + (1 − λ)·P_slm` (λ is the LLM's weight, as in the research's gate), λ from the gate (the personal gate when personalisation made one,
      else the release's).
 4. **The LLM's distribution**: llama-server's `/completion` with the prompt as token ids, `n_predict: 1`,
    `n_probs: k` (1000), `temperature: 0`, `cache_prompt: true`: the top k ids with their log-probabilities (about
