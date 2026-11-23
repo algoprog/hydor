@@ -174,7 +174,7 @@ export class SuggestService {
     if (s.llm === 'off') return { state: 'off', detail: 'Turned off in the settings' };
     if (!llamaSupported()) return { state: 'failed', detail: `llama.cpp has no ready-made build for ${process.platform} ${process.arch}` };
     const total = os.totalmem() / 2 ** 20;
-    if (s.llm === 'auto' && total < LLM_TOTAL_MB) return { state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB (set it to On to use it anyway)`, freeMb: Math.round(total), needMb: 8192 };
+    if (s.llm === 'auto' && total < LLM_TOTAL_MB) return { state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB (set it to On to use it anyway)`, totalMb: Math.round(total), needMb: 8192 };
     return { state: 'off', detail: l.detail ?? 'Starts when you type, and stops after half an hour without a suggestion' };
   }
 
@@ -304,7 +304,7 @@ export class SuggestService {
       const total = os.totalmem() / 2 ** 20;
       if (s.llm === 'auto') {
         const free = Math.round((await availableMemory()) / 2 ** 20);
-        if (total < LLM_TOTAL_MB) return void this.llm.note({ state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB`, freeMb: Math.round(total), needMb: 8192 }), null;
+        if (total < LLM_TOTAL_MB) return void this.llm.note({ state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB`, totalMb: Math.round(total), needMb: 8192 }), null;
         if (free < LLM_NEED_MB) return void this.llm.note({ state: 'memory', detail: `Only ${(free / 1024).toFixed(1)} GB of memory is free now; the language model needs ${(LLM_NEED_MB / 1024).toFixed(1)} GB. Suggestions use the small model alone until then`, freeMb: free, needMb: LLM_NEED_MB }), null;
       }
       if (!(await this.prepareLlm())) return null;

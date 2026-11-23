@@ -36,9 +36,11 @@ function llmLine(s: SuggestStatus, wanted: Settings['llm']): { tone: 'ok' | 'inf
     // Whole sentences with only numbers in them, so each is translated as one.
     return {
       tone: 'warn',
-      text: l.freeMb
-        ? `The language model is not running: this computer has too little free memory. ${gb(l.freeMb)} GB is free; it needs about ${gb(l.needMb ?? 2500)} GB. The small model alone is making the suggestions.`
-        : 'The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.',
+      text: l.totalMb
+        ? `The language model is not running: this computer has ${gb(l.totalMb)} GB of memory, and it needs a computer with at least ${gb(l.needMb ?? 8192)} GB. The small model alone is making the suggestions.`
+        : l.freeMb
+          ? `The language model is not running: this computer has too little free memory. ${gb(l.freeMb)} GB is free; it needs about ${gb(l.needMb ?? 2500)} GB. The small model alone is making the suggestions.`
+          : 'The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.',
     };
   }
   if (l.state === 'failed') {

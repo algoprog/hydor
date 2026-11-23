@@ -25639,6 +25639,7 @@
   "The language model is not running (it starts when you next type).": "言語モデルは実行されていません（次に入力すると起動します）。",
   "The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.": "言語モデルは実行されていません。このコンピューターの空きメモリが足りません。小型モデルだけで候補を表示しています。",
   "The language model is not running: this computer has too little free memory. {0} GB is free; it needs about {1} GB. The small model alone is making the suggestions.": "言語モデルは実行されていません。このコンピューターの空きメモリが足りません。空きは{0} GBですが、約{1} GB必要です。小型モデルだけで候補を表示しています。",
+  "The language model is not running: this computer has {0} GB of memory, and it needs a computer with at least {1} GB. The small model alone is making the suggestions.": "言語モデルは実行されていません。このコンピューターのメモリは{0} GBですが、少なくとも{1} GBのメモリを持つコンピューターが必要です。小型モデルだけで候補を表示しています。",
   "The language model is running, so guesses are better.": "言語モデルが実行されているため、候補の精度が上がっています。",
   "The language model is turned off here. The small model alone is making the suggestions.": "言語モデルはここではオフになっています。小型モデルだけで候補を表示しています。",
   "The last time it learned from your writing did not finish.": "前回の入力内容からの学習は完了しませんでした。",

@@ -27496,6 +27496,7 @@
   "The language model is not running (it starts when you next type).": "语言模型未在运行（下次输入时会启动）。",
   "The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.": "语言模型未在运行：这台电脑的空闲内存太少。目前只有小模型在生成建议。",
   "The language model is not running: this computer has too little free memory. {0} GB is free; it needs about {1} GB. The small model alone is making the suggestions.": "语言模型未在运行：这台电脑的空闲内存太少。当前空闲 {0} GB，大约需要 {1} GB。目前只有小模型在生成建议。",
+  "The language model is not running: this computer has {0} GB of memory, and it needs a computer with at least {1} GB. The small model alone is making the suggestions.": "语言模型未在运行：这台电脑有 {0} GB 内存，而它需要至少 {1} GB 内存的电脑。目前只有小模型在生成建议。",
   "The language model is running, so guesses are better.": "语言模型正在运行，所以猜得更准。",
   "The language model is turned off here. The small model alone is making the suggestions.": "此处已关闭语言模型。目前只有小模型在生成建议。",
   "The last time it learned from your writing did not finish.": "上一次从你的写作中学习没有完成。",

@@ -116,8 +116,11 @@ export interface SuggestStatus {
   state: 'off' | 'setting-up' | 'starting' | 'ready' | 'failed';
   /** Progress while setting up, or why it failed. */
   detail?: string;
-  /** Qwen3.5-0.8B: running, not running (and why: turned off, too little memory, failed), or starting. */
-  llm: { state: 'off' | 'starting' | 'ready' | 'memory' | 'failed'; detail?: string; freeMb?: number; needMb?: number };
+  /**
+   * Qwen3.5-0.8B: running, not running (and why: turned off, too little memory, failed), or starting. Too little
+   * memory: totalMb when the computer itself has too little (needMb: what a computer needs), freeMb when too little is free now (needMb: what it needs free).
+   */
+  llm: { state: 'off' | 'starting' | 'ready' | 'memory' | 'failed'; detail?: string; freeMb?: number; totalMb?: number; needMb?: number };
   /** The small model in use: the one that came with the app, or the one personalised on this computer. */
   model: { kind: 'base' | 'personal'; trainedAt?: number; tokens?: number; languages?: Record<string, number> };
   /** Personalising: idle, waiting for its time (next), running (progress), or the last one failed. */

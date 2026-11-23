@@ -20800,6 +20800,7 @@
 "The language model in 8 bits (better) or 4 bits (smaller, a little worse)":"shared/find-catalog.ts",
 "The language model is loading…":"web/src/features/suggest/SuggestSettings.tsx",
 "The language model is not running (it starts when you next type).":"web/src/features/suggest/SuggestSettings.tsx",
+"The language model is not running: this computer has {0} GB of memory, and it needs a computer with at least {1} GB. The small model alone is making the suggestions.":"web/src/features/suggest/SuggestSettings.tsx",
 "The language model is not running: this computer has too little free memory. {0} GB is free; it needs about {1} GB. The small model alone is making the suggestions.":"web/src/features/suggest/SuggestSettings.tsx",
 "The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.":"web/src/features/suggest/SuggestSettings.tsx",
 "The language model is running, so guesses are better.":"web/src/features/suggest/SuggestSettings.tsx",

@@ -26277,6 +26277,7 @@
   "The language model is not running (it starts when you next type).": "Das Sprachmodell läuft nicht (es startet, wenn du das nächste Mal tippst).",
   "The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.": "Das Sprachmodell läuft nicht: Dieser Computer hat zu wenig freien Speicher. Nur das kleine Modell erstellt die Vorschläge.",
   "The language model is not running: this computer has too little free memory. {0} GB is free; it needs about {1} GB. The small model alone is making the suggestions.": "Das Sprachmodell läuft nicht: Dieser Computer hat zu wenig freien Speicher. {0} GB sind frei; es braucht etwa {1} GB. Nur das kleine Modell erstellt die Vorschläge.",
+  "The language model is not running: this computer has {0} GB of memory, and it needs a computer with at least {1} GB. The small model alone is making the suggestions.": "Das Sprachmodell läuft nicht: Dieser Computer hat {0} GB Speicher, es braucht einen Computer mit mindestens {1} GB. Nur das kleine Modell erstellt die Vorschläge.",
   "The language model is running, so guesses are better.": "Das Sprachmodell läuft, daher sind die Vermutungen besser.",
   "The language model is turned off here. The small model alone is making the suggestions.": "Das Sprachmodell ist hier ausgeschaltet. Nur das kleine Modell erstellt die Vorschläge.",
   "The last time it learned from your writing did not finish.": "Das letzte Lernen aus deinem Geschriebenen wurde nicht abgeschlossen.",
