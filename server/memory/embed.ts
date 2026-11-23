@@ -86,13 +86,16 @@ export function modelDir(): string {
   if (process.env.HYDOR_EMBED_MODEL_DIR) return process.env.HYDOR_EMBED_MODEL_DIR;
   const folder = `mDenseOn-ONNX-${MODEL_REVISION.slice(0, 12)}`;
   if (fs.existsSync('/.dockerenv')) return path.join(dir(), 'model', folder);
-  const cache =
-    process.platform === 'win32'
-      ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'hydor', 'cache')
-      : process.platform === 'darwin'
-        ? path.join(os.homedir(), 'Library', 'Caches', 'hydor')
-        : path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'hydor');
-  return path.join(cache, folder);
+  return path.join(userCacheDir(), folder);
+}
+
+/** The user's cache for what the app downloads (models): beside Hugging Face's, shared by the app's data folders. */
+export function userCacheDir(): string {
+  return process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'hydor', 'cache')
+    : process.platform === 'darwin'
+      ? path.join(os.homedir(), 'Library', 'Caches', 'hydor')
+      : path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'hydor');
 }
 
 /** The model's files are all there, as downloaded and checked (a mark written last says so). */

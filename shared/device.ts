@@ -17,7 +17,7 @@ export interface DeviceSettings {
   /** What Enter does while an agent works: join its turn, or wait in the queue for it to end. */
   enter: 'join' | 'queue';
   terminalSuggestions: boolean;
-  /** Grey word suggestions while typing in this browser (the server's Settings → Capabilities → Word suggestions must be on too). */
+  /** Word suggestions: the grey rest of the word after the caret, in this browser (Settings → Capabilities → Word suggestions turns them on for the app). */
   wordSuggestions: boolean;
   /** The sidebar shown on a computer. */
   sidebar: boolean;

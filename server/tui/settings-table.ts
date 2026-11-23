@@ -87,7 +87,7 @@ export interface Row {
   /** A command that has this option's list or button (kind command). */
   command?: string;
   /** A device setting's key; `terminal` ones are the chat's own. */
-  device?: { key: 'theme' | 'language' | 'motion' | 'textSize' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions'; terminal?: boolean };
+  device?: { key: 'theme' | 'language' | 'motion' | 'textSize' | 'sound' | 'push' | 'signout' | 'dictation' | 'speech-language' | 'read-aloud' | 'enter' | 'suggestions' | 'word-suggestions'; terminal?: boolean };
   /** What an action's yes and no read as, when it has a state to show (a permission: allowed or not). */
   states?: [string, string];
   /** What the terminal cannot do here, or what to know. */
@@ -738,6 +738,96 @@ row('voice', 'Speech recognition on the server', 'choice', {
   note: 'On this machine downloads whisper.cpp and a model; a service needs its address first, which is set on the page.',
 });
 row('voice', 'Read aloud', 'device', { device: { key: 'read-aloud' }, note: 'Each browser keeps its own voice and speed.' });
+row('suggest', 'Word suggestions', 'switch', {
+  read: rd('/api/suggest', 'settings.enabled'),
+  write: put('/api/suggest', (v) => ({ enabled: v })),
+  note: 'Turning it on downloads about 1.3 GB the first time (the small model, llama.cpp and Qwen3.5-0.8B); nothing you type leaves this computer.',
+});
+row('suggest', 'Show in this browser', 'device', { device: { key: 'word-suggestions' }, note: 'Each browser keeps its own: whether it shows the grey suggestions.' });
+row('suggest', 'Language model', 'choice', {
+  choices: [
+    { value: 'auto', label: 'Automatic (when the computer has the memory)' },
+    { value: 'on', label: 'On' },
+    { value: 'off', label: 'Off (the small model alone)' },
+  ],
+  read: rd('/api/suggest', 'settings.llm'),
+  write: put('/api/suggest', (v) => ({ llm: v })),
+  note: 'Qwen3.5-0.8B beside the small model; automatic needs a computer of at least 8 GB with 2.5 GB free.',
+});
+row('suggest', 'Language model size', 'choice', {
+  choices: [
+    { value: 'q8', label: '8-bit (better)' },
+    { value: 'q4', label: '4-bit (smaller, a little worse)' },
+  ],
+  read: rd('/api/suggest', 'settings.quant'),
+  write: put('/api/suggest', (v) => ({ quant: v })),
+});
+row('suggest', 'How sure before showing', 'choice', {
+  choices: [
+    { value: '0.3', label: '30%: more suggestions' },
+    { value: '0.4', label: '40%: balanced' },
+    { value: '0.5', label: '50%: surer ones' },
+    { value: '0.6', label: '60%: only the surest' },
+  ],
+  free: true,
+  check: (v) => (Number(v) >= 0.3 && Number(v) <= 0.6 ? null : 'Pick a share from 0.3 (more suggestions) to 0.6 (only the surest)'),
+  read: { endpoint: '/api/suggest', pick: (d) => (d.settings?.precision == null ? undefined : String(d.settings.precision)) },
+  write: put('/api/suggest', (v) => ({ precision: Number(v) })),
+  note: 'The share of the suggestions shown that is meant to be right.',
+});
+row('suggest', 'Show the next word', 'switch', { read: rd('/api/suggest', 'settings.nextWord'), write: put('/api/suggest', (v) => ({ nextWord: v })) });
+row('suggest', 'In message boxes', 'switch', { read: rd('/api/suggest', 'settings.where.chat'), write: put('/api/suggest', (v) => ({ where: { chat: v } })) });
+row('suggest', 'In documents', 'switch', { read: rd('/api/suggest', 'settings.where.docs'), write: put('/api/suggest', (v) => ({ where: { docs: v } })) });
+row('suggest', 'In notes', 'switch', { read: rd('/api/suggest', 'settings.where.notes'), write: put('/api/suggest', (v) => ({ where: { notes: v } })) });
+row('suggest', 'In other text boxes', 'switch', { read: rd('/api/suggest', 'settings.where.other'), write: put('/api/suggest', (v) => ({ where: { other: v } })) });
+row('suggest', 'Words of what you typed', 'number', { range: { min: 20, max: 200 }, read: rd('/api/suggest', 'settings.typedWords'), write: put('/api/suggest', (v) => ({ typedWords: v })) });
+row('suggest', 'Words of the reply or document', 'number', { range: { min: 0, max: 200 }, read: rd('/api/suggest', 'settings.contextWords'), write: put('/api/suggest', (v) => ({ contextWords: v })) });
+row('suggest', 'Choose by language', 'switch', { read: rd('/api/suggest', 'settings.switchByLanguage'), write: put('/api/suggest', (v) => ({ switchByLanguage: v })) });
+row('suggest', 'Learn from the conversation', 'switch', { read: rd('/api/suggest', 'settings.sessionCache'), write: put('/api/suggest', (v) => ({ sessionCache: v })) });
+row('suggest', 'Threads', 'number', {
+  range: { min: 0, max: 32 },
+  read: rd('/api/suggest', 'settings.threads'),
+  write: put('/api/suggest', (v) => ({ threads: v })),
+  note: '0 chooses from the computer’s processors.',
+});
+row('suggest', 'Learn from what I write', 'switch', { read: rd('/api/suggest', 'settings.personalise'), write: put('/api/suggest', (v) => ({ personalise: v })) });
+row('suggest', 'When it learns', 'choice', {
+  choices: [
+    { value: 'nightly', label: 'Every night' },
+    { value: 'weekly', label: 'Every week' },
+    { value: 'manual', label: 'Only when I press Retrain now' },
+  ],
+  read: rd('/api/suggest', 'settings.schedule'),
+  write: put('/api/suggest', (v) => ({ schedule: v })),
+});
+row('suggest', 'From my messages', 'switch', { read: rd('/api/suggest', 'settings.sources.messages'), write: put('/api/suggest', (v) => ({ sources: { messages: v } })) });
+row('suggest', "From agents' replies", 'switch', { read: rd('/api/suggest', 'settings.sources.replies'), write: put('/api/suggest', (v) => ({ sources: { replies: v } })) });
+row('suggest', 'From my notes', 'switch', { read: rd('/api/suggest', 'settings.sources.notes'), write: put('/api/suggest', (v) => ({ sources: { notes: v } })) });
+row('suggest', 'From my documents', 'switch', { read: rd('/api/suggest', 'settings.sources.docs'), write: put('/api/suggest', (v) => ({ sources: { docs: v } })) });
+row('suggest', 'Weight of my own words', 'number', { range: { min: 1, max: 16 }, read: rd('/api/suggest', 'settings.userWeight'), write: put('/api/suggest', (v) => ({ userWeight: v })) });
+row('suggest', 'Threads for learning', 'number', {
+  range: { min: 0, max: 64 },
+  read: rd('/api/suggest', 'settings.trainThreads'),
+  write: put('/api/suggest', (v) => ({ trainThreads: v })),
+  note: '0 chooses from the computer’s processors.',
+});
+row('suggest', 'Retrain now', 'action', {
+  act: {
+    run: async (api) => {
+      await api('POST', '/api/suggest/train');
+      return ['Learning from what you wrote in the background, at the lowest priority.'];
+    },
+  },
+});
+row('suggest', 'Forget what it learned', 'action', {
+  act: {
+    question: 'Delete the small model that learned from what you wrote (the one that came with the app is used again)?',
+    run: async (api) => {
+      await api('DELETE', '/api/suggest/personal');
+      return ['Forgotten: the small model that came with the app is used again.'];
+    },
+  },
+});
 row('assistants', 'Your agents', 'command', { command: 'hydor agents' });
 row('assistants', 'Clean up after a task', 'switch', { read: rd('/api/assistants', 'cleanUp'), write: put('/api/assistants/settings', (v) => ({ cleanUp: v })) });
 row('assistants', 'Task folders', 'text', {
