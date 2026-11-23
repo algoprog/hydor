@@ -1,7 +1,8 @@
-// Setting word suggestions up on this computer: a private Python environment (torch's CPU build, tokenizers, NumPy,
-// safetensors) in the data folder, llama.cpp's llama-server for this system, the language model's GGUF file and the
-// small model's files, each downloaded once and checked against its SHA-256. Models go to the user's cache (shared by
-// the app's data folders, as memory's is), the program and the environment stay in the data folder.
+// Setting word suggestions up on this computer: a private Python environment (ONNX Runtime, tokenizers, NumPy,
+// safetensors; PyTorch's CPU build is added to it the first time learning needs it) in the data folder, llama.cpp's
+// llama-server for this system, the language model's GGUF file and the small model's files, each downloaded once and
+// checked against its SHA-256. Models go to the user's cache (shared by the app's data folders, as memory's is), the
+// program and the environment stay in the data folder.
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,12 +13,14 @@ import { which } from '../documents/tools.ts';
 import { downloadFiles, userCacheDir, type ModelFile } from '../memory/embed.ts';
 import { fetchFile } from '../voice/fetch.ts';
 import { tagSuits } from './gpu.ts';
-import { GGUF_FILES, GGUF_REPO, GGUF_REVISION, LLAMA_ASSETS, LLAMA_TAG, llamaUrl, SMALL_MODEL, SMALL_MODEL_NEEDS, SUGGEST_PACKAGES } from './pins.ts';
+import { GGUF_FILES, GGUF_REPO, GGUF_REVISION, LLAMA_ASSETS, LLAMA_TAG, llamaUrl, SMALL_MODEL, SMALL_MODEL_NEEDS, SUGGEST_PACKAGES, SUGGEST_PACKAGES_TORCH, TORCH_PACKAGE, TRAIN_PACKAGES } from './pins.ts';
 
 export const suggestDir = () => path.join(config.dataDir, 'suggest');
 const venv = () => path.join(suggestDir(), 'venv');
 const EXE = process.platform === 'win32' ? '.exe' : '';
-const DISK_GB = 2.5;
+/** Free disk the suggestion environment needs (about 150 MB installed), and what PyTorch adds for learning (about 1 GB). */
+const DISK_GB = 1;
+const TORCH_DISK_GB = 2;
 
 const readText = (f: string) => {
   try {
@@ -70,7 +73,7 @@ export async function withStall<T>(signal: AbortSignal | undefined, ms: number, 
   }
 }
 
-/** Why word suggestions cannot run on this system, or null: torch has no wheels for an Intel Mac. A Python of one's own (HYDOR_SUGGEST_PYTHON) is used as it is. */
+/** Why word suggestions cannot run on this system, or null: ONNX Runtime and PyTorch have no wheels for an Intel Mac. A Python of one's own (HYDOR_SUGGEST_PYTHON) is used as it is. */
 export function unsupportedSystem(platform: string = process.platform, arch: string = process.arch): string | null {
   if (process.env.HYDOR_SUGGEST_PYTHON) return null;
   return platform === 'darwin' && arch === 'x64' ? 'Word suggestions need a Mac with Apple silicon' : null;
@@ -80,7 +83,18 @@ export function unsupportedSystem(platform: string = process.platform, arch: str
 
 /** The Python that runs the engine: one given (HYDOR_SUGGEST_PYTHON, used as it is), else the private one. */
 export const pythonPath = () => process.env.HYDOR_SUGGEST_PYTHON || path.join(venv(), ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-export const packagesReady = () => (process.env.HYDOR_SUGGEST_PYTHON ? fs.existsSync(pythonPath()) : fs.existsSync(pythonPath()) && readText(path.join(venv(), '.packages')) === SUGGEST_PACKAGES);
+/** The suggestion environment is there: ONNX Runtime and the rest, with PyTorch or without it (an older version's has PyTorch and gets ONNX Runtime added). */
+export const packagesReady = () => {
+  if (!fs.existsSync(pythonPath())) return false;
+  if (process.env.HYDOR_SUGGEST_PYTHON) return true;
+  const have = readText(path.join(venv(), '.packages'));
+  return have === SUGGEST_PACKAGES || have === SUGGEST_PACKAGES_TORCH;
+};
+/** PyTorch is there too, which learning on the processor needs (a Python of one's own is used as it is). */
+export const torchReady = () => {
+  if (!fs.existsSync(pythonPath())) return false;
+  return !!process.env.HYDOR_SUGGEST_PYTHON || readText(path.join(venv(), '.packages')) === SUGGEST_PACKAGES_TORCH;
+};
 
 /** The engine's scripts, beside the bundled server (dist/server/suggest/py: scripts/build-server.mjs copies them). */
 export const pyDir = () => path.join(path.dirname(fileURLToPath(import.meta.url)), 'suggest', 'py');
@@ -181,75 +195,129 @@ function systemPython(): string | null {
 }
 
 const PYTORCH_CPU = 'https://download.pytorch.org/whl/cpu';
-const TORCH = 'torch>=2.4';
 const OTHERS = ['tokenizers>=0.20', 'numpy', 'safetensors>=0.4'];
 
-/** What a private Python environment is made of: where, which torch index (none: PyPI's), and how it says it is done. */
+/** One pip install: from which index (none: PyPI's), what, and what it is called while it runs. */
+interface PipStep {
+  index: string[];
+  packages: string[];
+  label: string;
+}
+
+/** What a private Python environment is made of: where, what goes into it, and how it says it is done. */
 interface VenvPlan {
   dir: string;
   python: string;
   /** Written into the folder when everything is installed. */
   marker: string;
-  torchIndex: string[];
-  torchLabel: string;
+  /** The markers of environments that are added to rather than made again (an older version's, or this one without its extra). */
+  keep: string[];
+  steps: PipStep[];
   /** Free disk needed (GB). */
   diskGb: number;
   /** What an environment that is there but not this one is told when it is taken away. */
   removing: string;
 }
 
-/** Makes the environment and installs torch and the other libraries into it (the pieces already there are kept). */
-async function buildVenv(v: VenvPlan, report: Report, signal?: AbortSignal): Promise<void> {
-  fs.mkdirSync(suggestDir(), { recursive: true });
-  if (fs.existsSync(v.dir) && readText(path.join(v.dir, '.packages')) !== v.marker && readText(path.join(v.dir, '.building')) !== v.marker) {
-    report(v.removing);
-    fs.rmSync(v.dir, { recursive: true, force: true });
+/** Builds of one environment go one after the other (PyTorch going in while the suggestion libraries are being checked would clash). */
+const venvBusy = new Map<string, Promise<unknown>>();
+async function inTurn<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+  const before = venvBusy.get(dir) ?? Promise.resolve();
+  const mine = before.catch(() => {}).then(fn);
+  venvBusy.set(dir, mine);
+  try {
+    return await mine;
+  } finally {
+    if (venvBusy.get(dir) === mine) venvBusy.delete(dir);
   }
-  const disk = freeDiskGb(suggestDir());
-  if (disk < v.diskGb) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, the Python libraries need about ${v.diskGb} GB.`);
-  const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
-  const made = () => fs.existsSync(v.python);
-  // A set-up that was stopped half way carries on (what pip fetched is kept in its cache); the marker is written only at the end.
-  const building = () => {
-    fs.mkdirSync(v.dir, { recursive: true });
-    fs.writeFileSync(path.join(v.dir, '.building'), v.marker);
-  };
-  if (uv) {
-    const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
-    if (!made()) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10,<3.14', v.dir], 'Making a private Python environment', report, signal);
-    building();
-    await run(uv, ['pip', 'install', '--quiet', '--python', v.python, ...v.torchIndex, TORCH], v.torchLabel, report, signal);
-    await run(uv, ['pip', 'install', '--quiet', '--python', v.python, ...OTHERS], 'Installing the tokenizer and NumPy', report, signal);
-  } else {
-    const sys = systemPython();
-    if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or: winget install Python.Python.3.12).');
-    if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or Homebrew: brew install python).');
-    if (!sys) throw new Error('Python 3 is not installed on this computer, and word suggestions need it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
-    if (!made()) await run(sys, ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report, signal);
-    if (!made()) await run(sys, ['-m', 'venv', v.dir], 'Making a private Python environment', report, signal);
-    building();
-    await run(v.python, ['-m', 'pip', 'install', '--quiet', ...v.torchIndex, TORCH], v.torchLabel, report, signal);
-    await run(v.python, ['-m', 'pip', 'install', '--quiet', ...OTHERS], 'Installing the tokenizer and NumPy', report, signal);
-  }
-  fs.writeFileSync(path.join(v.dir, '.packages'), v.marker);
-  fs.rmSync(path.join(v.dir, '.building'), { force: true });
 }
 
-/** The private Python environment with the engine's libraries (once; again when their list changes). */
+/** Makes the environment and installs the libraries into it (the pieces already there are kept); `ready` is asked again once it is this one's turn. */
+async function buildVenv(v: VenvPlan, ready: () => boolean, report: Report, signal?: AbortSignal): Promise<void> {
+  return inTurn(v.dir, async () => {
+    if (ready()) return;
+    fs.mkdirSync(suggestDir(), { recursive: true });
+    const have = readText(path.join(v.dir, '.packages'));
+    if (fs.existsSync(v.dir) && have !== v.marker && !(have && v.keep.includes(have)) && readText(path.join(v.dir, '.building')) !== v.marker) {
+      report(v.removing);
+      fs.rmSync(v.dir, { recursive: true, force: true });
+    }
+    const disk = freeDiskGb(suggestDir());
+    if (disk < v.diskGb) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, the Python libraries need about ${v.diskGb} GB.`);
+    const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
+    const made = () => fs.existsSync(v.python);
+    // A set-up that was stopped half way carries on (what pip fetched is kept in its cache); the marker is written only at the end.
+    const building = () => {
+      fs.mkdirSync(v.dir, { recursive: true });
+      fs.writeFileSync(path.join(v.dir, '.building'), v.marker);
+    };
+    if (uv) {
+      const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
+      if (!made()) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10,<3.14', v.dir], 'Making a private Python environment', report, signal);
+      building();
+      for (const st of v.steps) await run(uv, ['pip', 'install', '--quiet', '--python', v.python, ...st.index, ...st.packages], st.label, report, signal);
+    } else {
+      const sys = systemPython();
+      if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or: winget install Python.Python.3.12).');
+      if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or Homebrew: brew install python).');
+      if (!sys) throw new Error('Python 3 is not installed on this computer, and word suggestions need it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
+      if (!made()) await run(sys, ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report, signal);
+      if (!made()) await run(sys, ['-m', 'venv', v.dir], 'Making a private Python environment', report, signal);
+      building();
+      for (const st of v.steps) await run(v.python, ['-m', 'pip', 'install', '--quiet', ...st.index, ...st.packages], st.label, report, signal);
+    }
+    fs.writeFileSync(path.join(v.dir, '.packages'), v.marker);
+    fs.rmSync(path.join(v.dir, '.building'), { force: true });
+  });
+}
+
+/** PyTorch's CPU build (a few hundred MB) from its own index on Linux and Windows; the Mac's PyPI build is the same size. */
+const torchStep = (): PipStep => ({
+  index: process.platform === 'darwin' ? [] : ['--index-url', PYTORCH_CPU],
+  packages: [TORCH_PACKAGE],
+  label: 'Installing PyTorch (CPU) for learning, about 200 MB',
+});
+
+/**
+ * The private Python environment the engine runs in: ONNX Runtime and the rest (once; again when their list changes). One an older
+ * version made (PyTorch and no ONNX Runtime) is kept, with ONNX Runtime added; one that has PyTorch keeps it.
+ */
 export async function setupPython(report: Report, signal?: AbortSignal): Promise<void> {
   if (packagesReady()) return;
   if (process.env.HYDOR_SUGGEST_PYTHON) throw new Error(`HYDOR_SUGGEST_PYTHON (${process.env.HYDOR_SUGGEST_PYTHON}) does not exist`);
+  const hadTorch = [TRAIN_PACKAGES, SUGGEST_PACKAGES_TORCH].includes(readText(path.join(venv(), '.packages')) ?? '');
   await buildVenv(
     {
       dir: venv(),
       python: pythonPath(),
-      marker: SUGGEST_PACKAGES,
-      // PyTorch's CPU build (a few hundred MB) from its own index on Linux and Windows; the Mac's PyPI build is the same size.
-      torchIndex: process.platform === 'darwin' ? [] : ['--index-url', PYTORCH_CPU],
-      torchLabel: 'Installing PyTorch (CPU), about 200 MB',
+      marker: hadTorch ? SUGGEST_PACKAGES_TORCH : SUGGEST_PACKAGES,
+      keep: [TRAIN_PACKAGES, SUGGEST_PACKAGES_TORCH],
+      steps: [{ index: [], packages: ['onnxruntime>=1.23', ...OTHERS], label: 'Installing ONNX Runtime and the tokenizer, about 60 MB' }],
       diskGb: DISK_GB,
       removing: 'Removing the environment an older version made',
     },
+    packagesReady,
+    report,
+    signal,
+  );
+}
+
+/** PyTorch (the CPU build) into the suggestion environment, for learning on the processor: the first time learning runs, in the background. */
+export async function setupTorch(report: Report, signal?: AbortSignal): Promise<void> {
+  if (torchReady()) return;
+  if (process.env.HYDOR_SUGGEST_PYTHON) throw new Error(`HYDOR_SUGGEST_PYTHON (${process.env.HYDOR_SUGGEST_PYTHON}) does not exist`);
+  await setupPython(report, signal);
+  await buildVenv(
+    {
+      dir: venv(),
+      python: pythonPath(),
+      marker: SUGGEST_PACKAGES_TORCH,
+      keep: [SUGGEST_PACKAGES, TRAIN_PACKAGES],
+      steps: [torchStep()],
+      diskGb: TORCH_DISK_GB,
+      removing: 'Removing the environment an older version made',
+    },
+    torchReady,
     report,
     signal,
   );
@@ -260,7 +328,7 @@ export async function setupPython(report: Report, signal?: AbortSignal): Promise
 /** The second private environment, with PyTorch's CUDA build: learning on an NVIDIA card needs it (the CPU one cannot). */
 const venvGpu = () => path.join(suggestDir(), 'venv-gpu');
 const GPU_DISK_GB = 8;
-const gpuMarker = (tag: string) => `${SUGGEST_PACKAGES} ${tag}`;
+const gpuMarker = (tag: string) => `${TRAIN_PACKAGES} ${tag}`;
 
 /** The CUDA environment's Python: the one given (HYDOR_SUGGEST_PYTHON, used as it is), else the private one. */
 export const gpuPythonPath = () => process.env.HYDOR_SUGGEST_PYTHON || path.join(venvGpu(), ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
@@ -269,7 +337,7 @@ export const gpuPythonPath = () => process.env.HYDOR_SUGGEST_PYTHON || path.join
 export function gpuPackagesReady(tag: string): boolean {
   if (process.env.HYDOR_SUGGEST_PYTHON) return fs.existsSync(gpuPythonPath());
   const have = readText(path.join(venvGpu(), '.packages'));
-  const prefix = `${SUGGEST_PACKAGES} `;
+  const prefix = `${TRAIN_PACKAGES} `;
   return fs.existsSync(gpuPythonPath()) && !!have && have.startsWith(prefix) && tagSuits(have.slice(prefix.length), tag);
 }
 
@@ -282,11 +350,15 @@ export async function setupGpuPython(tag: string, report: Report, signal?: Abort
       dir: venvGpu(),
       python: gpuPythonPath(),
       marker: gpuMarker(tag),
-      torchIndex: ['--index-url', `https://download.pytorch.org/whl/${tag}`],
-      torchLabel: 'Installing PyTorch for the graphics card, about 2.5 GB',
+      keep: [],
+      steps: [
+        { index: ['--index-url', `https://download.pytorch.org/whl/${tag}`], packages: [TORCH_PACKAGE], label: 'Installing PyTorch for the graphics card, about 2.5 GB' },
+        { index: [], packages: OTHERS, label: 'Installing the tokenizer and NumPy' },
+      ],
       diskGb: GPU_DISK_GB,
       removing: 'Removing the graphics card environment an older version made',
     },
+    () => gpuPackagesReady(tag),
     report,
     signal,
   );

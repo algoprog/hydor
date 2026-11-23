@@ -1330,6 +1330,8 @@ test('the graphics card: a run on a card (its set-up first, its environment, one
       if (setupFails) throw new Error('no network');
       ready = true;
     },
+    torchReady: () => true,
+    setupTorch: async () => {},
   };
   try {
     // 1: the first run on the card waits for its environment, with the line saying so.
@@ -1476,6 +1478,77 @@ test('the graphics card: a run on a card (its set-up first, its environment, one
     flag('trainhold', false);
     flag('traingpufail', false);
     flag('trainfail', false);
+  }
+});
+
+test('PyTorch for learning goes into the environment the first time a run on the processor needs it (the line says so), not before', async () => {
+  await resetTraining();
+  const real = svc.trainer.deps;
+  const setups: string[] = [];
+  let ready = false;
+  let fails = false;
+  let gate: Promise<void> = Promise.resolve();
+  svc.trainer.deps = {
+    pick: async () => ({ device: { kind: 'cpu' } }),
+    gpuReady: () => false,
+    setupGpu: async () => {},
+    torchReady: () => ready,
+    setupTorch: async (report, signal) => {
+      setups.push('torch');
+      report('Installing PyTorch (CPU) for learning');
+      await new Promise<void>((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('Stopped')), { once: true });
+        void gate.then(resolve);
+      });
+      if (fails) throw new Error('no network');
+      ready = true;
+    },
+  };
+  try {
+    // The first run waits for it, with the learning line saying so; train.py starts after.
+    let open!: () => void;
+    gate = new Promise((r) => (open = r));
+    await addTyped('A message for the first run, which needs PyTorch');
+    let k = trainLog().length;
+    flag('trainhold', true);
+    await post('/api/suggest/train');
+    const during = await until('the set-up', async () => {
+      const t = await trainState();
+      return t.state === 'running' && /PyTorch/.test(t.detail ?? '') ? t : null;
+    });
+    assert.deepEqual(during.device, { kind: 'cpu' });
+    assert.equal(trainLog().length, k, 'train.py waits for it');
+    open();
+    await until('the run', async () => trainLog().length === k + 1);
+    assert.equal(trainLog()[k].args[trainLog()[k].args.indexOf('--device') + 1], 'cpu');
+    flag('trainhold', false);
+    await until('it to finish', async () => !svc.trainer.active && hasModel());
+    // It is there now: the next run does not ask again.
+    await addTyped('A message for the second run');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.deepEqual(setups, ['torch']);
+    // A set-up that fails fails the run, with why; train.py is not started.
+    ready = false;
+    fails = true;
+    gate = Promise.resolve();
+    await addTyped('A message for the run whose PyTorch cannot be had');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run to fail', async () => !svc.trainer.active);
+    const bad = await trainState();
+    assert.equal(bad.state, 'failed');
+    assert.match(bad.detail ?? '', /PyTorch could not be set up: no network/);
+    assert.equal(trainLog().length, k);
+    // Tried again at the next run.
+    fails = false;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.deepEqual(setups, ['torch', 'torch', 'torch']);
+  } finally {
+    svc.trainer.deps = real;
+    flag('trainhold', false);
   }
 });
 

@@ -112,13 +112,12 @@ def segments(text: str, size: int = 100) -> list:
 
 
 def spread(lp_row, llm_eos: int = -1):
-    """The small model's log-softmax row [V_slm] (a torch tensor; the specials it never predicts are at -inf) -> (a probability
+    """The small model's log-softmax row [V_slm] (float32 NumPy; the specials it never predicts are at -inf) -> (a probability
     vector over Qwen ids, float32 numpy; the probability of <unk>). Its <eos> mass goes to Qwen's end-of-text id (the decoder's
     "the word ends" check reads it)."""
-    import torch
-    p = torch.exp(lp_row)
+    p = np.exp(lp_row)
     unk = float(p[UNK])
-    out = p[NSPEC:].numpy().copy()
+    out = p[NSPEC:].copy()
     if 0 <= llm_eos < len(out):
         out[llm_eos] = float(p[EOS])
     return out, unk

@@ -1,6 +1,9 @@
 import unittest
 
 import helpers  # noqa: F401  (sets the import path)  (sets the path)
+
+if helpers.torch is None:
+    raise unittest.SkipTest('needs torch (learning and model.py are the only parts that do)')
 import torch
 
 from hydor_suggest import vocab as V

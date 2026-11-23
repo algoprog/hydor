@@ -165,7 +165,8 @@ class Worker:
             else:
                 raise ValueError(f'unknown op {op!r}')
         except Exception as e:                           # one request's failure never stops the worker
-            self.say({'id': rid, 'error': f'{type(e).__name__}: {e}'})
+            from .ort_slm import GraphError
+            self.say({'id': rid, 'error': str(e) if isinstance(e, GraphError) else f'{type(e).__name__}: {e}'})
             if os.environ.get('HYDOR_SUGGEST_DEBUG'):
                 import traceback
                 traceback.print_exc(file=sys.stderr)
@@ -190,7 +191,11 @@ def main() -> None:
         pass
     w = Worker(out)
     w.say({'status': 'loading'})
-    import torch  # noqa: F401  (the slow import: the status above is already out)
+    try:
+        import onnxruntime  # noqa: F401  (the slow import: the status above is already out)
+    except Exception as e:                               # not installed, or a build this computer cannot load: said as it is
+        print(f'ONNX Runtime could not be loaded on this computer ({type(e).__name__}: {e})', file=sys.stderr)
+        sys.exit(3)
     from . import engine  # noqa: F401
     w.say({'ready': True, 'rss': rss_mb()})
     w.run(sys.stdin)

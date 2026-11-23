@@ -9,6 +9,9 @@ import threading
 import unittest
 
 import helpers
+
+if helpers.torch is None:
+    raise unittest.SkipTest('needs torch (learning and model.py are the only parts that do)')
 import numpy as np
 import torch
 

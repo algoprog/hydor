@@ -12,7 +12,7 @@ import { which } from '../documents/tools.ts';
 import { childEnv } from './engine.ts';
 import { chooseDevice, GPU_ROOMY_MB, type DevicePick } from './gpu.ts';
 import { track } from './procs.ts';
-import { gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, suggestDir, trainScript } from './setup.ts';
+import { gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, setupTorch, suggestDir, torchReady, trainScript } from './setup.ts';
 import { trainThreads } from './settings.ts';
 import { writeTexts } from './texts.ts';
 
@@ -167,12 +167,18 @@ export interface TrainDeps {
   gpuReady(tag: string): boolean;
   /** Sets it up (downloads PyTorch's CUDA build), reporting where it is, and stopping when `signal` ends. */
   setupGpu(tag: string, report: (detail: string) => void, signal: AbortSignal): Promise<void>;
+  /** PyTorch (the CPU build) is in the suggestion environment, which learning on the processor runs from (suggesting needs none). */
+  torchReady(): boolean;
+  /** Puts it there, reporting where it is, and stopping when `signal` ends. */
+  setupTorch(report: (detail: string) => void, signal: AbortSignal): Promise<void>;
 }
 
 const realDeps: TrainDeps = {
   pick: (s) => chooseDevice({ enabled: s.trainGpu }),
   gpuReady: gpuPackagesReady,
   setupGpu: setupGpuPython,
+  torchReady,
+  setupTorch,
 };
 
 export class Trainer {
@@ -318,6 +324,12 @@ export class Trainer {
         if (prepared.ok) python = gpuPythonPath();
         else remember((pick = { device: { kind: 'cpu' }, why: prepared.why }));
       }
+      // The processor (and a Mac's graphics chip) learns from the suggestion environment: PyTorch goes into it the first time.
+      if (pick.device.kind !== 'cuda') {
+        const t = await this.prepareTorch(startedAt, pick.device);
+        if (this.stopping) return fail(ended(), true);
+        if (!t.ok) return fail(t.why);
+      }
       const attempt = (p: DevicePick, py: string) => {
         this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}`, device: { kind: p.device.kind, name: p.device.name } });
         return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p, seed }), this.envFor(threads, p));
@@ -329,6 +341,9 @@ export class Trainer {
         const why = `Learning on the graphics card failed: ${done.why}`;
         holdGpu(db, why);
         remember({ device: { kind: 'cpu' }, why });
+        const t = await this.prepareTorch(startedAt, { kind: 'cpu' });
+        if (this.stopping) return fail(ended(), true);
+        if (!t.ok) return fail(t.why);
         done = await attempt({ device: { kind: 'cpu' } }, pythonPath());
         // A processor that fails the same way says it was not the card.
         if (!done.ok && !done.nothing && !this.stopping) releaseGpu(db);
@@ -389,6 +404,20 @@ export class Trainer {
       const why = `PyTorch for the graphics card could not be set up: ${(e as Error).message}`;
       holdGpu(db, why);
       return { ok: false, why };
+    }
+  }
+
+  /** PyTorch's CPU build is in the suggestion environment (the first time it is installed, with the learning line saying so). */
+  private async prepareTorch(startedAt: number, device: TrainDevice): Promise<{ ok: true } | { ok: false; why: string }> {
+    if (this.deps.torchReady()) return { ok: true };
+    const report = (d: string) => this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, detail: d, device: { kind: device.kind, name: device.name } });
+    try {
+      report('Getting PyTorch for learning (about 200 MB, the first time)');
+      await this.deps.setupTorch(report, this.ctl.signal);
+      return { ok: true };
+    } catch (e) {
+      if (this.stopping) return { ok: false, why: 'Stopped' };
+      return { ok: false, why: `PyTorch could not be set up: ${(e as Error).message}` };
     }
   }
 

@@ -60,5 +60,17 @@ export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[] }
 /** The files a folder must hold to run the small model (a release has more: the card and the licence). */
 export const SMALL_MODEL_NEEDS = ['config.json', 'model.safetensors', 'tokenizer.json', 'gate.json', 'switch.json', 'calibration.json', 'lid.json', 'lid.bin', 'replay/replay.u32', 'replay/index.json'];
 
-/** What the Python environment holds: another string means making it again. */
-export const SUGGEST_PACKAGES = 'suggest/1 torch>=2.4 tokenizers>=0.20 numpy safetensors>=0.4';
+/**
+ * What the suggestion environment holds: ONNX Runtime (the small model runs on it), the tokenizer, NumPy and safetensors, about 150 MB
+ * installed. Another string means making it again.
+ */
+export const SUGGEST_PACKAGES = 'suggest/2 onnxruntime>=1.23 tokenizers>=0.20 numpy safetensors>=0.4';
+/** Learning (train.py) needs PyTorch, put into the same environment the first time it is needed (about 1 GB installed): the marker says so. */
+export const TORCH_PACKAGE = 'torch>=2.4';
+export const SUGGEST_PACKAGES_TORCH = `${SUGGEST_PACKAGES} ${TORCH_PACKAGE}`;
+/**
+ * What learning's own environments hold: PyTorch, the tokenizer, NumPy and safetensors. The graphics card's environment (venv-gpu) has
+ * been this since it was first made (with its CUDA build after it), and the suggestion environment of the first versions was this too
+ * (PyTorch ran the suggestions then): it is kept, with ONNX Runtime added.
+ */
+export const TRAIN_PACKAGES = 'suggest/1 torch>=2.4 tokenizers>=0.20 numpy safetensors>=0.4';

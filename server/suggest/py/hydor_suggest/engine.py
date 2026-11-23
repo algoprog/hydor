@@ -10,11 +10,10 @@ import json
 import os
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Callable, Optional
 
 import numpy as np
-import torch
 
 from . import cache as cache_mod
 from . import mix as mix_mod
@@ -22,7 +21,8 @@ from . import vocab as V
 from .decode import decode, next_word_text, text_after
 from .lid import Lid, mostly_letters
 from .llm import LlamaClient, LlmError, LlmUnavailable, dense_from_top
-from .model import SLM, State, build_model, config_from_dict, last_logits
+from .config import config_from_dict
+from .ort_slm import GraphError, OrtSlm, State, last_logits, log_softmax
 from .tokbytes import PrefixIndex, end_token_ids, token_bytes
 
 FORMAT = 'hydor-suggest/1'
@@ -31,11 +31,6 @@ ENC_MAX_CHARS = 2_000_000            # the characters the token-id cache may hol
 DEFAULTS = {'k': 1000, 'typed_words': 100, 'context_words': 100, 'max_tokens': 8, 'sessions': 20}
 PERSONAL_LANG_TOKENS = 2000          # the person's own tokens in a language from which the personal model counts as trained on it
 MAX_TYPED_BYTES = 128
-
-
-def _load_safetensors(path: str) -> dict:
-    from safetensors.torch import load_file
-    return load_file(path)
 
 
 def _read_json(path: str):
@@ -62,11 +57,11 @@ class SlmRunner:
     """The small model with an incremental state: the state after the last context is kept and extended when the next one only adds
     tokens; decoding steps run on copies of it (a State is never changed in place)."""
 
-    def __init__(self, model: SLM):
+    def __init__(self, model: OrtSlm):
         self.model = model
         self.ids: list = []
         self.state: Optional[State] = None
-        self.base_row: Optional[torch.Tensor] = None       # log-probabilities after self.ids
+        self.base_row: Optional[np.ndarray] = None         # log-probabilities after self.ids
         self.fed = 0                                       # tokens run through the model (the statistics, the tests)
         self._steps: dict = {}                             # path -> (log-probabilities, state), for this context
 
@@ -83,10 +78,10 @@ class SlmRunner:
 
     def _feed(self, ids: list) -> None:
         row, self.state = last_logits(self.model, ids, self.state)
-        self.base_row = torch.log_softmax(row, -1)
+        self.base_row = log_softmax(row)
         self.fed += len(ids)
 
-    def logprobs(self, path: tuple) -> torch.Tensor:
+    def logprobs(self, path: tuple) -> np.ndarray:
         """Log-probabilities of the next token after the context and the tokens of `path` (small-model ids)."""
         hit = self._steps.get(path)
         if hit is None:
@@ -95,7 +90,7 @@ class SlmRunner:
                 self.logprobs(path[:-1])
                 parent = self._steps[path[:-1]]
             row, st = last_logits(self.model, [path[-1]], parent[1])
-            hit = self._steps[path] = (torch.log_softmax(row, -1), st)
+            hit = self._steps[path] = (log_softmax(row), st)
             self.fed += 1
         return hit[0]
 
@@ -150,13 +145,16 @@ class Release:
         if os.path.isfile(cf):
             for plan, d in _read_json(cf).items():
                 self.cache_fits[plan] = cache_mod.CacheFit(float(d['a']), float(d['b']), float(d['c']))
-        self.state_dict = _load_safetensors(os.path.join(folder, 'model.safetensors'))
+        self.weights = os.path.join(folder, 'model.safetensors')
+        if not os.path.isfile(self.weights):
+            raise ValueError(f'{folder}: no model.safetensors')
 
 
 class Engine:
     def __init__(self):
         self.release: Optional[Release] = None
-        self.model: Optional[SLM] = None
+        self.model: Optional[OrtSlm] = None
+        self.model_key = None
         self.runner: Optional[SlmRunner] = None
         self.gate: Optional[mix_mod.Gate] = None
         self.kind = 'base'
@@ -178,20 +176,21 @@ class Engine:
              options: Optional[dict] = None) -> dict:
         """Load a release and the personal model, and connect the language model. Everything is built before anything is swapped in: a
         load that fails leaves the engine as it was."""
-        if threads and threads > 0:
-            torch.set_num_threads(int(threads))
+        threads = max(0, int(threads or 0))
         opts = dict(DEFAULTS)
         opts.update({k: v for k, v in (options or {}).items() if v is not None})
         same = self.release is not None and os.path.abspath(self.release.folder) == os.path.abspath(model_dir)
         rel = self.release if same else Release(model_dir)
         model, kind, languages, gate = None, 'base', {}, rel.gate
+        key = None
         personal_error = None
-        if personal_dir and os.path.isfile(os.path.join(personal_dir, 'model.safetensors')):
+        pw = os.path.join(personal_dir, 'model.safetensors') if personal_dir else None
+        if pw and os.path.isfile(pw):
             try:
                 cfg = config_from_dict(_read_json(os.path.join(personal_dir, 'config.json')).get('slm') or rel.config['slm'])
                 if cfg.vocab != rel.slm_config.vocab:
                     raise ValueError('the personal model has another vocabulary')
-                model = build_model(cfg, _load_safetensors(os.path.join(personal_dir, 'model.safetensors')))
+                model, key = self._slm(cfg, pw, [personal_dir, rel.folder], threads)
                 mp = os.path.join(personal_dir, 'meta.json')
                 if os.path.isfile(mp):
                     languages = {str(k): int(v) for k, v in (_read_json(mp).get('languages') or {}).items()}
@@ -200,10 +199,10 @@ class Engine:
                     gate = mix_mod.Gate.load(gp)
                 kind = 'personal'
             except Exception as e:                    # a broken personal model never stops the base one
-                model, kind, languages, gate = None, 'base', {}, rel.gate
+                model, key, kind, languages, gate = None, None, 'base', {}, rel.gate
                 personal_error = str(e)
         if model is None:
-            model = build_model(rel.slm_config, rel.state_dict)
+            model, key = self._slm(rel.slm_config, rel.weights, [rel.folder], threads)
         runner = SlmRunner(model)
         runner.prepare([V.BOS, V.DOC])                 # warms the threads and gives the first request a state
         client = LlamaClient(llm_url, int(opts['k'])) if llm_url else None
@@ -213,7 +212,10 @@ class Engine:
         if not same:
             self._enc.clear()
             self._enc_chars = 0
+        if self.model is not None and self.model is not model:
+            self.model.close()
         self.opts, self.release, self.model, self.kind, self.languages, self.gate = opts, rel, model, kind, languages, gate
+        self.model_key = key
         self.runner, self.client, self.llm_error, self.llm_down_until = runner, client, None, 0.0
         self.caches = cache_mod.SessionCaches(rel.V, int(opts['sessions']))
         for session, texts in list(self._session_texts.items()):
@@ -222,6 +224,15 @@ class Engine:
         if personal_error:
             out['personal_error'] = personal_error
         return out
+
+    def _slm(self, cfg, weights: str, folders: list, threads: int) -> tuple:
+        """The small model for these weights: the one already loaded when it is the same file (the same size and time) at the same
+        threads, else a new one (its graph is the release's own, else the one that comes with the app)."""
+        st = os.stat(weights)
+        key = (os.path.abspath(weights), st.st_mtime_ns, st.st_size, threads, json.dumps(asdict(cfg), sort_keys=True))
+        if self.model is not None and self.model_key == key:
+            return self.model, key
+        return OrtSlm(cfg, weights, threads=threads, folders=folders), key
 
     # ---- the language model's health -------------------------------------------------------------------------------------
     def llm(self) -> Optional[LlamaClient]:

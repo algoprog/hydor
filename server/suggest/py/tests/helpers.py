@@ -11,12 +11,15 @@ os.environ.setdefault('CUDA_VISIBLE_DEVICES', '')
 os.environ.setdefault('TOKENIZERS_PARALLELISM', 'false')
 
 import numpy as np  # noqa: E402
-import torch  # noqa: E402
-
-torch.set_num_threads(2)
 
 from hydor_suggest import vocab as V  # noqa: E402
-from hydor_suggest.model import SLM, SLMConfig, config_to_dict, state_for_save  # noqa: E402
+from hydor_suggest.config import SLMConfig, config_to_dict  # noqa: E402
+
+try:                                 # the suggestion path needs no torch: only the training and the model.py comparisons do
+    import torch  # noqa: E402
+    torch.set_num_threads(2)
+except ImportError:
+    torch = None
 
 ENGLISH = ['the quick brown fox jumps over the lazy dog', 'hello world how are you today', 'this is a test of the word suggestions',
            'we are writing a message to the assistant about the project', 'could you please fix the bug in the parser',
@@ -40,6 +43,48 @@ def make_tokenizer():
     return tok
 
 
+def random_weights(cfg, seed=0):
+    """Random weights for a configuration, by the names of model.py's state_dict (a release's model.safetensors has these), no torch."""
+    rng = np.random.default_rng(seed)
+    d, hd = cfg.d, cfg.head_dim
+    lin = lambda out, inn, std=0.08: (rng.standard_normal((out, inn)) * std).astype(np.float32)
+    norm = lambda n: (1.0 + 0.1 * rng.standard_normal(n)).astype(np.float32)
+    w = {}
+    for i, kind in enumerate(cfg.layer_types()):
+        p = f'blocks.{i}.'
+        if kind == 'c':
+            w[p + 'mixer.in_proj.weight'] = lin(3 * d, d)
+            w[p + 'mixer.conv'] = (rng.standard_normal((cfg.kernel, d)) / np.sqrt(cfg.kernel)).astype(np.float32)
+            w[p + 'mixer.out_proj.weight'] = lin(d, d)
+        else:
+            w[p + 'mixer.q_proj.weight'] = lin(cfg.heads * hd, d)
+            w[p + 'mixer.k_proj.weight'] = lin(cfg.kv_heads * hd, d)
+            w[p + 'mixer.v_proj.weight'] = lin(cfg.kv_heads * hd, d)
+            w[p + 'mixer.o_proj.weight'] = lin(d, cfg.heads * hd)
+            if cfg.qk_norm:
+                w[p + 'mixer.q_norm.weight'], w[p + 'mixer.k_norm.weight'] = norm(hd), norm(hd)
+        w[p + 'mlp.gate.weight'], w[p + 'mlp.up.weight'], w[p + 'mlp.down.weight'] = lin(cfg.ffn, d), lin(cfg.ffn, d), lin(d, cfg.ffn)
+        w[p + 'n1.weight'], w[p + 'n2.weight'] = norm(d), norm(d)
+        if cfg.sandwich:
+            w[p + 'p1.weight'], w[p + 'p2.weight'] = norm(d), norm(d)
+    w['embed.weight'] = lin(cfg.vocab, cfg.emb_rank or d, 0.5)
+    if cfg.emb_rank:
+        w['emb_proj.weight'] = lin(d, cfg.emb_rank)
+    w['norm.weight'] = norm(d)
+    return w
+
+
+def save_weights(path, weights):
+    from safetensors.numpy import save_file
+    save_file(weights, path)
+
+
+def write_graph(folder, cfg):
+    """The ONNX graph of a configuration into a release folder (the worker uses the one beside the weights before its own)."""
+    from hydor_suggest.graph import build, write
+    write(build(cfg), os.path.join(folder, 'slm.onnx'))
+
+
 def write_json(path, obj):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(obj, f)
@@ -52,10 +97,8 @@ def make_release(folder, llm_pad=4, seed=0, with_lid=True, with_replay=True, d=3
     tok.save(os.path.join(folder, 'tokenizer.json'))
     Vq = tok.get_vocab_size() + llm_pad
     cfg = SLMConfig(arch='lfm', vocab=Vq + V.NSPEC, d=d, n_layers=4, ffn=64, heads=4, kv_heads=2, kernel=3, emb_rank=16, max_len=512)
-    torch.manual_seed(seed)
-    model = SLM(cfg)
-    from safetensors.torch import save_file
-    save_file(state_for_save(model), os.path.join(folder, 'model.safetensors'))
+    save_weights(os.path.join(folder, 'model.safetensors'), random_weights(cfg, seed))
+    write_graph(folder, cfg)
     config = {'format': 'hydor-suggest/1', 'slm': config_to_dict(cfg), 'specials': V.SPECIALS, 'llm_vocab': Vq, 'max_ctx_tokens': 256,
               'llm': {'repo': 'tiny', 'gguf_repo': 'tiny'}}
     write_json(os.path.join(folder, 'config.json'), config)

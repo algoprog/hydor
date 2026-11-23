@@ -4,7 +4,6 @@ import unittest
 
 import helpers
 import numpy as np
-import torch
 
 from hydor_suggest import vocab as V
 from hydor_suggest.cache import CacheFit
@@ -152,9 +151,9 @@ class EngineTests(unittest.TestCase):
         ref = Engine()
         ref.load(self.release, None, None, 2)
         ref.runner.prepare(ids)
-        fin = torch.isfinite(e.runner.base_row)
-        self.assertTrue(torch.equal(fin, torch.isfinite(ref.runner.base_row)))
-        self.assertLess(float((ref.runner.base_row[fin] - e.runner.base_row[fin]).abs().max()), 1e-4)
+        fin = np.isfinite(e.runner.base_row)
+        self.assertTrue(np.array_equal(fin, np.isfinite(ref.runner.base_row)))
+        self.assertLess(float(np.abs(ref.runner.base_row[fin] - e.runner.base_row[fin]).max()), 1e-4)
         # a context that is not an extension starts again
         e.suggest({**req, 'text': 'hello world how are you today a'})
         self.assertGreater(e.runner.fed - before - grown, 5)
@@ -410,14 +409,11 @@ class EngineTests(unittest.TestCase):
 
     # ---- the personal model -------------------------------------------------------------------------------------------------
     def write_personal(self, folder, languages, break_it=False):
-        from safetensors.torch import save_file
-        from hydor_suggest.model import SLM, config_from_dict, state_for_save
-        torch.manual_seed(5)
-        m = SLM(config_from_dict(self.config['slm']))
-        sd = state_for_save(m)
+        from hydor_suggest.config import config_from_dict
+        sd = helpers.random_weights(config_from_dict(self.config['slm']), seed=5)
         if break_it:
             del sd['emb_proj.weight']
-        save_file(sd, os.path.join(folder, 'model.safetensors'))
+        helpers.save_weights(os.path.join(folder, 'model.safetensors'), sd)
         helpers.write_json(os.path.join(folder, 'config.json'), self.config)
         helpers.write_json(os.path.join(folder, 'meta.json'), {'trained_at': 1, 'tokens': 5000, 'languages': languages, 'dev_nll': 5.0})
 
