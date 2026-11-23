@@ -291,16 +291,16 @@ export function MoreMenu({ label = 'More', children, width = 260 }: { label?: st
   );
 }
 
-/** A number set with − and + (how many at once, how big a team). */
-export function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (n: number) => void; label: string }) {
+/** A number set with − and + (how many at once, how big a team); `step` for a wide range, `format` for a value that reads as a word (0 as "Automatic"). */
+export function Stepper({ value, min, max, onChange, label, step = 1, format }: { value: number; min: number; max: number; onChange: (n: number) => void; label: string; step?: number; format?: (n: number) => string }) {
   const btn = 'flex h-8 w-8 items-center justify-center text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg disabled:opacity-40';
   return (
     <div role="group" aria-label={label} className="inline-flex h-8 items-center overflow-hidden rounded-lg bg-bg-2 ring-1 ring-line-2 ring-inset">
-      <button type="button" aria-label={`Fewer: ${label}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className={btn}>
+      <button type="button" aria-label={`Fewer: ${label}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} className={btn}>
         −
       </button>
-      <span className="tnum w-8 text-center text-[13.5px] font-medium text-fg">{value}</span>
-      <button type="button" aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className={btn}>
+      <span className={cx('tnum text-center text-[13.5px] font-medium text-fg', format ? 'min-w-8 px-1.5' : 'w-8')}>{format ? format(value) : value}</span>
+      <button type="button" aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} className={btn}>
         +
       </button>
     </div>

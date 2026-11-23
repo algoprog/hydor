@@ -39,6 +39,7 @@ import { shotsFeature } from './shots/feature';
 import { signaturesFeature } from './signatures/feature';
 import { skillpackFeature } from './skillpack/feature';
 import { spacesFeature } from './spaces/feature';
+import { suggestFeature } from './suggest/feature';
 import { swarmFeature } from './swarm/feature';
 import { voiceFeature } from './voice/feature';
 
@@ -160,6 +161,7 @@ export const features = (): WebFeature[] =>
     automationsFeature,
     experimentsFeature,
     voiceFeature,
+    suggestFeature,
     assistantsFeature,
     appsFeature,
     answersFeature,
