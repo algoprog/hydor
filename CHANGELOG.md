@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.108.0 · 23 November 2026
+
+Every document an agent makes opens beside the conversation as it is written, files included, with a button that shows it
+full screen.
+
+- **Any document, beside the conversation**: on a wide screen, the first page or document a turn makes or changes opens
+  in the panel beside the conversation, whether you asked for it or the agent made it on its own. That now goes for
+  files too (Markdown, Word, Excel, PowerPoint, PDF, LaTeX, CSV and notebooks), and a notebook an agent saves has its
+  card in the conversation, as documents and slides have.
+- **Written before your eyes**: a Markdown, LaTeX or CSV file shows as the agent writes it, word by word. Any other file
+  shows once it is there, and every later change the agent makes lands in the panel as it is made.
+- **Full screen, and back**: **Full screen** in the panel's top line shows the page, document or file over the whole app,
+  and **Show beside the conversation** puts it back.
+- **Several documents, no panel**: when a turn makes or changes more than one, the panel goes back to what it showed
+  before and each document waits behind its card in the conversation. A document in several forms (a report's Markdown
+  and the PDF made from it, a kept document and the file exported from it) counts as one.
+- **From its card**: a file's card has **Open beside the conversation**, and is outlined while its file shows there. The
+  switch in the panel's menu is now **Open documents here as they are written**.
+
 ## 0.107.0 · 23 November 2026
 
 Word suggestions that run about three times faster with less to download, and that learn from your writing about four
