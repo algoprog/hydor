@@ -54,7 +54,7 @@ export const SECTION_TOPIC: Record<string, string> = {
   computer: 'web',
   memory: 'memory',
   children: 'research',
-  goals: 'sessions',
+  goals: 'goals',
   images: 'documents-voice',
   voice: 'documents-voice',
   suggest: 'documents-voice',

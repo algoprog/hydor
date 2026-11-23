@@ -272,7 +272,7 @@
 
 ### 目标
 
-[设置 → 目标](/settings?s=goals)：新目标的起始设置：轮数、向你询问的频率，以及何时按它自己的选择继续。详见[会话](/guide/sessions)。
+[设置 → 目标](/settings?s=goals)：新目标的起始设置：轮数、向你询问的频率，以及何时按它自己的选择继续。详见[目标](/guide/goals)。
 
 - [**目标最多可运行的轮数**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run)：新目标在达到上限而停止前可运行的轮数，除非智能体提议更少，或你在认可时修改。
 - [**目标向你询问的频率**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you)：新目标是自行推进、在转折点询问，还是每一轮都询问。

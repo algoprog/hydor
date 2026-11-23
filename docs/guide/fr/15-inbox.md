@@ -115,7 +115,7 @@ Le titre d’une notification est le nom de la session (abrégé s’il est long
   - pour un appel retenu dans la Boîte d’envoi, « Attend votre accord dans la Boîte d’envoi : », le compte et l’outil, et le destinataire. Toucher la notification ouvre la Boîte de réception.
 - **Échec**, puis l’erreur.
 
-Une session qui travaille sur un objectif envoie une seule notification pour chaque chose qui a besoin de vous ou qui y met fin, au lieu d’une notification « Terminées » après chaque tour ([Donner un objectif à la session](/guide/sessions#give-the-session-a-goal)). Les notifications « Terminées » ne sont retenues que pendant que l’objectif est en cours de travail, pas pendant qu’il vous attend :
+Une session qui travaille sur un objectif envoie une seule notification pour chaque chose qui a besoin de vous ou qui y met fin, au lieu d’une notification « Terminées » après chaque tour ([Objectifs](/guide/goals)). Les notifications « Terminées » ne sont retenues que pendant que l’objectif est en cours de travail, pas pendant qu’il vous attend :
 
 - « Les vérifications de l’objectif sont prêtes pour vous », quand l’agent a proposé les vérifications et attend votre clic sur **Début**, et « Une vérification n’a pas pu s’exécuter : … », avec laquelle et pourquoi, quand le clic sur **Début** a trouvé une vérification impossible à exécuter ;
 - la question de l’agent, quand il demande dans quelle direction continuer ; « L’objectif a besoin de vous : … », quand il est bloqué par quelque chose que vous seul pouvez fournir ; et « L’objectif a besoin de vous : “ … ” est-il respecté ? », pour une vérification que vous seul pouvez confirmer ;

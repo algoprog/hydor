@@ -15,7 +15,7 @@ Um agente é o programa que faz o trabalho em uma sessão: ele lê sua mensagem,
 
 O que cada um pode fazer no app:
 
-- Objetivos (o app mantém o agente trabalhando, rodada após rodada, até que as verificações combinadas sejam atendidas; veja [Dê um objetivo à sessão](/guide/sessions#give-the-session-a-goal)): todos os agentes, Claude Code, Codex, Custom e os outros agentes ACP. Um `/goal` digitado em um chat do Claude Code ou do Codex é o objetivo, mais simples, do próprio programa. Forks (uma cópia da sessão a partir de uma resposta anterior): Claude Code, Codex e Custom. Os outros agentes ACP, não.
+- Objetivos (o app mantém o agente trabalhando, rodada após rodada, até que as verificações combinadas sejam atendidas; veja [Objetivos](/guide/goals)): todos os agentes, Claude Code, Codex, Custom e os outros agentes ACP. Um `/goal` digitado em um chat do Claude Code ou do Codex é o objetivo, mais simples, do próprio programa. Forks (uma cópia da sessão a partir de uma resposta anterior): Claude Code, Codex e Custom. Os outros agentes ACP, não.
 - **Continuar em…** (passar a conversa para outro agente): do Claude Code ou do Codex, para o outro ou para o Custom.
 - Esforço (o quanto o modelo pensa): Claude Code, Codex e Grok Build, e qualquer outro agente ACP cujos modelos ofereçam isso.
 - Mais de uma conta, limites de uso do plano e troca de conta ao atingir um limite: Claude Code, Codex e Grok Build.

@@ -272,7 +272,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Goals
 
-[Settings → Goals](/settings?s=goals): what a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick. More in [Sessions](/guide/sessions).
+[Settings → Goals](/settings?s=goals): what a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick. More in [Goals](/guide/goals).
 
 - [**Rounds a goal may run**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run): How many rounds a new goal gets before it stops at its limit, unless the agent proposes fewer or you change it when you agree.
 - [**How much a goal asks you**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you): Whether a new goal works on its own, asks at turning points or asks every round.

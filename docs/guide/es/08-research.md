@@ -144,7 +144,7 @@ También puedes activar o desactivar un enjambre, o cambiarlo a una campaña, de
 
 Un miembro que termina su ángulo envía su informe al responsable. Un mensaje para un miembro que no está trabajando lo despierta.
 
-**Un enjambre con un objetivo**: una sesión que dirige un enjambre puede tener un objetivo que la app comprueba. Cada ronda es entonces el trabajo de todo el enjambre, y la app, no el responsable, decide cuándo está hecho. Consulta [Un objetivo para un enjambre](/guide/sessions#a-goal-for-a-swarm).
+**Un enjambre con un objetivo**: una sesión que dirige un enjambre puede tener un objetivo que la app comprueba. Cada ronda es entonces el trabajo de todo el enjambre, y la app, no el responsable, decide cuándo está hecho. Consulta [Un objetivo para un enjambre](/guide/goals#a-goal-for-a-swarm).
 
 ### Seguimiento: la barra y el tablero
 

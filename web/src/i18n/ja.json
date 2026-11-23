@@ -25754,5 +25754,6 @@
   "Stop learning?": "学習を停止しますか？",
   "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "NVIDIAのカードでは初回にPyTorchをダウンロードします（約2.5 GB）。使用中のカードや空きが4 GB未満のカード、失敗したカードは使わず、その場合はプロセッサで学習を続け、カードは1日後にもう一度試します。",
   "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "この実行でこれまでに学習した内容は破棄されます。今あるモデルはそのまま残り、次の実行は通常の時刻に始まります。",
-  "Why not the graphics card:": "グラフィックスカードを使わない理由："
+  "Why not the graphics card:": "グラフィックスカードを使わない理由：",
+  "Agents work round after round until checks you agree hold": "合意したチェックが成立するまで、エージェントがラウンドを重ねて作業します"
 }

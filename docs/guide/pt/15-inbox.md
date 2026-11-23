@@ -115,7 +115,7 @@ O título de uma notificação é o nome da sessão (abreviado quando é longo).
   - para uma chamada retida na Caixa de saída, “Aguarda seu OK na Caixa de saída:”, a conta e a ferramenta, e para quem vai. Tocar nela abre a caixa de entrada.
 - **Falhou**, seguido do erro.
 
-Uma sessão que trabalha em um objetivo envia um aviso para cada coisa que precisa de você ou que a encerra, em vez de um “Concluídas” após cada rodada ([Dar um objetivo à sessão](/guide/sessions#give-the-session-a-goal)). Os avisos “Concluídas” só são retidos enquanto o objetivo está em andamento, não enquanto ele espera por você:
+Uma sessão que trabalha em um objetivo envia um aviso para cada coisa que precisa de você ou que a encerra, em vez de um “Concluídas” após cada rodada ([Objetivos](/guide/goals)). Os avisos “Concluídas” só são retidos enquanto o objetivo está em andamento, não enquanto ele espera por você:
 
 - “As verificações do objetivo estão prontas para você”, quando o agente propôs as verificações e espera que você toque em **Início**, e “Uma verificação não pôde ser executada: …”, com qual e por quê, quando ao tocar em **Início** foi encontrada uma verificação que não pode ser executada;
 - a pergunta do agente, quando ele pergunta qual caminho seguir; “O objetivo precisa de você: …”, quando ele está travado em algo que só você pode dar; e “O objetivo precisa de você: “…” é verdadeiro?”, para uma verificação que só você pode confirmar;

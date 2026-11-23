@@ -133,7 +133,7 @@ In a [confidential session](/guide/sessions#keep-a-session-confidential) every c
 
 ## Give Custom a goal
 
-Custom has the same goals as every other agent: the app's own loop drives it, round after round, until checks you agree hold. Open the session's menu (⋯) → **Set a goal**, or turn on **Options** → **Goal** on the start page, and the agent proposes the checks for you to agree. Each round the app runs the checks itself, keeps the round or undoes it (in a worktree), asks you which way to go at turning points, and stops when every check holds, you stop it, or a limit is reached. The whole story, with the screens, is in [Give the session a goal](/guide/sessions#give-the-session-a-goal).
+Custom has the same goals as every other agent: the app's own loop drives it, round after round, until checks you agree hold. Open the session's menu (⋯) → **Set a goal**, or turn on **Options** → **Goal** on the start page, and the agent proposes the checks for you to agree. Each round the app runs the checks itself, keeps the round or undoes it (in a worktree), asks you which way to go at turning points, and stops when every check holds, you stop it, or a limit is reached. The whole story, with the screens, is in [Goals](/guide/goals).
 
 What is the same for every agent now: the agreement card, the checks, the rounds list, the questions, your rules and **Your say**, and the report. Typing `/goal` in a Custom session does nothing special any more: it is plain text. Two things are about Custom:
 

@@ -115,7 +115,7 @@ El título de una notificación es el nombre de la sesión (se acorta si es larg
   - para una llamada retenida en la Bandeja de salida, “Espera tu visto bueno en la Bandeja de salida:”, la cuenta y la herramienta, y a quién va dirigida. Al tocarla se abre la bandeja de entrada.
 - **Fallido**, y luego el error.
 
-Una sesión que trabaja en un objetivo envía un aviso por cada cosa que te necesita o que le pone fin, en lugar de un “Terminadas” después de cada ronda ([Dale un objetivo a la sesión](/guide/sessions#give-the-session-a-goal)). Los avisos de “Terminadas” solo se retienen mientras el objetivo está en marcha, no mientras te espera a ti:
+Una sesión que trabaja en un objetivo envía un aviso por cada cosa que te necesita o que le pone fin, en lugar de un “Terminadas” después de cada ronda ([Objetivos](/guide/goals)). Los avisos de “Terminadas” solo se retienen mientras el objetivo está en marcha, no mientras te espera a ti:
 
 - “Las comprobaciones del objetivo están listas para ti”, cuando el agente ha propuesto las comprobaciones y espera tu **Inicio**, y “Una comprobación no se pudo ejecutar: …”, con cuál y por qué, cuando al pulsar **Inicio** se encontró una comprobación que no puede ejecutarse;
 - la pregunta del agente, cuando pregunta por qué camino seguir; “El objetivo te necesita: …”, cuando está bloqueado por algo que solo tú puedes dar; y “El objetivo te necesita: ¿se cumple ‘…’?”, para una comprobación que solo tú puedes confirmar;

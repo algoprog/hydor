@@ -272,7 +272,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Ziele
 
-[Einstellungen → Ziele](/settings?s=goals): Wovon ein neues Ziel ausgeht: seine Runden, wie viel es dich fragt und wann es mit der eigenen Wahl weitermacht. Mehr dazu unter [Sitzungen](/guide/sessions).
+[Einstellungen → Ziele](/settings?s=goals): Wovon ein neues Ziel ausgeht: seine Runden, wie viel es dich fragt und wann es mit der eigenen Wahl weitermacht. Mehr dazu unter [Ziele](/guide/goals).
 
 - [**Runden, die ein Ziel laufen darf**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run): Wie viele Runden ein neues Ziel bekommt, bevor es an seinem Limit anhält, es sei denn, der Agent schlägt weniger vor oder du änderst es, wenn du zustimmst.
 - [**Wie viel ein Ziel dich fragt**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you): Ob ein neues Ziel eigenständig arbeitet, an Wendepunkten nachfragt oder in jeder Runde nachfragt.

@@ -15,7 +15,7 @@ Hydor 可以运行多种 AI 智能体：Claude Code、Codex、Custom（应用自
 
 各智能体在应用中能做什么：
 
-- 目标（应用会让智能体一轮接一轮地持续工作，直到你认可的检查全部通过；参见[给会话设定目标](/guide/sessions#give-the-session-a-goal)）：所有智能体都支持，包括 Claude Code、Codex、Custom 和其他 ACP 智能体。在 Claude Code 或 Codex 的对话中输入 `/goal`，用的是该程序自己的、更简单的目标功能。分叉（从较早的某条回复处复制出会话的副本）：Claude Code、Codex 和 Custom 支持，其他 ACP 智能体不支持。
+- 目标（应用会让智能体一轮接一轮地持续工作，直到你认可的检查全部通过；参见[目标](/guide/goals)）：所有智能体都支持，包括 Claude Code、Codex、Custom 和其他 ACP 智能体。在 Claude Code 或 Codex 的对话中输入 `/goal`，用的是该程序自己的、更简单的目标功能。分叉（从较早的某条回复处复制出会话的副本）：Claude Code、Codex 和 Custom 支持，其他 ACP 智能体不支持。
 - **转到…**（把对话交给另一个智能体）：从 Claude Code 或 Codex 转到另一个，或转到 Custom。
 - 思考强度（模型思考得多用力）：Claude Code、Codex 和 Grok Build 支持，其他模型提供该选项的 ACP 智能体也支持。
 - 多账户、套餐用量限制，以及达到限制时切换账户：Claude Code、Codex 和 Grok Build 支持。

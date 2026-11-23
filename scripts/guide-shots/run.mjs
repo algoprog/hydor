@@ -162,7 +162,7 @@ const pageScript = (theme, live) => `
         if (e.t === 'usage' || e.t === 'models') return;
         if (e.t === 'live' && LIVE[e.key]) return;
         if (e.t === 'sessions' && e.upsert) {
-          e.upsert = e.upsert.map((x) => (LIVE[x.key] ? { ...x, live: LIVE[x.key].live } : x));
+          e.upsert = e.upsert.map((x) => (LIVE[x.key] ? { ...x, live: LIVE[x.key].live, ...(LIVE[x.key].goal ? { goal: LIVE[x.key].goal } : {}) } : x));
           return fn.call(this, new MessageEvent('message', { data: JSON.stringify(e) }));
         }
         return fn.call(this, ev);
@@ -228,7 +228,7 @@ async function main() {
       await p.timezone('America/New_York');
       await p.cookie('wa_session', cookie, base);
       // Made afresh for each picture, so a card has waited seconds, not the minutes the run takes.
-      const fake = overrides(sessions, Date.now());
+      const fake = overrides(sessions, Date.now(), shot.goal);
       await p.initScript(pageScript(theme, fake.live));
       if (LIST?.desktop && !shot.phone) await p.initScript(DESKTOP);
       await route(p, api, fake);
@@ -248,9 +248,11 @@ async function main() {
 /** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox (and what waits on you
  * in While you were away), Settings → Models and the models it suggests, and Experiments' GPUs. */
 async function route(p, api, fake) {
-  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
+  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|goals\/[^/?]+|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
+    // A goal at work (the Goals picture): the session's goal, as the loop would give it.
+    if (u.pathname.startsWith('/api/goals/')) return fake.goal && decodeURIComponent(u.pathname.slice('/api/goals/'.length)) === fake.goal.key ? { json: { goal: fake.goal.state } } : null;
     if (u.pathname === '/api/models') return { json: fake.models(await api('GET', u.pathname)) };
     if (u.pathname === '/api/models/picks') return { json: { picks: fake.picks } };
     if (u.pathname === '/api/catalog/claude') return { json: { ...(await api('GET', u.pathname)), models: CATALOG.claude } };
@@ -263,13 +265,13 @@ async function route(p, api, fake) {
     }
     if (u.pathname === '/api/sessions') {
       const list = await api('GET', u.pathname + u.search);
-      const patch = (x) => (fake.live[x.key] ? { ...x, live: fake.live[x.key].live } : x);
+      const patch = (x) => (fake.live[x.key] ? { ...x, live: fake.live[x.key].live, ...(fake.live[x.key].goal ? { goal: fake.live[x.key].goal } : {}) } : x);
       return { json: Array.isArray(list) ? list.map(patch) : { ...list, sessions: list.sessions.map(patch) } };
     }
     const key = decodeURIComponent(u.pathname.slice('/api/sessions/'.length));
     if (!fake.live[key]) return null;
     const r = await api('GET', u.pathname);
-    return { json: { ...r, summary: r.summary && { ...r.summary, live: fake.live[key].live }, live: fake.live[key].live, overlay: fake.live[key].overlay } };
+    return { json: { ...r, summary: r.summary && { ...r.summary, live: fake.live[key].live, ...(fake.live[key].goal ? { goal: fake.live[key].goal } : {}) }, live: fake.live[key].live, overlay: fake.live[key].overlay } };
   });
 }
 

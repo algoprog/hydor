@@ -13,6 +13,7 @@ The guide is also in [German (Deutsch)](de/), [Spanish (Español)](es/), [French
 - [Wiki memory](28-wiki-memory.md)
 - [Search and the browser](07-web.md)
 - [Deep research, second opinions and several agents](08-research.md)
+- [Goals](29-goals.md)
 - [Documents, images, videos and voice](09-documents-voice.md)
 - [Apps](10-apps.md)
 - [Pages, documents and pictures](11-library.md)

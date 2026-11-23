@@ -115,7 +115,7 @@ A notification's title is the session's name (cut short when it is long). Its te
   - for a call held in the Outbox, "Waits for your OK in the Outbox:", the account and tool, and who it goes to. Tapping it opens the inbox.
 - **Failed**, then the error.
 
-A session working on a goal sends one notice for each thing that needs you or ends it, in place of a "Finished" after every round ([Give the session a goal](/guide/sessions#give-the-session-a-goal)). "Finished" notices are held back only while the goal is at work, not while it waits for you:
+A session working on a goal sends one notice for each thing that needs you or ends it, in place of a "Finished" after every round ([Goals](/guide/goals)). "Finished" notices are held back only while the goal is at work, not while it waits for you:
 
 - "The goal's checks are ready for you", when the agent has proposed the checks and waits for your **Start**, and "A check could not run: …", with which one and why, when pressing **Start** found a check that cannot run;
 - the agent's question, when it asks which way to go next; "The goal needs you: …", when it is blocked on something only you can give; and "The goal needs you: does "…" hold?", for a check only you can confirm;

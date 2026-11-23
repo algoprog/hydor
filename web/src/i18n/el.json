@@ -27613,5 +27613,6 @@
   "Stop learning?": "Διακοπή της εκμάθησης;",
   "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "Την πρώτη φορά σε κάρτα NVIDIA, κατεβάζει το PyTorch για αυτήν (περίπου 2,5 GB). Μια κάρτα που είναι απασχολημένη ή έχει λιγότερα από 4 GB ελεύθερα αφήνεται ήσυχη, όπως και μια που αποτυγχάνει: η εκμάθηση συνεχίζεται τότε στον επεξεργαστή, και η κάρτα δοκιμάζεται ξανά μία μέρα αργότερα.",
   "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "Ό,τι έμαθε μέχρι τώρα αυτή η εκτέλεση απορρίπτεται· το μοντέλο που έχετε τώρα παραμένει, και η επόμενη εκτέλεση ξεκινά στη συνηθισμένη της ώρα.",
-  "Why not the graphics card:": "Γιατί όχι η κάρτα γραφικών:"
+  "Why not the graphics card:": "Γιατί όχι η κάρτα γραφικών:",
+  "Agents work round after round until checks you agree hold": "Οι πράκτορες εργάζονται γύρο με γύρο μέχρι να ισχύσουν οι έλεγχοι που συμφωνείτε"
 }

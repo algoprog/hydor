@@ -25754,5 +25754,6 @@
   "Stop learning?": "¿Detener el aprendizaje?",
   "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "La primera vez en una tarjeta NVIDIA, descarga PyTorch para ella (unos 2,5 GB). Una tarjeta ocupada o con menos de 4 GB libres se deja en paz, y también una que falla: el aprendizaje sigue entonces en el procesador, y la tarjeta se prueba de nuevo un día después.",
   "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "Lo que esta ejecución aprendió hasta ahora se descarta; el modelo que tienes ahora se queda, y la siguiente ejecución empieza a su hora habitual.",
-  "Why not the graphics card:": "Por qué no la tarjeta gráfica:"
+  "Why not the graphics card:": "Por qué no la tarjeta gráfica:",
+  "Agents work round after round until checks you agree hold": "Los agentes trabajan ronda tras ronda hasta que se cumplen las comprobaciones que acuerdas"
 }

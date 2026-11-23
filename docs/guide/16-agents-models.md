@@ -15,7 +15,7 @@ An agent is the program that does the work in a session: it reads your message, 
 
 What each can do in the app:
 
-- Goals (the app keeps the agent working, round after round, until checks you agree hold; see [Give the session a goal](/guide/sessions#give-the-session-a-goal)): every agent, Claude Code, Codex, Custom and the other ACP agents. A `/goal` typed in a Claude Code or Codex chat is that program's own, simpler goal. Forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
+- Goals (the app keeps the agent working, round after round, until checks you agree hold; see [Goals](/guide/goals)): every agent, Claude Code, Codex, Custom and the other ACP agents. A `/goal` typed in a Claude Code or Codex chat is that program's own, simpler goal. Forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
 - **Continue in…** (hand the conversation to another agent): from Claude Code or Codex, to the other one or to Custom.
 - Effort (how hard the model thinks): Claude Code, Codex and Grok Build, and any other ACP agent whose models offer it.
 - More than one account, plan usage limits and switching accounts at a limit: Claude Code, Codex and Grok Build.

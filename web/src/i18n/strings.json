@@ -3629,6 +3629,7 @@
 "Agents use these by name and never see a value: in requests and sign-ins on the hosts you allow, and in commands where you allow it.":"web/src/features/connections/Keys.tsx",
 "Agents using it lose access at once.":"web/src/features/settings/ConnectSettings.tsx",
 "Agents won’t run it in your sessions":"web/src/features/apps/About.tsx",
+"Agents work round after round until checks you agree hold":"web/src/features/guide/topics.ts",
 "Agents you already use, such as Gemini CLI or Goose, work here too. The app installs those it knows; each asks you to sign in once.":"web/src/features/tour/Tour.tsx",
 "Agents, accounts and models":"docs/guide/16-agents-models.md",
 "ago":"web/src/features/apps/AppPage.tsx",

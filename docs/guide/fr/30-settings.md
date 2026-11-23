@@ -272,7 +272,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 ### Objectifs
 
-[Paramètres → Objectifs](/settings?s=goals) : point de départ d’un nouvel objectif : ses tours, la fréquence de ses questions et le moment où il poursuit avec son propre choix. Pour en savoir plus : [Sessions](/guide/sessions).
+[Paramètres → Objectifs](/settings?s=goals) : point de départ d’un nouvel objectif : ses tours, la fréquence de ses questions et le moment où il poursuit avec son propre choix. Pour en savoir plus : [Objectifs](/guide/goals).
 
 - [**Tours qu’un objectif peut exécuter**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run) : Nombre de tours accordés à un nouvel objectif avant qu’il s’arrête à sa limite, sauf si l’agent en propose moins ou si vous le modifiez en l’approuvant.
 - [**Fréquence des questions posées par un objectif**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you) : Indique si un nouvel objectif travaille seul, vous demande votre avis aux tournants ou à chaque tour.

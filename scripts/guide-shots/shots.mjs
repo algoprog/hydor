@@ -85,6 +85,7 @@ const sessionShot = (id, name, o = {}) => ({
   async take(p, ctx) {
     await ctx.go(session(ctx, name), { settle: 2000 });
     for (const t of o.unfold ?? []) await p.click(button(t), { wait: 700 });
+    if (o.rounds) await p.click(button('Rounds'), { wait: 700 });
     await p.park();
     await sleep(500);
     return p.shot(ctx.file, { clip: await main(p) });
@@ -139,6 +140,8 @@ export const SHOTS = [
     },
   },
   sessionShot('sessions', 'checkout'),
+  // The same session with a goal at work (overrides in demo.mjs answers the page with it): its bar above the message box.
+  { ...sessionShot('goals', 'checkout', { rounds: true }), goal: 'working' },
   sessionShot('ask-agents', 'settings', { unfold: ['Read 2'] }),
   sessionShot('web', 'ebike', { height: 1000, unfold: ['Worked for', 'Look for recent reviews'] }),
   sessionShot('documents-voice', 'report', { unfold: ['Worked for', 'Read the report first'] }),

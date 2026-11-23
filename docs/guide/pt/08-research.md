@@ -144,7 +144,7 @@ Você também pode ativar ou desativar um enxame, ou mudá-lo para uma campanha,
 
 Um membro que termina seu ângulo envia seu relatório ao líder. Uma mensagem para um membro que não está trabalhando o acorda.
 
-**Um enxame com um objetivo**: uma sessão que lidera um enxame pode ter um objetivo que o app verifica. Cada rodada passa a ser o trabalho do enxame inteiro, e o app, não o líder, decide quando está pronto. Veja [Um objetivo para um enxame](/guide/sessions#a-goal-for-a-swarm).
+**Um enxame com um objetivo**: uma sessão que lidera um enxame pode ter um objetivo que o app verifica. Cada rodada passa a ser o trabalho do enxame inteiro, e o app, não o líder, decide quando está pronto. Veja [Um objetivo para um enxame](/guide/goals#a-goal-for-a-swarm).
 
 ### Acompanhar: a barra e o painel
 

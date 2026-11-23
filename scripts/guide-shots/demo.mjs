@@ -1001,10 +1001,74 @@ export function wikiData(db, spaces, now) {
   for (const [document, file, at, articles, notes, error] of rows) add.run(spaces.thesis, 'demo', document, file, at, JSON.stringify(articles), notes, error);
 }
 
+// ---- a goal at work (the Goals picture) ----------------------------------------------------------------
+
+/**
+ * The checkout session's goal as the app's own loop keeps it (shared/goals.ts): tests and types hold, the coverage and the
+ * reviewer's claim do not yet; round 5 of 12 runs after three rounds kept and one undone.
+ */
+function goalDemo(c, now) {
+  const t0 = now - 52 * MIN;
+  const checks = [
+    { id: 'c1', kind: 'command', label: 'Tests pass', run: 'npm test' },
+    { id: 'c2', kind: 'command', label: 'Types check', run: 'npm run typecheck' },
+    { id: 'c3', kind: 'measure', label: 'Coverage: checkout at least 90%', run: 'npm run coverage:checkout', target: { op: '>=', value: 90 }, unit: '%' },
+    { id: 'c4', kind: 'review', label: 'Expired cards: checkout handles them', claim: 'Checkout handles expired cards: the customer sees a clear message and the order is not placed', evidence: { diff: true } },
+  ];
+  const res = (cov, o = {}) => {
+    const tests = o.tests !== false;
+    const review = !!o.review;
+    return [
+      { id: 'c1', holds: tests, closeness: tests ? 1 : 0, ms: 12_000, ...(tests ? {} : { detail: 'FAIL src/checkout/total.test.ts › rounds once\nTests: 1 failed, 38 passed, 39 total' }) },
+      { id: 'c2', holds: true, closeness: 1, ms: 6_000 },
+      { id: 'c3', holds: cov >= 90, value: cov, closeness: cov >= 90 ? 1 : Math.max(0, Math.min(0.99, (cov - 71) / (90 - 71))), ms: 15_000 },
+      { id: 'c4', holds: review, closeness: review ? 1 : 0, ms: 4_000, detail: review ? 'An expired card now stops the order with a message.' : 'Nothing in the diff stops an order with an expired card.' },
+    ];
+  };
+  const score = (r) => r.reduce((a, x) => a + x.closeness, 0) / r.length;
+  const round = (n, at, took, cov, o) => {
+    const results = res(cov, o);
+    return { n, startedAt: t0 + (at - took) * MIN, endedAt: t0 + at * MIN, results, score: score(results), outcome: 'kept', usd: 0.4, ...o.rest };
+  };
+  const rounds = [
+    round(0, 2, 2, 71, { tests: false, rest: { outcome: 'start', usd: 0.05 } }),
+    round(1, 11, 9, 78, { rest: { way: 'Fix the discount maths first', did: 'Applied the discount before tax and rounded once.', usd: 0.52 } }),
+    round(2, 21, 10, 83, { rest: { way: 'Test the card form’s edge cases', did: 'Added tests for a card that expires this month and for a wrong card number.', usd: 0.47 } }),
+    round(3, 32, 11, 79, { tests: false, rest: { way: 'Move the card checks into one place', did: 'Moved the card checks into a single function.', outcome: 'undone', cause: 'broke', why: 'A check that held (Tests pass) stopped holding.', usd: 0.58 } }),
+    round(4, 42, 10, 84, { rest: { way: 'Reject an expired card before the order is placed', did: 'Stopped the order when the card has expired, with a message that names the month.', usd: 0.44 } }),
+  ];
+  const state = {
+    key: c.key,
+    id: 'goal-checkout',
+    status: 'working',
+    contract: {
+      objective: 'npm test passes and checkout handles expired cards.',
+      title: 'Checkout tests pass and expired cards are handled.',
+      checks,
+      protect: ['src/checkout/total.test.ts', 'fixtures/'],
+      limits: { rounds: 12, usd: 8, minutes: 90 },
+    },
+    settings: { asks: 'forks', noAnswerMin: 10 },
+    rounds,
+    best: 4,
+    round: 5,
+    undo: true,
+    rules: [{ id: 'r1', text: 'No new dependencies', at: now - 30 * MIN }],
+    next: [],
+    dropped: [],
+    startedAt: t0,
+    spentUsd: 2.06,
+    activeMs: 41 * MIN,
+  };
+  const holds = res(84, {}).filter((r) => r.holds).length;
+  const summary = { objective: state.contract.objective, status: 'active', app: { state: state.status, round: state.round, rounds: 12, holds, of: checks.length } };
+  return { state, summary };
+}
+
 // ---- answered to the page ---------------------------------------------------------------------------
 
 /** What the server can't show without a real agent or account: live states, cards, plan limits, the inbox. */
-export function overrides(s, now) {
+export function overrides(s, now, goal) {
   const commandCard = {
     id: 'demo-tests',
     itemId: s.checkout.waitingOn,
@@ -1185,6 +1249,12 @@ export function overrides(s, now) {
       .map((it) => ({ id: it.id, group: 'needs', outcome: 'waiting', title: it.title, ...(it.detail ? { line: it.detail.replace(/\s+/g, ' ') } : {}), at: it.at, path: it.path, ...(it.agent ? { agent: it.agent } : {}), ...(it.session ? { session: it.session } : {}), item: it }));
     return { ...real, rows: [...needs, ...real.rows.filter((r) => r.group !== 'needs')], counts: { ...real.counts, needs: needs.length } };
   };
+  // The goal shot only: the checkout session works towards a goal, with no card waiting on it.
+  if (goal) {
+    const g = goalDemo(s.checkout, now);
+    live[s.checkout.key] = { live: { status: 'working', startedAt: now - 41 * MIN, turnStartedAt: now - 3 * MIN, pendingApprovals: 0, model: 'opus', effort: 'high', mode: 'default', contextTokens: 88_400, contextWindow: 200_000 }, overlay: { items: [], patches: {}, approvals: [] }, goal: g.summary };
+    return { live, usage, inbox, models, picks, gpus, away, goal: { key: s.checkout.key, state: g.state, summary: g.summary } };
+  }
   return { live, usage, inbox, models, picks, gpus, away };
 }
 

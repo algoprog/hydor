@@ -272,7 +272,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 
 ### Objetivos
 
-[Configuración → Objetivos](/settings?s=goals): los valores con los que empieza un objetivo nuevo: sus rondas, cuánto te pregunta y cuándo sigue con su propia elección. Más en [Sesiones](/guide/sessions).
+[Configuración → Objetivos](/settings?s=goals): los valores con los que empieza un objetivo nuevo: sus rondas, cuánto te pregunta y cuándo sigue con su propia elección. Más en [Objetivos](/guide/goals).
 
 - [**Rondas que puede ejecutar un objetivo**](/settings?s=goals&find=Rounds%20a%20goal%20may%20run): Cuántas rondas tiene un objetivo nuevo antes de detenerse en su límite, a menos que el agente proponga menos o tú lo cambies al aceptar.
 - [**Cuánto te pregunta un objetivo**](/settings?s=goals&find=How%20much%20a%20goal%20asks%20you): Si un objetivo nuevo trabaja por su cuenta, pregunta en los puntos de decisión o pregunta en cada ronda.

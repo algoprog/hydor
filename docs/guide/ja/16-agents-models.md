@@ -15,7 +15,7 @@ Hydorでは、複数のAIエージェントを使えます。Claude Code、Codex
 
 アプリ内でできること：
 
-- ゴール（合意したチェックが満たされるまで、アプリがラウンドを重ねてエージェントに作業を続けさせる機能。[セッションにゴールを設定する](/guide/sessions#give-the-session-a-goal)を参照）：すべてのエージェント（Claude Code、Codex、Custom、その他のACPエージェント）で使えます。Claude CodeやCodexのチャットで入力した `/goal` は、そのプログラム独自のより簡易なゴールです。フォーク（セッションの以前の返信から作る複製）：Claude Code、Codex、Customで使えます。その他のACPエージェントでは使えません。
+- ゴール（合意したチェックが満たされるまで、アプリがラウンドを重ねてエージェントに作業を続けさせる機能。[ゴール](/guide/goals)を参照）：すべてのエージェント（Claude Code、Codex、Custom、その他のACPエージェント）で使えます。Claude CodeやCodexのチャットで入力した `/goal` は、そのプログラム独自のより簡易なゴールです。フォーク（セッションの以前の返信から作る複製）：Claude Code、Codex、Customで使えます。その他のACPエージェントでは使えません。
 - **続きを開く…**（会話を別のエージェントに引き継ぐ機能）：Claude CodeまたはCodexから、もう一方のエージェントまたはCustomへ。
 - 思考レベル（モデルがどれだけ深く考えるか）：Claude Code、Codex、Grok Build、そしてモデルが対応しているその他のACPエージェント。
 - 複数アカウント、プランの使用上限、上限に達したときのアカウント切り替え：Claude Code、Codex、Grok Build。

@@ -15,7 +15,7 @@ Un agent est le programme qui fait le travail dans une session : il lit votre me
 
 Ce que chacun peut faire dans l’app :
 
-- Objectifs (l’app garde l’agent au travail, tour après tour, jusqu’à ce que des vérifications convenues soient satisfaites ; voir [Donner un objectif à la session](/guide/sessions#give-the-session-a-goal)) : tous les agents, Claude Code, Codex, Custom et les autres agents ACP. Un `/goal` saisi dans une conversation Claude Code ou Codex est l’objectif, plus simple, de ce programme. Bifurcations (une copie de la session à partir d’une réponse antérieure) : Claude Code, Codex et Custom. Pas les autres agents ACP.
+- Objectifs (l’app garde l’agent au travail, tour après tour, jusqu’à ce que des vérifications convenues soient satisfaites ; voir [Objectifs](/guide/goals)) : tous les agents, Claude Code, Codex, Custom et les autres agents ACP. Un `/goal` saisi dans une conversation Claude Code ou Codex est l’objectif, plus simple, de ce programme. Bifurcations (une copie de la session à partir d’une réponse antérieure) : Claude Code, Codex et Custom. Pas les autres agents ACP.
 - **Continuer dans…** (confier la conversation à un autre agent) : depuis Claude Code ou Codex, vers l’autre ou vers Custom.
 - Effort (l’intensité de réflexion du modèle) : Claude Code, Codex et Grok Build, ainsi que tout autre agent ACP dont les modèles le proposent.
 - Plusieurs comptes, limites d’utilisation du forfait et changement de compte lorsqu’une limite est atteinte : Claude Code, Codex et Grok Build.

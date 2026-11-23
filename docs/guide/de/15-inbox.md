@@ -115,7 +115,7 @@ Der Titel einer Benachrichtigung ist der Name der Sitzung (gekürzt, wenn er lan
   - bei einem Aufruf, der im Postausgang festgehalten wird, „Wartet im Postausgang auf dein OK:“, das Konto und das Tool sowie an wen er geht. Ein Tippen darauf öffnet den Posteingang.
 - **Fehlgeschlagen**, danach der Fehler.
 
-Eine Sitzung, die an einem Ziel arbeitet, sendet für alles, was dich braucht oder das Ziel beendet, jeweils eine Benachrichtigung, statt nach jeder Runde ein „Abgeschlossen“ ([Der Sitzung ein Ziel geben](/guide/sessions#give-the-session-a-goal)). „Abgeschlossen“-Benachrichtigungen werden nur zurückgehalten, solange am Ziel gearbeitet wird, nicht, solange es auf dich wartet:
+Eine Sitzung, die an einem Ziel arbeitet, sendet für alles, was dich braucht oder das Ziel beendet, jeweils eine Benachrichtigung, statt nach jeder Runde ein „Abgeschlossen“ ([Ziele](/guide/goals)). „Abgeschlossen“-Benachrichtigungen werden nur zurückgehalten, solange am Ziel gearbeitet wird, nicht, solange es auf dich wartet:
 
 - „Die Prüfungen des Ziels sind bereit für dich“, wenn der Agent die Prüfungen vorgeschlagen hat und auf dein **Starten** wartet, und „Eine Prüfung konnte nicht ausgeführt werden: …“, mit welcher und warum, wenn beim Drücken von **Starten** eine Prüfung gefunden wurde, die nicht ausgeführt werden kann;
 - die Frage des Agents, wenn er fragt, wie es weitergehen soll; „Das Ziel braucht dich: …“, wenn es bei etwas feststeckt, das nur du geben kannst; und „Das Ziel braucht dich: Stimmt „…“?“, bei einer Prüfung, die nur du bestätigen kannst;

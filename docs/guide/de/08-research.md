@@ -144,7 +144,7 @@ Du kannst einen Schwarm auch innerhalb einer Sitzung ein- oder ausschalten oder 
 
 Ein fertiges Mitglied sendet seinen Bericht an die Leitung. Eine neue Nachricht an ein gerade nicht arbeitendes Mitglied aktiviert es wieder.
 
-**Ein Schwarm mit einem Ziel**: Eine Sitzung, die einen Schwarm leitet, kann ein Ziel haben, dessen Prüfungen die App ausführt. Jede Runde ist dann die Arbeit des ganzen Schwarms, und die App, nicht die Leitung, entscheidet, wann es fertig ist. Siehe [Ein Ziel für einen Schwarm](/guide/sessions#a-goal-for-a-swarm).
+**Ein Schwarm mit einem Ziel**: Eine Sitzung, die einen Schwarm leitet, kann ein Ziel haben, dessen Prüfungen die App ausführt. Jede Runde ist dann die Arbeit des ganzen Schwarms, und die App, nicht die Leitung, entscheidet, wann es fertig ist. Siehe [Ein Ziel für einen Schwarm](/guide/goals#a-goal-for-a-swarm).
 
 ### Fortschritt und Board ansehen
 
