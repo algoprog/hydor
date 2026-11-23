@@ -12,7 +12,7 @@ import { LlamaServer } from './llm.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
 import { reapLeftovers } from './procs.ts';
 import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, unsupportedSystem, workerScript } from './setup.ts';
-import { forgetPersonal, hasPersonal, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
+import { forgetPersonal, gpuHold, hasPersonal, lastDevice, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
 import { addUsage, readUsage, resetUsage } from './usage.ts';
 
@@ -32,6 +32,16 @@ const CHECK_MS = 10 * 60_000;
 /** The gap between runs: about a day (a computer that is off at night too), a week. */
 const GAP_MS = { nightly: 20 * 3600_000, weekly: 164 * 3600_000 };
 const ATTEMPT_KEY = 'suggest.train.at';
+/**
+ * A run the person paused: {at, done, total} (where it had got). It is kept across a restart of the server, and while it is
+ * there the schedule starts nothing: only Resume (or Retrain now) goes on from the run's resume state, and Stop drops it.
+ */
+const PAUSE_KEY = 'suggest.train.paused';
+interface Paused {
+  at: number;
+  done: number;
+  total: number;
+}
 /**
  * When word suggestions were first wanted: a message box used (warm or a request) or the switch turned on. On by default,
  * they set themselves up only from then on, so a server nobody types on (headless, Docker) downloads nothing, and the
@@ -128,6 +138,20 @@ export class SuggestService {
     return personalState()?.trainedAt ?? 0;
   }
 
+  /** The paused run, or null. */
+  private paused(): Paused | null {
+    try {
+      const p = JSON.parse(kvGet(this.db, PAUSE_KEY) ?? 'null') as Paused | null;
+      return p && typeof p.at === 'number' ? { at: p.at, done: Number(p.done) || 0, total: Number(p.total) || 0 } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private clearPause() {
+    if (kvGet(this.db, PAUSE_KEY)) kvSet(this.db, PAUSE_KEY, 'null');
+  }
+
   private lastAttempt() {
     return Math.max(Number(kvGet(this.db, ATTEMPT_KEY)) || 0, this.trainedAt());
   }
@@ -136,7 +160,8 @@ export class SuggestService {
   private dueAt(): number | undefined {
     const s = this.st;
     // Not set up (or a setup that failed): nothing could learn yet, so no run is promised.
-    if (!s.enabled || !s.personalise || s.schedule === 'manual' || !this.used() || !this.isSetUp()) return undefined;
+    // A paused run is held until the person resumes it.
+    if (!s.enabled || !s.personalise || s.schedule === 'manual' || !this.used() || !this.isSetUp() || this.paused()) return undefined;
     return this.lastAttempt() + GAP_MS[s.schedule];
   }
 
@@ -208,10 +233,20 @@ export class SuggestService {
   private trainingStatus(): SuggestStatus['training'] {
     const t = this.trainer.state;
     const lastAt = this.trainedAt() || undefined;
-    if (t.state === 'running') return { ...t, lastAt };
+    // Where it learns, and why not on the graphics card when the setting allows it: the hold of a day, else the last run's reason.
+    const last = lastDevice(this.db);
+    const noGpu = this.st.trainGpu ? (gpuHold(this.db)?.why ?? last?.why) : undefined;
+    const extra = noGpu ? { noGpu } : {};
+    const paused = this.paused();
+    // (A run that was paused may still be ending: the page already has it as paused.)
+    if (paused && this.st.enabled && this.st.personalise) {
+      return { state: 'paused', progress: { done: paused.done, total: paused.total }, ...(lastAt ? { lastAt } : {}), ...(last ? { device: last.device } : {}), ...extra };
+    }
+    // (One that is being stopped is no longer running for the page.)
+    if (t.state === 'running' && !this.trainer.stopping) return { ...t, lastAt, ...extra };
     const next = this.nextAt();
     const base: SuggestStatus['training'] = t.state === 'failed' ? { ...t } : { state: next ? 'waiting' : 'idle', ...(t.detail && t.state === 'idle' ? { detail: t.detail } : {}) };
-    return { ...base, ...(lastAt ? { lastAt } : {}), ...(next && this.st.enabled ? { next } : {}) };
+    return { ...base, ...(lastAt ? { lastAt } : {}), ...(next && this.st.enabled ? { next } : {}), ...extra };
   }
 
   /** The language model's state, with why it is not running when that is for the settings or the computer's memory. */
@@ -249,7 +284,10 @@ export class SuggestService {
     const next = merge(before, patch, true);
     writeSettings(this.db, next);
     this.st = next;
-    if (before.enabled && !next.enabled) this.shutdown();
+    if (before.enabled && !next.enabled) {
+      this.shutdown();
+      this.clearPause();
+    }
     else if (next.enabled) {
       if (!before.enabled) {
         this.markUsed();
@@ -273,8 +311,11 @@ export class SuggestService {
           if (next.llm !== 'off' && this.worker?.ready) void this.startLlm();
           else if (next.llm !== 'off') void this.prepareLlm();
         }
-        // Learning turned off: a run stops, and the texts and resume state it left go.
-        if (!next.personalise && before.personalise) this.trainer.stopAndClean();
+        // Learning turned off: a run stops, and the texts and resume state it left go, and a pause with them.
+        if (!next.personalise && before.personalise) {
+          this.trainer.stopAndClean();
+          this.clearPause();
+        }
       }
     }
     this.changed();
@@ -758,28 +799,62 @@ export class SuggestService {
     return now - Math.max(lastTyped(this.db), this.lastRequest) >= QUIET_MS;
   }
 
-  /** Personalises now (in the background); a 409 when it cannot. */
+  /** Personalises now (in the background); a paused run goes on from where it stopped. A 409 when it cannot. */
   train(): SuggestState {
     const s = this.st;
     if (!s.enabled) throw new HttpError(409, 'Turn on word suggestions first');
     if (suggestDisabled()) throw new HttpError(409, 'Word suggestions are off on this server (HYDOR_SUGGEST=off)');
     if (!s.personalise) throw new HttpError(409, 'Learning from what you write is turned off');
+    if (this.paused()) {
+      // Resume: the pause ends, and the run goes on once the one that was paused has let go of its work folder.
+      this.clearPause();
+      void this.trainer.settled().then(() => this.runTraining());
+      this.changed();
+      return this.state();
+    }
     if (this.trainer.active) return this.state();
     void this.runTraining();
     return this.state();
   }
 
+  /** Pauses the run that is going: it stops where it is (what it learned so far is kept), and nothing starts it until Resume. A 409 when none is going. */
+  pause(): SuggestState {
+    if (!this.trainer.active || this.trainer.stopping || this.paused()) throw new HttpError(409, 'Nothing is being learned right now');
+    const p = this.trainer.state.progress;
+    kvSet(this.db, PAUSE_KEY, JSON.stringify({ at: Date.now(), done: p?.done ?? 0, total: p?.total ?? 0 } satisfies Paused));
+    this.trainer.pause();
+    this.changed();
+    return this.state();
+  }
+
+  /**
+   * Stops the run that is going or paused for good: what it learned so far is dropped (the model in use stays), and the
+   * schedule waits its usual gap from now. A 409 when none is going or paused.
+   */
+  stopTraining(): SuggestState {
+    if (!this.trainer.active && !this.paused()) throw new HttpError(409, 'Nothing is being learned right now');
+    this.trainer.stopAndClean();
+    this.clearPause();
+    kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
+    this.changed();
+    return this.state();
+  }
+
   private async runTraining() {
     if (!(await this.ensureSetup())) return;
-    // Turned off while it was setting up: nothing is started.
-    if (!this.st.enabled || !this.st.personalise) return;
+    // Turned off while it was setting up, or paused meanwhile: nothing is started.
+    if (!this.st.enabled || !this.st.personalise || this.paused()) return;
     const out = await this.trainer.run(this.db, this.st, {
       // The worker lets go of the personal model's files before the new one takes their place; it starts again with the new one.
       hooks: { beforeSwap: () => this.stopWorker() },
     });
-    // A run that was stopped is not an attempt (the schedule is not moved by it).
-    if (out.ok || out.why !== 'Stopped') kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
-    if (out.ok) void this.syncLoad();
+    // A run that was stopped or paused is not an attempt (the schedule is not moved by it; a stop moves it itself).
+    if (out.ok || !out.halted) kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
+    // A run that finished as the pause came is finished: nothing is left to resume.
+    if (out.ok) {
+      this.clearPause();
+      void this.syncLoad();
+    }
     this.changed();
   }
 
@@ -799,6 +874,7 @@ export class SuggestService {
   forget(): SuggestState {
     this.trainer.stop();
     forgetPersonal();
+    this.clearPause();
     kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
     void this.syncLoad();
     this.changed();

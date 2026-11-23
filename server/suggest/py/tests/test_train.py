@@ -300,6 +300,60 @@ class TrainRunTests(unittest.TestCase):
         self.assertEqual(lines[0]['progress']['done'], 0)
 
 
+class DeviceTests(unittest.TestCase):
+    def test_bf16_only_where_it_is_supported(self):
+        self.assertTrue(T.use_bf16('cpu'))
+        self.assertFalse(T.use_bf16('mps'))
+        self.assertFalse(T.use_bf16('something else'))
+        was = torch.cuda.is_bf16_supported
+        try:
+            torch.cuda.is_bf16_supported = lambda *a, **k: False       # an older graphics card
+            self.assertFalse(T.use_bf16('cuda'))
+            torch.cuda.is_bf16_supported = lambda *a, **k: True
+            self.assertTrue(T.use_bf16('cuda'))
+
+            def broken(*a, **k):
+                raise RuntimeError('no driver')
+            torch.cuda.is_bf16_supported = broken
+            self.assertFalse(T.use_bf16('cuda'))
+        finally:
+            torch.cuda.is_bf16_supported = was
+
+    def test_a_resume_state_is_saved_on_the_processor_and_the_optimizer_moves_to_the_model(self):
+        model = torch.nn.Linear(3, 2)
+        opt = torch.optim.AdamW(model.parameters(), lr=1e-2)
+        model(torch.ones(1, 3)).sum().backward()
+        opt.step()
+        saved = T.to_cpu(opt.state_dict())
+        self.assertEqual(saved['param_groups'][0]['lr'], 1e-2)
+        leaves = [v for st in saved['state'].values() for v in st.values()]
+        self.assertTrue(leaves and all(isinstance(v, torch.Tensor) and v.device.type == 'cpu' and not v.requires_grad for v in leaves))
+        other = torch.optim.AdamW(model.parameters(), lr=1e-2)
+        other.load_state_dict(saved)
+        T.optimizer_to(other, 'cpu')
+        for p in model.parameters():
+            for k, v in other.state[p].items():
+                self.assertEqual(v.device, p.device)
+                if k != 'step':
+                    self.assertEqual(v.dtype, p.dtype)
+        # Plain data passes through, lists and tuples keep their kind.
+        self.assertEqual(T.to_cpu({'a': [1, (2, torch.ones(1))], 'b': 'x'})['a'][1][0], 2)
+
+    def test_the_resume_state_moves_between_devices_in_both_directions(self):
+        if not torch.cuda.is_available():
+            self.skipTest('no graphics card here')
+        model = torch.nn.Linear(3, 2).cuda()
+        opt = torch.optim.AdamW(model.parameters(), lr=1e-2)
+        model(torch.ones(1, 3).cuda()).sum().backward()
+        opt.step()
+        saved = T.to_cpu(opt.state_dict())
+        cpu_model = torch.nn.Linear(3, 2)
+        cpu_opt = torch.optim.AdamW(cpu_model.parameters(), lr=1e-2)
+        cpu_opt.load_state_dict(saved)
+        T.optimizer_to(cpu_opt, 'cpu')
+        self.assertTrue(all(v.device.type == 'cpu' for p in cpu_model.parameters() for v in cpu_opt.state[p].values()))
+
+
 class RobustnessTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

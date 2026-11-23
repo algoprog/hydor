@@ -331,6 +331,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**De mes documents**](/settings?s=suggest&find=From%20my%20documents) : Apprendre à partir des documents et des pages que vous avez écrits.
 - [**Poids de mes propres mots**](/settings?s=suggest&find=Weight%20of%20my%20own%20words) : Combien les mots que vous avez saisis comptent de plus que le reste de ce qu’il apprend.
 - [**Threads pour l’apprentissage**](/settings?s=suggest&find=Threads%20for%20learning) : Threads de processeur pour l’apprentissage (automatique par défaut).
+- [**Apprendre sur la carte graphique**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card) : L’apprentissage se fait sur une carte graphique NVIDIA ou un Mac avec puce Apple quand il y en a une de libre, bien plus vite que sur le processeur.
 - [**Réentraîner maintenant**](/settings?s=suggest&find=Retrain%20now) : Apprend maintenant, en arrière-plan, de ce que vous avez écrit depuis la dernière fois.
 - [**Oublier ce qu’il a appris**](/settings?s=suggest&find=Forget%20what%20it%20learned) : Supprime le modèle qui a appris de vous ; celui fourni avec l’app est de nouveau utilisé.
 

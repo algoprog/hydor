@@ -1477,6 +1477,10 @@ agents that speak ACP and take MCP servers.
   and other sessions put there), agents' replies, the notes you wrote and the documents you wrote, each source with its
   switch and your own words weighted higher, every night, every week or when you press Retrain now, in the background at
   the lowest priority and when you have not typed for ten minutes; the first time can take hours without a graphics card.
+  A run learns on an NVIDIA graphics card with room (4 GB free, under half busy; the one with the most free) or a
+  Mac's own, many times faster, when Learn on the graphics card is on (the first time on an NVIDIA card it downloads
+  PyTorch's build for it, about 2.5 GB, and a card that fails is left alone for a day), and Pause, Resume and Stop on the
+  learning line hold or end a run (a pause keeps what it learned and holds the schedule, also after a restart).
   Forget what it learned goes back to the model that came with the app. **How it's helping** counts how many keystrokes
   the suggestions saved (and their share of your typing) and how many were right (taken with Tab or →, or typed through
   by you, against the ones where you typed something else), with today, this week and the total behind a button and

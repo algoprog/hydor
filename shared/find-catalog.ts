@@ -315,6 +315,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['suggest', 'From my documents', 'documents sources learn pages docs wrote latex', 'Learn from the documents and pages you wrote'],
   ['suggest', 'Weight of my own words', 'weight own words typed more than replies how much count heavier user', 'How much more the words you typed count than the rest it learns from'],
   ['suggest', 'Threads for learning', 'training threads cpu cores processors learning faster slower busy', 'Processor threads for learning (automatic by default)'],
+  ['suggest', 'Learn on the graphics card', 'gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram', 'Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor'],
   ['suggest', 'Retrain now', 'retrain train now learn now personalise start update model', 'Learns from what you wrote since the last time, now, in the background'],
   ['suggest', 'Forget what it learned', 'forget delete reset remove personal model start over privacy', 'Deletes the model that learned from you; the one that came with the app is used again'],
   // Capabilities › Assistants

@@ -373,10 +373,13 @@ By default, the small model also learns your own words: the names, terms and way
 - It learns from the sources you leave on: **[From my messages](/settings?s=suggest&find=From%20my%20messages)** (what you typed to agents, but not in sessions with memory turned off or [confidential ones](/guide/sessions#keep-a-session-confidential), and not what apps, scheduled tasks or other sessions wrote for you), **[From agents' replies](/settings?s=suggest&find=From%20agents'%20replies)**, **[From my notes](/settings?s=suggest&find=From%20my%20notes)** (the memory notes you wrote yourself) and **[From my documents](/settings?s=suggest&find=From%20my%20documents)** (the pages and documents you wrote). Turn off the agents' replies, for instance, to keep its guesses to your own style.
 - **[Weight of my own words](/settings?s=suggest&find=Weight%20of%20my%20own%20words)** says how much more what you typed counts than the rest, from 1 (alike) to 16; 4 at first.
 - **[When it learns](/settings?s=suggest&find=When%20it%20learns)**: **Every night** (about once a day, when you have not typed for ten minutes and the computer has the memory), **Every week**, or **Only when I ask**. It runs in the background at the lowest priority, so your work is not slowed, and it picks up where it stopped if the computer is turned off. The first time reads all you have written, and on a computer without a graphics card that can take hours; the later ones read only what is new and take minutes. **[Threads for learning](/settings?s=suggest&find=Threads%20for%20learning)** limits the processor it may use.
+- **[Learn on the graphics card](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card)** (on by default) lets a run use the computer's graphics card when there is one, many times faster than the processor: an NVIDIA card with at least 4 GB free that is less than half busy (when you have several, the one with the most free; one that another program is using is left alone), or a Mac with Apple silicon. The first time on an NVIDIA card, the app downloads PyTorch's build for it, about 2.5 GB, into its own folder, and the run waits for it, with the line under the switch saying so. If the card cannot be set up or fails in a run, that run goes on at once on the processor and the card is left alone for a day; the setting says why. Turn it off to always learn on the processor.
 - **[Retrain now](/settings?s=suggest&find=Retrain%20now)** learns from what you wrote since the last time, straight away.
 - **[Forget what it learned](/settings?s=suggest&find=Forget%20what%20it%20learned)** deletes the model made from your writing, after you confirm, and goes back to the one that came with the app. It learns again at its next time, unless you turned learning off.
 
-The line under the switch says which small model is in use, when it last learned, and how far a learning run has got.
+The line under the switch says which small model is in use, when it last learned, and how far a learning run has got and where it learns (**On the graphics card: …** or **On the processor**).
+
+While a run is going, that line has **Pause** and **Stop**. **Pause** stops the run where it is and keeps what it has learned so far; the line then reads **Paused at 45%** with **Resume** and **Stop**, and nothing starts it again by itself, not even the schedule, until you press **Resume** (**Retrain now** does the same), even after you restart the app. **Resume** goes on from where it stopped, with the same writing it was reading. **Stop** asks first, then drops what this run learned so far (the model you use now stays) and the next run waits its usual time. Turning learning off, or **Forget what it learned**, ends a paused run too.
 
 ### How much it helps
 
@@ -508,6 +511,8 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Set up word suggestions now, before I type, and tell me when they are ready."
 - "Make word suggestions show only the ones you are surer of, and not the next word."
 - "Stop word suggestions from learning from agents' replies, and make it learn only when I ask."
+- "Pause the learning of word suggestions, and resume it tonight." / "Stop the learning that is running."
+- "Is word suggestions' learning using the graphics card? If not, why?" / "Make word suggestions learn on the processor only."
 - "Is the language model running for word suggestions? If not, why?"
 - "Turn word suggestions off in this browser only."
 - "How many keystrokes have word suggestions saved me?"

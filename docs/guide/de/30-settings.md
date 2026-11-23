@@ -331,6 +331,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Aus meinen Dokumenten**](/settings?s=suggest&find=From%20my%20documents): Aus den von dir geschriebenen Dokumenten und Seiten lernen.
 - [**Gewicht meiner eigenen Wörter**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Wie viel stärker deine getippten Wörter zählen als der Rest, aus dem gelernt wird.
 - [**Threads für das Lernen**](/settings?s=suggest&find=Threads%20for%20learning): Prozessor-Threads für das Lernen (standardmäßig automatisch).
+- [**Auf der Grafikkarte lernen**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): Das Lernen läuft auf einer NVIDIA-Grafikkarte oder einem Mac mit Apple Silicon, wenn eine frei ist, um ein Vielfaches schneller als auf dem Prozessor.
 - [**Jetzt neu trainieren**](/settings?s=suggest&find=Retrain%20now): Lernt jetzt im Hintergrund aus dem, was du seit dem letzten Mal geschrieben hast.
 - [**Gelerntes vergessen**](/settings?s=suggest&find=Forget%20what%20it%20learned): Löscht das Modell, das von dir gelernt hat; das mit der App gelieferte wird wieder verwendet.
 

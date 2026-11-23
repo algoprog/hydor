@@ -22,7 +22,8 @@ import { LlamaServer } from './llm.ts';
 import { killAll, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
-import { personalDir, recoverPersonal } from './train.ts';
+import { chooseDevice, bestGpu, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
+import { gpuHold, personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
@@ -36,6 +37,8 @@ if (!DATA.startsWith('/tmp/')) {
 fs.rmSync(DATA, { recursive: true, force: true });
 fs.mkdirSync(DATA, { recursive: true });
 process.env.CUDA_VISIBLE_DEVICES = '';
+// No graphics card is asked about, not even by looking: nvidia-smi is a program that does not exist (a test that needs one gives its own).
+process.env.HYDOR_SUGGEST_NVIDIA_SMI = '/nonexistent/nvidia-smi';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ws-server-suggest-'));
 // The engine's stand-ins: python is a script that ignores what it is asked to run and plays the part (the worker, or train.py).
@@ -60,12 +63,13 @@ if any(a.endswith('train.py') for a in args):
     raw = open(a['--texts'], 'rb').read()
     texts = raw.decode().splitlines()
     flag = lambda n: os.path.exists(os.path.join(here, n))
-    log({'train': True, 'args': args, 'texts': len(texts), 'sha': hashlib.sha256(raw).hexdigest(), 'mode': oct(os.stat(a['--texts']).st_mode & 0o777), 'nice': os.nice(0)})
+    log({'train': True, 'args': args, 'texts': len(texts), 'sha': hashlib.sha256(raw).hexdigest(), 'mode': oct(os.stat(a['--texts']).st_mode & 0o777), 'nice': os.nice(0), 'cvd': os.environ.get('CUDA_VISIBLE_DEVICES'), 'order': os.environ.get('CUDA_DEVICE_ORDER')})
     out({'progress': {'done': 1, 'total': 2}, 'loss': 3.0})
     os.makedirs(a['--out'], exist_ok=True)
     if flag('trainhold'):
         while flag('trainhold'): time.sleep(0.05)
     if flag('trainfail'): sys.exit(1)
+    if flag('traingpufail') and a.get('--device') == 'cuda': sys.exit(1)
     if flag('trainnothing'): sys.exit(3)
     if flag('traincode2'): sys.exit(2)
     open(os.path.join(a['--out'], 'model.safetensors'), 'w').write('weights')
@@ -261,6 +265,7 @@ test('settings: a wrong value is a 400 that names the field; limits are inclusiv
   bad({ userWeight: 0 }, 'userWeight');
   bad({ userWeight: 17 }, 'userWeight');
   bad({ trainThreads: 65 }, 'trainThreads');
+  bad({ trainGpu: 'yes' }, 'trainGpu');
   bad({ where: { chats: true } }, 'where.chats');
   bad({ where: { chat: 1 } }, 'where.chat');
   bad({ sources: 'all' }, 'sources');
@@ -630,7 +635,8 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   const a = t.args as string[];
   const opt = (k: string) => a[a.indexOf(k) + 1];
   assert.equal(opt('--threads'), '3');
-  assert.equal(opt('--device'), 'cpu', 'an Apple GPU is out of the lowest priority’s reach');
+  assert.equal(opt('--device'), 'cpu', 'no graphics card here: the processor, said outright (not auto)');
+  assert.ok(!a.includes('--micro-tokens'), 'the processor runs its batch in small pieces');
   assert.equal(svc.pids().worker, undefined, 'the worker was stopped for the swap');
   assert.equal(opt('--w-user'), '6');
   assert.equal(opt('--base'), release);
@@ -988,6 +994,400 @@ test('13: forgetting a run in progress, or turning learning off while it sets up
   assert.equal(trains().length, before, 'learning was turned off before it began');
   assert.equal(svc.trainer.active, false);
   await put({ personalise: true });
+});
+
+// ---- pause, resume and stop ----------------------------------------------------------------------------------------
+
+const trainLog = () => logLines().filter((l) => l.train);
+const trainState = async () => (await get()).status.training;
+const post = (url: string) => app.inject({ method: 'POST', url });
+const del = (url: string) => app.inject({ method: 'DELETE', url });
+const PAUSE = 'suggest.train.paused';
+const startHeld = async (text: string) => {
+  flag('trainhold', true);
+  await addTyped(text);
+  const k = trainLog().length;
+  await post('/api/suggest/train');
+  const first = await until('the run', async () => trainLog()[k]);
+  await until('its first progress', async () => (await trainState()).progress?.done === 1);
+  return { k, first };
+};
+const resetTraining = async () => {
+  flag('trainhold', false);
+  flag('traingpufail', false);
+  await put({ enabled: true, personalise: true, schedule: 'nightly', llm: 'off', trainThreads: 1, trainGpu: true });
+  await del('/api/suggest/personal');
+  kvSet(db, PAUSE, 'null');
+  kvSet(db, 'suggest.train.gpu.hold', 'null');
+};
+
+test('pause: the run stops where it is, the schedule is held, it survives a restart, and Resume goes on with the same texts', async () => {
+  await resetTraining();
+  const far = Date.now() + 40 * 24 * 3600_000;
+  assert.equal(svc.trainDue(far), true, 'due when nothing holds it');
+  assert.equal((await post('/api/suggest/train/pause')).statusCode, 409, 'nothing is running');
+  const { k, first } = await startHeld('A message for the paused run');
+  const p = await post('/api/suggest/train/pause');
+  assert.equal(p.statusCode, 200);
+  assert.equal(p.json().status.training.state, 'paused', 'paused at once, while the process is still ending');
+  assert.deepEqual(p.json().status.training.progress, { done: 1, total: 2 });
+  await until('the run to end', async () => !svc.trainer.active);
+  const t = await trainState();
+  assert.equal(t.state, 'paused');
+  assert.deepEqual(t.progress, { done: 1, total: 2 });
+  assert.equal(t.next, undefined, 'no time is promised while it is paused');
+  assert.equal(t.detail, undefined);
+  assert.equal(svc.trainDue(far), false, 'the schedule starts nothing while it is paused');
+  assert.ok(fs.existsSync(workFile('job.json')) && fs.existsSync(workFile('out')), 'its work stays for Resume');
+  assert.ok(!fs.existsSync(workFile('texts.jsonl')), 'the texts do not');
+  assert.equal(trainLog().length, k + 1);
+  assert.equal((await post('/api/suggest/train/pause')).statusCode, 409, 'already paused');
+  await priv.check();
+  assert.equal(trainLog().length, k + 1, 'the scheduled check starts nothing');
+  // A server that starts again on the same database still has it paused.
+  const again = new SuggestService(db);
+  try {
+    const st = again.state().status.training;
+    assert.equal(st.state, 'paused');
+    assert.deepEqual(st.progress, { done: 1, total: 2 });
+    assert.equal(again.trainDue(far), false);
+  } finally {
+    again.stop();
+  }
+  // Resume (Retrain now does it too): the same texts, from the same resume state.
+  flag('trainhold', false);
+  await addTyped('Written while it was paused: not in the paused run’s texts');
+  const r = await post('/api/suggest/train');
+  assert.equal(r.statusCode, 200);
+  assert.notEqual(r.json().status.training.state, 'paused');
+  const second = await until('the run again', async () => trainLog()[k + 1]);
+  assert.equal(second.sha, first.sha, 'the same texts come back');
+  assert.equal(second.texts, first.texts);
+  await until('it to finish', async () => !svc.trainer.active && fs.existsSync(path.join(personalDir(), 'model.safetensors')));
+  assert.equal(kvGet(db, PAUSE), 'null');
+  assert.equal((await trainState()).state, 'waiting', 'the schedule goes on');
+  assert.equal(svc.trainDue(far), true);
+});
+
+test('pause: during "Reading what you wrote", before train.py starts, it also ends as paused', async () => {
+  await resetTraining();
+  await addTyped('A message read while the pause comes');
+  const k = trainLog().length;
+  svc.train();
+  while (!svc.trainer.active) await Promise.resolve();
+  assert.equal(svc.trainer.state.detail, 'Reading what you wrote');
+  assert.equal(svc.pause().status.training.state, 'paused');
+  await until('the run to end', async () => !svc.trainer.active);
+  await sleep(200);
+  assert.equal(trainLog().length, k, 'train.py never started');
+  assert.equal((await trainState()).state, 'paused');
+  await post('/api/suggest/train');
+  await until('the run to finish', async () => trainLog().length === k + 1 && !svc.trainer.active);
+  assert.equal((await trainState()).state, 'waiting');
+});
+
+test('stop: what the run learned so far is dropped, the schedule waits its usual gap, and a paused run can be stopped too', async () => {
+  await resetTraining();
+  assert.equal((await del('/api/suggest/train')).statusCode, 409, 'nothing is running or paused');
+  await startHeld('A message for the stopped run');
+  const t0 = Date.now();
+  const r = await del('/api/suggest/train');
+  assert.equal(r.statusCode, 200);
+  assert.notEqual(r.json().status.training.state, 'running');
+  await until('the run to end', async () => !svc.trainer.active);
+  assert.ok(!fs.existsSync(path.join(personalDir(), 'train')), 'its work is gone, the resume state too');
+  assert.ok(Number(kvGet(db, 'suggest.train.at')) >= t0, 'it counts as an attempt');
+  const t = await trainState();
+  assert.equal(t.state, 'waiting');
+  assert.equal(t.detail, undefined);
+  assert.ok(t.next! >= t0 + 19 * 3600_000, 'the next run waits its usual gap');
+  assert.ok(!hasModel(), 'nothing was put in');
+  // Paused, then stopped.
+  await startHeld('A message for the run that is paused and then stopped');
+  await post('/api/suggest/train/pause');
+  await until('the run to end', async () => !svc.trainer.active);
+  assert.equal((await trainState()).state, 'paused');
+  const s2 = await del('/api/suggest/train');
+  assert.equal(s2.statusCode, 200);
+  assert.equal(s2.json().status.training.state, 'waiting');
+  assert.equal(kvGet(db, PAUSE), 'null');
+  assert.ok(!fs.existsSync(path.join(personalDir(), 'train')));
+  assert.equal((await del('/api/suggest/train')).statusCode, 409, 'nothing left to stop');
+  assert.equal((await post('/api/suggest/train/pause')).statusCode, 409);
+  // Stopped while it is being paused (the process has not ended yet): the stop wins.
+  await startHeld('A message for a pause that is stopped as it ends');
+  await post('/api/suggest/train/pause');
+  await del('/api/suggest/train');
+  await until('the run to end', async () => !svc.trainer.active);
+  assert.ok(!fs.existsSync(path.join(personalDir(), 'train')));
+  assert.equal((await trainState()).state, 'waiting');
+  flag('trainhold', false);
+});
+const hasModel = () => fs.existsSync(path.join(personalDir(), 'model.safetensors'));
+
+test('pause: turning learning off, word suggestions off, or Forget clears it', async () => {
+  for (const [what, act] of [
+    ['learning off', () => put({ personalise: false })],
+    ['word suggestions off', () => put({ enabled: false })],
+    ['forget', () => del('/api/suggest/personal')],
+  ] as const) {
+    await resetTraining();
+    await startHeld(`A message for the run paused, then ${what}`);
+    await post('/api/suggest/train/pause');
+    await until('the run to end', async () => !svc.trainer.active);
+    assert.equal((await trainState()).state, 'paused', what);
+    await act();
+    assert.equal(kvGet(db, PAUSE), 'null', what);
+    assert.notEqual((await trainState()).state, 'paused', what);
+    if (what === 'learning off') assert.ok(!fs.existsSync(path.join(personalDir(), 'train')), 'and its work goes');
+    assert.equal((await post('/api/suggest/train/pause')).statusCode, 409, what);
+  }
+  flag('trainhold', false);
+  await put({ enabled: true, personalise: true });
+});
+
+// ---- the graphics card -----------------------------------------------------------------------------------------------
+
+const cards = [
+  '0, NVIDIA GeForce RTX 4090, 21070, 0',
+  '1, NVIDIA GeForce RTX 4090, 24082, 10',
+  '2, NVIDIA GeForce RTX 3080, 3000, 0',
+  '3, NVIDIA GeForce RTX 4090, 24066, 80',
+].join('\n');
+const smiOf = (rows: string | null, cuda = '12.4', calls: string[][] = []) => async (args: string[]) => {
+  calls.push(args);
+  if (rows == null) return null;
+  return args.length ? rows : `Mon\n| NVIDIA-SMI 550.54     Driver Version: 550.54     CUDA Version: ${cuda}     |\n`;
+};
+const choose = (o: Partial<Parameters<typeof chooseDevice>[0]> = {}) => chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env: {}, smi: smiOf(cards), ...o });
+
+test('the graphics card: the setting, a Mac, and the card with the most memory free that is not busy', async () => {
+  const calls: string[][] = [];
+  assert.deepEqual(await choose({ enabled: false, smi: smiOf(cards, '12.4', calls) }), { device: { kind: 'cpu' } }, 'the setting off: the processor, no reason');
+  assert.deepEqual(await chooseDevice({ enabled: true, platform: 'darwin', arch: 'arm64', env: {}, smi: smiOf(cards, '12.4', calls) }), { device: { kind: 'mps', name: 'Apple silicon' } }, 'a Mac with Apple silicon');
+  assert.equal(calls.length, 0, 'nvidia-smi was not asked about');
+  assert.equal((await chooseDevice({ enabled: true, platform: 'darwin', arch: 'x64', env: {}, smi: smiOf(cards) })).device.kind, 'cpu');
+  assert.equal((await chooseDevice({ enabled: true, platform: 'win32', arch: 'arm64', env: {}, smi: smiOf(cards) })).device.kind, 'cpu');
+  const best = await choose({ smi: smiOf(cards, '12.4', calls) });
+  assert.deepEqual(best, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 1 }, tag: 'cu124' }, 'card 1: the most free, under half busy');
+  assert.deepEqual(calls[0], ['--query-gpu=index,name,memory.free,utilization.gpu', '--format=csv,noheader,nounits']);
+  assert.equal((await choose({ platform: 'win32' })).device.kind, 'cuda', 'Windows too');
+  // The server's own CUDA_VISIBLE_DEVICES: only those listed; an empty list is none.
+  assert.equal((await choose({ env: { CUDA_VISIBLE_DEVICES: '0,3' } })).device.index, 0, 'of 0 and 3, the one with room and not busy');
+  assert.equal((await choose({ env: { CUDA_VISIBLE_DEVICES: '3,2,0' } })).device.index, 0);
+  const none = await choose({ env: { CUDA_VISIBLE_DEVICES: '' } });
+  assert.equal(none.device.kind, 'cpu');
+  assert.match(none.why!, /CUDA_VISIBLE_DEVICES/);
+  assert.match((await choose({ env: { CUDA_VISIBLE_DEVICES: '7' } })).why!, /CUDA_VISIBLE_DEVICES/, 'a number that is no card');
+  assert.match((await choose({ env: { CUDA_VISIBLE_DEVICES: 'GPU-0a1b2c3d-1111' } })).why!, /CUDA_VISIBLE_DEVICES/, 'a card named by its id cannot be matched: none');
+  // Neither the card too full nor the one too busy.
+  const room = await choose({ env: { CUDA_VISIBLE_DEVICES: '2,3' } });
+  assert.equal(room.device.kind, 'cpu');
+  assert.match(room.why!, /4 GB free/);
+  const edge = (free: number, util: number) => choose({ smi: smiOf(`0, Card, ${free}, ${util}`) });
+  assert.equal((await edge(4096, 49)).device.kind, 'cuda', '4 GB free and 49% busy are enough');
+  assert.equal((await edge(4095, 0)).device.kind, 'cpu', 'a megabyte short');
+  assert.equal((await edge(24000, 50)).device.kind, 'cpu', 'half busy is too busy');
+  assert.match((await choose({ smi: smiOf(null) })).why!, /No NVIDIA/, 'no nvidia-smi: no card');
+  assert.match((await choose({ smi: smiOf('') })).why!, /No NVIDIA/, 'no card listed');
+  assert.match((await choose({ smi: smiOf('garbage\n0, Card, [N/A], [N/A]') })).why!, /No NVIDIA/, 'a card that says nothing of its memory is left out');
+});
+
+test('the graphics card: the newest PyTorch build the driver supports', async () => {
+  for (const [cuda, tag] of [['13.2', 'cu130'], ['13.0', 'cu130'], ['12.9', 'cu129'], ['12.8', 'cu128'], ['12.7', 'cu126'], ['12.6', 'cu126'], ['12.5', 'cu124'], ['12.1', 'cu121'], ['11.8', 'cu118']] as const) {
+    const p = await choose({ smi: smiOf(cards, cuda) });
+    assert.equal(p.tag, tag, `CUDA ${cuda}`);
+  }
+  const old = await choose({ smi: smiOf(cards, '11.7') });
+  assert.equal(old.device.kind, 'cpu');
+  assert.match(old.why!, /too old/);
+  assert.match((await choose({ smi: async (a) => (a.length ? cards : 'no version here') })).why!, /CUDA version/);
+  assert.deepEqual(parseCuda('Driver Version: 595.91.07      CUDA Version: 13.2'), [13, 2]);
+  assert.equal(wheelTag([10, 2]), null);
+  assert.deepEqual(parseGpus('0, NVIDIA A100, SXM4, 40000, 1\n'), [{ index: 0, name: 'NVIDIA A100, SXM4', freeMb: 40000, util: 1 }], 'a name with a comma');
+  assert.deepEqual(visibleCards(undefined), null);
+  assert.deepEqual(visibleCards(' 1, 3 '), [1, 3]);
+  assert.deepEqual(visibleCards('0,GPU-abc,2'), [0], 'CUDA reads up to the first entry it cannot');
+  assert.equal(bestGpu([], null).hasOwnProperty('why'), true);
+  // An environment made for an older CUDA suits a driver that has moved on, not one that went back.
+  assert.equal(tagSuits('cu126', 'cu130'), true);
+  assert.equal(tagSuits('cu126', 'cu126'), true);
+  assert.equal(tagSuits('cu130', 'cu126'), false);
+  assert.equal(tagSuits('cpu', 'cu126'), false);
+});
+
+test('the graphics card: nvidia-smi is run for real (a stand-in program), and its answers are used', async () => {
+  const exe = path.join(fakeDir, 'nvidia-smi');
+  fs.writeFileSync(exe, `#!/bin/sh\nif [ -n "$1" ]; then printf '%s\\n' '${cards.split('\n').join("' '")}'; else echo '| NVIDIA-SMI 560.35  Driver Version: 560.35  CUDA Version: 12.6 |'; fi\n`, { mode: 0o755 });
+  const env = { HYDOR_SUGGEST_NVIDIA_SMI: exe, CUDA_VISIBLE_DEVICES: '0,2' };
+  const p = await chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env });
+  assert.deepEqual(p, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 0 }, tag: 'cu126' });
+  const missing = await chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env: { HYDOR_SUGGEST_NVIDIA_SMI: '/nonexistent/nvidia-smi' } });
+  assert.match(missing.why!, /No NVIDIA/);
+});
+
+test('the graphics card: a run on a card (its set-up first, its environment, one piece), a set-up that fails, a card that fails', async () => {
+  await resetTraining();
+  const real = svc.trainer.deps;
+  const picks: string[] = [];
+  const setups: string[] = [];
+  let ready = false;
+  let setupFails = false;
+  let gate: Promise<void> = Promise.resolve();
+  let kind: DevicePick['device']['kind'] = 'cuda';
+  svc.trainer.deps = {
+    pick: async () => {
+      picks.push(kind);
+      return kind === 'mps' ? { device: { kind: 'mps', name: 'Apple silicon' } } : { device: { kind: 'cuda', name: 'Fake RTX 4090', index: 3 }, tag: 'cu126' };
+    },
+    gpuReady: () => ready,
+    setupGpu: async (tag, report, signal) => {
+      setups.push(tag);
+      report('Installing PyTorch for the graphics card');
+      await new Promise<void>((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('Stopped')), { once: true });
+        void gate.then(resolve);
+      });
+      if (setupFails) throw new Error('no network');
+      ready = true;
+    },
+  };
+  try {
+    // 1: the first run on the card waits for its environment, with the line saying so.
+    let open!: () => void;
+    gate = new Promise((r) => (open = r));
+    await addTyped('A message for the first run on the card');
+    let k = trainLog().length;
+    flag('trainhold', true);
+    await post('/api/suggest/train');
+    const during = await until('the set-up', async () => {
+      const t = await trainState();
+      return t.state === 'running' && /graphics card/i.test(t.detail ?? '') ? t : null;
+    });
+    assert.deepEqual(during.device, { kind: 'cuda' });
+    assert.equal(trainLog().length, k, 'train.py waits for it');
+    open();
+    const run = await until('the run on the card', async () => trainLog()[k]);
+    const arg = (l: any, n: string) => l.args[l.args.indexOf(n) + 1];
+    assert.equal(arg(run, '--device'), 'cuda');
+    assert.equal(arg(run, '--micro-tokens'), arg(run, '--batch-tokens'), 'the batch in one piece');
+    assert.equal(run.cvd, '3', 'only the chosen card is visible to it');
+    assert.equal(run.order, 'PCI_BUS_ID', 'numbered as nvidia-smi numbers them');
+    assert.equal(run.nice, 19, 'its processor side stays at the lowest priority');
+    assert.deepEqual(setups, ['cu126']);
+    const live = await trainState();
+    assert.deepEqual(live.device, { kind: 'cuda', name: 'Fake RTX 4090' });
+    assert.equal(live.noGpu, undefined);
+    flag('trainhold', false);
+    await until('it to finish', async () => !svc.trainer.active && hasModel());
+    assert.equal(gpuHold(db), null, 'a card that worked is not held back');
+    // 2: a Mac's own graphics.
+    kind = 'mps';
+    await addTyped('A message for the run on a Mac');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    const mac = await until('the run', async () => trainLog()[k]);
+    assert.equal(arg(mac, '--device'), 'mps');
+    assert.ok(!mac.args.includes('--micro-tokens'));
+    await until('it to finish', async () => !svc.trainer.active);
+    kind = 'cuda';
+    // 3: the set-up fails: this run is on the processor, the card is left alone for a day, and the line says why.
+    ready = false;
+    setupFails = true;
+    gate = Promise.resolve();
+    await addTyped('A message for the run whose set-up fails');
+    k = trainLog().length;
+    const before = Date.now();
+    await post('/api/suggest/train');
+    const cpu = await until('the run on the processor', async () => trainLog()[k]);
+    assert.equal(arg(cpu, '--device'), 'cpu');
+    assert.ok(!cpu.args.includes('--micro-tokens'));
+    assert.equal(cpu.cvd, '', 'no card is visible to it');
+    await until('it to finish', async () => !svc.trainer.active);
+    const hold = gpuHold(db)!;
+    assert.match(hold.why, /could not be set up: no network/);
+    assert.ok(hold.until >= before + 23 * 3600_000 && hold.until <= Date.now() + 25 * 3600_000, 'for a day');
+    assert.match((await trainState()).noGpu!, /no network/);
+    // Held: not asked about, not set up again.
+    const [p0, s0] = [picks.length, setups.length];
+    await addTyped('A message for the run while the card is held back');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.equal(arg(trainLog()[k], '--device'), 'cpu');
+    assert.deepEqual([picks.length, setups.length], [p0, s0]);
+    // The day is over: it is tried again.
+    kvSet(db, 'suggest.train.gpu.hold', JSON.stringify({ until: Date.now() - 1, why: 'old' }));
+    ready = false;
+    setupFails = false;
+    await addTyped('A message for the run when the day is over');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.equal(arg(trainLog()[k], '--device'), 'cuda');
+    assert.equal(picks.length, p0 + 1);
+    assert.equal(gpuHold(db), null);
+    // 4: the card fails in the run: it goes on at once on the processor with the same texts, and the card is held back.
+    flag('traingpufail', true);
+    await addTyped('A message for the run whose card fails');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('both runs', async () => trainLog().length === k + 2 && !svc.trainer.active);
+    const [onCard, onCpu] = [trainLog()[k], trainLog()[k + 1]];
+    assert.deepEqual([arg(onCard, '--device'), arg(onCpu, '--device')], ['cuda', 'cpu']);
+    assert.equal(onCpu.sha, onCard.sha, 'the same texts');
+    assert.ok(onCpu.args.includes('--resume'), 'from its resume state');
+    assert.equal(onCpu.cvd, '');
+    assert.match(gpuHold(db)!.why, /graphics card failed/);
+    const done = await trainState();
+    assert.equal(done.state, 'waiting', 'the run itself did not fail');
+    assert.match(done.noGpu!, /graphics card failed/);
+    assert.equal((await get()).status.model.kind, 'personal');
+    // The processor failing too says it was not the card: no hold.
+    kvSet(db, 'suggest.train.gpu.hold', 'null');
+    flag('trainfail', true);
+    await addTyped('A message for the run that fails everywhere');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('both runs', async () => trainLog().length === k + 2 && !svc.trainer.active);
+    assert.equal(gpuHold(db), null, 'the card was not at fault');
+    assert.equal((await trainState()).state, 'failed');
+    flag('trainfail', false);
+    flag('traingpufail', false);
+    // 5: the setting off: the card is not even asked about.
+    await put({ trainGpu: false });
+    const p1 = picks.length;
+    await addTyped('A message for the run with the card turned off');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.equal(arg(trainLog()[k], '--device'), 'cpu');
+    assert.equal(picks.length, p1);
+    assert.equal((await trainState()).noGpu, undefined, 'and no reason is given');
+    await put({ trainGpu: true });
+    // 6: paused while the environment is being set up: it stops, nothing is held back, and Resume sets it up again.
+    ready = false;
+    gate = new Promise(() => {});
+    await addTyped('A message for the pause during the set-up');
+    k = trainLog().length;
+    const s1 = setups.length;
+    await post('/api/suggest/train');
+    await until('the set-up', async () => setups.length === s1 + 1);
+    assert.equal((await post('/api/suggest/train/pause')).statusCode, 200);
+    await until('the run to end', async () => !svc.trainer.active);
+    assert.equal(trainLog().length, k);
+    assert.equal(gpuHold(db), null, 'a stop is not a failure');
+    assert.equal((await trainState()).state, 'paused');
+    gate = Promise.resolve();
+    await post('/api/suggest/train');
+    await until('the run on the card', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.equal(arg(trainLog()[k], '--device'), 'cuda');
+  } finally {
+    svc.trainer.deps = real;
+    flag('trainhold', false);
+    flag('traingpufail', false);
+    flag('trainfail', false);
+  }
 });
 
 test('12: a swap that a crash cut short is finished or undone at start; the new model is private', () => {

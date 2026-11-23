@@ -66,6 +66,8 @@ export const suggest: Feature = {
     });
     d.app.post('/api/suggest/warm', async () => s.warm());
     d.app.post('/api/suggest/train', async () => s.train());
+    d.app.post('/api/suggest/train/pause', async () => s.pause());
+    d.app.delete('/api/suggest/train', async () => s.stopTraining());
     d.app.delete('/api/suggest/personal', async () => s.forget());
     // What suggestions did, as counts: the page sends them in batches.
     d.app.post('/api/suggest/usage', async (req) => ({ usage: s.addUsage(cleanUsage(req.body ?? {})) }));

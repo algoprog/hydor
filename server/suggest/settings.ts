@@ -13,7 +13,7 @@ const SCHEDULE = ['nightly', 'weekly', 'manual'] as const;
 const WHERE = ['chat', 'docs', 'notes', 'other'] as const;
 const SOURCES = ['messages', 'replies', 'notes', 'docs'] as const;
 const NUMBERS = ['precision', 'typedWords', 'contextWords', 'threads', 'userWeight', 'trainThreads'] as const;
-const SWITCHES = ['enabled', 'nextWord', 'switchByLanguage', 'sessionCache', 'personalise'] as const;
+const SWITCHES = ['enabled', 'nextWord', 'switchByLanguage', 'sessionCache', 'personalise', 'trainGpu'] as const;
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 

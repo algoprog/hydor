@@ -12,7 +12,7 @@ import { LOCALE } from '../../i18n/locale';
 import { toastError, useUI } from '../../lib/store';
 import { Group, Notice, Row, Select, Stack, Stepper } from '../settings/kit';
 import { hasCounts, summarise } from './logic';
-import { forgetPersonal, resetUsage, retrainNow, setSuggest, useSuggest, useSuggestOpen } from './store';
+import { forgetPersonal, pauseTraining, resetUsage, resumeTraining, retrainNow, setSuggest, stopTraining, useSuggest, useSuggestOpen } from './store';
 import { discardUsage, flushUsage } from './usage';
 
 const automatic = (n: number) => (n === 0 ? 'Automatic' : String(n));
@@ -55,6 +55,49 @@ function llmLine(s: SuggestStatus, wanted: Settings['llm']): { tone: 'ok' | 'inf
     return { tone: 'err', text: l.detail ? `The language model could not start: ${l.detail}. The small model alone is making the suggestions.` : 'The language model could not start. The small model alone is making the suggestions.' };
   }
   return { tone: 'info', text: wanted === 'off' ? 'The language model is turned off here. The small model alone is making the suggestions.' : 'The language model is not running (it starts when you next type).' };
+}
+
+/** Where a run learns, in words (the card's name is the computer's own). */
+function deviceLine(d: NonNullable<SuggestStatus['training']['device']>): string {
+  if (d.kind === 'cpu') return 'On the processor';
+  return d.name ? `On the graphics card: ${d.name}` : 'On the graphics card';
+}
+
+/** The learning line's buttons: Pause and Stop while a run goes, Resume and Stop while it is paused. */
+function RunControls({ paused }: { paused: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [confirm, confirmNode] = useConfirm();
+  const go = (f: () => Promise<void>) => {
+    setBusy(true);
+    f()
+      .catch(toastError)
+      .finally(() => setBusy(false));
+  };
+  return (
+    <span className="mt-2 flex flex-wrap gap-2">
+      {confirmNode}
+      {paused ? (
+        <Button size="sm" disabled={busy} onClick={() => go(resumeTraining)}>
+          Resume
+        </Button>
+      ) : (
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => go(pauseTraining)}>
+          Pause
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={busy}
+        onClick={async () => {
+          const ok = await confirm({ title: 'Stop learning?', body: 'What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.', confirm: 'Stop', danger: true });
+          if (ok) go(stopTraining);
+        }}
+      >
+        Stop
+      </Button>
+    </span>
+  );
 }
 
 /** How it is doing: set-up and loading, the language model, the small model in use, and learning. */
@@ -101,6 +144,18 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
         <Notice icon={<Throbber size={15} />}>
           {t.progress && t.progress.total ? `Learning from your writing: ${Math.round((100 * t.progress.done) / t.progress.total)}%` : 'Learning from your writing…'}
           {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2 w-64 max-w-full" />}
+          {/* Before train.py starts, on a card: PyTorch's CUDA build is downloaded the first time. */}
+          {!t.progress && t.device?.kind === 'cuda' && <span className="block text-[12px] text-fg-3">Getting PyTorch for the graphics card (about 2.5 GB, the first time)…</span>}
+          {t.device && t.progress && <span className="block text-[12px] text-fg-3">{deviceLine(t.device)}</span>}
+          <RunControls paused={false} />
+        </Notice>
+      )}
+      {t.state === 'paused' && (
+        <Notice>
+          {t.progress && t.progress.total ? `Paused at ${Math.round((100 * t.progress.done) / t.progress.total)}%` : 'Paused'}
+          {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2 w-64 max-w-full" />}
+          <span className="block text-[12px] text-fg-3">It goes on from here when you press Resume, and does not start by itself until then.</span>
+          <RunControls paused />
         </Notice>
       )}
       {t.state === 'waiting' && settings.personalise && <Notice>{t.next ? `It learns from your writing next at ${when(t.next)}, when the computer is quiet.` : 'It learns from your writing when the computer is quiet.'}</Notice>}
@@ -209,6 +264,7 @@ export function SuggestSettings() {
   const off = !settings.enabled;
   const learning = !settings.personalise;
   const running = status.training.state === 'running';
+  const paused = status.training.state === 'paused';
   const num = (key: 'typedWords' | 'contextWords' | 'threads' | 'userWeight' | 'trainThreads', label: string, step = 1, format?: (n: number) => string) => (
     <Stepper label={label} value={settings[key]} min={SUGGEST_LIMITS[key][0]} max={SUGGEST_LIMITS[key][1]} step={step} format={format} onChange={(n) => set({ [key]: n })} />
   );
@@ -315,6 +371,22 @@ export function SuggestSettings() {
         <Row label="Weight of my own words" hint="How much more your own typing counts than text from agents; 1 counts them alike" disabled={learning} control={num('userWeight', 'Weight of my own words')} />
         <Row label="Threads for learning" hint="How many processor threads learning uses; Automatic picks from the computer's cores" disabled={learning} control={num('trainThreads', 'Threads for learning', 1, automatic)} />
         <Row
+          label="Learn on the graphics card"
+          hint="Many times faster on an NVIDIA graphics card with 4 GB free, or a Mac with Apple silicon"
+          info="The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later."
+          disabled={learning}
+          control={<Switch on={settings.trainGpu} label="Learn on the graphics card" disabled={learning} onChange={(trainGpu) => set({ trainGpu })} />}
+        >
+          {settings.trainGpu && !learning && status.training.noGpu && (
+            <>
+              <span className="block text-[12px] text-fg-3">Why not the graphics card:</span>
+              <span translate="no" className="block text-[12px] break-words text-fg-3">
+                {status.training.noGpu}
+              </span>
+            </>
+          )}
+        </Row>
+        <Row
           label="Retrain now"
           hint="Learns from your writing again now; the first time can take hours on a computer without a graphics card"
           disabled={learning || off}
@@ -340,7 +412,7 @@ export function SuggestSettings() {
             <Button
               size="sm"
               variant="danger"
-              disabled={busy === 'forget' || (status.model.kind !== 'personal' && !running)}
+              disabled={busy === 'forget' || (status.model.kind !== 'personal' && !running && !paused)}
               onClick={async () => {
                 const ok = await confirm({ title: 'Forget what it learned?', body: 'This deletes the small model that was made on this computer from your writing. Suggestions go back to the one that came with the app, and it learns again at its next time.', confirm: 'Forget', danger: true });
                 if (!ok) return;

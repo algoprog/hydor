@@ -167,7 +167,14 @@ text (`--init` the personal model) and take minutes.
 - **Personalising**: with `personalise` on and the schedule due (`nightly`: when 20 h have passed and the person has
   not typed for 10 minutes, as memory's tidy-up; `weekly`; `manual`: only "Retrain now"), Node writes the texts
   (below) and runs `train.py` at `nice 19` (Windows: below-normal priority), then `load`s the new personal model.
-  The first run reads everything; later ones the texts since the last run, from the personal model.
+  The first run reads everything; later ones the texts since the last run, from the personal model. A run is paused
+  (`POST /api/suggest/train/pause`: SIGTERM, train.py saves its resume state; the pause is kept in `kv`, so it holds the
+  schedule across restarts), resumed (`POST /api/suggest/train`) or stopped (`DELETE /api/suggest/train`: the work folder goes
+  and the schedule counts it as an attempt). With `trainGpu` on, each run picks its device first (`server/suggest/gpu.ts`):
+  an NVIDIA card with at least 4 GB free and under 50% use (the most free, among those `CUDA_VISIBLE_DEVICES` leaves), run
+  with `--device cuda --micro-tokens <batch>` from a second private environment (`venv-gpu`, PyTorch's CUDA build for the
+  newest CUDA the driver supports), or `mps` on a Mac with Apple silicon. A card that cannot be set up or fails in a run
+  makes that run (resumed) go on the processor, and holds the card back for a day.
 - **The texts**: the person's own typed words from sessions (`chunk_text` kind `user`, through `ownWords`, sessions
   with memory on and not confidential, not subagents', minus the injected text `research/word-suggest/data/extract.py`
   filters out: cross-session and child messages, scheduled-run text, wrapper tags), each with the agent reply it

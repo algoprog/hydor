@@ -27599,5 +27599,19 @@
   "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.": "Οι πληκτρολογήσεις που εξοικονομήθηκαν και οι προτάσεις που ήταν σωστές μηδενίζονται και η καταμέτρηση ξεκινά ξανά από τώρα. Τίποτα άλλο δεν αλλάζει.",
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "επαναφορά καθαρισμός μηδέν στατιστικά στοιχεία χρήση αριθμοί μετρητές πληκτρολογήσεις εξοικονόμηση προτάσεις σωστές λάθος πόσες πληκτρολόγηση κοινοποίηση νέα αρχή reset stats",
   "{0}: a whole number from 0 to {1}": "{0}: ακέραιος αριθμός από 0 έως {1}",
-  "{0}: not a count ({1})": "{0}: δεν είναι μετρητής ({1})"
+  "{0}: not a count ({1})": "{0}: δεν είναι μετρητής ({1})",
+  "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "Λήψη του PyTorch για την κάρτα γραφικών (περίπου 2,5 GB, την πρώτη φορά)…",
+  "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu κάρτα γραφικών nvidia cuda mac apple silicon mps ταχύτερα ταχύτητα εκμάθηση εκπαίδευση γρήγορα vram graphics card",
+  "It goes on from here when you press Resume, and does not start by itself until then.": "Συνεχίζει από εδώ όταν πατήσετε Συνέχεια και δεν ξεκινά αυτόματα μέχρι τότε.",
+  "Learn on the graphics card": "Εκμάθηση στην κάρτα γραφικών",
+  "Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor": "Η εκμάθηση γίνεται σε κάρτα γραφικών NVIDIA ή σε Mac με Apple silicon όταν υπάρχει μία ελεύθερη, πολλές φορές ταχύτερα από ό,τι στον επεξεργαστή",
+  "Many times faster on an NVIDIA graphics card with 4 GB free, or a Mac with Apple silicon": "Πολλές φορές ταχύτερα σε κάρτα γραφικών NVIDIA με 4 GB ελεύθερα ή σε Mac με Apple silicon",
+  "Nothing is being learned right now": "Αυτή τη στιγμή δεν γίνεται εκμάθηση",
+  "On the graphics card": "Στην κάρτα γραφικών",
+  "On the graphics card: {0}": "Στην κάρτα γραφικών: {0}",
+  "Paused at {0}%": "Σε παύση στο {0}%",
+  "Stop learning?": "Διακοπή της εκμάθησης;",
+  "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "Την πρώτη φορά σε κάρτα NVIDIA, κατεβάζει το PyTorch για αυτήν (περίπου 2,5 GB). Μια κάρτα που είναι απασχολημένη ή έχει λιγότερα από 4 GB ελεύθερα αφήνεται ήσυχη, όπως και μια που αποτυγχάνει: η εκμάθηση συνεχίζεται τότε στον επεξεργαστή, και η κάρτα δοκιμάζεται ξανά μία μέρα αργότερα.",
+  "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "Ό,τι έμαθε μέχρι τώρα αυτή η εκτέλεση απορρίπτεται· το μοντέλο που έχετε τώρα παραμένει, και η επόμενη εκτέλεση ξεκινά στη συνηθισμένη της ώρα.",
+  "Why not the graphics card:": "Γιατί όχι η κάρτα γραφικών:"
 }

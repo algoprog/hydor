@@ -821,6 +821,11 @@ row('suggest', 'Threads for learning', 'number', {
   write: put('/api/suggest', (v) => ({ trainThreads: v })),
   note: '0 chooses from the computer’s processors.',
 });
+row('suggest', 'Learn on the graphics card', 'switch', {
+  read: rd('/api/suggest', 'settings.trainGpu'),
+  write: put('/api/suggest', (v) => ({ trainGpu: v })),
+  note: 'Why it did not, if it did not, is in GET /api/suggest, status.training.noGpu; the run that is going shows where it learns in status.training.device.',
+});
 row('suggest', 'Retrain now', 'action', {
   act: {
     run: async (api) => {

@@ -331,6 +331,7 @@
 - [**自分のドキュメントから**](/settings?s=suggest&find=From%20my%20documents)：書いたドキュメントやページから学習します。
 - [**自分の言葉の重み**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：学習の対象のうち、入力した単語を他のテキストよりどのくらい重視するか。
 - [**学習用スレッド数**](/settings?s=suggest&find=Threads%20for%20learning)：学習に使うプロセッサスレッド数（デフォルトは自動）。
+- [**グラフィックスカードで学習**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card)：空いているNVIDIAのグラフィックスカードやApple siliconのMacがあれば、そこで学習します。プロセッサより何倍も高速です。
 - [**今すぐ再学習**](/settings?s=suggest&find=Retrain%20now)：前回以降に書いた内容を、バックグラウンドで今すぐ学習します。
 - [**学習内容を消去**](/settings?s=suggest&find=Forget%20what%20it%20learned)：入力内容から学習したモデルを削除し、アプリに付属のモデルに戻します。
 

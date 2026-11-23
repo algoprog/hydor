@@ -25740,5 +25740,19 @@
   "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.": "節約したキー入力数と正解した提案数がゼロに戻り、今から数え直します。ほかは変わりません。",
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "リセット クリア ゼロ 統計 使用状況 数 カウント 入力 キー入力 節約 提案 正解 不正解 何回 タイピング 割合 最初からやり直し reset stats",
   "{0}: a whole number from 0 to {1}": "{0}：0から{1}までの整数",
-  "{0}: not a count ({1})": "{0}：数値ではありません（{1}）"
+  "{0}: not a count ({1})": "{0}：数値ではありません（{1}）",
+  "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "グラフィックスカード用のPyTorchを取得しています（初回は約2.5 GB）…",
+  "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu グラフィックスカード グラボ nvidia cuda mac apple silicon mps 高速 速度 学習 トレーニング 速い vram graphics card",
+  "It goes on from here when you press Resume, and does not start by itself until then.": "「再開」を押すとここから続けます。それまでは自動では始まりません。",
+  "Learn on the graphics card": "グラフィックスカードで学習",
+  "Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor": "空いているNVIDIAのグラフィックスカードやApple siliconのMacがあれば、そこで学習します。プロセッサより何倍も高速です",
+  "Many times faster on an NVIDIA graphics card with 4 GB free, or a Mac with Apple silicon": "4 GBの空きがあるNVIDIAのグラフィックスカードやApple siliconのMacでは、何倍も高速になります",
+  "Nothing is being learned right now": "今は何も学習していません",
+  "On the graphics card": "グラフィックスカード",
+  "On the graphics card: {0}": "グラフィックスカード：{0}",
+  "Paused at {0}%": "{0}%で一時停止中",
+  "Stop learning?": "学習を停止しますか？",
+  "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "NVIDIAのカードでは初回にPyTorchをダウンロードします（約2.5 GB）。使用中のカードや空きが4 GB未満のカード、失敗したカードは使わず、その場合はプロセッサで学習を続け、カードは1日後にもう一度試します。",
+  "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "この実行でこれまでに学習した内容は破棄されます。今あるモデルはそのまま残り、次の実行は通常の時刻に始まります。",
+  "Why not the graphics card:": "グラフィックスカードを使わない理由："
 }

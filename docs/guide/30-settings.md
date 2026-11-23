@@ -331,6 +331,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**From my documents**](/settings?s=suggest&find=From%20my%20documents): Learn from the documents and pages you wrote.
 - [**Weight of my own words**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): How much more the words you typed count than the rest it learns from.
 - [**Threads for learning**](/settings?s=suggest&find=Threads%20for%20learning): Processor threads for learning (automatic by default).
+- [**Learn on the graphics card**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor.
 - [**Retrain now**](/settings?s=suggest&find=Retrain%20now): Learns from what you wrote since the last time, now, in the background.
 - [**Forget what it learned**](/settings?s=suggest&find=Forget%20what%20it%20learned): Deletes the model that learned from you; the one that came with the app is used again.
 

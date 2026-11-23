@@ -331,6 +331,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Dos meus documentos**](/settings?s=suggest&find=From%20my%20documents): Aprender com os documentos e as páginas que você escreveu.
 - [**Peso das minhas próprias palavras**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Quanto mais as palavras que você digitou contam em relação ao resto do que ele aprende.
 - [**Threads para o aprendizado**](/settings?s=suggest&find=Threads%20for%20learning): Threads do processador para o aprendizado (automático por padrão).
+- [**Aprender na placa de vídeo**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): O aprendizado roda em uma placa de vídeo NVIDIA ou em um Mac com Apple silicon quando há uma livre, muitas vezes mais rápido do que no processador.
 - [**Treinar de novo**](/settings?s=suggest&find=Retrain%20now): Aprende agora, em segundo plano, com o que você escreveu desde a última vez.
 - [**Esquecer o que aprendeu**](/settings?s=suggest&find=Forget%20what%20it%20learned): Exclui o modelo que aprendeu com você; o que veio com o app volta a ser usado.
 

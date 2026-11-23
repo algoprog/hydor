@@ -27596,5 +27596,19 @@
   "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.": "节省的按键次数和正确的建议数会归零，并从现在开始重新统计。其他内容不会改变。",
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "重置 清零 归零 统计 用量 数字 计数 节省的按键 按键 已节省 建议 正确 错误 多少 输入 分享 重新开始 reset clear zero statistics stats usage counts keystrokes suggestions",
   "{0}: a whole number from 0 to {1}": "{0}：需为 0 到 {1} 之间的整数",
-  "{0}: not a count ({1})": "{0}：不是有效的数字（{1}）"
+  "{0}: not a count ({1})": "{0}：不是有效的数字（{1}）",
+  "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "正在获取适用于显卡的 PyTorch（约 2.5 GB，仅第一次）…",
+  "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu 显卡 nvidia cuda mac apple silicon mps 更快 速度 学习 训练 快 vram 显存 graphics card",
+  "It goes on from here when you press Resume, and does not start by itself until then.": "按下“继续”后会从这里接着学习，在此之前不会自行开始。",
+  "Learn on the graphics card": "在显卡上学习",
+  "Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor": "有空闲的 NVIDIA 显卡或搭载 Apple 芯片的 Mac 时，会在其上学习，比在处理器上快很多倍",
+  "Many times faster on an NVIDIA graphics card with 4 GB free, or a Mac with Apple silicon": "在有 4 GB 空闲的 NVIDIA 显卡或搭载 Apple 芯片的 Mac 上，快很多倍",
+  "Nothing is being learned right now": "现在没有在学习",
+  "On the graphics card": "在显卡上",
+  "On the graphics card: {0}": "在显卡上：{0}",
+  "Paused at {0}%": "已暂停，进度 {0}%",
+  "Stop learning?": "停止学习？",
+  "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "第一次在 NVIDIA 显卡上时，会为它下载 PyTorch（约 2.5 GB）。繁忙或空闲不足 4 GB 的显卡不会被使用，出错的显卡也一样：这时会改在处理器上继续学习，一天后再试这块显卡。",
+  "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "这次运行目前学到的内容会被丢弃；你现在使用的模型保持不变，下一次运行会在平常的时间开始。",
+  "Why not the graphics card:": "为什么没用显卡："
 }

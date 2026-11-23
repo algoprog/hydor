@@ -6,12 +6,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import type { SuggestSettings, SuggestStatus } from '../../shared/suggest.ts';
-import type { DB } from '../db.ts';
+import type { SuggestSettings, SuggestStatus, TrainDevice } from '../../shared/suggest.ts';
+import { kvGet, kvSet, type DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import { childEnv } from './engine.ts';
+import { chooseDevice, type DevicePick } from './gpu.ts';
 import { track } from './procs.ts';
-import { pythonPath, releaseDir, suggestDir, trainScript } from './setup.ts';
+import { gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, suggestDir, trainScript } from './setup.ts';
 import { trainThreads } from './settings.ts';
 import { writeTexts } from './texts.ts';
 
@@ -111,18 +112,84 @@ export interface TrainHooks {
   beforeSwap?(): void | Promise<void>;
 }
 
-export type TrainOutcome = { ok: true; tokens?: number } | { ok: false; why: string; nothing?: boolean };
+/** halted: the run was ended on purpose, by a stop (what it did is dropped) or a pause (it goes on from its resume state). */
+export type TrainOutcome = { ok: true; tokens?: number } | { ok: false; why: string; nothing?: boolean; halted?: 'stop' | 'pause' };
+
+/** After a graphics card fails or cannot be set up, the processor is used for a day. */
+export const GPU_HOLD_MS = 24 * 3600_000;
+const GPU_HOLD_KEY = 'suggest.train.gpu.hold';
+const LAST_KEY = 'suggest.train.device';
+
+/** Why the graphics card is not used until when (a failure, or a set-up that did not work), while that holds. */
+export function gpuHold(db: DB, now = Date.now()): { until: number; why: string } | null {
+  try {
+    const h = JSON.parse(kvGet(db, GPU_HOLD_KEY) ?? 'null') as { until?: number; why?: string } | null;
+    return h && typeof h.until === 'number' && h.until > now && typeof h.why === 'string' ? { until: h.until, why: h.why } : null;
+  } catch {
+    return null;
+  }
+}
+const holdGpu = (db: DB, why: string, now = Date.now()) => kvSet(db, GPU_HOLD_KEY, JSON.stringify({ until: now + GPU_HOLD_MS, why }));
+const releaseGpu = (db: DB) => kvSet(db, GPU_HOLD_KEY, 'null');
+
+/** Where the last run learned, and why not on the graphics card when that was wanted. */
+export interface LastDevice {
+  device: TrainDevice;
+  why?: string;
+}
+export function lastDevice(db: DB): LastDevice | null {
+  try {
+    const l = JSON.parse(kvGet(db, LAST_KEY) ?? 'null') as LastDevice | null;
+    return l && l.device && ['cpu', 'cuda', 'mps'].includes(l.device.kind) ? l : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What a run asks of the outside, so a test can answer for it. */
+export interface TrainDeps {
+  /** Where to learn (the graphics card when there is a free one and the setting allows). */
+  pick(s: SuggestSettings): Promise<DevicePick>;
+  /** The CUDA environment is set up for this PyTorch build. */
+  gpuReady(tag: string): boolean;
+  /** Sets it up (downloads PyTorch's CUDA build), reporting where it is, and stopping when `signal` ends. */
+  setupGpu(tag: string, report: (detail: string) => void, signal: AbortSignal): Promise<void>;
+}
+
+const realDeps: TrainDeps = {
+  pick: (s) => chooseDevice({ enabled: s.trainGpu }),
+  gpuReady: gpuPackagesReady,
+  setupGpu: setupGpuPython,
+};
 
 export class Trainer {
   state: SuggestStatus['training'] = { state: 'idle' };
   private proc: ChildProcess | null = null;
   private running: Promise<TrainOutcome> | null = null;
-  private stopping = false;
+  /** The run is being ended on purpose: stopped (dropped) or paused (kept). A stop wins over a pause. */
+  private halted: 'stop' | 'pause' | null = null;
+  private ctl = new AbortController();
   private cleanAfter = false;
+  deps: TrainDeps = realDeps;
   constructor(private onChange: () => void) {}
 
   get active() {
     return !!this.running;
+  }
+
+  /** The run is being ended (stopped or paused). */
+  get stopping() {
+    return this.halted !== null;
+  }
+
+  /** The run is being stopped (not paused). */
+  private get dropped() {
+    return this.halted === 'stop';
+  }
+
+  /** Resolves once no run is going (at once when none is). */
+  async settled() {
+    while (this.running) await this.running.catch(() => {});
   }
 
   private set(s: SuggestStatus['training']) {
@@ -132,7 +199,18 @@ export class Trainer {
 
   /** Stops a run that is going (its resume state stays: the next run goes on from it). */
   stop() {
-    this.stopping = true;
+    this.halted = 'stop';
+    this.end();
+  }
+
+  /** Pauses a run that is going: the same, but the run is told apart (the service holds the schedule until it is resumed). */
+  pause() {
+    this.halted ??= 'pause';
+    this.end();
+  }
+
+  private end() {
+    this.ctl.abort();
     const p = this.proc;
     if (p) {
       try {
@@ -151,13 +229,18 @@ export class Trainer {
   stopAndClean() {
     this.stop();
     if (this.running) this.cleanAfter = true;
-    else fs.rmSync(workDir(), { recursive: true, force: true });
+    else {
+      fs.rmSync(workDir(), { recursive: true, force: true });
+      this.state = { state: 'idle', lastAt: this.state.lastAt };
+      this.onChange();
+    }
   }
 
   /** One run, now: write the texts, personalise, put the new model in place. */
   run(db: DB, s: SuggestSettings, o: { now?: number; hooks?: TrainHooks } = {}): Promise<TrainOutcome> {
     if (this.running) return this.running;
-    this.stopping = false;
+    this.halted = null;
+    this.ctl = new AbortController();
     this.cleanAfter = false;
     this.running = this.go(db, s, o.now ?? Date.now(), o.hooks ?? {}).finally(() => {
       this.running = null;
@@ -170,9 +253,12 @@ export class Trainer {
 
   private async go(db: DB, s: SuggestSettings, startedAt: number, hooks: TrainHooks): Promise<TrainOutcome> {
     const fail = (why: string, nothing = false): TrainOutcome => {
-      this.set({ state: nothing ? 'idle' : 'failed', startedAt: undefined, lastAt: this.state.lastAt, detail: why });
-      return { ok: false, why, nothing };
+      const halted = this.halted ?? undefined;
+      // Ended on purpose: nothing to explain (the service shows a pause, and a stop is the person's own).
+      this.set({ state: nothing ? 'idle' : 'failed', startedAt: undefined, lastAt: this.state.lastAt, detail: halted ? undefined : why });
+      return { ok: false, why, nothing, halted };
     };
+    const ended = () => (this.dropped ? 'Stopped' : 'Paused');
     const release = releaseDir();
     if (!release) return fail('The small model is not available yet');
     this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, detail: 'Reading what you wrote' });
@@ -192,7 +278,7 @@ export class Trainer {
       } catch {}
       if (!resumed) fs.rmSync(outDir(), { recursive: true, force: true });
       const n = await writeTexts(db, texts, { since, until, sources: s.sources });
-      if (this.stopping) return fail('Stopped', true);
+      if (this.stopping) return fail(ended(), true);
       const count = n.user + n.agent + n.doc;
       if (!count) {
         fs.rmSync(job, { force: true });
@@ -201,14 +287,33 @@ export class Trainer {
       fs.writeFileSync(job, JSON.stringify({ since, until, texts: n }), { mode: 0o600 });
       const threads = trainThreads(s);
       const init = hasPersonal() ? personalDir() : release;
-      const args = [
-        '-I', trainScript(), '--texts', texts, '--base', release, '--init', init, '--out', outDir(), '--replay', path.join(release, 'replay'),
-        '--lr', '5e-4', '--batch-tokens', '4096', '--w-user', String(s.userWeight), '--replay-ratio', '1.0', '--epochs', '1',
-        // The processor: `auto` would pick an Apple GPU, which the lowest priority does not reach.
-        '--threads', String(threads), '--device', 'cpu', '--resume',
-      ];
       this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}` });
-      const done = await this.spawnTrain(args, threads);
+      // Where to learn: the graphics card when there is one to use, else the processor (and why not, for the page).
+      let pick = await this.choose(db, s);
+      if (this.stopping) return fail(ended(), true);
+      let python = pythonPath();
+      if (pick.device.kind === 'cuda') {
+        const prepared = await this.prepareGpu(db, pick.tag!, startedAt);
+        if (this.stopping) return fail(ended(), true);
+        if (prepared.ok) python = gpuPythonPath();
+        else pick = { device: { kind: 'cpu' }, why: prepared.why };
+      }
+      const attempt = (p: DevicePick, py: string) => {
+        this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}`, device: { kind: p.device.kind, name: p.device.name } });
+        return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p }), this.envFor(threads, p));
+      };
+      kvSet(db, LAST_KEY, JSON.stringify({ device: { kind: pick.device.kind, name: pick.device.name }, ...(pick.why ? { why: pick.why } : {}) } satisfies LastDevice));
+      let done = await attempt(pick, python);
+      if (!done.ok && !done.nothing && !this.stopping && pick.device.kind !== 'cpu') {
+        // The graphics card did not work (out of memory, a driver that fails): this run goes on at once on the processor from its
+        // resume state, and the card is left alone for a day.
+        const why = `Learning on the graphics card failed: ${done.why}`;
+        holdGpu(db, why);
+        kvSet(db, LAST_KEY, JSON.stringify({ device: { kind: 'cpu' }, why } satisfies LastDevice));
+        done = await attempt({ device: { kind: 'cpu' } }, pythonPath());
+        // A processor that fails the same way says it was not the card.
+        if (!done.ok && !done.nothing && !this.stopping) releaseGpu(db);
+      }
       if (!done.ok && done.nothing) {
         // train.py found nothing it can learn from in these texts (all too short, say): not a failure, and not to be tried again.
         fs.rmSync(job, { force: true });
@@ -216,15 +321,15 @@ export class Trainer {
         return fail(done.why, true);
       }
       if (!done.ok) return fail(done.why, this.stopping);
-      // Stopped or forgotten as it ended: its model is not put in.
-      if (this.stopping) return fail('Stopped', true);
+      // Stopped or forgotten as it ended: its model is not put in (a pause that came as it ended is too late: the run is done).
+      if (this.dropped) return fail(ended(), true);
       // The new model is complete in outDir: it takes the place of the old one, which stays until it has.
       for (const f of fs.readdirSync(outDir())) if (/^resume|\.pt$|\.part$|\.tmp$/i.test(f)) fs.rmSync(path.join(outDir(), f), { recursive: true, force: true });
       const state: PersonalState = { trainedAt: Date.now(), since: until, tokens: done.tokens, languages: done.languages, devNll: done.devNll, seconds: done.seconds };
       fs.writeFileSync(path.join(outDir(), 'state.json'), JSON.stringify(state), { mode: 0o600 });
       // Whoever holds the old model's files lets go first (Windows will not move them otherwise).
       await hooks.beforeSwap?.();
-      if (this.stopping) return fail('Stopped', true);
+      if (this.dropped) return fail(ended(), true);
       const next = `${personalDir()}.next`;
       fs.rmSync(next, { recursive: true, force: true });
       fs.renameSync(outDir(), next);
@@ -233,19 +338,66 @@ export class Trainer {
       this.set({ state: 'idle', lastAt: state.trainedAt });
       return { ok: true, tokens: done.tokens };
     } catch (e) {
-      return fail(this.stopping ? 'Stopped' : (e as Error).message || 'Personalising failed', this.stopping);
+      return fail(this.stopping ? ended() : (e as Error).message || 'Personalising failed', this.stopping);
     } finally {
       // The texts are the person's own words: they do not stay beyond the run (a resume reads them again, bounded the same).
       fs.rmSync(texts, { force: true });
     }
   }
 
-  private spawnTrain(args: string[], threads: number): Promise<{ ok: true; tokens?: number; languages?: Record<string, number>; devNll?: number; seconds?: number } | { ok: false; why: string; nothing?: boolean }> {
+  /** Chooses where this run learns: the held-back card is not asked about again, a failure to find out is the processor. */
+  private async choose(db: DB, s: SuggestSettings): Promise<DevicePick> {
+    if (!s.trainGpu) return { device: { kind: 'cpu' } };
+    const hold = gpuHold(db);
+    if (hold) return { device: { kind: 'cpu' }, why: hold.why };
+    try {
+      return await this.deps.pick(s);
+    } catch (e) {
+      return { device: { kind: 'cpu' }, why: `The graphics card could not be looked at: ${(e as Error).message}` };
+    }
+  }
+
+  /** PyTorch's CUDA build is there (the first time it is downloaded, with the learning line saying so); not when it cannot be, and then for a day. */
+  private async prepareGpu(db: DB, tag: string, startedAt: number): Promise<{ ok: true } | { ok: false; why: string }> {
+    if (this.deps.gpuReady(tag)) return { ok: true };
+    const report = (d: string) => this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, detail: d, device: { kind: 'cuda' } });
+    try {
+      report('Getting PyTorch for the graphics card (about 2.5 GB, the first time)');
+      await this.deps.setupGpu(tag, report, this.ctl.signal);
+      return { ok: true };
+    } catch (e) {
+      if (this.stopping) return { ok: false, why: 'Stopped' };
+      const why = `PyTorch for the graphics card could not be set up: ${(e as Error).message}`;
+      holdGpu(db, why);
+      return { ok: false, why };
+    }
+  }
+
+  /** train.py's command line for where it learns. */
+  private args(o: { texts: string; release: string; init: string; s: SuggestSettings; threads: number; pick: DevicePick }): string[] {
+    const batch = 4096;
+    return [
+      '-I', trainScript(), '--texts', o.texts, '--base', o.release, '--init', o.init, '--out', outDir(), '--replay', path.join(o.release, 'replay'),
+      '--lr', '5e-4', '--batch-tokens', String(batch), '--w-user', String(o.s.userWeight), '--replay-ratio', '1.0', '--epochs', '1',
+      // Said outright, never `auto`: the processor unless the choice was a card. A card runs the batch in one piece (the same gradient).
+      '--threads', String(o.threads), '--device', o.pick.device.kind, '--resume',
+      ...(o.pick.device.kind === 'cuda' ? ['--micro-tokens', String(batch)] : []),
+    ];
+  }
+
+  /** The environment of the run: no card unless it is the chosen one (CUDA_VISIBLE_DEVICES names only it, numbered as nvidia-smi does). */
+  private envFor(threads: number, pick: DevicePick) {
+    const extra: Record<string, string> = { OMP_NUM_THREADS: String(threads), MKL_NUM_THREADS: String(threads) };
+    if (pick.device.kind === 'cuda') Object.assign(extra, { CUDA_VISIBLE_DEVICES: String(pick.device.index ?? 0), CUDA_DEVICE_ORDER: 'PCI_BUS_ID' });
+    if (pick.device.kind === 'mps') extra.PYTORCH_ENABLE_MPS_FALLBACK = '1';
+    return childEnv(extra);
+  }
+
+  private spawnTrain(python: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ ok: true; tokens?: number; languages?: Record<string, number>; devNll?: number; seconds?: number } | { ok: false; why: string; nothing?: boolean }> {
     return new Promise((resolve) => {
-      const env = childEnv({ OMP_NUM_THREADS: String(threads), MKL_NUM_THREADS: String(threads) });
       // The lowest priority: `nice` (every thread of the process inherits it), or below normal on Windows.
       const nice = process.platform === 'win32' ? null : which('nice');
-      const proc = nice ? spawn(nice, ['-n', '19', pythonPath(), ...args], { stdio: ['ignore', 'pipe', 'pipe'], env }) : spawn(pythonPath(), args, { stdio: ['ignore', 'pipe', 'pipe'], env });
+      const proc = nice ? spawn(nice, ['-n', '19', python, ...args], { stdio: ['ignore', 'pipe', 'pipe'], env }) : spawn(python, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
       this.proc = proc;
       track('train', proc, trainScript());
       if (process.platform === 'win32' && proc.pid) {

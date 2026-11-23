@@ -331,6 +331,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**De mis documentos**](/settings?s=suggest&find=From%20my%20documents): Aprender de los documentos y páginas que escribiste.
 - [**Peso de mis propias palabras**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Cuánto más pesan las palabras que escribiste frente al resto de lo que aprende.
 - [**Hilos para el aprendizaje**](/settings?s=suggest&find=Threads%20for%20learning): Hilos del procesador para el aprendizaje (automático por defecto).
+- [**Aprender con la tarjeta gráfica**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): El aprendizaje se hace en una tarjeta gráfica NVIDIA o en un Mac con Apple silicon cuando hay una libre, muchas veces más rápido que en el procesador.
 - [**Volver a entrenar ahora**](/settings?s=suggest&find=Retrain%20now): Aprende ahora, en segundo plano, de lo que escribiste desde la última vez.
 - [**Olvidar lo aprendido**](/settings?s=suggest&find=Forget%20what%20it%20learned): Elimina el modelo que aprendió de ti; se vuelve a usar el que venía con la app.
 

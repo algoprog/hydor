@@ -331,6 +331,7 @@
 - [**来自我的文档**](/settings?s=suggest&find=From%20my%20documents)：从你写的文档和页面中学习。
 - [**我自己输入的词的权重**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：你输入的词比它学习的其余内容重要多少。
 - [**用于学习的线程数**](/settings?s=suggest&find=Threads%20for%20learning)：用于学习的处理器线程数（默认自动）。
+- [**在显卡上学习**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card)：有空闲的 NVIDIA 显卡或搭载 Apple 芯片的 Mac 时，会在其上学习，比在处理器上快很多倍。
 - [**立即重新训练**](/settings?s=suggest&find=Retrain%20now)：现在在后台学习你自上次以来写的内容。
 - [**忘记已学内容**](/settings?s=suggest&find=Forget%20what%20it%20learned)：删除从你的写作中学习的模型；改回使用应用自带的模型。
 

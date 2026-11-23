@@ -72,6 +72,24 @@ export async function retrainNow(): Promise<void> {
   await loadSuggest();
 }
 
+/** Pause the learning that is going (Settings: Pause): it stops where it is, and nothing starts it until Resume. */
+export async function pauseTraining(): Promise<void> {
+  take(await post<SuggestState>('/api/suggest/train/pause'));
+  void loadSuggest();
+}
+
+/** Go on with a paused run (Settings: Resume), from where it stopped. */
+export async function resumeTraining(): Promise<void> {
+  take(await post<SuggestState>('/api/suggest/train'));
+  void loadSuggest();
+}
+
+/** Stop the learning that is going or paused (Settings: Stop): what it learned so far is dropped. */
+export async function stopTraining(): Promise<void> {
+  take(await del<SuggestState>('/api/suggest/train'));
+  void loadSuggest();
+}
+
 /** Forget what it learned: the model goes back to the one that came with the app. */
 export async function forgetPersonal(): Promise<void> {
   await del('/api/suggest/personal');

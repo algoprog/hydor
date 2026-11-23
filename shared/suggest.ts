@@ -79,6 +79,8 @@ export interface SuggestSettings {
   userWeight: number;
   /** Threads for personalising (0: chosen from the computer's cores). */
   trainThreads: number;
+  /** Learn on the graphics card when there is one (an NVIDIA card with 4 GB free, or a Mac with Apple silicon); else on the processor. */
+  trainGpu: boolean;
 }
 
 export const SUGGEST_DEFAULTS: SuggestSettings = {
@@ -98,6 +100,7 @@ export const SUGGEST_DEFAULTS: SuggestSettings = {
   sources: { messages: true, replies: true, notes: true, docs: true },
   userWeight: 4,
   trainThreads: 0,
+  trainGpu: true,
 };
 
 /** The limits of the numeric settings (inclusive). */
@@ -142,6 +145,13 @@ export interface SuggestUsage {
   week: SuggestCounts;
 }
 
+/** Where a run of learning is done. */
+export interface TrainDevice {
+  kind: 'cpu' | 'cuda' | 'mps';
+  /** The graphics card's name (cuda). */
+  name?: string;
+}
+
 /** What word suggestions are doing (GET /api/suggest). */
 export interface SuggestStatus {
   /**
@@ -159,14 +169,21 @@ export interface SuggestStatus {
   llm: { state: 'off' | 'starting' | 'ready' | 'memory' | 'failed'; detail?: string; freeMb?: number; totalMb?: number; needMb?: number };
   /** The small model in use: the one that came with the app, or the one personalised on this computer. */
   model: { kind: 'base' | 'personal'; trainedAt?: number; tokens?: number; languages?: Record<string, number> };
-  /** Personalising: idle, waiting for its time (next), running (progress), or the last one failed. */
+  /**
+   * Personalising: idle, waiting for its time (next), running (progress), paused by the person (progress: where it stopped; it
+   * does not start again until Resume), or the last one failed.
+   */
   training: {
-    state: 'idle' | 'waiting' | 'running' | 'failed';
+    state: 'idle' | 'waiting' | 'running' | 'paused' | 'failed';
     progress?: { done: number; total: number };
     startedAt?: number;
     lastAt?: number;
     next?: number;
     detail?: string;
+    /** Where the run learns: on the processor, an NVIDIA graphics card (its name) or a Mac's (while running or paused). */
+    device?: TrainDevice;
+    /** Why the graphics card is not used when the setting is on (for the last run, or the next while it is held back for a day). */
+    noGpu?: string;
   };
   /** Requests answered since the worker started, and their time (ms). */
   stats?: { requests: number; p50Ms?: number; p90Ms?: number };

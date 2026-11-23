@@ -15,7 +15,7 @@ answered. The recipe is the research's:
 - public text from the release's replay folder is mixed into every batch at --replay-ratio tokens per token of the person's, weight 1,
   or the other languages are forgotten;
 - AdamW (betas 0.9 / 0.95, weight decay 0.1 except on the embeddings, convolutions and norms), warm-up and cosine decay, gradient
-  clipping at 1, bf16 autocast on the CPU, batches of --batch-tokens padded tokens, --epochs passes (one).
+  clipping at 1, bf16 autocast on the CPU (and on a graphics card that supports it), batches of --batch-tokens padded tokens, --epochs passes (one).
 
 Output: JSON lines on stdout: {"progress": {"done", "total"}, "loss"} after each step and at the end {"done": true, "dev_nll", "tokens",
 "seconds", "languages": {lang: the person's tokens}}. Every 10 minutes the state is saved to <out>/.resume (--resume continues from it
@@ -359,6 +359,39 @@ def train_step(model: SLM, batch: list, micro_tokens: int, bf16: bool, device) -
     return loss, tokens
 
 
+def use_bf16(device: str) -> bool:
+    """bf16 autocast on the processor, and on a graphics card only when it supports it (older NVIDIA cards do not; the others, an Apple GPU
+    too, run in float32)."""
+    if device == 'cpu':
+        return True
+    if device == 'cuda':
+        try:
+            return bool(torch.cuda.is_bf16_supported())
+        except Exception:
+            return False
+    return False
+
+
+def to_cpu(obj):
+    """The same structure (dicts, lists, tuples, tensors) with every tensor on the processor: a resume state is the same wherever it was saved."""
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu()
+    if isinstance(obj, dict):
+        return {k: to_cpu(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(to_cpu(v) for v in obj)
+    return obj
+
+
+def optimizer_to(opt, device) -> None:
+    """The optimizer's state (its moments) on the device of its parameters: a state saved on another device is moved to this one."""
+    for group in opt.param_groups:
+        for p in group['params']:
+            for k, v in opt.state.get(p, {}).items():
+                if isinstance(v, torch.Tensor) and k != 'step':
+                    opt.state[p][k] = v.to(device=p.device, dtype=p.dtype if v.is_floating_point() else v.dtype)
+
+
 def pick_device(name: str) -> str:
     if name != 'auto':
         return name
@@ -457,7 +490,7 @@ def main(argv=None) -> None:
     device = pick_device(a.device)
     torch.manual_seed(a.seed)
     st = Settings(lr=a.lr, batch_tokens=a.batch_tokens, w_user=a.w_user, replay_ratio=a.replay_ratio, epochs=a.epochs,
-                  warmup=a.warmup, seed=a.seed, bf16=device in ('cpu', 'cuda'))
+                  warmup=a.warmup, seed=a.seed, bf16=use_bf16(device))
 
     # ---- the release, the weights to start from ----
     with open(os.path.join(a.base, 'config.json'), encoding='utf-8') as f:
@@ -519,6 +552,7 @@ def main(argv=None) -> None:
             state = load_resume(os.path.join(resume_dir, 'state.pt'))
             if state.get('sig') == sig:
                 opt.load_state_dict(state['opt'])             # the optimizer first: if either fails, the weights below are the init's
+                optimizer_to(opt, device)                     # a state saved on another device (the processor, a graphics card) moves to this one
                 model.load_state_dict(state['model'])
                 rng_from_plain(replay_rng, state['replay_rng'])
                 step, trained_tokens = int(state['step']), int(state['tokens'])
@@ -544,7 +578,7 @@ def main(argv=None) -> None:
     def save_resume():
         private_dir(resume_dir)
         tmp = private_file(os.path.join(resume_dir, 'state.pt.tmp'))
-        torch.save({'sig': sig, 'model': {k: v.detach().cpu() for k, v in model.state_dict().items()}, 'opt': opt.state_dict(),
+        torch.save({'sig': sig, 'model': {k: v.detach().cpu() for k, v in model.state_dict().items()}, 'opt': to_cpu(opt.state_dict()),
                     'replay_rng': rng_to_plain(replay_rng), 'step': step, 'tokens': trained_tokens}, tmp)
         os.replace(tmp, os.path.join(resume_dir, 'state.pt'))
 

@@ -25740,5 +25740,19 @@
   "The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.": "Les frappes économisées et les suggestions justes repassent à zéro, et le comptage recommence maintenant. Rien d’autre ne change.",
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "réinitialiser remettre à zéro statistiques stats utilisation nombres compteurs frappes économisées suggestions justes fausses combien saisie frappe partage recommencer reset",
   "{0}: a whole number from 0 to {1}": "{0} : un nombre entier de 0 à {1}",
-  "{0}: not a count ({1})": "{0} : ce n’est pas un nombre ({1})"
+  "{0}: not a count ({1})": "{0} : ce n’est pas un nombre ({1})",
+  "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "Récupération de PyTorch pour la carte graphique (environ 2,5 Go, la première fois)…",
+  "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu carte graphique nvidia cuda mac apple silicon mps plus rapide vitesse apprendre entraîner rapide vram graphics card",
+  "It goes on from here when you press Resume, and does not start by itself until then.": "L’apprentissage reprend à partir de là quand vous appuyez sur Reprendre, et ne redémarre pas tout seul d’ici là.",
+  "Learn on the graphics card": "Apprendre sur la carte graphique",
+  "Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor": "L’apprentissage se fait sur une carte graphique NVIDIA ou un Mac avec puce Apple quand il y en a une de libre, bien plus vite que sur le processeur",
+  "Many times faster on an NVIDIA graphics card with 4 GB free, or a Mac with Apple silicon": "Bien plus rapide sur une carte graphique NVIDIA avec 4 Go libres, ou un Mac avec puce Apple",
+  "Nothing is being learned right now": "Rien n’est en cours d’apprentissage pour l’instant",
+  "On the graphics card": "Sur la carte graphique",
+  "On the graphics card: {0}": "Sur la carte graphique : {0}",
+  "Paused at {0}%": "En pause à {0} %",
+  "Stop learning?": "Arrêter l’apprentissage ?",
+  "The first time on an NVIDIA card it downloads PyTorch for it (about 2.5 GB). A card that is busy or has less than 4 GB free is left alone, and so is one that fails: learning then goes on the processor, and the card is tried again a day later.": "La première fois sur une carte NVIDIA, l’application télécharge PyTorch pour elle (environ 2,5 Go). Une carte occupée ou avec moins de 4 Go libres est laissée de côté, tout comme une carte qui échoue : l’apprentissage se poursuit alors sur le processeur, et la carte est réessayée un jour plus tard.",
+  "What this run learned so far is dropped; the model you have now stays, and the next run starts at its usual time.": "Ce que cette exécution a appris jusqu’ici est abandonné ; le modèle que vous avez maintenant reste, et la prochaine exécution démarre à son heure habituelle.",
+  "Why not the graphics card:": "Pourquoi pas la carte graphique :"
 }
