@@ -3,6 +3,23 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.107.0 · 23 November 2026
+
+Word suggestions that run two to three times faster with less to download, and that learn from your writing about four
+times faster on the processor, keeping their place across restarts.
+
+- **Faster suggestions, less to download**: word suggestions now run on ONNX Runtime instead of PyTorch, two to three
+  times faster on the processor and in much less memory, with the same suggestions as before. The first download is
+  about 1.2 GB, and PyTorch (about 200 MB) comes only the first time they learn from your writing. A setup made by an
+  earlier version is brought up to date the first time it is used, with nothing for you to do.
+- **Learning about four times faster on the processor**: the costliest part of each learning step now runs in one pass,
+  more of the processor's cores are used by default (half of them, at most 16; **Threads for learning** still decides),
+  and fast 16-bit arithmetic is used only where the processor has it.
+- **Learning keeps its place across a restart**: an update or a restart of the app no longer loses what a learning run
+  had done since it last saved.
+- **Other languages kept better over time**: each learning run replays different passages of the public text that keeps
+  the other languages in the model, instead of the same few every night.
+
 ## 0.106.0 · 23 November 2026
 
 Antigravity CLI for your Google AI plan, word suggestions that learn on your graphics card and can be paused or
