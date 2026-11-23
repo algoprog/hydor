@@ -3,6 +3,39 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.105.0 · 23 November 2026
+
+Word suggestions as you type, made on your own computer; schedules you can pause and delete wherever they show; and
+the models behind your own OpenAI-compatible gateway seeing images and taking a reasoning effort.
+
+- **Word suggestions**: as you type in a message box, the rest of the word shows in grey and the next word dimmer.
+  **Tab** takes the word, the right arrow at the end takes both, and **Esc** hides them. They work in the message boxes,
+  in **Docs** paragraphs, and in the smaller boxes too (follow-ups, the Ask panels, a queued or earlier message's
+  editor, memory notes and your profile).
+- **Made on your computer**: suggestions come from a small model of their own (published on Hugging Face as
+  hydor-suggest-49m), with a larger language model beside it when the computer has the memory, so nothing you type
+  leaves your computer. They are on by default and set themselves up the first time you type in a message box,
+  downloading about 1.3 GB once.
+- **They learn how you write**: from your messages, documents and notes (and agents' replies, if you like), when the
+  computer is quiet and at the lowest priority. **Settings → Capabilities → Word suggestions** has **Retrain now** and
+  **Forget what it learned**, where they show and what they read, how sure a suggestion must be (**More** by default),
+  how much they help (keystrokes saved, suggestions right), and a switch for each browser.
+- **Pause and delete a schedule wherever it shows**: an agent's page (a built-in agent's too) has a pause switch and a
+  delete button for each of its schedules, a saved schedule's form has **Delete**, and in **Schedules** a right-click on
+  a calendar entry or a row of the list opens **Edit**, **Pause** and **Delete…** (on a phone, tap the entry). Deleting
+  always asks first.
+- **Your own gateway's models see images and reason**: under an endpoint in **Settings → Models → Runtimes and
+  endpoints**, **Set what each model can do** gives each model **Sees images** and **Reasoning effort**: **Automatic**,
+  **Yes** or **No**. Automatic follows what the endpoint says of the model, LiteLLM's model information included. A
+  model that sees images gets your screenshots and pictures as they are, and one that reasons offers Low, Medium and
+  High in the **Effort** menu.
+- **Wiki memory on a network drive no longer stalls the app**: the wiki's upkeep in the background reads its files
+  without holding the app up, reads each article once and only the folders it needs, so the app keeps answering while
+  a wiki on a NAS is read.
+- **One agent process for each session**: two starts of a session at the same moment (a usage limit's move to another
+  account and a queued message) could leave two agent processes running, and after a restart the session's tools
+  stopped answering. A session now starts once.
+
 ## 0.104.0 · 23 November 2026
 
 A stronger ad blocker in your own browser, for YouTube and the sites that look for ad blockers too, with what it blocked
