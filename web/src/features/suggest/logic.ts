@@ -22,6 +22,8 @@ export interface Field {
   selected?: boolean;
   /** An input method (Japanese, Chinese, an accent key…) is composing. */
   composing?: boolean;
+  /** Which box it is, where one editor holds many (Docs: a paragraph): another box is never "typing more". */
+  id?: string;
 }
 
 /** The switches that decide whether to ask in a place. */
@@ -116,7 +118,7 @@ export const takeAll = (g: Grey): string => g.word + g.next;
  */
 export function typedBetween(prev: Field | null, cur: Field): string | null {
   if (!prev) return null;
-  if (prev.after !== cur.after) return null;
+  if (prev.after !== cur.after || prev.id !== cur.id) return null;
   if (!cur.before.startsWith(prev.before)) return null;
   return cur.before.slice(prev.before.length);
 }

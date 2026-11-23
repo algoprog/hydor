@@ -25,7 +25,7 @@ export interface Outside {
   client: string;
 }
 
-const same = (a: Field | null, b: Field | null) => !!a && !!b && a.before === b.before && a.after === b.after && !!a.selected === !!b.selected && !!a.composing === !!b.composing;
+const same = (a: Field | null, b: Field | null) => !!a && !!b && a.before === b.before && a.after === b.after && a.id === b.id && !!a.selected === !!b.selected && !!a.composing === !!b.composing;
 
 export class Suggester {
   grey: Grey | null = null;

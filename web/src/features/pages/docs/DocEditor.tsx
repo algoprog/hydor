@@ -76,6 +76,7 @@ import { citeItems, citeOf, normalizeBlocks, type CiteStyle, type Source } from 
 import * as ops from './ops';
 import type { Pos as DocPos } from './ops';
 import { useDocAi } from './ai/useDocAi';
+import { useDocSuggest } from '../../suggest/useDocSuggest';
 
 // Insert → Signature: the saved signatures and the pad, loaded when first opened.
 const InsertSignature = lazy(() => import('../../signatures/InsertSignature').then((m) => ({ default: m.InsertSignature })));
@@ -671,7 +672,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   );
 
   // The AI that writes with you: its box at the caret, its runs over the whole document, its suggestions as you type, its panel.
-  const ai = useDocAi({ engine: engine.current, st, doc: model, title: doc?.title ?? '', host, width, readOnly: !!readOnly || liveOn || !!compare, ghostOn: view.ghost, tick });
+  // Word suggestions: the grey rest of the word at the caret; while one shows, the AI's suggestion as you type waits.
+  const grey = useDocSuggest({ engine: engine.current, st, host, readOnly: !!readOnly || liveOn || !!compare, tick });
+  const ai = useDocAi({ engine: engine.current, st, doc: model, title: doc?.title ?? '', host, width, readOnly: !!readOnly || liveOn || !!compare, ghostOn: view.ghost && !grey.shown, tick });
   useEffect(() => setAskOpen(ai.ask), [ai.ask]);
   // Voice typing and Read aloud.
   const voice = useDocVoice(engine.current, !!readOnly || liveOn || !!compare);
@@ -747,6 +750,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
         return true;
       }
     }
+    if (grey.onKey(ev)) return true;
     if (ai.onKey(ev)) return true;
     if (globalKey(ev)) {
       ev.preventDefault();
@@ -1671,6 +1675,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
               {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} menu={(id) => blockContext({ engine: e, doc: model, id, comment: startComment, copyLink: copyText })} />}
               {ai.overlay}
+              {grey.overlay}
               {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${drawnLive}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
