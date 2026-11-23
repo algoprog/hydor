@@ -56,6 +56,18 @@ const mkPrivate = (d: string) => {
   } catch {}
 };
 
+/** The personal model is the person's own: its folder only theirs (0700) and every file in it too (0600), whatever train.py made them. */
+const keepPrivate = (d: string) => {
+  try {
+    fs.chmodSync(d, 0o700);
+    for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, f.name);
+      if (f.isDirectory()) keepPrivate(p);
+      else if (f.isFile()) fs.chmodSync(p, 0o600);
+    }
+  } catch {}
+};
+
 export type TrainOutcome = { ok: true; tokens?: number } | { ok: false; why: string; nothing?: boolean };
 
 export class Trainer {
@@ -161,6 +173,7 @@ export class Trainer {
       fs.rmSync(texts, { force: true });
       if (fs.existsSync(personalDir())) fs.renameSync(personalDir(), prev);
       fs.renameSync(next, personalDir());
+      keepPrivate(personalDir());
       fs.rmSync(prev, { recursive: true, force: true });
       this.set({ state: 'idle', lastAt: state.trainedAt });
       return { ok: true, tokens: done.tokens };
