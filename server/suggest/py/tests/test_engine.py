@@ -378,6 +378,18 @@ class EngineTests(unittest.TestCase):
         self.assertGreater(len(fake2.requests), 0)
         e.client.close()
 
+    def test_no_answer_for_one_prompt_does_not_switch_the_language_model_off(self):
+        fake = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake.stop)
+        e = self.engine(fake.url)
+        fake.drop_probs = lambda body: True                                  # the server is there, but gives no probabilities
+        out = e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})
+        self.assertEqual(out['plan'], 'slm')                                 # this suggestion comes from the small model
+        self.assertIsNotNone(e.llm_error)
+        self.assertEqual(e.llm_down_until, 0.0)
+        fake.drop_probs = None
+        self.assertEqual(e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})['plan'], 'mix')
+
     def test_the_token_cache_is_bounded_by_characters(self):
         import hydor_suggest.engine as eng
         e = self.engine()

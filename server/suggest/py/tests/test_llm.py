@@ -81,6 +81,19 @@ class LlmTests(unittest.TestCase):
         with self.assertRaises(LlmError):
             LlamaClient('http://127.0.0.1:1', timeout=2).top_logprobs([1])
 
+    def test_probabilities_left_out_for_part_of_a_character_are_asked_again_with_two_tokens(self):
+        fake = helpers.FakeLlama(100, script=lambda prompt: [(7, float(np.log(0.5))), (3, float(np.log(0.25)))])
+        fake.drop_probs = lambda body: body['n_predict'] == 1
+        try:
+            c = LlamaClient(fake.url)
+            ids, lp = c.top_logprobs([1, 2, 3])
+            self.assertEqual(ids.tolist(), [7, 3])
+            self.assertEqual([r['n_predict'] for r in fake.requests], [1, 2])
+            self.assertEqual(fake.requests[0]['prompt'], fake.requests[1]['prompt'])
+            c.close()
+        finally:
+            fake.stop()
+
     def test_an_answer_without_probabilities_is_an_error(self):
         fake = helpers.FakeLlama(100, script=lambda prompt: [])
         try:

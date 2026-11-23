@@ -32,7 +32,11 @@ def cut_prompt(ids: list) -> list:
 
 
 class LlmError(RuntimeError):
-    pass
+    """The language model gave no usable answer to this request."""
+
+
+class LlmUnavailable(LlmError):
+    """The server is not there: refused, closed, timed out, or answered with an error status. The engine leaves it alone for a while."""
 
 
 class LlamaClient:
@@ -66,19 +70,19 @@ class LlamaClient:
                 r = self._conn.getresponse()
                 data = r.read()
                 if r.status != 200:
-                    raise LlmError(f'llama-server answered {r.status}: {data[:200]!r}')
+                    raise LlmUnavailable(f'llama-server answered {r.status}: {data[:200]!r}')
                 return data
-            except LlmError:
+            except LlmUnavailable:
                 self.close()
                 raise
             except (ConnectionError, http.client.RemoteDisconnected, http.client.BadStatusLine) as e:
                 self.close()
                 if attempt == 1 or not reused:
-                    raise LlmError(f'llama-server is not reachable: {e}')
+                    raise LlmUnavailable(f'llama-server is not reachable: {e}')
             except (OSError, http.client.HTTPException) as e:       # a timeout, an unreachable host
                 self.close()
-                raise LlmError(f'llama-server is not answering: {e}')
-        raise LlmError('llama-server is not reachable')
+                raise LlmUnavailable(f'llama-server is not answering: {e}')
+        raise LlmUnavailable('llama-server is not reachable')
 
     def top_logprobs(self, prompt_ids) -> tuple:
         """The k most likely next ids and their log-probabilities (numpy int64, float32) after the prompt (its front is cut when it is over
@@ -86,15 +90,28 @@ class LlamaClient:
         ids = cut_prompt([int(t) for t in prompt_ids])
         if not ids:
             raise LlmError('an empty prompt')
-        body = json.dumps({'prompt': ids, 'n_predict': 1, 'n_probs': self.k, 'temperature': 0, 'cache_prompt': True}).encode()
         self.calls += 1
+        try:
+            return self._ask(ids, 1)
+        except LlmError as first:
+            if isinstance(first, LlmUnavailable):
+                raise
+        # llama-server leaves the probabilities out when the one token it sampled is a part of a character (its text is not valid UTF-8
+        # yet: "content": "\ufffd"). Asked for two tokens it answers with the first one's probabilities, which are what is wanted.
+        self.calls += 1
+        return self._ask(ids, 2)
+
+    def _ask(self, ids: list, n_predict: int) -> tuple:
+        body = json.dumps({'prompt': ids, 'n_predict': n_predict, 'n_probs': self.k, 'temperature': 0, 'cache_prompt': True}).encode()
         data = self._post(body)
         try:
             top = json.loads(data)['completion_probabilities'][0]['top_logprobs']
             tid = np.fromiter((t['id'] for t in top), np.int64, len(top))
             lp = np.fromiter((t['logprob'] for t in top), np.float64, len(top)).astype(np.float32)
         except (KeyError, IndexError, TypeError, ValueError) as e:
-            raise LlmError(f'llama-server answered without probabilities: {e}')
+            raise LlmError(f'llama-server answered without probabilities: {e!r}')
+        if not len(tid):
+            raise LlmError('llama-server answered with no probabilities')
         return tid, lp
 
 

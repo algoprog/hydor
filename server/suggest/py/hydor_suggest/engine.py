@@ -21,7 +21,7 @@ from . import mix as mix_mod
 from . import vocab as V
 from .decode import decode, next_word_text, text_after
 from .lid import Lid, mostly_letters
-from .llm import LlamaClient, LlmError, dense_from_top
+from .llm import LlamaClient, LlmError, LlmUnavailable, dense_from_top
 from .model import SLM, State, build_model, config_from_dict, last_logits
 from .tokbytes import PrefixIndex, end_token_ids, token_bytes
 
@@ -350,7 +350,10 @@ class Engine:
         except LlmError as e:                       # the language model stopped answering: this suggestion comes from the small model
             if plan == 'slm':
                 raise
-            self._llm_failed(e)
+            if isinstance(e, LlmUnavailable):
+                self._llm_failed(e)                 # the server is not there: not asked again for a while
+            else:
+                self.llm_error = str(e)             # no answer for this prompt only: the next request asks again
             used, stats = 'slm', {'llm': stats['llm'], 'slm': 0.0}
             result = self._decode('slm', *args, stats)
         t_llm, t_slm = stats['llm'], stats['slm']
