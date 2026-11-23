@@ -2,6 +2,7 @@
 // tools on each session's own MCP server, what an agent gets when it starts, instructions for Custom,
 // and work after a turn ends. server/features/index.ts lists them; registry.ts calls them.
 import type { FastifyInstance } from 'fastify';
+import type { DeviceReport } from '../../shared/device.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { InboxItem } from '../../shared/inbox.ts';
 import type { Agent, ServerEvent } from '../../shared/types.ts';
@@ -20,6 +21,10 @@ export interface Deps {
   broadcast(e: ServerEvent): void;
   /** To the pages showing one session. */
   toSubscribers(key: string, e: ServerEvent): void;
+  /** The open pages that told the settings their browser keeps (theme, language…), those showing `key` first, then the latest (shared/device.ts). */
+  devices?(key?: string): (DeviceReport & { at: number; showing: boolean })[];
+  /** To one of those pages, by its device id; false when it is no longer open. */
+  toDevice?(id: string, e: ServerEvent): boolean;
   /** This app's address as the user reaches it, for links (no trailing slash). */
   publicBase(): string;
 }

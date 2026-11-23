@@ -218,7 +218,12 @@ agents that speak ACP and take MCP servers.
   about it from there, with links to the place. Ask it to change a setting or set something up (a project, an
   assistant, a scheduled task, memory notes…) and it does it through the app's API (`app_api`): reading runs at
   once, and each change shows you a card first, with what changes before → after, to allow once, for the rest of
-  the session, or not. Your agents have tools of their own (`list_agents`, `save_agent`, `delete_agent`): any agent
+  the session, or not. It knows every option of Settings and what it is set to now (`GET /api/settings`, the same
+  table `hydor settings` uses), changes any of them as its page would (the card asks as the calls the change makes
+  would), and for the few only you can change it says where. The settings each device keeps (theme, language,
+  motion, text size, the chime, what Enter does, the sidebar, and voice: the language you speak, dictation, the
+  reading voice and speed) are reported by every open page, so an agent reads them as well as changes them, on the
+  device showing its session or on another open one it names. Your agents have tools of their own (`list_agents`, `save_agent`, `delete_agent`): any agent
   makes one from what you say, changes only what you ask (a new version by An agent), adds, changes or removes its
   schedules in the same step, and deletes one with its schedules; its card shows the agent, or what changes in
   sentences, and when each schedule runs next, and schedules and deletions ask every time but in Full access. When it needs details it shows a form (`ask_form`). Passwords, keys' values, approvals,

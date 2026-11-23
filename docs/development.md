@@ -60,7 +60,12 @@ Around it:
   (`args.ts`) and Tab completion all come out of that list, so a new verb needs nothing else. See
   [the plan](plans/terminal-parity.md).
 - `server/tui/settings-table.ts` says, for every option of the Settings page (`shared/find-catalog.ts`), how
-  `hydor settings` reads and changes it; `settings-test.ts` fails when an option has no row.
+  `hydor settings` reads and changes it; `settings-test.ts` fails when an option has no row. Agents use the same
+  table through `GET /api/settings`, `PUT /api/settings/:id` and `POST /api/settings/:id/run`
+  (`server/guide/settings.ts`, which also says how an agent does what the table leaves to a page, in `WAYS`), and
+  app_api asks about such a change as it would about the calls the change makes. The settings each browser keeps
+  are in `shared/device.ts`: every open page reports them over its socket (`web/src/lib/device.ts`), so agents read
+  them (`GET /device`) as they set them.
 - `server/tui/complete.ts` is the chat's completion menu and `completion.ts` the shell's Tab completion (scripts for
   bash, zsh and fish, and the lists they ask the command for), each with a test.
 - The desktop apps put the command on the PATH from `desktop/cli-link.cjs`: a link on a Mac, a shim file on Linux and

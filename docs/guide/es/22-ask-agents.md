@@ -15,6 +15,7 @@ También puedes leer la guía por tu cuenta: **Ayuda** en la barra de iconos, o 
 Los agentes pueden hacer en la app lo que tú podrías hacer en sus páginas. Algunos ejemplos de lo que puedes pedir:
 
 - "Activa la búsqueda por significado."
+- "¿Cómo está mi configuración de la memoria?" "¿Qué configuraciones tengo desactivadas?"
 - "Crea un proyecto llamado Tesis para mi disertación, con el agente Investigador."
 - "Hazme un agente que resuma mis boletines sin leer todos los viernes a las 5."
 - "Cada día laborable a las 8, dame un resumen de noticias sobre energías renovables."
@@ -25,7 +26,7 @@ Los agentes pueden hacer en la app lo que tú podrías hacer en sus páginas. Al
 - "Cambia este dispositivo al tema claro."
 - "Usa Opus en esta sesión y piensa con más esfuerzo." "Sal del modo plan y adelante."
 
-El agente primero lee cómo están las cosas ahora y luego te pide que confirmes el cambio en una tarjeta de la conversación. Leer nunca pide confirmación: un agente siempre puede mirar tu configuración, tus proyectos, tus tareas y el resto para responderte.
+El agente primero lee cómo están las cosas ahora y luego te pide que confirmes el cambio en una tarjeta de la conversación. Leer nunca pide confirmación: un agente siempre puede mirar tu configuración, tus proyectos, tus tareas y el resto para responderte. Conoce todas las opciones de la Configuración y cómo está cada una ahora, así que puede contarte sobre cualquiera de ellas y cambiar cualquiera; en las pocas que solo tú puedes cambiar (tu contraseña, iniciar sesión, los valores de las claves, activar las notificaciones en un dispositivo), te dice dónde hacerlo.
 
 ## Pide a un agente que haga lo que hace un editor
 
@@ -100,7 +101,7 @@ Sean cuales sean los permisos, un cambio en los permisos de una sesión o en su 
 
 ## Configuración guardada en cada dispositivo
 
-Unas pocas configuraciones pertenecen a cada dispositivo y no a la app: el tema, el idioma, el sonido de las notificaciones, lo que hace Enter mientras un agente trabaja, las sugerencias de la terminal y si se muestra la barra lateral. Un agente puede cambiarlas en el dispositivo desde el que le hablas (las páginas que muestran esa sesión), sin tarjeta: "Cambia al tema oscuro", "Usa el tema Sage", "Muestra la app en griego". Tus otros dispositivos conservan los suyos.
+Unas pocas configuraciones pertenecen a cada dispositivo y no a la app: el tema, el idioma, el movimiento y el tamaño del texto, el sonido de las notificaciones, lo que hace Enter mientras un agente trabaja, las sugerencias de la terminal, si se muestra la barra lateral y la voz (el idioma en que hablas, cómo escucha el dictado, y la voz con la que se leen las respuestas en voz alta y a qué velocidad). Cada página abierta de la app le dice qué guarda su dispositivo, así que un agente puede decirte cuáles son y también cambiarlas. Las cambia en el dispositivo desde el que le hablas (las páginas que muestran esa sesión), sin tarjeta: "Cambia al tema oscuro", "Usa el tema Sage", "Muestra la app en griego", "Lee las respuestas en voz alta un poco más rápido". Tus otros dispositivos conservan los suyos. Cuando ninguna página muestra la sesión, como cuando escribes desde una app de chat o desde la terminal, el agente puede cambiarlas en otro dispositivo que tenga la app abierta: "Usa texto más grande en mi computadora portátil". Las notificaciones son la excepción: cada dispositivo las activa por sí mismo, porque su navegador te pide permiso.
 
 ## Pregunta a un agente
 
@@ -109,4 +110,5 @@ Unas pocas configuraciones pertenecen a cada dispositivo y no a la app: el tema,
 - "Desactiva las capturas de pantalla del navegador."
 - "Muéstrame qué tareas programadas tengo y desactiva el seguimiento de precios."
 - "Cambia este dispositivo al tema claro."
+- "¿Cuáles son todas mis configuraciones ahora mismo?"
 - "Cambia esta sesión a Sonnet con poco esfuerzo."

@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { appPageLink } from '../../shared/app-pages.ts';
+import { cleanReport, deviceChange } from '../../shared/device.ts';
 import { OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import { headingId, parseTopic, topicId, translatedTopic } from '../../shared/guide.ts';
 import { LANGS } from '../../shared/i18n.ts';
@@ -26,11 +27,13 @@ import { globalGuidelines, guidelines, guidelinesBlock, guidelinesView, putGuide
 import { internalHeaders, isInternal } from '../internal.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { createSpace } from '../spaces/index.ts';
+import { ROWS } from '../tui/settings-table.ts';
 import { appApi, forgetAllowed, ruleFor } from './api.ts';
 import { findByWords, guideTopics } from './content.ts';
 import { askForm } from './form.ts';
 import { answersText, keepForm, standAll, standingForm, standingForms } from '../openForms.ts';
 import { guide, GUIDE_INSTRUCTIONS, helpInstructions } from './index.ts';
+import { settingsRoutes, WAYS } from './settings.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -703,6 +706,259 @@ test('guidelines: “How the agents talk to you” moves into every session’s,
   assert.equal(toneOf(db), '');
   guidelines.start!(d);
   assert.equal(globalGuidelines(db), 'Answer in plain English.\n\nHow to talk to me: Brief and technical');
+});
+
+
+// ---- every option of Settings, and the settings kept on each device ------------------------------------------------------
+
+type Page = { id: string; label: string; settings: Record<string, unknown>; showing: boolean; at: number };
+const page = (id: string, label: string, showing: boolean, settings: Record<string, unknown> = {}): Page => ({ id, label, settings, showing, at: Date.now() });
+
+/** A session whose open pages are `pages`; what goes to one page by its id is kept in `sent`. */
+function withPages(ctx: RunCtx, pages: Page[], sent: [string, unknown][] = []): RunCtx {
+  const toDevice = (id: string, e: unknown) => {
+    if (!pages.some((d) => d.id === id)) return false;
+    sent.push([id, e]);
+    return true;
+  };
+  return { ...ctx, deps: { ...ctx.deps, devices: () => pages, toDevice } as unknown as Deps };
+}
+
+test('a page’s report of its browser keeps only the settings there are, in the values they take', () => {
+  const r = cleanReport({
+    id: 'p-0a1b2c',
+    label: 'Chrome on Mac',
+    settings: { theme: 'dark', motion: 'wild', sound: 'yes', readingSpeed: 1.25, voiceLanguage: 'de-DE', password: 'x', language: 'el' },
+    notifications: 'maybe',
+    voices: ['Anna', 3, ' Yannick '],
+  });
+  assert.deepEqual(r, { id: 'p-0a1b2c', label: 'Chrome on Mac', settings: { theme: 'dark', language: 'el', voiceLanguage: 'de-DE', readingSpeed: 1.3 }, voices: ['Anna', 'Yannick'] });
+  assert.equal(cleanReport({ settings: {} }), null, 'no id, no report');
+  assert.deepEqual(deviceChange({ theme: 'system', themeName: ' Sage ', darkTheme: 'x', size: 3 }), { set: { theme: 'system', themeName: 'Sage' }, bad: ['darkTheme', 'size'] });
+});
+
+test('app_api: GET /device reads what each open page’s browser keeps; PUT /device goes to the pages showing the session, or to one named', async () => {
+  const app = await testApp();
+  const s = session('default', () => null);
+  const sent: [string, unknown][] = [];
+  const ctx = withPages(ctxOf(app, s), [page('p-mac1', 'Chrome on Mac', true, { theme: 'dark', sound: false }), page('p-phone1', 'Safari on iPhone', false, { theme: 'light' })], sent);
+  const read = JSON.parse((await appApi({ method: 'GET', path: '/device' }, ctx)).text);
+  assert.deepEqual(
+    read.devices.map((d: any) => [d.id, d.device, d.showsThisSession, d.settings.theme]),
+    [
+      ['p-mac1', 'Chrome on Mac', true, 'dark'],
+      ['p-phone1', 'Safari on iPhone', false, 'light'],
+    ],
+  );
+  const r = await appApi({ method: 'PUT', path: '/device', body: { readingSpeed: 1.5, voiceLanguage: 'de-DE', dictation: 'server' } }, ctx);
+  assert.equal(r.isError, undefined, r.text);
+  assert.deepEqual(s.sent.at(-1), { key: 'claude:own', e: { t: 'feature', id: 'guide', key: 'claude:own', data: { device: { readingSpeed: 1.5, voiceLanguage: 'de-DE', dictation: 'server' } } } });
+  assert.match((await appApi({ method: 'PUT', path: '/device', body: { textSize: 'large', device: 'p-phone1' } }, ctx)).text, /^Sent to Safari on iPhone/);
+  assert.deepEqual(
+    sent.map(([id]) => id),
+    ['p-phone1'],
+  );
+  assert.equal((await appApi({ method: 'PUT', path: '/device', body: { textSize: 'large', device: 'p-gone' } }, ctx)).isError, true);
+  assert.equal((await appApi({ method: 'PUT', path: '/device', body: { readingSpeed: 5 } }, ctx)).isError, true);
+  assert.match((await appApi({ method: 'PUT', path: '/device', body: { themeName: 'midnight' } }, ctx)).text, /^Sent/);
+  assert.deepEqual((s.sent.at(-1) as any).e.data.device, { themeName: 'Midnight' }, 'a theme by its id or name, sent by its name');
+  const nope = await appApi({ method: 'PUT', path: '/device', body: { themeName: 'Purple rain' } }, ctx);
+  assert.equal(nope.isError, true);
+  assert.match(nope.text, /Hydor Dark, Hydor Light, Midnight, Sage/);
+  assert.equal(s.cards.length, 0, 'no card for a device’s own settings');
+  await app.close();
+});
+
+test('app_api: with no page showing the session, a device change says which pages are open, to name one', async () => {
+  const app = await testApp();
+  const s = session('default', () => null);
+  const r = await appApi({ method: 'PUT', path: '/device', body: { theme: 'light' } }, withPages(ctxOf(app, s), [page('p-lap1', 'Firefox on Linux', false)]));
+  assert.equal(r.isError, true);
+  assert.match(r.text, /No page shows this session now.*p-lap1 \(Firefox on Linux\)/s);
+  assert.equal(s.sent.length, 0);
+  assert.match((await appApi({ method: 'GET', path: '/device' }, withPages(ctxOf(app, s), []))).text, /No page of the app is open now/);
+  await app.close();
+});
+
+/** The app's own API for the settings routes: a few options' endpoints, as their pages call them. */
+async function settingsApp(pages: Page[] = []) {
+  const app = Fastify();
+  app.addHook('onRequest', async (req, reply) => {
+    if (!isInternal(req)) return reply.code(401).send({ error: 'Sign in required' });
+  });
+  const state = {
+    tips: { on: true },
+    startup: { on: false, how: 'user-service', can: true },
+    telegram: { connected: true },
+    profiles: [
+      { id: 'pr1', name: 'Work' },
+      { id: 'pr2', name: 'Shopping' },
+    ],
+    calls: [] as string[],
+  };
+  app.get('/api/tips', async () => state.tips);
+  app.put('/api/tips', async (req) => (state.tips = { ...state.tips, ...(req.body as object) }));
+  app.get('/api/startup', async () => state.startup);
+  app.put('/api/startup', async (req) => (state.startup = { ...state.startup, ...(req.body as object) }));
+  app.get('/api/telegram', async () => state.telegram);
+  app.put('/api/telegram', async (req) => {
+    state.calls.push(`PUT /api/telegram ${JSON.stringify(req.body)}`);
+    return (state.telegram = { connected: !!(req.body as { token?: string }).token });
+  });
+  app.get('/api/browser/settings', async () => ({ settings: {}, profiles: state.profiles }));
+  app.delete('/api/browser/profiles/:id', async (req) => {
+    state.profiles = state.profiles.filter((p) => p.id !== (req.params as { id: string }).id);
+    return { ok: true };
+  });
+  app.post('/api/browser/profiles', async (req) => {
+    const p = { id: `pr${state.profiles.length + 3}`, name: (req.body as { name: string }).name };
+    state.profiles.push(p);
+    return { profile: p };
+  });
+  app.post('/api/mcp/tokens', async () => {
+    state.calls.push('POST /api/mcp/tokens');
+    return { id: 't1', token: 'not for agents' };
+  });
+  app.post('/api/update-check', async () => ({ update: null }));
+  settingsRoutes({ app, devices: () => pages } as unknown as Deps);
+  await app.ready();
+  return { app, state };
+}
+const inject = async (app: Awaited<ReturnType<typeof settingsApp>>['app'], method: 'GET' | 'PUT' | 'POST', url: string, body?: object) => {
+  const r = await app.inject({ method, url, headers: internalHeaders(), ...(body ? { payload: body } : {}) });
+  return { status: r.statusCode, json: r.json() };
+};
+
+test('GET /api/settings: every option’s value, read in this process; asked for some, what each takes and how it changes', async () => {
+  const { app } = await settingsApp([page('p-mac1', 'Chrome on Mac', true, { theme: 'dark', darkTheme: 'Midnight', lightTheme: 'Hydor Light', sound: true })]);
+  const all = await inject(app, 'GET', '/api/settings');
+  assert.equal(all.status, 200);
+  assert.equal(all.json.sections.length, SECTIONS.length, 'every section');
+  assert.deepEqual(all.json.device, { label: 'Chrome on Mac', showsThisSession: true });
+  const general = all.json.sections.find((x: any) => x.id === 'general');
+  assert.equal(general.values['general.tips'], true);
+  assert.deepEqual(general.values['general.appearance'], { theme: 'dark', darkTheme: 'Midnight', lightTheme: 'Hydor Light' }, 'a device’s own, from the page showing the session');
+  assert.equal(all.json.sections.find((x: any) => x.id === 'notifications').values['notifications.sound'], true);
+  assert.ok(general.errors['general.resume-after-usage-limits'], 'an endpoint that fails is that option’s error, not the list’s');
+  assert.ok(general.more.includes('general.check-now'), 'buttons and pages are named, to ask about');
+  const tips = (await inject(app, 'GET', '/api/settings?q=tips')).json.sections[0].options[0];
+  assert.deepEqual([tips.id, tips.value, tips.takes, tips.link], ['general.tips', true, 'true or false', '/settings?s=general&find=Tips']);
+  const dark = (await inject(app, 'GET', '/api/settings?q=dark%20mode')).json.sections[0].options[0];
+  assert.equal(dark.id, 'general.appearance');
+  assert.match(dark.change, /^PUT \/device/);
+  assert.equal((await inject(app, 'GET', '/api/settings/tips')).json.id, 'general.tips', 'an option by words that name only it');
+  assert.match((await inject(app, 'GET', '/api/settings/no-such-thing')).json.error, /GET \/api\/settings lists them/);
+  const tg = (await inject(app, 'GET', '/api/settings/chat.telegram')).json;
+  assert.equal(tg.value, true, 'a key reads as set or not');
+  assert.match(tg.only, /never passes through an agent/);
+  await app.close();
+});
+
+test('PUT /api/settings/:id changes an option through its own endpoint; a device’s, a page’s and a button’s say how instead', async () => {
+  const { app, state } = await settingsApp();
+  const r = await inject(app, 'PUT', '/api/settings/general.tips', { value: false });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, false);
+  assert.equal(state.tips.on, false);
+  assert.match((await inject(app, 'PUT', '/api/settings/general.keep-the-computer-awake', { value: 'purple' })).json.error, /takes one of tasks, working, never/);
+  assert.match((await inject(app, 'PUT', '/api/settings/general.appearance', { value: 'dark' })).json.error, /PUT \/device/);
+  assert.match((await inject(app, 'PUT', '/api/settings/general.new-theme', { value: 'x' })).json.error, /PUT \/api\/themes/);
+  assert.match((await inject(app, 'PUT', '/api/settings/general.check-now', { value: true })).json.error, /a button: POST \/api\/settings\/general\.check-now\/run/);
+  assert.match((await inject(app, 'POST', '/api/settings/general.tips/run', {})).json.error, /not a button/);
+  const q = await inject(app, 'PUT', '/api/settings/browser.profiles', { value: ['Work'] });
+  assert.equal(q.status, 409, 'a change that deletes what it leaves out asks first');
+  assert.match(q.json.question, /Delete the browser profile “Shopping”/);
+  assert.equal(state.profiles.length, 2);
+  assert.equal((await inject(app, 'PUT', '/api/settings/browser.profiles', { value: ['Work'], confirm: true })).status, 200);
+  assert.deepEqual(
+    state.profiles.map((p) => p.name),
+    ['Work'],
+  );
+  assert.equal((await inject(app, 'POST', '/api/settings/general.check-now/run', {})).json.said.length, 1);
+  await app.close();
+});
+
+test('app_api: an option of Settings asks as the calls its change makes would; a key’s value never goes through', async () => {
+  forgetAllowed();
+  const { app, state } = await settingsApp();
+  const s = session('default', () => ({ decision: 'accept' }));
+  const ctx = ctxOf(app, s);
+  const r = await appApi({ method: 'PUT', path: '/api/settings/general.tips', body: { value: false } }, ctx);
+  assert.equal(r.isError, undefined, r.text);
+  assert.equal(state.tips.on, false);
+  const card = s.cards[0].card;
+  assert.equal(card.title, 'Change “Tips”');
+  assert.match(card.detail!, /\*\*Tips\*\*: on → off/);
+  assert.match(card.detail!, /`PUT \/api\/tips`/);
+  assert.deepEqual(
+    card.options.map((o) => o.id),
+    ['accept', 'always', 'deny'],
+  );
+  await appApi({ method: 'PUT', path: '/api/settings/general.start-when-this-computer-starts', body: { value: true } }, ctx);
+  assert.deepEqual(
+    s.cards[1].card.options.map((o) => o.id),
+    ['accept', 'deny'],
+    'asks every time, as PUT /api/startup does',
+  );
+  assert.equal(state.startup.on, true);
+  const token = await appApi({ method: 'POST', path: '/api/settings/connect.new-token/run', body: { arg: 'Laptop' } }, ctx);
+  assert.equal(token.isError, true);
+  assert.match(token.text, /Tokens are made by the user/);
+  const key = await appApi({ method: 'PUT', path: '/api/settings/chat.telegram', body: { value: '123:abc' } }, ctx);
+  assert.equal(key.isError, true);
+  assert.match(key.text, /never passes through an agent/);
+  assert.deepEqual(state.calls, [], 'neither was called');
+  assert.equal(s.cards.length, 2, 'nor asked about');
+  await appApi({ method: 'PUT', path: '/api/settings/chat.telegram', body: { value: '' } }, ctx);
+  assert.match(s.cards.at(-1)!.card.detail!, /\*\*Telegram\*\*: set → removed/);
+  assert.deepEqual(state.calls, ['PUT /api/telegram {"token":null}']);
+  const cards = s.cards.length;
+  assert.match((await appApi({ method: 'PUT', path: '/api/settings/general.appearance', body: { value: 'light' } }, ctx)).text, /^Sent/);
+  assert.deepEqual((s.sent.at(-1) as any).e.data.device, { theme: 'light' }, 'a device’s own goes to its pages');
+  assert.equal(s.cards.length, cards);
+  assert.match((await appApi({ method: 'PUT', path: '/api/settings/browser.profiles', body: { value: ['Work', 'Shopping'] } }, ctx)).text, /Nothing to change/);
+  assert.match((await appApi({ method: 'PUT', path: '/api/settings/general.keep-the-computer-awake', body: { value: 'purple' } }, ctx)).text, /takes one of/);
+  const plan = session('plan', () => ({ decision: 'accept' }));
+  assert.match((await appApi({ method: 'PUT', path: '/api/settings/general.tips', body: { value: true } }, ctxOf(app, plan))).text, /only reads/);
+  assert.equal(plan.cards.length, 0);
+  await app.close();
+});
+
+test('app_api: keys’ values and the sign-ins the user does are refused on their own endpoints too', async () => {
+  const app = await testApp();
+  const s = session('bypassPermissions', () => null);
+  const ctx = ctxOf(app, s);
+  for (const [method, p, body] of [
+    ['PUT', '/api/search/settings', { provider: { id: 'brave', key: 'BSA-123' } }],
+    ['PUT', '/api/telegram', { token: '123:abc' }],
+    ['PUT', '/api/slack', { botToken: 'xoxb-1', appToken: 'xapp-1' }],
+    ['PUT', '/api/voice', { endpoint: { url: 'https://x.example', apiKey: 'sk-1' } }],
+    ['POST', '/api/scm/accounts', { provider: 'github', token: 'ghp_1' }],
+    ['POST', '/api/machines', { name: 'lab', url: 'https://lab.example', token: 'acm_1' }],
+    ['POST', '/api/setup/mcp/login', { agent: 'claude', name: 'linear' }],
+    ['POST', '/api/browser/profiles/pr1/open', {}],
+  ] as const) {
+    const r = await appApi({ method, path: p, body }, ctx);
+    assert.equal(r.isError, true, `${method} ${p}`);
+    assert.match(r.text, /^Not through app_api/);
+  }
+  assert.notEqual((await appApi({ method: 'PUT', path: '/api/search/settings', body: { provider: { id: 'brave', key: null } } }, ctx)).text.slice(0, 16), 'Not through app_', 'removing a key is fine');
+  await app.close();
+});
+
+test('every option of Settings tells an agent how it changes, or why only the person can', async () => {
+  const { app } = await settingsApp();
+  const all = await inject(app, 'GET', `/api/settings?section=${SECTIONS.map(([id]) => id).join(',')}&values=0`);
+  const opts = all.json.sections.flatMap((x: any) => x.options);
+  assert.equal(opts.length, ROWS.length);
+  const silent = opts.filter((o: any) => !o.takes && !o.change && !o.only && !ROWS.find((r) => r.id === o.id)!.readonly).map((o: any) => o.id);
+  assert.deepEqual(silent, [], 'options an agent is told nothing about: say how in WAYS (server/guide/settings.ts)');
+  assert.deepEqual(
+    Object.keys(WAYS).filter((id) => !ROWS.some((r) => r.id === id)),
+    [],
+    'ways for options there are not',
+  );
+  await app.close();
 });
 
 for (const [name, fn] of tests) {

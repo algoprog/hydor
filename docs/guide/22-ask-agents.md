@@ -15,6 +15,7 @@ You can also read the guide yourself: **Help** on the rail, or search it from th
 Agents can do in the app what you could do in its pages. Some examples of what you can ask:
 
 - "Turn on search by meaning."
+- "What are my memory settings?" "Which of my settings are off?"
 - "Make a project called Thesis for my dissertation, with the Researcher agent."
 - "Make me an agent that sums up my unread newsletters every Friday at 5."
 - "Every weekday at 8, give me a news brief on renewable energy."
@@ -25,7 +26,7 @@ Agents can do in the app what you could do in its pages. Some examples of what y
 - "Switch this device to the light theme."
 - "Use Opus for this session and think harder." "Leave plan mode and go ahead."
 
-The agent first reads how things are now, then asks you to confirm the change on a card in the conversation. Reading never asks: an agent can always look at your settings, projects, tasks and the rest to answer you.
+The agent first reads how things are now, then asks you to confirm the change on a card in the conversation. Reading never asks: an agent can always look at your settings, projects, tasks and the rest to answer you. It knows every option of Settings and what each is set to now, so it can tell you about any of them and change any of them; for the few only you can change (your password, signing in, the values of keys, turning on notifications on a device), it tells you where.
 
 ## Have an agent do what an editor does
 
@@ -100,7 +101,7 @@ Whatever the permissions, a change to a session's permissions or its spending ca
 
 ## Settings kept on each device
 
-A few settings belong to each device rather than the app: the theme, the language, the notification sound, what Enter does while an agent works, terminal suggestions and whether the sidebar shows. An agent can change these on the device you're talking to it from (the pages showing that session), without a card: "Switch to the dark theme", "Use the Sage theme", "Show the app in Greek". Your other devices keep their own.
+A few settings belong to each device rather than the app: the theme, the language, motion and text size, the notification sound, what Enter does while an agent works, terminal suggestions, whether the sidebar shows, and voice (the language you speak, how dictation listens, and the voice replies are read aloud in and how fast). Each open page of the app tells it what its device keeps, so an agent can tell you what these are as well as change them. It changes them on the device you're talking to it from (the pages showing that session), without a card: "Switch to the dark theme", "Use the Sage theme", "Show the app in Greek", "Read replies aloud a little faster". Your other devices keep their own. When no page shows the session, as when you write from a chat app or the terminal, the agent can change them on another device that has the app open: "Use larger text on my laptop". Notifications are the exception: each device turns them on for itself, because its browser asks for your permission.
 
 ## Ask an agent
 
@@ -109,4 +110,5 @@ A few settings belong to each device rather than the app: the theme, the languag
 - "Turn the browser's screenshots off."
 - "Show me which scheduled tasks I have, and turn off the price watch."
 - "Switch this device to the light theme."
+- "What are all my settings right now?"
 - "Switch this session to Sonnet with low effort."

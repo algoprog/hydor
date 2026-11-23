@@ -14,6 +14,8 @@ class LiveSocket {
   private backoff = 500;
   private timer: number | null = null;
   private stopped = true;
+  /** The settings this page's browser keeps (lib/device.ts), told again each time the socket opens. */
+  private report: unknown = null;
   up = false;
 
   start() {
@@ -48,6 +50,7 @@ class LiveSocket {
       this.backoff = 500;
       this.setUp(true);
       for (const key of this.subs.keys()) ws.send(JSON.stringify({ t: 'sub', key }));
+      if (this.report) ws.send(JSON.stringify({ t: 'device', device: this.report }));
       pinger = window.setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('{"t":"ping"}'), 25_000);
     };
     ws.onmessage = (m) => {
@@ -86,6 +89,12 @@ class LiveSocket {
     return () => {
       this.statusHandlers.delete(h);
     };
+  }
+
+  /** Tells the server the settings this page's browser keeps (lib/device.ts), now and whenever the socket opens again. */
+  device(report: unknown) {
+    this.report = report;
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'device', device: report }));
   }
 
   /** Reference-counted subscription to a session (or '@system'). */

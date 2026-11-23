@@ -4,15 +4,17 @@
 // can also switch the settings kept on this device (theme, language…) of the pages showing its session.
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
+import type { DeviceSettings } from '@shared/device';
 import { isLang } from '@shared/i18n';
 import type { ToolInfo, ToolItem } from '@shared/types';
 import { cx } from '../../components/ui';
 import { onFeatureEvent } from '../../lib/featureEvents';
-import { setNotifyPrefs } from '../../lib/notify';
+import { deviceNews, setNotifyPrefs } from '../../lib/notify';
 import { useUI } from '../../lib/store';
 import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
 import { setLang, currentLang } from '../../i18n';
 import { ToolDetail, ToolLine } from '../session/items';
+import { useVoicePrefs } from '../voice/prefs';
 import type { WebFeature } from '../registry';
 import { GuidePage } from './GuidePage';
 import { useGuide } from './state';
@@ -58,22 +60,11 @@ function formStep(t: ToolInfo) {
   return { category: 'question' as const, verb: running(t) ? 'Asking you' : 'Asked you', title: arg(t, 'title') };
 }
 
-// Settings kept on this device, as an agent set them for the pages showing its session.
-interface DeviceSettings {
-  theme?: 'dark' | 'light' | 'system';
-  themeName?: string;
-  motion?: 'full' | 'calm' | 'off';
-  textSize?: 'default' | 'large' | 'larger';
-  language?: string;
-  sound?: boolean;
-  enter?: 'join' | 'queue';
-  terminalSuggestions?: boolean;
-  sidebar?: boolean;
-  groupSessions?: boolean;
-}
+// Settings kept on this device, as an agent set them for the pages showing its session (shared/device.ts).
+type DeviceChange = Partial<DeviceSettings> & { themeName?: string };
 
 onFeatureEvent('guide', (e) => {
-  const d = (e.data as { device?: DeviceSettings } | undefined)?.device;
+  const d = (e.data as { device?: DeviceChange } | undefined)?.device;
   if (!d) return;
   const ui = useUI.getState();
   if (d.theme) ui.set({ theme: d.theme });
@@ -86,13 +77,25 @@ onFeatureEvent('guide', (e) => {
   if (d.motion) ui.set({ motion: d.motion });
   if (d.textSize) ui.set({ textSize: d.textSize });
   if (d.sound !== undefined) setNotifyPrefs({ sound: d.sound });
-  if (d.enter)
+  if (d.enter) {
     try {
       localStorage.setItem('wa.followUp', d.enter === 'queue' ? 'queue' : 'steer');
     } catch {}
+    deviceNews();
+  }
   if (d.terminalSuggestions !== undefined) ui.set({ termSuggest: d.terminalSuggestions });
   if (d.sidebar !== undefined) ui.set({ sideOpen: d.sidebar });
   if (d.groupSessions !== undefined) ui.set({ groupByFolder: d.groupSessions });
+  // Voice: the language spoken, how dictation listens, the voice and speed replies are read in.
+  const voice = useVoicePrefs.getState();
+  if (d.voiceLanguage !== undefined) voice.set({ lang: d.voiceLanguage });
+  if (d.dictation) voice.set({ use: d.dictation });
+  if (d.readingSpeed !== undefined) voice.set({ rate: d.readingSpeed });
+  if (d.readingVoice !== undefined) {
+    const want = d.readingVoice.toLowerCase();
+    const v = want && typeof speechSynthesis !== 'undefined' ? speechSynthesis.getVoices().find((x) => x.name.toLowerCase() === want || x.voiceURI.toLowerCase() === want) : undefined;
+    if (!want || v) voice.set({ voice: v ? v.voiceURI : '' });
+  }
   // Last: switching the language reloads the page.
   if (d.language && isLang(d.language) && d.language !== currentLang()) setLang(d.language);
 });

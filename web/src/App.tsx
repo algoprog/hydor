@@ -10,6 +10,7 @@ import { useMachines } from './lib/machines';
 import { newerBuild, useApp, useSessions, useUI, useUsage, type Bootstrap } from './lib/store';
 import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
 import { handleNotify, initNotifications } from './lib/notify';
+import { startDeviceReports } from './lib/device';
 import { startPresence } from './lib/presence';
 import { useSignIn } from './features/accounts/signin';
 import { live, ownLive } from './lib/ws';
@@ -124,6 +125,8 @@ export function App() {
     });
     live.start();
     initNotifications();
+    // The settings this browser keeps, for agents to read (lib/device.ts).
+    startDeviceReports();
     // Your visits, for the start page's "While you were away".
     const offPresence = startPresence();
     const t = setInterval(() => useUsage.getState().refresh().catch(() => {}), 5 * 60_000);

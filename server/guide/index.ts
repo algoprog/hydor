@@ -13,6 +13,7 @@ import type { Feature, RunTool } from '../features/types.ts';
 import { appApi } from './api.ts';
 import { findSections, GUIDE_DIR, guideTopics } from './content.ts';
 import { askForm } from './form.ts';
+import { settingsRoutes } from './settings.ts';
 
 /** Links in the guide are the app's own paths: made whole, so an agent can hand them on. */
 const absolute = (md: string, base: string) => md.replace(/\]\(\/(?!\/)/g, `](${base}/`);
@@ -91,7 +92,8 @@ const APP_API: RunTool = {
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
     'Some things are only the user’s (the password, keys’ values, files and commands, answering approvals): those are refused, with where the user does them. A session’s permissions mode and spending caps change only on a card the user answers each time, even in Full access.',
     'This session is /api/sessions/this: when the user asks to change its model, effort or permissions, POST /api/sessions/this/config { model?, effort?, mode? } (values from GET /api/catalog/<agent>); memory off or on: PATCH /api/sessions/this/extra { memory: false | null }. A session in Plan mode only reads, but it can change its own settings that way (on a card), such as leaving Plan mode when asked.',
-    'Settings kept on each device: PUT /device { theme: dark|light|system, themeName, language: en|de|zh|el, sound, enter: join|queue, terminalSuggestions, sidebar, groupSessions }, for the pages showing this session.',
+    'Every option of Settings: GET /api/settings gives each one’s value now, by section; ?q=<a few words> or ?section=<id> gives the options asked for with what each takes and how it changes; PUT /api/settings/<id> { value } changes one, POST /api/settings/<id>/run presses a button, and the card asks as the calls the change makes would.',
+    'Settings kept on each device (theme, language, text size, sound, what Enter does, voice…): GET /device reads them from the open pages; PUT /device { theme: dark|light|system, themeName, motion, textSize, language, sound, enter: join|queue, terminalSuggestions, sidebar, groupSessions, voiceLanguage, dictation: browser|server, readingVoice, readingSpeed } changes them on the pages showing this session, or with device: "<id>" on another open page.',
     'Links into the app for the user: its address plus the page (/projects/<id>, /settings?s=<section>, /guide/<topic>).',
   ].join(' '),
   inputSchema: {
@@ -139,7 +141,7 @@ const ASK_FORM: RunTool = {
 
 /** Every agent hears of the tools: Claude Code sees an MCP tool's name only until it looks it up. */
 export const GUIDE_INSTRUCTIONS =
-  'Hydor, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask you to change one of its settings or to make, change or remove something in it (a project, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. Their agents (the Agents page) have tools of their own: list_agents, save_agent (make one or change it, with its schedules) and delete_agent. Delete a schedule once it is no longer needed rather than leave it paused. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound) change with app_api on /device.';
+  'Hydor, the app you run in: when the user asks how to use it, where something is or what a feature does, look it up with app_guide and answer from the guide, with links to the place in the app. When they ask what one of its settings is, or to change one, use app_api: GET /api/settings?q=<a few words> gives the options those words describe, with their values now and how each changes (PUT /api/settings/<id> { value }), and GET /api/settings every option’s value. To make, change or remove something in it (a project, a scheduled task, an app, a page, memory notes, guidelines…), do it with app_api: find the endpoint in app_guide’s "api" topic, read what is there now, then make the change. Their agents (the Agents page) have tools of their own: list_agents, save_agent (make one or change it, with its schedules) and delete_agent. Delete a schedule once it is no longer needed rather than leave it paused. The user confirms each change on a card (it can carry a form for details to fill in or check), so there is no need to ask for a go-ahead in text first. To ask for several details at once, ask_form shows a form. Settings kept on each device (theme, language, sound, voice) are read with app_api’s GET /device and changed with PUT /device.';
 
 /** A question asked on the Help page (`extra.help`: true, or the topic open there): the session is about the app. */
 export function helpInstructions(help: unknown): string | null {
@@ -157,6 +159,8 @@ const IMAGE_TYPES: Record<string, string> = { webp: 'image/webp', png: 'image/pn
 export const guide: Feature = {
   id: 'guide',
   routes(d) {
+    // Every option of Settings, with its value now and how it changes (settings.ts).
+    settingsRoutes(d);
     d.app.get('/api/guide', async (req): Promise<GuideResponse> => {
       const lang = (req.query as { lang?: string }).lang;
       return { topics: guideTopics(isLang(lang) ? lang : 'en') };

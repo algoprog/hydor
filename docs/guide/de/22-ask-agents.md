@@ -15,6 +15,7 @@ Du kannst die Hilfe auch selbst lesen: über **Hilfe** in der Werkzeugleiste ode
 Agenten können die App so bedienen, wie du es auf ihren Seiten tun würdest. Zum Beispiel:
 
 - „Aktiviere die semantische Suche.“
+- „Was sind meine Memory-Einstellungen?“ „Welche meiner Einstellungen sind ausgeschaltet?“
 - „Erstelle für meine Dissertation ein Projekt namens Thesis mit dem Agenten Forscher.“
 - „Erstelle mir einen Agenten, der jeden Freitag um 17 Uhr meine ungelesenen Newsletter zusammenfasst.“
 - „Gib mir werktags um 8 Uhr einen Nachrichtenüberblick zu erneuerbaren Energien.“
@@ -25,7 +26,7 @@ Agenten können die App so bedienen, wie du es auf ihren Seiten tun würdest. Zu
 - „Stelle dieses Gerät auf das helle Design um.“
 - „Verwende in dieser Sitzung Opus und denke gründlicher nach.“ Oder: „Verlasse den Plan-Modus und leg los.“
 
-Der Agent liest zunächst den aktuellen Zustand und bittet dich dann auf einer Karte in der Unterhaltung, die Änderung zu bestätigen. Zum Lesen braucht er keine Bestätigung: Er kann deine Einstellungen, Projekte und Aufgaben jederzeit ansehen, um deine Fragen zu beantworten.
+Der Agent liest zunächst den aktuellen Zustand und bittet dich dann auf einer Karte in der Unterhaltung, die Änderung zu bestätigen. Zum Lesen braucht er keine Bestätigung: Er kann deine Einstellungen, Projekte und Aufgaben jederzeit ansehen, um deine Fragen zu beantworten. Er kennt jede Option der Einstellungen und weiß, worauf sie gerade steht; so kann er dir zu jeder Auskunft geben und jede ändern. Bei den wenigen, die nur du ändern kannst (dein Passwort, die Anmeldung, die Werte von Keys, das Aktivieren von Benachrichtigungen auf einem Gerät), sagt er dir, wo du das tust.
 
 ## Inhalte mit einem Agenten bearbeiten
 
@@ -100,7 +101,7 @@ Unabhängig vom Modus erfordert jede Änderung der Sitzungsberechtigungen oder d
 
 ## Einstellungen pro Gerät
 
-Einige Einstellungen gelten nur für das jeweilige Gerät: Design, Sprache, Benachrichtigungston, die Funktion von Enter während der Agent arbeitet, Terminalvorschläge und die Sichtbarkeit der Seitenleiste. Ein Agent kann sie auf dem Gerät ändern, von dem aus du mit ihm sprichst, also auf den Seiten, die diese Sitzung anzeigen. Dafür erscheint keine Bestätigungskarte. Zum Beispiel: „Wechsle zum dunklen Design“, „Verwende das Design Sage“ oder „Zeige die App auf Griechisch an“. Deine anderen Geräte behalten ihre Einstellungen.
+Einige Einstellungen gelten nur für das jeweilige Gerät: Design, Sprache, Bewegung und Textgröße, Benachrichtigungston, die Funktion von Enter während der Agent arbeitet, Terminalvorschläge, die Sichtbarkeit der Seitenleiste und Spracheingabe (die Sprache, die du sprichst, wie das Diktat zuhört sowie die Stimme, in der Antworten vorgelesen werden, und ihre Geschwindigkeit). Jede geöffnete Seite der App teilt dem Agenten mit, was ihr Gerät speichert; er kann dir diese Einstellungen also nennen und auch ändern. Er ändert sie auf dem Gerät, von dem aus du mit ihm sprichst, also auf den Seiten, die diese Sitzung anzeigen. Dafür erscheint keine Bestätigungskarte. Zum Beispiel: „Wechsle zum dunklen Design“, „Verwende das Design Sage“, „Zeige die App auf Griechisch an“ oder „Lies Antworten etwas schneller vor“. Deine anderen Geräte behalten ihre Einstellungen. Zeigt keine Seite die Sitzung an, etwa wenn du aus einer Chat-App oder dem Terminal schreibst, kann der Agent sie auf einem anderen Gerät ändern, auf dem die App geöffnet ist: „Verwende größeren Text auf meinem Laptop“. Benachrichtigungen sind die Ausnahme: Jedes Gerät schaltet sie für sich selbst ein, weil sein Browser dich um Erlaubnis fragt.
 
 ## Beispielaufträge
 
@@ -109,4 +110,5 @@ Einige Einstellungen gelten nur für das jeweilige Gerät: Design, Sprache, Bena
 - „Deaktiviere Screenshots im Browser.“
 - „Zeige meine geplanten Aufgaben und deaktiviere die Preisüberwachung.“
 - „Stelle dieses Gerät auf das helle Design um.“
+- „Wie sind alle meine Einstellungen gerade eingestellt?“
 - „Wechsle diese Sitzung zu Sonnet mit geringem Denkaufwand.“

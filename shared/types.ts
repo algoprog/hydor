@@ -1045,7 +1045,8 @@ export type ServerEvent =
   | { t: 'tasks' }
   | { t: 'themes'; themes: AppTheme[] };
 
-export type ClientEvent = { t: 'sub'; key: string } | { t: 'unsub'; key: string } | { t: 'ping' };
+/** `device`: the settings this page's browser keeps (theme, language, sound…), sent when it connects and when one changes (shared/device.ts). */
+export type ClientEvent = { t: 'sub'; key: string } | { t: 'unsub'; key: string } | { t: 'ping' } | { t: 'device'; device: unknown };
 
 // ---- notebooks ----------------------------------------------------------------------
 

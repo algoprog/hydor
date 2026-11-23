@@ -15,6 +15,7 @@ Vous pouvez aussi lire le guide vous-même : **Aide** dans la barre d’icônes,
 Les agents peuvent faire dans l’app ce que vous pourriez faire dans ses pages. Voici quelques exemples de demandes :
 
 - « Active la recherche par le sens. »
+- « Quels sont mes paramètres de la Mémoire ? » « Lesquels de mes paramètres sont désactivés ? »
 - « Crée un projet nommé Thèse pour mon mémoire, avec l’agent Chercheur. »
 - « Crée-moi un agent qui résume mes newsletters non lues chaque vendredi à 17 h. »
 - « Chaque jour de la semaine à 8 h, fais-moi une revue de presse sur les énergies renouvelables. »
@@ -25,7 +26,7 @@ Les agents peuvent faire dans l’app ce que vous pourriez faire dans ses pages.
 - « Passe cet appareil au thème Clair. »
 - « Utilise Opus pour cette session et réfléchis davantage. » « Quitte le mode Planifier et vas-y. »
 
-L’agent commence par lire l’état actuel, puis vous demande de confirmer la modification sur une carte dans la conversation. La lecture ne demande jamais de confirmation : un agent peut toujours consulter vos paramètres, vos projets, vos tâches et le reste pour vous répondre.
+L’agent commence par lire l’état actuel, puis vous demande de confirmer la modification sur une carte dans la conversation. La lecture ne demande jamais de confirmation : un agent peut toujours consulter vos paramètres, vos projets, vos tâches et le reste pour vous répondre. Il connaît toutes les options des Paramètres et la valeur actuelle de chacune : il peut donc vous renseigner sur n’importe laquelle et modifier n’importe laquelle ; pour les quelques-unes que vous seul pouvez changer (votre mot de passe, la connexion, les valeurs des clés, l’activation des notifications sur un appareil), il vous indique où aller.
 
 ## Demander à un agent de faire ce que fait un éditeur
 
@@ -100,7 +101,7 @@ Quelles que soient les autorisations, une modification des autorisations d’une
 
 ## Paramètres propres à chaque appareil
 
-Quelques paramètres appartiennent à chaque appareil plutôt qu’à l’app : le thème, la langue, le son des notifications, ce que fait Entrée pendant qu’un agent travaille, les suggestions du terminal et l’affichage de la Barre latérale. Un agent peut les modifier sur l’appareil depuis lequel vous lui parlez (les pages qui affichent cette session), sans carte : « Passe au thème Sombre », « Utilise le thème Sage », « Affiche l’app en grec ». Vos autres appareils conservent leurs propres paramètres.
+Quelques paramètres appartiennent à chaque appareil plutôt qu’à l’app : le thème, la langue, les animations et la taille du texte, le son des notifications, ce que fait Entrée pendant qu’un agent travaille, les suggestions du terminal, l’affichage de la Barre latérale et la voix (la langue que vous parlez, la façon dont la dictée écoute, ainsi que la voix dans laquelle les réponses sont lues à voix haute et à quelle vitesse). Chaque page ouverte de l’app indique à l’agent ce que garde son appareil : il peut donc vous dire de quoi il s’agit et aussi les modifier. Il les modifie sur l’appareil depuis lequel vous lui parlez (les pages qui affichent cette session), sans carte : « Passe au thème Sombre », « Utilise le thème Sage », « Affiche l’app en grec », « Lis les réponses à voix haute un peu plus vite ». Vos autres appareils conservent leurs propres paramètres. Quand aucune page n’affiche la session, par exemple quand vous écrivez depuis une app de messagerie ou le terminal, l’agent peut les modifier sur un autre appareil où l’app est ouverte : « Utilise un texte plus grand sur mon ordinateur portable ». Les notifications font exception : chaque appareil les active pour lui-même, car son navigateur vous demande votre autorisation.
 
 ## Demander à un agent
 
@@ -109,4 +110,5 @@ Quelques paramètres appartiennent à chaque appareil plutôt qu’à l’app : 
 - « Désactive les captures d’écran du Navigateur. »
 - « Montre-moi les tâches planifiées que j’ai et désactive la surveillance des prix. »
 - « Passe cet appareil au thème Clair. »
+- « Quels sont tous mes paramètres en ce moment ? »
 - « Passe cette session à Sonnet avec un effort faible. »

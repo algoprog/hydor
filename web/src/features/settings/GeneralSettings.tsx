@@ -5,6 +5,7 @@ import { CircleHelp } from 'lucide-react';
 import { isLang, LANGS } from '@shared/i18n';
 import type { KeepAwakeMode, KeepAwakeState, RetentionSettings, StartupState, UpdateState } from '@shared/types';
 import { api, post, put } from '../../lib/api';
+import { deviceNews } from '../../lib/notify';
 import { ago, MOD } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp, useUI, type Motion, type TextSize } from '../../lib/store';
@@ -50,6 +51,7 @@ export function GeneralSettings() {
                 try {
                   localStorage.setItem('wa.followUp', x);
                 } catch {}
+                deviceNews();
               }}
               options={[
                 { value: 'steer', label: 'Join the turn' },

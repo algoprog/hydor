@@ -51,7 +51,12 @@ rename or remove something users can see or do (a page, a button, a setting or a
    `web/src/i18n/de.json` has it: Paper, Subagent, Pull-Request, Unterhaltung, Computer, Tab…), "tú" in Spanish,
    "vous" in French, "você" in Brazilian Portuguese, です・ます in Japanese, polite plural in Greek.
    A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all eight
-   languages from `shared/find-catalog.ts` and the dictionaries.
+   languages from `shared/find-catalog.ts` and the dictionaries. Give the option its row in
+   `server/tui/settings-table.ts`, which says how it is read and changed (a browser-kept one gets a `device` row):
+   `hydor settings` and agents (`GET /api/settings`, `PUT /api/settings/:id`) both use it. When the row leaves it to
+   a page or a command, say how an agent does it, or why only the person can, in `WAYS` (`server/guide/settings.ts`).
+   A setting each browser keeps goes in `shared/device.ts` too, which pages report and agents set (`PUT /device`).
+   `settings-test.ts` and `guide-test.ts` fail when one is left out.
    An `/api/` route goes in `docs/guide/90-api.md`, one bullet in its area:
    `` - `METHOD /api/path/:param` — what it does. Body: `{ field: type — meaning }`. Returns: `{ … }`. `` (routes
    agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's

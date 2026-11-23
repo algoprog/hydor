@@ -31,7 +31,11 @@ export function setNotifyPrefs(p: Partial<NotifyPrefs>) {
   try {
     localStorage.setItem(PREFS, JSON.stringify({ ...notifyPrefs(), ...p }));
   } catch {}
+  deviceNews();
 }
+
+/** A setting this browser keeps changed outside the stores: the server hears of it (lib/device.ts). */
+export const deviceNews = () => window.dispatchEvent(new Event('hydor:device'));
 
 let pushOn = false;
 
@@ -155,6 +159,7 @@ export async function enablePush(): Promise<PushState> {
   const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
   await post('/api/push/subscribe', { subscription: sub.toJSON() });
   pushOn = true;
+  deviceNews();
   return 'on';
 }
 
@@ -175,6 +180,7 @@ export async function disablePush(): Promise<PushState> {
     await sub.unsubscribe().catch(() => {});
   }
   pushOn = false;
+  deviceNews();
   return 'off';
 }
 

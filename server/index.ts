@@ -103,6 +103,7 @@ import { goalDefaults, setGoalDefaults } from './goals/settings.ts';
 import { parseGoalAction } from './goals/validate.ts';
 import { loadGoal } from './goals/store.ts';
 import { goalOver } from '../shared/goals.ts';
+import { cleanReport, type DeviceReport } from '../shared/device.ts';
 import { sessionExtraRoutes } from './sessions-extra.ts';
 import { useMachines } from './experiments/remote.ts';
 import { BROWSING_KEY } from '../shared/browser.ts';
@@ -1726,8 +1727,28 @@ app.post('/api/terminals/:id/ask', async (req) => {
 interface Client {
   ws: WebSocket;
   subs: Set<string>;
+  /** The settings its page's browser keeps (theme, language, sound…), as the page last told them (shared/device.ts). */
+  device?: DeviceReport & { at: number };
 }
 const clients = new Set<Client>();
+
+/** The open pages that told their device's settings, the latest first; `showing`: the page has the session open. */
+function devices(key?: string): (DeviceReport & { at: number; showing: boolean })[] {
+  const out: (DeviceReport & { at: number; showing: boolean })[] = [];
+  for (const c of clients) if (c.device && c.ws.readyState === c.ws.OPEN) out.push({ ...c.device, showing: !!key && c.subs.has(key) });
+  return out.sort((a, b) => Number(b.showing) - Number(a.showing) || b.at - a.at);
+}
+/** To the page that told this device id; false when none is open. */
+function toDevice(id: string, e: ServerEvent): boolean {
+  const s = JSON.stringify(e);
+  let sent = false;
+  for (const c of clients)
+    if (c.device?.id === id && c.ws.readyState === c.ws.OPEN) {
+      c.ws.send(s);
+      sent = true;
+    }
+  return sent;
+}
 
 function send(c: Client, e: ServerEvent) {
   if (c.ws.readyState === c.ws.OPEN) c.ws.send(JSON.stringify(e));
@@ -1911,7 +1932,11 @@ app.register(async (scope) => {
       } catch {
         return;
       }
-      if (m.t !== 'ping' && typeof m.key === 'string' && m.key.startsWith('kernel:')) {
+      if (m.t === 'device') {
+        // The page's browser and its settings: agents read them (app_api's GET /device) as they change them.
+        const r = cleanReport(m.device);
+        if (r) c.device = { ...r, at: Date.now() };
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && m.key.startsWith('kernel:')) {
         // A notebook page: the kernel's state now, then its changes.
         const id = m.key.slice('kernel:'.length);
         if (m.t === 'unsub') c.subs.delete(m.key);
@@ -2108,7 +2133,7 @@ const publicBase = () => linkBase(config.allowedOrigins, phone.servedUrl(), conf
 
 // ---- the app's capabilities (server/features): search, browser, memory, assistants… ------------------
 
-registerFeatures(FEATURES, { app, db, sessions, scheduler, models, broadcast, toSubscribers, publicBase });
+registerFeatures(FEATURES, { app, db, sessions, scheduler, models, broadcast, toSubscribers, devices, toDevice, publicBase });
 
 // Everything waiting on the user on this machine, newest first: the inbox (the page asks the other machines too).
 app.get('/api/inbox', async () => ({ items: [...sessions.inbox(), ...inboxItems()].sort((a, b) => b.at - a.at) }));
