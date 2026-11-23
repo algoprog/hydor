@@ -108,11 +108,17 @@ export class SuggestService {
     return Math.max(Number(kvGet(this.db, ATTEMPT_KEY)) || 0, this.trainedAt());
   }
 
-  /** When the next scheduled run may start (ms), not before the gap since the last. */
-  private nextAt(): number | undefined {
+  /** When the schedule says the next run may start (ms): the gap since the last run. */
+  private dueAt(): number | undefined {
     const s = this.st;
     if (!s.enabled || !s.personalise || s.schedule === 'manual') return undefined;
     return this.lastAttempt() + GAP_MS[s.schedule];
+  }
+
+  /** The same for the page: never in the past (a run not yet made waits only for a quiet moment). */
+  private nextAt(): number | undefined {
+    const due = this.dueAt();
+    return due == null ? undefined : Math.max(due, Date.now());
   }
 
   state(): SuggestState {
@@ -123,7 +129,8 @@ export class SuggestService {
       model: this.modelStatus(),
       training: this.trainingStatus(),
     };
-    if (s.enabled) {
+    if (s.enabled && suggestDisabled()) Object.assign(status, { detail: 'Word suggestions are off on this server (HYDOR_SUGGEST=off)' });
+    else if (s.enabled) {
       if (this.setupP) Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' });
       else if (this.failure) Object.assign(status, { state: 'failed', detail: this.failure.why });
       else if (this.startingWorker) Object.assign(status, { state: 'starting', detail: 'Loading the language models' });
@@ -168,7 +175,7 @@ export class SuggestService {
     if (!llamaSupported()) return { state: 'failed', detail: `llama.cpp has no ready-made build for ${process.platform} ${process.arch}` };
     const total = os.totalmem() / 2 ** 20;
     if (s.llm === 'auto' && total < LLM_TOTAL_MB) return { state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB (set it to On to use it anyway)`, freeMb: Math.round(total), needMb: 8192 };
-    return l;
+    return { state: 'off', detail: l.detail ?? 'Starts when you type, and stops after half an hour without a suggestion' };
   }
 
   // ---- the settings ---------------------------------------------------------------------------------------------
@@ -272,6 +279,9 @@ export class SuggestService {
       if (this.abort.signal.aborted) return false;
       this.llm.note({ state: 'failed', detail: (e as Error).message });
       return false;
+    } finally {
+      // Downloaded: it is not starting until a request starts it (a failure stays in its state).
+      if (this.llm.state.state === 'starting') this.llm.reset();
     }
   }
 
@@ -603,8 +613,8 @@ export class SuggestService {
 
   /** Whether the schedule says it is time: the gap since the last run, and no writing for a while (the person's, in any session, or here). */
   trainDue(now = Date.now()): boolean {
-    const next = this.nextAt();
-    if (next == null || now < next) return false;
+    const due = this.dueAt();
+    if (due == null || now < due) return false;
     return now - Math.max(lastTyped(this.db), this.lastRequest) >= QUIET_MS;
   }
 

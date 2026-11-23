@@ -170,6 +170,12 @@ export class LlamaServer {
     this.set({ state, ...(why ? { detail: why } : {}) });
   }
 
+  /** Nothing is going on with it: not running, nothing to say. */
+  reset() {
+    if (this.proc || this.starting) return;
+    this.set({ state: 'off' });
+  }
+
   /** The state with something to say (why it is not running: turned off, too little memory). */
   note(s: LlmState) {
     if (this.proc || this.starting) return;
