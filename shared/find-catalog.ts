@@ -291,7 +291,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['voice', 'Speech recognition on the server', 'whisper speech recognition server transcription', 'Recognize speech on this computer or with a service'],
   ['voice', 'Read aloud', 'text to speech tts read replies voice speak', 'Have replies read aloud'],
   // Capabilities › Word suggestions
-  ['suggest', 'Word suggestions', 'autocomplete predictive text next word ghost text grey text typing suggestions complete word type ahead tab accept on off turn on', 'The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.3 GB'],
+  ['suggest', 'Word suggestions', 'autocomplete predictive text next word ghost text grey text typing suggestions complete word type ahead tab accept on off turn on', 'The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.2 GB'],
   ['suggest', 'Show in this browser', 'this browser device show hide word suggestions autocomplete ghost text grey text per browser', 'Whether this browser shows word suggestions (each browser keeps its own)'],
   ['suggest', 'Language model', 'qwen llm llama.cpp language model memory ram 8 gb auto on off small model only slower weaker', 'Qwen3.5 beside the small model: automatically when the computer has the memory, always, or never'],
   ['suggest', 'Language model size', 'quantization 8-bit 4-bit q8 q4 smaller download memory better worse quality qwen', 'The language model in 8 bits (better) or 4 bits (smaller, a little worse)'],

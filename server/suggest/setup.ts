@@ -182,6 +182,11 @@ export function run(cmd: string, args: string[], label: string, report: (detail:
   });
 }
 
+/** Whether a Python has pip (an environment uv made has none). */
+function hasPip(python: string): Promise<boolean> {
+  return new Promise((resolve) => execFile(python, ['-m', 'pip', '--version'], { timeout: 60_000, windowsHide: true }, (err) => resolve(!err)));
+}
+
 function systemPython(): string | null {
   if (process.platform === 'win32') return which('python') ?? which('py');
   if (process.platform === 'darwin') {
@@ -258,12 +263,29 @@ async function buildVenv(v: VenvPlan, ready: () => boolean, report: Report, sign
       for (const st of v.steps) await run(uv, ['pip', 'install', '--quiet', '--python', v.python, ...st.index, ...st.packages], st.label, report, signal);
     } else {
       const sys = systemPython();
-      if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or: winget install Python.Python.3.12).');
-      if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or Homebrew: brew install python).');
-      if (!sys) throw new Error('Python 3 is not installed on this computer, and word suggestions need it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
-      if (!made()) await run(sys, ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report, signal);
-      if (!made()) await run(sys, ['-m', 'venv', v.dir], 'Making a private Python environment', report, signal);
+      // A system Python is needed only to make the environment, not to add to one that is there.
+      const needSys = (): string => {
+        if (sys) return sys;
+        if (process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or: winget install Python.Python.3.12).');
+        if (process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or Homebrew: brew install python).');
+        throw new Error('Python 3 is not installed on this computer, and word suggestions need it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
+      };
+      const make = async () => {
+        await run(needSys(), ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report, signal);
+        await run(needSys(), ['-m', 'venv', v.dir], 'Making a private Python environment', report, signal);
+      };
+      if (!made()) await make();
       building();
+      // An environment uv made has no pip of its own (uv was found then, and is not now): give it one, or make it again with pip.
+      if (!(await hasPip(v.python))) {
+        try {
+          await run(v.python, ['-m', 'ensurepip', '--upgrade', '--default-pip'], 'Adding pip to the private Python environment', report, signal);
+        } catch {
+          fs.rmSync(v.dir, { recursive: true, force: true });
+          await make();
+          building();
+        }
+      }
       for (const st of v.steps) await run(v.python, ['-m', 'pip', 'install', '--quiet', ...st.index, ...st.packages], st.label, report, signal);
     }
     fs.writeFileSync(path.join(v.dir, '.packages'), v.marker);

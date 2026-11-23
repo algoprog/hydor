@@ -227,7 +227,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Perguntar antes de enviar em sites com login**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de um agente enviar, publicar, excluir ou transferir algo em um site em que ele esteja conectado.
 - [**Favoritos**](/settings?s=browser&find=Bookmarks): Os seus, junto com os dos outros navegadores deste computador.
 - [**Extensões**](/settings?s=browser&find=Extensions): Extensões do Chrome, no app para computador.
-- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Página inicial, mecanismo de busca, atalhos de busca, zoom da página, verificação ortográfica, tradução, páginas escuras, bloqueador de anúncios com suas listas de filtros, idiomas e sites onde anúncios são permitidos, histórico e limpeza do que ele guardou.
+- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Uso do computador
 
@@ -307,7 +307,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 [Configurações → Sugestões de palavras](/settings?s=suggest): o resto da palavra que você está digitando em cinza, e a próxima palavra, de um modelo pequeno que aprende com a sua escrita. Mais em [Documentos, imagens, vídeos e voz](/guide/documents-voice).
 
-- [**Sugestões de palavras**](/settings?s=suggest&find=Word%20suggestions): O resto da palavra que você está digitando e a próxima, em cinza depois do cursor, de modelos que rodam neste computador; na primeira vez, baixa cerca de 1,3 GB.
+- [**Sugestões de palavras**](/settings?s=suggest&find=Word%20suggestions): O resto da palavra que você está digitando e a próxima, em cinza depois do cursor, de modelos que rodam neste computador; na primeira vez, baixa cerca de 1,2 GB.
 - [**Mostrar neste navegador**](/settings?s=suggest&find=Show%20in%20this%20browser): Se este navegador mostra sugestões de palavras (cada navegador mantém a sua configuração).
 - [**Modelo de linguagem**](/settings?s=suggest&find=Language%20model): Qwen3.5 junto com o modelo pequeno: automaticamente quando o computador tem memória, sempre ou nunca.
 - [**Tamanho do modelo de linguagem**](/settings?s=suggest&find=Language%20model%20size): O modelo de linguagem em 8 bits (melhor) ou 4 bits (menor, um pouco pior).

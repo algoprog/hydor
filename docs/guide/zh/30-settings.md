@@ -227,7 +227,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷方式、网页缩放、拼写检查、翻译、深色网页、带过滤列表的广告拦截器、语言和允许显示广告的网站、历史记录，以及清除浏览器保留的内容。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
 
 ### 电脑操控
 
@@ -307,7 +307,7 @@
 
 [设置 → 词语建议](/settings?s=suggest)：以灰色显示你正在输入的词的其余部分和下一个词，由会从你的写作中学习的小模型生成。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
-- [**词语建议**](/settings?s=suggest&find=Word%20suggestions)：你正在输入的词的其余部分和下一个词，以灰色显示在光标后，由在这台电脑上运行的模型生成；首次使用会下载约 1.3 GB。
+- [**词语建议**](/settings?s=suggest&find=Word%20suggestions)：你正在输入的词的其余部分和下一个词，以灰色显示在光标后，由在这台电脑上运行的模型生成；首次使用会下载约 1.2 GB。
 - [**在此浏览器中显示**](/settings?s=suggest&find=Show%20in%20this%20browser)：此浏览器是否显示词语建议（每个浏览器各自保存设置）。
 - [**语言模型**](/settings?s=suggest&find=Language%20model)：在小模型之外加用 Qwen3.5：电脑内存足够时自动使用、始终使用，或从不使用。
 - [**语言模型大小**](/settings?s=suggest&find=Language%20model%20size)：8 位（更好）或 4 位（更小，稍差）的语言模型。

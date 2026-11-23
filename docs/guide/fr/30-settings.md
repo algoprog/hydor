@@ -227,7 +227,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Demander avant d’envoyer sur les sites connectés**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) : Avant qu’un agent n’envoie, ne publie, ne supprime ou ne transfère quoi que ce soit sur un site où il est connecté.
 - [**Favoris**](/settings?s=browser&find=Bookmarks) : Les vôtres, avec ceux des autres navigateurs de cet ordinateur.
 - [**Extensions**](/settings?s=browser&find=Extensions) : Extensions Chrome, dans l’app de bureau.
-- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Page d’accueil, moteur de recherche, raccourcis de recherche, zoom des pages, correction orthographique, traduction, pages sombres, bloqueur de publicités avec ses listes de filtres, ses langues et les sites où les publicités sont autorisées, historique et effacement de ce qu’il a conservé.
+- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Utilisation de l’ordinateur
 
@@ -307,7 +307,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 [Paramètres → Suggestions de mots](/settings?s=suggest) : la fin du mot que vous tapez en gris, et le mot suivant, grâce à un petit modèle qui apprend de votre écriture. Pour en savoir plus : [Documents, images, vidéos et voix](/guide/documents-voice).
 
-- [**Suggestions de mots**](/settings?s=suggest&find=Word%20suggestions) : La fin du mot que vous tapez et le suivant, en gris après le curseur, grâce à des modèles qui s’exécutent sur cet ordinateur ; la première fois, il télécharge environ 1,3 Go.
+- [**Suggestions de mots**](/settings?s=suggest&find=Word%20suggestions) : La fin du mot que vous tapez et le suivant, en gris après le curseur, grâce à des modèles qui s’exécutent sur cet ordinateur ; la première fois, il télécharge environ 1,2 Go.
 - [**Afficher dans ce navigateur**](/settings?s=suggest&find=Show%20in%20this%20browser) : Indique si ce navigateur affiche les suggestions de mots (chaque navigateur garde les siennes).
 - [**Modèle de langage**](/settings?s=suggest&find=Language%20model) : Qwen3.5 en plus du petit modèle : automatiquement quand l’ordinateur a assez de mémoire, toujours, ou jamais.
 - [**Taille du modèle de langage**](/settings?s=suggest&find=Language%20model%20size) : Le modèle de langage en 8 bits (meilleur) ou en 4 bits (plus petit, un peu moins bon).

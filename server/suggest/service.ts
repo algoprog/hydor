@@ -206,7 +206,7 @@ export class SuggestService {
           status,
           this.used()
             ? { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' }
-            : { state: 'waiting', detail: 'Sets itself up the first time you type in a message box (it downloads about 1.3 GB)' },
+            : { state: 'waiting', detail: 'Sets itself up the first time you type in a message box (it downloads about 1.2 GB)' },
         );
       else
         Object.assign(status, {

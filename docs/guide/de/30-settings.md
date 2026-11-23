@@ -227,7 +227,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Vor dem Senden auf angemeldeten Websites fragen**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist.
 - [**Lesezeichen**](/settings?s=browser&find=Bookmarks): Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer.
 - [**Erweiterungen**](/settings?s=browser&find=Extensions): Chrome-Erweiterungen in der Desktop-App.
-- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Startseite, Suchmaschine, Suchkürzel, Seitenzoom, Rechtschreibprüfung, Übersetzung, dunkle Seiten, Werbeblocker mit seinen Filterlisten, Sprachen und Seiten, auf denen Werbung erlaubt ist, Verlauf und das Löschen gespeicherter Daten.
+- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Computer Use
 
@@ -307,7 +307,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 [Einstellungen → Wortvorschläge](/settings?s=suggest): Der Rest des Wortes, das du tippst, in Grau und das nächste Wort, von einem kleinen Modell, das aus deinem Geschriebenen lernt. Mehr dazu unter [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice).
 
-- [**Wortvorschläge**](/settings?s=suggest&find=Word%20suggestions): Der Rest des Wortes, das du tippst, und das nächste, in Grau nach dem Cursor, von Modellen, die auf diesem Computer laufen; beim ersten Mal werden etwa 1,3 GB heruntergeladen.
+- [**Wortvorschläge**](/settings?s=suggest&find=Word%20suggestions): Der Rest des Wortes, das du tippst, und das nächste, in Grau nach dem Cursor, von Modellen, die auf diesem Computer laufen; beim ersten Mal werden etwa 1,2 GB heruntergeladen.
 - [**In diesem Browser anzeigen**](/settings?s=suggest&find=Show%20in%20this%20browser): Ob dieser Browser Wortvorschläge anzeigt (jeder Browser behält seine eigene Einstellung).
 - [**Sprachmodell**](/settings?s=suggest&find=Language%20model): Qwen3.5 neben dem kleinen Modell: automatisch, wenn der Computer genug Speicher hat, immer oder nie.
 - [**Größe des Sprachmodells**](/settings?s=suggest&find=Language%20model%20size): Das Sprachmodell in 8 Bit (besser) oder 4 Bit (kleiner, etwas schlechter).

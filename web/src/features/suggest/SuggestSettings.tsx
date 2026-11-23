@@ -107,11 +107,11 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
   const llm = status.state === 'ready' || status.state === 'starting' ? llmLine(status, settings.llm) : null;
   return (
     <div className="space-y-2.5">
-      {status.state === 'waiting' && <Notice>Not set up yet: it sets itself up the first time you type in a message box or a document, and downloads about 1.3 GB then.</Notice>}
+      {status.state === 'waiting' && <Notice>Not set up yet: it sets itself up the first time you type in a message box or a document, and downloads about 1.2 GB then.</Notice>}
       {status.state === 'setting-up' && (
         <Notice icon={<Throbber size={15} />}>
           <span translate="no">{status.detail || 'Setting up…'}</span>
-          <span className="block text-[12px] text-fg-3">The first time it installs what it needs and downloads about 1.3 GB; it works once that is done.</span>
+          <span className="block text-[12px] text-fg-3">The first time it installs what it needs and downloads about 1.2 GB; it works once that is done.</span>
         </Notice>
       )}
       {status.state === 'starting' && <Notice icon={<Throbber size={15} />}>Loading the models…</Notice>}
@@ -283,7 +283,7 @@ export function SuggestSettings() {
       <Group title="Suggestions">
         <Row
           label="Word suggestions"
-          hint="Shows the rest of the word you are typing in grey, and the next word dimmer: Tab takes it. It runs on this computer, so nothing you type leaves it; the first time it is used, it downloads about 1.3 GB."
+          hint="Shows the rest of the word you are typing in grey, and the next word dimmer: Tab takes it. It runs on this computer, so nothing you type leaves it; the first time it is used, it downloads about 1.2 GB."
           control={<Switch on={settings.enabled} label="Word suggestions" onChange={(enabled) => set({ enabled })} />}
         >
           <Status settings={settings} status={status} />

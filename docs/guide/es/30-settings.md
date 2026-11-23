@@ -227,7 +227,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Preguntar antes de enviar en sitios con sesión iniciada**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de que un agente envíe, publique, elimine o transfiera algo en un sitio donde ha iniciado sesión.
 - [**Marcadores**](/settings?s=browser&find=Bookmarks): Los tuyos, junto con los de los otros navegadores de esta computadora.
 - [**Extensiones**](/settings?s=browser&find=Extensions): Extensiones de Chrome, en la app de escritorio.
-- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Página de inicio, motor de búsqueda, atajos de búsqueda, zoom de página, corrector ortográfico, traducción, páginas oscuras, bloqueador de anuncios con sus listas de filtros, idiomas y sitios donde se permiten anuncios, historial y borrado de lo que guardó.
+- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Uso de la computadora
 
@@ -307,7 +307,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 
 [Configuración → Sugerencias de palabras](/settings?s=suggest): el resto de la palabra que escribes en gris, y la palabra siguiente, de un modelo pequeño que aprende de lo que escribes. Más en [Documentos, imágenes, videos y voz](/guide/documents-voice).
 
-- [**Sugerencias de palabras**](/settings?s=suggest&find=Word%20suggestions): El resto de la palabra que escribes y la siguiente, en gris después del cursor, con modelos que se ejecutan en esta computadora; la primera vez descarga cerca de 1,3 GB.
+- [**Sugerencias de palabras**](/settings?s=suggest&find=Word%20suggestions): El resto de la palabra que escribes y la siguiente, en gris después del cursor, con modelos que se ejecutan en esta computadora; la primera vez descarga cerca de 1,2 GB.
 - [**Mostrar en este navegador**](/settings?s=suggest&find=Show%20in%20this%20browser): Si este navegador muestra sugerencias de palabras (cada navegador guarda las suyas).
 - [**Modelo de lenguaje**](/settings?s=suggest&find=Language%20model): Qwen3.5 junto al modelo pequeño: automáticamente cuando la computadora tiene memoria, siempre o nunca.
 - [**Tamaño del modelo de lenguaje**](/settings?s=suggest&find=Language%20model%20size): El modelo de lenguaje en 8 bits (mejor) o en 4 bits (más pequeño, algo peor).

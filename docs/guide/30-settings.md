@@ -307,7 +307,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → Word suggestions](/settings?s=suggest): the rest of the word you are typing in grey, and the next word, from a small model that learns from your writing. More in [Documents, images, videos and voice](/guide/documents-voice).
 
-- [**Word suggestions**](/settings?s=suggest&find=Word%20suggestions): The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.3 GB.
+- [**Word suggestions**](/settings?s=suggest&find=Word%20suggestions): The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.2 GB.
 - [**Show in this browser**](/settings?s=suggest&find=Show%20in%20this%20browser): Whether this browser shows word suggestions (each browser keeps its own).
 - [**Language model**](/settings?s=suggest&find=Language%20model): Qwen3.5 beside the small model: automatically when the computer has the memory, always, or never.
 - [**Language model size**](/settings?s=suggest&find=Language%20model%20size): The language model in 8 bits (better) or 4 bits (smaller, a little worse).
