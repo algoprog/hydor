@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.104.0 · 23 November 2026
+
+A stronger ad blocker in your own browser, for YouTube and the sites that look for ad blockers too, with what it blocked
+at a glance; names in answers that link to their pages; and agents that read and change every setting.
+
+- **The ad blocker catches more**: your own browser now uses uBlock Origin's own lists, with EasyList, EasyPrivacy, Peter
+  Lowe's list and the malicious URL list, fetched from their makers and kept fresh: uBlock's quick fixes about every 8
+  hours, the others every few days, or at once with **Update now** in **Browser settings → Ads**. It also hides ads by
+  their words or their shape, as uBlock's advanced rules do.
+- **YouTube and "turn off your ad blocker"**: uBlock's small page fixes now run in every frame of a page before its own
+  scripts. That removes YouTube's video ads and defuses many anti-adblock messages, and a page that checks for the ad
+  scripts it blocks gets harmless stand-ins, so it goes on working.
+- **A shield in the address bar**: how many ads and trackers were blocked on the page. Click it for the hosts they came
+  from, what was blocked on the site in all, and **Block ads on this site** (it was in the padlock's box).
+- **Ad blocker statistics**: totals, the data saved, the last 30 days and the hosts and sites blocked most, kept on your
+  computer (**Statistics** in the shield, or in **Browser settings → Ads**). A private tab counts only in the totals.
+- **More lists when you want them**: **Lists for sites in other languages** (the one for the app's language is on at
+  first), **Stricter blocking** (AdGuard's ad list) and **Hide annoyances** (pop-ups, newsletter boxes, chat widgets).
+- **Names in answers are links**: the places, products, papers and pages an answer names open their own page, in its
+  text and in its cards (a place opens on Google Maps). Linked names are underlined with a small ↗, so they read as links
+  on a phone too.
+- **Agents read and change every setting**: ask an agent to change an option of **Settings** and it does it through
+  that option's own place, asking you first as for any change; keys and tokens stay out of its reach. It can read and
+  change the settings each browser keeps too (theme, language, text size, voice and more).
+
 ## 0.103.0 · 22 November 2026
 
 Apps that start from what they know about you and answer in your language, a goal for a whole swarm, and goals you set
