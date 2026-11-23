@@ -26420,5 +26420,11 @@
   "gemini cli antigravity agy google ai pro ultra opencode qwen code goose grok build xai supergrok hermes agent pi openclaw acp": "gemini cli antigravity agy google ai pro ultra opencode qwen code goose grok build xai supergrok hermes agent pi openclaw acp",
   "login sign in claude code codex grok build xai supergrok antigravity agy google gemini ai pro ultra subscription email plan second account work personal add": "login anmelden anmeldung claude code codex grok build xai supergrok antigravity agy google gemini ai pro ultra abo abonnement e-mail tarif zweites konto arbeit privat hinzufügen",
   "{0} has its own sign-in only": "{0} hat nur eine eigene Anmeldung",
-  "{0} is not signed in: sign in with your {1} account in Settings → Agents → Accounts, then try again.": "{0} ist nicht angemeldet: Melde dich in den Einstellungen → Agents → Konten mit deinem {1}-Konto an und versuche es dann erneut."
+  "{0} is not signed in: sign in with your {1} account in Settings → Agents → Accounts, then try again.": "{0} ist nicht angemeldet: Melde dich in den Einstellungen → Agents → Konten mit deinem {1}-Konto an und versuche es dann erneut.",
+  "It opens afresh there: changes that are not saved yet would be lost.": "Dort wird es neu geöffnet: Änderungen, die noch nicht gespeichert sind, gehen verloren.",
+  "Open beside the conversation": "Neben der Unterhaltung öffnen",
+  "Open documents here as they are written": "Dokumente hier öffnen, während sie geschrieben werden",
+  "Save your changes first?": "Zuerst deine Änderungen speichern?",
+  "Show beside the conversation": "Neben der Unterhaltung anzeigen",
+  "Waiting for your OK": "Wartet auf dein OK"
 }

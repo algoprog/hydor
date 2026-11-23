@@ -1,12 +1,15 @@
 // Pages as an agent writes them. Claude Code reports a tool call's input while the model writes it
 // (input_json_delta, passed on by the session manager as 'toolstream'); for show_html, save_page and an
 // HTML file written whole (Write), this reads the page's HTML out of that partial JSON as it grows and
-// sends each new piece to the pages showing the session, which draw the page as it comes. For a document, a
+// sends each new piece to the pages showing the session, which draw the page as it comes. A document written
+// whole as text (Write of a Markdown, LaTeX, CSV or TSV file) goes the same way: its text as it grows, which
+// the panel beside the conversation shows until the file is there. For a document, a
 // deck, a spreadsheet, a LaTeX document or a diagram being saved (save_doc, save_slides, save_sheet, save_latex, save_diagram) it sends the
 // call's input itself as it grows, to the session's pages and to an editor that has that page open (subscribed to
 // page:<id>), which read it (shared/partial-json.ts) and show the version being written (shared/page-drafts.ts); once
 // the call has run, the draft says which version it saved, or that it saved nothing, and the page shows that. Agents
 // that hand over whole calls only (Codex, ACP) show the page once the call is there.
+import { isStreamedDoc } from '../../shared/documents.ts';
 import type { PageDraft, PagesEvent } from '../../shared/pages.ts';
 import type { Deps } from '../features/types.ts';
 
@@ -48,6 +51,8 @@ export class JsonFields {
   private strEsc = false;
   private cur: string | null = null;
   readonly fields = new Map<string, string>();
+  /** The wanted fields whose string has ended: what it holds is the whole of it. */
+  readonly ended = new Set<string>();
 
   constructor(private want: ReadonlySet<string>) {}
 
@@ -110,6 +115,7 @@ export class JsonFields {
             this.state = 'esc';
           } else if (c === '"') {
             flush();
+            if (this.cur !== null) this.ended.add(this.cur);
             this.cur = null;
             this.state = 'key-start';
           } else put(c);
@@ -185,8 +191,14 @@ const FIELDS: Record<Kind, Set<string>> = {
   save_diagram: new Set(['id', 'title']),
 };
 
-/** A file draft shows once its path says it is an HTML file. */
-const showable = (d: Draft) => d.tool !== 'file' || (!!d.path && HTML_FILE.test(d.path));
+/** The files followed as they are written: an HTML file (a page), and a document written as text. */
+const followed = (path: string) => HTML_FILE.test(path) || isStreamedDoc(path);
+
+/** A file's path has come whole (it comes in pieces, like the rest of the call). */
+const named = (d: Draft) => !!d.path && (d.done || d.json.ended.has('file_path'));
+
+/** A file draft shows once its path says it is one of those. */
+const showable = (d: Draft) => d.tool !== 'file' || (named(d) && followed(d.path!));
 
 const info = (d: Draft): Omit<PageDraft, 'text'> => ({
   id: d.id,
@@ -277,8 +289,8 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
     if (!e.delta || !d.json.feed(e.delta).size) return;
     const before = d.text.length;
     read(d);
-    // Any other file is no page: it is not followed further.
-    if (d.tool === 'file' && d.path && !HTML_FILE.test(d.path)) return forget(key, d.id);
+    // Any other file is no page and no document: it is not followed further.
+    if (d.tool === 'file' && named(d) && !followed(d.path!)) return forget(key, d.id);
     // A field read again from its start (a model that wrote it twice) starts the pages over too.
     if (d.text.length < before) d.started = false;
     later(deps, d);

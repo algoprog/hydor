@@ -45,11 +45,11 @@ const IN_EDITOR = {
  * `embedded`: in a dialog over another page (FilePeek), showing documents as they look first. A file opened at a line
  * (a search's match) shows as text, at that line.
  */
-export function FileView({ path, line, embedded, onDirty }: { path: string; line?: number; embedded?: boolean; onDirty?: (dirty: boolean) => void }) {
+export function FileView({ path, line, embedded, narrow, onDirty }: { path: string; line?: number; embedded?: boolean; narrow?: boolean; onDirty?: (dirty: boolean) => void }) {
   const saveFirst = useRef<(() => Promise<boolean>) | null>(null);
   const wide = useMediaQuery('(min-width: 1100px)');
   const ask = useFileAsk();
-  if (embedded) return <FileBody path={path} line={line} embedded onDirty={onDirty} />;
+  if (embedded) return <FileBody path={path} line={line} embedded narrow={narrow} onDirty={onDirty} />;
   // Ask an agent about the file: beside it on a wide screen, over it otherwise (folding away to watch it change).
   const panel = ask.open && <FileAskPanel path={path} beforeSend={() => saveFirst.current?.() ?? Promise.resolve(true)} className={wide ? 'w-[400px] shrink-0 border-l border-line' : undefined} />;
   return (
@@ -68,17 +68,19 @@ export function FileView({ path, line, embedded, onDirty }: { path: string; line
   );
 }
 
-/** The file itself; `saveFirst` (the Files page, not a dialog) brings the Ask button. */
+/** The file itself; `saveFirst` (the Files page, not a dialog) brings the Ask button. `narrow`: where there is little room across (the panel beside a conversation). */
 function FileBody({
   path,
   line,
   embedded,
+  narrow,
   onDirty,
   saveFirst,
 }: {
   path: string;
   line?: number;
   embedded?: boolean;
+  narrow?: boolean;
   onDirty?: (dirty: boolean) => void;
   saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
@@ -87,7 +89,7 @@ function FileBody({
   const [source, setSource] = useState(false);
   const kind = editorKindOf(path);
   const [asText, setAsText] = useState(() => !!line);
-  if (kind && !asText) return <FileInEditor path={path} embedded={embedded} onDirty={onDirty} fileMenu={!embedded} onText={() => setAsText(true)} actions={askButton} saveFirst={saveFirst} />;
+  if (kind && !asText) return <FileInEditor path={path} embedded={embedded} narrow={narrow} onDirty={onDirty} fileMenu={!embedded} onText={() => setAsText(true)} actions={askButton} saveFirst={saveFirst} />;
   if (notebook && !source) {
     return (
       <Suspense
@@ -106,6 +108,7 @@ function FileBody({
       path={path}
       line={line}
       embedded={embedded}
+      narrow={narrow}
       preview={embedded}
       onDirty={onDirty}
       fileMenu={!embedded}

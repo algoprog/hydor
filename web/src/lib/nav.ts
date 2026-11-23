@@ -127,9 +127,12 @@ export type Peeked = { path: string; line?: number; dir?: boolean; sel?: string;
  */
 export const useFilePeek = create<{ file: Peeked | null; show?: (to: Peeked) => Promise<boolean> }>(() => ({ file: null }));
 
+/** A session's page is the one on screen. */
+export const inSession = () => location.pathname.slice(machineBase.length).startsWith('/s/');
+
 /** Opens a file. From a session it shows in a dialog over the conversation, which stays where it was; elsewhere on the Files page. */
 export function openFile(path: string, line?: number) {
-  if (location.pathname.slice(machineBase.length).startsWith('/s/')) useFilePeek.setState({ file: { path, line } });
+  if (inSession()) useFilePeek.setState({ file: { path, line } });
   else showInFiles(path, line);
 }
 

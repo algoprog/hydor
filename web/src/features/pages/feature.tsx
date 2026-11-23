@@ -37,6 +37,7 @@ export const pagesFeature: WebFeature = {
     save_doc: saved,
     save_sheet: saved,
     save_latex: saved,
+    save_notebook: saved,
     save_diagram: saved,
     save_board: saved,
     // Nothing is published until the user says so on its card.

@@ -835,7 +835,12 @@ agents that speak ACP and take MCP servers.
   pictures and videos, and you can write your own (Write its title and description again). The search box (its Kept files) and agents (get_page's query) find things by title and description with hybrid search: by words (BM25) and by
   meaning, joined by rank. Files and whole folders dropped on a project's Files, or added with Upload, are put in the
   folder shown as they are, sent in pieces up to 1 GB with a tray of
-  each file's progress (Upload files in the + of a phone's Files does the same). A page shows as the agent writes it (beside the conversation on a wide screen), fills the width it gets,
+  each file's progress (Upload files in the + of a phone's Files does the same). A page shows as the agent writes it (beside the conversation on a wide screen), and so does every other kind of
+  document: slides, documents, spreadsheets, LaTeX, notebooks and diagrams the app keeps, and files (Markdown, Word,
+  Excel, PowerPoint, PDF, LaTeX, CSV, notebooks), Markdown, LaTeX and CSV files as their text comes and the others
+  once they are there, each change an agent makes landing as it is made. The first page or document a turn makes or
+  changes opens there by itself, asked for or not; a turn that goes on to a second one puts the panel back as it
+  was, and each opens from its card. Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,
@@ -1774,7 +1779,8 @@ programs shows each program's version and what is out, with Check now, Update no
   that live in a spreadsheet or a file, more than a few dozen rows, or a card to keep; `find_ui` gives each such card's
   form with an example.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
-  beside it on a wide screen. Before showing one, an agent can picture it as the app shows it, in the dark theme or
+  beside it on a wide screen, where a turn's only page or document (a file such as Markdown, Word or a PDF too)
+  opens by itself, with a full-screen button; a turn that makes several shows their cards only. Before showing one, an agent can picture it as the app shows it, in the dark theme or
   the light, to see what would not read well.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
   from before and after, on a computer's or a phone's screen, in the light or dark theme: a reply's screenshots as one card of small

@@ -27643,5 +27643,11 @@
   "gemini cli antigravity agy google ai pro ultra opencode qwen code goose grok build xai supergrok hermes agent pi openclaw acp": "gemini cli antigravity agy google ai pro ultra opencode qwen code goose grok build xai supergrok hermes agent pi openclaw acp πράκτορας",
   "login sign in claude code codex grok build xai supergrok antigravity agy google gemini ai pro ultra subscription email plan second account work personal add": "σύνδεση login sign in claude code codex grok build xai supergrok antigravity agy google gemini ai pro ultra συνδρομή email πρόγραμμα δεύτερος λογαριασμός εργασία προσωπικός προσθήκη",
   "{0} has its own sign-in only": "Το {0} διαθέτει μόνο τη δική του σύνδεση",
-  "{0} is not signed in: sign in with your {1} account in Settings → Agents → Accounts, then try again.": "Το {0} δεν είναι συνδεδεμένο: συνδεθείτε με τον λογαριασμό σας {1} στις Ρυθμίσεις → Πράκτορες → Λογαριασμοί και δοκιμάστε ξανά."
+  "{0} is not signed in: sign in with your {1} account in Settings → Agents → Accounts, then try again.": "Το {0} δεν είναι συνδεδεμένο: συνδεθείτε με τον λογαριασμό σας {1} στις Ρυθμίσεις → Πράκτορες → Λογαριασμοί και δοκιμάστε ξανά.",
+  "It opens afresh there: changes that are not saved yet would be lost.": "Θα ανοίξει εκ νέου εκεί: οι αλλαγές που δεν έχουν αποθηκευτεί θα χαθούν.",
+  "Open beside the conversation": "Άνοιγμα δίπλα στη συνομιλία",
+  "Open documents here as they are written": "Άνοιγμα των εγγράφων εδώ καθώς γράφονται",
+  "Save your changes first?": "Αποθήκευση των αλλαγών σας πρώτα;",
+  "Show beside the conversation": "Εμφάνιση δίπλα στη συνομιλία",
+  "Waiting for your OK": "Αναμονή για την έγκρισή σας"
 }

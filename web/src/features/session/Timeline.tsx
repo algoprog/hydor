@@ -25,7 +25,8 @@ import { runEndedNotice } from '@shared/apps';
 import { LOCALE } from '../../i18n/locale';
 import { ReplyFilesCtx } from '../../components/Markdown';
 import type { Card } from '../documents/FileCards';
-import { SLACK, startOf, TurnDocs, turnFiles, useMadeFiles } from './TurnDocs';
+import { OFFER_MS, SLACK, startOf, turnDocFiles, TurnDocs, turnFiles, useMadeFiles, type DocFile } from './TurnDocs';
+import { fileDoc, offerBeside } from '../pages/Canvas';
 
 /**
  * Custom works with Hydor's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
@@ -1291,6 +1292,24 @@ export function Timeline({
   }, [segs, idle]);
   const made = useMadeFiles(sessionCwd, madeSince, madeUntil);
   const filesOf = (seg: Segment, i: number) => turnFiles(seg, isFinished(seg, i), sessionCwd, home, made);
+  // The last turn's documents that are files (a Markdown write-up, a Word file, a PDF): they are offered to the panel
+  // beside the conversation as they come, where the turn's only document opens by itself (pages/Canvas.tsx). A turn
+  // that ended a while ago (a session opened later) offers nothing.
+  const lastSeg = segs[segs.length - 1] as Segment | undefined;
+  const lastDone = !!lastSeg && isFinished(lastSeg, segs.length - 1);
+  const lastDocs = lastSeg ? turnDocFiles(lastSeg, lastDone, lastDone ? filesOf(lastSeg, segs.length - 1).docs : [], sessionCwd, home) : [];
+  const lastDocsKey = lastDocs.length ? JSON.stringify(lastDocs) : '';
+  const lastId = lastSeg?.id;
+  const lastEnded = lastSeg?.end?.ts;
+  useEffect(() => {
+    if (!lastId || !lastDocsKey) return;
+    if (lastDone && Date.now() - (lastEnded ?? 0) > OFFER_MS) return;
+    offerBeside(
+      sessionKey,
+      (JSON.parse(lastDocsKey) as DocFile[]).map((d) => fileDoc(d.path, d)),
+      lastId.replace(/^seg:/, ''),
+    );
+  }, [sessionKey, lastId, lastDocsKey, lastDone]);
   // The paths of everything the turns changed, handed over or show as documents, oldest first, each at its latest place:
   // the replies' file links find their files among them. The same list (the same array) until a path changes.
   const pathsKey = useMemo(() => {

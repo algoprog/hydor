@@ -40,6 +40,8 @@ export interface TurnFiles {
 
 /** How long after a turn ends a file's change still counts as the turn's (the file system's clock and the app's differ a little). */
 export const SLACK = 5000;
+/** How long after a turn ended its documents are still offered to the panel beside the conversation (a session opened later shows its cards only). */
+export const OFFER_MS = 20_000;
 /** At most this much of a tool call's input, and of its output, is searched for the names of files. */
 const INPUT_CHARS = 20_000;
 const NONE: MadeFile[] = [];
@@ -111,10 +113,54 @@ function compute(t: TurnLike, finished: boolean, cwd: string | undefined, home: 
     }
   }
   for (const p of handed) docs.delete(p);
-  // What it made to be read (a PDF, a Word file, slides) before the sources it was made from (LaTeX, Markdown, tables).
-  const source = (p: string) => (/\.(tex|md|markdown|csv|tsv)$/i.test(p) ? 1 : 0);
   out.docs = [...docs.values()].sort((a, b) => source(a.path) - source(b.path));
   return out;
+}
+
+/** What it made to be read (a PDF, a Word file, slides) before the sources it was made from (LaTeX, Markdown, tables). */
+const source = (p: string) => (/\.(tex|md|markdown|csv|tsv)$/i.test(p) ? 1 : 0);
+
+/** A document among a turn's files: handed over (present_files) or not, and the saved page it is a copy of (export_page). */
+export interface DocFile {
+  path: string;
+  handed?: boolean;
+  page?: string;
+}
+
+/**
+ * The documents among a turn's files, for the panel beside the conversation (pages/Canvas.tsx: a turn's only document
+ * opens there by itself). While the turn runs: those its steps that have run changed, and those it handed over
+ * (`handed`). Once it has ended: its cards (`docs`) and what it handed over. A file export_page wrote is the saved
+ * page it came from in another form (`page`), not a second document. What was made to be read comes first.
+ */
+export function turnDocFiles(t: TurnLike, finished: boolean, docs: Card[], cwd: string | undefined, home: string | undefined): DocFile[] {
+  const out = new Map<string, DocFile>();
+  const exported = new Map<string, string>();
+  if (finished) for (const c of docs) out.set(c.path, { path: c.path });
+  for (const it of [...t.work, ...t.answer, ...t.attention]) {
+    if (it.kind !== 'tool' || it.tool.status !== 'ok') continue;
+    const bare = nagetTool(it.tool.name);
+    if (bare === 'export_page') {
+      // "Wrote <file> (12 KB)." is what the tool answers; the page is the one it was asked for.
+      const id = (it.tool.input as { id?: unknown } | undefined)?.id;
+      const file = /^Wrote (.+) \(\d+ KB\)\./.exec(it.tool.output ?? '')?.[1];
+      if (typeof id === 'string' && file) exported.set(resolveIn(file, cwd, home), id.trim());
+      continue;
+    }
+    if (bare === 'present_files') {
+      for (const p of presentedPaths(it, cwd, home)) if (isMadeDoc(p)) out.set(p, { path: p, handed: true });
+      continue;
+    }
+    if (finished) continue;
+    for (const f of (it.tool.files ?? []) as FileChange[]) {
+      const p = resolveIn(f.op === 'move' && f.movePath ? f.movePath : f.path, cwd, home);
+      // A file the turn made and took away again (a scratch one) is none of its documents.
+      if (f.op === 'delete') out.delete(p);
+      else if (isMadeDoc(p) && !out.has(p)) out.set(p, { path: p });
+    }
+  }
+  for (const [p, page] of exported) if (out.has(p)) out.set(p, { ...out.get(p)!, page });
+  return [...out.values()].sort((a, b) => source(a.path) - source(b.path));
 }
 
 const SHOWN = 4;

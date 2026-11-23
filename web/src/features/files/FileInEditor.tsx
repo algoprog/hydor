@@ -97,6 +97,7 @@ const Band = ({ tone = 'warn', children }: { tone?: 'warn' | 'quiet'; children: 
 export function FileInEditor({
   path,
   embedded,
+  narrow,
   onDirty,
   onText,
   fileMenu,
@@ -105,6 +106,8 @@ export function FileInEditor({
 }: {
   path: string;
   embedded?: boolean;
+  /** Little room across (the panel beside a conversation): its path is one line that folds, as on a phone. */
+  narrow?: boolean;
   onDirty?: (dirty: boolean) => void;
   onText: () => void;
   fileMenu?: boolean;
@@ -358,7 +361,7 @@ export function FileInEditor({
       </div>
     </>
   ) : (
-    <PathCrumbs path={path} after={unsaved} className="flex-1 pl-1" />
+    <PathCrumbs compact={narrow} path={path} after={unsaved} className="flex-1 pl-1" />
   );
 
   const tail = (

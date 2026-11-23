@@ -153,20 +153,21 @@ export interface PageDataEntry {
 }
 
 /**
- * A page an agent is writing (show_html, save_page, or an HTML file written whole), or a document, deck, spreadsheet
- * or LaTeX document it is saving (save_doc, save_slides, save_sheet, save_latex), as its call streams in: the pages
- * showing the session (and an editor that has that page open) watch it grow until the call is complete.
+ * A page an agent is writing (show_html, save_page, or an HTML file written whole), a document it writes whole as a
+ * text file (Markdown, LaTeX, CSV, TSV), or a document, deck, spreadsheet or LaTeX document it is saving (save_doc,
+ * save_slides, save_sheet, save_latex), as its call streams in: the pages showing the session (and an editor that has
+ * that page open) watch it grow until the call is complete.
  */
 export interface PageDraft {
   /** The tool call's id: its item in the conversation. */
   id: string;
   tool: 'show_html' | 'save_page' | 'file' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex' | 'save_diagram';
   title?: string;
-  /** An HTML file's path. */
+  /** A file's path (tool 'file'): an HTML file, or a document written as text. */
   path?: string;
   /** save_page (or a save of another kind) with an id: the saved page it changes. */
   pageId?: string;
-  /** The page's HTML so far; for a save of another kind, the call's own input so far (JSON still being written). */
+  /** The page's HTML so far (a text document's text); for a save of another kind, the call's own input so far (JSON still being written). */
   text: string;
   /** The call is complete (or stopped). */
   done: boolean;

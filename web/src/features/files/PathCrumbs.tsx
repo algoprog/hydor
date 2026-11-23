@@ -1,20 +1,25 @@
 // The path above an open file: each folder in it goes to that folder on the Files page (with the next step of the path
 // picked there), and the file's name shows it in its folder. A long path folds its middle into a "…" that lists the
 // folders between; on a phone the folder's path is one button that lists the folders to go to. Over a file in the
-// file pop-up (FilePeek), the folder shows in the pop-up itself, which asks first about changes not saved.
+// file pop-up (FilePeek), the folder shows in the pop-up itself, which asks first about changes not saved; from a file
+// beside a session's conversation it opens in that pop-up too, so the conversation and the file stay as they are.
 import { useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Folder, FolderOpen, House } from 'lucide-react';
 import { cx, MenuItem, MenuSep, Popover } from '../../components/ui';
 import { basename, dirname, inside, isWinPath, joinPath, pathParts, sepOf, tildify } from '../../lib/format';
-import { useFilePeek } from '../../lib/nav';
+import { inSession, useFilePeek } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { goFolder } from './actions';
 import { Step } from './Places';
 
-/** Opens a folder with `select` picked: in the file pop-up over the page when the file is in one (with Back to it), else on the Files page. */
+/**
+ * Opens a folder with `select` picked: in the file pop-up over the page when the file is in one (with Back to it) or
+ * beside a session's conversation, else on the Files page.
+ */
 function visit(dir: string, select: string) {
   const show = useFilePeek.getState().show;
   if (show) void show({ path: dir, dir: true, sel: select });
+  else if (inSession()) useFilePeek.setState({ file: { path: dir, dir: true, sel: select } });
   else goFolder(dir, select);
 }
 

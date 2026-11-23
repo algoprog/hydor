@@ -401,5 +401,32 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
   ok(!draftsOf('claude:s1').find((d) => d.id === 'c1')?.failed, 'the answer of one that saved changes nothing');
 }
 
+// ---- a file written whole: followed when it is a page or a document, as its text comes -----------------------------
+{
+  const sent: { key: string; data: any }[] = [];
+  const deps = { toSubscribers: (key: string, e: { data: unknown }) => void sent.push({ key, data: e.data }) } as unknown as Deps;
+  const text = '# Lisbon\n\nTwo days, "on foot".\n\n- Alfama\n- Belém\n';
+  const write = (id: string, file_path: string) => {
+    const call = JSON.stringify({ file_path, content: text });
+    feedDraft(deps, 'claude:s2', { id, name: 'Write', at: 'start' });
+    for (let i = 0; i < call.length; i += 17) feedDraft(deps, 'claude:s2', { id, name: 'Write', at: 'delta', delta: call.slice(i, i + 17) });
+  };
+  const whole = (id: string) => sent.filter((x) => x.data.draft.id === id).reduce((acc, x) => (x.data.from === 0 ? x.data.text : acc.slice(0, x.data.from) + x.data.text), '');
+  write('w1', '/home/a/trip/lisbon.md');
+  write('w2', '/home/a/trip/plan.py');
+  write('w3', '/home/a/trip/costs.csv');
+  write('w4', '/home/a/trip/index.html');
+  write('w5', '/home/a/trip/notes.ipynb');
+  await new Promise((r) => setTimeout(r, 200));
+  const md = draftsOf('claude:s2').find((d) => d.id === 'w1');
+  ok(md?.tool === 'file' && md.path === '/home/a/trip/lisbon.md' && md.text === text && !md.done && whole('w1') === text, 'a Markdown file written whole comes as its text, a piece at a time');
+  ok(whole('w3') === text && whole('w4') === text, 'so do a CSV table and an HTML page');
+  ok(!draftsOf('claude:s2').some((d) => d.id === 'w2' || d.id === 'w5') && !sent.some((x) => x.data.draft.id === 'w2' || x.data.draft.id === 'w5'), 'code and a notebook are not followed');
+  feedDraft(deps, 'claude:s2', { id: 'w1', name: 'Write', at: 'end', input: { file_path: '/home/a/trip/lisbon.md', content: text } });
+  ok(draftsOf('claude:s2').find((d) => d.id === 'w1')?.done && sent.at(-1)!.data.draft.done, 'the call complete, the draft is done: the file itself shows once the step has run');
+  endDrafts(deps, 'claude:s2');
+  ok(draftsOf('claude:s2').every((d) => d.done), 'the turn over, none is left open');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

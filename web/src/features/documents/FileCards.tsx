@@ -3,17 +3,18 @@
 // app's file viewer, which previews documents), Download and ⋯ (a session with it, a project, a kept notebook,
 // a document, a spreadsheet or a LaTeX file, Files).
 import { useEffect, useState } from 'react';
-import { Download, FileQuestion } from 'lucide-react';
-import { kindLabel, docKind } from '@shared/documents';
+import { Download, FileQuestion, PanelRight } from 'lucide-react';
+import { kindLabel, docKind, isMadeDoc } from '@shared/documents';
 import type { ToolItem } from '@shared/types';
 import { api } from '../../lib/api';
 import { basename, bytes } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { openFile } from '../../lib/nav';
 import { useApp, useSessions } from '../../lib/store';
-import { Button, cx, IconButton } from '../../components/ui';
+import { Button, cx, IconButton, useMediaQuery } from '../../components/ui';
 import { FileIcon, resolveIn } from './fileTypes';
 import { FileMore } from '../files/SpaceMenu';
+import { CANVAS_MEDIA, onScreen, useCanvas } from '../pages/state';
 
 export interface Card {
   path: string;
@@ -79,8 +80,21 @@ export function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; s
   const gone = stat && !stat.exists;
   const image = docKind(card.path) === 'image' && !gone;
   const [thumbOk, setThumbOk] = useState(true);
+  // A document (not a picture, code or an archive) shows beside the conversation too, where there is room: its card
+  // says so while it does, as a page's card does.
+  const wide = useMediaQuery(CANVAS_MEDIA);
+  const beside = wide && !gone && isMadeDoc(card.path) && onScreen(sessionKey);
+  const here = useCanvas((x) => {
+    const t = x.open[sessionKey];
+    return beside && t?.kind === 'file' && t.id === card.path;
+  });
   return (
-    <div className={cx('flex min-w-0 items-center gap-3 rounded-xl border border-line bg-panel py-2.5 pr-2 pl-2.5 transition-colors', gone ? 'opacity-60' : 'hover:border-line-2')}>
+    <div
+      className={cx(
+        'flex min-w-0 items-center gap-3 rounded-xl border bg-panel py-2.5 pr-2 pl-2.5 transition-colors',
+        gone ? 'border-line opacity-60' : here ? 'border-accent/50 shadow-[0_0_0_3px_var(--accent-soft)]' : 'border-line hover:border-line-2',
+      )}
+    >
       <button type="button" disabled={gone} onClick={() => openFile(card.path)} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={card.path}>
         {image && thumbOk ? (
           <img src={mu(`/api/fs/raw?path=${encodeURIComponent(card.path)}`)} alt="" loading="lazy" onError={() => setThumbOk(false)} className="h-10 w-10 shrink-0 rounded-[10px] border border-line object-cover" />
@@ -110,6 +124,11 @@ export function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; s
           <Button size="sm" variant="subtle" onClick={() => openFile(card.path)} className="h-8 px-2.5">
             Open
           </Button>
+          {beside && (
+            <IconButton label="Open beside the conversation" active={here} onClick={() => useCanvas.getState().show(sessionKey, { kind: 'file', id: card.path })}>
+              <PanelRight size={16} />
+            </IconButton>
+          )}
           <IconButton label={`Download ${name}`} onClick={() => download(card.path)}>
             <Download size={16} />
           </IconButton>

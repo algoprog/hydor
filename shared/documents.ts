@@ -177,6 +177,19 @@ const KIND_WORDS: Record<DocKind, string> = {
 export const MADE_DOC_EXTS = ['pdf', 'docx', 'doc', 'odt', 'rtf', 'xlsx', 'xls', 'ods', 'csv', 'tsv', 'pptx', 'ppt', 'odp', 'tex', 'ipynb', 'epub', 'md', 'markdown'];
 export const isMadeDoc = (path: string) => /\.[^./\\]+$/.test(path) && MADE_DOC_EXTS.includes(path.split('.').pop()!.toLowerCase());
 
+/**
+ * Those of them an agent writes as text in one call (Markdown, LaTeX, a CSV or TSV table): they show beside the
+ * conversation as the call comes in, a piece at a time (server/pages/drafts.ts), as pages and saved documents do.
+ */
+export const STREAMED_DOC_EXTS = ['md', 'markdown', 'tex', 'csv', 'tsv'];
+export const isStreamedDoc = (path: string) => /\.[^./\\]+$/.test(path) && STREAMED_DOC_EXTS.includes(path.split('.').pop()!.toLowerCase());
+
+/**
+ * A document's file without the ending that says its form: a report written as Markdown and made into a Word file and a
+ * PDF in the same folder ("report.md", "report.docx", "report.pdf") is one document in three forms, and counts once.
+ */
+export const docStem = (path: string) => path.replace(/\.[^./\\]+$/, '');
+
 /** "Word document", "Excel workbook", "PDF"…: what a file is, in words. */
 export function kindLabel(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
@@ -184,7 +197,7 @@ export function kindLabel(path: string): string {
     doc: 'Word document', docx: 'Word document', odt: 'OpenDocument text', rtf: 'Rich text',
     xls: 'Excel workbook', xlsx: 'Excel workbook', xlsm: 'Excel workbook', ods: 'OpenDocument sheet', csv: 'CSV table', tsv: 'TSV table',
     ppt: 'PowerPoint', pptx: 'PowerPoint', odp: 'OpenDocument slides',
-    md: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image', ipynb: 'Jupyter notebook', tex: 'LaTeX', ltx: 'LaTeX',
+    md: 'Markdown', markdown: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image', ipynb: 'Jupyter notebook', tex: 'LaTeX', ltx: 'LaTeX',
   };
   return named[ext] ?? (KIND_WORDS[docKind(path)] === 'Image' && ext ? `${ext.toUpperCase()} image` : KIND_WORDS[docKind(path)]);
 }

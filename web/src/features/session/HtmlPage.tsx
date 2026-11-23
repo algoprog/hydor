@@ -15,10 +15,10 @@ import { tr } from '../../i18n/runtime';
 import { Throbber, IconButton, cx, useMediaQuery } from '../../components/ui';
 import { useKeepIn } from '../spaces/SpacePick';
 import { useSpacesStore } from '../spaces/state';
-import { openOver, showBeside } from '../pages/Canvas';
+import { callDoc, offerBeside, openOver, showBeside } from '../pages/Canvas';
 import { pageFile, pageStore, PageFrame, shownStore, StreamFrame, usePreviewMax, type Pick } from '../pages/frame';
 import { PageOverlay } from '../pages/overlay';
-import { CANVAS_MEDIA, onScreen, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
+import { CANVAS_MEDIA, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from '../pages/state';
 
 // The server was called agent-console in older sessions.
 export const isPageTool = (name: string) => /^mcp__(hydor|naget-agent|agent-console)__show_html$/.test(name);
@@ -47,14 +47,15 @@ export function usePicks(sessionKey: string | undefined, holding: boolean) {
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
 
-/** A page call that just came in (Codex and other agents hand over whole calls) opens beside, as a streamed one does; so does a newer save a card shows. */
+/**
+ * A page call that just came in (Codex and other agents hand over whole calls) is offered to the panel beside the
+ * conversation, as a streamed one is by its draft: the turn's only document opens there by itself (Canvas.tsx).
+ */
 export function useOpensBeside(sessionKey: string | undefined, item: ToolItem) {
   useEffect(() => {
     if (!sessionKey || !item.ts || Date.now() - item.ts > 20_000) return;
-    const c = useCanvas.getState();
-    if (!c.auto || c.open[sessionKey] || !matchMedia(CANVAS_MEDIA).matches || !onScreen(sessionKey)) return;
     if (useDrafts.getState().byKey[sessionKey]?.[item.id]) return;
-    c.show(sessionKey, { kind: 'item', id: item.id });
+    offerBeside(sessionKey, [callDoc(item)], item.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 }

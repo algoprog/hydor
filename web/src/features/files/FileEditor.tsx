@@ -178,11 +178,13 @@ function PageFrame({ url, version, title }: { url: string | null; version: numbe
  * `saveFirst` is given a way to save unsaved changes (true when there were none, or they are saved), for an agent
  * asked about the file to work on them. Changes made to the file elsewhere (an agent, a terminal) come into the
  * editor as they land, while nothing is changed here, their lines tinted for a moment; asked about otherwise.
+ * `narrow`: little room across (the panel beside a conversation): its path is one line that folds, as on a phone.
  */
 export function FileEditor({
   path,
   line,
   embedded,
+  narrow,
   preview,
   onDirty,
   onSaved,
@@ -193,6 +195,7 @@ export function FileEditor({
   path: string;
   line?: number;
   embedded?: boolean;
+  narrow?: boolean;
   preview?: boolean;
   onDirty?: (dirty: boolean) => void;
   onSaved?: () => void;
@@ -638,7 +641,7 @@ export function FileEditor({
         </div>
       ) : (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-3">
-          <PathCrumbs path={path} after={unsaved} className="flex-1" />
+          <PathCrumbs compact={narrow} path={path} after={unsaved} className="flex-1" />
           {text && (
             <>
               {(isMd || isHtml) && (

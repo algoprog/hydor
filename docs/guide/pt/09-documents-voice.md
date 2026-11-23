@@ -139,6 +139,7 @@ Abaixo da resposta de um agente, os documentos que ele criou ou alterou naquele 
 - Cada cartão diz **Nova** ou **Atualizado**, com o tipo e o tamanho, e tem **Abrir**, um botão de download e **⋯**, como os cartões acima.
 - Os documentos finalizados (um PDF, um arquivo do Word…) vêm antes das fontes deles (LaTeX, Markdown, tabelas). Os quatro primeiros aparecem; **Mostrar N documentos a mais** mostra o restante e **Mostrar menos** os recolhe de novo.
 - Um arquivo que o agente entregou mantém o próprio cartão e a própria legenda, e não aparece duas vezes. Um arquivo que não está mais lá fica de fora. Imagens, arquivos de código e de dados não aparecem desse jeito (o agente ainda entrega as imagens).
+- Em uma tela larga, um documento também aparece ao lado da conversa: o botão de painel no cartão dele (**Abrir ao lado da conversa**) o abre ali, e o cartão do que está sendo exibido fica com contorno. Quando um turno cria ou altera um só documento, ele abre ali sozinho ([Acompanhar uma página enquanto ela é escrita](/guide/library#watch-a-page-as-it-is-written)).
 
 Nomes de arquivos e caminhos em uma resposta são links. Um nome ou caminho em código (`report.tex`, `docs/report.pdf`, `src/app.ts:42`, que abre naquela linha), um caminho absoluto ou com `~/` no texto e um link para um arquivo abrem o arquivo na janela sobre a conversa, como o **Abrir** de um cartão. Um nome sozinho abre o arquivo da conversa com esse nome; um caminho que não começa na raiz parte da pasta da sessão.
 

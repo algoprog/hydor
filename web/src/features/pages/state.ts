@@ -149,8 +149,11 @@ onFeatureEvent('pages', ({ key, data }) => {
 
 // ---- beside the conversation ---------------------------------------------------------------------------
 
-/** What a session shows beside its conversation: a page (an agent's call, by its id, or a saved page) or a review. */
-export type CanvasTarget = ({ kind: 'item'; id: string } | { kind: 'page'; id: string } | { kind: 'review'; id: string }) & {
+/**
+ * What a session shows beside its conversation: a page (an agent's call, by its id, or a saved page), a document that
+ * is a file (by its path) or a review.
+ */
+export type CanvasTarget = ({ kind: 'item'; id: string } | { kind: 'page'; id: string } | { kind: 'file'; id: string } | { kind: 'review'; id: string }) & {
   /** Opened to change it (Edit), not just to see it. */
   edit?: boolean;
 };
@@ -169,7 +172,7 @@ interface CanvasState {
   open: Record<string, CanvasTarget | null>;
   /** The panel's width, as a share of the session's space (kept on this device). */
   width: number;
-  /** Pages an agent starts writing open beside the conversation by themselves (kept on this device). */
+  /** A turn's document opens beside the conversation by itself, while it is the turn's only one (kept on this device). */
   auto: boolean;
   show(key: string, t: CanvasTarget): void;
   close(key: string): void;

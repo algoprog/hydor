@@ -1,13 +1,17 @@
-// Beside a session's conversation, on a wide screen: the page an agent is writing, as it comes, then the
-// page itself to use, edit and save. Pages shown in the conversation (show_html), saved pages (save_page)
-// and HTML files an agent writes (Write) open here; when the user saves a change, the agent hears of it
-// with their next message. It opens by itself when an agent starts writing a page in the session on
-// screen (unless that was turned off), and from the cards in the conversation.
+// Beside a session's conversation, on a wide screen: the page or document an agent is writing, as it comes, then
+// the thing itself to use, edit and save. Pages shown in the conversation (show_html), saved pages, documents,
+// slides, spreadsheets, LaTeX, notebooks and diagrams (save_page and the other save tools), HTML files an agent
+// writes (Write) and documents that are files (Markdown, Word, Excel, PowerPoint, PDF…: BesideFile.tsx) open here;
+// when the user saves a change, the agent hears of it with their next message. A turn's document opens by itself in
+// the session on screen (unless that was turned off) while it is the turn's only one: a turn that makes or changes
+// several shows none of them here (beside-rule.ts), and each opens from its card in the conversation. Its top line
+// has a button that shows it over everything instead (full screen), and back.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
-import { AppWindow, ChevronDown, Download, Ellipsis, ExternalLink, FileCode2, FolderOpen, X } from 'lucide-react';
-import type { PageInfo } from '@shared/pages';
+import { AppWindow, ChevronDown, Download, Ellipsis, ExternalLink, FileCode2, FolderOpen, Maximize2, PanelRight, X } from 'lucide-react';
+import { docStem } from '@shared/documents';
+import type { PageDraft, PageInfo } from '@shared/pages';
 import type { SessionSummary, TimelineItem, ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post, put } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
@@ -18,6 +22,7 @@ import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store
 import { nagetTool } from '../registry';
 import { cx, IconButton, MenuItem, MenuSep, Popover, Switch, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { useSpacesStore } from '../spaces/state';
+import { FileMore } from '../files/SpaceMenu';
 import { tr } from '../../i18n/runtime';
 import { pageFile, pageStore, shownStore, type Store } from './frame';
 import { CANVAS_MEDIA, onDraftStart, onScreen, savedPageOf, savedRef, useCanvas, useDrafts, usePagesStore, type CanvasTarget } from './state';
@@ -27,6 +32,8 @@ import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
 import { draftKind, useEmptyModel, useLiveDraft, usePageDraft } from './live';
+import { noteDoc, opened, quiet, type TurnDocs } from './beside-rule';
+import { SessionFile } from './BesideFile';
 import { sendToSession, useCommentAi } from './common/commentAi';
 import { pageNamed } from '@shared/comment-asks';
 import type { Deck } from '@shared/slides';
@@ -51,7 +58,7 @@ export function pageCall(t: ToolInfo | undefined): PageCall | null {
   const bare = nagetTool(t.name);
   if (bare === 'show_html' || bare === 'save_page') return bare;
   // A deck, a document or a spreadsheet is a saved page too, opened by its id.
-  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex' || bare === 'save_diagram' || bare === 'save_board') return 'save_page';
+  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex' || bare === 'save_notebook' || bare === 'save_diagram' || bare === 'save_board') return 'save_page';
   // A change page_action saved: the page it changed, as a save of it.
   if (bare === 'page_action' && savedRef(t.output)) return 'save_page';
   const p = (t.input as { file_path?: unknown } | undefined)?.file_path;
@@ -93,39 +100,209 @@ const titleOf = (it: ToolItem | undefined, kind: PageCall | null): string => {
 
 // ---- opening it by itself -------------------------------------------------------------------------------
 
-onDraftStart((key, started) => {
-  const c = useCanvas.getState();
-  if (!c.auto || !matchMedia(CANVAS_MEDIA).matches || !onScreen(key)) return;
-  const cur = c.open[key];
-  // A page already open with unsaved changes stays.
-  if (cur && dirty.has(key)) return;
-  // Another save of the page shown here (an agent working in steps): it shows there as it comes, the panel as it is. Its
-  // page is known once its id has come (the first piece, mostly): until then, a moment's wait.
-  if (draftKind(started)) {
-    const decide = () => {
-      const now = useDrafts.getState().byKey[key]?.[started.id];
-      if (!now || now.done || dirty.has(key)) return;
-      if (now.pageId && shownPage.get(key) === now.pageId && useCanvas.getState().open[key]) return;
-      if (!now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
-      useCanvas.getState().show(key, { kind: 'item', id: now.id });
-    };
-    return decide();
-  }
-  const d = useDrafts.getState().byKey[key];
-  const id = d ? Object.values(d).filter((x) => !x.done).sort((a, b) => b.startedAt - a.startedAt)[0]?.id : undefined;
-  if (id) c.show(key, { kind: 'item', id });
-});
-
 /** Sessions whose panel holds changes not saved yet. */
 const dirty = new Set<string>();
 /** The saved page each session's panel shows now. */
 const shownPage = new Map<string, string>();
+
+/** A document a turn made or changed: the names it goes by (beside-rule.ts), and what shows it beside the conversation. */
+export interface BesideDoc {
+  names: string[];
+  target: CanvasTarget;
+  /** A page written anew by each call: the newest call is the one to show (a save of another kind shows in the editor that is open). */
+  follow?: boolean;
+  /** The agent handed it over (present_files): it takes the place of another form of it that opened by itself (its source, say). */
+  handed?: boolean;
+}
+
+/** By session: its turn's documents so far, what opened by itself for it, and what the panel showed before that. */
+const turns = new Map<string, { docs: TurnDocs; target?: CanvasTarget; before?: CanvasTarget | null }>();
+
+const sameTarget = (a: CanvasTarget | null | undefined, b: CanvasTarget | null | undefined) => !!a && !!b && a.kind === b.kind && a.id === b.id;
+
+/** A file as a document's name: its path without the ending that says its form (a report's .md and .pdf are one document). */
+export const fileName = (path: string) => `file:${docStem(path)}`;
+
+/**
+ * A document that is a file, as the panel shows it. `page`: the saved page it is a copy of (export_page wrote it), so
+ * the two are one document; `handed`: the agent handed it over.
+ */
+export const fileDoc = (path: string, o: { handed?: boolean; page?: string } = {}): BesideDoc => ({
+  names: [fileName(path), ...(o.page ? [o.page] : [])],
+  target: { kind: 'file', id: path },
+  ...(o.handed ? { handed: true } : {}),
+});
+
+/** A call that makes a page (a card in the conversation), as a document. */
+export function callDoc(it: ToolItem): BesideDoc {
+  const kind = pageCall(it.tool);
+  const page = kind === 'save_page' ? savedPageOf(it.tool) : undefined;
+  const path = (it.tool.input as { file_path?: unknown } | undefined)?.file_path;
+  return { names: [it.id, ...(page ? [page] : []), ...(kind === 'file' && typeof path === 'string' ? [fileName(path)] : [])], target: { kind: 'item', id: it.id } };
+}
+
+/** A call as it comes in, as a document: a page, a save of another kind, an HTML file, or a document written as text. */
+function draftDoc(d: PageDraft): BesideDoc {
+  if (d.tool === 'file' && d.path) return /\.html?$/i.test(d.path) ? { names: [d.id, fileName(d.path)], target: { kind: 'item', id: d.id }, follow: true } : fileDoc(d.path);
+  return { names: d.pageId ? [d.id, d.pageId] : [d.id], target: { kind: 'item', id: d.id }, ...(draftKind(d) ? {} : { follow: true }) };
+}
+
+/**
+ * The turn an item of a session's conversation is in, by what ended before it (the id of the end of the turn before);
+ * with no item, or one the conversation does not have yet, the turn going on.
+ */
+function turnOf(key: string, item?: string): string {
+  const items = useTimeline.getState().byKey[key]?.items ?? [];
+  let end = items.length;
+  if (item) {
+    const i = items.findIndex((x) => x.id === item);
+    if (i >= 0) end = i;
+  }
+  for (let i = end - 1; i >= 0; i--) if (items[i].kind === 'turn') return items[i].id;
+  return '';
+}
+
+/** What else a document's name is known as by now: the page its call saved, once it has. */
+function alsoKnown(key: string): (name: string) => string[] {
+  return (name) => {
+    if (name.startsWith('file:') || /^[a-f0-9]{10}$/.test(name)) return [];
+    const d = useDrafts.getState().byKey[key]?.[name];
+    const drafted = d?.saved?.pageId ?? d?.pageId;
+    if (drafted) return [drafted];
+    const ov = useLive.getState().byKey[key]?.overlay;
+    const it = useTimeline.getState().byKey[key]?.items.find((x) => x.id === name) ?? ov?.items.find((x) => x.id === name);
+    if (it?.kind !== 'tool') return [];
+    const tool = { ...it.tool, ...ov?.patches?.[name] };
+    const page = pageCall(tool) === 'save_page' ? savedPageOf(tool) : undefined;
+    return page ? [page] : [];
+  };
+}
+
+/** Whether the panel shows this document already, however it came to (opened by hand, or by an earlier save of it). */
+function shows(key: string, cur: CanvasTarget | null, doc: BesideDoc): boolean {
+  if (!cur) return false;
+  if (sameTarget(cur, doc.target)) return true;
+  if (cur.kind === 'file') return doc.names.includes(fileName(cur.id));
+  if (cur.kind === 'page') return doc.names.includes(cur.id);
+  const page = shownPage.get(key);
+  return cur.kind === 'item' && (doc.names.includes(cur.id) || (!!page && doc.names.includes(page)));
+}
+
+/**
+ * Documents a session's turn made or changed (`at`: an item of that turn; none for the turn going on). The turn's
+ * first one opens beside the conversation by itself, for the session on screen on a wide one, unless that is turned
+ * off; a second one puts the panel back as it was before, and nothing more opens by itself in that turn (each has
+ * its card in the conversation). A page open with changes not saved is left alone, and so is one opened by hand.
+ */
+export function offerBeside(key: string, docs: BesideDoc[], at?: string) {
+  if (!docs.length) return;
+  const turn = turnOf(key, at);
+  const had = turns.get(key);
+  let st = had && had.docs.turn === turn ? had : { docs: { turn, docs: [] } as TurnDocs };
+  const more = alsoKnown(key);
+  let first: { doc: BesideDoc; at: number } | null = null;
+  let back = false;
+  let again: BesideDoc | null = null;
+  for (const doc of docs) {
+    const r = noteDoc(st.docs, turn, doc.names, more);
+    st = { ...st, docs: r.now };
+    if (r.step === 'open') first ??= { doc, at: r.at };
+    else if (r.step === 'put-back') back = true;
+    else if (r.now.opened === r.at && !r.now.quiet) again = doc;
+  }
+  turns.set(key, st);
+  const c = useCanvas.getState();
+  const cur = c.open[key] ?? null;
+  // A page open with changes not saved stays.
+  if (cur && dirty.has(key)) return;
+  if (back) {
+    // Several documents: the one that opened by itself gives way to what was there before it (wherever you are now).
+    if (st.target && sameTarget(cur, st.target)) {
+      if (st.before) c.show(key, st.before);
+      else c.close(key);
+    }
+    turns.set(key, { docs: quiet(st.docs) });
+    return;
+  }
+  // Only where it would be seen: the session on screen, with room beside it, nothing of it over everything.
+  if (!c.auto || !matchMedia(CANVAS_MEDIA).matches || !onScreen(key) || useOver.getState().at?.key === key) return;
+  if (first && st.docs.docs.length === 1) {
+    // There already (opened by hand, or in an earlier turn): it stays as it is, and is not this turn's to put back.
+    if (shows(key, cur, first.doc)) return void turns.set(key, { docs: opened(st.docs, first.at) });
+    c.show(key, first.doc.target);
+    turns.set(key, { docs: opened(st.docs, first.at), target: first.doc.target, before: cur });
+    return;
+  }
+  // The one that opened by itself, again: a page written anew shows by its newest call, and a file the agent hands
+  // over takes the place of the file shown (the Word file made from the Markdown that was watched). A saved page
+  // stays: the file made from it is a copy, and the page is what goes on being changed.
+  if (again && (again.follow || (again.handed && st.target?.kind === 'file')) && st.target && sameTarget(cur, st.target) && !sameTarget(st.target, again.target)) {
+    c.show(key, again.target);
+    turns.set(key, { ...st, target: again.target });
+  }
+}
+
+/** The panel was closed by hand: nothing more opens there by itself in the turn going on. */
+function closedByHand(key: string) {
+  const st = turns.get(key);
+  if (st) turns.set(key, { docs: quiet(st.docs) });
+}
+
+onDraftStart((key, started) => {
+  // Which document it is shows once the call says so: the page a save of another kind changes (its id comes first,
+  // mostly; a new one has none), the file a Write writes. Until then, a moment's wait.
+  const decide = () => {
+    const now = useDrafts.getState().byKey[key]?.[started.id];
+    if (!now || now.done) return;
+    if (draftKind(now) && !now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
+    offerBeside(key, [draftDoc(now)], now.id);
+  };
+  decide();
+});
 
 /** Opens a page call beside the conversation, when the screen is wide enough; false when it is not. */
 export function showBeside(key: string, t: CanvasTarget): boolean {
   if (!matchMedia(CANVAS_MEDIA).matches) return false;
   useCanvas.getState().show(key, t);
   return true;
+}
+
+// ---- full screen, and back ----------------------------------------------------------------------------------
+
+/**
+ * Moves what a session shows beside its conversation over everything (full screen), or what it shows there back beside
+ * the conversation. It opens afresh where it goes: the caller asks about changes not saved first.
+ */
+function moveOver(key: string, target: CanvasTarget, layout: 'panel' | 'sheet' | 'page') {
+  if (layout === 'panel') {
+    useCanvas.getState().close(key);
+    openOver(key, target);
+  } else {
+    useOver.setState({ at: null });
+    showBeside(key, target);
+  }
+}
+
+/** The button that does it, in the top line of what is shown: none on a phone, nor where there is no room beside. */
+function FullButton({ layout, onClick }: { layout: 'panel' | 'sheet' | 'page'; onClick: () => void }) {
+  const wide = useMediaQuery(CANVAS_MEDIA);
+  if (layout === 'sheet' || (layout === 'page' && !wide)) return null;
+  return (
+    <IconButton label={layout === 'panel' ? 'Full screen' : 'Show beside the conversation'} size="sm" onClick={onClick}>
+      {layout === 'panel' ? <Maximize2 size={14} /> : <PanelRight size={15} />}
+    </IconButton>
+  );
+}
+
+/** The switch in the panel's menu: a turn's document opens here by itself. */
+function AutoSwitch() {
+  const auto = useCanvas((x) => x.auto);
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1.5 text-[13px] text-fg-2">
+      <span className="min-w-0 flex-1">Open documents here as they are written</span>
+      <Switch label="Open documents here as they are written" on={auto} onChange={(v) => useCanvas.getState().setAuto(v)} />
+    </div>
+  );
 }
 
 // ---- what the panel shows ---------------------------------------------------------------------------------
@@ -312,7 +489,6 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     return out;
   }, [items]);
   const shownKey = target.kind === 'page' ? target.id : item ? pageKey(item) : target.id;
-  const auto = useCanvas((x) => x.auto);
   const [menu, setMenu] = useState<'more' | 'pick' | null>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const pickRef = useRef<HTMLButtonElement>(null);
@@ -357,6 +533,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   );
   const tail = (
     <>
+      <FullButton layout={layout} onClick={() => void full()} />
       <IconButton ref={moreRef} label="More" size="sm" active={menu === 'more'} onClick={() => setMenu(menu === 'more' ? null : 'more')}>
         <Ellipsis size={15} />
       </IconButton>
@@ -393,10 +570,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
         {layout === 'panel' && (
           <>
             <MenuSep />
-            <div className="flex items-center gap-2 px-2.5 py-1.5 text-[13px] text-fg-2">
-              <span className="min-w-0 flex-1">Open pages here as they are written</span>
-              <Switch label="Open pages here as they are written" on={auto} onChange={(v) => useCanvas.getState().setAuto(v)} />
-            </div>
+            <AutoSwitch />
           </>
         )}
       </Popover>
@@ -457,6 +631,19 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     },
     key,
   );
+
+  // Full screen, or back beside the conversation: its editor starts afresh there, so changes not saved are saved first.
+  const full = async () => {
+    if (isDirty) {
+      if (!(await confirm({ title: 'Save your changes first?', body: 'It opens afresh there: changes that are not saved yet would be lost.', confirm: 'Save' }))) return;
+      try {
+        if (!((await saveNow.current?.()) ?? true)) return;
+      } catch (e) {
+        return void toastError(e);
+      }
+    }
+    moveOver(key, target, layout);
+  };
 
   const Editor = loaded?.kind ? EDITORS[loaded.kind] : fresh && saving ? EDITORS[saving] : undefined;
   // A new one being written: its editor, empty until the first words come (the same editor then shows it saved).
@@ -583,16 +770,61 @@ export function CanvasSide({ s }: { s: SessionSummary }) {
   const width = useCanvas((x) => x.width);
   const wide = useMediaQuery(CANVAS_MEDIA);
   if (!target || !wide) return null;
-  const close = () => useCanvas.getState().close(s.key);
+  const close = () => closeCanvas(s.key);
   return (
     <aside style={{ width: `${width * 100}%` }} className="relative flex min-h-0 shrink-0 flex-col border-l border-line">
       <Grip />
       {target.kind === 'review' ? (
         <ReviewBeside sessionKey={s.key} id={target.id} onClose={close} />
+      ) : target.kind === 'file' ? (
+        <FilePanel key={`file:${target.id}`} sessionKey={s.key} target={target} layout="panel" onClose={close} />
       ) : (
         <SessionPage key={`${target.kind}:${target.id}:${target.edit ? 'edit' : ''}`} sessionKey={s.key} target={target} layout="panel" onClose={close} />
       )}
     </aside>
+  );
+}
+
+/** A document that is a file, in the panel or over everything: the file under the panel's own buttons (BesideFile.tsx). */
+function FilePanel({ sessionKey: key, target, layout, onClose }: { sessionKey: string; target: CanvasTarget; layout: 'panel' | 'sheet' | 'page'; onClose: () => void }) {
+  const path = target.id;
+  const [isDirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (isDirty) dirty.add(key);
+    else dirty.delete(key);
+    return () => void dirty.delete(key);
+  }, [isDirty, key]);
+  return (
+    <SessionFile
+      sessionKey={key}
+      path={path}
+      layout={layout}
+      onDirty={setDirty}
+      tail={(leave) => (
+        <>
+          <FullButton layout={layout} onClick={() => void leave().then((ok) => ok && moveOver(key, target, layout))} />
+          <FileMore
+            path={path}
+            inFiles={false}
+            small
+            iconSize={15}
+            sessionKey={key}
+            extra={
+              <>
+                <MenuItem icon={<FolderOpen size={14} />} onClick={() => void leave().then((ok) => ok && (onClose(), showInFiles(path)))}>
+                  Open in Files
+                </MenuItem>
+                {layout === 'panel' && <AutoSwitch />}
+                <MenuSep />
+              </>
+            }
+          />
+          <IconButton label="Close" size="sm" onClick={() => void leave().then((ok) => ok && onClose())}>
+            <X size={15} />
+          </IconButton>
+        </>
+      )}
+    />
   );
 }
 
@@ -614,7 +846,11 @@ export function useCanvasOpen(key: string): boolean {
   const wide = useMediaQuery(CANVAS_MEDIA);
   return open && wide;
 }
-export const closeCanvas = (key: string) => useCanvas.getState().close(key);
+/** Closes it by hand (its ✕, or the session's details opened in its place): nothing more opens there by itself in this turn. */
+export const closeCanvas = (key: string) => {
+  closedByHand(key);
+  useCanvas.getState().close(key);
+};
 
 // ---- over everything, on a phone or a narrow window ---------------------------------------------------------
 
@@ -630,7 +866,11 @@ export function PageOver() {
   const close = () => useOver.setState({ at: null });
   return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col bg-bg pt-[var(--safe-top)]">
-      <SessionPage key={`${at.key}:${at.target.kind}:${at.target.id}`} sessionKey={at.key} target={at.target} layout={mobile ? 'sheet' : 'page'} onClose={close} />
+      {at.target.kind === 'file' ? (
+        <FilePanel key={`${at.key}:file:${at.target.id}`} sessionKey={at.key} target={at.target} layout={mobile ? 'sheet' : 'page'} onClose={close} />
+      ) : (
+        <SessionPage key={`${at.key}:${at.target.kind}:${at.target.id}`} sessionKey={at.key} target={at.target} layout={mobile ? 'sheet' : 'page'} onClose={close} />
+      )}
     </div>,
     document.body,
   );
