@@ -9110,6 +9110,7 @@
 "Getting in from the airport or station, transport passes, money, safety, and what to pack for the weather":"server/apps/templates.ts",
 "Getting it ready":"web/src/features/voice/VoiceSettings.tsx",
 "Getting it ready to read":"web/src/features/memory/BringIn.tsx",
+"Getting PyTorch for learning (about 200 MB, the first time)…":"web/src/features/suggest/SuggestSettings.tsx",
 "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…":"web/src/features/suggest/SuggestSettings.tsx",
 "Getting ready":"web/src/features/knowledge/parts.tsx",
 "Getting ready on the remote":"web/src/features/git/AddRepo.tsx",

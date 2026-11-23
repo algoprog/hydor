@@ -25741,6 +25741,7 @@
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "リセット クリア ゼロ 統計 使用状況 数 カウント 入力 キー入力 節約 提案 正解 不正解 何回 タイピング 割合 最初からやり直し reset stats",
   "{0}: a whole number from 0 to {1}": "{0}：0から{1}までの整数",
   "{0}: not a count ({1})": "{0}：数値ではありません（{1}）",
+  "Getting PyTorch for learning (about 200 MB, the first time)…": "学習用のPyTorchを取得しています（初回は約200 MB）…",
   "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "グラフィックスカード用のPyTorchを取得しています（初回は約2.5 GB）…",
   "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu グラフィックスカード グラボ nvidia cuda mac apple silicon mps 高速 速度 学習 トレーニング 速い vram graphics card",
   "It goes on from here when you press Resume, and does not start by itself until then.": "「再開」を押すとここから続けます。それまでは自動では始まりません。",

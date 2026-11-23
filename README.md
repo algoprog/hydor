@@ -231,7 +231,7 @@ On a Mac, the app puts the command on your PATH by itself.
 - Pictures, video, music and voice-overs made with AI, and edits to your own.
 - **Word suggestions** as you type: the rest of the word in grey after the cursor, and the next word dimmer (Tab takes it),
   from a small model of the app's own that learns from what you write and, when the computer has the memory,
-  Qwen3.5-0.8B beside it, both on your computer (on from the start: about 1.3 GB downloaded the first time you type). Nothing you
+  Qwen3.5-0.8B beside it, both on your computer (on from the start: about 1.2 GB downloaded the first time you type). Nothing you
   type leaves it ([word suggestions](docs/guide/09-documents-voice.md#word-suggestions-as-you-type)).
 - **Everything you keep is in the files of its project**: a project's details (from the sidebar) have a **Files** tab
   with tiles that show each file's picture, an **Upload** button, and the pages, documents, slides, spreadsheets,

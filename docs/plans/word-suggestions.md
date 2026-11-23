@@ -33,9 +33,12 @@ learned gate, 30.5% → 31.5%. Documents are best served by Qwen3.5 alone.
 
 ### Folders on the computer
 
-- `<DATA_DIR>/suggest/venv/`: the Python for the engine (torch CPU build, tokenizers, numpy, safetensors), made with
+- `<DATA_DIR>/suggest/venv/`: the Python for the engine (ONNX Runtime, tokenizers, numpy, safetensors; about 150 MB), made with
   uv when it is there, else `python3 -m venv` + pip, as `server/memory/embed.ts` does; the package string kept in
-  `venv/.packages` (a different string rebuilds it). Never the memory venv (its check deletes torch).
+  `venv/.packages` (a different string rebuilds it). PyTorch's CPU build is added to the same environment the first time learning
+  on the processor runs (in the background, the learning line says so; the marker then adds `torch`); an environment an older
+  version made (PyTorch, no ONNX Runtime) is kept, with ONNX Runtime added. `venv-gpu` (PyTorch's CUDA build) is for learning on a card only.
+  Never the memory venv (its check deletes torch).
 - `<DATA_DIR>/suggest/llama/<tag>/`: llama.cpp's prebuilt `llama-server` for this platform (pinned release, per-asset
   SHA-256, as `server/voice/whisper.ts` pins whisper.cpp).
 - The model files (the release, the GGUF): the user cache as `modelDir()` in embed.ts does

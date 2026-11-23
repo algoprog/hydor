@@ -25741,6 +25741,7 @@
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "réinitialiser remettre à zéro statistiques stats utilisation nombres compteurs frappes économisées suggestions justes fausses combien saisie frappe partage recommencer reset",
   "{0}: a whole number from 0 to {1}": "{0} : un nombre entier de 0 à {1}",
   "{0}: not a count ({1})": "{0} : ce n’est pas un nombre ({1})",
+  "Getting PyTorch for learning (about 200 MB, the first time)…": "Récupération de PyTorch pour l’apprentissage (environ 200 Mo, la première fois)…",
   "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "Récupération de PyTorch pour la carte graphique (environ 2,5 Go, la première fois)…",
   "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu carte graphique nvidia cuda mac apple silicon mps plus rapide vitesse apprendre entraîner rapide vram graphics card",
   "It goes on from here when you press Resume, and does not start by itself until then.": "L’apprentissage reprend à partir de là quand vous appuyez sur Reprendre, et ne redémarre pas tout seul d’ici là.",

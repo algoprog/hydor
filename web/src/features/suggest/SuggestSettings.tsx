@@ -144,8 +144,9 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
         <Notice icon={<Throbber size={15} />}>
           {t.progress && t.progress.total ? `Learning from your writing: ${Math.round((100 * t.progress.done) / t.progress.total)}%` : 'Learning from your writing…'}
           {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2 w-64 max-w-full" />}
-          {/* Before train.py starts, on a card: PyTorch's CUDA build is downloaded the first time. */}
+          {/* Before train.py starts: PyTorch's CUDA build is downloaded the first time on a card, its processor build the first time on the processor. */}
           {!t.progress && t.device?.kind === 'cuda' && <span className="block text-[12px] text-fg-3">Getting PyTorch for the graphics card (about 2.5 GB, the first time)…</span>}
+          {!t.progress && t.device && t.device.kind !== 'cuda' && <span className="block text-[12px] text-fg-3">Getting PyTorch for learning (about 200 MB, the first time)…</span>}
           {t.device && t.progress && <span className="block text-[12px] text-fg-3">{deviceLine(t.device)}</span>}
           <RunControls paused={false} />
         </Notice>

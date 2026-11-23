@@ -27600,6 +27600,7 @@
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "επαναφορά καθαρισμός μηδέν στατιστικά στοιχεία χρήση αριθμοί μετρητές πληκτρολογήσεις εξοικονόμηση προτάσεις σωστές λάθος πόσες πληκτρολόγηση κοινοποίηση νέα αρχή reset stats",
   "{0}: a whole number from 0 to {1}": "{0}: ακέραιος αριθμός από 0 έως {1}",
   "{0}: not a count ({1})": "{0}: δεν είναι μετρητής ({1})",
+  "Getting PyTorch for learning (about 200 MB, the first time)…": "Λήψη του PyTorch για τη μάθηση (περίπου 200 MB, την πρώτη φορά)…",
   "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "Λήψη του PyTorch για την κάρτα γραφικών (περίπου 2,5 GB, την πρώτη φορά)…",
   "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu κάρτα γραφικών nvidia cuda mac apple silicon mps ταχύτερα ταχύτητα εκμάθηση εκπαίδευση γρήγορα vram graphics card",
   "It goes on from here when you press Resume, and does not start by itself until then.": "Συνεχίζει από εδώ όταν πατήσετε Συνέχεια και δεν ξεκινά αυτόματα μέχρι τότε.",

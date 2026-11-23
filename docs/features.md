@@ -1476,7 +1476,7 @@ agents that speak ACP and take MCP servers.
 - **Word suggestions**: while you type, the rest of the word shows in grey after the caret and the next word dimmer; Tab takes
   the word (again, the next one), → at the end of the text takes both, Esc hides them until the next word. It is on from
   the start and sets itself up the first time you type in a message box or a document: it installs its Python libraries
-  and downloads about 1.3 GB then (llama.cpp from GitHub, the language model and the small model from Hugging Face), and
+  and downloads about 1.2 GB then (ONNX Runtime and the tokenizer from PyPI, llama.cpp from GitHub, the language model and the small model from Hugging Face), and
   nothing before (Settings says Not set up yet); a setup that fails is tried again later, waiting longer each time.
   Settings → Capabilities → Word suggestions turns it off. Everything runs on this computer, and what you type never
   leaves it. A small model of the app's own (49M parameters, 200 languages)
@@ -1493,7 +1493,7 @@ agents that speak ACP and take MCP servers.
   the lowest priority and when you have not typed for ten minutes; the first time can take hours without a graphics card.
   A run learns on an NVIDIA graphics card with room (4 GB free, under half busy; the one with the most free) or a
   Mac's own, many times faster, when Learn on the graphics card is on (the first time on an NVIDIA card it downloads
-  PyTorch's build for it, about 2.5 GB, and a card that fails is left alone for a day), and Pause, Resume and Stop on the
+  PyTorch's build for it, about 2.5 GB, and a card that fails is left alone for a day; the first time on the processor it adds PyTorch's processor build, about 200 MB, which only learning needs), and Pause, Resume and Stop on the
   learning line hold or end a run (a pause keeps what it learned and holds the schedule, also after a restart).
   Forget what it learned goes back to the model that came with the app. **How it's helping** counts how many keystrokes
   the suggestions saved (and their share of your typing) and how many were right (taken with Tab or →, or typed through

@@ -39,13 +39,19 @@ Word suggestions (`server/suggest/`, `web/src/features/suggest/`, the spec in [t
 two processes of their own, llama.cpp's `llama-server` and a Python worker (`server/suggest/py/`). `server/suggest/suggest-test.ts`
 needs neither: it plays them with a stand-in worker and a stand-in `llama-server`, and checks the settings, the routes, cancelling,
 the texts personalising reads and their filters, and the schedule; the web side's rules (when to ask, what Tab and → take) have
-their own test beside them. Neither downloads anything. The Python engine's tests need a Python with PyTorch (the CPU build),
-tokenizers, NumPy and safetensors:
+their own test beside them. Neither downloads anything. The Python engine's tests need a Python with ONNX Runtime, `onnx`,
+tokenizers, NumPy and safetensors; the ones for learning and for model.py (they skip themselves without it) also need PyTorch (the CPU build):
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/suggest/suggest-test.ts && DATA_DIR=/tmp/hydor-test-suggest node dist/dev/suggest-test.js
 cd server/suggest/py && /path/to/that/python -m unittest discover -s tests
 ```
+
+The small model runs on ONNX Runtime from a graph, `server/suggest/py/hydor_suggest/slm.onnx` (313 KB: its weights are not in it; the
+worker puts in those of the release's or the person's `model.safetensors` when it makes the session). When you change the model's
+architecture (`model.py`), change `graph.py` with it and make the file again with
+`python server/suggest/py/export_onnx.py --config <release>/config.json --check <release>/model.safetensors` (it needs `onnx`, and torch for
+`--check`, which compares the graph with `model.py`); `test_ort_slm.py` fails while the file is not what `graph.py` makes.
 
 Keep `CUDA_VISIBLE_DEVICES` empty, as for every test: learning on a graphics card is tested with a stand-in `nvidia-smi`
 (`HYDOR_SUGGEST_NVIDIA_SMI`) and a fake Python, never a real card.
@@ -54,7 +60,7 @@ To run the engine in a scratch copy of the app without downloading its model ([a
 at the revision `server/suggest/pins.ts` pins) or with one of your own, point `HYDOR_SUGGEST_MODEL_DIR` at a folder holding the model's files, `HYDOR_SUGGEST_PYTHON` at that Python and, when you have
 them, `HYDOR_SUGGEST_GGUF` and `HYDOR_SUGGEST_LLAMA_SERVER` at the language model and a `llama-server`: nothing is then downloaded
 ([configuration](configuration.md)). Do not put PyTorch into search by meaning's private environment (`memory/venv`): the app rebuilds it whenever its packages differ.
-Word suggestions are on by default and set themselves up (about 1.3 GB) the first time a message box gets the focus, so
+Word suggestions are on by default and set themselves up (about 1.2 GB) the first time a message box gets the focus, so
 a scratch copy driven in a browser needs `HYDOR_SUGGEST=off` unless it has all of these; `scripts/guide-shots` and the
 desktop app's tests set it.
 

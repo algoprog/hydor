@@ -27597,6 +27597,7 @@
   "reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over": "重置 清零 归零 统计 用量 数字 计数 节省的按键 按键 已节省 建议 正确 错误 多少 输入 分享 重新开始 reset clear zero statistics stats usage counts keystrokes suggestions",
   "{0}: a whole number from 0 to {1}": "{0}：需为 0 到 {1} 之间的整数",
   "{0}: not a count ({1})": "{0}：不是有效的数字（{1}）",
+  "Getting PyTorch for learning (about 200 MB, the first time)…": "正在获取用于学习的 PyTorch（约 200 MB，仅第一次）…",
   "Getting PyTorch for the graphics card (about 2.5 GB, the first time)…": "正在获取适用于显卡的 PyTorch（约 2.5 GB，仅第一次）…",
   "gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram": "gpu 显卡 nvidia cuda mac apple silicon mps 更快 速度 学习 训练 快 vram 显存 graphics card",
   "It goes on from here when you press Resume, and does not start by itself until then.": "按下“继续”后会从这里接着学习，在此之前不会自行开始。",
