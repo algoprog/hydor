@@ -7,6 +7,7 @@ import type { Doc } from '@shared/docs';
 import { toastError } from '../../../../lib/store';
 import { IconButton, Throbber } from '../../../../components/ui';
 import { askDoc, costWords, plainOf } from './ai';
+import { useTextareaSuggest } from '../../../suggest/useTextareaSuggest';
 
 interface Turn {
   q: string;
@@ -64,6 +65,7 @@ export function AskPanel({ doc, title, onGo, onClose }: { doc: Doc; title: strin
   const stop = useRef<AbortController | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(input, { place: 'other', value: q });
   useEffect(() => () => stop.current?.abort(), []);
   useEffect(() => {
     input.current?.focus();
@@ -127,7 +129,7 @@ export function AskPanel({ doc, title, onGo, onClose }: { doc: Doc; title: strin
         ))}
       </div>
       <div className="shrink-0 border-t border-line p-2">
-        <div className="flex items-end gap-1.5 rounded-xl border border-line bg-bg px-2.5 py-1.5 focus-within:border-accent">
+        <div className="relative flex items-end gap-1.5 rounded-xl border border-line bg-bg px-2.5 py-1.5 focus-within:border-accent">
           <textarea
             ref={input}
             rows={1}
@@ -135,6 +137,7 @@ export function AskPanel({ doc, title, onGo, onClose }: { doc: Doc; title: strin
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               e.stopPropagation();
+              if (words.onKeyDown(e)) return;
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 void send();
@@ -144,6 +147,7 @@ export function AskPanel({ doc, title, onGo, onClose }: { doc: Doc; title: strin
             aria-label="Your question"
             className="max-h-32 min-h-[24px] min-w-0 flex-1 resize-none bg-transparent py-0.5 text-[13.5px] text-fg outline-none placeholder:text-fg-3"
           />
+          {words.overlay}
           {busy ? (
             <button type="button" title="Stop" aria-label="Stop" onClick={() => stop.current?.abort()} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-fg-2 hover:bg-bg-2">
               <Square size={11} fill="currentColor" strokeWidth={0} />

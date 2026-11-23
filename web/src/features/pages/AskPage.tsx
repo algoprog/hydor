@@ -22,6 +22,7 @@ import { cx, IconButton, Throbber, useIsMobile } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { Conversation } from '../guide/AskPanel';
 import { useAskRun } from '../guide/ask';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** Where a request is for: its words start the message ("On slide 3 (“Pricing”): "). */
 export interface AskScope {
@@ -147,6 +148,7 @@ function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[
   const [text, setText] = useState(draft);
   const [busy, setBusy] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const picked = scopes.find((s) => s.id === scope) ?? scopes[0];
   useEffect(() => {
     setText(draft);
@@ -187,13 +189,14 @@ function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[
           ))}
         </div>
       )}
-      <div className="mt-3 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
+      <div className="relative mt-3 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
         <textarea
           ref={ta}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
+            if (words.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !mobile) {
               e.preventDefault();
               void send();
@@ -203,6 +206,7 @@ function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[
           placeholder={PLACEHOLDER[kind]}
           className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-fg-3"
         />
+        {words.overlay}
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-fg-3" title="The agent and model picked last on the start page">
             <AgentIcon agent={run.agent} size={13} className="shrink-0" />

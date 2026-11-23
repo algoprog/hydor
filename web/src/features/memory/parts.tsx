@@ -4,6 +4,7 @@ import { Brain } from 'lucide-react';
 import { Badge, Button, cx, inputCls, MenuItem } from '../../components/ui';
 import type { MemoryChange } from '@shared/memory';
 import { setSessionMemory } from './state';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** "Memory for this session · On" ("Memory" among a session's settings): turns it off, or back on. */
 export function SessionMemoryItem({ sessionKey, on, allOff, close, label = 'Memory for this session' }: { sessionKey: string; on: boolean; allOff: boolean; close: () => void; label?: string }) {
@@ -33,6 +34,7 @@ export function EntryEditor({
   const [v, setV] = useState(text);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ref, { place: 'notes', value: v });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -56,7 +58,7 @@ export function EntryEditor({
     }
   };
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <textarea
         ref={ref}
         value={v}
@@ -65,6 +67,7 @@ export function EntryEditor({
         placeholder={placeholder}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
+          if (words.onKeyDown(e)) return;
           if (e.key === 'Escape') onCancel();
           else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -73,6 +76,7 @@ export function EntryEditor({
         }}
         className={cx(inputCls, 'h-auto resize-none py-2 text-[13.5px] leading-snug')}
       />
+      {words.overlay}
       <div className="flex items-center justify-end gap-2">
         {extra && <div className="mr-auto min-w-0">{extra}</div>}
         <Button size="sm" variant="ghost" onClick={onCancel}>

@@ -26,6 +26,7 @@ import { useAskRun, type AskRun } from '../guide/ask';
 import { sendToSession } from '../pages/common/commentAi';
 import { Starting } from '../pages/AskPage';
 import { quoteBlock } from '../session/QuoteSelection';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /**
  * A part of a file picked to ask about: a PDF's page, and its words or a picture of it (an area); or, in the text editor,
@@ -166,6 +167,7 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const pick = useFileAsk((s) => s.picked[path]);
   const kind = kindOf(path);
   useEffect(() => {
@@ -229,13 +231,14 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
           </IconButton>
         </div>
       )}
-      <div className="mt-3 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
+      <div className="relative mt-3 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
         <textarea
           ref={ta}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
+            if (words.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !mobile) {
               e.preventDefault();
               void send();
@@ -245,6 +248,7 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
           placeholder={kind === 'pdf' ? 'What would you like to know?' : pick ? 'What should change in the part you picked?' : 'What should change in the file?'}
           className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-fg-3"
         />
+        {words.overlay}
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-fg-3" title="The agent and model picked last on the start page">
             <AgentIcon agent={run.agent} size={13} className="shrink-0" />

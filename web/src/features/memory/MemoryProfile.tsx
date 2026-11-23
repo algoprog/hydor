@@ -11,6 +11,7 @@ import { EmptyRow, Group, MoreMenu, Notice } from '../settings/kit';
 import { LOCALE } from '../../i18n/locale';
 import { HistoryList, reloadState, SessionLink, when } from './common';
 import { SOURCE, useMemoryState } from './state';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /**
  * Writes the profile: lines kept (Enter starts one; Ctrl+Enter or ⌘+Enter saves, Escape cancels), its words counted
@@ -20,6 +21,7 @@ function ProfileEditor({ text, limit, onSave, onCancel }: { text: string; limit:
   const [v, setV] = useState(text);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ref, { place: 'notes', value: v });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -45,7 +47,7 @@ function ProfileEditor({ text, limit, onSave, onCancel }: { text: string; limit:
     }
   };
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <textarea
         ref={ref}
         value={v}
@@ -53,6 +55,7 @@ function ProfileEditor({ text, limit, onSave, onCancel }: { text: string; limit:
         placeholder="Who you are and what you do, what you use, how you like answers, what to avoid. Say, “Data analyst in Lisbon; works in Python and SQL. Short answers, the conclusion first.”"
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
+          if (words.onKeyDown(e)) return;
           if (e.key === 'Escape') onCancel();
           else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -61,6 +64,7 @@ function ProfileEditor({ text, limit, onSave, onCancel }: { text: string; limit:
         }}
         className={cx(inputCls, 'h-auto resize-none py-2 text-[13.5px] leading-relaxed')}
       />
+      {words.overlay}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span className={cx('tnum mr-auto min-w-0 text-[12px] leading-snug', over ? 'text-warn' : 'text-fg-3')}>
           {over

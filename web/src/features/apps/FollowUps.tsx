@@ -11,6 +11,7 @@ import { toastError } from '../../lib/store';
 import { ReplyMarkdown } from '../../components/Markdown';
 import { cx, Throbber } from '../../components/ui';
 import type { RunDetail } from './api';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 function Bubble({ text, at, note }: { text: string; at?: number; note?: string }) {
   return (
@@ -98,6 +99,7 @@ export function AskBox({ d, onSent }: { d: RunDetail; onSent: () => void }) {
   });
   const [busy, setBusy] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const active = isActive(d.run.status);
   const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const put = (t: string) => {
@@ -131,7 +133,7 @@ export function AskBox({ d, onSent }: { d: RunDetail; onSent: () => void }) {
   const can = !!text.trim() && !busy;
   return (
     <div className="shrink-0 px-3 pt-2 pb-[max(10px,var(--safe-bottom))] sm:px-6 sm:pb-4">
-      <div className="mx-auto flex max-w-[860px] items-end gap-1 rounded-[22px] border border-line-2 bg-panel py-1.5 pr-1.5 pl-4 shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50">
+      <div className="relative mx-auto flex max-w-[860px] items-end gap-1 rounded-[22px] border border-line-2 bg-panel py-1.5 pr-1.5 pl-4 shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-colors focus-within:border-accent/50">
         <textarea
           ref={ta}
           rows={1}
@@ -141,6 +143,7 @@ export function AskBox({ d, onSent }: { d: RunDetail; onSent: () => void }) {
           data-lpignore="true"
           onChange={(e) => put(e.target.value)}
           onKeyDown={(e) => {
+            if (words.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (!touch || e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               send();
@@ -149,6 +152,7 @@ export function AskBox({ d, onSent }: { d: RunDetail; onSent: () => void }) {
           placeholder={active ? 'Ask for another change…' : d.recipe.answer.length ? 'Ask for a change to the result…' : 'Ask for a change…'}
           className="block max-h-[33vh] min-h-[40px] min-w-0 flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none"
         />
+        {words.overlay}
         <button
           onClick={send}
           disabled={!can}

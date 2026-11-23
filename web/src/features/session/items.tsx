@@ -56,6 +56,7 @@ import { TriggerIcon } from '../automations/parts';
 import { ChildReplyRow } from '../children/ChildReply';
 import { GoalMessage } from '../goal/GoalMessage';
 import { tr } from '../../i18n/runtime';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** The session's folder (paths inside it are shown relative to it) and a way to show its changes. */
 /** `fork(at)`: start a new session from this one, up to the transcript entry `at` (Claude) or all of it. */
@@ -995,6 +996,8 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
   const [text, setText] = useState(initial);
   const [restore, setRestore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const custom = s?.agent === 'acp' && s.acpAgent === 'console';
   const canRestore = s?.agent === 'claude' || custom || !!s?.worktree;
   const send = async () => {
@@ -1010,12 +1013,14 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
     }
   };
   return (
-    <div className="w-full space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3">
+    <div className="relative w-full space-y-2.5 rounded-2xl border border-accent/40 bg-panel p-3">
       <textarea
+        ref={ta}
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
+          if (words.onKeyDown(e)) return;
           if (e.key === 'Escape') onDone();
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -1025,6 +1030,7 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
         rows={Math.min(10, Math.max(2, text.split('\n').length))}
         className="w-full resize-y bg-transparent text-[15px] leading-relaxed outline-none"
       />
+      {words.overlay}
       <label className={cx('flex items-start gap-2 text-[12.5px]', canRestore ? 'text-fg-2' : 'text-fg-3')} title={canRestore ? undefined : 'Codex sessions can put files back only when they work in a worktree'}>
         <input type="checkbox" checked={restore} disabled={!canRestore} onChange={(e) => setRestore(e.target.checked)} className="mt-0.5 accent-[var(--accent)]" />
         <span>

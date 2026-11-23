@@ -16,6 +16,7 @@ import { Timeline } from '../session/Timeline';
 import { FeatureDock } from '../registry';
 import { askAgent, closeAsk, openAsk, useAsk, useAskRun } from './ask';
 import { POPULAR } from './topics';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** A question to start with: the box, who answers, and questions to pick from. */
 function AskStart({ draft, topic, suggestions }: { draft: string; topic?: string; suggestions: string[] }) {
@@ -23,6 +24,7 @@ function AskStart({ draft, topic, suggestions }: { draft: string; topic?: string
   const run = useAskRun();
   const [text, setText] = useState(draft);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   useEffect(() => {
     setText(draft);
     // On a phone the keyboard waits for a tap, unless a question was picked to change.
@@ -38,12 +40,13 @@ function AskStart({ draft, topic, suggestions }: { draft: string; topic?: string
       <p className="mt-1.5 text-[13.5px] leading-relaxed text-fg-2">
         An agent answers from the guide, with links to the right place. It can also change a setting or set something up for you; you confirm each change on a card first.
       </p>
-      <div className="mt-4 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
+      <div className="relative mt-4 rounded-[18px] border border-line-2 bg-panel transition-colors focus-within:border-accent/50">
         <textarea
           ref={ta}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
+            if (words.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !mobile) {
               e.preventDefault();
               ask();
@@ -53,6 +56,7 @@ function AskStart({ draft, topic, suggestions }: { draft: string; topic?: string
           placeholder="How do I…"
           className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-fg-3"
         />
+        {words.overlay}
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-fg-3" title="The agent and model picked last on the start page">
             <AgentIcon agent={run.agent} size={13} className="shrink-0" />

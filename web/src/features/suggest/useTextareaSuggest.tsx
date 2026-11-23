@@ -64,12 +64,13 @@ export function GreyMirror({ ta, before, grey }: { ta: HTMLTextAreaElement | nul
     if (!el || !ta?.isConnected) return;
     const cs = getComputedStyle(ta);
     for (const k of COPIED) el.style[k as 'fontFamily'] = cs[k as 'fontFamily'];
-    // Where the textarea's inside is, in the box the mirror is positioned in.
-    const parent = el.offsetParent as HTMLElement | null;
-    const p = parent?.getBoundingClientRect();
+    // Where the textarea's inside is, in the box the mirror is positioned in: measured from where the mirror lands at 0, 0.
+    el.style.left = '0px';
+    el.style.top = '0px';
+    const o = el.getBoundingClientRect();
     const r = ta.getBoundingClientRect();
-    el.style.left = `${r.left - (p?.left ?? 0) + ta.clientLeft + (parent?.scrollLeft ?? 0) - (parent?.clientLeft ?? 0)}px`;
-    el.style.top = `${r.top - (p?.top ?? 0) + ta.clientTop + (parent?.scrollTop ?? 0) - (parent?.clientTop ?? 0)}px`;
+    el.style.left = `${r.left + ta.clientLeft - o.left}px`;
+    el.style.top = `${r.top + ta.clientTop - o.top}px`;
     el.style.width = `${ta.clientWidth}px`;
     el.style.height = `${ta.clientHeight}px`;
     el.scrollTop = ta.scrollTop;
@@ -81,10 +82,13 @@ export function GreyMirror({ ta, before, grey }: { ta: HTMLTextAreaElement | nul
     const ro = new ResizeObserver(place);
     ro.observe(ta);
     ta.addEventListener('scroll', place, { passive: true });
+    // Anything it sits in that scrolls (a panel, the page) moves the textarea: measured again.
+    window.addEventListener('scroll', place, { passive: true, capture: true });
     window.addEventListener('resize', place);
     return () => {
       ro.disconnect();
       ta.removeEventListener('scroll', place);
+      window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
     };
   }, [ta]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -18,6 +18,7 @@ import { Button, cx } from '../../components/ui';
 import { ChildReplyLabel } from '../children/ChildReply';
 import { mu } from '../../lib/machine';
 import { AreaTouchSensor, touchDragArea } from '../../lib/dragTouch';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** Rows move up and down only. */
 const vertical: Modifier = ({ transform }) => ({ ...transform, x: 0 });
@@ -173,6 +174,8 @@ function QueueEditor({ s, m, sent, onDone }: { s: SessionSummary; m: QueuedMessa
   const [keep, setKeep] = useState<string[]>(() => (m.att ?? []).map((a) => a.ref));
   const [added, setAdded] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
+  const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const fileRef = useRef<HTMLInputElement>(null);
   const addedRef = useRef(added);
   addedRef.current = added;
@@ -200,7 +203,7 @@ function QueueEditor({ s, m, sent, onDone }: { s: SessionSummary; m: QueuedMessa
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className="rounded-xl border border-accent/45 bg-panel p-2.5 shadow-[0_0_0_3px_var(--accent-soft)]"
+      className="relative rounded-xl border border-accent/45 bg-panel p-2.5 shadow-[0_0_0_3px_var(--accent-soft)]"
       onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
       onDrop={(e) => {
         if (!e.dataTransfer.files.length) return;
@@ -209,10 +212,12 @@ function QueueEditor({ s, m, sent, onDone }: { s: SessionSummary; m: QueuedMessa
       }}
     >
       <textarea
+        ref={ta}
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
+          if (words.onKeyDown(e)) return;
           if (e.key === 'Escape') onDone();
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -228,6 +233,7 @@ function QueueEditor({ s, m, sent, onDone }: { s: SessionSummary; m: QueuedMessa
         placeholder="Message"
         className="min-h-[52px] w-full resize-y bg-transparent px-1 text-[13.5px] leading-snug outline-none placeholder:text-fg-3"
       />
+      {words.overlay}
       {(kept.length > 0 || added.length > 0) && (
         <div className="mt-1.5 flex flex-wrap gap-2 px-1">
           {kept.map((a) => (

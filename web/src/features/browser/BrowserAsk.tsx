@@ -21,6 +21,7 @@ import { useAskRun, type AskRun } from '../guide/ask';
 import { Starting } from '../pages/AskPage';
 import { isWebPage } from './browsing';
 import { lastWho, startDo, useRunFor, whoOf, type Who } from './HandOff';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 
 /** What the question quotes at most, of words picked in a page. */
 const QUOTE_MAX = 4000;
@@ -177,6 +178,7 @@ function Start({ tab, onStarted }: { tab: BrowserTab; onStarted: (key: string) =
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const words = useTextareaSuggest(ta, { place: 'other', value: text });
   const picked = useBrowserAsk((s) => s.picked[tab.id]);
   const can = doing ? canDoOn(tab.url) : isWebPage(tab.url);
   useEffect(() => {
@@ -225,13 +227,14 @@ function Start({ tab, onStarted }: { tab: BrowserTab; onStarted: (key: string) =
           </IconButton>
         </div>
       )}
-      <div className="mt-3 rounded-[14px] border border-line-2 bg-bg-2 transition-colors focus-within:border-accent/50">
+      <div className="relative mt-3 rounded-[14px] border border-line-2 bg-bg-2 transition-colors focus-within:border-accent/50">
         <textarea
           ref={ta}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
+            if (words.onKeyDown(e)) return;
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault();
               void send(text);
@@ -242,6 +245,7 @@ function Start({ tab, onStarted }: { tab: BrowserTab; onStarted: (key: string) =
           aria-label={doing ? 'What the agent should do on this page' : 'Your question about this page'}
           className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[14px] leading-relaxed outline-none placeholder:text-fg-3"
         />
+        {words.overlay}
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           {doing ? (
             <DoAgent who={who} label={doRun.label} onPick={setWho} />
