@@ -56,6 +56,9 @@ def get_args(argv=None):
     p.add_argument('--flores-final-n', type=int, default=100)
     p.add_argument('--early', type=int, default=200, help='the person\'s earliest messages (segments) kept as a measure')
     p.add_argument('--max-nights', type=int, default=0, help='stop after this many nights (a test)')
+    p.add_argument('--lr', type=float, default=5e-4, help='the app\'s 5e-4')
+    p.add_argument('--fixed-warmup', action='store_true', help='warm-up always --warmup steps (the app: at most a tenth of the run, so 1 to 3 steps in a short night)')
+    p.add_argument('--warmup', type=int, default=50)
     p.add_argument('--micro-tokens', type=int, default=4096)
     p.add_argument('--threads', type=int, default=4)
     p.add_argument('--no-final', action='store_true')
@@ -133,7 +136,7 @@ def main(argv=None):
         log({'t': 'start', 'arm': a.arm, 'nights': len(nights), 'first_day': nights[0][0], 'last_day': nights[-1][0],
              'records': len(recs), 'sequences': len(seqs.seqs), 'pub': cur_pub, 'args': vars(a)})
         eval_set('start', -1, nights[0][0] - 1)
-    stt = T.Settings(bf16=bf16)
+    stt = T.Settings(bf16=bf16, lr=a.lr, warmup=a.warmup)
 
     t_all = time.time()
     for pos, (day, ridx) in enumerate(nights):
@@ -174,13 +177,13 @@ def main(argv=None):
                 backup = {k: v.detach().clone() for k, v in model.state_dict().items()}
             rec['fresh'] = bool(fresh)
             rec['new_tokens'] = int(sum(len(s.ids) - 1 for s in train_seqs))
-            r = N.train_run(model, train_seqs, replay, seed=seed, device=device, st=stt, micro_tokens=a.micro_tokens)
+            r = N.train_run(model, train_seqs, replay, seed=seed, device=device, st=stt, micro_tokens=a.micro_tokens, fixed_warmup=a.fixed_warmup)
             rec.update({k: r[k] for k in ('steps', 'tokens', 'seconds', 'skipped', 'loss_first', 'loss_last')})
         t1 = time.time()
         new_pub = pub()
         rec['pub_s'] = time.time() - t1
         accepted = True
-        if a.arm == 'C' and not fresh:
+        if a.arm == 'C':
             accepted = new_pub['macro'] <= cur_pub['macro'] + a.margin
             rec['pub_before'], rec['pub_candidate'] = cur_pub['macro'], new_pub['macro']
             if not accepted:

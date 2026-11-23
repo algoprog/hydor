@@ -169,7 +169,7 @@ def reset_weights(model, state: dict) -> None:
 # One run of the app's loop
 # ===================================================================================================================
 def train_run(model, seqs: list, replay, *, seed: int, device, st: Optional[T.Settings] = None, micro_tokens: int = 4096,
-              log_losses: bool = False) -> dict:
+              log_losses: bool = False, fixed_warmup: bool = False) -> dict:
     """The app's training loop (train.py main) on `seqs`, from the model's weights, with a fresh optimizer: one plan of batches of
     st.batch_tokens padded tokens over `seqs`, replay_ratio public tokens per token of the batch, warm-up min(50, steps // 10), cosine
     to 10% of lr, gradient clipping, a step with a non-finite loss is skipped.  `seed` seeds the plan and (+7) the replay's draws."""
@@ -178,7 +178,7 @@ def train_run(model, seqs: list, replay, *, seed: int, device, st: Optional[T.Se
     lengths = np.array([len(s.ids) for s in seqs])
     plan = T.make_plan(lengths, st.batch_tokens, rng, st.epochs)
     total = len(plan)
-    warmup = min(st.warmup, max(1, total // 10))
+    warmup = st.warmup if fixed_warmup else min(st.warmup, max(1, total // 10))     # the app's warm-up shrinks with a short run
     opt = T.make_optimizer(model, st.lr, st.wd)
     replay_rng = np.random.RandomState(seed + 7)
     model.train()
