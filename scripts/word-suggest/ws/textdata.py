@@ -5,6 +5,11 @@ chat  : data/user_msgs.jsonl     target = the message (segments of <= 100 words)
 doc   : data/other_texts.jsonl   target = a paragraph; doc_ctx = the D words before it in the text.
 plain : data/multi/<lang>.jsonl  target = a paragraph; doc_ctx = the previous paragraph's last D words.
 
+messages : data/messages_oasst2.jsonl  public: human messages to an assistant (OpenAssistant oasst2 validation), read as chat (agent_ctx = the
+                                  assistant message answered); built by data/oasst2_messages.py. A fixed sample: use --limit 0.
+email    : data/email_enron.jsonl  public: the body an Enron employee wrote (corbt/enron-emails), cleaned; one example per email, read as
+                                  text (no context, like the app's text boxes); built by data/enron_email.py. A fixed sample: --limit 0.
+
 --ctx none|agent|agent+user: none clears every context; agent keeps agent_ctx (chat) and doc_ctx (doc, plain: the
 document's own context); agent+user keeps agent_ctx, user_ctx and doc_ctx.
 """
@@ -144,6 +149,27 @@ def doc_candidates(path: str, split: str, ctx: str, min_words: int, lang: Option
                                          dict(source=r.get("source"), author=r.get("author")))
 
 
+def messages_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None) -> Iterator[dict]:
+    """The public messages test (data/messages_oasst2.jsonl, FLORES language codes): chat examples of the surface 'messages'."""
+    for c in chat_candidates(path, split, ctx, lang):
+        yield dict(c, surface="messages")
+
+
+def email_candidates(path: str, split: str, ctx: str, min_words: int, lang: Optional[str] = None) -> Iterator[dict]:
+    """The public email test (data/email_enron.jsonl): the body of one email is the target (segments of <= 100 words; a later one
+    has the 100 words before it as doc_ctx), nothing before it, as in the app's text boxes."""
+    for r in read_jsonl(path):
+        if split != "all" and r.get("split") != split:
+            continue
+        rl = r.get("lang") or "eng_Latn"
+        if lang and rl not in lang.split(",") and rl.split("_")[0] not in lang.split(","):
+            continue
+        text = _norm((r.get("text") or "").strip())
+        if text:
+            yield from _paragraph_candidates(r["id"], text, rl, "email", int(r.get("ts") or 0), r.get("split", ""), ctx, min_words,
+                                             dict(writer=r.get("writer")), paras=[text])
+
+
 PLAIN_SPLITS = ("all", "dev", "test")
 
 
@@ -238,7 +264,7 @@ def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "a
     limit: at most this many examples per surface (per language for 'plain' and 'flores'), chosen with random.Random(seed) after
     sorting by id, so the same arguments always give the same examples. 0 = all.
     plain_split: for 'plain' only, 'dev' = paragraphs with an even `idx`, 'test' = odd ones, 'all' = every one."""
-    surfaces = ["chat", "doc", "plain"] if surface == "all" else surface.split(",")
+    surfaces = ["chat", "doc", "plain"] if surface == "all" else surface.split(",")      # messages and email only by name
     rng = random.Random(seed)
     out: list[Example] = []
 
@@ -252,6 +278,14 @@ def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "a
         if s == "chat":
             p = os.path.join(data_dir, "user_msgs.jsonl")
             cands = list(chat_candidates(p, split, ctx, lang)) if os.path.exists(p) else []
+            groups = [cands]
+        elif s == "messages":
+            p = os.path.join(data_dir, "messages_oasst2.jsonl")
+            cands = list(messages_candidates(p, split, ctx, lang)) if os.path.exists(p) else []
+            groups = [cands]
+        elif s == "email":
+            p = os.path.join(data_dir, "email_enron.jsonl")
+            cands = list(email_candidates(p, split, ctx, min_words, lang)) if os.path.exists(p) else []
             groups = [cands]
         elif s == "doc":
             p = os.path.join(data_dir, "other_texts.jsonl")
@@ -285,7 +319,7 @@ def add_data_args(ap, plain_split: bool = False) -> None:
         ap.add_argument("--plain-split", default="all", choices=list(PLAIN_SPLITS),
                         help="plain surface only: dev = paragraphs with an even idx, test = odd idx, all = every paragraph")
     ap.add_argument("--split", default="test", help="train|dev|test|all (plain: its whole files unless --plain-split is dev or test; flores: dev = FLORES dev, test = devtest)")
-    ap.add_argument("--surface", default="chat", help="chat|doc|plain|flores|all or a comma list (all = chat, doc, plain)")
+    ap.add_argument("--surface", default="chat", help="chat|doc|plain|flores|messages|email|all or a comma list (all = chat, doc, plain; messages and email are the public tests: --limit 0)")
     ap.add_argument("--lang", default=None, help="only these languages (comma list)")
     ap.add_argument("--ctx", default="agent+user", choices=["none", "agent", "agent+user"])
     ap.add_argument("--limit", type=int, default=0, help="examples per surface (per language for plain and flores); 0 = all")

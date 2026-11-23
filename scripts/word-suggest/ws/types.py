@@ -14,6 +14,9 @@ NOSPACE_CODES = frozenset({"zh", "ja", "th", "lo", "km", "my", "bo", "dz", "zho"
 NOSPACE_SCRIPTS = frozenset({"Hans", "Hant", "Hani", "Jpan", "Thai", "Laoo", "Khmr", "Mymr", "Tibt"})
 
 
+CHAT_SURFACES = frozenset({"chat", "messages"})     # surfaces whose context is an agent reply (the chat prefixes)
+
+
 def is_nospace(lang: str, extra: tuple = ()) -> bool:
     """True if the language has no spaces between words (so its words are single characters in the metrics)."""
     if lang in extra:
@@ -26,7 +29,7 @@ def is_nospace(lang: str, extra: tuple = ()) -> bool:
 class Example:
     """One text to be typed and the context the app would give the models there (SPEC.md, Examples and context)."""
     id: str
-    surface: str                      # 'chat' | 'doc' | 'plain' | 'flores'
+    surface: str                      # 'chat' | 'doc' | 'plain' | 'flores' | 'messages' (read as chat) | 'email'
     lang: str                         # 'en', 'el', 'zh', ... or 'other'
     agent_ctx: str                    # last A words of the agent's reply ('' if none or not used)
     user_ctx: str                     # earlier typed words, within the typed budget ('' if none or not used)

@@ -15,6 +15,8 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 import torch
 
+from .types import CHAT_SURFACES
+
 DEFAULT_LLM = 'Qwen/Qwen3.5-0.8B-Base'
 SPECIALS = ['<unk>', '<bos>', '<eos>', '<agent>', '<user>', '<doc>']
 UNK, BOS, EOS, AGENT, USER, DOC = range(6)
@@ -175,7 +177,7 @@ class Vocab:
         prefix ``<bos> <doc>``.  Each part keeps its last ``max_ctx`` tokens.
         """
         ids = [BOS]
-        if surface == 'chat':
+        if surface in CHAT_SURFACES:
             if len(agent):
                 ids += [AGENT] + [int(t) for t in agent[-max_ctx:]]
             if len(user):

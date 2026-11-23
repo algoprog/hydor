@@ -318,6 +318,84 @@ def compare_real(files, labels, ps, boot, seed, emit):
         per_language(evs, labels, langs, thetas, ps, boot, seed, emit)
 
 
+class EventsPlen(Events):
+    """Events that also hold plen, the letters each suggestion adds to the typed ones (scripts/real_chances.py writes it)."""
+
+    def __init__(self, path, **kw):
+        super().__init__(path, **kw)
+        rows = [r for r in read_events(path)[0]]
+        rows.sort(key=lambda r: (r["id"], r["j"], r["k"]))
+        if not rows or any("plen" not in r for r in rows[:1]):
+            raise SystemExit(f"{path}: no plen in its events (decode again with the current scripts/real_chances.py)")
+        self.plen = np.array([r["plen"] for r in rows], dtype=np.int64)
+        if len(self.plen) != len(self.c):
+            raise SystemExit(f"{path}: plen and chances differ in number")
+
+
+def min_save_scores(ev, m):
+    """(score, grid) for hiding the suggestions that would save fewer than m keystrokes (their letters minus the Tab, plen - 1 < m):
+    a hidden one gets score -1, below every theta of the grid, which is built on the others' confidences only. m = 0 hides nothing."""
+    ok = np.ones(len(ev.c), dtype=bool) if m <= 0 else (ev.plen - 1 >= m)
+    score = np.where(ok, ev.c, -1.0)
+    return score, (grid(ev.c[ok]) if ok.any() else np.array([np.inf]))
+
+
+def compare_min_save(files, labels, ps, ms, boot, seed, emit):
+    """The minimum length: for every file (a real-decoded variant), every m in ms and every precision p, the threshold on the true
+    confidence is picked again (the best ksr with precision >= p, as compare_real), with the suggestions that save fewer than m
+    keystrokes hidden. Rows tagged min_save: ksr with a paired bootstrap 95% interval, precision, coverage (shown / chances) with
+    its interval at the chosen threshold, the suggestions shown (count and per 1000 characters), the difference from m = 0 of the
+    same file and, for the later files, from the first file at the same m (paired: the same resamples everywhere)."""
+    evs = [EventsPlen(f, names=["top"]) for f in files]
+    for f, e in zip(files[1:], evs[1:]):
+        if e.ids != evs[0].ids:
+            raise SystemExit(f"{f}: not the same examples as {files[0]}")
+    n = evs[0].n_ex
+    W = np.random.RandomState(seed).multinomial(n, np.full(n, 1.0 / n), size=boot).astype(np.float64)
+    res = {}
+    for li, e in enumerate(evs):
+        for m in ms:
+            score, th = min_save_scores(e, m)
+            S = e.sweep(score, th)
+            ksr, prec, cov = curve(S, np.ones(n), e.chars)
+            tot = np.einsum("be,aet->abt", W, S)
+            kb = tot[0] / (W @ e.chars)[:, None]
+            with np.errstate(invalid="ignore", divide="ignore"):
+                pb = np.where(tot[1] > 0, tot[2] / tot[1], 0.0)
+            res[li, m] = dict(S=S, th=th, ksr=ksr, prec=prec, cov=cov, chars=float(e.chars.sum()),
+                              boot={p: np.where(pb >= p, kb, 0.0).max(1) for p in ps})
+    for li, (lab, e) in enumerate(zip(labels, evs)):
+        for m in ms:
+            r = res[li, m]
+            for p in ps:
+                b = r["boot"][p]
+                ok = r["prec"] >= p
+                j = int(np.argmax(np.where(ok, r["ksr"], -1))) if ok.any() else 0
+                point = float(r["ksr"][j]) if ok.any() else 0.0
+                shown, chances = r["S"][1][:, j], r["S"][3][:, j]
+                cb = (W @ shown) / np.maximum(W @ chances, 1e-9)
+                row = dict(tag="min_save", label=lab, min_save=m, precision=p, ksr=point, ksr_lo=float(np.percentile(b, 2.5)),
+                           ksr_hi=float(np.percentile(b, 97.5)), prec_at_best=float(r["prec"][j]) if ok.any() else None,
+                           cov_at_best=float(r["cov"][j]) if ok.any() else None, cov_lo=float(np.percentile(cb, 2.5)),
+                           cov_hi=float(np.percentile(cb, 97.5)), shown=int(shown.sum()),
+                           shown_per_1000_chars=float(1000 * shown.sum() / r["chars"]), theta=float(r["th"][j]) if ok.any() else None,
+                           chances=int(chances.sum()), examples=n)
+                if m != ms[0]:
+                    r0 = res[li, ms[0]]
+                    k0 = int(np.argmax(np.where(r0["prec"] >= p, r0["ksr"], -1))) if (r0["prec"] >= p).any() else 0
+                    d = b - r0["boot"][p]
+                    row.update(vs_min_save=ms[0], delta_vs_min=point - float(r0["ksr"][k0]),
+                               delta_vs_min_lo=float(np.percentile(d, 2.5)), delta_vs_min_hi=float(np.percentile(d, 97.5)),
+                               delta_vs_min_p_le_0=float((d <= 0).mean()))
+                if li:
+                    r1 = res[0, m]
+                    k1 = int(np.argmax(np.where(r1["prec"] >= p, r1["ksr"], -1))) if (r1["prec"] >= p).any() else 0
+                    d = b - r1["boot"][p]
+                    row.update(vs=labels[0], delta=point - float(r1["ksr"][k1]), delta_lo=float(np.percentile(d, 2.5)),
+                               delta_hi=float(np.percentile(d, 97.5)), delta_p_le_0=float((d <= 0).mean()))
+                emit(row)
+
+
 def per_language(evs, labels, langs, thetas, ps, boot, seed, emit):
     """Keystrokes saved per language at the threshold each file's pooled curve picks for the precision p (one threshold for all
     languages: what one deployed setting would do), the per-language difference against the first file, and the mean over
@@ -368,6 +446,10 @@ def main(argv=None):
     ap.add_argument("--compare-real", nargs="+", default=None, metavar="EVENTS",
                     help="compare the true-c thresholds of these real-decoded event files (same examples); needs --labels; "
                          "no --dev / --test then")
+    ap.add_argument("--min-save", default=None, metavar="M,M,..",
+                    help="with --compare-real: instead of those rows, the minimum length of a suggestion (compare_min_save): hide the "
+                         "suggestions that would save fewer than m keystrokes (their letters minus the Tab), for each m of the list "
+                         "(0 = today), the threshold picked again; needs events with plen (scripts/real_chances.py)")
     ap.add_argument("--labels", default=None, help="comma list of names for --compare-real, one per file")
     ap.add_argument("--phrase-compare", nargs="+", default=None, metavar="EVENTS",
                     help="the keystroke simulation for phrases (scripts/phrase_sim.py) on real-decoded events made with "
@@ -426,15 +508,19 @@ def main(argv=None):
         return
     if a.compare_real:
         labels = a.labels.split(",") if a.labels else [os.path.splitext(os.path.basename(f))[0] for f in a.compare_real]
-        if len(labels) != len(a.compare_real) or len(labels) < 2:
-            raise SystemExit("--compare-real needs two or more files and one label each")
+        if len(labels) != len(a.compare_real) or (len(labels) < 2 and not a.min_save):
+            raise SystemExit("--compare-real needs two or more files and one label each (one file is enough with --min-save)")
         lines = []
 
         def emit0(d, quiet=False):
             lines.append(d)
             if not quiet:                            # the per-language rows go to metrics.jsonl only
                 print(json.dumps(d), flush=True)
-        compare_real(a.compare_real, labels, [float(x) for x in a.precisions.split(",")], a.boot, a.seed, emit0)
+        if a.min_save:
+            compare_min_save(a.compare_real, labels, [float(x) for x in a.precisions.split(",")],
+                             [int(x) for x in a.min_save.split(",")], a.boot, a.seed, emit0)
+        else:
+            compare_real(a.compare_real, labels, [float(x) for x in a.precisions.split(",")], a.boot, a.seed, emit0)
         with open(os.path.join(a.out, "metrics.jsonl"), "w") as f:
             for l in lines:
                 f.write(json.dumps(l) + "\n")

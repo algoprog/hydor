@@ -19,7 +19,7 @@ spec: the data, the contexts, the scorers and every metric, defined exactly.
 The package `ws/`:
 
 - `types.py`: the types every module shares (an example, a scorer).
-- `textdata.py`: builds the test examples (chat, documents, plain paragraphs, FLORES-200) and the options every script
+- `textdata.py`: builds the test examples (chat, documents, plain paragraphs, FLORES-200, and the public `messages` and `email` tests) and the options every script
   shares for choosing them (`--split`, `--surface`, `--lang`, `--ctx`, `--limit`).
 - `vocab.py`: the small model's vocabulary, a projection of Qwen3.5's token ids. The release uses all of them:
   its id is Qwen's id plus 6 (six special tokens come first).
@@ -56,6 +56,8 @@ The pipeline steps in `scripts/`:
 - `merge_eval.py`, `merge_real.py`: join the shards of an evaluation or a decoding that ran on several GPUs.
 - `show_filter.py`: the keystroke simulation. It also finds the confidence thresholds for a given share of right
   suggestions (`--compare-real`).
+  `show_filter.py --compare-real ... --min-save 0,1,2,3` measures a minimum length: suggestions that would save fewer than m
+  keystrokes (their letters minus the Tab, the `plen` of an event from `real_chances.py`) are hidden, and the threshold is picked again.
 - `fit_cache.py`: fits the session cache's weight.
 - `export_release.py`: writes `model.safetensors` and `config.json` from a checkpoint.
 - `release_manifest.py`: writes `manifest.json`, the size and SHA-256 of every file of a release.
@@ -81,6 +83,13 @@ The corpus builders and test sets in `data/`:
 - `iso3to1.json`: three-letter to two-letter language codes.
 - `flores.py`: FLORES-200, the 204 language variants, as test data.
 - `multi.py`: about 300 Wikipedia paragraphs in six languages, a small multilingual test.
+- `oasst2_messages.py`: the public `messages` test, `data/messages_oasst2.jsonl`: 800 human messages of OpenAssistant oasst2's
+  validation split (Apache-2.0) with the assistant message each answers as context, every language, seeded. The small model
+  was pretrained on oasst2's chats (all but a held-out 1% of the trees), so this test is not unseen for it; the file marks
+  the held-out ones.
+- `enron_email.py`: the public `email` test, `data/email_enron.jsonl`: 700 emails of the Enron corpus (`corbt/enron-emails`, no
+  licence stated; a public-record corpus), quoted replies, forwards, headers and signatures removed, one writer each, English.
+  Both run with `--surface messages` or `--surface email --limit 0` (the files are the fixed samples).
 - `extract.py`, `stats.py`, `validate.py`: your own chat test set, built from your own Hydor database (see
   "Your own chat test set").
 

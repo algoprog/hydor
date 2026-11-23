@@ -333,6 +333,12 @@ class Decoder:
         return out
 
 
+def suggestion_letters(produced: bytes, k: int) -> int:
+    """The letters a suggestion adds to the k typed ones (its word without the typed letters; the Tab and the space that may follow
+    are not counted): the `plen` of an event, which show_filter.py --min-save uses to hide short suggestions."""
+    return max(0, len(produced.decode("utf-8", errors="ignore").strip()) - k)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_data_args(ap)
@@ -351,6 +357,8 @@ def main(argv=None):
     ap.add_argument("--phrase-floor", type=float, default=0.05, help="with --phrase-words: no word is decoded after a path of confidence below this")
     ap.add_argument("--check-words", type=int, default=2, help="words per example whose first step is rebuilt from the state")
     ap.add_argument("--device", default="cpu", help="cpu | cuda | cuda:N (cuda: .venv-gpu; WS_GPU_MEM_GB caps the memory)")
+    ap.add_argument("--only-lang", default=None, help="comma list: decode only the examples of these languages, chosen AFTER the "
+                    "sample is drawn (unlike --lang, which changes the sample --limit draws): the same examples as the run without it")
     ap.add_argument("--shard", default=None, help="k/n: this process decodes examples k, k+n, ... (k from 0); cat the events files")
     ap.add_argument("--events-out", required=True)
     ap.add_argument("--skip-switch", default=None, metavar="JSON", help="after --shard: leave out the examples whose language this "
@@ -391,6 +399,8 @@ def main(argv=None):
     exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words)
     if not exs:
         raise SystemExit("no examples")
+    if a.only_lang:
+        exs = [e for e in exs if e.lang in a.only_lang.split(",")]
     total = len(exs)
     exs = exs[shard_k::shard_n]
     if a.skip_switch:
@@ -478,6 +488,7 @@ def main(argv=None):
                 feat_check["n"] += 1
                 rec = dict(t="c", id=ex.id, j=j, k=k, L=t["L"], bonus=t["bonus"], y=y, c=conf, prev=t["prev"], **f,
                            c_tf=t["c"], y_tf=t["y"], ntok=ntok, ended=int(ended))
+                rec["plen"] = suggestion_letters(produced, k)      # read by show_filter.py --min-save
                 if a.phrase_words > 1 and y and ended and conf >= a.phrase_floor and dec.cont is not None:
                     rec["ph"] = dec.phrase(st, ex, gold[:w["a"]], conf, gold_next(j), a.phrase_words, a.phrase_floor)
                 recs.append(rec)

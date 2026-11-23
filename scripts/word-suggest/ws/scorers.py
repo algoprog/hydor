@@ -7,7 +7,7 @@ from typing import Optional
 
 import torch
 
-from .types import Example
+from .types import CHAT_SURFACES, Example
 
 START_FALLBACK = "\n\n"
 
@@ -30,7 +30,7 @@ def build_prefix(ex: Example, fmt: str = "plain") -> str:
             s += f"Assistant: {ex.agent_ctx}\n\n"
         if ex.user_ctx:
             s += f"User: {ex.user_ctx}\n\n"
-        if ex.surface == "chat":
+        if ex.surface in CHAT_SURFACES:
             s += "User: "
         return s or START_FALLBACK
     raise ValueError(f"unknown fmt {fmt!r}")
