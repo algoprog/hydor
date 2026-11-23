@@ -132,6 +132,8 @@ export function SuggestSettings() {
     <Row label={label} hint={hint} control={<Switch on={settings.where[key]} label={label} onChange={(v) => set({ where: { [key]: v } })} />} />
   );
   return (
+    // A part of its own for the translations: "More" here means more suggestions (suggest::More), not "Other".
+    <div data-i18n="suggest">
     <Stack>
       {confirmNode}
       <Group title="Suggestions">
@@ -266,6 +268,7 @@ export function SuggestSettings() {
         />
       </Group>
     </Stack>
+    </div>
   );
 }
 
