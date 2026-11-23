@@ -373,6 +373,9 @@ def main(argv=None):
                     help="the keystroke simulation for phrases (scripts/phrase_sim.py) on real-decoded events made with "
                          "real_chances.py --phrase-words and --words-per-example 0; needs --labels; no --dev / --test then")
     ap.add_argument("--phrase-max-n", type=int, default=5, help="--phrase-compare: the most words shown")
+    ap.add_argument("--phrase-calibration", default=None, help="--phrase-compare: the app's calibration.json, and --phrase-plans "
+                    "names its row (mix, llm or slm) for each file: also every rule at the app's own thresholds")
+    ap.add_argument("--phrase-plans", default=None, help="comma list, one per file (see --phrase-calibration)")
     ap.add_argument("--phrase-floor", type=float, default=0.05, help="--phrase-compare: the --phrase-floor of the decoding run")
     ap.add_argument("--dev-real", default=None, help="real-decoded dev events (scripts/real_chances.py)")
     ap.add_argument("--test-real", default=None, help="real-decoded test events: also compare on these (needs --dev-real)")
@@ -408,8 +411,15 @@ def main(argv=None):
         def emit1(d):
             lines.append(d)
             print(json.dumps(d), flush=True)
+        cal = None
+        if a.phrase_calibration:
+            table = json.load(open(a.phrase_calibration))
+            plans = a.phrase_plans.split(",")
+            if len(plans) != len(labels):
+                raise SystemExit("--phrase-plans needs one plan per file")
+            cal = {lab: {float(p): t for p, t in table[pl].items()} for lab, pl in zip(labels, plans)}
         phrase_sim.compare(a.phrase_compare, labels, [float(x) for x in a.precisions.split(",")], a.boot, a.seed, emit1,
-                           max_n=a.phrase_max_n, floor=a.phrase_floor)
+                           max_n=a.phrase_max_n, floor=a.phrase_floor, calibrated=cal)
         with open(os.path.join(a.out, "metrics.jsonl"), "w") as f:
             for l in lines:
                 f.write(json.dumps(l) + "\n")

@@ -176,12 +176,14 @@ def rules(max_n=5, strict=(0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)):
 
 
 def compare(files, labels, ps, boot, seed, emit, max_n=5, floor=0.05, n_theta=120, strict=(0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
-            folds=2):
+            folds=2, calibrated=None):
     """For each event file (a setting) and each setting of rules(): the keystrokes saved at the first-word precisions ps, as
     show_filter.compare_real does it (the best theta with precision >= p, the paired bootstrap over examples choosing it again in every
     resample), plus the phrase's own precision, coverage and words shown. For each N the stricter threshold is chosen among `strict`
     as the one with most keystrokes saved (rows tagged phrase_best), and a cross-fitted figure (theta and the stricter threshold
-    chosen on half of the examples, the keystrokes counted on the other half) is given for every rule family (rows phrase_crossfit)."""
+    chosen on half of the examples, the keystrokes counted on the other half) is given for every rule family (rows phrase_crossfit).
+    calibrated: {label: {p: theta}} (the app's calibration.json row of the setting): rows phrase_calibrated give every rule at that
+    one theta (no choosing on the events), with paired bootstrap intervals of the differences from N=1 and from today."""
     t0 = time.time()
     rl = rules(max_n, strict)
     for f, lab in zip(files, labels):
@@ -206,6 +208,23 @@ def compare(files, labels, ps, boot, seed, emit, max_n=5, floor=0.05, n_theta=12
                   with_phrase=int(ev.P_has[:, 0].sum()) if ev.M else 0, seconds=time.time() - t0))
         base = res["N=1"]
         today = res["today N=2 own"]
+        for p, tcal in sorted(((calibrated or {}).get(lab) or {}).items()):
+            tcal = max(float(tcal), floor)
+            Sc = {name: ev.sim([tcal], nw, rule, strictv)[:, :, 0] for name, nw, rule, strictv in rl}
+            kb = {name: (W @ S[0]) / (W @ ev.chars) for name, S in Sc.items()}
+            for name, nw, rule, strictv in rl:
+                S = Sc[name]
+                sh = S[1].sum()
+                row = dict(tag="phrase_calibrated", setting=lab, rule=name, n_words=nw, stricter=strictv, precision=p, theta=tcal,
+                           ksr=float(S[0].sum() / ev.chars.sum()), ksr_lo=float(np.percentile(kb[name], 2.5)),
+                           ksr_hi=float(np.percentile(kb[name], 97.5)), first_precision=float(S[2].sum() / sh) if sh else None,
+                           phrase_precision=float(S[4].sum() / sh) if sh else None, coverage=float(sh / S[3].sum()) if S[3].sum() else None,
+                           words_per_phrase=float(S[6].sum() / S[5].sum()) if S[5].sum() else None)
+                for ref, key in (("N=1", "vs_N1"), ("today N=2 own", "vs_today")):
+                    d = kb[name] - kb[ref]
+                    row[key] = dict(delta=float(S[0].sum() / ev.chars.sum() - Sc[ref][0].sum() / ev.chars.sum()),
+                                    lo=float(np.percentile(d, 2.5)), hi=float(np.percentile(d, 97.5)))
+                emit(row)
 
         def best(r, p):
             ok = r["prec"] >= p

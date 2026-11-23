@@ -353,6 +353,8 @@ def main(argv=None):
     ap.add_argument("--device", default="cpu", help="cpu | cuda | cuda:N (cuda: .venv-gpu; WS_GPU_MEM_GB caps the memory)")
     ap.add_argument("--shard", default=None, help="k/n: this process decodes examples k, k+n, ... (k from 0); cat the events files")
     ap.add_argument("--events-out", required=True)
+    ap.add_argument("--skip-switch", default=None, metavar="JSON", help="after --shard: leave out the examples whose language this "
+                    "switch gives to the LLM alone (to decode only what a mix is for; the shards stay those of the full list)")
     ap.add_argument("--resume", action="store_true", help="keep the examples already in --events-out and decode the rest "
                     "(appended; an example's lines are written together once it is decoded). <out>'s checks then cover only "
                     "the rest; the events, which scripts/merge_real.py and show_filter.py read, cover all")
@@ -391,6 +393,9 @@ def main(argv=None):
         raise SystemExit("no examples")
     total = len(exs)
     exs = exs[shard_k::shard_n]
+    if a.skip_switch:
+        sw = mix.Gate.load(a.skip_switch)
+        exs = [e for e in exs if sw.choice(e.lang) != "llm"]
     if not exs:
         raise SystemExit("no examples in this shard")
     st = Stepper(sc, v, {}, tb)
