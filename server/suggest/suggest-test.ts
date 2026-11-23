@@ -19,7 +19,7 @@ import { initPages } from '../pages/store.ts';
 import { downloadFiles } from '../memory/embed.ts';
 import { suggest, suggestService, cleanRequest } from './index.ts';
 import { LlamaServer } from './llm.ts';
-import { killAll, reapLeftovers, track } from './procs.ts';
+import { killAll, leftoverTraining, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
@@ -783,6 +783,20 @@ test('1: programs are kept in pids.json, ended when the server exits, and an ear
   assert.ok(fs.existsSync(pidsFile), 'kept for the next start');
   assert.equal(reapLeftovers(), 0);
   assert.ok(!fs.existsSync(pidsFile));
+});
+
+test('a learning run an earlier server left gets time to save its place, and a new run waits for it', async () => {
+  // It saves at the end of its step: here that takes 4 seconds after SIGTERM, longer than the 3 seconds other leftovers get.
+  const saved = path.join(tmp, 'leftover-saved.txt');
+  const slow = spawn('python3', ['-c', 'import signal, sys, time\ndef bye(*a):\n    time.sleep(4)\n    open(sys.argv[1], "w").write("saved")\n    sys.exit(143)\nsignal.signal(signal.SIGTERM, bye)\ntime.sleep(60)', saved, '/leftover/train.py'], { stdio: 'ignore' });
+  await sleep(400);
+  const pidsFile = path.join(DATA, 'suggest', 'pids.json');
+  fs.mkdirSync(path.dirname(pidsFile), { recursive: true });
+  fs.writeFileSync(pidsFile, JSON.stringify([{ pid: slow.pid, kind: 'train', marker: '/leftover/train.py' }]));
+  assert.equal(reapLeftovers(), 1);
+  assert.equal(leftoverTraining(), true, 'still saving: a new run waits');
+  await until('the leftover to save and end', () => fs.existsSync(saved) && !leftoverTraining(), 15_000);
+  assert.equal(fs.readFileSync(saved, 'utf8'), 'saved', 'not killed before it saved');
 });
 
 test('2: turning it off while the worker starts stops it, and one that is stopped while a port is found starts nothing', async () => {

@@ -74,6 +74,20 @@ const alive = (pid: number) => {
 };
 
 /** Ends the programs an earlier server left running; how many it ended. (Not on Windows, where a process cannot be told from the command line.) */
+/**
+ * A learning run an earlier server left gets this long to save where it is before it is killed: it saves at the end of the
+ * step it is in, which takes tens of seconds on a busy computer (the server that left it asked it to as it exited).
+ */
+export const TRAIN_REAP_GRACE_MS = 3 * 60_000;
+/** Learning runs an earlier server left that are still saving: a new run waits for them (they write the same folder). */
+const reaping = new Set<number>();
+
+/** Whether a learning run an earlier server left is still ending (saving where it was). */
+export function leftoverTraining(): boolean {
+  for (const pid of reaping) if (!alive(pid)) reaping.delete(pid);
+  return reaping.size > 0;
+}
+
 export function reapLeftovers(): number {
   let list: Entry[] = [];
   try {
@@ -90,14 +104,16 @@ export function reapLeftovers(): number {
     } catch {
       continue;
     }
-    // One that ignores the signal is killed a few seconds later.
+    // One that ignores the signal is killed a few seconds later; a learning run is given time to save its place first.
+    if (e.kind === 'train') reaping.add(e.pid);
     const t = setTimeout(() => {
+      reaping.delete(e.pid);
       if (alive(e.pid) && commandLine(e.pid)?.includes(e.marker)) {
         try {
           process.kill(e.pid, 'SIGKILL');
         } catch {}
       }
-    }, 3000);
+    }, e.kind === 'train' ? TRAIN_REAP_GRACE_MS : 3000);
     t.unref?.();
   }
   if (!live.size) fs.rmSync(file(), { force: true });

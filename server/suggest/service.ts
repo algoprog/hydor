@@ -10,7 +10,7 @@ import { availableMemory } from '../models/machine.ts';
 import { childEnv, PyWorker, type Reply } from './engine.ts';
 import { LlamaServer } from './llm.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
-import { reapLeftovers } from './procs.ts';
+import { leftoverTraining, reapLeftovers } from './procs.ts';
 import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, unsupportedSystem, workerScript } from './setup.ts';
 import { forgetPersonal, gpuHold, hasPersonal, lastDevice, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
@@ -844,6 +844,8 @@ export class SuggestService {
 
   private async runTraining() {
     if (!(await this.ensureSetup())) return;
+    // A run an earlier server left may still be saving its place: this one goes on from it once it has.
+    while (leftoverTraining()) await new Promise((r) => setTimeout(r, 2000));
     // Turned off while it was setting up, or paused meanwhile: nothing is started.
     if (!this.st.enabled || !this.st.personalise || this.paused()) return;
     const out = await this.trainer.run(this.db, this.st, {
@@ -863,7 +865,7 @@ export class SuggestService {
   /** The scheduled check: personalise when it is due and the computer has the memory. */
   private async check() {
     try {
-      if (!this.st.enabled || !this.st.personalise || this.trainer.active || this.setupP || !this.trainDue()) return;
+      if (!this.st.enabled || !this.st.personalise || this.trainer.active || this.setupP || leftoverTraining() || !this.trainDue()) return;
       if (releaseProblem() || !packagesReady()) return;
       if ((await availableMemory()) / 2 ** 20 < 2048) return;
       await this.runTraining();
