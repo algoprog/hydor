@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
-import { BROWSING_KEY, BROWSING_PROFILE, GROUP_COLORS, isTranslateLang, matchShortcut, PAGE_ZOOMS, READER_DEFAULTS, SEARCH_ENGINES, SEARCH_SHORTCUTS, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type ReaderPrefs, type SearchEngine, type SearchShortcut } from '../../shared/browser.ts';
+import { adListsToUse, BROWSING_KEY, BROWSING_PROFILE, defaultAdLists, GROUP_COLORS, isOptionalAdList, isTranslateLang, matchShortcut, PAGE_ZOOMS, READER_DEFAULTS, SEARCH_ENGINES, SEARCH_SHORTCUTS, type BrowserGroup, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type ReaderPrefs, type SearchEngine, type SearchShortcut } from '../../shared/browser.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
@@ -114,6 +114,7 @@ export const DEFAULT_PREFS: BrowsingPrefs = {
   adblock: true,
   allowAds: [],
   cookieBanners: true,
+  adLists: [],
   translateTo: 'en',
   translateOffer: true,
   translateAlways: [],
@@ -251,6 +252,7 @@ export function browsingPrefs(db: DB): BrowsingPrefs {
     adblock: typeof v.adblock === 'boolean' ? v.adblock : DEFAULT_PREFS.adblock,
     allowAds: cleanSites(v.allowAds),
     cookieBanners: typeof v.cookieBanners === 'boolean' ? v.cookieBanners : DEFAULT_PREFS.cookieBanners,
+    adLists: Array.isArray(v.adLists) ? [...new Set(v.adLists.filter(isOptionalAdList))] : defaultAdLists(userLang(db)),
     translateTo: isTranslateLang(v.translateTo) ? v.translateTo : userLang(db),
     translateOffer: typeof v.translateOffer === 'boolean' ? v.translateOffer : DEFAULT_PREFS.translateOffer,
     translateAlways: always,
@@ -297,6 +299,10 @@ export function setBrowsingPrefs(db: DB, patch: Record<string, unknown>): Browsi
     next.zoom = patch.zoom as number;
   }
   if (patch.allowAds !== undefined) next.allowAds = cleanSites(patch.allowAds);
+  if (patch.adLists !== undefined) {
+    if (!Array.isArray(patch.adLists) || !patch.adLists.every(isOptionalAdList)) throw new HttpError(400, 'adLists should be a list of the ad blocker’s optional list ids');
+    next.adLists = [...new Set(patch.adLists as string[])];
+  }
   if (patch.translateNeverSites !== undefined) next.translateNeverSites = cleanSites(patch.translateNeverSites);
   if (patch.darkExcept !== undefined) next.darkExcept = cleanSites(patch.darkExcept);
   if (patch.translateTo !== undefined) {
@@ -732,7 +738,7 @@ export function browsingRoutes(d: Deps) {
   /** Tells the app how to block ads (once the browser has started, and at each change of the settings). */
   const tellPrefs = () => {
     const p = browsingPrefs(db);
-    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds, cookieBanners: p.cookieBanners, darkPages: p.darkPages, darkExcept: p.darkExcept, autoplay: p.autoplay, zoom: p.zoom, spellcheck: p.spellcheck });
+    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds, cookieBanners: p.cookieBanners, adLists: adListsToUse(p), darkPages: p.darkPages, darkExcept: p.darkExcept, autoplay: p.autoplay, zoom: p.zoom, spellcheck: p.spellcheck });
   };
   /**
    * Your browsing, started when it is not running, with the tabs it had last time (and the home page when it had none,
@@ -1046,7 +1052,9 @@ export function browsingRoutes(d: Deps) {
 
   app.post('/api/browser/browsing/history/clear', async (req) => {
     const since = sinceOf(B(req).since);
-    return { removed: clearHistory(db, since) };
+    const removed = clearHistory(db, since);
+    tellDesktop({ type: 'browser-clear', profile: BROWSING_PROFILE, cookies: false, cache: false, history: true });
+    return { removed };
   });
 
   /** Clears what you pick: history here (with the list of downloads), cookies and site data and cached files in the app's browser. */
@@ -1057,7 +1065,7 @@ export function browsingRoutes(d: Deps) {
     const removed = history === true ? clearHistory(db, since) : 0;
     // The list of what was downloaded goes with the history, for the same time (the files stay where they were saved).
     if (history === true) clearDownloads(db, since);
-    const told = cookies === true || cache === true ? tellDesktop({ type: 'browser-clear', profile: BROWSING_PROFILE, cookies: cookies === true, cache: cache === true, ...(since === undefined ? {} : { since }) }) : false;
+    const told = cookies === true || cache === true || history === true ? tellDesktop({ type: 'browser-clear', profile: BROWSING_PROFILE, cookies: cookies === true, cache: cache === true, history: history === true, ...(since === undefined ? {} : { since }) }) : false;
     return { history: removed, desktop: told };
   });
 

@@ -2,14 +2,17 @@
 // and whether it suggests as you type, the shortcuts that search one site, the ad blocker, how pages are shown, and
 // clearing what the browser kept (history, cookies, cached files). Settings → Browser has a row that opens it.
 import { useEffect, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
-import { SEARCH_ENGINES, SEARCH_SHORTCUTS, type SearchEngine, type SearchShortcut } from '@shared/browser';
+import { LOCALE } from '../../i18n/locale';
+import { BarChart3, Plus, X } from 'lucide-react';
+import { AD_FILTER_LISTS, SEARCH_ENGINES, SEARCH_SHORTCUTS, type SearchEngine, type SearchShortcut } from '@shared/browser';
 import { toast } from '../../lib/store';
-import { Button, inputCls, Switch, Throbber } from '../../components/ui';
+import { Button, inputCls, OptionRow, Popover, Switch, Throbber } from '../../components/ui';
 import { Group, Row, Select, Stack } from '../settings/kit';
-import { activeTab, clearBrowsingData, ENGINE_NAMES, isWebPage, KEY, loadPrefs, savePrefs, usePrefs } from './browsing';
+import { activeTab, adblockCounts, clearBrowsingData, ENGINE_NAMES, isWebPage, KEY, loadAdblockStats, loadPrefs, savePrefs, updateAdblockLists, useAdblockStats, usePrefs } from './browsing';
+import { openAdBlockStats, sinceLabel } from './AdBlock';
+import { langLabel } from './languages';
 import { Panel } from './Panel';
-import { PagesGroup, TranslationGroup } from './TranslationSettings';
+import { Chips, PagesGroup, TranslationGroup } from './TranslationSettings';
 import { useBrowser } from './store';
 
 type Range = 'hour' | 'day' | 'week' | 'all';
@@ -90,7 +93,136 @@ function ShortcutsRow({ shortcuts }: { shortcuts: SearchShortcut[] }) {
   );
 }
 
-export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: { onClose: () => void; focusClear?: boolean; focusTranslation?: number }) {
+/** How long ago, in the app's language ("2 hours ago", "yesterday"). */
+function relative(ms: number): string {
+  const s = Math.round((ms - Date.now()) / 1000);
+  const f = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' });
+  const a = Math.abs(s);
+  if (a < 60) return f.format(0, 'second');
+  if (a < 3600) return f.format(Math.round(s / 60), 'minute');
+  if (a < 86400) return f.format(Math.round(s / 3600), 'hour');
+  return f.format(Math.round(s / 86400), 'day');
+}
+
+/** "Add a language" for the ad blocker's lists: the language lists not turned on yet, each as its language with the list's own name under it. */
+function AddAdList({ taken, onAdd }: { taken: string[]; onAdd: (id: string) => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const left = AD_FILTER_LISTS.filter((l) => l.kind === 'language' && !taken.includes(l.id));
+  return (
+    <>
+      <Button ref={ref} size="sm" variant="secondary" icon={<Plus size={14} />} disabled={!left.length} aria-label="Add a language" onClick={() => setOpen((o) => !o)}>
+        Add a language
+      </Button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={280} className="max-h-72" title="Add a language">
+        {left.map((l) => (
+          <OptionRow
+            key={l.id}
+            label={<span translate="no">{langLabel(l.langs![0])}</span>}
+            hint={l.listName}
+            onClick={() => {
+              setOpen(false);
+              onAdd(l.id);
+            }}
+          />
+        ))}
+      </Popover>
+    </>
+  );
+}
+
+/** The ad blocker's rows past the two switches: its filter lists and their state, the lists for other languages, the stricter and annoyances lists, the sites where ads are allowed, and the statistics. */
+function AdListsRows() {
+  const prefs = usePrefs((s) => s.prefs)!;
+  const stats = useAdblockStats((s) => s.stats);
+  const counts = adblockCounts();
+  const updating = !!stats?.lists.updating;
+  useEffect(() => {
+    if (counts) void loadAdblockStats();
+  }, [counts]);
+  // While it fetches, its state is read again until it is done.
+  useEffect(() => {
+    if (!updating) return;
+    const t = window.setInterval(() => void loadAdblockStats(), 1500);
+    return () => window.clearInterval(t);
+  }, [updating]);
+  const off = !prefs.adblock;
+  const lists = prefs.adLists ?? [];
+  const toggle = (id: string, on: boolean) => void savePrefs({ adLists: on ? [...lists.filter((x) => x !== id), id] : lists.filter((x) => x !== id) });
+  const chosen = AD_FILTER_LISTS.filter((l) => l.kind === 'language' && lists.includes(l.id));
+  const total = stats ? stats.total.ads + stats.total.trackers : 0;
+  const st = stats?.lists;
+  let status: React.ReactNode = null;
+  if (st?.updating)
+    status = (
+      <span className="inline-flex items-center gap-1.5">
+        <Throbber size={13} /> Updating…
+      </span>
+    );
+  // The app's own words for what went wrong (a list that did not answer, say) come after a sentence of ours.
+  else if (st?.error) status = <span className="text-err">{`The lists could not be updated: ${st.error}`}</span>;
+  else if (st) status = st.updatedAt ? <span className="tnum">{`Updated ${relative(st.updatedAt)} · ${st.rules.toLocaleString(LOCALE)} rules`}</span> : 'Not updated yet';
+  return (
+    <>
+      {counts && (
+        <>
+          <Row
+            label="Filter lists"
+            hint="EasyList, EasyPrivacy, uBlock Origin’s lists and Peter Lowe’s list, kept up to date"
+            disabled={off}
+            control={
+              <Button size="sm" variant="secondary" disabled={off || updating} onClick={() => void updateAdblockLists()}>
+                Update now
+              </Button>
+            }
+          >
+            {status && <div className="text-[12.5px] text-fg-3">{status}</div>}
+          </Row>
+          <Row label="Lists for sites in other languages" disabled={off}>
+            <div className="space-y-2">
+              <Chips
+                items={chosen.map((l) => ({ id: l.id, text: langLabel(l.langs![0]) }))}
+                label={(t) => `Stop using the list for ${t}`}
+                onRemove={(id) => toggle(id, false)}
+              />
+              {off ? null : <AddAdList taken={lists} onAdd={(id) => toggle(id, true)} />}
+            </div>
+          </Row>
+          <Row
+            label="Stricter blocking"
+            hint="Adds AdGuard’s ad list: catches more ads, but a few sites may need ads allowed"
+            disabled={off}
+            control={<Switch on={lists.includes('adguard-ads')} label="Stricter blocking" disabled={off} onChange={(v) => toggle('adguard-ads', v)} />}
+          />
+          <Row
+            label="Hide annoyances"
+            hint="Pop-ups, newsletter boxes, chat and social widgets and ‘open in app’ banners (uBlock Origin’s annoyances list). Some sites may not work as they should"
+            disabled={off}
+            control={<Switch on={lists.includes('ublock-annoyances')} label="Hide annoyances" disabled={off} onChange={(v) => toggle('ublock-annoyances', v)} />}
+          />
+        </>
+      )}
+      {prefs.allowAds.length > 0 && (
+        <Row label="Sites where ads are allowed" hint="Allow ads on a site from the shield in the address bar">
+          <Chips items={prefs.allowAds.map((h) => ({ id: h, text: h }))} label={(t) => `Block ads on ${t} again`} onRemove={(h) => void savePrefs({ allowAds: prefs.allowAds.filter((x) => x !== h) })} />
+        </Row>
+      )}
+      {counts && (
+        <Row
+          label="Statistics"
+          hint={stats && total > 0 ? `${total.toLocaleString(LOCALE)} blocked since ${sinceLabel(stats.since)}` : 'Nothing blocked yet'}
+          control={
+            <Button size="sm" variant="secondary" icon={<BarChart3 size={14} />} onClick={openAdBlockStats}>
+              Show
+            </Button>
+          }
+        />
+      )}
+    </>
+  );
+}
+
+export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation, focusAds }: { onClose: () => void; focusClear?: boolean; focusTranslation?: number; focusAds?: number }) {
   const prefs = usePrefs((s) => s.prefs);
   const tab = activeTab(useBrowser((s) => s.views[KEY]));
   const [home, setHome] = useState('');
@@ -101,6 +233,7 @@ export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: 
   const [busy, setBusy] = useState(false);
   const clear = useRef<HTMLDivElement>(null);
   const translation = useRef<HTMLDivElement>(null);
+  const ads = useRef<HTMLDivElement>(null);
   useEffect(() => void loadPrefs(), []);
   // The fields start from what is kept (once it arrives).
   const loaded = !!prefs;
@@ -119,6 +252,11 @@ export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: 
   useEffect(() => {
     if (focusTranslation) translation.current?.scrollIntoView({ block: 'start' });
   }, [focusTranslation, loaded]);
+
+  // The shield's "Settings" opens this scrolled to the Ads group (each press, whether the panel was open or not).
+  useEffect(() => {
+    if (focusAds) ads.current?.scrollIntoView({ block: 'start' });
+  }, [focusAds, loaded]);
 
   const saveHome = async (v: string) => {
     const t = v.trim();
@@ -197,15 +335,18 @@ export function BrowserSettingsPanel({ onClose, focusClear, focusTranslation }: 
               <Row label="Search suggestions" hint="What you type in the address bar goes to your search engine, as in any browser" control={<Switch on={prefs.suggest} label="Search suggestions" onChange={(v) => void savePrefs({ suggest: v })} />} />
               <ShortcutsRow shortcuts={prefs.shortcuts} />
             </Group>
-            <Group title="Ads">
-              <Row label="Block ads and trackers" hint="Extensions that block ads may not run while this is on" control={<Switch on={prefs.adblock} label="Block ads and trackers" onChange={(v) => void savePrefs({ adblock: v })} />} />
-              <Row
-                label="Hide cookie banners"
-                hint="Hides the cookie notices many sites show, using EasyList’s list of them. A site that waits for your answer may hold some of its content back: allow ads on it from its padlock to see its notice again."
-                disabled={!prefs.adblock}
-                control={<Switch on={prefs.cookieBanners} label="Hide cookie banners" disabled={!prefs.adblock} onChange={(v) => void savePrefs({ cookieBanners: v })} />}
-              />
-            </Group>
+            <div ref={ads}>
+              <Group title="Ads">
+                <Row label="Block ads and trackers" hint="Extensions that block ads may not run while this is on" control={<Switch on={prefs.adblock} label="Block ads and trackers" onChange={(v) => void savePrefs({ adblock: v })} />} />
+                <Row
+                  label="Hide cookie banners"
+                  hint="Hides the cookie notices many sites show, using EasyList’s list of them. A site that waits for your answer may hold some of its content back: allow ads on it from the shield in the address bar to see its notice again."
+                  disabled={!prefs.adblock}
+                  control={<Switch on={prefs.cookieBanners} label="Hide cookie banners" disabled={!prefs.adblock} onChange={(v) => void savePrefs({ cookieBanners: v })} />}
+                />
+                <AdListsRows />
+              </Group>
+            </div>
             <div ref={translation}>
               <TranslationGroup />
             </div>

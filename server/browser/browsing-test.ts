@@ -18,6 +18,7 @@ import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { addHighlight } from './highlights.ts';
 import { addressOf, addressSent, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, groupWithAi, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
+import { adListsToUse } from '../../shared/browser.ts';
 import { pickChrome } from './chrome.ts';
 import { checkProposal, TabGroups } from './groups.ts';
 import { addDownload, downloadCount } from './downloads.ts';
@@ -52,7 +53,7 @@ const check = async (name: string, fn: () => Promise<void> | void) => {
 };
 const refused = (status: number, re: RegExp) => (e: unknown) => e instanceof HttpError && e.status === status && re.test(e.message);
 /** The settings that came with private tabs and the new browser settings, as they are before you change any (the app in English). */
-const NEWER = { shortcuts: SEARCH_SHORTCUTS, zoom: 1, spellcheck: true, cookieBanners: true, translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, importOffered: false, reader: READER_DEFAULTS };
+const NEWER = { shortcuts: SEARCH_SHORTCUTS, zoom: 1, spellcheck: true, cookieBanners: true, adLists: [], translateTo: 'en', translateOffer: true, translateAlways: [], translateNever: [], translateNeverSites: [], darkPages: false, darkExcept: [], autoplay: false, importOffered: false, reader: READER_DEFAULTS };
 
 async function main() {
   // ---- the address bar ----
@@ -112,6 +113,21 @@ async function main() {
     assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: ['a.com', 'b.com'], ...NEWER });
     store.set('browser.browsing.prefs', 'junk');
     assert.equal(browsingPrefs(db).engine, 'google');
+  });
+  await check('ad lists: the app’s language’s list on at first, the ones you pick kept once each, and a bad one keeps nothing', () => {
+    const { db, store } = mem();
+    assert.deepEqual(browsingPrefs(db).adLists, [], 'English has no language list of its own');
+    store.set('ui.language', 'de');
+    assert.deepEqual(browsingPrefs(db).adLists, ['lang-de'], 'German starts with its list');
+    assert.deepEqual(setBrowsingPrefs(db, { adLists: ['adguard-ads', 'lang-fr', 'adguard-ads'] }).adLists, ['adguard-ads', 'lang-fr']);
+    assert.deepEqual(browsingPrefs(db).adLists, ['adguard-ads', 'lang-fr'], 'kept');
+    assert.throws(() => setBrowsingPrefs(db, { adLists: ['easylist'] }), refused(400, /ad blocker/), 'a core list is not optional');
+    assert.throws(() => setBrowsingPrefs(db, { adLists: 'lang-fr' }), refused(400, /ad blocker/), 'a text is not a list');
+    assert.throws(() => setBrowsingPrefs(db, { adLists: ['lang-fr', 'nope'] }), refused(400, /ad blocker/));
+    assert.deepEqual(browsingPrefs(db).adLists, ['adguard-ads', 'lang-fr'], 'the failed changes kept nothing');
+    const lists = adListsToUse({ cookieBanners: true, adLists: ['lang-fr'] }).map((l) => l.id);
+    for (const core of ['easylist', 'easylist-cookies', 'lang-fr']) assert.ok(lists.includes(core), core);
+    assert.ok(!adListsToUse({ cookieBanners: false, adLists: ['lang-fr'] }).some((l) => l.id === 'easylist-cookies'), 'no cookie notices without Hide cookie banners');
   });
   await check('prefs: the new settings are on or off, in the app’s language, and empty lists, until you change them', () => {
     const { db, store } = mem();

@@ -20,9 +20,17 @@
 //   - the right-click menu drawn by the window's page in the app's own look: its items, the point and a picture of the tab
 //     reach the page that draws menus, what it picks is done once (a stale or a stranger's pick is refused), and without
 //     such a page the system's own menu shows; no Highlight for words in a frame, and a highlight inside a shadow root is found;
-//   - the ad blocker: a request to a test ad host (a tiny list of its own, no network) fails while it is on, goes through when
-//     it is off or the site is one you allowed ads on, the count of what a page had blocked reaches the window's page, and
-//     the saved engine is kept a week, made again when older, and kept when the lists cannot be fetched.
+//   - the ad blocker (a small engine of its own and stand-in networks for the lists: nothing is fetched): a request to a test ad
+//     host fails while it is on, goes through when it is off or the site is one you allowed ads on, and the count of what a page
+//     had blocked reaches the window's page; a scriptlet runs before the page's own scripts in the main frame and in a cross-site
+//     iframe under a nonce policy with Trusted Types, and the bait element is hidden by then; a procedural filter (:has-text) and
+//     a generic rule hide what they match, also an element added later; a $redirect rule answers a script, an image and a fetch
+//     with the stand-in under a strict CSP; the lists are fetched from the mirror that answers, with includes in place, a copy of
+//     each (fresh ones are not fetched again, an `! Expires: 8 hours` list is after 8 hours, one the server says is unchanged
+//     keeps the engine), the engine saved and used again with no download, and everything keeps working offline; the lists the
+//     server sends are the ones used; the engine's build (preprocessor lines, each list on its own, trusted scriptlets, trackers
+//     by the privacy lists) and that it does not stall the app; the statistics (by kind, day, host and site, saved, after a
+//     restart, nothing of private tabs but the totals, forgetting sites, reset) and the four calls that give them to the page.
 //   - private tabs (a `hydorPrivate` context: your own real pages in a partition kept in memory, cookies apart from the normal
 //     tabs', gone with the context; the menu's private items), pages shown dark (and kept dark across sites, except the ones
 //     excepted), the sound policy of new tabs, a picture and a PDF of a page saved in Downloads, deleting one site's data, the
@@ -37,11 +45,44 @@ const os = require('node:os');
 const path = require('node:path');
 const { createBrowser } = require('../browser.cjs');
 const { createReveal } = require('../reveal.cjs');
-const { createAdblock } = require('../adblock.cjs');
+const { createAdblock, registerScheme } = require('../adblock.cjs');
+const { createStats } = require('../adblock-stats.cjs');
+const { createListStore, expiresOf } = require('../adblock-lists.cjs');
+const { buildEngine, ENV, CONFIG } = require('../adblock-build.cjs');
+// The stand-ins' scheme is registered before the app is ready, as main.cjs's browser does by making its blocker at the top.
+registerScheme();
 
 // The ad blocker's package is the server's (the repository's node_modules).
 const ADBLOCK = path.resolve(__dirname, '../../node_modules/@ghostery/adblocker-electron');
 const AD_HOST = 'ads.hydor-test.example';
+// A host of another site than the pages': through the proxy, so it works wherever the check runs (a loopback name such as 127.0.0.2 does not everywhere).
+const CROSS = 'cross.hydor-test.example';
+const REDIR_HOST = 'redir.hydor-test.example';
+// What the test engine knows besides the ad host: a scriptlet that marks the page, stand-ins for what `$redirect` rules answer with,
+// and cosmetic filters (specific, generic and procedural). Pages of the app's own origin are on 127.0.0.1; these are for `localhost`.
+const TEST_RULES = `||${AD_HOST}^
+||${REDIR_HOST}^*/ads.js$script,redirect=hydor-ads.js
+||${REDIR_HOST}^*/pixel.gif$image,redirect=1x1.gif
+||${REDIR_HOST}^*/noop.txt$xhr,redirect=noop.txt
+localhost,${CROSS}##+js(hydor-mark)
+localhost,${CROSS}##.hydor-bait
+localhost##div:has-text(Sponsored)
+localhost##.hydor-gen
+`;
+const TEST_RESOURCES = {
+  scriptlets: [{ name: 'hydor-mark.js', aliases: [], body: "function hydorMark() { window.__marked = 'ran'; }", dependencies: [] }],
+  redirects: [
+    { name: 'hydor-ads.js', aliases: [], body: 'window.__surrogate = "surrogate-ran";', contentType: 'application/javascript' },
+    { name: '1x1.gif', aliases: [], body: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', contentType: 'image/gif;base64' },
+    { name: 'noop.txt', aliases: [], body: 'noop', contentType: 'text/plain' },
+  ],
+};
+/** An engine made from rule text, with the blocker's own settings and the stand-in resources (no network). */
+const testEngine = (text = TEST_RULES) => {
+  const e = require(ADBLOCK).ElectronBlocker.parse(text, CONFIG);
+  e.updateResources(JSON.stringify(TEST_RESOURCES), 'test');
+  return e;
+};
 
 app.commandLine.appendSwitch('disable-gpu');
 app.disableHardwareAcceleration();
@@ -93,6 +134,14 @@ document.onmousemove=()=>{};
   '/sound': '<!doctype html><title>sound</title><body><video id="v" src="/clip.webm" preload="auto"></video>',
   '/video': '<!doctype html><title>video</title><body style="margin:0"><video id="v" src="/clip.webm" width="320" height="180" muted style="display:block"></video><a id="lnk" href="/words" style="position:fixed;left:0;bottom:0;width:120px;height:30px;background:#ccc">link</a>',
   '/marked-shadow': '<!doctype html><title>marked shadow</title><body style="margin:0"><div id="host"></div><script>host.attachShadow({ mode: "open" }).innerHTML = \'<p style="margin:0;padding:10px">plain <mark class="hydor-hl" data-hydor-hl="33333333-3333-3333-3333-333333333333" style="font-size:30px">marked words</mark></p>\'</script>',
+  // The ad blocker's frames. Each page's own script (nonce) first looks whether the blocker's scriptlet has run and whether its bait element is
+  // hidden: all that comes before the page's own scripts. The CSP is strict (nonces, 'strict-dynamic', Trusted Types), which a scriptlet must not mind.
+  '/early': `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src 'nonce-abc' 'strict-dynamic'; require-trusted-types-for 'script'"><title>early</title><script nonce="abc">window.__early = window.__marked === 'ran' ? 'scriptlet-first' : 'page-first';</script></head><body><div class="hydor-bait" id="bait">bait</div><script nonce="abc">window.__bait = getComputedStyle(document.getElementById('bait')).display; window.__frameMsg = null; addEventListener('message', (e) => { window.__frameMsg = e.data; });</script><iframe src="http://${CROSS}:__PORT__/early-frame"></iframe></body></html>`,
+  '/early-frame': `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src 'nonce-xyz'"><script nonce="xyz">window.__early = window.__marked === 'ran' ? 'scriptlet-first' : 'page-first';</script></head><body><div class="hydor-bait" id="bait">bait</div><script nonce="xyz">parent.postMessage({ early: window.__early, bait: getComputedStyle(document.getElementById('bait')).display }, '*');</script></body></html>`,
+  // Procedural and generic filters: the first by what the text says, the second by a class that is added later.
+  '/proc': '<!doctype html><title>proc</title><body style="margin:0"><div id="p1">Sponsored link</div><div id="p2">Normal text</div><script>setTimeout(() => { const d = document.createElement("div"); d.className = "hydor-gen"; d.id = "late"; d.textContent = "late ad"; document.body.append(d); }, 300)</script>',
+  // $redirect rules: a script, an image and a fetch, each answered with a stand-in under a strict CSP that does not list the stand-ins' scheme.
+  '/redir': `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src 'nonce-r1' http://${REDIR_HOST}:__PORT__; img-src 'self' http://${REDIR_HOST}:__PORT__; connect-src 'self' http://${REDIR_HOST}:__PORT__"><title>redir</title><script nonce="r1" src="http://${REDIR_HOST}:__PORT__/ads.js"></script></head><body><img id="i" src="http://${REDIR_HOST}:__PORT__/pixel.gif"><script nonce="r1">window.__r = { script: String(window.__surrogate), img: -1, fetch: 'waiting' }; addEventListener('load', () => { window.__r.img = document.getElementById('i').naturalWidth; fetch('http://${REDIR_HOST}:__PORT__/noop.txt').then((r) => r.text()).then((t) => { window.__r.fetch = 'ok:' + t; }, (e) => { window.__r.fetch = 'err ' + e; }); });</script></body></html>`,
   // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
   '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
 };
@@ -113,7 +162,7 @@ const site = http.createServer((req, res) => {
   const body = pages[req.url.split('?')[0]];
   if (!body) return void (res.writeHead(404), res.end('nf'));
   res.writeHead(200, { 'content-type': 'text/html' });
-  res.end(body);
+  res.end(body.replace(/__PORT__/g, String(sitePort)));
 });
 let sitePort = 0;
 // Absolute-URL requests (as a browser sends to a proxy) go on to the site.
@@ -165,7 +214,7 @@ app.whenReady().then(async () => {
     fromOwnPage: (e) => (e.senderFrame && e.senderFrame.url ? new URL(e.senderFrame.url).origin === appOrigin : false),
     ext: null,
     // A tiny list of its own: nothing is fetched.
-    adblock: { dir: path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`), modulePath: () => ADBLOCK, engine: require(ADBLOCK).ElectronBlocker.parse(`||${AD_HOST}^\n`) },
+    adblock: { dir: path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`), modulePath: () => ADBLOCK, engine: testEngine() },
   });
   browser.registerIpc();
   // Reveal as main.cjs wires it (its fromThisMachine: the app's origin, and not a /m/ page), with a stand-in for the system's file manager.
@@ -1019,57 +1068,499 @@ app.whenReady().then(async () => {
       assert.ok(!ab.allows('bad host!'));
     });
 
-    await check('the ad blocker’s lists: saved once, made again when a week old, and the old ones kept when they cannot be fetched', async () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-'));
-      const realFetch = globalThis.fetch;
-      let calls = 0;
-      let offline = false;
-      globalThis.fetch = async (url) => {
-        calls++;
-        if (offline) throw new Error('no network');
-        // The lists are text, and uBlock's resources a JSON file.
-        return new Response(/\.json$/.test(String(url)) ? '[]' : `||${AD_HOST}^\n`);
+    // ---- the ad blocker's frames: scriptlets, cosmetic and procedural filters, stand-ins for $redirect ----
+    const localOrigin = `http://localhost:${sitePort}`;
+    const prefsOn = (more) => browser.message({ type: 'browser-prefs', adblock: true, allowAds: [], cookieBanners: true, ...more });
+
+    await check('a scriptlet runs before the page’s own scripts in the main frame and in a cross-site iframe, under a nonce policy with Trusted Types; the bait element is hidden by then', async () => {
+      prefsOn();
+      assert.equal(ownT().wc.getLastWebPreferences().nodeIntegrationInSubFrames, true, 'your own tabs run the preload in every frame');
+      await goTo(own, `${localOrigin}/early`);
+      assert.equal(await evalIn(own.sid, 'window.__early'), 'scriptlet-first');
+      assert.equal(await evalIn(own.sid, 'window.__bait'), 'none', 'the bait is shown when the page looks');
+      const msg = await until(() => evalIn(own.sid, 'window.__frameMsg'), 5000, 'the iframe’s message');
+      assert.deepEqual(msg, { early: 'scriptlet-first', bait: 'none' });
+      // A site you allowed ads on gets neither (the top page's site decides, for its frames too).
+      prefsOn({ allowAds: ['localhost'] });
+      await goTo(own, `${localOrigin}/early`);
+      assert.equal(await evalIn(own.sid, 'window.__early'), 'page-first');
+      assert.equal(await evalIn(own.sid, 'window.__bait'), 'block');
+      assert.deepEqual(await until(() => evalIn(own.sid, 'window.__frameMsg'), 5000, 'the iframe’s message'), { early: 'page-first', bait: 'block' });
+      prefsOn();
+    });
+
+    await check('a procedural filter (:has-text) hides what matches, and a generic rule by class hides an element the page adds later', async () => {
+      await goTo(own, `${localOrigin}/proc`);
+      const shown = (id) => evalIn(own.sid, `getComputedStyle(document.getElementById(${JSON.stringify(id)})).display`);
+      await until(async () => (await shown('p1')) === 'none', 3000, 'the procedural filter');
+      assert.equal(await shown('p2'), 'block', 'what does not match stays');
+      await until(async () => (await evalIn(own.sid, 'document.getElementById("late")')) !== null && (await shown('late')) === 'none', 4000, 'the late element to be hidden');
+    });
+
+    await check('a $redirect rule answers with the stand-in (a script, an image and a fetch), under a strict CSP that does not list its scheme; the blocked count and the stats count it', async () => {
+      const before = browser.adStats.summary().total.ads + browser.adStats.summary().total.trackers;
+      await goTo(own, `${appOrigin}/redir`);
+      const r = await until(async () => {
+        const v = await evalIn(own.sid, 'window.__r');
+        return v && v.fetch !== 'waiting' && v;
+      }, 5000, 'the page’s requests to end');
+      assert.deepEqual(r, { script: 'surrogate-ran', img: 1, fetch: 'ok:noop' });
+      assert.ok(browser.adStats.summary().total.ads + browser.adStats.summary().total.trackers >= before + 3, 'the three redirects were counted');
+      // A page that guesses a stand-in's address (to learn that the blocker is there) gets nothing: they sit behind a secret.
+      const guessed = await evalIn(own.sid, `fetch('hydor-adblock://r/noop.js').then((x) => x.status, () => 'refused')`);
+      assert.notEqual(guessed, 200, 'a guessed address answered');
+    });
+
+    // ---- what it counts ----
+    await check('statistics: counted by kind, per day, host and site; saved, and back after a restart; private tabs only in totals and days; forgetSites and reset', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-stats-'));
+      const file = path.join(dir, 'stats.json');
+      let t = new Date(2026, 10, 22, 12, 0, 0).getTime();
+      const make = () => createStats({ file, now: () => t, timers: false });
+      try {
+        const s = make();
+        s.record({ kind: 'ad', host: 'ads.example', site: 'news.example', type: 'script', private: false });
+        s.record({ kind: 'ad', host: 'ads.example', site: 'news.example', type: 'image', private: false });
+        s.record({ kind: 'tracker', host: 'trk.example', site: 'blog.example', type: 'xhr', private: false });
+        // A private tab: the totals and the day, no host and no site.
+        s.record({ kind: 'tracker', host: 'secret-host.example', site: 'secret.example', type: 'ping', private: true });
+        let sum = s.summary({ updatedAt: 5, rules: 7, ids: ['a'], updating: false });
+        assert.deepEqual(sum.total, { ads: 2, trackers: 2 });
+        assert.equal(sum.bytes, 25_000 + 12_000 + 3_000 + 500, 'bytes by what was blocked: a script, an image, a fetch and a ping');
+        assert.equal(sum.since, t);
+        assert.deepEqual(sum.lists, { updatedAt: 5, rules: 7, ids: ['a'], updating: false });
+        assert.equal(sum.days.length, 30);
+        assert.deepEqual(sum.days.at(-1), { day: '2026-11-22', ads: 2, trackers: 2 });
+        assert.deepEqual(sum.days[0], { day: '2026-10-24', ads: 0, trackers: 0 }, 'every day is there, the oldest first');
+        assert.deepEqual(sum.hosts, [{ host: 'ads.example', count: 2, kind: 'ad' }, { host: 'trk.example', count: 1, kind: 'tracker' }]);
+        assert.deepEqual(sum.sites, [{ site: 'news.example', count: 2 }, { site: 'blog.example', count: 1 }]);
+        assert.ok(!JSON.stringify(sum).includes('secret'), 'a private tab leaves nothing of where it went');
+        assert.equal(s.siteTotal('news.example'), 2);
+        assert.equal(s.siteTotal('secret.example'), 0);
+        s.flush();
+        assert.ok(!JSON.stringify(JSON.parse(fs.readFileSync(file, 'utf8'))).includes('secret'), 'nor does the file');
+        // A restart: the same numbers; a day later a new day starts, and the old one is still in the list.
+        t += 24 * 3600 * 1000;
+        const again = make();
+        again.record({ kind: 'ad', host: 'ads.example', site: 'news.example', type: 'other', private: false });
+        sum = again.summary();
+        assert.deepEqual(sum.total, { ads: 3, trackers: 2 });
+        assert.deepEqual(sum.days.slice(-2), [{ day: '2026-11-22', ads: 2, trackers: 2 }, { day: '2026-11-23', ads: 1, trackers: 0 }]);
+        // Forgetting the history takes the sites and keeps the counts and hosts.
+        again.forgetSites();
+        sum = again.summary();
+        assert.deepEqual(sum.sites, []);
+        assert.equal(sum.total.ads, 3);
+        assert.equal(sum.hosts[0].count, 3);
+        // Reset starts from nothing, counting from now.
+        again.reset();
+        sum = again.summary();
+        assert.deepEqual(sum.total, { ads: 0, trackers: 0 });
+        assert.equal(sum.bytes, 0);
+        assert.equal(sum.since, t);
+        assert.deepEqual(sum.hosts, []);
+        assert.ok(sum.days.every((d) => d.ads === 0 && d.trackers === 0));
+        again.flush();
+        assert.deepEqual(make().summary().total, { ads: 0, trackers: 0 }, 'the reset is saved');
+        // The tables are cut to the biggest 500 once they pass 1,000.
+        const many = make();
+        for (let i = 0; i < 1100; i++) many.record({ kind: 'ad', host: `h${i}.example`, site: `s${i}.example`, type: 'other', private: false });
+        for (let i = 0; i < 5; i++) many.record({ kind: 'ad', host: 'h3.example', site: 's3.example', type: 'other', private: false });
+        const kept = JSON.parse((many.flush(), fs.readFileSync(file, 'utf8')));
+        assert.ok(Object.keys(kept.hosts).length <= 1000 && Object.keys(kept.sites).length <= 1000);
+        assert.ok(Object.keys(kept.hosts).length < 1100, 'cut');
+        assert.equal(many.summary().hosts[0].host, 'h3.example', 'the biggest are kept');
+        // Days older than 400 are dropped when it is written.
+        const old = make();
+        t = new Date(2026, 10, 22).getTime();
+        old.record({ kind: 'ad', host: 'a.example', site: 'a.example', type: 'other', private: false });
+        t = new Date(2028, 0, 1).getTime();
+        old.record({ kind: 'ad', host: 'a.example', site: 'a.example', type: 'other', private: false });
+        old.flush();
+        const days = Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')).days);
+        assert.ok(!days.includes('2026-11-22') && days.includes('2028-01-01'), days.join());
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    await check('the tab’s page numbers: ads, trackers and hosts since its last main-frame navigation; the statistics; private tabs leave no host or site; clearing history forgets sites; reset', async () => {
+      prefsOn();
+      browser.adStats.reset();
+      await goTo(own, `${appOrigin}/own`);
+      await goTo(own, `${appOrigin}/ads`);
+      await until(async () => (await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(own.targetId)})`)).ads === 1, 3000, 'the page’s ad');
+      const pg = await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(own.targetId)})`);
+      assert.deepEqual({ ...pg, since: 0 }, { ads: 1, trackers: 0, hosts: [{ host: AD_HOST, count: 1, kind: 'ad' }], site: '127.0.0.1', siteTotal: 1, since: 0 });
+      assert.ok(pg.since > 0 && pg.since <= Date.now(), 'since: when it started counting');
+      let st = await page('hydorDesktop.browser.adblockStats()');
+      assert.deepEqual(st.total, { ads: 1, trackers: 0 });
+      assert.equal(st.days.length, 30);
+      assert.deepEqual(st.hosts, [{ host: AD_HOST, count: 1, kind: 'ad' }]);
+      assert.deepEqual(st.sites, [{ site: '127.0.0.1', count: 1 }]);
+      assert.equal(st.lists.ids.length >= 0 && typeof st.lists.updating, 'boolean');
+      // A new page starts again from nothing.
+      await goTo(own, `${appOrigin}/own`);
+      assert.deepEqual((await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(own.targetId)})`)).hosts, []);
+      // A private tab: in the totals, but its host and site are not kept, and its page has no site total.
+      const { browserContextId } = await cdp('Target.createBrowserContext', { hydorPrivate: true });
+      const priv = await openTab(`${appOrigin}/ads`, { browserContextId });
+      await until(async () => (await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(priv.targetId)})`)).ads === 1, 3000, 'the private page’s ad');
+      const pp = await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(priv.targetId)})`);
+      assert.deepEqual(pp, { ads: 1, trackers: 0, hosts: [{ host: AD_HOST, count: 1, kind: 'ad' }], site: '127.0.0.1', siteTotal: 0, since: 0 });
+      st = await page('hydorDesktop.browser.adblockStats()');
+      assert.deepEqual(st.total, { ads: 2, trackers: 0 });
+      assert.deepEqual(st.hosts, [{ host: AD_HOST, count: 1, kind: 'ad' }], 'no host of a private tab');
+      assert.deepEqual(st.sites, [{ site: '127.0.0.1', count: 1 }], 'no site of a private tab');
+      await cdp('Target.disposeBrowserContext', { browserContextId });
+      // The file has the counts as they are, once written.
+      browser.adStats.flush();
+      assert.equal(JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`, 'stats.json'), 'utf8')).ads, 2);
+      // Clearing the browsing history forgets the sites (and only the sites); clearing cookies alone does not.
+      browser.message({ type: 'browser-clear', profile: 'browsing', cookies: true, cache: false, history: false });
+      await sleep(300);
+      assert.equal((await page('hydorDesktop.browser.adblockStats()')).sites.length, 1);
+      browser.message({ type: 'browser-clear', profile: 'browsing', cookies: false, cache: false, history: true });
+      await until(async () => (await page('hydorDesktop.browser.adblockStats()')).sites.length === 0, 3000, 'the sites to go');
+      assert.equal((await page('hydorDesktop.browser.adblockStats()')).total.ads, 2);
+      // Reset.
+      assert.equal(await page('hydorDesktop.browser.adblockReset()'), true);
+      st = await page('hydorDesktop.browser.adblockStats()');
+      assert.deepEqual([st.total, st.hosts, st.sites], [{ ads: 0, trackers: 0 }, [], []]);
+      // Update with a ready engine of its own (a check's): there is nothing to fetch, and it is done.
+      assert.equal(await page('hydorDesktop.browser.adblockUpdate()'), true);
+    });
+
+    await check('the four ad blocker calls answer the app’s own page only', async () => {
+      const other = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, preload: process.env.HYDOR_PRELOAD } });
+      try {
+        await other.loadURL(`http://localhost:${sitePort}/app`);
+        assert.equal(await other.webContents.executeJavaScript('typeof hydorDesktop.browser.adblockStats'), 'function');
+        assert.equal(await other.webContents.executeJavaScript('hydorDesktop.browser.adblockStats()'), null);
+        assert.equal(await other.webContents.executeJavaScript(`hydorDesktop.browser.adblockPage(${JSON.stringify(own.targetId)})`), null);
+        assert.equal(await other.webContents.executeJavaScript('hydorDesktop.browser.adblockReset()'), false);
+        assert.equal(await other.webContents.executeJavaScript('hydorDesktop.browser.adblockUpdate()'), false);
+      } finally {
+        other.destroy();
+      }
+      // Not one of your tabs: an agent's tab, or nothing.
+      assert.equal(await page(`hydorDesktop.browser.adblockPage(${JSON.stringify(agent.targetId)})`), null);
+      assert.equal(await page(`hydorDesktop.browser.adblockPage('NOSUCHTARGET')`), null);
+    });
+
+    // ---- the ad blocker's lists: per-list copies, mirrors, includes, expiry, the saved engine, offline ----
+    const LISTS = 'https://lists.hydor-test.example';
+    const { RESOURCES_URL } = require('../adblock-lists.cjs');
+    /** A stand-in network for the lists: what each address answers (with an ETag, and a 304 for it), what was asked, and whether it is down. */
+    const fakeNet = (files) => {
+      const net = { files: { [RESOURCES_URL]: JSON.stringify(TEST_RESOURCES), ...files }, asked: [], down: false };
+      const etag = (text) => `"${require('node:crypto').createHash('md5').update(text).digest('hex')}"`;
+      net.fetch = async (url, init = {}) => {
+        net.asked.push(String(url));
+        if (net.down) throw new Error('no network');
+        const f = net.files[String(url)] ?? (/\.txt$/.test(String(url)) && !/c-bad/.test(String(url)) ? '||fallback.hydor-test.example^\n' : undefined);
+        if (f === undefined) return new Response('not found', { status: 404 });
+        if (init.headers && init.headers['if-none-match'] === etag(f)) return new Response(null, { status: 304 });
+        return new Response(f, { headers: { etag: etag(f) } });
       };
-      // The engine without the cookie notices list (its own file), as the one that was there before it.
-      const make = () => {
-        const ab = createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
-        ab.setPrefs({ cookieBanners: false });
+      return net;
+    };
+    const FILES = () => ({
+      [`${LISTS}/a.txt`]: '! Expires: 8 hours (update frequency)\n||a.hydor-test.example^\n',
+      [`${LISTS}/b/list.txt`]: '!#include part.txt\n||b.hydor-test.example^\n',
+      [`${LISTS}/b/part.txt`]: '||part.hydor-test.example^\n',
+      [`${LISTS}/c-good.txt`]: '||c.hydor-test.example^\n',
+    });
+    const SET = [
+      { id: 'a', urls: [`${LISTS}/a.txt`] },
+      { id: 'b', urls: [`${LISTS}/b/list.txt`] },
+      { id: 'c', urls: [`${LISTS}/c-bad.txt`, `${LISTS}/c-good.txt`] },
+    ];
+    const HOUR = 3600 * 1000;
+    const quiet = (...a) => (process.env.HYDOR_CHECK_VERBOSE ? console.log('  [adblock]', ...a) : undefined);
+
+    await check('the lists’ expiry: a list’s own `! Expires:` line, kept between 6 hours and 7 days, 4 days when it says nothing', async () => {
+      assert.equal(expiresOf('! Title: x\n! Expires: 8 hours (update frequency)\n||a^'), 8 * HOUR);
+      assert.equal(expiresOf('! Expires: 4 days\n'), 4 * 24 * HOUR);
+      assert.equal(expiresOf('! Expires: 1 hour\n'), 6 * HOUR);
+      assert.equal(expiresOf('! Expires: 30 days\n'), 7 * 24 * HOUR);
+      assert.equal(expiresOf('! Expires: 12 hr\n'), 12 * HOUR);
+      assert.equal(expiresOf('! Diff-Expires: 317 minutes\n||x.example/a=Expires\n'), 4 * 24 * HOUR);
+      assert.equal(expiresOf('||x^'), 4 * 24 * HOUR);
+    });
+
+    await check('the lists: a mirror that answers, includes in place, a copy of each, the engine saved and used again without a download; fresh lists are not fetched again, an 8-hour list is after 8 hours', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-'));
+      const net = fakeNet(FILES());
+      let t = Date.now();
+      const make = (set = SET) => {
+        const ab = createAdblock({ log: quiet, dir, modulePath: () => ADBLOCK, onBlocked: () => {}, fetch: net.fetch, now: () => t });
+        ab.setPrefs({ adblock: true, adLists: set });
         return ab;
       };
-      const file = path.join(dir, 'engine-ads-and-tracking.bin');
+      const built = () => JSON.parse(fs.readFileSync(path.join(dir, 'engine.json'), 'utf8'));
+      const asked = (from) => net.asked.slice(from);
+      try {
+        // Pre-made files of the earlier versions are removed once the new engine is saved.
+        fs.writeFileSync(path.join(dir, 'engine-ads-and-tracking.bin'), 'old');
+        fs.writeFileSync(path.join(dir, 'engine-ads-tracking-cookies.bin'), 'old');
+        const first = make();
+        assert.equal(await first.ready(), true);
+        assert.ok(asked(0).includes(`${LISTS}/c-bad.txt`) && asked(0).includes(`${LISTS}/c-good.txt`), 'the second mirror is tried when the first does not answer');
+        assert.ok(asked(0).includes(`${LISTS}/b/part.txt`), 'the include is fetched next to its list');
+        const b = fs.readFileSync(path.join(dir, 'lists', 'b.txt'), 'utf8');
+        assert.ok(b.includes('||part.hydor-test.example^') && b.includes('||b.hydor-test.example^') && !b.includes('!#include'), b);
+        assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'lists', 'a.json'), 'utf8')).expires, 8 * HOUR);
+        assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'lists', 'b.json'), 'utf8')).expires, 4 * 24 * HOUR);
+        assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'lists', 'c.json'), 'utf8')).url, `${LISTS}/c-good.txt`);
+        assert.ok(fs.existsSync(path.join(dir, 'engine.bin')) && fs.existsSync(path.join(dir, 'resources.json')) && fs.existsSync(path.join(dir, 'trackers.json')));
+        assert.ok(!fs.existsSync(path.join(dir, 'engine-ads-and-tracking.bin')) && !fs.existsSync(path.join(dir, 'engine-ads-tracking-cookies.bin')), 'the old engines are gone');
+        const st = first.status();
+        assert.deepEqual(st.ids, ['a', 'b', 'c']);
+        assert.equal(st.rules, 4);
+        assert.equal(st.updating, false);
+        assert.ok(st.updatedAt && Math.abs(st.updatedAt - t) < 5000);
+        const builtAt = built().builtAt;
+        first.close();
+        // Everything fresh: the saved engine, nothing asked.
+        let n = net.asked.length;
+        const second = make();
+        assert.equal(await second.ready(), true);
+        assert.equal(net.asked.length, n, 'a fresh engine is used as it is');
+        assert.equal(second.status().rules, 4);
+        second.close();
+        // 7 hours on: the 8-hour list is not due yet either.
+        t += 7 * HOUR;
+        const third = make();
+        assert.equal(await third.ready(), true);
+        assert.equal(net.asked.length, n);
+        third.close();
+        // 9 hours: that list alone is fetched again (the server says nothing changed): the engine is kept, not made again.
+        t += 2 * HOUR;
+        const fourth = make();
+        assert.equal(await fourth.ready(), true);
+        assert.deepEqual(asked(n), [`${LISTS}/a.txt`], 'only the list that expired');
+        assert.equal(built().builtAt, builtAt, 'the same text again leaves the engine alone');
+        assert.ok(Math.abs(JSON.parse(fs.readFileSync(path.join(dir, 'lists', 'a.json'), 'utf8')).fetchedAt - t) < 1000, 'its date is renewed');
+        fourth.close();
+        // Its text changes: fetched again after 8 more hours, and the engine is made again from it.
+        net.files[`${LISTS}/a.txt`] = '! Expires: 8 hours (update frequency)\n||a2.hydor-test.example^\n||a3.hydor-test.example^\n';
+        t += 9 * HOUR;
+        n = net.asked.length;
+        const fifth = make();
+        assert.equal(await fifth.ready(), true);
+        assert.deepEqual(asked(n), [`${LISTS}/a.txt`]);
+        assert.ok(built().builtAt >= builtAt && fifth.status().rules === 5, `${fifth.status().rules} rules`);
+        assert.ok(fs.readFileSync(path.join(dir, 'lists', 'a.txt'), 'utf8').includes('a2.hydor-test.example'));
+        fifth.close();
+        // 5 days on: every list is due again (4 days), and the resources (a week) are not; 3 days later they are.
+        t += 5 * 24 * HOUR;
+        n = net.asked.length;
+        const sixth = make();
+        assert.equal(await sixth.ready(), true);
+        const got = asked(n);
+        for (const u of [`${LISTS}/a.txt`, `${LISTS}/b/list.txt`, `${LISTS}/b/part.txt`, `${LISTS}/c-good.txt`]) assert.ok(got.includes(u), `${u} in ${got.join()}`);
+        assert.ok(!got.includes(RESOURCES_URL), 'the resources are weekly');
+        sixth.close();
+        t += 3 * 24 * HOUR;
+        n = net.asked.length;
+        const seventh = make();
+        assert.equal(await seventh.ready(), true);
+        assert.ok(asked(n).includes(RESOURCES_URL));
+        seventh.close();
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    await check('the lists offline: the copies and the saved engine keep working, update() says it failed, nothing on disk is no blocker (and no throwing), an old engine is better than none', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-off-'));
+      const net = fakeNet(FILES());
+      let t = Date.now();
+      const make = (d = dir, set = SET) => {
+        const ab = createAdblock({ log: quiet, dir: d, modulePath: () => ADBLOCK, onBlocked: () => {}, fetch: net.fetch, now: () => t });
+        ab.setPrefs({ adblock: true, adLists: set });
+        return ab;
+      };
+      const extra = [];
       try {
         const first = make();
         assert.equal(await first.ready(), true);
-        assert.ok(fs.statSync(file).size > 0, 'the engine was not saved');
         first.close();
-        // Fresh: no fetching at all.
-        const n = calls;
-        const second = make();
-        assert.equal(await second.ready(), true);
-        assert.equal(calls, n, 'a fresh file is used as it is');
-        second.close();
-        // A week old and no network: the old file does.
-        const old = new Date(Date.now() - 8 * 24 * 3600 * 1000);
-        fs.utimesSync(file, old, old);
-        offline = true;
-        const third = make();
-        assert.equal(await third.ready(), true);
-        assert.ok(calls > n, 'an old file is fetched again');
-        third.close();
-        // A week old and the network is there: made again, the file is new.
-        offline = false;
-        const fourth = make();
-        assert.equal(await fourth.ready(), true);
-        assert.ok(Date.now() - fs.statSync(file).mtimeMs < 60_000, 'the old file was kept');
-        fourth.close();
-        // Nothing saved and no network: no blocker (and no throwing).
-        fs.rmSync(file);
-        offline = true;
-        const fifth = make();
-        assert.equal(await fifth.ready(), false);
-        fifth.close();
+        // Long past every expiry, no network: the saved engine does (its lists are what they were), and it says why it could not update.
+        t += 30 * 24 * HOUR;
+        net.down = true;
+        let n = net.asked.length;
+        const off = make();
+        assert.equal(await off.ready(), true);
+        assert.ok(net.asked.length > n, 'it tried');
+        assert.equal(off.status().rules, 4);
+        assert.match(off.status().error || '', /could not fetch/);
+        assert.equal(await off.update(), false, 'update() fails without a network');
+        assert.equal(off.status().rules, 4, 'and the blocker goes on');
+        off.close();
+        // A copy of one list is missing: the engine is made from the others (offline).
+        fs.rmSync(path.join(dir, 'lists', 'c.txt'));
+        fs.rmSync(path.join(dir, 'lists', 'c.json'));
+        const partial = make();
+        assert.equal(await partial.ready(), true);
+        assert.deepEqual(partial.status().ids, ['a', 'b']);
+        assert.equal(partial.status().rules, 3);
+        partial.close();
+        // Back online, update() fetches every list (and the resources) now and makes the engine again.
+        net.down = false;
+        n = net.asked.length;
+        const on = make();
+        assert.equal(await on.ready(), true);
+        assert.equal(await on.update(), true);
+        const got = net.asked.slice(n);
+        for (const u of [`${LISTS}/a.txt`, `${LISTS}/b/list.txt`, `${LISTS}/c-good.txt`, RESOURCES_URL]) assert.ok(got.includes(u), `${u} in ${got.join()}`);
+        assert.deepEqual(on.status().ids, ['a', 'b', 'c']);
+        assert.equal(on.status().rules, 4);
+        on.close();
+        // Nothing on disk and no network: no blocker, no exception.
+        const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-none-'));
+        extra.push(empty);
+        net.down = true;
+        const none = make(empty);
+        assert.equal(await none.ready(), false);
+        assert.deepEqual(none.status().ids, []);
+        none.close();
+        // No lists but an old engine (whatever it was made from): that one.
+        const old = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-old-'));
+        extra.push(old);
+        for (const f of ['engine.bin', 'engine.json', 'trackers.json']) fs.copyFileSync(path.join(dir, f), path.join(old, f));
+        const reuse = make(old, [{ id: 'z', urls: [`${LISTS}/z.txt`] }]);
+        assert.equal(await reuse.ready(), true);
+        assert.equal(reuse.status().rules, 4);
+        reuse.close();
       } finally {
-        globalThis.fetch = realFetch;
+        for (const d of [dir, ...extra]) fs.rmSync(d, { recursive: true, force: true });
+      }
+    });
+
+    await check('the lists the server sends are the lists used (a change makes the engine again); without any, the core lists and the cookie notices list; Hide cookie banners adds that one', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-set-'));
+      const net = fakeNet(FILES());
+      const ses = session.fromPartition('hydor-ipc-lists-set');
+      try {
+        const ab = createAdblock({ log: quiet, dir, modulePath: () => ADBLOCK, onBlocked: () => {}, fetch: net.fetch });
+        ab.attach(ses);
+        ab.setPrefs({ adblock: true, cookieBanners: true, adLists: SET });
+        assert.equal(await ab.ready(), true);
+        assert.deepEqual(ab.status().ids, ['a', 'b', 'c']);
+        // The server sends another set (a language list turned on): the engine is made from that.
+        ab.setPrefs({ adLists: [SET[0], { id: 'lang-de', urls: [`${LISTS}/lang-de.txt`] }, { id: 'bad', urls: ['http://not-https.example/x.txt'] }, { id: 'no urls', urls: [] }] });
+        await until(() => ab.status().ids.join() === 'a,lang-de', 8000, 'the new set');
+        assert.ok(!fs.existsSync(path.join(dir, 'lists', 'b.txt')), 'a list no longer in use is let go');
+        assert.equal(ab.isOn(ses), true, 'blocking went on meanwhile');
+        ab.close();
+        // An older server sends no lists: the core ones, with the cookie notices list while Hide cookie banners is on.
+        const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-fb-'));
+        const n = net.asked.length;
+        const old = createAdblock({ log: quiet, dir: dir2, modulePath: () => ADBLOCK, onBlocked: () => {}, fetch: net.fetch });
+        old.attach(ses);
+        old.setPrefs({ adblock: true, cookieBanners: true });
+        assert.equal(await old.ready(), true);
+        const asked = net.asked.slice(n);
+        assert.ok(asked.includes('https://ublockorigin.github.io/uAssetsCDN/filters/filters.min.txt'), 'uBlock’s own lists');
+        assert.ok(asked.includes('https://ublockorigin.github.io/uAssetsCDN/filters/quick-fixes.min.txt'));
+        assert.ok(asked.includes('https://ublockorigin.github.io/uAssetsCDN/thirdparties/easylist-cookies.txt'), 'the cookie notices list');
+        assert.ok(!asked.some((u) => /annoyances/.test(u)), 'not the broader annoyances list');
+        assert.equal(old.hidesCookieNotices(ses), true);
+        old.setPrefs({ cookieBanners: false });
+        await until(() => !old.hidesCookieNotices(ses) && !old.status().ids.includes('easylist-cookies'), 8000, 'the engine without the cookie notices');
+        assert.equal(old.isOn(ses), true);
+        old.close();
+        fs.rmSync(dir2, { recursive: true, force: true });
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    await check('the engine’s build: preprocessor lines by uBlock’s tokens, each list parsed on its own, trusted scriptlets only from uBlock’s lists, trackers from the privacy lists', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-build-'));
+      try {
+        const write = (name, text) => (fs.writeFileSync(path.join(dir, name), text), path.join(dir, name));
+        const lib = require(path.join(ADBLOCK, '..', 'adblocker'));
+        const res = write('resources.json', JSON.stringify({
+          scriptlets: [
+            { name: 'hydor-mark.js', aliases: [], body: "function hydorMark() { window.__marked = 'ran'; }", dependencies: [] },
+            { name: 'trusted-hydor.js', aliases: [], body: "function trustedHydor() { window.__trusted = 'ran'; }", dependencies: [], requiresTrust: true },
+          ],
+          redirects: [],
+        }));
+        const u = write('u.txt', '!#if env_firefox\n||ff.hydor-test.example^\n||both.hydor-test.example^\n!#else\n||chromium.hydor-test.example^\n!#endif\n!#if env_chromium && !env_mobile\n||desktop.hydor-test.example^\n!#endif\nlocalhost##+js(trusted-hydor)\n');
+        const o = write('o.txt', 'localhost##+js(hydor-mark)\nlocalhost##+js(trusted-hydor)\n!#if env_firefox\n||after-open.hydor-test.example^\n');
+        const l = write('l.txt', '||leaked.hydor-test.example^\n||both.hydor-test.example^\n');
+        const p = write('p.txt', '||tracker.hydor-test.example^\n||tracker2.hydor-test.example/path^\n@@||exempt.hydor-test.example^\n');
+        const made = buildEngine(lib, {
+          lists: [
+            { id: 'ublock-x', file: u, trusted: true, privacy: false },
+            { id: 'other', file: o, trusted: false, privacy: false },
+            { id: 'later', file: l, trusted: false, privacy: false },
+            { id: 'easyprivacy', file: p, trusted: false, privacy: true },
+          ],
+          resources: res,
+          env: ENV,
+          config: CONFIG,
+        });
+        const e = require(ADBLOCK).ElectronBlocker.deserialize(made.bytes);
+        const blocks = (host) => e.match(lib.Request.fromRawDetails({ url: `https://${host}.hydor-test.example/x.js`, sourceUrl: 'https://page.test/', type: 'script' })).match;
+        assert.equal(blocks('ff'), false, 'a Firefox-only rule stays out');
+        assert.equal(blocks('chromium'), true, 'the #else branch is Chromium’s');
+        assert.equal(blocks('desktop'), true, 'env_chromium && !env_mobile');
+        assert.equal(blocks('after-open'), false, 'inside an #if that its list never closed (a Firefox one)');
+        assert.equal(blocks('leaked'), true, 'the next list is not caught in that #if');
+        assert.equal(blocks('both'), true, 'a rule that one list has in a Firefox branch and another has plainly applies');
+        const scripts = e.getCosmeticsFilters({ url: 'http://localhost/', hostname: 'localhost', domain: 'localhost', getBaseRules: false, getInjectionRules: true, getExtendedRules: false, getRulesFromHostname: true, getRulesFromDOM: false }).scripts;
+        assert.equal(scripts.filter((s) => s.includes('__trusted')).length, 1, 'trusted-* from uBlock’s list only, not from the other');
+        assert.equal(scripts.filter((s) => s.includes('__marked')).length, 1);
+        assert.deepEqual([...made.trackerHosts].sort(), ['tracker.hydor-test.example'], 'a whole-host rule names a tracker host; a path rule does not');
+        assert.equal(made.trackerIds.length, 2, 'the blocking rules of the privacy lists, not their exceptions');
+        assert.equal(made.rules, 9, `${made.rules} rules`);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    await check('a request is a tracker when a privacy list’s rule (or its host) blocked it, an ad otherwise; the engine is made in a worker, so the app does not stall', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-kinds-'));
+      // A big list besides: ~120,000 rules, a second or so of work that would stall the app if it were done in it.
+      const bigRules = Array.from({ length: 120_000 }, (_, i) => `||b${i}.hydor-big.example^$third-party`).join('\n');
+      const net = fakeNet({
+        [`${LISTS}/easylist.txt`]: `||ad.hydor-test.example^\n${bigRules}\n`,
+        [`${LISTS}/easyprivacy.txt`]: '||trk.hydor-test.example^\n||trk2.hydor-test.example/p/x^\n',
+      });
+      const ses = session.fromPartition('hydor-ipc-kinds');
+      const seen = [];
+      let stall = 0;
+      let last = Date.now();
+      const watch = setInterval(() => {
+        const n = Date.now();
+        stall = Math.max(stall, n - last - 10);
+        last = n;
+      }, 10);
+      const w = new BrowserWindow({ show: false, webPreferences: { session: ses } });
+      try {
+        const ab = createAdblock({ log: quiet, dir, modulePath: () => ADBLOCK, onBlocked: (id, what) => seen.push(what), fetch: net.fetch });
+        ab.attach(ses);
+        ab.setPrefs({ adblock: true, adLists: [{ id: 'easylist', urls: [`${LISTS}/easylist.txt`] }, { id: 'easyprivacy', urls: [`${LISTS}/easyprivacy.txt`] }] });
+        assert.equal(await ab.ready(), true);
+        clearInterval(watch);
+        assert.ok(stall < 400, `the main thread stalled for ${stall} ms while the engine was made`);
+        assert.ok(ab.status().rules > 120_000);
+        await w.loadURL(`${localOrigin}/own`);
+        await w.webContents.executeJavaScript(`Promise.all(['ad.hydor-test.example/x', 'trk.hydor-test.example/x', 'trk2.hydor-test.example/p/x', 'sub.trk.hydor-test.example/x'].map((u) => fetch('http://' + u, { mode: 'no-cors' }).catch(() => 0)))`);
+        const by = (host) => seen.find((s) => s.host === host);
+        assert.deepEqual(by('ad.hydor-test.example') && [by('ad.hydor-test.example').kind, by('ad.hydor-test.example').type], ['ad', 'xhr']);
+        assert.equal(by('trk.hydor-test.example').kind, 'tracker');
+        assert.equal(by('trk2.hydor-test.example').kind, 'tracker', 'a rule with a path: its own id, kept in the privacy lists’ set');
+        assert.equal(by('sub.trk.hydor-test.example').kind, 'tracker', 'a subdomain of a tracker’s host');
+        ab.close();
+      } finally {
+        clearInterval(watch);
+        w.destroy();
         fs.rmSync(dir, { recursive: true, force: true });
       }
     });
@@ -1538,51 +2029,6 @@ app.whenReady().then(async () => {
         await until(() => !bubble().shown, 2000, 'the bubble to go when the page changes');
       } finally {
         screen.getCursorScreenPoint = real;
-      }
-    });
-
-    await check('the ad blocker with cookie notices: the setting changes the engine on the sessions; its list is saved apart and the plain one is the fallback', async () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-cookies-'));
-      const realFetch = globalThis.fetch;
-      const asked = [];
-      let offline = false;
-      globalThis.fetch = async (url) => {
-        asked.push(String(url));
-        if (offline) throw new Error('no network');
-        return new Response(/\.json$/.test(String(url)) ? '[]' : /cookie/.test(String(url)) ? `||cookie-banner.${AD_HOST}^\n` : `||${AD_HOST}^\n`);
-      };
-      const make = () => createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
-      const ses = session.fromPartition('hydor-ipc-cookie-test');
-      try {
-        const ab = make();
-        ab.attach(ses);
-        ab.setPrefs({ adblock: true });
-        assert.equal(await ab.ready(), true);
-        await until(() => ab.hidesCookieNotices(ses), 5000, 'the cookie notices engine');
-        assert.ok(asked.some((u) => /easylist-cookie\.txt$/.test(u)), 'EasyList’s cookie list');
-        assert.ok(!asked.some((u) => /annoyances/.test(u)), 'not the broader annoyances lists');
-        assert.ok(fs.existsSync(path.join(dir, 'engine-ads-tracking-cookies.bin')));
-        // Off: the engine without them, made once (saved apart); on again: the first, from its file.
-        ab.setPrefs({ cookieBanners: false });
-        await until(() => ab.isOn(ses) && !ab.hidesCookieNotices(ses), 5000, 'the plain engine');
-        assert.ok(fs.existsSync(path.join(dir, 'engine-ads-and-tracking.bin')));
-        const n = asked.length;
-        ab.setPrefs({ cookieBanners: true });
-        await until(() => ab.hidesCookieNotices(ses), 5000, 'the cookie notices engine again');
-        assert.equal(asked.length, n, 'a fresh file is used as it is');
-        ab.close();
-        // No network and no cookie file, but the plain one is there: it does (the blocker is not lost for the new setting).
-        fs.rmSync(path.join(dir, 'engine-ads-tracking-cookies.bin'));
-        offline = true;
-        const again = make();
-        again.attach(ses);
-        again.setPrefs({ adblock: true, cookieBanners: true });
-        assert.equal(await again.ready(), true);
-        assert.equal(again.isOn(ses), true);
-        again.close();
-      } finally {
-        globalThis.fetch = realFetch;
-        fs.rmSync(dir, { recursive: true, force: true });
       }
     });
 

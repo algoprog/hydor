@@ -581,6 +581,11 @@ export interface BrowsingPrefs {
   allowAds: string[];
   /** Hide cookie banners (with the ad blocker on): EasyList's cookie notice list added to its lists. On at first. */
   cookieBanners: boolean;
+  /**
+   * The ad blocker's lists you turned on beyond the ones it always has (ids of AD_FILTER_LISTS of kind 'language' or
+   * 'extra'). At first the list for the app's own language, when there is one (none for English).
+   */
+  adLists: string[];
   /** The language pages are translated into (a code of TRANSLATE_LANGS): the app's own language at first. */
   translateTo: string;
   /** Offer to translate a page whose language is not `translateTo` (a button in the address bar). On at first. */
@@ -600,6 +605,118 @@ export interface BrowsingPrefs {
   reader: ReaderPrefs;
   /** The Browser page has offered once to bring in the other browsers' bookmarks and history (in the desktop app; the welcome tour's page counts too). */
   importOffered: boolean;
+}
+
+// ---- the ad blocker: its filter lists, and what it counts --------------------------------------------------------
+
+/**
+ * A filter list the ad blocker of your own browsing can use (desktop app). The `core` ones are always used while it is on,
+ * `cookies` goes with Hide cookie banners, and the `language` and `extra` ones are those you turn on (BrowsingPrefs.adLists).
+ * The desktop app fetches each from the first of its addresses that answers, resolves its `!#include` lines, keeps a copy,
+ * and fetches it again when the list says it expires (its `! Expires:` line), between every 6 hours and every 7 days.
+ */
+export interface AdFilterList {
+  id: string;
+  /** Its name as its makers give it: never translated (scripts/i18n-extract.mjs keeps `listName` out of the dictionaries). */
+  listName: string;
+  kind: 'core' | 'cookies' | 'language' | 'extra';
+  /** A language list: the languages of the sites it is for (ISO 639-1); the first is the one it is shown under. */
+  langs?: string[];
+  /** Where it is fetched, in order of preference (mirrors of the same list). */
+  urls: string[];
+}
+
+const UBO = (file: string): string[] => [`https://ublockorigin.github.io/uAssetsCDN/${file}`, `https://ublockorigin.pages.dev/${file}`, `https://cdn.jsdelivr.net/gh/uBlockOrigin/uAssetsCDN@main/${file}`];
+
+/**
+ * Every list the ad blocker knows, as uBlock Origin's own catalog has them: its default lists are the core ones here (the
+ * CDN copies of uBlock's lists have their includes resolved: the yearly ones, the general one and the link shorteners).
+ */
+export const AD_FILTER_LISTS: readonly AdFilterList[] = [
+  { id: 'ublock-filters', listName: 'uBlock filters – Ads', kind: 'core', urls: UBO('filters/filters.min.txt') },
+  { id: 'ublock-badware', listName: 'uBlock filters – Badware risks', kind: 'core', urls: UBO('filters/badware.min.txt') },
+  { id: 'ublock-privacy', listName: 'uBlock filters – Privacy', kind: 'core', urls: UBO('filters/privacy.min.txt') },
+  { id: 'ublock-unbreak', listName: 'uBlock filters – Unbreak', kind: 'core', urls: UBO('filters/unbreak.min.txt') },
+  { id: 'ublock-quick-fixes', listName: 'uBlock filters – Quick fixes', kind: 'core', urls: UBO('filters/quick-fixes.min.txt') },
+  { id: 'easylist', listName: 'EasyList', kind: 'core', urls: [...UBO('thirdparties/easylist.txt'), 'https://easylist.to/easylist/easylist.txt'] },
+  { id: 'easyprivacy', listName: 'EasyPrivacy', kind: 'core', urls: [...UBO('thirdparties/easyprivacy.txt'), 'https://easylist.to/easylist/easyprivacy.txt'] },
+  { id: 'plowe', listName: 'Peter Lowe’s Ad and tracking server list', kind: 'core', urls: ['https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext'] },
+  { id: 'urlhaus', listName: 'Online Malicious URL Blocklist', kind: 'core', urls: ['https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt', 'https://curbengh.github.io/malware-filter/urlhaus-filter-vivaldi-online.txt'] },
+  { id: 'easylist-cookies', listName: 'EasyList – Cookie Notices', kind: 'cookies', urls: [...UBO('thirdparties/easylist-cookies.txt'), 'https://secure.fanboy.co.nz/fanboy-cookiemonster_ubo.txt'] },
+  { id: 'adguard-ads', listName: 'AdGuard – Ads', kind: 'extra', urls: ['https://filters.adtidy.org/extension/ublock/filters/2_without_easylist.txt'] },
+  { id: 'ublock-annoyances', listName: 'uBlock filters – Annoyances', kind: 'extra', urls: UBO('filters/annoyances.min.txt') },
+  { id: 'lang-de', listName: 'EasyList Germany', kind: 'language', langs: ['de'], urls: ['https://easylist.to/easylistgermany/easylistgermany.txt'] },
+  { id: 'lang-fr', listName: 'AdGuard Français', kind: 'language', langs: ['fr'], urls: ['https://filters.adtidy.org/extension/ublock/filters/16.txt'] },
+  { id: 'lang-es', listName: 'EasyList Spanish', kind: 'language', langs: ['es', 'ca', 'gl', 'eu'], urls: ['https://easylist-downloads.adblockplus.org/easylistspanish.txt'] },
+  { id: 'lang-pt', listName: 'AdGuard Spanish/Portuguese', kind: 'language', langs: ['pt'], urls: ['https://filters.adtidy.org/extension/ublock/filters/9.txt'] },
+  { id: 'lang-el', listName: 'Greek AdBlock Filter', kind: 'language', langs: ['el'], urls: ['https://www.void.gr/kargig/void-gr-filters.txt'] },
+  { id: 'lang-ja', listName: 'AdGuard Japanese', kind: 'language', langs: ['ja'], urls: ['https://filters.adtidy.org/extension/ublock/filters/7.txt'] },
+  { id: 'lang-zh', listName: 'AdGuard Chinese', kind: 'language', langs: ['zh', 'zh-TW'], urls: ['https://filters.adtidy.org/extension/ublock/filters/224.txt'] },
+  { id: 'lang-it', listName: 'EasyList Italy', kind: 'language', langs: ['it'], urls: ['https://easylist-downloads.adblockplus.org/easylistitaly.txt'] },
+  { id: 'lang-nl', listName: 'AdGuard Dutch', kind: 'language', langs: ['nl'], urls: ['https://filters.adtidy.org/extension/ublock/filters/8.txt'] },
+  { id: 'lang-ru', listName: 'RU AdList', kind: 'language', langs: ['ru', 'be', 'kk', 'uz'], urls: ['https://raw.githubusercontent.com/easylist/ruadlist/master/RuAdList-uBO.txt', 'https://cdn.jsdelivr.net/gh/dimisa-RUAdList/RUAdListCDN@main/lists/ruadlist.ubo.min.txt'] },
+  { id: 'lang-uk', listName: 'AdGuard Ukrainian', kind: 'language', langs: ['uk'], urls: ['https://filters.adtidy.org/extension/ublock/filters/23.txt'] },
+  { id: 'lang-pl', listName: 'Oficjalne Polskie Filtry do uBlocka Origin', kind: 'language', langs: ['pl'], urls: ['https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/master/polish-adblock-filters/adblock.txt'] },
+  { id: 'lang-cs', listName: 'EasyList Czech and Slovak', kind: 'language', langs: ['cs', 'sk'], urls: ['https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt'] },
+  { id: 'lang-tr', listName: 'AdGuard Turkish', kind: 'language', langs: ['tr'], urls: ['https://filters.adtidy.org/extension/ublock/filters/13.txt'] },
+  { id: 'lang-ko', listName: 'List-KR', kind: 'language', langs: ['ko'], urls: ['https://cdn.jsdelivr.net/npm/@filteringdev/filterslists-ko@latest/dist/filterslist-uBlockOrigin-classic.txt'] },
+  { id: 'lang-vi', listName: 'ABPVN List', kind: 'language', langs: ['vi'], urls: ['https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn_ublock.txt'] },
+  { id: 'lang-id', listName: 'ABPindo', kind: 'language', langs: ['id', 'ms'], urls: ['https://raw.githubusercontent.com/ABPindo/indonesianadblockrules/master/subscriptions/abpindo.txt'] },
+  { id: 'lang-hi', listName: 'IndianList', kind: 'language', langs: ['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'], urls: ['https://easylist-downloads.adblockplus.org/indianlist.txt'] },
+  { id: 'lang-ar', listName: 'Liste AR', kind: 'language', langs: ['ar'], urls: ['https://easylist-downloads.adblockplus.org/Liste_AR.txt'] },
+  { id: 'lang-he', listName: 'EasyList Hebrew', kind: 'language', langs: ['he'], urls: ['https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt'] },
+  { id: 'lang-sv', listName: 'Frellwit’s Swedish Filter', kind: 'language', langs: ['sv'], urls: ['https://raw.githubusercontent.com/lassekongo83/Frellwits-filter-lists/master/Frellwits-Swedish-Filter.txt'] },
+  { id: 'lang-nordic', listName: 'Dandelion Sprout’s Nordic Filters', kind: 'language', langs: ['no', 'nb', 'nn', 'da', 'is'], urls: ['https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianList.txt'] },
+  { id: 'lang-fi', listName: 'Adblock List for Finland', kind: 'language', langs: ['fi'], urls: ['https://raw.githubusercontent.com/finnish-easylist-addition/finnish-easylist-addition/gh-pages/Finland_adb.txt'] },
+  { id: 'lang-hu', listName: 'hufilter', kind: 'language', langs: ['hu'], urls: ['https://cdn.jsdelivr.net/gh/hufilter/hufilter@gh-pages/hufilter-ublock.txt'] },
+  { id: 'lang-ro', listName: 'ROad Block List Light', kind: 'language', langs: ['ro'], urls: ['https://raw.githubusercontent.com/tcptomato/ROad-Block/master/road-block-filters-light.txt'] },
+  { id: 'lang-bg', listName: 'Bulgarian Adblock list', kind: 'language', langs: ['bg'], urls: ['https://stanev.org/abp/adblock_bg.txt'] },
+];
+
+/** The lists you can turn on (language and extra ones), by id. */
+export const isOptionalAdList = (id: unknown): id is string => typeof id === 'string' && AD_FILTER_LISTS.some((l) => l.id === id && (l.kind === 'language' || l.kind === 'extra'));
+
+/** The lists turned on at first: the one for the app's own language (zh-TW as zh), or none. */
+export function defaultAdLists(lang: string): string[] {
+  const code = String(lang || '').toLowerCase();
+  const l = AD_FILTER_LISTS.find((x) => x.kind === 'language' && x.langs?.some((c) => c.toLowerCase() === code || c.toLowerCase() === code.split('-')[0]));
+  return l ? [l.id] : [];
+}
+
+/** What the desktop app builds its blocker from with these settings: the core lists, the cookie notices with Hide cookie banners, and the ones turned on. */
+export function adListsToUse(p: Pick<BrowsingPrefs, 'cookieBanners' | 'adLists'>): { id: string; urls: string[] }[] {
+  return AD_FILTER_LISTS.filter((l) => l.kind === 'core' || (l.kind === 'cookies' && p.cookieBanners) || p.adLists.includes(l.id)).map((l) => ({ id: l.id, urls: [...l.urls] }));
+}
+
+/** What a blocked request was: an ad (or anything of the ad lists), or a tracker (of EasyPrivacy and uBlock's privacy list). */
+export type BlockedKind = 'ad' | 'tracker';
+
+/** What the ad blocker blocked on a tab's page since it loaded (`hydorDesktop.browser.adblockPage`). */
+export interface AdblockPage {
+  ads: number;
+  trackers: number;
+  /** The hosts it blocked requests to, the most first (at most 50). */
+  hosts: { host: string; count: number; kind: BlockedKind }[];
+  /** The page's site (its host without www.), and what was blocked on that site since `since` (0 for a private tab: it keeps nothing). */
+  site: string;
+  siteTotal: number;
+  since: number;
+}
+
+/** The ad blocker's statistics, kept on this computer by the desktop app (`hydorDesktop.browser.adblockStats`). */
+export interface AdblockStats {
+  /** When it started counting (ms): the first block, or the last reset. */
+  since: number;
+  total: { ads: number; trackers: number };
+  /** The data it saved, roughly: what blocked requests of each kind weigh on average (bytes). */
+  bytes: number;
+  /** The last 30 days, the oldest first, each day there (local dates, YYYY-MM-DD). */
+  days: { day: string; ads: number; trackers: number }[];
+  /** The hosts blocked most (at most 20) and the sites where most was blocked (at most 20; private tabs are not in it). */
+  hosts: { host: string; count: number; kind: BlockedKind }[];
+  sites: { site: string; count: number }[];
+  /** Its lists: when they were last fetched (ms, null before ever), how many rules the blocker has, whether it is fetching now, and the last error. */
+  lists: { updatedAt: number | null; rules: number; ids: string[]; updating: boolean; error?: string };
 }
 
 /** A page you visited in your own browser. */

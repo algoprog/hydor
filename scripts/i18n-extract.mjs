@@ -166,6 +166,8 @@ const QUIET_IN = {
   // A diagram's own words (what its shapes say), drawn where nothing is translated: the sample words of the panel's
   // shapes; their names are the app's.
   'shared/diagram-palette.ts': ['text', 'rows'],
+  // The ad blocker's filter lists keep the names their makers give them ("EasyList Germany", "AdGuard Japanese").
+  'shared/browser.ts': ['listName'],
 };
 /**
  * Keys quiet in every file of a folder: the answer UIs' catalog (shared/answer-ui), whose types, examples and search words

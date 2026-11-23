@@ -10,7 +10,7 @@ import { langChoice, langLabel } from './languages';
 import { LANG_OPTIONS } from './Translate';
 
 /** A list of small chips, each with a × that takes it away. `none`: what shows while the list is empty. */
-function Chips({ items, label, onRemove, none }: { items: { id: string; text: string }[]; label: (text: string) => string; onRemove: (id: string) => void; none?: ReactNode }) {
+export function Chips({ items, label, onRemove, none }: { items: { id: string; text: string }[]; label: (text: string) => string; onRemove: (id: string) => void; none?: ReactNode }) {
   if (!items.length) return none ? <div className="text-[12.5px] text-fg-3">{none}</div> : null;
   return (
     <div className="flex flex-wrap gap-1.5">

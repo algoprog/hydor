@@ -108,6 +108,7 @@ import {
   useTabState,
   zoomPercent,
 } from './browsing';
+import { AdBlockStatsPanel, useAdBlockUI } from './AdBlock';
 import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
 import { FindBar } from './FindBar';
@@ -130,8 +131,8 @@ import { DESKTOP_APP } from '../tour/setup';
 import { TabMenu } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'import' | 'bookmarks' | 'later' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings' | 'shortcuts';
-const isPanel = (v: unknown): v is PanelId => v === 'import' || v === 'bookmarks' || v === 'later' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings' || v === 'shortcuts';
+type PanelId = 'adblock' | 'import' | 'bookmarks' | 'later' | 'extensions' | 'downloads' | 'permissions' | 'history' | 'highlights' | 'settings' | 'shortcuts';
+const isPanel = (v: unknown): v is PanelId => v === 'adblock' || v === 'import' || v === 'bookmarks' || v === 'later' || v === 'extensions' || v === 'downloads' || v === 'permissions' || v === 'history' || v === 'highlights' || v === 'settings' || v === 'shortcuts';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -305,6 +306,10 @@ function OwnBrowser() {
   const [clearAt, setClearAt] = useState(false);
   // "Translation settings" in the translate popover opens the settings at its Translation group (a count, so each press scrolls).
   const [translationAt, setTranslationAt] = useState(0);
+  // The shield's "Settings" opens the settings at its Ads group, its "Statistics" the ad blocker's panel (counts, so each press does it).
+  const [adsAt, setAdsAt] = useState(0);
+  const adSettingsAsked = useAdBlockUI((s) => s.settings);
+  const adStatsAsked = useAdBlockUI((s) => s.stats);
   const translateAt = useTranslateUI((s) => s.at);
   const settingsAsked = useTranslateUI((s) => s.settings);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -453,16 +458,32 @@ function OwnBrowser() {
     setAskOpen(false);
     setPanel(p);
   };
-  const togglePanel = (p: PanelId) => (setClearAt(false), setTranslationAt(0), openPanel(panel === p ? null : p));
+  const togglePanel = (p: PanelId) => (setClearAt(false), setTranslationAt(0), setAdsAt(0), openPanel(panel === p ? null : p));
   // The translate popover's "Translation settings".
   const askedBefore = useRef(settingsAsked);
   useEffect(() => {
     if (!settingsAsked || settingsAsked === askedBefore.current) return;
     askedBefore.current = settingsAsked;
     setClearAt(false);
+    setAdsAt(0);
     setTranslationAt(settingsAsked);
     openPanel('settings');
   }, [settingsAsked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const adSettingsBefore = useRef(adSettingsAsked);
+  useEffect(() => {
+    if (!adSettingsAsked || adSettingsAsked === adSettingsBefore.current) return;
+    adSettingsBefore.current = adSettingsAsked;
+    setClearAt(false);
+    setTranslationAt(0);
+    setAdsAt(adSettingsAsked);
+    openPanel('settings');
+  }, [adSettingsAsked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const adStatsBefore = useRef(adStatsAsked);
+  useEffect(() => {
+    if (!adStatsAsked || adStatsAsked === adStatsBefore.current) return;
+    adStatsBefore.current = adStatsAsked;
+    openPanel('adblock');
+  }, [adStatsAsked]); // eslint-disable-line react-hooks/exhaustive-deps
   const openAsk = () => {
     if (tab?.private) return;
     setPanel(null);
@@ -814,7 +835,9 @@ function OwnBrowser() {
   else if (!watching && panel) {
     const close = () => openPanel(null);
     right =
-      panel === 'import' ? (
+      panel === 'adblock' ? (
+        <AdBlockStatsPanel onClose={close} />
+      ) : panel === 'import' ? (
         <ImportPanel onClose={close} />
       ) : panel === 'bookmarks' ? (
         <BookmarksPanel onClose={close} />
@@ -833,7 +856,7 @@ function OwnBrowser() {
       ) : panel === 'shortcuts' ? (
         <ShortcutsPanel onClose={close} />
       ) : (
-        <BrowserSettingsPanel focusClear={clearAt} focusTranslation={translationAt} onClose={close} />
+        <BrowserSettingsPanel focusClear={clearAt} focusTranslation={translationAt} focusAds={adsAt} onClose={close} />
       );
   } else if (!watching && askOpen && tab && !priv) right = <BrowserAskPanel tab={tab} onClose={() => setAskOpen(false)} onStarted={started} onWatch={watch} />;
   // On a phone every one of them is a sheet over the page (the panels bring their own).

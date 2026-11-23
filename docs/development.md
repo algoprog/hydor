@@ -132,7 +132,10 @@ The browser works through that channel too. In the desktop apps the browser agen
 app's Electron: `desktop/browser.cjs` answers the Chrome DevTools Protocol the server speaks (`server/browser/cdp.ts`, over
 the channel with `Cdp.over`; `server/browser/desktopEngine.ts` is the server's side), each tab a view, and
 `desktop/extensions.cjs` loads Chrome extensions into your own browsing's session, and `desktop/adblock.cjs` puts Ghostery's ad
-and tracker blocker on it (`@ghostery/adblocker-electron`, from the server's packages; the server sends it the setting as `browser-prefs`). Settings → Browser offers it
+and tracker blocker on it (`@ghostery/adblocker`, from the server's packages; the server sends it the setting and the filter lists
+to use as `browser-prefs`), with `adblock-lists.cjs` (fetching and keeping the lists), `adblock-build.cjs` (the engine, made in a
+worker thread), `adblock-preload.cjs` (scriptlets and cosmetic filters in every frame) and `adblock-stats.cjs` (what it blocked);
+`desktop/scripts/browser-ipc-check.cjs` checks them with small engines made from text, without a network. Settings → Browser offers it
 (`DESKTOP_CHROME`, the value `desktop`) when the server was started by the app (`HYDOR_DESKTOP_BROWSER`).
 `server/browser/selftest.ts` drives a real browser through every tool (`npm test -- browser/selftest` runs it on a
 Chromium installed here), and `desktop/scripts/browser-selftest.mjs` runs the same one on the desktop engine. It builds

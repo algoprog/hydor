@@ -4,7 +4,8 @@
 // Enter opens the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your
 // history. At rest it shows the address as its site and the rest. What you typed stays while the window is behind another;
 // a click into the page ends it, as in any browser. A padlock opens what the page's site may do; a chip
-// shows a zoom other than the default; a star bookmarks the page.
+// shows a zoom other than the default; a shield shows the ads blocked on the page and opens the ad blocker's popover; a star
+// bookmarks the page.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star, WandSparkles } from 'lucide-react';
@@ -12,6 +13,7 @@ import { matchShortcut, type BrowserTab, type Suggestion } from '@shared/browser
 import { MOD } from '../../lib/format';
 import { cx, Kbd } from '../../components/ui';
 import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
+import { AdBlockButton } from './AdBlock';
 import { useAskMode } from './BrowserAsk';
 import { fitRows } from './omniboxFit';
 import { PrivateChip } from './Private';
@@ -343,6 +345,7 @@ export function Omnibox({
           {percent}%
         </button>
       )}
+      {tab && <AdBlockButton tab={tab} />}
       {tab && <TranslateButton tab={tab} />}
       {tab && <ReaderButtons tab={tab} />}
       <button

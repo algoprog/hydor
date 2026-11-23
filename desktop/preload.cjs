@@ -174,6 +174,14 @@ if (own) {
       savePdf: (target) => ipcRenderer.invoke('hydor:browser-pdf', { target: String(target) }),
       /** Deletes the tab's site's cookies and stored data (the tab's own session: a private tab's too) and loads the tab again: { cleared, site }; null when it is not a web page of one of your tabs. */
       clearSite: (target) => ipcRenderer.invoke('hydor:browser-clear-site', { target: String(target) }),
+      /** What the ad blocker blocked on a tab's page since it loaded (shared/browser.ts AdblockPage); null when it is not one of your tabs, or there is no blocker. */
+      adblockPage: (target) => ipcRenderer.invoke('hydor:browser-adblock-page', { target: String(target) }),
+      /** The ad blocker's statistics, kept on this computer (shared/browser.ts AdblockStats); null without a blocker. */
+      adblockStats: () => ipcRenderer.invoke('hydor:browser-adblock-stats'),
+      /** Starts the statistics again from nothing: whether it was done. */
+      adblockReset: () => ipcRenderer.invoke('hydor:browser-adblock-reset'),
+      /** Fetches the filter lists now and makes the blocker again (it can take a while): false when that failed. */
+      adblockUpdate: () => ipcRenderer.invoke('hydor:browser-adblock-update'),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
     },

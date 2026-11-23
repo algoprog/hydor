@@ -7,6 +7,8 @@ import {
   BROWSING_KEY,
   type BookmarkNode,
   type BookmarkOrganizeState,
+  type AdblockPage,
+  type AdblockStats,
   type BrowserGroup,
   type BrowserPermissionAsk,
   type BrowserTab,
@@ -646,6 +648,48 @@ export async function reopenClosed(index?: number) {
   } catch (e) {
     toastError(e);
   }
+}
+
+// ---- the ad blocker: what it blocked, its statistics and its filter lists ---------------------------------------
+
+/** Whether the desktop app tells this page what the ad blocker counted (an older one does not). */
+export const adblockCounts = (): boolean => !!desktopBrowser()?.adblockStats;
+
+/** What was blocked on a tab's page, by host (null when the app cannot say). */
+export const loadAdblockPage = (tab: string): Promise<AdblockPage | null> => {
+  const f = desktopBrowser()?.adblockPage;
+  return f ? f.call(desktopBrowser(), tab).then((p) => p ?? null, () => null) : Promise.resolve(null);
+};
+
+/** The blocker's statistics and the state of its lists, as the desktop app last said (null: none yet, or an older app). */
+export const useAdblockStats = create<{ stats: AdblockStats | null; loaded: boolean }>(() => ({ stats: null, loaded: false }));
+
+/** Reads them again. */
+export async function loadAdblockStats(): Promise<AdblockStats | null> {
+  const b = desktopBrowser();
+  const stats = b?.adblockStats ? await b.adblockStats().catch(() => null) : null;
+  useAdblockStats.setState({ stats, loaded: true });
+  return stats;
+}
+
+/** Forgets the statistics (the counts start again from now). */
+export async function resetAdblockStats(): Promise<boolean> {
+  const b = desktopBrowser();
+  if (!b?.adblockReset) return false;
+  const ok = await b.adblockReset().catch(() => false);
+  await loadAdblockStats();
+  return ok;
+}
+
+/** Fetches the filter lists again (the statistics say meanwhile that it is updating), and reads the state they ended in. */
+export async function updateAdblockLists(): Promise<boolean> {
+  const b = desktopBrowser();
+  if (!b?.adblockUpdate) return false;
+  const now = useAdblockStats.getState().stats;
+  if (now) useAdblockStats.setState({ stats: { ...now, lists: { ...now.lists, updating: true, error: undefined } } });
+  const ok = await b.adblockUpdate().catch(() => false);
+  await loadAdblockStats();
+  return ok;
 }
 
 // ---- what a tab tells the app: sound, zoom, blocked ads ----------------------------------------------------------

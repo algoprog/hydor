@@ -50,6 +50,8 @@ const PERMISSION_MS = 120_000;
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 /** What the blocked count of a page shows in the window at most this often (a page can have hundreds of requests blocked). */
 const BLOCKED_MS = 500;
+/** How many hosts a tab remembers it blocked requests to (the most are shown, 50). */
+const HOSTS_PER_TAB = 200;
 /** The search pages of the engines (shared/browser.ts SEARCH_ENGINES), for the right-click menu's search; the server has the same table. */
 const ENGINES = {
   google: ['Google', 'https://www.google.com/search?q=%s'],
@@ -281,9 +283,12 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   const zoomedByYou = new Set();
   /** The ad blocker of the browsing profile, when this app has it (adblock.cjs). */
   let adblock = null;
+  /** What it blocked, kept on this computer (adblock-stats.cjs). */
+  let adStats = null;
   if (adblockOptions) {
     try {
-      adblock = require('./adblock.cjs').createAdblock({ log, ...adblockOptions, onBlocked: (wcId) => blocked(wcId) });
+      adblock = require('./adblock.cjs').createAdblock({ log, ...adblockOptions, onBlocked: (wcId, what) => blocked(wcId, what) });
+      adStats = require('./adblock-stats.cjs').createStats({ file: path.join(adblockOptions.dir, 'stats.json'), log });
     } catch (e) {
       log('the ad blocker did not start', String((e && e.message) || e));
     }
@@ -436,7 +441,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   /** The view and its page's handlers; not yet a target the server knows. */
   function makeTarget(conn, ctx, o) {
     const offscreen = o.offscreen;
-    const prefsNow = () => ({ partition: ctx.partition, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: !offscreen, ...(offscreen ? { offscreen: true } : { autoplayPolicy: autoplayPolicy() }) });
+    // Your own tabs run the ad blocker's preload in every frame, iframes of other sites too (with the sandbox and context
+    // isolation on, this only makes the session's frame preloads run in each frame; the page's own scripts get nothing).
+    const prefsNow = () => ({ partition: ctx.partition, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: !offscreen, ...(offscreen ? { offscreen: true } : { autoplayPolicy: autoplayPolicy(), nodeIntegrationInSubFrames: ownSession(ctx) }) });
     const prefs = prefsNow();
     const view = o.webContents ? new WebContentsView({ webContents: o.webContents }) : new WebContentsView({ webPreferences: prefs });
     const wc = view.webContents;
@@ -469,6 +476,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       newsAt: 0,
       newsTimer: null,
       blocked: 0,
+      blockedAds: 0,
+      blockedTrackers: 0,
+      blockedHosts: new Map(),
       fs: null,
       finding: null,
       /** Whether this tab shows pages dark now (what was last sent to its page), and the bubble that has its link's address. */
@@ -586,13 +596,39 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   /** Everything about a tab, for a window that has just got it. */
   const allState = (t) => ({ audible: t.wc.isCurrentlyAudible(), muted: t.wc.isAudioMuted(), zoom: zoomOf(t), blocked: t.blocked, fullscreen: !!t.fs });
 
-  /** The ad blocker blocked a request of this page. */
-  function blocked(wcId) {
+  /**
+   * The ad blocker blocked a request of this page (`what`: { kind: 'ad' | 'tracker', host, type }): the tab counts it since its last
+   * main-frame navigation (and its hosts, the most 200), and the statistics do, by the page's site. A private tab counts in the
+   * totals only.
+   */
+  function blocked(wcId, what) {
     const t = byWc.get(wcId);
     if (!t || t.gone || t.offscreen) return;
     t.blocked++;
+    const kind = what && what.kind === 'tracker' ? 'tracker' : 'ad';
+    if (kind === 'tracker') t.blockedTrackers++;
+    else t.blockedAds++;
+    const host = what && what.host;
+    if (host) {
+      const h = t.blockedHosts.get(host);
+      if (h) h.count++;
+      else if (t.blockedHosts.size < HOSTS_PER_TAB) t.blockedHosts.set(host, { count: 1, kind });
+    }
+    if (adStats) {
+      try {
+        adStats.record({ kind, host, site: siteOfPage(t), type: what && what.type, private: !!t.ctx.private });
+      } catch {}
+    }
     tabState(t, { blocked: t.blocked });
   }
+  /** A tab's page's site: its host without www. ('' when it has none). */
+  const siteOfPage = (t) => {
+    try {
+      return new URL(t.wc.getURL()).hostname.toLowerCase().replace(/\.$/, '').replace(/^www\./, '');
+    } catch {
+      return '';
+    }
+  };
 
   const zoomOf = (t) => Math.round((t.wc.isDestroyed() ? 1 : t.wc.getZoomFactor()) * 100) / 100;
   /** The key of a tab's site in the ones you zoomed yourself. */
@@ -657,6 +693,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     wc.on('did-start-navigation', (d) => {
       if (!d.isMainFrame || d.isSameDocument) return;
       t.blocked = 0;
+      t.blockedAds = 0;
+      t.blockedTrackers = 0;
+      t.blockedHosts = new Map();
       tabState(t, { blocked: 0 });
       bubbleOff(t);
       // Dark or not by the site it goes to (and again once it is there: a redirect may have taken it to another).
@@ -1807,7 +1846,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
       return true;
     }
     if (m.type === 'browser-prefs') {
-      if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds, cookieBanners: m.cookieBanners });
+      if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds, cookieBanners: m.cookieBanners, adLists: m.adLists });
       if (typeof m.autoplay === 'boolean') settings.autoplay = m.autoplay;
       if (typeof m.spellcheck === 'boolean' && m.spellcheck !== settings.spellcheck) {
         settings.spellcheck = m.spellcheck;
@@ -1846,6 +1885,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   /** The server is gone (or the app quits): every browser closes. */
   function closeAll(why) {
     for (const conn of [...conns.values()]) closeConn(conn, why);
+    adStats?.flush();
   }
 
   /**
@@ -2395,6 +2435,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   async function clearData(m) {
     const profile = String(m.profile || '');
     if (!profile) return;
+    // The history is gone: so are the sites the ad blocker's statistics name (its totals and days are only counts).
+    if (m.history && profile === BROWSING && adStats) adStats.forgetSites();
     try {
       const ses = session.fromPartition(partitionOf({ profile, id: '' }, ''));
       if (m.cookies) {
@@ -2514,6 +2556,47 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     }
   }
 
+  // ---- the ad blocker's page and statistics -------------------------------------------------------------------------------
+
+  /**
+   * What the ad blocker blocked on a tab's page since it loaded (shared/browser.ts AdblockPage): the ads, the trackers, the hosts
+   * the most, and how much was blocked on that site in all. A private tab has no total for its site and no `since`: it keeps nothing.
+   * Null when it is not one of your tabs, or there is no blocker.
+   */
+  function adblockPage(e, target) {
+    if (!fromOwnPage(e) || !adblock || !adStats) return null;
+    const t = ownTab(target);
+    if (!t || t.wc.isDestroyed()) return null;
+    const site = siteOfPage(t);
+    const hosts = [...t.blockedHosts.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 50)
+      .map(([host, v]) => ({ host, count: v.count, kind: v.kind }));
+    const priv = !!t.ctx.private;
+    return { ads: t.blockedAds, trackers: t.blockedTrackers, hosts, site, siteTotal: priv ? 0 : adStats.siteTotal(site), since: priv ? 0 : adStats.summary(adblock.status()).since };
+  }
+  /** The statistics (shared/browser.ts AdblockStats), or null without a blocker. */
+  function adblockStats(e) {
+    if (!fromOwnPage(e) || !adblock || !adStats) return null;
+    return adStats.summary(adblock.status());
+  }
+  /** Starts the statistics again from nothing. */
+  function adblockReset(e) {
+    if (!fromOwnPage(e) || !adStats) return false;
+    adStats.reset();
+    adStats.flush();
+    return true;
+  }
+  /** Fetches the filter lists now and makes the blocker again; false when that failed (or there is no blocker). */
+  async function adblockUpdate(e) {
+    if (!fromOwnPage(e) || !adblock) return false;
+    try {
+      return await adblock.update();
+    } catch {
+      return false;
+    }
+  }
+
   let registered = false;
   function registerIpc() {
     if (registered) return;
@@ -2536,6 +2619,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     ipcMain.handle('hydor:browser-capture', (e, a) => capture(e, a && a.target, !!(a && a.whole)));
     ipcMain.handle('hydor:browser-pdf', (e, a) => savePdf(e, a && a.target));
     ipcMain.handle('hydor:browser-clear-site', (e, a) => clearSite(e, a && a.target));
+    ipcMain.handle('hydor:browser-adblock-page', (e, a) => adblockPage(e, a && a.target));
+    ipcMain.handle('hydor:browser-adblock-stats', (e) => adblockStats(e));
+    ipcMain.handle('hydor:browser-adblock-reset', (e) => adblockReset(e));
+    ipcMain.handle('hydor:browser-adblock-update', (e) => adblockUpdate(e));
     ipcMain.on('hydor:browser-frame-ack', (e, target) => frameTaken(e, target));
     ipcMain.on('hydor:browser-menus', (e, on) => menusFrom(e, !!on));
     ipcMain.handle('hydor:browser-menu-pick', (e, a) => menuPick(e, a && a.target, a && a.menu, a && a.item));
@@ -2550,7 +2637,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     /** What the app tells the extensions (a stand-in for tests, and for the window's page). */
     browsingSession,
     // For desktop/scripts/browser-ipc-check.cjs, which calls what the page's messages call.
-    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal, menuPick, capture, savePdf, clearSite },
+    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal, menuPick, capture, savePdf, clearSite, adblockPage, adblockStats, adblockReset, adblockUpdate },
     /** The link bubble of a window, for the checks: { view, shown, text, side, bounds }, or null. */
     bubble: (win) => {
       const b = bubbles.get(win);
@@ -2561,6 +2648,8 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     shortcut,
     siteOfHost,
     adblock,
+    /** The ad blocker's statistics (for checks). */
+    adStats,
     conns,
   };
 }

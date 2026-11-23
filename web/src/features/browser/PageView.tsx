@@ -7,7 +7,7 @@
 // to the page. Everywhere else, and for a tab the desktop app does not have, the live picture (LiveView), as before.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Globe } from 'lucide-react';
-import { MOD, type BrowserInput, type BrowserView } from '@shared/browser';
+import { MOD, type AdblockPage, type AdblockStats, type BrowserInput, type BrowserView } from '@shared/browser';
 import { cx } from '../../components/ui';
 import { AgentPointer } from './AgentPointer';
 import { KEYCODES, LiveView, mods, type LiveViewApi } from './LiveView';
@@ -70,6 +70,14 @@ export interface DesktopBrowserBridge {
   savePdf?(target: string): Promise<{ path: string; name: string } | null>;
   /** Deletes the cookies and site data of a tab's site; which site it was (an older app does not have it). */
   clearSite?(target: string): Promise<{ cleared: boolean; site: string } | null>;
+  /** What the ad blocker blocked on a tab's page since it loaded, by host, and what it blocked on that site in all (null: not one of this app's tabs; an older app does not have it). */
+  adblockPage?(target: string): Promise<AdblockPage | null>;
+  /** The ad blocker's statistics, kept on this computer, and the state of its filter lists (null when it has none to give; an older app does not have it). */
+  adblockStats?(): Promise<AdblockStats | null>;
+  /** Forgets the ad blocker's statistics and starts counting again; whether it was done (an older app does not have it). */
+  adblockReset?(): Promise<boolean>;
+  /** Fetches the filter lists again and builds the blocker from them; resolves when that is done, whether it worked (an older app does not have it). */
+  adblockUpdate?(): Promise<boolean>;
 }
 
 /** What a tab's state said changed. */

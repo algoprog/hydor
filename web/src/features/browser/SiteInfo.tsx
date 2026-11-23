@@ -1,11 +1,11 @@
-// What the padlock of the address bar opens: whether the connection to the site is secure, what the site may use
-// (the answers you gave it, each with a way to forget it), and its ads: how many were blocked on this page, and a
-// switch for this site.
+// What the padlock of the address bar opens: whether the connection to the site is secure, and what the site may use
+// (the answers you gave it, each with a way to forget it), with the switches for dark pages and the site's cookies. Its
+// ads are the shield's (AdBlock.tsx), beside the padlock.
 import { useEffect, type RefObject } from 'react';
-import { Cookie, Lock, LockOpen, Moon, ShieldCheck } from 'lucide-react';
+import { Cookie, Lock, LockOpen, Moon } from 'lucide-react';
 import type { BrowserTab } from '@shared/browser';
 import { Badge, Button, Popover, Switch, useConfirm } from '../../components/ui';
-import { deleteSiteData, desktopBrowser, forgetSitePermission, loadSitePermissions, navigate, permissionWords, savePrefs, useSitePermissions, usePrefs, useTabState } from './browsing';
+import { deleteSiteData, desktopBrowser, forgetSitePermission, loadSitePermissions, permissionWords, savePrefs, useSitePermissions, usePrefs } from './browsing';
 import { hostOf } from './store';
 
 /** The state of a page's connection, for the padlock. */
@@ -31,14 +31,12 @@ function siteOfHost(host: string): string {
 export function SiteInfo({ anchor, open, onClose, tab }: { anchor: RefObject<HTMLElement | null>; open: boolean; onClose: () => void; tab: BrowserTab }) {
   const list = useSitePermissions((s) => s.list);
   const prefs = usePrefs((s) => s.prefs);
-  const blocked = useTabState((s) => s.byTab[tab.id]?.blocked);
   useEffect(() => {
     if (open) void loadSitePermissions();
   }, [open]);
   const host = hostOf(tab.url);
   const conn = connectionOf(tab.url);
   const mine = (list ?? []).filter((p) => hostOf(p.origin) === host);
-  const allowed = !!prefs?.allowAds.includes(host);
   const [confirm, confirmNode] = useConfirm();
   const web = /^https?:/i.test(tab.url);
   // Dark pages is on in the browser: this site can be shown as it is.
@@ -52,15 +50,6 @@ export function SiteInfo({ anchor, open, onClose, tab }: { anchor: RefObject<HTM
     const site = siteOfHost(host);
     const ok = await confirm({ title: 'Delete cookies and site data', body: `Delete the cookies and site data of ${site}, its subdomains too? You’ll be signed out of it.`, confirm: 'Delete', danger: true });
     if (ok) await deleteSiteData(tab.id);
-  };
-  const setAds = async (allow: boolean) => {
-    if (!prefs) return;
-    const rest = prefs.allowAds.filter((h) => h !== host);
-    if (await savePrefs({ allowAds: allow ? [...rest, host] : rest })) {
-      onClose();
-      // The page asks for its ads again, with the new answer.
-      void navigate('reload');
-    }
   };
   return (
     <Popover anchor={anchor} open={open} onClose={onClose} width={310} title={host}>
@@ -85,17 +74,6 @@ export function SiteInfo({ anchor, open, onClose, tab }: { anchor: RefObject<HTM
                 </Button>
               </div>
             ))}
-          </div>
-        )}
-        {prefs?.adblock && /^https?:/i.test(tab.url) && (
-          <div className="space-y-2 border-t border-line pt-2.5">
-            <div className="flex items-center gap-2 text-[13px] text-fg-2">
-              <ShieldCheck size={15} className="shrink-0 text-fg-3" />
-              <span className="tnum">{allowed ? 'Ads are allowed on this site' : blocked ? `${blocked} ${blocked === 1 ? 'ad or tracker' : 'ads and trackers'} blocked on this page` : 'No ads or trackers blocked on this page'}</span>
-            </div>
-            <Button size="sm" variant="secondary" className="w-full" onClick={() => void setAds(!allowed)}>
-              {allowed ? 'Block ads on this site' : 'Allow ads on this site'}
-            </Button>
           </div>
         )}
         {prefs?.darkPages && web && (

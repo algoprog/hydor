@@ -41,9 +41,24 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   a vector of their title and address from the same model, in the background (`server/browser/meaning.ts`), in a table of
   their own that nothing else reads; the address bar adds the pages alike in meaning to the ones with the words, fused by
   rank, and the search box finds them for the person at it, never for an agent's call. A vector goes with its page. The
-  ad and tracker blocker is the app's (`desktop/adblock.cjs`): Ghostery's engine on the session of your own browsing,
-  made from its lists once and kept as a file in the app's data folder, made again when a week old (the old file stays in
-  use when that fails), with EasyList's cookie notice list added while **Hide cookie banners** is on. The server tells the app when the setting or the sites you allowed ads on change. Electron's own
+  ad and tracker blocker is the app's (`desktop/adblock.cjs`): Ghostery's engine, on the sessions of your own browsing and
+  its private tabs, made from uBlock Origin's default lists (its own lists, EasyList, EasyPrivacy, Peter Lowe's and the
+  malicious URL list), EasyList's cookie notices with **Hide cookie banners**, and the lists you turned on; the server names
+  them (`shared/browser.ts`, `AD_FILTER_LISTS`) and sends them with the setting and the sites you allowed ads on
+  (`browser-prefs`). `desktop/adblock-lists.cjs` fetches each from the first mirror that answers, resolves its includes,
+  keeps a copy in the app's data folder and fetches it again when the list says it expires (uBlock's quick fixes, where its
+  YouTube fixes are, every 8 hours; most others every few days); a worker thread makes the engine from them
+  (`desktop/adblock-build.cjs`: each list parsed on its own, `!#if` lines evaluated for a Chromium uBlock without HTML
+  filtering, `trusted-` scriptlets only from uBlock's own lists), and the engine is saved and loaded at the next start
+  without a download. Requests to ad and tracking servers are cancelled, and those a `$redirect` rule names get a harmless
+  stand-in from a scheme of the app's own (`hydor-adblock:`, behind a secret that changes at each start, so a page cannot
+  ask for one to find the blocker). In every frame of your own tabs (`nodeIntegrationInSubFrames`), a preload
+  (`desktop/adblock-preload.cjs`) asks synchronously for its frame's scriptlets and style sheet and runs them before the
+  page's own scripts, in the page's world, where its Content-Security-Policy and Trusted Types do not apply: that is what
+  strips YouTube's ads from the player's data and defuses anti-adblock checks; procedural filters (`:has-text()` and the
+  like) are evaluated in the page with Ghostery's evaluator. What it blocks is counted by kind (a tracker when a rule of the
+  privacy lists blocked it, an ad otherwise), per tab and in statistics the app keeps in its data folder
+  (`desktop/adblock-stats.cjs`; a private tab adds to the totals only), which the Browser page reads from the app. Electron's own
   request handlers go before an extension's, so with the blocker on an extension's request blocking may not run.
 - **Your own browsing's private tabs, translation and reader view.** A private tab is a tab in a browser context of its
   own that the app keeps in memory (`desktop/browser.cjs`: a partition that is never saved) and disposes of when the last

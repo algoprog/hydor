@@ -322,16 +322,27 @@ agents that speak ACP and take MCP servers.
     browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
     the history, the files staying where they are.
   - **Browser settings**: home page (**Use the current page**), search engine, **Search shortcuts** (`yt`, `wiki`, `gh`,
-    `scholar`, `arxiv` and `hf` at first; add your own, up to 50, with %s where your words go), search suggestions, **Block ads and
-    trackers**, **Hide cookie banners**, **Translation** (what to translate into, the offer, languages to always or never
+    `scholar`, `arxiv` and `hf` at first; add your own, up to 50, with %s where your words go), search suggestions, **Ads** (**Block ads and
+    trackers**, **Hide cookie banners**, **Filter lists** with **Update now**, **Lists for sites in other languages**,
+    **Stricter blocking**, **Hide annoyances**, **Sites where ads are allowed**, **Statistics**), **Translation** (what to translate into, the offer, languages to always or never
     translate, sites never translated), **Pages** (**Page zoom**, **Check spelling**, **Dark pages**, **Sites shown as they are**, **Let sites play sound by
     themselves**) and **Clear browsing data** (history with the list of downloads, cookies and site data, cached files,
     with a time range for the history).
-  - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
-    padlock's popover counts what was blocked on the page and lets you **Allow ads on this site**. An extension's own
-    request blocking may not run while it is on. **Hide cookie banners** (on at first, with the blocker on) adds
-    EasyList's cookie notice list: it hides a notice and does not answer it, and allowing ads on a site shows its notice
-    again.
+  - **An ad and tracker blocker**, on at first: it stops requests to ad and tracking servers, hides what they leave and
+    boxes marked as sponsored (uBlock Origin's advanced rules too), runs uBlock Origin's page fixes in every frame
+    before the page's scripts (YouTube's video ads, many "turn off your ad blocker" messages go) and gives a page
+    harmless stand-ins for the scripts it blocks. Its lists (EasyList, EasyPrivacy, uBlock Origin's, Peter Lowe's, the
+    Online Malicious URL Blocklist) are fetched from their makers and kept up to date: each when it expires (quick
+    fixes about every 8 hours, the others every few days), or at once with **Update now**. It starts with the list for
+    the app's language, and **Add a language** adds others (about 25); **Stricter blocking** adds AdGuard's list and
+    **Hide annoyances** uBlock Origin's annoyances list. A **shield** in the address bar counts what was blocked on the
+    page: click it for the hosts (ads and trackers), what was blocked on the site in all, **Block ads on this site**
+    (off allows its ads and reloads the page), **Statistics** and **Settings**. The **Ad blocker** panel
+    (`/browser?panel=adblock`) shows blocked, ads, trackers and data saved, the last 30 days, the hosts and sites with
+    the most blocked, and **Reset statistics**; it stays on the computer, private tabs count in the totals and leave no
+    hosts or sites, and clearing history forgets the sites. An extension's own request blocking may not run while it is
+    on. **Hide cookie banners** (on at first, with the blocker on) adds EasyList's cookie notice list: it hides a notice
+    and does not answer it, and allowing ads on a site shows its notice again.
   - **Private tabs** (Ctrl/⌘+Shift+N, **New private tab** in the ⋯ menu and the tab column, **Open link in private tab**,
     `/browser?private=1`): a purple **Private** section in the tab column and a **Private** chip in the address bar.
     Their sign-ins, cookies, site data and cache are kept apart, in memory, and forgotten when the last private tab
