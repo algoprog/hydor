@@ -26,17 +26,18 @@ function save() {
   } catch {}
 }
 
-/** Ends everything that is running, at once (no waiting: this runs as the server exits). */
+/**
+ * Ends everything that is running, at once (no waiting: this runs as the server exits). llama-server and the worker
+ * keep nothing, so they are killed outright (a signal they block or ignore must not leave them running); train.py
+ * gets SIGTERM, which it answers by saving where it is. pids.json stays: the next start ends any that outlived this.
+ */
 export function killAll() {
-  for (const pid of live.keys()) {
+  for (const [pid, e] of live) {
     try {
-      process.kill(pid, 'SIGTERM');
+      process.kill(pid, e.kind === 'train' ? 'SIGTERM' : 'SIGKILL');
     } catch {}
   }
   live.clear();
-  try {
-    fs.rmSync(file(), { force: true });
-  } catch {}
 }
 
 /** Keeps a started program's id (and forgets it when it ends). */

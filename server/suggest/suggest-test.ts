@@ -677,12 +677,20 @@ test('1: programs are kept in pids.json, ended when the server exits, and an ear
   assert.ok(alive(b.pid!), 'a process that is not what was started is not touched');
   assert.ok(!fs.existsSync(pidsFile), 'and the list is cleared');
   b.kill('SIGKILL');
-  // Everything tracked is ended at once (what runs at the server's exit).
+  // Everything tracked is ended at once (what runs at the server's exit): train.py with SIGTERM (it saves where it is),
+  // llama-server and the worker outright, even one that blocks or ignores SIGTERM (a server started from a shell that
+  // blocks it hands that on to what it starts).
   const c = sleeper('/tracked/train.py');
   track('train', c, '/tracked/train.py');
+  const deaf = spawn('python3', ['-c', 'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)', '/tracked/model.gguf'], { stdio: 'ignore' });
+  track('llama', deaf, '/tracked/model.gguf');
   assert.ok(fs.existsSync(pidsFile));
   killAll();
-  assert.ok(await exited(c), 'ended');
+  assert.ok(await exited(c), 'train.py ended');
+  assert.ok(await exited(deaf), 'a llama-server that ignores SIGTERM ended all the same');
+  // The list stays for the next start, which finds nothing left to end and clears it.
+  assert.ok(fs.existsSync(pidsFile), 'kept for the next start');
+  assert.equal(reapLeftovers(), 0);
   assert.ok(!fs.existsSync(pidsFile));
 });
 
