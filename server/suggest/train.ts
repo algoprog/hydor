@@ -141,6 +141,13 @@ export class Trainer {
       ];
       this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}` });
       const done = await this.spawnTrain(args, threads);
+      if (!done.ok && done.nothing) {
+        // train.py found nothing it can learn from in these texts (all too short, say): not a failure, and not to be tried again.
+        fs.rmSync(texts, { force: true });
+        fs.rmSync(job, { force: true });
+        fs.rmSync(outDir(), { recursive: true, force: true });
+        return fail(done.why, true);
+      }
       if (!done.ok) return fail(done.why, this.stopping);
       // The new model is complete in outDir: it takes the place of the old one, which stays until it has.
       const next = `${personalDir()}.next`;
@@ -162,7 +169,7 @@ export class Trainer {
     }
   }
 
-  private spawnTrain(args: string[], threads: number): Promise<{ ok: true; tokens?: number; languages?: Record<string, number>; devNll?: number; seconds?: number } | { ok: false; why: string }> {
+  private spawnTrain(args: string[], threads: number): Promise<{ ok: true; tokens?: number; languages?: Record<string, number>; devNll?: number; seconds?: number } | { ok: false; why: string; nothing?: boolean }> {
     return new Promise((resolve) => {
       const env = childEnv({ OMP_NUM_THREADS: String(threads), MKL_NUM_THREADS: String(threads) });
       // The lowest priority: `nice` (every thread of the process inherits it), or below normal on Windows.
@@ -194,6 +201,8 @@ export class Trainer {
       proc.on('error', (e) => resolve({ ok: false, why: e.message }));
       proc.on('exit', (code, signal) => {
         if (code === 0 && finished) resolve({ ok: true, ...finished });
+        // Exit code 2: nothing in the texts to learn from (train.py's own answer, not a failure).
+        else if (code === 2 && !this.stopping) resolve({ ok: false, why: 'Nothing new to learn from', nothing: true });
         else resolve({ ok: false, why: this.stopping ? 'Stopped' : `Personalising stopped (${signal ?? `exit ${code}`})${tail.length ? `: ${tail.slice(-2).join(' ')}` : ''}` });
       });
     });
