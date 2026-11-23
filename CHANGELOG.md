@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.106.0 · 23 November 2026
+
+Antigravity CLI for your Google AI plan, word suggestions that learn on your graphics card and can be paused or
+stopped, and goals with a help topic of their own.
+
+- **Antigravity CLI**: Google's coding agent runs in Hydor with your Google AI plan (Pro, Ultra, Plus or the free plan),
+  now that Gemini CLI no longer serves those plans. Add it in **Settings → Agents → More agents** (you install it with
+  Google's own installer, whose command the app shows), then sign in from **Settings → Agents → Accounts**. Its models
+  and thinking levels fill the session's **Model** and **Effort** pickers, and when its quota runs out the session says
+  when it lifts. As Google's terms ask, it runs only in sessions you start and drive.
+- **Word suggestions learn on the graphics card**: learning from your writing runs many times faster on an NVIDIA
+  graphics card with room, or on the graphics of a Mac with Apple silicon. The first time on an NVIDIA card it
+  downloads a graphics-card build of PyTorch (a few GB, once). A card another program is using, such as a local model
+  server, is left alone, and if the card fails, learning carries on on the processor. **Learn on the graphics card**
+  in **Settings → Capabilities → Word suggestions** turns it off.
+- **Pause, resume or stop learning**: while word suggestions learn from your writing, the line under their switch has
+  **Pause** and **Stop**. A paused run waits for **Resume**, even across a restart; **Stop** drops the run, keeps the
+  model you have, and the next run comes at its usual time.
+- **Moving to another account at a usage limit**: a session moves again even when the other account still holds a
+  copy of its history, and one that cannot move keeps running instead of stopping.
+- **Help**: goals have a topic of their own, and **Settings → Goals → Learn more** opens it.
+- **Browser**: the Bookmarks panel keeps each folder open or closed as you left it.
+- **Answer cards**: the copy button lines up with the other buttons again.
+- The guide in Spanish, Portuguese and French names the start page's goal option as the app does.
+
 ## 0.105.0 · 23 November 2026
 
 Word suggestions as you type, made on your own computer; schedules you can pause and delete wherever they show; and
