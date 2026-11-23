@@ -23,7 +23,7 @@ import { killAll, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
-import { gpuHold, personalDir, recoverPersonal } from './train.ts';
+import { GRACE, gpuHold, personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
@@ -66,6 +66,13 @@ if any(a.endswith('train.py') for a in args):
     log({'train': True, 'args': args, 'texts': len(texts), 'sha': hashlib.sha256(raw).hexdigest(), 'mode': oct(os.stat(a['--texts']).st_mode & 0o777), 'nice': os.nice(0), 'cvd': os.environ.get('CUDA_VISIBLE_DEVICES'), 'order': os.environ.get('CUDA_DEVICE_ORDER')})
     out({'progress': {'done': 1, 'total': 2}, 'loss': 3.0})
     os.makedirs(a['--out'], exist_ok=True)
+    if flag('trainslowterm'):
+        import signal
+        def slow(signum, frame):
+            time.sleep(1.0)
+            log({'termsaved': True})
+            sys.exit(143)
+        signal.signal(signal.SIGTERM, slow)
     if flag('trainhold'):
         while flag('trainhold'): time.sleep(0.05)
     if flag('trainfail'): sys.exit(1)
@@ -1125,6 +1132,35 @@ test('stop: what the run learned so far is dropped, the schedule waits its usual
 });
 const hasModel = () => fs.existsSync(path.join(personalDir(), 'model.safetensors'));
 
+test('pause: train.py gets time to save its resume state, a stop does not wait for it', async () => {
+  await resetTraining();
+  const was = { ...GRACE };
+  Object.assign(GRACE, { stop: 300, pause: 5000 });
+  flag('trainslowterm', true);
+  try {
+    await startHeld('A message for a run that is slow to leave when paused');
+    const saved = () => logLines().filter((l) => l.termsaved).length;
+    const n = saved();
+    await post('/api/suggest/train/pause');
+    await until('the run to end', async () => !svc.trainer.active);
+    assert.equal(saved(), n + 1, 'it was not killed before it had saved (it needs a second)');
+    // Stopped (or paused, then stopped), it is killed soon.
+    await del('/api/suggest/train');
+    await startHeld('A message for a run that is stopped');
+    const m = saved();
+    const t0 = Date.now();
+    await del('/api/suggest/train');
+    await until('the run to end', async () => !svc.trainer.active);
+    assert.ok(Date.now() - t0 < 900, 'killed after the short wait');
+    await sleep(1200);
+    assert.equal(saved(), m, 'and never saved');
+  } finally {
+    Object.assign(GRACE, was);
+    flag('trainslowterm', false);
+    flag('trainhold', false);
+  }
+});
+
 test('pause: turning learning off, word suggestions off, or Forget clears it', async () => {
   for (const [what, act] of [
     ['learning off', () => put({ personalise: false })],
@@ -1169,7 +1205,7 @@ test('the graphics card: the setting, a Mac, and the card with the most memory f
   assert.equal((await chooseDevice({ enabled: true, platform: 'darwin', arch: 'x64', env: {}, smi: smiOf(cards) })).device.kind, 'cpu');
   assert.equal((await chooseDevice({ enabled: true, platform: 'win32', arch: 'arm64', env: {}, smi: smiOf(cards) })).device.kind, 'cpu');
   const best = await choose({ smi: smiOf(cards, '12.4', calls) });
-  assert.deepEqual(best, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 1 }, tag: 'cu124' }, 'card 1: the most free, under half busy');
+  assert.deepEqual(best, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 1, freeMb: 24082 }, tag: 'cu124' }, 'card 1: the most free, under half busy');
   assert.deepEqual(calls[0], ['--query-gpu=index,name,memory.free,utilization.gpu', '--format=csv,noheader,nounits']);
   assert.equal((await choose({ platform: 'win32' })).device.kind, 'cuda', 'Windows too');
   // The server's own CUDA_VISIBLE_DEVICES: only those listed; an empty list is none.
@@ -1221,7 +1257,7 @@ test('the graphics card: nvidia-smi is run for real (a stand-in program), and it
   fs.writeFileSync(exe, `#!/bin/sh\nif [ -n "$1" ]; then printf '%s\\n' '${cards.split('\n').join("' '")}'; else echo '| NVIDIA-SMI 560.35  Driver Version: 560.35  CUDA Version: 12.6 |'; fi\n`, { mode: 0o755 });
   const env = { HYDOR_SUGGEST_NVIDIA_SMI: exe, CUDA_VISIBLE_DEVICES: '0,2' };
   const p = await chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env });
-  assert.deepEqual(p, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 0 }, tag: 'cu126' });
+  assert.deepEqual(p, { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 0, freeMb: 21070 }, tag: 'cu126' });
   const missing = await chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env: { HYDOR_SUGGEST_NVIDIA_SMI: '/nonexistent/nvidia-smi' } });
   assert.match(missing.why!, /No NVIDIA/);
 });
@@ -1235,10 +1271,11 @@ test('the graphics card: a run on a card (its set-up first, its environment, one
   let setupFails = false;
   let gate: Promise<void> = Promise.resolve();
   let kind: DevicePick['device']['kind'] = 'cuda';
+  let tight = false;
   svc.trainer.deps = {
     pick: async () => {
       picks.push(kind);
-      return kind === 'mps' ? { device: { kind: 'mps', name: 'Apple silicon' } } : { device: { kind: 'cuda', name: 'Fake RTX 4090', index: 3 }, tag: 'cu126' };
+      return kind === 'mps' ? { device: { kind: 'mps', name: 'Apple silicon' } } : { device: { kind: 'cuda', name: 'Fake RTX 4090', index: 3, ...(tight ? { freeMb: 4500 } : {}) }, tag: 'cu126' };
     },
     gpuReady: () => ready,
     setupGpu: async (tag, report, signal) => {
@@ -1270,7 +1307,7 @@ test('the graphics card: a run on a card (its set-up first, its environment, one
     const run = await until('the run on the card', async () => trainLog()[k]);
     const arg = (l: any, n: string) => l.args[l.args.indexOf(n) + 1];
     assert.equal(arg(run, '--device'), 'cuda');
-    assert.equal(arg(run, '--micro-tokens'), arg(run, '--batch-tokens'), 'the batch in one piece');
+    assert.equal(arg(run, '--micro-tokens'), arg(run, '--batch-tokens'), 'the batch in one piece on a card with room');
     assert.equal(run.cvd, '3', 'only the chosen card is visible to it');
     assert.equal(run.order, 'PCI_BUS_ID', 'numbered as nvidia-smi numbers them');
     assert.equal(run.nice, 19, 'its processor side stays at the lowest priority');
@@ -1290,7 +1327,17 @@ test('the graphics card: a run on a card (its set-up first, its environment, one
     assert.equal(arg(mac, '--device'), 'mps');
     assert.ok(!mac.args.includes('--micro-tokens'));
     await until('it to finish', async () => !svc.trainer.active);
+    // A card with little room: the smaller pieces.
+    tight = true;
     kind = 'cuda';
+    await addTyped('A message for the run on a card with little room');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    const small = await until('the run', async () => trainLog()[k]);
+    assert.equal(arg(small, '--device'), 'cuda');
+    assert.ok(!small.args.includes('--micro-tokens'), 'train.py’s own pieces, which fit in under 4 GB');
+    await until('it to finish', async () => !svc.trainer.active);
+    tight = false;
     // 3: the set-up fails: this run is on the processor, the card is left alone for a day, and the line says why.
     ready = false;
     setupFails = true;

@@ -235,7 +235,9 @@ export class SuggestService {
     const lastAt = this.trainedAt() || undefined;
     // Where it learns, and why not on the graphics card when the setting allows it: the hold of a day, else the last run's reason.
     const last = lastDevice(this.db);
-    const noGpu = this.st.trainGpu ? (gpuHold(this.db)?.why ?? last?.why) : undefined;
+    // (Not while the run is on a card: the last run's reason is out of date.)
+    const onCard = t.state === 'running' && !this.trainer.stopping && !!t.device && t.device.kind !== 'cpu';
+    const noGpu = this.st.trainGpu && !onCard ? (gpuHold(this.db)?.why ?? last?.why) : undefined;
     const extra = noGpu ? { noGpu } : {};
     const paused = this.paused();
     // (A run that was paused may still be ending: the page already has it as paused.)

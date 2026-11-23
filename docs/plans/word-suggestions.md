@@ -172,7 +172,8 @@ text (`--init` the personal model) and take minutes.
   schedule across restarts), resumed (`POST /api/suggest/train`) or stopped (`DELETE /api/suggest/train`: the work folder goes
   and the schedule counts it as an attempt). With `trainGpu` on, each run picks its device first (`server/suggest/gpu.ts`):
   an NVIDIA card with at least 4 GB free and under 50% use (the most free, among those `CUDA_VISIBLE_DEVICES` leaves), run
-  with `--device cuda --micro-tokens <batch>` from a second private environment (`venv-gpu`, PyTorch's CUDA build for the
+  with `--device cuda` (and `--micro-tokens <batch>`, the batch in one piece, when the card has 6 GB free; a card with less
+  keeps train.py's pieces of 1,024, which peak under 4 GB) from a second private environment (`venv-gpu`, PyTorch's CUDA build for the
   newest CUDA the driver supports), or `mps` on a Mac with Apple silicon. A card that cannot be set up or fails in a run
   makes that run (resumed) go on the processor, and holds the card back for a day.
 - **The texts**: the person's own typed words from sessions (`chunk_text` kind `user`, through `ownWords`, sessions

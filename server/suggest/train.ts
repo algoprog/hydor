@@ -10,7 +10,7 @@ import type { SuggestSettings, SuggestStatus, TrainDevice } from '../../shared/s
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { which } from '../documents/tools.ts';
 import { childEnv } from './engine.ts';
-import { chooseDevice, type DevicePick } from './gpu.ts';
+import { chooseDevice, GPU_ROOMY_MB, type DevicePick } from './gpu.ts';
 import { track } from './procs.ts';
 import { gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, suggestDir, trainScript } from './setup.ts';
 import { trainThreads } from './settings.ts';
@@ -111,6 +111,12 @@ export interface TrainHooks {
   /** Just before the new model takes the old one's place (the worker lets go of the files). */
   beforeSwap?(): void | Promise<void>;
 }
+
+/**
+ * How long train.py has to leave after SIGTERM before it is killed (ms). It saves its resume state at the end of the step it is
+ * in, which on a busy computer takes tens of seconds: a pause waits for that (it keeps the work), a stop does not need to.
+ */
+export const GRACE = { stop: 5000, pause: 3 * 60_000 };
 
 /** halted: the run was ended on purpose, by a stop (what it did is dropped) or a pause (it goes on from its resume state). */
 export type TrainOutcome = { ok: true; tokens?: number } | { ok: false; why: string; nothing?: boolean; halted?: 'stop' | 'pause' };
@@ -220,7 +226,7 @@ export class Trainer {
         try {
           if (p.exitCode == null) p.kill('SIGKILL');
         } catch {}
-      }, 5000);
+      }, this.halted === 'pause' ? GRACE.pause : GRACE.stop);
       t.unref?.();
     }
   }
@@ -291,25 +297,26 @@ export class Trainer {
       // Where to learn: the graphics card when there is one to use, else the processor (and why not, for the page).
       let pick = await this.choose(db, s);
       if (this.stopping) return fail(ended(), true);
+      const remember = (p: DevicePick) => kvSet(db, LAST_KEY, JSON.stringify({ device: { kind: p.device.kind, name: p.device.name }, ...(p.why ? { why: p.why } : {}) } satisfies LastDevice));
+      remember(pick);
       let python = pythonPath();
       if (pick.device.kind === 'cuda') {
         const prepared = await this.prepareGpu(db, pick.tag!, startedAt);
         if (this.stopping) return fail(ended(), true);
         if (prepared.ok) python = gpuPythonPath();
-        else pick = { device: { kind: 'cpu' }, why: prepared.why };
+        else remember((pick = { device: { kind: 'cpu' }, why: prepared.why }));
       }
       const attempt = (p: DevicePick, py: string) => {
         this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}`, device: { kind: p.device.kind, name: p.device.name } });
         return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p }), this.envFor(threads, p));
       };
-      kvSet(db, LAST_KEY, JSON.stringify({ device: { kind: pick.device.kind, name: pick.device.name }, ...(pick.why ? { why: pick.why } : {}) } satisfies LastDevice));
       let done = await attempt(pick, python);
       if (!done.ok && !done.nothing && !this.stopping && pick.device.kind !== 'cpu') {
         // The graphics card did not work (out of memory, a driver that fails): this run goes on at once on the processor from its
         // resume state, and the card is left alone for a day.
         const why = `Learning on the graphics card failed: ${done.why}`;
         holdGpu(db, why);
-        kvSet(db, LAST_KEY, JSON.stringify({ device: { kind: 'cpu' }, why } satisfies LastDevice));
+        remember({ device: { kind: 'cpu' }, why });
         done = await attempt({ device: { kind: 'cpu' } }, pythonPath());
         // A processor that fails the same way says it was not the card.
         if (!done.ok && !done.nothing && !this.stopping) releaseGpu(db);
@@ -379,9 +386,10 @@ export class Trainer {
     return [
       '-I', trainScript(), '--texts', o.texts, '--base', o.release, '--init', o.init, '--out', outDir(), '--replay', path.join(o.release, 'replay'),
       '--lr', '5e-4', '--batch-tokens', String(batch), '--w-user', String(o.s.userWeight), '--replay-ratio', '1.0', '--epochs', '1',
-      // Said outright, never `auto`: the processor unless the choice was a card. A card runs the batch in one piece (the same gradient).
+      // Said outright, never `auto`: the processor unless the choice was a card. A card with room runs the batch in one piece (the
+      // same gradient); one with less keeps train.py's smaller pieces.
       '--threads', String(o.threads), '--device', o.pick.device.kind, '--resume',
-      ...(o.pick.device.kind === 'cuda' ? ['--micro-tokens', String(batch)] : []),
+      ...(o.pick.device.kind === 'cuda' && (o.pick.device.freeMb ?? Infinity) >= GPU_ROOMY_MB ? ['--micro-tokens', String(batch)] : []),
     ];
   }
 

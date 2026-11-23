@@ -9,6 +9,11 @@ import type { TrainDevice } from '../../shared/suggest.ts';
 /** A card needs this much memory free (MiB) and must be less busy than this (percent) to be learned on. */
 export const GPU_NEED_MB = 4096;
 export const GPU_BUSY_MAX = 50;
+/**
+ * With this much free (MiB) a run does the whole batch in one piece (measured on an RTX 4090: about 5 GB at its peak); a
+ * card with less does it in pieces of 1,024 tokens (the same gradient, under 4 GB at its peak, a little slower).
+ */
+export const GPU_ROOMY_MB = 6144;
 
 export interface GpuInfo {
   index: number;
@@ -20,7 +25,7 @@ export interface GpuInfo {
 
 /** The answer: where to learn, and when it is the processor although the graphics card was wanted, why not. */
 export interface DevicePick {
-  device: TrainDevice & { /** cuda: the card's number (CUDA_VISIBLE_DEVICES for the run). */ index?: number };
+  device: TrainDevice & { /** cuda: the card's number (CUDA_VISIBLE_DEVICES for the run), and the memory free on it (MiB) when it was chosen. */ index?: number; freeMb?: number };
   why?: string;
   /** cuda: the PyTorch build to use, such as cu126 (the newest the driver supports). */
   tag?: string;
@@ -135,5 +140,5 @@ export async function chooseDevice(o: ChooseOptions): Promise<DevicePick> {
   if (!cuda) return { ...cpu, why: 'The graphics card driver did not say which CUDA version it supports' };
   const tag = wheelTag(cuda);
   if (!tag) return { ...cpu, why: `The graphics card driver is too old for PyTorch (it supports CUDA ${cuda[0]}.${cuda[1]}, PyTorch needs 11.8 or newer)` };
-  return { device: { kind: 'cuda', name: best.gpu.name, index: best.gpu.index }, tag };
+  return { device: { kind: 'cuda', name: best.gpu.name, index: best.gpu.index, freeMb: best.gpu.freeMb }, tag };
 }
