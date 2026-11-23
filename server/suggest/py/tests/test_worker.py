@@ -155,6 +155,46 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(seen[3], {'id': 3, 'cancelled': True})
         self.assertIn('word', seen[2])
 
+    def test_bad_lines_never_stop_the_reader(self):
+        w = self.start()
+        w.p.stdin.write(json.dumps({'id': 1, 'op': 'cancel', 'target': [1]}) + '\n')          # an unhashable target
+        w.p.stdin.write(json.dumps({'id': [2], 'op': 'stats'}) + '\n')                         # an id that is not an id
+        w.p.stdin.write(json.dumps([1, 2]) + '\n')
+        w.p.stdin.write(json.dumps({'id': 3, 'op': 'cancel'}) + '\n')                         # a cancel without a target
+        w.p.stdin.flush()
+        w.p.stdin.buffer.write(b'{"id": 4, "op": "stats", "x": "\xff\xfe"}\n')               # not UTF-8
+        w.p.stdin.buffer.flush()
+        w.send(id=5, op='stats')
+        got = {}
+        while 5 not in got:
+            m = w.get(30)
+            got[m['id'] if m['id'] is not None else 'none'] = m
+        self.assertIn('error', got[1])
+        self.assertIn('error', got[3])
+        self.assertIn('error', got['none'])
+        self.assertEqual(got[4]['requests'], 0)                                                # the bad byte was replaced, the line answered
+        self.assertIn('rss', got[5])
+        w.send(id=6, op='load', model_dir=self.release, threads=2)
+        self.assertTrue(w.answer(6)['ok'])                                                     # and the worker still works
+
+    def test_a_nan_is_an_error_answer_not_invalid_json(self):
+        from hydor_suggest.worker import Worker
+        import io
+        out = io.StringIO()
+        w = Worker(out)
+        with self.assertRaises(ValueError):
+            w.say({'id': 1, 'conf': float('nan')})
+        self.assertEqual(out.getvalue(), '')
+        class Boom:
+            requests, durations = 1, [1.0]
+            def percentile(self, q):
+                return float('nan')
+        w.engine = Boom()
+        w.handle({'id': 7, 'op': 'stats'})
+        answer = json.loads(out.getvalue())
+        self.assertEqual(answer['id'], 7)
+        self.assertIn('error', answer)
+
     def test_exits_when_stdin_closes(self):
         w = self.start()
         w.p.stdin.close()

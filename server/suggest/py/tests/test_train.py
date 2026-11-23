@@ -1,6 +1,7 @@
 import json
 import os
 import queue
+import shutil
 import signal
 import subprocess
 import sys
@@ -297,6 +298,165 @@ class TrainRunTests(unittest.TestCase):
         code, lines, err = run_train(self.release, self.texts, out, extra=['--resume'])
         self.assertEqual(code, 0, err)
         self.assertEqual(lines[0]['progress']['done'], 0)
+
+
+class RobustnessTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = helpers.tmpdir()
+        cls.release = os.path.join(cls.dir.name, 'release')
+        helpers.make_release(cls.release)
+        cls.texts = os.path.join(cls.dir.name, 'texts.jsonl')
+        write_texts(cls.texts)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def test_reading_the_texts_is_tolerant(self):
+        p = os.path.join(self.dir.name, 'odd.jsonl')
+        with open(p, 'wb') as f:
+            f.write(b'[1, 2]\n"a string"\n3\nnull\n')
+            f.write(json.dumps({'kind': 'user', 'text': 'good one', 'ts': 'abc'}).encode() + b'\n')
+            f.write(json.dumps({'kind': 'user', 'text': 'string ts', 'ts': '1700000000000'}).encode() + b'\n')
+            f.write(json.dumps({'kind': 'user', 'text': 'null ts', 'ts': None}).encode() + b'\n')
+            f.write(json.dumps({'kind': 'user', 'text': 'inf ts', 'ts': 1e999}).encode() + b'\n')
+            f.write(b'{"kind": "user", "text": "bad \xff\xfe byte", "ts": 1}\n')
+        recs = T.read_texts(p)
+        self.assertEqual([r['text'][:6] for r in recs], ['good o', 'string', 'null t', 'inf ts', 'bad \ufffd\ufffd'])
+        self.assertEqual([r['ts'] for r in recs], [0, 1700000000000, 0, 0, 1])
+
+    def test_holdout_defaults_follow_where_the_run_starts_from(self):
+        a = os.path.join(self.dir.name, 'h1')
+        code, lines, err = run_train(self.release, self.texts, a)                 # from the release: 5% held out
+        self.assertEqual(code, 0, err)
+        self.assertIn('dev_nll', lines[-1])
+        b = os.path.join(self.dir.name, 'h2')
+        code, lines, err = run_train(self.release, self.texts, b, init=a)          # from a personal model: nothing held out
+        self.assertEqual(code, 0, err)
+        self.assertNotIn('dev_nll', lines[-1])
+        self.assertNotIn('dev_nll_before', lines[-1])
+        with open(os.path.join(b, 'meta.json')) as f:
+            self.assertNotIn('dev_nll', json.load(f))
+        c = os.path.join(self.dir.name, 'h3')
+        code, lines, err = run_train(self.release, self.texts, c, init=a, extra=['--holdout', '0.1'])    # asked for explicitly
+        self.assertEqual(code, 0, err)
+        self.assertIn('dev_nll', lines[-1])
+        d = os.path.join(self.dir.name, 'h4')
+        code, lines, err = run_train(self.release, self.texts, d, extra=['--holdout', '0'])
+        self.assertEqual(code, 0, err)
+        self.assertNotIn('dev_nll', lines[-1])
+
+    def test_the_output_is_private(self):
+        out = os.path.join(self.dir.name, 'priv')
+        code, lines, err = run_train(self.release, self.texts, out)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(os.stat(out).st_mode & 0o777, 0o700)
+        for name in os.listdir(out):
+            self.assertEqual(os.stat(os.path.join(out, name)).st_mode & 0o777, 0o600, name)
+
+    def test_a_non_finite_step_is_skipped_and_non_finite_weights_are_never_saved(self):
+        # a release whose weights contain a nan: every step is non-finite, the run must not write a model
+        with helpers.tmpdir() as d:
+            rel = os.path.join(d, 'r')
+            helpers.make_release(rel)
+            from safetensors.torch import load_file, save_file
+            sd = load_file(os.path.join(rel, 'model.safetensors'))
+            sd['blocks.0.n1.weight'] = sd['blocks.0.n1.weight'].clone()
+            sd['blocks.0.n1.weight'][0] = float('nan')
+            save_file(sd, os.path.join(rel, 'model.safetensors'))
+            out = os.path.join(d, 'o')
+            code, lines, err = run_train(rel, self.texts, out)
+            self.assertEqual(code, 1, err)
+            self.assertIn('non-finite', lines[-1]['error'])
+            self.assertTrue(any(l.get('skipped') for l in lines if 'progress' in l))
+            self.assertFalse(os.path.exists(os.path.join(out, 'model.safetensors')))
+            for l in lines:                                                        # every line is valid JSON without NaN
+                json.dumps(l, allow_nan=False)
+
+    def test_say_never_writes_nan(self):
+        self.assertEqual(T._finite({'a': float('nan'), 'b': [1.0, float('inf')], 'c': {'d': 2}}), {'a': None, 'b': [1.0, None], 'c': {'d': 2}})
+
+    def test_a_failed_resume_starts_again_from_the_init_weights(self):
+        out = os.path.join(self.dir.name, 'rs1')
+        ref = os.path.join(self.dir.name, 'rs1ref')
+        code, ref_lines, err = run_train(self.release, self.texts, ref, extra=['--epochs', '2'])
+        self.assertEqual(code, 0, err)
+        # a resume state with the right signature but a broken optimizer part
+        p = run_train(self.release, self.texts, out, extra=['--epochs', '2'], wait=False)
+        q: queue.Queue = queue.Queue()
+        threading.Thread(target=lambda: [q.put(l) for l in p.stdout], daemon=True).start()
+        n = 0
+        while n < 2:
+            n = json.loads(q.get(timeout=120)).get('progress', {}).get('done', 0)
+        p.send_signal(signal.SIGTERM)
+        p.wait(timeout=60)
+        p.stdout.close()
+        p.stderr.close()
+        path = os.path.join(out, '.resume', 'state.pt')
+        state = torch.load(path, map_location='cpu', weights_only=True)
+        state['opt'] = {'state': {0: {'exp_avg': torch.zeros(1)}}, 'param_groups': 'broken'}
+        torch.save(state, path)
+        code, lines, err = run_train(self.release, self.texts, out, extra=['--epochs', '2', '--resume'])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(lines[0]['progress']['done'], 0)                          # started again, not from the checkpoint's step
+        from safetensors.torch import load_file
+        a, b = load_file(os.path.join(out, 'model.safetensors')), load_file(os.path.join(ref, 'model.safetensors'))
+        self.assertLess(max(float((a[k] - b[k]).abs().max()) for k in a), 1e-3)    # the same model as a clean run
+
+    def test_the_resume_state_is_plain_data_and_loads_safely(self):
+        out = os.path.join(self.dir.name, 'rs2')
+        p = run_train(self.release, self.texts, out, extra=['--epochs', '2'], wait=False)
+        q: queue.Queue = queue.Queue()
+        threading.Thread(target=lambda: [q.put(l) for l in p.stdout], daemon=True).start()
+        n = 0
+        while n < 1:
+            n = json.loads(q.get(timeout=120)).get('progress', {}).get('done', 0)
+        p.send_signal(signal.SIGTERM)
+        p.wait(timeout=60)
+        p.stdout.close()
+        p.stderr.close()
+        path = os.path.join(out, '.resume', 'state.pt')
+        state = torch.load(path, map_location='cpu', weights_only=True)            # would raise on anything but tensors and plain data
+        self.assertEqual(os.stat(os.path.dirname(path)).st_mode & 0o777, 0o700)
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        self.assertEqual(state['replay_rng'][0], 'MT19937')
+        rng = np.random.RandomState(3)
+        rng.randint(0, 100, size=7)
+        plain = T.rng_to_plain(rng)
+        other = np.random.RandomState(0)
+        T.rng_from_plain(other, json.loads(json.dumps(plain)))
+        self.assertEqual(rng.randint(0, 1000, size=5).tolist(), other.randint(0, 1000, size=5).tolist())
+        old = os.path.join(self.dir.name, 'old.pt')                                # a file of the older kind (a numpy tuple) still loads
+        torch.save({'x': np.random.RandomState(1).get_state()}, old)
+        self.assertIn('x', T.load_resume(old))
+
+    def test_the_resume_signature_follows_the_init_weights_and_the_holdout(self):
+        out = os.path.join(self.dir.name, 'rs3')
+        def stopped(extra, rel):
+            p = run_train(rel, self.texts, out, extra=['--epochs', '3', *extra], wait=False)
+            q: queue.Queue = queue.Queue()
+            threading.Thread(target=lambda: [q.put(l) for l in p.stdout], daemon=True).start()
+            n = 0
+            while n < 2:
+                n = json.loads(q.get(timeout=120)).get('progress', {}).get('done', 0)
+            p.send_signal(signal.SIGTERM)
+            p.wait(timeout=60)
+            p.stdout.close()
+            p.stderr.close()
+        stopped([], self.release)
+        path = os.path.join(out, '.resume', 'state.pt')
+        sig0 = torch.load(path, map_location='cpu', weights_only=True)['sig']
+        shutil.rmtree(out)
+        stopped(['--holdout', '0.2'], self.release)
+        self.assertNotEqual(torch.load(path, map_location='cpu', weights_only=True)['sig'], sig0)      # the hold-out is in it
+        shutil.rmtree(out)
+        with helpers.tmpdir() as d:                                                # same size, another time and another content
+            rel = os.path.join(d, 'r')
+            shutil.copytree(self.release, rel)
+            os.utime(os.path.join(rel, 'model.safetensors'), (1, 1))
+            stopped([], rel)
+            self.assertNotEqual(torch.load(path, map_location='cpu', weights_only=True)['sig'], sig0)
 
 
 if __name__ == '__main__':

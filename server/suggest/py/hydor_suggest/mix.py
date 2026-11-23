@@ -13,6 +13,7 @@ from typing import Optional
 
 import numpy as np
 
+LOGIT_LIMIT = 30.0
 FEATURES = ['llm_entropy', 'llm_maxp', 'slm_entropy', 'slm_maxp', 'slm_unk', 'log1p_pos', 'word_start']
 
 
@@ -43,7 +44,9 @@ class Gate:
     def lam(self, feats) -> float:
         f = np.asarray(feats, dtype=np.float64)
         z = (f - np.asarray(self.mu)) / np.asarray(self.sd)
-        return float(1.0 / (1.0 + math.exp(-float(z @ np.asarray(self.w) + self.b))))
+        logit = float(z @ np.asarray(self.w) + self.b)
+        logit = 0.0 if logit != logit else min(max(logit, -LOGIT_LIMIT), LOGIT_LIMIT)            # a feature with a tiny sd (slm_unk) can give a huge z
+        return 1.0 / (1.0 + math.exp(-logit))
 
     @staticmethod
     def from_dict(d: dict) -> 'Gate':

@@ -21,11 +21,13 @@ from . import mix as mix_mod
 from . import vocab as V
 from .decode import decode, next_word_text, text_after
 from .lid import Lid, mostly_letters
-from .llm import LlamaClient, LlmError, dense_from_top
+from .llm import LlamaClient, LlmError, LlmUnavailable, dense_from_top
 from .model import SLM, State, build_model, config_from_dict, last_logits
 from .tokbytes import PrefixIndex, end_token_ids, token_bytes
 
 FORMAT = 'hydor-suggest/1'
+LLM_BACKOFF = 30.0                   # seconds the language model is left alone after it failed
+ENC_MAX_CHARS = 2_000_000            # the characters the token-id cache may hold
 DEFAULTS = {'k': 1000, 'typed_words': 100, 'context_words': 100, 'max_tokens': 8, 'sessions': 20}
 PERSONAL_LANG_TOKENS = 2000          # the person's own tokens in a language from which the personal model counts as trained on it
 MAX_TYPED_BYTES = 128
@@ -162,8 +164,11 @@ class Engine:
         self.client: Optional[LlamaClient] = None
         self.opts = dict(DEFAULTS)
         self.caches: Optional[cache_mod.SessionCaches] = None
-        self._session_texts: dict = {}
+        self._session_texts: OrderedDict = OrderedDict()
         self._enc: OrderedDict = OrderedDict()
+        self._enc_chars = 0
+        self._clock: Callable = time.monotonic
+        self.llm_down_until = 0.0
         self.llm_error: Optional[str] = None
         self.requests = 0
         self.durations: list = []
@@ -171,48 +176,64 @@ class Engine:
     # ---- loading ----------------------------------------------------------------------------------------------------------
     def load(self, model_dir: str, personal_dir: Optional[str] = None, llm_url: Optional[str] = None, threads: int = 0,
              options: Optional[dict] = None) -> dict:
+        """Load a release and the personal model, and connect the language model. Everything is built before anything is swapped in: a
+        load that fails leaves the engine as it was."""
         if threads and threads > 0:
             torch.set_num_threads(int(threads))
-        self.opts = dict(DEFAULTS)
-        self.opts.update({k: v for k, v in (options or {}).items() if v is not None})
-        if self.release is None or os.path.abspath(self.release.folder) != os.path.abspath(model_dir):
-            self.release = Release(model_dir)
-        rel = self.release
-        model, kind, self.languages = None, 'base', {}
-        self.gate = rel.gate
+        opts = dict(DEFAULTS)
+        opts.update({k: v for k, v in (options or {}).items() if v is not None})
+        same = self.release is not None and os.path.abspath(self.release.folder) == os.path.abspath(model_dir)
+        rel = self.release if same else Release(model_dir)
+        model, kind, languages, gate = None, 'base', {}, rel.gate
         personal_error = None
         if personal_dir and os.path.isfile(os.path.join(personal_dir, 'model.safetensors')):
             try:
                 cfg = config_from_dict(_read_json(os.path.join(personal_dir, 'config.json')).get('slm') or rel.config['slm'])
-                model = build_model(cfg, _load_safetensors(os.path.join(personal_dir, 'model.safetensors')))
                 if cfg.vocab != rel.slm_config.vocab:
                     raise ValueError('the personal model has another vocabulary')
-                kind = 'personal'
+                model = build_model(cfg, _load_safetensors(os.path.join(personal_dir, 'model.safetensors')))
                 mp = os.path.join(personal_dir, 'meta.json')
                 if os.path.isfile(mp):
-                    self.languages = {str(k): int(v) for k, v in (_read_json(mp).get('languages') or {}).items()}
+                    languages = {str(k): int(v) for k, v in (_read_json(mp).get('languages') or {}).items()}
                 gp = os.path.join(personal_dir, 'gate.json')
                 if os.path.isfile(gp):
-                    self.gate = mix_mod.Gate.load(gp)
+                    gate = mix_mod.Gate.load(gp)
+                kind = 'personal'
             except Exception as e:                    # a broken personal model never stops the base one
-                model, kind, self.languages, self.gate = None, 'base', {}, rel.gate
+                model, kind, languages, gate = None, 'base', {}, rel.gate
                 personal_error = str(e)
         if model is None:
             model = build_model(rel.slm_config, rel.state_dict)
-        self.model, self.kind = model, kind
-        self.runner = SlmRunner(model)
-        self.runner.prepare([V.BOS, V.DOC])            # warms the threads and gives the first request a state
+        runner = SlmRunner(model)
+        runner.prepare([V.BOS, V.DOC])                 # warms the threads and gives the first request a state
+        client = LlamaClient(llm_url, int(opts['k'])) if llm_url else None
+        # nothing failed: swap it all in
         if self.client is not None:
             self.client.close()
-        self.client = LlamaClient(llm_url, int(self.opts['k'])) if llm_url else None
-        self.llm_error = None
-        self.caches = cache_mod.SessionCaches(rel.V, int(self.opts['sessions']))
+        if not same:
+            self._enc.clear()
+            self._enc_chars = 0
+        self.opts, self.release, self.model, self.kind, self.languages, self.gate = opts, rel, model, kind, languages, gate
+        self.runner, self.client, self.llm_error, self.llm_down_until = runner, client, None, 0.0
+        self.caches = cache_mod.SessionCaches(rel.V, int(opts['sessions']))
         for session, texts in list(self._session_texts.items()):
             self._set_session_cache(session, texts)
-        out = {'model': kind, 'languages': dict(self.languages)}
+        out = {'model': kind, 'languages': dict(languages)}
         if personal_error:
             out['personal_error'] = personal_error
         return out
+
+    # ---- the language model's health -------------------------------------------------------------------------------------
+    def llm(self) -> Optional[LlamaClient]:
+        """The language model's client, or None when there is none or it failed less than LLM_BACKOFF seconds ago (plans are then made as
+        if there were no language model: it is not asked again, and a hung server is not waited for at every keystroke)."""
+        if self.client is None or self._clock() < self.llm_down_until:
+            return None
+        return self.client
+
+    def _llm_failed(self, error: Exception) -> None:
+        self.llm_error = str(error)
+        self.llm_down_until = self._clock() + LLM_BACKOFF
 
     # ---- tokens -----------------------------------------------------------------------------------------------------------
     def encode(self, text: str) -> np.ndarray:
@@ -223,19 +244,29 @@ class Engine:
         if hit is None:
             hit = np.asarray(self.release.tok.encode(text, add_special_tokens=False).ids, dtype=np.int64)
             self._enc[text] = hit
-            if len(self._enc) > 4096:
-                self._enc.popitem(last=False)
+            self._enc_chars += len(text)
+            while self._enc and (len(self._enc) > 4096 or self._enc_chars > ENC_MAX_CHARS):      # bounded by entries and by characters
+                old, _ = self._enc.popitem(last=False)
+                self._enc_chars -= len(old)
         else:
             self._enc.move_to_end(text)
         return hit
 
     # ---- sessions ---------------------------------------------------------------------------------------------------------
-    def session(self, session: str, texts: list) -> None:
+    def session(self, session, texts: list) -> None:
+        """The earlier texts of a session, for its cache. The last `sessions` sessions are kept (least recently used out); ids are strings."""
+        session = str(session)
+        self._session_texts.pop(session, None)                 # re-inserted last: the order is the order of use
         self._session_texts[session] = [V.nfc(t) for t in texts if t]
         while len(self._session_texts) > int(self.opts['sessions']):
-            self._session_texts.pop(next(iter(self._session_texts)))
+            self._session_texts.popitem(last=False)
         if self.caches is not None:
             self._set_session_cache(session, self._session_texts[session])
+
+    @staticmethod
+    def _session_id(req: dict) -> Optional[str]:
+        sid = req.get('session')
+        return None if sid is None or sid == '' else str(sid)
 
     def _set_session_cache(self, session: str, texts: list) -> None:
         self.caches.set(session, [self.encode(t) for t in texts])
@@ -253,8 +284,8 @@ class Engine:
             if mostly_letters(f'{ctx_text} {typed_text}' if short else typed_text):
                 lang, _, _ = rel.lid.guess(ids)
         if surface == 'doc':
-            return ('llm' if self.client else 'slm'), lang
-        if not self.client:
+            return ('llm' if self.llm() else 'slm'), lang
+        if not self.llm():
             return 'slm', lang
         if lang is not None and self.languages.get(lang, 0) >= PERSONAL_LANG_TOKENS:
             return 'mix', lang
@@ -270,7 +301,7 @@ class Engine:
         if surface not in ('chat', 'doc', 'text'):
             raise ValueError(f'unknown surface {surface!r}')
         text = V.nfc(req.get('text') or '')
-        typed_words = int(req.get('typed_words') or o['typed_words'])
+        typed_words = int(req['typed_words']) if req.get('typed_words') is not None else int(o['typed_words'])
         ctx_words = int(req['context_words']) if req.get('context_words') is not None else int(o['context_words'])
         ctx_text, R_str = V.split_typed(text)
         target_text = V.last_words(ctx_text, typed_words)
@@ -302,7 +333,9 @@ class Engine:
         want_cache = bool(req.get('cache', True)) and surface == 'chat' and self.caches is not None
         extras, extra_key = [], None
         if want_cache:
-            sess = req.get('session')
+            sess = self._session_id(req)
+            if sess in self._session_texts:
+                self._session_texts.move_to_end(sess)             # used: the last to be forgotten
             known = {hash(t) for t in self._session_texts.get(sess, ())} if sess else set()
             texts = [t for t in (V.nfc(req.get('reply') or ''), V.nfc(req.get('prev') or '')) if t and hash(t) not in known]
             extras = [self.encode(t) for t in texts]
@@ -317,7 +350,10 @@ class Engine:
         except LlmError as e:                       # the language model stopped answering: this suggestion comes from the small model
             if plan == 'slm':
                 raise
-            self.llm_error = str(e)
+            if isinstance(e, LlmUnavailable):
+                self._llm_failed(e)                 # the server is not there: not asked again for a while
+            else:
+                self.llm_error = str(e)             # no answer for this prompt only: the next request asks again
             used, stats = 'slm', {'llm': stats['llm'], 'slm': 0.0}
             result = self._decode('slm', *args, stats)
         t_llm, t_slm = stats['llm'], stats['slm']
@@ -351,7 +387,7 @@ class Engine:
         cs = None
         added = 0
         if want_cache:
-            cs = self.caches.state(req.get('session'), extras, extra_key)
+            cs = self.caches.state(self._session_id(req), extras, extra_key)
             cs.add_sequence(target_ids.tolist())
         memo: dict = {}
         target_list = [int(x) for x in target_ids]

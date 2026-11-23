@@ -122,6 +122,7 @@ class FakeLlama:
 
     def __init__(self, vocab, script=None, delay=0.0):
         self.vocab, self.delay = vocab, delay
+        self.drop_probs = None           # a function (body) -> bool: answer without probabilities, as llama-server does for part of a character
         self.close_each = False          # answer with Connection: close, as a server that drops idle connections
         self.requests = []
         self.script = script or self._default
@@ -142,6 +143,8 @@ class FakeLlama:
                     time.sleep(outer.delay)
                 k = int(body.get('n_probs') or 1)
                 top = [{'id': int(i), 'token': f't{i}', 'logprob': float(lp), 'bytes': []} for i, lp in outer.script(body['prompt'])[:k]]
+                if outer.drop_probs and outer.drop_probs(body):
+                    top = []
                 cp = [{'id': top[0]['id'], 'logprob': top[0]['logprob'], 'top_logprobs': top}] if top else []
                 data = json.dumps({'content': '', 'completion_probabilities': cp}).encode()
                 self.send_response(200)
@@ -154,6 +157,7 @@ class FakeLlama:
                 self.wfile.write(data)
 
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.server.handle_error = lambda *a: None          # a client that timed out and left is not an error of the fake
         self.url = f'http://127.0.0.1:{self.server.server_address[1]}'
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
