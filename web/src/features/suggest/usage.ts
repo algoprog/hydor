@@ -30,13 +30,15 @@ export function discardUsage(): void {
  * Send what is in the batch. A request the network lost, or the server could not answer, goes back in the batch for
  * the next time; one the server refused (a version without the route) is dropped. `leaving`: the page is being hidden.
  */
-export async function flushUsage(leaving = false): Promise<void> {
+export async function flushUsage(_leaving = false): Promise<void> {
   clearTimeout(timer);
   timer = undefined;
   if (!hasCounts(pending)) return;
   const pieces = splitCounts(pending);
   pending = noCounts();
-  const sent = await Promise.allSettled(pieces.map((p) => api<{ usage: SuggestUsage }>('/api/suggest/usage', { method: 'POST', body: p, keepalive: leaving })));
+  // Always a request that outlives the page (a few bytes, far under keepalive's limit): one on its way as the tab closes
+  // or the page is left is not cut off, and what it carried is not lost.
+  const sent = await Promise.allSettled(pieces.map((p) => api<{ usage: SuggestUsage }>('/api/suggest/usage', { method: 'POST', body: p, keepalive: true })));
   let again = false;
   sent.forEach((r, i) => {
     if (r.status === 'fulfilled') {
