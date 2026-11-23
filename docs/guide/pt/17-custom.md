@@ -133,7 +133,7 @@ Em uma [sessão confidencial](/guide/sessions#keep-a-session-confidential), todo
 
 ## Dar um objetivo ao Custom
 
-O Custom tem os mesmos objetivos que todos os outros agentes: o próprio ciclo do app o conduz, rodada após rodada, até que as verificações que você aprovou sejam satisfeitas. Abra o menu da sessão (⋯) → **Definir um objetivo**, ou ative **Opções** → **Gol** na página inicial, e o agente propõe as verificações para você aprovar. A cada rodada, o app executa as verificações por conta própria, mantém a rodada ou a desfaz (em um worktree), pergunta a você que rumo tomar nos pontos de virada e para quando todas as verificações são satisfeitas, quando você o interrompe ou quando um limite é atingido. A história completa, com as telas, está em [Objetivos](/guide/goals).
+O Custom tem os mesmos objetivos que todos os outros agentes: o próprio ciclo do app o conduz, rodada após rodada, até que as verificações que você aprovou sejam satisfeitas. Abra o menu da sessão (⋯) → **Definir um objetivo**, ou ative **Opções** → **Objetivo** na página inicial, e o agente propõe as verificações para você aprovar. A cada rodada, o app executa as verificações por conta própria, mantém a rodada ou a desfaz (em um worktree), pergunta a você que rumo tomar nos pontos de virada e para quando todas as verificações são satisfeitas, quando você o interrompe ou quando um limite é atingido. A história completa, com as telas, está em [Objetivos](/guide/goals).
 
 O que agora é igual para todos os agentes: o cartão de acordo, as verificações, a lista de rodadas, as perguntas, suas regras e **Sua decisão**, e o relatório. Digitar `/goal` em uma sessão do Custom não faz mais nada de especial: é texto comum. Duas coisas são específicas do Custom:
 
