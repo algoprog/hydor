@@ -107,6 +107,25 @@ class EngineTests(unittest.TestCase):
         self.assertFalse(out['word'].startswith('fo') and len(out['word']) > 8)
         self.assertEqual(out['word'], out['word'].rstrip())
 
+    def test_typed_words_and_context_words_limit_what_is_read(self):
+        e = self.engine()
+        text = ' '.join(f'w{i}' for i in range(30)) + ' wor'
+        reply = ' '.join(f'r{i}' for i in range(30))
+        full = e.prepare({'surface': 'chat', 'text': text, 'reply': reply})
+        few = e.prepare({'surface': 'chat', 'text': text, 'reply': reply, 'typed_words': 5, 'context_words': 3})
+        none = e.prepare({'surface': 'chat', 'text': text, 'reply': reply, 'context_words': 0})
+        self.assertEqual(few.target_text, 'w25 w26 w27 w28 w29')
+        self.assertEqual(few.agent_ctx, 'r27 r28 r29')
+        self.assertEqual(full.target_text.split()[0], 'w0')
+        self.assertEqual(none.agent_ctx, '')
+        self.assertEqual(none.slm_ids[:2], [V.BOS, V.USER])
+        self.assertLess(len(few.llm_prompt), len(full.llm_prompt))
+        doc = e.prepare({'surface': 'doc', 'text': 'a b c', 'doc': reply, 'context_words': 2})
+        self.assertEqual(doc.doc_ctx, 'r28 r29')
+        e.opts['typed_words'] = 7                                   # the load options are the default
+        self.assertEqual(e.prepare({'surface': 'chat', 'text': text}).target_text.count(' '), 6)
+        self.assertEqual(e.suggest({'surface': 'chat', 'text': text, 'reply': reply, 'typed_words': 5, 'context_words': 0})['plan'], 'slm')
+
     def test_empty_and_overlong_typed_words(self):
         e = self.engine()
         out = e.suggest({'surface': 'text', 'text': ''})
