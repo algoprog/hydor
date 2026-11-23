@@ -91,6 +91,9 @@ async function startServer() {
     // The graphics card left alone when asked (HYDOR_VIDEO_GPU=off: videos made on the processor, the card never tried).
     ...(process.env.HYDOR_VIDEO_GPU ? { HYDOR_VIDEO_GPU: process.env.HYDOR_VIDEO_GPU } : {}),
     ...(process.env.CUDA_VISIBLE_DEVICES !== undefined ? { CUDA_VISIBLE_DEVICES: process.env.CUDA_VISIBLE_DEVICES } : {}),
+    // Word suggestions with what is already on this computer (a Python with its libraries, the model files, the GGUF,
+    // llama-server), so a picture can show them without the demo downloading anything; without these they stay off.
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^HYDOR_SUGGEST(_|$)/.test(k))),
   };
   const log = fs.openSync(path.join(demo, 'server.log'), 'a');
   server = spawn(process.execPath, [path.join(o.root, 'dist/server/index.js')], { cwd: home, env, stdio: ['ignore', log, log] });
