@@ -57,17 +57,39 @@ class Seq(NamedTuple):
     nbytes: int
 
 
+def _finite(x):
+    """The object with every float that is not finite (nan, inf) as None: the output is always valid JSON."""
+    if isinstance(x, float):
+        return x if math.isfinite(x) else None
+    if isinstance(x, dict):
+        return {k: _finite(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_finite(v) for v in x]
+    return x
+
+
 def say(obj: dict) -> None:
-    sys.stdout.write(json.dumps(obj, separators=(',', ':')) + '\n')
+    sys.stdout.write(json.dumps(_finite(obj), separators=(',', ':'), allow_nan=False) + '\n')
     sys.stdout.flush()
 
 
 # ===================================================================================================================
 # The texts -> sequences
 # ===================================================================================================================
+def _ts(x) -> int:
+    """A timestamp as an int: numbers and numeric strings; anything else is 0."""
+    try:
+        v = float(x)
+        return int(v) if math.isfinite(v) else 0
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def read_texts(path: str) -> list:
+    """The records of the texts file that are text. A line that is not a JSON object, has another kind, or has no text is skipped; a ts
+    that is not a number is 0; bytes that are not UTF-8 are replaced."""
     out = []
-    with open(path, encoding='utf-8') as f:
+    with open(path, encoding='utf-8', errors='replace') as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -76,11 +98,13 @@ def read_texts(path: str) -> list:
                 r = json.loads(line)
             except ValueError:
                 continue
+            if not isinstance(r, dict):
+                continue
             kind = r.get('kind')
             text = V.nfc(str(r.get('text') or '')).strip()
             if kind not in ('user', 'agent', 'doc') or not text:
                 continue
-            out.append({'kind': kind, 'text': text, 'ts': int(r.get('ts') or 0), 'reply': V.nfc(str(r.get('reply') or ''))})
+            out.append({'kind': kind, 'text': text, 'ts': _ts(r.get('ts')), 'reply': V.nfc(str(r.get('reply') or ''))})
     return out
 
 
@@ -367,10 +391,45 @@ def file_signature(path: str) -> str:
     return h.hexdigest()
 
 
+def private_file(path: str) -> str:
+    """Create the file (empty) readable by this user only, so whatever is written into it never has wider rights."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.close(fd)
+    return path
+
+
+def private_dir(path: str) -> None:
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        pass
+
+
 def write_atomic(path: str, data: bytes) -> None:
-    with open(path + '.tmp', 'wb') as f:
+    tmp = private_file(path + '.tmp')
+    with open(tmp, 'wb') as f:
         f.write(data)
-    os.replace(path + '.tmp', path)
+    os.replace(tmp, path)
+
+
+def rng_to_plain(rng: np.random.RandomState) -> list:
+    name, keys, pos, has_gauss, cached = rng.get_state()
+    return [name, [int(k) for k in keys], int(pos), int(has_gauss), float(cached)]
+
+
+def rng_from_plain(rng: np.random.RandomState, state: list) -> None:
+    name, keys, pos, has_gauss, cached = state
+    rng.set_state((name, np.array(keys, dtype=np.uint32), pos, has_gauss, cached))
+
+
+def load_resume(path: str) -> dict:
+    """The resume state: tensors and plain data only, so it loads with weights_only; a file from an older run (it is our own private
+    file) that does not is loaded the other way."""
+    try:
+        return torch.load(path, map_location='cpu', weights_only=True)
+    except Exception:
+        return torch.load(path, map_location='cpu', weights_only=False)
 
 
 def main(argv=None) -> None:
@@ -391,7 +450,7 @@ def main(argv=None) -> None:
     p.add_argument('--micro-tokens', type=int, default=1024, help='padded tokens of one forward and backward (a batch is run in pieces of this size: the same gradient, less memory)')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--warmup', type=int, default=50)
-    p.add_argument('--holdout', type=float, default=0.05, help="the share of the person's messages, the latest, kept out for the dev loss")
+    p.add_argument('--holdout', type=float, default=None, help="the share of the person's messages, the latest, kept out for the dev loss (default 0.05 when starting from the release; 0 when --init is a personal model, whose later messages would otherwise never be learned from)")
     a = p.parse_args(argv)
     t_start = time.time()
     torch.set_num_threads(a.threads if a.threads > 0 else max(1, (os.cpu_count() or 2) // 2))
@@ -417,13 +476,15 @@ def main(argv=None) -> None:
         with open(os.path.join(init, 'meta.json'), encoding='utf-8') as f:
             prev_meta = json.load(f)
     lid = Lid.load(a.base)
+    personal_init = os.path.realpath(init) != os.path.realpath(a.base)
+    holdout = a.holdout if a.holdout is not None else (0.0 if personal_init else 0.05)
 
     # ---- the texts ----
     records = read_texts(a.texts)
     tokens = Tokens(tok)
     built = build_sequences(records, tokens, st.w_user)
     user_idx = sorted((ri for ri, r in enumerate(records) if r['kind'] == 'user'), key=lambda i: records[i]['ts'])
-    n_dev = int(len(user_idx) * a.holdout) if len(user_idx) >= 20 else 0
+    n_dev = int(len(user_idx) * holdout) if len(user_idx) >= 20 else 0
     dev_records = set(user_idx[len(user_idx) - n_dev:]) if n_dev else set()
     train_seqs = [s for ri, s in built if ri not in dev_records]
     dev_seqs = [dev_version(s) for ri, s in built if ri in dev_records]
@@ -443,26 +504,31 @@ def main(argv=None) -> None:
     plan = make_plan(lengths, st.batch_tokens, rng, st.epochs)
     total = len(plan)
     warmup = min(st.warmup, max(1, total // 10))
+    model.to(device)
     opt = make_optimizer(model, st.lr, st.wd)
     replay_rng = np.random.RandomState(st.seed + 7)
     resume_dir = os.path.join(a.out, '.resume')
     sig = hashlib.sha1(json.dumps([file_signature(a.texts), [st.lr, st.batch_tokens, st.w_user, st.replay_ratio, st.epochs, st.seed, warmup],
-                                   base_cfg.get('slm'), os.path.getsize(os.path.join(init, 'model.safetensors')),
-                                   len(replay) if replay is not None else 0]).encode()).hexdigest()
-    os.makedirs(a.out, exist_ok=True)
+                                   base_cfg.get('slm'), [os.stat(os.path.join(init, 'model.safetensors')).st_size,
+                                                         os.stat(os.path.join(init, 'model.safetensors')).st_mtime_ns],
+                                   len(replay) if replay is not None else 0, round(holdout, 6)]).encode()).hexdigest()
+    private_dir(a.out)
     step, trained_tokens = 0, 0
     if a.resume and os.path.isfile(os.path.join(resume_dir, 'state.pt')):
         try:
-            state = torch.load(os.path.join(resume_dir, 'state.pt'), map_location='cpu', weights_only=False)
+            state = load_resume(os.path.join(resume_dir, 'state.pt'))
             if state.get('sig') == sig:
+                opt.load_state_dict(state['opt'])             # the optimizer first: if either fails, the weights below are the init's
                 model.load_state_dict(state['model'])
-                opt.load_state_dict(state['opt'])
-                replay_rng.set_state(state['replay_rng'])
+                rng_from_plain(replay_rng, state['replay_rng'])
                 step, trained_tokens = int(state['step']), int(state['tokens'])
         except Exception as e:
             print(f'could not resume: {e}', file=sys.stderr)
+            # a half-applied resume must not leave the checkpoint's weights under a fresh plan: start again from what we were given
+            model.load_state_dict(load_file(os.path.join(init, 'model.safetensors')), strict=False)
+            opt = make_optimizer(model, st.lr, st.wd)
+            replay_rng = np.random.RandomState(st.seed + 7)
             step, trained_tokens = 0, 0
-    model.to(device)
     dev_before = eval_nll(model, dev_seqs, bf16=st.bf16, device=device) if dev_seqs and step == 0 else None
 
     stop = {'now': False}
@@ -476,10 +542,10 @@ def main(argv=None) -> None:
             pass
 
     def save_resume():
-        os.makedirs(resume_dir, exist_ok=True)
-        tmp = os.path.join(resume_dir, 'state.pt.tmp')
+        private_dir(resume_dir)
+        tmp = private_file(os.path.join(resume_dir, 'state.pt.tmp'))
         torch.save({'sig': sig, 'model': {k: v.detach().cpu() for k, v in model.state_dict().items()}, 'opt': opt.state_dict(),
-                    'replay_rng': replay_rng.get_state(), 'step': step, 'tokens': trained_tokens}, tmp)
+                    'replay_rng': rng_to_plain(replay_rng), 'step': step, 'tokens': trained_tokens}, tmp)
         os.replace(tmp, os.path.join(resume_dir, 'state.pt'))
 
     say({'progress': {'done': step, 'total': total}})
@@ -509,11 +575,15 @@ def main(argv=None) -> None:
             g['lr'] = lr_at(step, total, st.lr, warmup)
         opt.zero_grad(set_to_none=True)
         loss, ntok = train_step(model, b, a.micro_tokens, st.bf16, device)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), st.clip)
-        opt.step()
+        gnorm = float(torch.nn.utils.clip_grad_norm_(model.parameters(), st.clip))
+        finite = math.isfinite(loss) and math.isfinite(gnorm)
+        if finite:
+            opt.step()
+        else:                                                 # a step whose loss or gradient is not finite is skipped, never applied
+            opt.zero_grad(set_to_none=True)
         step += 1
         trained_tokens += ntok
-        say({'progress': {'done': step, 'total': total}, 'loss': round(loss, 5)})
+        say({'progress': {'done': step, 'total': total}, **({'loss': round(loss, 5)} if finite else {'skipped': True})})
         if time.time() - last_save >= resume_every and step < total:
             save_resume()
             last_save = time.time()
@@ -521,17 +591,24 @@ def main(argv=None) -> None:
     # ---- the end: the dev loss, the files ----
     dev_nll = eval_nll(model, dev_seqs, bf16=st.bf16, device=device) if dev_seqs else None
     model.cpu()
+    weights = state_for_save(model)
+    bad = [k for k, v in weights.items() if not bool(torch.isfinite(v).all())]
+    if bad:                                                   # never write a model with a nan or an inf in it
+        say({'error': f'the trained model has non-finite weights ({bad[0]}, {len(bad)} tensors): not saved'})
+        shutil.rmtree(resume_dir, ignore_errors=True)
+        sys.exit(1)
     languages = {str(k): int(v) for k, v in (prev_meta.get('languages') or {}).items()}
     for k, v in languages_new.items():
         languages[k] = languages.get(k, 0) + v
     own_total = int(prev_meta.get('tokens') or 0) + own_tokens
     write_atomic(os.path.join(a.out, 'config.json'), json.dumps(base_cfg, indent=1).encode())
     tmp = os.path.join(a.out, 'model.safetensors.tmp')
-    save_file(state_for_save(model), tmp)
+    save_file(weights, private_file(tmp))
     os.replace(tmp, os.path.join(a.out, 'model.safetensors'))
+    held = {} if dev_nll is None else {'dev_nll': dev_nll, 'dev_nll_before': dev_before}     # only when something was held out
     meta = {'format': 'hydor-suggest-personal/1', 'trained_at': int(time.time() * 1000), 'tokens': own_total, 'languages': languages,
-            'dev_nll': dev_nll, 'dev_nll_before': dev_before, 'steps': total}
+            **held, 'steps': total}
     write_atomic(os.path.join(a.out, 'meta.json'), json.dumps(meta, indent=1).encode())
     shutil.rmtree(resume_dir, ignore_errors=True)
-    say({'done': True, 'dev_nll': dev_nll, 'dev_nll_before': dev_before, 'tokens': own_total, 'seconds': round(time.time() - t_start, 1),
+    say({'done': True, **held, 'tokens': own_total, 'seconds': round(time.time() - t_start, 1),
          'languages': languages})

@@ -55,7 +55,7 @@ class Worker:
 
     # ---- output -----------------------------------------------------------------------------------------------------------
     def say(self, obj: dict) -> None:
-        line = json.dumps(obj, separators=(',', ':'))
+        line = json.dumps(obj, separators=(',', ':'), allow_nan=False)         # a NaN is an error of the request, never invalid JSON
         with self._lock:
             self._out.write(line + '\n')
             self._out.flush()
@@ -79,23 +79,50 @@ class Worker:
 
     # ---- the reader thread ------------------------------------------------------------------------------------------------
     def read_stdin(self, stream) -> None:
-        for raw in stream:
-            line = raw.strip()
-            if not line:
-                continue
-            try:
-                req = json.loads(line)
-                if not isinstance(req, dict):
-                    raise ValueError('a request is a JSON object')
-            except Exception as e:
-                self.say({'id': None, 'error': f'bad request: {e}'})
-                continue
-            if req.get('op') == 'cancel':
-                self._cancel(req.get('target'))
-                self.say({'id': req.get('id'), 'ok': True})
-                continue
-            self.queue.put(req)
-        self.queue.put(None)
+        """Every line is handled on its own: a bad one (not JSON, not an object, an id or a target that is not a string or a number)
+        is answered with an error (or dropped when it has no usable id), and the thread never dies before stdin ends."""
+        try:
+            for raw in stream:
+                try:
+                    self._read_line(raw)
+                except Exception as e:                         # whatever is wrong with this line
+                    try:
+                        self.say({'id': None, 'error': f'bad request: {type(e).__name__}: {e}'})
+                    except Exception:
+                        pass
+        except Exception as e:                                 # the stream itself broke
+            print(f'stdin: {e}', file=sys.stderr)
+        finally:
+            self.queue.put(None)
+
+    @staticmethod
+    def _plain_id(x) -> bool:
+        return x is None or (isinstance(x, (str, int)) and not isinstance(x, bool))
+
+    def _read_line(self, raw: str) -> None:
+        line = raw.strip()
+        if not line:
+            return
+        try:
+            req = json.loads(line)
+            if not isinstance(req, dict):
+                raise ValueError('a request is a JSON object')
+        except ValueError as e:
+            self.say({'id': None, 'error': f'bad request: {e}'})
+            return
+        rid = req.get('id')
+        if not self._plain_id(rid):
+            self.say({'id': None, 'error': 'bad request: an id is a string or a number'})
+            return
+        if req.get('op') == 'cancel':
+            target = req.get('target')
+            if target is None or not self._plain_id(target):
+                self.say({'id': rid, 'error': 'bad request: a cancel needs the target id (a string or a number)'})
+                return
+            self._cancel(target)
+            self.say({'id': rid, 'ok': True})
+            return
+        self.queue.put(req)
 
     # ---- handling ---------------------------------------------------------------------------------------------------------
     def handle(self, req: dict) -> None:
@@ -158,7 +185,7 @@ def main() -> None:
     os.environ.setdefault('TOKENIZERS_PARALLELISM', 'false')
     os.environ.setdefault('CUDA_VISIBLE_DEVICES', '')    # the engine runs on the CPU
     try:
-        sys.stdin.reconfigure(encoding='utf-8')
+        sys.stdin.reconfigure(encoding='utf-8', errors='replace')
     except Exception:
         pass
     w = Worker(out)

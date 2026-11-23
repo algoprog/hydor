@@ -44,6 +44,15 @@ class MixTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Gate.from_dict({**d, 'features': ['other'] * 7})
 
+    def test_the_gate_logit_is_clamped(self):
+        g = Gate(w=[0, 0, 0, 0, -0.06, 0, 0], b=0.0, sd=[1, 1, 1, 1, 1e-6, 1, 1], mu=[0, 0, 0, 0, 1.8e-9, 0, 0])     # the shipped gate's slm_unk
+        lam = g.lam([3, .4, 3, .4, 0.01, 1, 1])                # z is 1e4: an unclamped exp(600) is fine, exp(60000) overflows
+        self.assertGreater(lam, 0.0)
+        self.assertLess(lam, 1e-12)
+        self.assertGreater(g.lam([3, .4, 3, .4, -1e3, 1, 1]), 1 - 1e-12)
+        self.assertEqual(g.lam([0, 0, 0, 0, 1e9, 0, 0]), 1 / (1 + math.exp(30)))
+        self.assertEqual(g.lam([float('nan')] + [0] * 6), 0.5)
+
     def test_linear_mix(self):
         a = np.array([1.0, 0.0], dtype=np.float32)
         b = np.array([0.0, 1.0], dtype=np.float32)

@@ -319,6 +319,77 @@ class EngineTests(unittest.TestCase):
                          'prev': 'send the project plan', 'next': False})
         self.assertEqual(out['word'], 'ect')
 
+    def test_sessions_are_least_recently_used_out_and_ids_are_strings(self):
+        e = self.engine(options={'sessions': 3})
+        for sid in ('a', 'b', 'c'):
+            e.session(sid, [f'text {sid}'])
+        e.session('a', ['text a again'])                       # a was used: b is now the oldest
+        e.session('d', ['text d'])
+        self.assertEqual(list(e._session_texts), ['c', 'a', 'd'])
+        e.suggest({'surface': 'chat', 'text': 'the qu', 'session': 'c', 'next': False})      # a suggest in c uses it too
+        e.session('e', ['text e'])
+        self.assertEqual(list(e._session_texts), ['d', 'c', 'e'])
+        self.assertIn('c', e._session_texts)
+        self.assertNotIn('a', e._session_texts)
+        e.session(7, ['numbers are ids too'])                  # an id that is a number is the same session as its string
+        e.session('7', ['again'])
+        self.assertEqual([k for k in e._session_texts if k == '7'], ['7'])
+        self.assertEqual(e._session_texts['7'], ['again'])
+        e.suggest({'surface': 'chat', 'text': 'the qu', 'session': 7, 'next': False})          # a suggest with a number finds it
+
+    def test_typed_words_zero_is_zero_not_the_default(self):
+        e = self.engine()
+        pr = e.prepare({'surface': 'chat', 'text': 'one two three wor', 'typed_words': 0})
+        self.assertEqual(pr.target_text, '')
+        pr = e.prepare({'surface': 'chat', 'text': 'one two three wor'})
+        self.assertEqual(pr.target_text, 'one two three')
+
+    def test_a_load_that_fails_changes_nothing(self):
+        e = self.engine()
+        runner, model, release = e.runner, e.model, e.release
+        with self.assertRaises(Exception):
+            e.load(self.release, None, 'ftp://nowhere', 2)               # the client cannot be built
+        self.assertIs(e.runner, runner)
+        self.assertIs(e.model, model)
+        self.assertIs(e.release, release)
+        self.assertIn('word', e.suggest({'surface': 'text', 'text': 'the quick br'}))
+        with self.assertRaises(Exception):
+            e.load(os.path.join(self.dir.name, 'missing'))
+        self.assertIs(e.release, release)
+
+    def test_a_language_model_that_failed_is_left_alone_for_a_while(self):
+        fake = helpers.FakeLlama(self.Vq)
+        e = self.engine(fake.url)
+        now = {'t': 1000.0}
+        e._clock = lambda: now['t']
+        e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})
+        fake.stop()
+        e.client.close()
+        out = e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})
+        self.assertEqual(out['plan'], 'slm')                                 # fell back, and noted it
+        fake2 = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake2.stop)
+        e.client = type(e.client)(fake2.url)                                 # the server is back, but is not asked yet
+        now['t'] += 10
+        self.assertEqual(e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})['plan'], 'slm')
+        self.assertEqual(fake2.requests, [])
+        now['t'] += 25                                                       # 30 s after the failure
+        self.assertEqual(e.suggest({'surface': 'text', 'text': 'we write a mess', 'switch': False})['plan'], 'mix')
+        self.assertGreater(len(fake2.requests), 0)
+        e.client.close()
+
+    def test_the_token_cache_is_bounded_by_characters(self):
+        import hydor_suggest.engine as eng
+        e = self.engine()
+        old = eng.ENC_MAX_CHARS
+        eng.ENC_MAX_CHARS = 5000
+        self.addCleanup(lambda: setattr(eng, 'ENC_MAX_CHARS', old))
+        for i in range(20):
+            e.encode(('word%d ' % i) * 150)                                  # about 900 characters each
+        self.assertLessEqual(e._enc_chars, 5000)
+        self.assertEqual(e._enc_chars, sum(len(k) for k in e._enc))
+        self.assertGreater(len(e._enc), 0)
+
     def test_sessions_are_kept_for_the_last_few(self):
         e = self.engine(options={'sessions': 2})
         for i in range(4):

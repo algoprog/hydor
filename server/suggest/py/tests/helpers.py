@@ -154,6 +154,7 @@ class FakeLlama:
                 self.wfile.write(data)
 
         self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.server.handle_error = lambda *a: None          # a client that timed out and left is not an error of the fake
         self.url = f'http://127.0.0.1:{self.server.server_address[1]}'
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
