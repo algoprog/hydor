@@ -305,7 +305,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 
 ### Sugerencias de palabras
 
-[Configuración → Sugerencias de palabras](/settings?s=suggest): el resto de la palabra que escribes y la siguiente, en gris después del cursor: Tab la acepta. Más en [Documentos, imágenes, videos y voz](/guide/documents-voice).
+[Configuración → Sugerencias de palabras](/settings?s=suggest): el resto de la palabra que escribes en gris, y la palabra siguiente, de un modelo pequeño que aprende de lo que escribes. Más en [Documentos, imágenes, videos y voz](/guide/documents-voice).
 
 - [**Sugerencias de palabras**](/settings?s=suggest&find=Word%20suggestions): El resto de la palabra que escribes y la siguiente, en gris después del cursor, con modelos que se ejecutan en esta computadora; la primera vez descarga cerca de 1,3 GB.
 - [**Mostrar en este navegador**](/settings?s=suggest&find=Show%20in%20this%20browser): Si este navegador muestra sugerencias de palabras (cada navegador guarda las suyas).

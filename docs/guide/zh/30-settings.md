@@ -305,7 +305,7 @@
 
 ### 词语建议
 
-[设置 → 词语建议](/settings?s=suggest)：你正在输入的词的其余部分和下一个词，以灰色显示在光标后：按 Tab 即可采用。详见[文档、图片、视频和语音](/guide/documents-voice)。
+[设置 → 词语建议](/settings?s=suggest)：以灰色显示你正在输入的词的其余部分和下一个词，由会从你的写作中学习的小模型生成。详见[文档、图片、视频和语音](/guide/documents-voice)。
 
 - [**词语建议**](/settings?s=suggest&find=Word%20suggestions)：你正在输入的词的其余部分和下一个词，以灰色显示在光标后，由在这台电脑上运行的模型生成；首次使用会下载约 1.3 GB。
 - [**在此浏览器中显示**](/settings?s=suggest&find=Show%20in%20this%20browser)：此浏览器是否显示词语建议（每个浏览器各自保存设置）。

@@ -305,7 +305,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 
 ### Suggestions de mots
 
-[Paramètres → Suggestions de mots](/settings?s=suggest) : la fin du mot que vous tapez, et le suivant, en gris après le curseur : Tab l’accepte. Pour en savoir plus : [Documents, images, vidéos et voix](/guide/documents-voice).
+[Paramètres → Suggestions de mots](/settings?s=suggest) : la fin du mot que vous tapez en gris, et le mot suivant, grâce à un petit modèle qui apprend de votre écriture. Pour en savoir plus : [Documents, images, vidéos et voix](/guide/documents-voice).
 
 - [**Suggestions de mots**](/settings?s=suggest&find=Word%20suggestions) : La fin du mot que vous tapez et le suivant, en gris après le curseur, grâce à des modèles qui s’exécutent sur cet ordinateur ; la première fois, il télécharge environ 1,3 Go.
 - [**Afficher dans ce navigateur**](/settings?s=suggest&find=Show%20in%20this%20browser) : Indique si ce navigateur affiche les suggestions de mots (chaque navigateur garde les siennes).

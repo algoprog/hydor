@@ -305,7 +305,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Word suggestions
 
-[Settings → Word suggestions](/settings?s=suggest): the rest of the word you are typing, and the next one, in grey after the caret: Tab takes it. More in [Documents, images, videos and voice](/guide/documents-voice).
+[Settings → Word suggestions](/settings?s=suggest): the rest of the word you are typing in grey, and the next word, from a small model that learns from your writing. More in [Documents, images, videos and voice](/guide/documents-voice).
 
 - [**Word suggestions**](/settings?s=suggest&find=Word%20suggestions): The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.3 GB.
 - [**Show in this browser**](/settings?s=suggest&find=Show%20in%20this%20browser): Whether this browser shows word suggestions (each browser keeps its own).

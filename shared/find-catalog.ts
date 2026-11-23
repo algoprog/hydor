@@ -91,7 +91,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['goals', 'Goals', 'Capabilities', 'What a new goal starts from: its rounds, how much it asks you, and when it goes on with its own pick'],
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
-  ['suggest', 'Word suggestions', 'Capabilities', 'The rest of the word you are typing, and the next one, in grey after the caret: Tab takes it'],
+  ['suggest', 'Word suggestions', 'Capabilities', 'The rest of the word you are typing in grey, and the next word, from a small model that learns from your writing'],
   ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
   ['apps', 'Apps', 'Capabilities', 'What apps know about you, and which run without asking'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode and a sandbox for commands'],

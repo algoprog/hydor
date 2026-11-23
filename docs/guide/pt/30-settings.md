@@ -305,7 +305,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 ### Sugestões de palavras
 
-[Configurações → Sugestões de palavras](/settings?s=suggest): o resto da palavra que você está digitando e a próxima, em cinza depois do cursor: Tab aceita. Mais em [Documentos, imagens, vídeos e voz](/guide/documents-voice).
+[Configurações → Sugestões de palavras](/settings?s=suggest): o resto da palavra que você está digitando em cinza, e a próxima palavra, de um modelo pequeno que aprende com a sua escrita. Mais em [Documentos, imagens, vídeos e voz](/guide/documents-voice).
 
 - [**Sugestões de palavras**](/settings?s=suggest&find=Word%20suggestions): O resto da palavra que você está digitando e a próxima, em cinza depois do cursor, de modelos que rodam neste computador; na primeira vez, baixa cerca de 1,3 GB.
 - [**Mostrar neste navegador**](/settings?s=suggest&find=Show%20in%20this%20browser): Se este navegador mostra sugestões de palavras (cada navegador mantém a sua configuração).

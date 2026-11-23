@@ -305,7 +305,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Wortvorschläge
 
-[Einstellungen → Wortvorschläge](/settings?s=suggest): Der Rest des Wortes, das du tippst, und das nächste, in Grau nach dem Cursor: Mit Tab übernimmst du es. Mehr dazu unter [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice).
+[Einstellungen → Wortvorschläge](/settings?s=suggest): Der Rest des Wortes, das du tippst, in Grau und das nächste Wort, von einem kleinen Modell, das aus deinem Geschriebenen lernt. Mehr dazu unter [Dokumente, Bilder, Videos und Sprache](/guide/documents-voice).
 
 - [**Wortvorschläge**](/settings?s=suggest&find=Word%20suggestions): Der Rest des Wortes, das du tippst, und das nächste, in Grau nach dem Cursor, von Modellen, die auf diesem Computer laufen; beim ersten Mal werden etwa 1,3 GB heruntergeladen.
 - [**In diesem Browser anzeigen**](/settings?s=suggest&find=Show%20in%20this%20browser): Ob dieser Browser Wortvorschläge anzeigt (jeder Browser behält seine eigene Einstellung).
