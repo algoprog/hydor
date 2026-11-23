@@ -335,7 +335,7 @@ Dos modelos trabajan juntos, ambos en tu computadora:
 - **El modelo pequeño** es uno propio de la app, lo bastante pequeño para funcionar en cualquier computadora y entrenado con texto en 200 idiomas. También aprende de lo que escribes ([más abajo](#learn-from-what-you-write)).
 - **El modelo de lenguaje** es Qwen3.5-0.8B, un modelo más grande que acierta más, sobre todo en documentos. Necesita una computadora con al menos 8 GB de memoria y 2,5 GB de ella libres en ese momento.
 
-**[Modelo de lenguaje](/settings?s=suggest&find=Language%20model)** tiene tres opciones. **Automático** lo usa cuando la computadora tiene la memoria, y solo el modelo pequeño cuando no la tiene; la línea bajo el interruptor indica qué ocurre y por qué. **Activado** lo usa incluso entonces (puede ralentizar la computadora). **Desactivado** no lo usa nunca. Sin él, las sugerencias siguen funcionando, un poco peor. **[Tamaño del modelo de lenguaje](/settings?s=suggest&find=Language%20model%20size)** permite elegir **8 bits**, que acierta un poco más, o **4 bits**, que ocupa menos memoria y requiere una descarga menor (unos 560 MB en lugar de 830 MB).
+**[Modelo de lenguaje](/settings?s=suggest&find=Language%20model)** tiene tres opciones. **Automático** lo usa cuando la computadora tiene la memoria, y solo el modelo pequeño cuando no la tiene; la línea bajo el interruptor indica qué ocurre y por qué. **Activado** lo usa incluso entonces (puede ralentizar la computadora). **Desactivado** no lo usa nunca. Sin él, las sugerencias siguen funcionando, un poco peor. **[Tamaño del modelo de lenguaje](/settings?s=suggest&find=Language%20model%20size)** permite elegir **8-bit**, que acierta un poco más, o **4-bit**, que ocupa menos memoria y requiere una descarga menor (unos 560 MB en lugar de 830 MB).
 
 Cambiar el tamaño descarga el otro archivo la primera vez. **[Elegir según el idioma](/settings?s=suggest&find=Choose%20by%20language)**, activado por defecto, permite que la app use el modelo que rinda mejor en el idioma en que te ve escribir.
 
@@ -344,7 +344,7 @@ Cambiar el tamaño descarga el otro archivo la primera vez. **[Elegir según el 
 En **Dónde**, dentro de la misma sección, cada lugar tiene su interruptor:
 
 - **[En los cuadros de mensaje](/settings?s=suggest&find=In%20message%20boxes)**: donde escribes a un agente, en la página de inicio y en una conversación.
-- **[En documentos](/settings?s=suggest&find=In%20documents)**: mientras escribes en Docs. La opción “Sugerir mientras escribo” de **Ver** en Docs, que le pregunta al modelo auxiliar cómo podría seguir una frase, espera mientras se muestra una sugerencia de palabra.
+- **[En documentos](/settings?s=suggest&find=In%20documents)**: mientras escribes un documento. La opción “Sugerir mientras escribo” del menú **Ver** de los documentos, que le pregunta al modelo auxiliar cómo podría seguir una frase, espera mientras se muestra una sugerencia de palabra.
 - **[En notas](/settings?s=suggest&find=In%20notes)**: notas de memoria y tu perfil.
 - **[En otros cuadros de texto](/settings?s=suggest&find=In%20other%20text%20boxes)**: seguimientos, la cola, un prompt anterior que editas, los paneles de Preguntar y otros cuadros pequeños.
 

@@ -25670,7 +25670,7 @@
   "When it learns": "Quand il apprend",
   "When you write to an agent, on the start page or in a conversation": "Quand vous écrivez à un agent, sur la page d’accueil ou dans une conversation",
   "Whether this browser shows word suggestions (each browser keeps its own)": "Indique si ce navigateur affiche les suggestions de mots (chaque navigateur garde les siennes)",
-  "While you write in Docs": "Pendant que vous écrivez dans les documents",
+  "While you write in Docs": "Pendant que vous écrivez un document",
   "Word suggestions": "Suggestions de mots",
   "Word suggestions are off on this server (HYDOR_SUGGEST=off)": "Les suggestions de mots sont désactivées sur ce serveur (HYDOR_SUGGEST=off)",
   "Word suggestions could not start.": "Les suggestions de mots n’ont pas pu démarrer.",
@@ -25706,7 +25706,7 @@
   "threads cpu cores processors speed suggestions faster slower busy": "threads cpu cœurs processeurs vitesse suggestions plus rapide plus lent occupé",
   "training threads cpu cores processors learning faster slower busy": "threads d’entraînement cpu cœurs processeurs apprentissage plus rapide plus lent occupé",
   "weight own words typed more than replies how much count heavier user": "poids mots à soi saisis plus que les réponses combien compter plus lourd utilisateur",
-  "{0} tokens of yours.": "{0} tokens de vous.",
+  "{0} tokens of yours.": "{0} tokens de vos écrits.",
   "{0}: a short text": "{0} : un texte court",
   "{0}: text": "{0} : texte"
 }

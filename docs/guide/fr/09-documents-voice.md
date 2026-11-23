@@ -335,7 +335,7 @@ Deux modèles travaillent ensemble, tous deux sur votre ordinateur :
 - **Le petit modèle** est l’un des modèles propres à l’app, assez petit pour fonctionner sur n’importe quel ordinateur et entraîné sur des textes en 200 langues. Il apprend aussi de ce que vous écrivez ([voir plus bas](#learn-from-what-you-write)).
 - **Le modèle de langage** est Qwen3.5-0.8B, un modèle plus grand qui devine mieux, surtout dans les documents. Il demande un ordinateur avec au moins 8 Go de mémoire, dont 2,5 Go libres à ce moment-là.
 
-**[Modèle de langage](/settings?s=suggest&find=Language%20model)** propose trois choix. **Automatique** l’utilise quand l’ordinateur a la mémoire nécessaire, et le petit modèle seul sinon ; la ligne sous l’interrupteur indique ce qui se passe, et pourquoi. **Activé** l’utilise même dans ce cas (cela peut ralentir l’ordinateur). **Désactivé** ne l’utilise jamais. Sans lui, les suggestions fonctionnent encore, un peu moins bien. **[Taille du modèle de langage](/settings?s=suggest&find=Language%20model%20size)** permet de choisir **8 bits**, qui devine un peu mieux, ou **4 bits**, qui prend moins de mémoire et se télécharge plus vite (environ 560 Mo au lieu de 830 Mo).
+**[Modèle de langage](/settings?s=suggest&find=Language%20model)** propose trois choix. **Automatique** l’utilise quand l’ordinateur a la mémoire nécessaire, et le petit modèle seul sinon ; la ligne sous l’interrupteur indique ce qui se passe, et pourquoi. **Activé** l’utilise même dans ce cas (cela peut ralentir l’ordinateur). **Désactivé** ne l’utilise jamais. Sans lui, les suggestions fonctionnent encore, un peu moins bien. **[Taille du modèle de langage](/settings?s=suggest&find=Language%20model%20size)** permet de choisir **8-bit**, qui devine un peu mieux, ou **4-bit**, qui prend moins de mémoire et demande un téléchargement plus léger (environ 560 Mo au lieu de 830 Mo).
 
 Changer la taille télécharge l’autre fichier la première fois. **[Choisir selon la langue](/settings?s=suggest&find=Choose%20by%20language)**, activé par défaut, laisse l’app utiliser celui des deux modèles qui est le meilleur dans la langue dans laquelle elle vous voit écrire.
 
@@ -344,9 +344,9 @@ Changer la taille télécharge l’autre fichier la première fois. **[Choisir s
 Sous **Où**, dans la même section, chaque endroit a son interrupteur :
 
 - **[Dans les zones de message](/settings?s=suggest&find=In%20message%20boxes)** : là où vous écrivez à un agent, sur la page d’accueil et dans une conversation.
-- **[Dans les documents](/settings?s=suggest&find=In%20documents)** : pendant que vous écrivez dans Docs. L’option « Suggérer pendant la saisie » du menu **Affichage** de Docs, qui demande au modèle d’appoint comment une phrase pourrait continuer, attend tant qu’une suggestion de mot est affichée.
+- **[Dans les documents](/settings?s=suggest&find=In%20documents)** : pendant que vous écrivez un document. L’option « Suggérer pendant la saisie » du menu **Affichage** des documents, qui demande au modèle d’appoint comment une phrase pourrait continuer, attend tant qu’une suggestion de mot est affichée.
 - **[Dans les notes](/settings?s=suggest&find=In%20notes)** : les notes de la Mémoire et votre profil.
-- **[Dans les autres zones de texte](/settings?s=suggest&find=In%20other%20text%20boxes)** : les relances, la file d’attente, un prompt précédent que vous modifiez, les panneaux Demander et les autres petites zones.
+- **[Dans les autres zones de texte](/settings?s=suggest&find=In%20other%20text%20boxes)** : les suivis, la file d’attente, un prompt précédent que vous modifiez, les panneaux Demander et les autres petites zones.
 
 Ces réglages sont définis une fois pour toute l’app. **[Afficher dans ce navigateur](/settings?s=suggest&find=Show%20in%20this%20browser)** fait exception : il est conservé par chaque navigateur, de sorte que vous pouvez désactiver les mots en gris sur un appareil et les garder sur un autre. Un agent peut aussi le modifier pour les navigateurs qui affichent sa session.
 
@@ -374,7 +374,7 @@ Par défaut, le petit modèle apprend aussi vos propres mots : les noms, les ter
 - **[Réentraîner maintenant](/settings?s=suggest&find=Retrain%20now)** apprend tout de suite de ce que vous avez écrit depuis la dernière fois.
 - **[Oublier ce qu’il a appris](/settings?s=suggest&find=Forget%20what%20it%20learned)** supprime le modèle construit à partir de vos écrits, après confirmation, et revient à celui livré avec l’app. Il réapprend à sa prochaine échéance, sauf si vous avez désactivé l’apprentissage.
 
-La ligne sous l’interrupteur indique quel petit modèle est utilisé, quand il a appris pour la dernière fois, et où en est une session d’apprentissage.
+La ligne sous l’interrupteur indique quel petit modèle est utilisé, quand il a appris pour la dernière fois, et où en est un cycle d’apprentissage.
 
 ## Dicter un message
 

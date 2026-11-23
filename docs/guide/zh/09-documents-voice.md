@@ -337,16 +337,16 @@ Custom 也可以通过普通的文件读取功能来读取 PDF、Office 文档�
 
 **[语言模型](/settings?s=suggest&find=Language%20model)** 有三个选项。**自动**表示电脑内存足够时使用它，不够时只用小模型；开关下方的文字会说明当前是哪种情况以及原因。**开启**表示即使内存不够也使用它（可能会拖慢电脑）。**关闭**表示从不使用。没有它，建议仍然可用，只是稍差一些。**[语言模型大小](/settings?s=suggest&find=Language%20model%20size)** 可选 **8-bit**（猜得稍准）或 **4-bit**（占用内存更少，下载也更小，约 560 MB，而不是 830 MB）。
 
-更改大小时，第一次会下载另一个文件。**[按语言选择](/settings?s=suggest&find=Choose%20by%20language)** 默认开启，它会让应用在两个模型中选用对它看到你所写语言表现更好的那一个。
+更改大小时，第一次会下载另一个文件。**[按语言选择](/settings?s=suggest&find=Choose%20by%20language)** 默认开启，它会让应用在两个模型中，选用在你正在书写的语言上表现更好的那一个。
 
 ### 在哪里显示
 
 在同一部分的 **位置** 下，每个位置都有各自的开关：
 
 - **[在消息框中](/settings?s=suggest&find=In%20message%20boxes)**：你给智能体写消息的地方，包括起始页和会话中。
-- **[在文档中](/settings?s=suggest&find=In%20documents)**：在 Docs 中书写时。Docs 里 **视图** 中的“边输入边给出建议”会请辅助模型猜测一句话如何继续；当有词语建议显示时，它会先等待。
-- **[在备注中](/settings?s=suggest&find=In%20notes)**：记忆备注和你的个人资料。
-- **[在其他文本框中](/settings?s=suggest&find=In%20other%20text%20boxes)**：后续追问、队列、你正在编辑的早先提示词、询问面板和其他小文本框。
+- **[在文档中](/settings?s=suggest&find=In%20documents)**：在文档中书写时。文档里 **视图** 中的“边输入边给出建议”会请辅助模型猜测一句话如何继续；当有词语建议显示时，它会先等待。
+- **[在备注中](/settings?s=suggest&find=In%20notes)**：记忆笔记和你的档案。
+- **[在其他文本框中](/settings?s=suggest&find=In%20other%20text%20boxes)**：追问、队列、你正在编辑的早先提示词、询问面板和其他小文本框。
 
 这些选项对整个应用只设置一次。**[在此浏览器中显示](/settings?s=suggest&find=Show%20in%20this%20browser)** 是例外：它按浏览器分别保存，因此你可以在一台设备上关闭灰色词语，而在另一台设备上保持开启。智能体也可以为显示其会话的浏览器更改这一项。
 
@@ -368,7 +368,7 @@ Custom 也可以通过普通的文件读取功能来读取 PDF、Office 文档�
 默认情况下，小模型还会学习你自己的用词：你使用的名称、术语和写作方式，让它的猜测更贴合你。这一切都在你的电脑上进行，你写的内容不会离开电脑。学习得到的模型保存在应用的数据文件夹中，不会与任何人分享。
 
 - **[从我写的内容中学习](/settings?s=suggest&find=Learn%20from%20what%20I%20write)** 用来开启或关闭学习。
-- 它会从你保持开启的来源中学习：**[来自我的消息](/settings?s=suggest&find=From%20my%20messages)**（你对智能体输入的内容，但不包括已关闭记忆的会话或[保密会话](/guide/sessions#keep-a-session-confidential)，也不包括应用、定时任务或其他会话替你写的内容）、**[来自智能体的回复](/settings?s=suggest&find=From%20agents'%20replies)**、**[来自我的备注](/settings?s=suggest&find=From%20my%20notes)**（你亲自写的记忆备注）和 **[来自我的文档](/settings?s=suggest&find=From%20my%20documents)**（你写的页面和文档）。例如，关闭智能体的回复，可以让它的猜测只贴合你自己的风格。
+- 它会从你保持开启的来源中学习：**[来自我的消息](/settings?s=suggest&find=From%20my%20messages)**（你对智能体输入的内容，但不包括已关闭记忆的会话或[保密会话](/guide/sessions#keep-a-session-confidential)，也不包括应用、定时任务或其他会话替你写的内容）、**[来自智能体的回复](/settings?s=suggest&find=From%20agents'%20replies)**、**[来自我的备注](/settings?s=suggest&find=From%20my%20notes)**（你亲自写的记忆笔记）和 **[来自我的文档](/settings?s=suggest&find=From%20my%20documents)**（你写的页面和文档）。例如，关闭智能体的回复，可以让它的猜测只贴合你自己的风格。
 - **[我自己输入的词的权重](/settings?s=suggest&find=Weight%20of%20my%20own%20words)** 表示你输入的内容比其余内容重要多少，范围从 1（相同）到 16；初始为 4。
 - **[学习时间](/settings?s=suggest&find=When%20it%20learns)**：**每晚**（大约每天一次，在你十分钟没有输入且电脑内存足够时）、**每周**，或 **仅在我需要时**。它以最低优先级在后台运行，不会拖慢你的工作；如果电脑被关闭，它会从中断的地方继续。第一次会读取你写过的所有内容，在没有显卡的电脑上可能需要数小时；之后只读取新增的内容，只需几分钟。**[用于学习的线程数](/settings?s=suggest&find=Threads%20for%20learning)** 限制它可以使用的处理器资源。
 - **[立即重新训练](/settings?s=suggest&find=Retrain%20now)** 会立刻从你上次之后写的内容中学习。

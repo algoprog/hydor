@@ -325,13 +325,13 @@
 - [**入力内容から学習**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小型モデルが、このコンピューター上でバックグラウンドで入力内容から学習します。
 - [**学習するタイミング**](/settings?s=suggest&find=When%20it%20learns)：毎晩、毎週、または「今すぐ再学習」を押したときだけ。10分間入力がないときに実行されます。
 - [**自分のメッセージから**](/settings?s=suggest&find=From%20my%20messages)：エージェントに書いたメッセージから学習します。
-- [**エージェントの返信から**](/settings?s=suggest&find=From%20agents'%20replies)：エージェントからの返信から学習します。
+- [**エージェントの返信から**](/settings?s=suggest&find=From%20agents'%20replies)：エージェントが返した内容から学習します。
 - [**自分のメモから**](/settings?s=suggest&find=From%20my%20notes)：書いたメモリのメモから学習します。
 - [**自分のドキュメントから**](/settings?s=suggest&find=From%20my%20documents)：書いたドキュメントやページから学習します。
 - [**自分の言葉の重み**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：学習の対象のうち、入力した単語を他のテキストよりどのくらい重視するか。
 - [**学習用スレッド数**](/settings?s=suggest&find=Threads%20for%20learning)：学習に使うプロセッサスレッド数（デフォルトは自動）。
 - [**今すぐ再学習**](/settings?s=suggest&find=Retrain%20now)：前回以降に書いた内容を、バックグラウンドで今すぐ学習します。
-- [**学習内容を消去**](/settings?s=suggest&find=Forget%20what%20it%20learned)：あなたの入力から学習したモデルを削除し、アプリに付属のモデルに戻します。
+- [**学習内容を消去**](/settings?s=suggest&find=Forget%20what%20it%20learned)：入力内容から学習したモデルを削除し、アプリに付属のモデルに戻します。
 
 ### 自分のエージェント
 

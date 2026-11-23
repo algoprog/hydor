@@ -344,7 +344,7 @@ Mudar o tamanho baixa o outro arquivo na primeira vez. **[Escolher por idioma](/
 Em **Onde**, na mesma seção, cada lugar tem seu interruptor:
 
 - **[Em caixas de mensagem](/settings?s=suggest&find=In%20message%20boxes)**: onde você escreve para um agente, na página inicial e em uma conversa.
-- **[Em documentos](/settings?s=suggest&find=In%20documents)**: enquanto você escreve em Docs. A opção “Sugerir enquanto eu digito” de **Exibir** em Docs, que pergunta ao modelo auxiliar como uma frase pode continuar, espera enquanto uma sugestão de palavra aparece.
+- **[Em documentos](/settings?s=suggest&find=In%20documents)**: enquanto você escreve um documento. A opção “Sugerir enquanto eu digito” do menu **Exibir** dos documentos, que pergunta ao modelo auxiliar como uma frase pode continuar, espera enquanto uma sugestão de palavra aparece.
 - **[Em notas](/settings?s=suggest&find=In%20notes)**: notas de memória e seu perfil.
 - **[Em outras caixas de texto](/settings?s=suggest&find=In%20other%20text%20boxes)**: acompanhamentos, a fila, um prompt anterior que você edita, os painéis Perguntar e outras caixas pequenas.
 
