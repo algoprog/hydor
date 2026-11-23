@@ -27,6 +27,7 @@ class LlmTests(unittest.TestCase):
         try:
             c = LlamaClient(fake.url)
             c.top_logprobs(list(range(2000)))
+            c.close()
             self.assertEqual(len(fake.requests[0]['prompt']), MAX_PROMPT_TOKENS)
             self.assertEqual(fake.requests[0]['prompt'][-1], 1999)
         finally:
