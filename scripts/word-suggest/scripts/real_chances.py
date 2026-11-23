@@ -26,6 +26,18 @@ biases are used with ex.lang) and llm+slm:langswitch:<json> (a language the swit
 without spaces are skipped (char accuracy only, as in eval.py). --device cuda (with .venv-gpu, CUDA_VISIBLE_DEVICES, WS_GPU_MEM_GB) runs the LLM
 with its cache, the SLM, the gate and the allowed-set work on the GPU; --shard k/n decodes every n-th example (cat the shards' events files:
 scripts/merge_real.py). The words sampled per example depend on the example's id and --seed only, so every variant and shard sees the same words.
+--phrase-words N (default 1: as before, nothing else is decoded or recorded) also decodes up to N words per suggestion, the way
+engine.py does for the next word: after a word that ended (and not on end-of-text) the next word is decoded from the tokens the
+suggestion has so far, unconstrained, with the first step's whitespace-only tokens left out (step_allowed), and so on. For
+a chance whose first word is right and whose confidence is at least --phrase-floor, each following word is decoded while the
+words so far are right, the path's confidence (the product of the words' confidences) is at least --phrase-floor and each word
+ended: the chance's record then holds "ph", a list with one [y, c_own, c_path, L, bonus] per following word (y: the word is the
+gold word that follows; c_own: its own confidence; c_path: the product of the confidences of the words up to it; L, bonus: the
+gold word's letters and the single space after it, as the first word's record has them; a following word that the harness left
+unaligned counts as wrong, one past the end of the text as well). Nothing is recorded for a chance whose first word is wrong
+(a phrase starting wrong saves nothing, whatever follows) or whose confidence is below the floor (no threshold below the floor may
+be used on these events). Run it with --words-per-example 0 (every word): scripts/show_filter.py --phrase-compare walks the
+whole example, a phrase taken at one word covering the next ones.
 An {"t": "e"} line per example: chars = the characters of the sampled words plus the single spaces after them (the keystroke
 simulation of scripts/show_filter.py is over these words only; k <= --max-k). Checks reported in <out>/metrics.jsonl: agreement
 of y with y_tf, how much c_tf overstates c, and (first --check-words words per example) how far the first step's distribution
@@ -176,6 +188,11 @@ class Decoder:
         self.ends_word = ev.index.ends_word
         self._cache: "OrderedDict[bytes, tuple]" = OrderedDict()
         self._elems, self._budget = 0, elem_budget
+        self.end_set = set(ev.index.end_ids)
+        self.cont = None            # after a word that ended: (node, token or None, ended on end-of-text); where a next word goes on
+        ws_only = torch.tensor([bool(b) and not b.strip(b" \t\n\r\x0b\x0c") for b in tb], dtype=torch.bool)
+        keep = ~ws_only[self.valid_cpu]
+        self.first_next = (self.valid_cpu[keep], self.valid[keep.to(self.dev)])     # step_allowed(b"", False) of the app
 
     def allowed(self, R: bytes):
         """(ids on the CPU, ids on the device) of the allowed set for the bytes still to match (all valid tokens if empty)."""
@@ -220,7 +237,10 @@ class Decoder:
 
     def stat(self, row, R, want_end):
         """(token, max, lse, unconstrained arg max id, ends lse) inside the allowed set of R (arg max / ends None unless want_end)."""
-        cpu, dev = self.allowed(R)
+        return self.stat_set(row, *self.allowed(R), want_end)
+
+    def stat_set(self, row, cpu, dev, want_end):
+        """stat() for a given allowed set (ids on the CPU, ids on the device)."""
         vals = row.index_select(0, dev)
         m, i = vals.max(0)
         parts = [m, vals.logsumexp(0), i.to(vals.dtype)]
@@ -235,6 +255,7 @@ class Decoder:
         """Constrained greedy decoding from root with the typed bytes R. Returns (produced bytes, confidence, ended, tokens)."""
         tb = self.tb
         produced, conf, node = b"", 1.0, root
+        self.cont = None
         for step in range(self.max_tokens):
             cpu, _ = self.allowed(R)
             if not len(cpu):
@@ -247,6 +268,7 @@ class Decoder:
             else:
                 tok, m, lse, arg, ends_lse = self.stat(node.lp, R, want_end)
             if want_end and bool(self.ends_word[arg]):
+                self.cont = (node, None, arg in self.end_set)
                 return produced, conf * math.exp(ends_lse), True, len(node.path)
             if lse == NEG:
                 return produced, 0.0, False, len(node.path)
@@ -255,11 +277,60 @@ class Decoder:
             produced += b
             R = R[len(b):] if len(b) < len(R) else b""
             if not R and b[-1:] in WS_END:                         # the token carries the whitespace that ends the word
+                self.cont = (node, tok, False)
                 return produced, conf, True, len(node.path) + 1
             if step == self.max_tokens - 1:                        # the token limit: the next row would not be read
                 break
             node = st.child(ex, gold_before, node, tok)
         return produced, conf, False, self.max_tokens
+
+    def decode_next(self, st, ex, gold_before, node):
+        """The next whole word after `node` (engine.py: decode(row_fn, index, b"", path)): greedy over the valid tokens, the
+        whitespace-only ones left out of the first step. Returns (produced bytes, confidence, ended); self.cont as in decode()."""
+        tb = self.tb
+        produced, conf = b"", 1.0
+        self.cont = None
+        for step in range(self.max_tokens):
+            started = bool(produced.strip())
+            cpu, dev = self.allowed(b"") if started else self.first_next
+            if not len(cpu):
+                return produced, 0.0, False
+            tok, m, lse, arg, ends_lse = self.stat_set(node.lp, cpu, dev, started)
+            if started and bool(self.ends_word[arg]):
+                self.cont = (node, None, arg in self.end_set)
+                return produced, conf * math.exp(ends_lse), True
+            if lse == NEG:
+                return produced, 0.0, False
+            conf *= math.exp(m - lse)
+            b = tb[tok]
+            produced += b
+            if b[-1:] in WS_END and produced.strip():
+                self.cont = (node, tok, False)
+                return produced, conf, True
+            if step == self.max_tokens - 1:
+                break
+            node = st.child(ex, gold_before, node, tok)
+        return produced, conf, False
+
+    def phrase(self, st, ex, gold_before, conf, gold_next, n_words, floor):
+        """The words after a first word that ended (self.cont) and had confidence conf: [[y, c_own, c_path, L, bonus], ...] for
+        up to n_words - 1 words (see the module docstring). gold_next: [(word bytes, L, bonus) or None] for the words after."""
+        out, cum = [], conf
+        node, tok, eot = self.cont
+        if eot:
+            return out
+        for i in range(n_words - 1):
+            if tok is not None:
+                node = st.child(ex, gold_before, node, tok)
+            produced, c_own, ended = self.decode_next(st, ex, gold_before, node)
+            g = gold_next[i] if i < len(gold_next) else None
+            y = int(g is not None and produced.strip() == g[0])
+            cum *= c_own
+            out.append([y, c_own, cum, g[1] if g else 0, g[2] if g else 0])
+            if not (y and ended and cum >= floor) or self.cont is None or self.cont[2]:
+                break
+            node, tok, _ = self.cont
+        return out
 
 
 def main(argv=None):
@@ -276,6 +347,8 @@ def main(argv=None):
     ap.add_argument("--words-per-example", type=int, default=12, help="words sampled per example (0 = all)")
     ap.add_argument("--max-k", type=int, default=6, help="letters typed: k = 0 .. min(len - 1, max-k)")
     ap.add_argument("--max-tokens", type=int, default=8)
+    ap.add_argument("--phrase-words", type=int, default=1, help="decode up to this many words per suggestion (1: the first word only, as before)")
+    ap.add_argument("--phrase-floor", type=float, default=0.05, help="with --phrase-words: no word is decoded after a path of confidence below this")
     ap.add_argument("--check-words", type=int, default=2, help="words per example whose first step is rebuilt from the state")
     ap.add_argument("--device", default="cpu", help="cpu | cuda | cuda:N (cuda: .venv-gpu; WS_GPU_MEM_GB caps the memory)")
     ap.add_argument("--shard", default=None, help="k/n: this process decodes examples k, k+n, ... (k from 0); cat the events files")
@@ -362,6 +435,14 @@ def main(argv=None):
         logits, cache = (None, None) if plan == "slm" else advance(sc.llm.model, sc.llm.prefix_ids(ex), None)
         pos = 0
         recs, chars = [], 0
+
+        def gold_next(j):
+            """The gold words after word j (bytes, letters, the single space after): None where the harness left the word unaligned."""
+            out = []
+            for i in range(j + 1, min(j + a.phrase_words, len(ev.details))):
+                d = ev.details[i]
+                out.append((d["word"].encode("utf-8"), tf[(i, 0)]["L"], tf[(i, 0)]["bonus"]) if d["aligned"] else None)
+            return out
         for wi, (j, w) in enumerate(words):
             if w["a"] > pos and plan != "slm":
                 logits, cache = advance(sc.llm.model, gold[pos:w["a"]], cache)
@@ -390,8 +471,11 @@ def main(argv=None):
                     if key in t:
                         feat_check["max_abs"] = max(feat_check["max_abs"], abs(float(val) - float(t[key])))
                 feat_check["n"] += 1
-                recs.append(dict(t="c", id=ex.id, j=j, k=k, L=t["L"], bonus=t["bonus"], y=y, c=conf, prev=t["prev"], **f,
-                                 c_tf=t["c"], y_tf=t["y"], ntok=ntok, ended=int(ended)))
+                rec = dict(t="c", id=ex.id, j=j, k=k, L=t["L"], bonus=t["bonus"], y=y, c=conf, prev=t["prev"], **f,
+                           c_tf=t["c"], y_tf=t["y"], ntok=ntok, ended=int(ended))
+                if a.phrase_words > 1 and y and ended and conf >= a.phrase_floor and dec.cont is not None:
+                    rec["ph"] = dec.phrase(st, ex, gold[:w["a"]], conf, gold_next(j), a.phrase_words, a.phrase_floor)
+                recs.append(rec)
                 s = agree[k]
                 s[0] += 1
                 s[1] += int(y == t["y"])

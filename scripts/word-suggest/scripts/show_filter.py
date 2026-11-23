@@ -369,6 +369,11 @@ def main(argv=None):
                     help="compare the true-c thresholds of these real-decoded event files (same examples); needs --labels; "
                          "no --dev / --test then")
     ap.add_argument("--labels", default=None, help="comma list of names for --compare-real, one per file")
+    ap.add_argument("--phrase-compare", nargs="+", default=None, metavar="EVENTS",
+                    help="the keystroke simulation for phrases (scripts/phrase_sim.py) on real-decoded events made with "
+                         "real_chances.py --phrase-words and --words-per-example 0; needs --labels; no --dev / --test then")
+    ap.add_argument("--phrase-max-n", type=int, default=5, help="--phrase-compare: the most words shown")
+    ap.add_argument("--phrase-floor", type=float, default=0.05, help="--phrase-compare: the --phrase-floor of the decoding run")
     ap.add_argument("--dev-real", default=None, help="real-decoded dev events (scripts/real_chances.py)")
     ap.add_argument("--test-real", default=None, help="real-decoded test events: also compare on these (needs --dev-real)")
     ap.add_argument("--variant", default=None, help="the variant's spec, to find its line in --check-metrics")
@@ -393,6 +398,22 @@ def main(argv=None):
 
     os.makedirs(a.out, exist_ok=True)
     t0 = time.time()
+    if a.phrase_compare:
+        import phrase_sim
+        labels = a.labels.split(",") if a.labels else [os.path.splitext(os.path.basename(f))[0] for f in a.phrase_compare]
+        if len(labels) != len(a.phrase_compare):
+            raise SystemExit("--phrase-compare needs one label per file")
+        lines = []
+
+        def emit1(d):
+            lines.append(d)
+            print(json.dumps(d), flush=True)
+        phrase_sim.compare(a.phrase_compare, labels, [float(x) for x in a.precisions.split(",")], a.boot, a.seed, emit1,
+                           max_n=a.phrase_max_n, floor=a.phrase_floor)
+        with open(os.path.join(a.out, "metrics.jsonl"), "w") as f:
+            for l in lines:
+                f.write(json.dumps(l) + "\n")
+        return
     if a.compare_real:
         labels = a.labels.split(",") if a.labels else [os.path.splitext(os.path.basename(f))[0] for f in a.compare_real]
         if len(labels) != len(a.compare_real) or len(labels) < 2:
