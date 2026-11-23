@@ -157,6 +157,24 @@ class MicroBatchTests(unittest.TestCase):
             self.assertTrue(max(len(s.ids) for s in g) * len(g) <= 100 or len(g) == 1)
 
 
+class CpuSpeedTests(unittest.TestCase):
+    def test_bf16_on_the_processor_follows_what_it_does_in_hardware(self):
+        from unittest import mock
+        self.assertIs(T.use_bf16('cpu'), T.cpu_bf16_native())
+        with mock.patch('platform.machine', return_value='x86_64'), \
+                mock.patch.object(torch.cpu, '_is_avx512_bf16_supported', return_value=False, create=True), \
+                mock.patch.object(torch.cpu, '_is_amx_tile_supported', return_value=False, create=True):
+            self.assertFalse(T.cpu_bf16_native())          # an x86 processor without AVX-512 BF16 or AMX stays in float32
+        with mock.patch('platform.machine', return_value='x86_64'), \
+                mock.patch.object(torch.cpu, '_is_avx512_bf16_supported', return_value=True, create=True):
+            self.assertTrue(T.cpu_bf16_native())
+        with mock.patch('platform.machine', return_value='arm64'):
+            self.assertTrue(T.cpu_bf16_native())           # anything else keeps what it always did
+        with mock.patch('platform.machine', return_value='x86_64'), \
+                mock.patch.object(torch.cpu, '_is_avx512_bf16_supported', side_effect=RuntimeError, create=True):
+            self.assertTrue(T.cpu_bf16_native())           # torch cannot say: as before
+
+
 class ReplayTests(unittest.TestCase):
     def test_sampling_reaches_the_tokens_asked_and_weights_follow_the_markers(self):
         with helpers.tmpdir() as d:

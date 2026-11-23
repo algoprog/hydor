@@ -105,6 +105,58 @@ class ModelTests(unittest.TestCase):
         (sw / sws).backward()
         self.assertTrue(any(p.grad is not None for p in m.parameters()))
 
+    def test_the_fused_head_gives_the_loss_and_gradients_of_the_plain_one(self):
+        from hydor_suggest import fused_ce
+        saved = (fused_ce.ROWS, fused_ce.PIECE_ROWS, fused_ce.PIECE_COLS)
+        fused_ce.ROWS, fused_ce.PIECE_ROWS, fused_ce.PIECE_COLS = 7, 3, 64       # several blocks and pieces, the last piece the longer one
+        try:
+            for rank in (16, 0):
+                for bf16 in (False, True):
+                    m, cfg = tiny(emb_rank=rank)
+                    m.train()
+                    torch.manual_seed(5)
+                    ids = torch.randint(6, cfg.vocab, (3, 14))
+                    ids[0, 3] = V.EOS
+                    w = torch.zeros(3, 13)
+                    w[:, 3:] = torch.tensor([1.0, 4.0, 0.5]).view(3, 1)
+                    got = []
+                    for fused in (False, True):
+                        m.zero_grad()
+                        with torch.autocast('cpu', dtype=torch.bfloat16, enabled=bf16):
+                            sw, sws, n = m.loss(ids[:, :-1], ids[:, 1:], w, fused=fused)
+                        (sw / sws).backward()
+                        got.append((float(sw.detach()), torch.cat([p.grad.flatten() for p in m.parameters()])))
+                    tol = 3e-2 if bf16 else 1e-4
+                    self.assertLess(abs(got[0][0] - got[1][0]) / got[0][0], tol, (rank, bf16))
+                    scale = float(got[0][1].abs().max())
+                    self.assertLess(float((got[0][1] - got[1][1]).abs().max()) / scale, tol, (rank, bf16))
+                    self.assertTrue(torch.isfinite(got[1][1]).all())
+                    # the ids that are never predicted get no gradient from the softmax (and are not in the input here)
+                    table = m.embed.weight.grad
+                    for i in V.NEVER_PREDICT:
+                        self.assertEqual(float(table[i].abs().max()), 0.0, (rank, bf16, i))
+        finally:
+            fused_ce.ROWS, fused_ce.PIECE_ROWS, fused_ce.PIECE_COLS = saved
+
+    def test_a_large_vocabulary_uses_the_fused_head_by_default_while_training_only(self):
+        cfg = SLMConfig(arch='lfm', vocab=70000, d=32, n_layers=2, ffn=64, heads=4, kv_heads=2, emb_rank=8, max_len=64)
+        torch.manual_seed(2)
+        m = SLM(cfg).train()
+        ids = torch.randint(6, cfg.vocab, (2, 10))
+        w = torch.ones(2, 9)
+        grads = []
+        for fused in (None, False):
+            m.zero_grad()
+            sw, sws, n = m.loss(ids[:, :-1], ids[:, 1:], w, fused=fused)
+            (sw / sws).backward()
+            grads.append((float(sw.detach()), torch.cat([p.grad.flatten() for p in m.parameters()])))
+        self.assertAlmostEqual(grads[0][0], grads[1][0], delta=1e-3 * grads[1][0])
+        self.assertLess(float((grads[0][1] - grads[1][1]).abs().max()) / float(grads[1][1].abs().max()), 1e-3)
+        with torch.no_grad():                                  # evaluation takes the plain path and needs no gradients
+            sw, _, _ = m.loss(ids[:, :-1], ids[:, 1:], w)
+        self.assertFalse(sw.requires_grad)
+        self.assertAlmostEqual(float(sw), grads[1][0], delta=1e-3 * grads[1][0])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -84,5 +84,9 @@ export function writeSettings(db: DB, next: SuggestSettings) {
 export const llmThreads = (s: SuggestSettings) => s.threads || Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));
 /** Threads for the small model's worker: 2, or the setting (at most 4). */
 export const workerThreads = (s: SuggestSettings) => (s.threads ? Math.min(4, s.threads) : 2);
-/** Threads for personalising: the setting, else the smaller of 8 and half the cores. */
-export const trainThreads = (s: SuggestSettings) => s.trainThreads || Math.max(1, Math.min(8, Math.floor(os.cpus().length / 2)));
+/**
+ * Threads for personalising: the setting, else the smaller of 16 and half the logical cores (the physical cores on a computer with
+ * two threads each). It runs at the lowest priority, so whatever else the computer is doing goes first; on a 16-core processor 16
+ * threads learned about 1.2 times as fast as 8 and 1.1 times as fast as 12.
+ */
+export const trainThreads = (s: SuggestSettings) => s.trainThreads || Math.max(1, Math.min(16, Math.floor(os.cpus().length / 2)));

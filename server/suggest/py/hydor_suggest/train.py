@@ -47,6 +47,8 @@ MAX_LEN = 1024
 CTX_WORDS = 100
 SEG_WORDS = 100
 RESUME_SECONDS = 600
+CPU_MICRO_TOKENS = 4096       # padded tokens of one forward and backward on the CPU (the whole of a usual batch: the cache-friendly head makes it cheap)
+DEVICE_MICRO_TOKENS = 1024    # on a graphics card or an Apple GPU, whose memory is smaller
 
 
 class Seq(NamedTuple):
@@ -359,11 +361,23 @@ def train_step(model: SLM, batch: list, micro_tokens: int, bf16: bool, device) -
     return loss, tokens
 
 
+def cpu_bf16_native() -> bool:
+    """Whether bf16 is worth it on this CPU: its maths done in hardware (AVX-512 BF16 or AMX on x86; on anything else, or when torch cannot
+    say, it stays as it was: on). Without that the bf16 conversions cost more than they save, and plain float32 is the faster."""
+    import platform
+    if platform.machine().lower() not in ('x86_64', 'amd64'):
+        return True
+    try:
+        return bool(torch.cpu._is_avx512_bf16_supported() or torch.cpu._is_amx_tile_supported())
+    except Exception:
+        return True
+
+
 def use_bf16(device: str) -> bool:
-    """bf16 autocast on the processor, and on a graphics card only when it supports it (older NVIDIA cards do not; the others, an Apple GPU
+    """bf16 autocast on the processor (where it does the maths in hardware, see cpu_bf16_native), and on a graphics card only when it supports it (older NVIDIA cards do not; the others, an Apple GPU
     too, run in float32)."""
     if device == 'cpu':
-        return True
+        return cpu_bf16_native()
     if device == 'cuda':
         try:
             return bool(torch.cuda.is_bf16_supported())
@@ -480,7 +494,7 @@ def main(argv=None) -> None:
     p.add_argument('--threads', type=int, default=0)
     p.add_argument('--device', default='auto')
     p.add_argument('--resume', action='store_true')
-    p.add_argument('--micro-tokens', type=int, default=1024, help='padded tokens of one forward and backward (a batch is run in pieces of this size: the same gradient, less memory)')
+    p.add_argument('--micro-tokens', type=int, default=0, help=f'padded tokens of one forward and backward (a batch is run in pieces of this size: the same gradient, less memory); 0: {CPU_MICRO_TOKENS} on the CPU, {DEVICE_MICRO_TOKENS} on a graphics card')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--warmup', type=int, default=50)
     p.add_argument('--holdout', type=float, default=None, help="the share of the person's messages, the latest, kept out for the dev loss (default 0.05 when starting from the release; 0 when --init is a personal model, whose later messages would otherwise never be learned from)")
@@ -537,6 +551,7 @@ def main(argv=None) -> None:
     plan = make_plan(lengths, st.batch_tokens, rng, st.epochs)
     total = len(plan)
     warmup = min(st.warmup, max(1, total // 10))
+    micro_tokens = a.micro_tokens or (CPU_MICRO_TOKENS if device == 'cpu' else DEVICE_MICRO_TOKENS)
     model.to(device)
     opt = make_optimizer(model, st.lr, st.wd)
     replay_rng = np.random.RandomState(st.seed + 7)
@@ -608,7 +623,7 @@ def main(argv=None) -> None:
         for g in opt.param_groups:
             g['lr'] = lr_at(step, total, st.lr, warmup)
         opt.zero_grad(set_to_none=True)
-        loss, ntok = train_step(model, b, a.micro_tokens, st.bf16, device)
+        loss, ntok = train_step(model, b, micro_tokens, st.bf16, device)
         gnorm = float(torch.nn.utils.clip_grad_norm_(model.parameters(), st.clip))
         finite = math.isfinite(loss) and math.isfinite(gnorm)
         if finite:

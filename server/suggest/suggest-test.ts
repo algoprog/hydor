@@ -24,7 +24,7 @@ import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
 import { GRACE, gpuHold, personalDir, recoverPersonal } from './train.ts';
-import { merge, readSettings, writeSettings } from './settings.ts';
+import { merge, readSettings, trainThreads, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
 import { addUsage, cleanUsage, dayBefore, dayKey, readUsage, resetUsage, USAGE_KEY } from './usage.ts';
@@ -280,6 +280,9 @@ test('settings: a wrong value is a 400 that names the field; limits are inclusiv
   bad([], 'Send');
   const edge = merge(SUGGEST_DEFAULTS, { precision: 0.3, typedWords: 200, contextWords: 0, threads: 32, userWeight: 16, trainThreads: 64 }, true);
   assert.deepEqual([edge.precision, edge.typedWords, edge.contextWords, edge.threads, edge.userWeight, edge.trainThreads], [0.3, 200, 0, 32, 16, 64]);
+  // Threads for learning: the person's number wins; else half the logical cores, at most 16.
+  assert.equal(trainThreads({ ...SUGGEST_DEFAULTS, trainThreads: 3 }), 3);
+  assert.equal(trainThreads(SUGGEST_DEFAULTS), Math.max(1, Math.min(16, Math.floor(os.cpus().length / 2))));
   // What is kept and no longer valid reads as its default.
   assert.equal(merge(SUGGEST_DEFAULTS, { precision: 9, llm: 'x', enabled: true }, false).precision, SUGGEST_DEFAULTS.precision);
   assert.equal(merge(SUGGEST_DEFAULTS, { precision: 9, llm: 'x', enabled: true }, false).enabled, true);

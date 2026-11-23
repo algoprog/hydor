@@ -11,6 +11,7 @@ matches the full forward. The parameter names are the research code's, so its ch
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import asdict, dataclass, fields
 from typing import Optional
 
@@ -316,14 +317,27 @@ class SLM(nn.Module):
         logits[:, list(NEVER_PREDICT)] = float('-inf')
         return logits
 
-    def loss(self, ids, targets, weights, chunk: int = 0):
+    def loss(self, ids, targets, weights, chunk: int = 0, fused: Optional[bool] = None):
         """Weighted CE over positions with weight > 0 (the lm head runs only there).  Returns (sum w*ce, sum w,
         n positions).  <bos> <agent> <user> <doc> are masked out of the softmax.  chunk > 0: the lm head and the
         cross-entropy run `chunk` positions at a time, each recomputed in the backward pass (the logits of a large
-        batch never exist all at once)."""
+        batch never exist all at once).  fused: the head and its cross-entropy in one cache-friendly pass with the gradients made
+        in the same pass (fused_ce.py; several times faster on a CPU for a large vocabulary); the default is for a vocabulary over 64k
+        on the CPU while gradients are recorded (HYDOR_SUGGEST_FUSED_CE=0 turns it off)."""
         h, _ = self.body(ids)
         m = weights > 0
         w = weights[m].float()
+        if fused is None:
+            fused = (self.cfg.vocab > 65536 and h.device.type == 'cpu' and torch.is_grad_enabled()
+                     and os.environ.get('HYDOR_SUGGEST_FUSED_CE') != '0')
+        if fused and int(m.sum()) > 0:
+            from .fused_ce import FusedCrossEntropy
+            hm = h[m]
+            if self.emb_proj is not None:
+                z, table = hm @ self.emb_proj.weight, self.embed.weight
+            else:
+                z, table = hm, self.lm_head.weight
+            return FusedCrossEntropy.apply(z, table, targets[m], w, NEVER_PREDICT), w.sum(), int(m.sum())
         if not chunk and self.cfg.vocab > 65536:
             chunk = 384                       # a large vocabulary: never all the logits at once
         if chunk and int(m.sum()) > chunk:
