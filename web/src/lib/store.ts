@@ -481,6 +481,8 @@ interface UIState {
   lightTheme: string;
   /** Grey suggestions after the cursor in terminals. */
   termSuggest: boolean;
+  /** Grey word suggestions while typing, in this browser (Settings → Capabilities → Word suggestions). */
+  wordSuggestions: boolean;
   /** The Files page's left pane: the tree or search in files. */
   side: SideView;
   /** Desktop sidebar shown. */
@@ -546,6 +548,7 @@ export const useUI = create<UIState>((set, get) => ({
   darkTheme: 'naget-dark',
   lightTheme: 'naget-light',
   termSuggest: true,
+  wordSuggestions: true,
   side: 'files',
   sideOpen: true,
   drawerOpen: false,

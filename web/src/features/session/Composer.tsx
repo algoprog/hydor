@@ -7,6 +7,8 @@ import { goalMessageOf } from '@shared/goals';
 import { accountAgentOf } from '@shared/grok';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
+import { chatContext } from '../suggest/chat';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 import { openSession } from '../../lib/nav';
 import { LOCALE } from '../../i18n/locale';
 import { stopOverridden, toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
@@ -200,6 +202,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const menu = useComposerMenu({ ta, setText, root: s.cwd, commands: (move ? moveCat : cat)?.commands });
+  // Grey word suggestions after the caret (Tab takes the word, → at the end takes it and the next, Esc hides them).
+  const words = useTextareaSuggest(ta, { place: 'chat', value: text, context: () => chatContext(key), off: locked });
   // Text from elsewhere (dictation, a choice clicked in a page) joins what is being written.
   const insertText = (t: string) => {
     if (!t) return;
@@ -557,6 +561,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             onKeyUp={(e) => (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') && menu.update()}
             onKeyDown={(e) => {
               if (menu.onKeyDown(e)) return;
+              if (words.onKeyDown(e)) return;
               const el = e.currentTarget;
               // Earlier prompts: Up from an empty box (or one showing a recalled prompt, caret at the start).
               if (e.key === 'ArrowUp' && !e.shiftKey && prompts?.length && (!text || (recall >= 0 && el.selectionStart === 0))) {
@@ -640,6 +645,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             }
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 composer-input leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />
+          {words.overlay}
           <div className="flex items-center gap-1 px-2.5 pt-0.5 pb-2.5">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <AddButton

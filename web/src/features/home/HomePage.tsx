@@ -17,6 +17,7 @@ import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { startSession, warmMemory } from '../../lib/starting';
+import { useTextareaSuggest } from '../suggest/useTextareaSuggest';
 import { agentKey, lastAgent, parseAgentKey, picksAt, placePicks, placeRecord, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
@@ -275,6 +276,8 @@ function StartComposer({
   }, [cwd]);
   const ta = useRef<HTMLTextAreaElement>(null);
   const menu = useComposerMenu({ ta, setText, root: cwd || undefined, commands: cat?.commands });
+  // Grey word suggestions after the caret; a new session has no reply to answer.
+  const words = useTextareaSuggest(ta, { place: 'chat', value: text });
   const fileRef = useRef<HTMLInputElement>(null);
   // Text from the capabilities' buttons (dictation) joins what is being written.
   const insertText = (t: string) => {
@@ -620,6 +623,7 @@ function StartComposer({
           onKeyUp={(e) => (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') && menu.update()}
           onKeyDown={(e) => {
             if (menu.onKeyDown(e)) return;
+            if (words.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (!mobile || e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               start();
@@ -638,6 +642,7 @@ function StartComposer({
           placeholder="Describe a task or ask a question"
           className="block w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15.5px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none"
         />
+        {words.overlay}
         <div className="flex items-center gap-0.5 px-2.5 pb-2.5">
           <button className={iconBtn} onClick={() => fileRef.current?.click()} title="Attach files" aria-label="Attach files">
             <Paperclip size={17} />
