@@ -429,7 +429,7 @@ def main(argv=None) -> None:
     dev_seqs = [dev_version(s) for ri, s in built if ri in dev_records]
     if not train_seqs:
         say({'error': 'no text to learn from'})
-        sys.exit(2)
+        sys.exit(3)   # nothing to learn from (the server reads 3 as that, and 2 stays argparse's usage error)
     own_tokens, languages_new = own_tokens_by_language(records, tokens, lid)
     replay = None
     if a.replay and st.replay_ratio > 0 and os.path.isfile(os.path.join(a.replay, 'index.json')):

@@ -36,6 +36,45 @@ const freeDiskGb = (p: string) => {
 };
 const mb = (n: number) => Math.round(n / 2 ** 20);
 
+/** A download that gets no data for this long is given up (a stalled connection would hold the set-up for ever). */
+export const STALL_MS = 60_000;
+
+/**
+ * Runs a download with a signal that ends when `signal` does, or when `alive` has not been called for `ms` (the download
+ * calls it with every bit of progress): the error then says the connection stalled.
+ */
+export async function withStall<T>(signal: AbortSignal | undefined, ms: number, fn: (signal: AbortSignal, alive: () => void) => Promise<T>): Promise<T> {
+  const c = new AbortController();
+  let stalled = false;
+  let timer: NodeJS.Timeout | undefined;
+  const alive = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      c.abort();
+    }, ms);
+  };
+  const onAbort = () => c.abort();
+  if (signal?.aborted) c.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  alive();
+  try {
+    return await fn(c.signal, alive);
+  } catch (e) {
+    if (stalled) throw new Error(`The download stopped: no data came for ${Math.round(ms / 1000)} seconds. It is tried again later`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/** Why word suggestions cannot run on this system, or null: torch has no wheels for an Intel Mac. A Python of one's own (HYDOR_SUGGEST_PYTHON) is used as it is. */
+export function unsupportedSystem(platform: string = process.platform, arch: string = process.arch): string | null {
+  if (process.env.HYDOR_SUGGEST_PYTHON) return null;
+  return platform === 'darwin' && arch === 'x64' ? 'Word suggestions need a Mac with Apple silicon' : null;
+}
+
 // ---- where things are ----------------------------------------------------------------------------------------------
 
 /** The Python that runs the engine: one given (HYDOR_SUGGEST_PYTHON, used as it is), else the private one. */
@@ -97,10 +136,20 @@ export function ggufPath(quant: 'q8' | 'q4'): string | null {
 
 type Report = (detail: string) => void;
 
-function run(cmd: string, args: string[], label: string, report: Report): Promise<void> {
+/** Ended (turned off, or no data for a while). */
+const aborted = () => new Error('Stopped');
+
+export function run(cmd: string, args: string[], label: string, report: (detail: string) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(aborted());
     report(label);
     const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } });
+    const stop = () => {
+      try {
+        p.kill('SIGTERM');
+      } catch {}
+    };
+    signal?.addEventListener('abort', stop, { once: true });
     const tail: string[] = [];
     const take = (b: Buffer) => {
       for (const l of b.toString().split('\n')) if (l.trim()) tail.push(l.trim().slice(0, 300));
@@ -109,7 +158,12 @@ function run(cmd: string, args: string[], label: string, report: Report): Promis
     p.stdout!.on('data', take);
     p.stderr!.on('data', take);
     p.on('error', reject);
-    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${label} failed${tail.length ? `: ${tail.slice(-3).join(' ')}` : ''}`))));
+    p.on('exit', (code) => {
+      signal?.removeEventListener('abort', stop);
+      if (signal?.aborted) reject(aborted());
+      else if (code === 0) resolve();
+      else reject(new Error(`${label} failed${tail.length ? `: ${tail.slice(-3).join(' ')}` : ''}`));
+    });
   });
 }
 
@@ -130,7 +184,7 @@ const TORCH = 'torch>=2.4';
 const OTHERS = ['tokenizers>=0.20', 'numpy', 'safetensors>=0.4'];
 
 /** The private Python environment with the engine's libraries (once; again when their list changes). */
-export async function setupPython(report: Report): Promise<void> {
+export async function setupPython(report: Report, signal?: AbortSignal): Promise<void> {
   if (packagesReady()) return;
   if (process.env.HYDOR_SUGGEST_PYTHON) throw new Error(`HYDOR_SUGGEST_PYTHON (${process.env.HYDOR_SUGGEST_PYTHON}) does not exist`);
   fs.mkdirSync(suggestDir(), { recursive: true });
@@ -145,18 +199,18 @@ export async function setupPython(report: Report): Promise<void> {
   const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
   if (uv) {
     const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
-    if (!fs.existsSync(pythonPath())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10,<3.14', venv()], 'Making a private Python environment', report);
-    await run(uv, ['pip', 'install', '--quiet', '--python', pythonPath(), ...torchIndex, TORCH], 'Installing PyTorch (CPU), about 200 MB', report);
-    await run(uv, ['pip', 'install', '--quiet', '--python', pythonPath(), ...OTHERS], 'Installing the tokenizer and NumPy', report);
+    if (!fs.existsSync(pythonPath())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10,<3.14', venv()], 'Making a private Python environment', report, signal);
+    await run(uv, ['pip', 'install', '--quiet', '--python', pythonPath(), ...torchIndex, TORCH], 'Installing PyTorch (CPU), about 200 MB', report, signal);
+    await run(uv, ['pip', 'install', '--quiet', '--python', pythonPath(), ...OTHERS], 'Installing the tokenizer and NumPy', report, signal);
   } else {
     const sys = systemPython();
     if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or: winget install Python.Python.3.12).');
     if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and word suggestions need it (python.org, or Homebrew: brew install python).');
     if (!sys) throw new Error('Python 3 is not installed on this computer, and word suggestions need it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
-    if (!fs.existsSync(pythonPath())) await run(sys, ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report);
-    if (!fs.existsSync(pythonPath())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment', report);
-    await run(pythonPath(), ['-m', 'pip', 'install', '--quiet', ...torchIndex, TORCH], 'Installing PyTorch (CPU), about 200 MB', report);
-    await run(pythonPath(), ['-m', 'pip', 'install', '--quiet', ...OTHERS], 'Installing the tokenizer and NumPy', report);
+    if (!fs.existsSync(pythonPath())) await run(sys, ['-c', 'import sys; sys.exit(0 if (3, 10) <= sys.version_info < (3, 14) else 1)'], 'Checking Python (3.10 to 3.13)', report, signal);
+    if (!fs.existsSync(pythonPath())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment', report, signal);
+    await run(pythonPath(), ['-m', 'pip', 'install', '--quiet', ...torchIndex, TORCH], 'Installing PyTorch (CPU), about 200 MB', report, signal);
+    await run(pythonPath(), ['-m', 'pip', 'install', '--quiet', ...OTHERS], 'Installing the tokenizer and NumPy', report, signal);
   }
   fs.writeFileSync(path.join(venv(), '.packages'), SUGGEST_PACKAGES);
 }
@@ -167,7 +221,7 @@ function withFolders(to: string, files: ModelFile[]) {
 }
 
 /** The small model's release (nothing to do for a folder of one's own: HYDOR_SUGGEST_MODEL_DIR). */
-export async function setupRelease(report: Report): Promise<void> {
+export async function setupRelease(report: Report, signal?: AbortSignal): Promise<void> {
   const problem = releaseProblem();
   if (!problem) return;
   const dir = releaseDir();
@@ -177,11 +231,14 @@ export async function setupRelease(report: Report): Promise<void> {
   fs.mkdirSync(dir, { recursive: true });
   withFolders(dir, SMALL_MODEL.files);
   const base = (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
-  await downloadFiles(dir, SMALL_MODEL.files, {
-    url: (from) => `${base}/${SMALL_MODEL.repo}/resolve/${SMALL_MODEL.revision}/${from}`,
-    mark: SMALL_MODEL.revision,
-    progress: (done, all) => report(done >= all ? 'Checking the small model' : `Downloading the small model: ${mb(done)} of ${mb(all)} MB`),
-  });
+  await withStall(signal, STALL_MS, (sig, alive) =>
+    downloadFiles(dir, SMALL_MODEL.files, {
+      url: (from) => `${base}/${SMALL_MODEL.repo}/resolve/${SMALL_MODEL.revision}/${from}`,
+      mark: SMALL_MODEL.revision,
+      signal: sig,
+      progress: (done, all) => (alive(), report(done >= all ? 'Checking the small model' : `Downloading the small model: ${mb(done)} of ${mb(all)} MB`)),
+    }),
+  );
 }
 
 function extract(file: string, to: string): Promise<void> {
@@ -207,7 +264,7 @@ function findIn(dir: string, name: string, depth = 3): string | null {
 }
 
 /** llama.cpp's llama-server for this system, from the pinned release (not when HYDOR_SUGGEST_LLAMA_SERVER names one). */
-export async function setupLlama(report: Report, signal: AbortSignal): Promise<void> {
+export async function setupLlama(report: Report, signal?: AbortSignal): Promise<void> {
   if (llamaBinary()) return;
   if (process.env.HYDOR_SUGGEST_LLAMA_SERVER) throw new Error(`HYDOR_SUGGEST_LLAMA_SERVER (${process.env.HYDOR_SUGGEST_LLAMA_SERVER}) does not exist`);
   const asset = LLAMA_ASSETS[llamaKey()];
@@ -215,10 +272,12 @@ export async function setupLlama(report: Report, signal: AbortSignal): Promise<v
   const root = path.join(suggestDir(), 'llama');
   fs.mkdirSync(root, { recursive: true });
   const file = path.join(root, asset.name);
-  await fetchFile({ url: llamaUrl(asset), bytes: asset.bytes, sha256: asset.sha256 }, file, {
-    signal,
-    progress: (done, total) => report(`Downloading llama.cpp: ${mb(done)} of ${mb(total || asset.bytes)} MB`),
-  });
+  await withStall(signal, STALL_MS, (sig, alive) =>
+    fetchFile({ url: llamaUrl(asset), bytes: asset.bytes, sha256: asset.sha256 }, file, {
+      signal: sig,
+      progress: (done, total) => (alive(), report(`Downloading llama.cpp: ${mb(done)} of ${mb(total || asset.bytes)} MB`)),
+    }),
+  );
   report('Unpacking llama.cpp');
   const tmp = path.join(root, `${LLAMA_TAG}.partial`);
   fs.rmSync(tmp, { recursive: true, force: true });
@@ -233,16 +292,19 @@ export async function setupLlama(report: Report, signal: AbortSignal): Promise<v
 }
 
 /** The language model's GGUF file for a size. */
-export async function setupGguf(quant: 'q8' | 'q4', report: Report): Promise<void> {
+export async function setupGguf(quant: 'q8' | 'q4', report: Report, signal?: AbortSignal): Promise<void> {
   if (ggufPath(quant)) return;
   if (process.env.HYDOR_SUGGEST_GGUF) throw new Error(`HYDOR_SUGGEST_GGUF (${process.env.HYDOR_SUGGEST_GGUF}) does not exist`);
   const f = GGUF_FILES[quant];
   const dir = ggufDir();
   if (freeDiskGb(path.dirname(dir)) < f.bytes / 2 ** 30 + 0.2) throw new Error(`Not enough disk space for the language model (${mb(f.bytes)} MB).`);
   const base = (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
-  await downloadFiles(dir, [f], {
-    url: (from) => `${base}/${GGUF_REPO}/resolve/${GGUF_REVISION}/${from}`,
-    mark: GGUF_REVISION,
-    progress: (done, all) => report(done >= all ? 'Checking the language model' : `Downloading the language model: ${mb(done)} of ${mb(all)} MB`),
-  });
+  await withStall(signal, STALL_MS, (sig, alive) =>
+    downloadFiles(dir, [f], {
+      url: (from) => `${base}/${GGUF_REPO}/resolve/${GGUF_REVISION}/${from}`,
+      mark: GGUF_REVISION,
+      signal: sig,
+      progress: (done, all) => (alive(), report(done >= all ? 'Checking the language model' : `Downloading the language model: ${mb(done)} of ${mb(all)} MB`)),
+    }),
+  );
 }

@@ -258,7 +258,7 @@ class TrainRunTests(unittest.TestCase):
         with open(empty, 'w'):
             pass
         code, lines, err = run_train(self.release, empty, os.path.join(self.dir.name, 'p5'))
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 3)   # 3: nothing to learn from (2 is argparse's own usage error)
         self.assertEqual(lines[-1], {'error': 'no text to learn from'})
         self.assertFalse(os.path.exists(os.path.join(self.dir.name, 'p5', 'model.safetensors')))
 

@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
 import Fastify from 'fastify';
 import { SUGGEST_DEFAULTS, type SuggestState } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
@@ -14,7 +16,13 @@ import { kvGet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { memorySchema } from '../memory/store.ts';
 import { initPages } from '../pages/store.ts';
+import { downloadFiles } from '../memory/embed.ts';
 import { suggest, suggestService, cleanRequest } from './index.ts';
+import { LlamaServer } from './llm.ts';
+import { killAll, reapLeftovers, track } from './procs.ts';
+import { SuggestService } from './service.ts';
+import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
+import { personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
@@ -47,10 +55,18 @@ def out(o):
 args = sys.argv[1:]
 if any(a.endswith('train.py') for a in args):
     a = {k: args[i + 1] for i, k in enumerate(args) if k.startswith('--') and i + 1 < len(args)}
-    texts = open(a['--texts']).read().splitlines()
-    log({'train': True, 'args': args, 'texts': len(texts), 'mode': oct(os.stat(a['--texts']).st_mode & 0o777), 'nice': os.nice(0)})
+    import hashlib
+    raw = open(a['--texts'], 'rb').read()
+    texts = raw.decode().splitlines()
+    flag = lambda n: os.path.exists(os.path.join(here, n))
+    log({'train': True, 'args': args, 'texts': len(texts), 'sha': hashlib.sha256(raw).hexdigest(), 'mode': oct(os.stat(a['--texts']).st_mode & 0o777), 'nice': os.nice(0)})
     out({'progress': {'done': 1, 'total': 2}, 'loss': 3.0})
     os.makedirs(a['--out'], exist_ok=True)
+    if flag('trainhold'):
+        while flag('trainhold'): time.sleep(0.05)
+    if flag('trainfail'): sys.exit(1)
+    if flag('trainnothing'): sys.exit(3)
+    if flag('traincode2'): sys.exit(2)
     open(os.path.join(a['--out'], 'model.safetensors'), 'w').write('weights')
     open(os.path.join(a['--out'], 'config.json'), 'w').write('{}')
     open(os.path.join(a['--out'], 'resume.pt'), 'w').write('state')
@@ -68,12 +84,16 @@ def reader():
         q.put(m)
     q.put(None)
 threading.Thread(target=reader, daemon=True).start()
+log({'boot': os.getpid()})
+if os.path.exists(os.path.join(here, 'slowstart')): time.sleep(2)
 out({'status': 'loading'}); out({'ready': True, 'rss': 100})
 while True:
     m = q.get()
     if m is None: break
     op = m.get('op')
-    if op == 'load': out({'id': m['id'], 'ok': True, 'model': 'personal' if m.get('personal_dir') else 'base', 'languages': {}})
+    if op == 'load':
+        if os.path.exists(os.path.join(here, 'slowload')): time.sleep(1.5)
+        out({'id': m['id'], 'ok': True, 'model': 'personal' if m.get('personal_dir') else 'base', 'languages': {}})
     elif op == 'session': out({'id': m['id'], 'ok': True})
     elif op == 'stats': out({'id': m['id'], 'rss': 100, 'requests': 0, 'p50_ms': 1, 'p90_ms': 2})
     elif op == 'suggest':
@@ -523,6 +543,9 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   await put({ enabled: true, personalise: true, trainThreads: 3, userWeight: 6, schedule: 'manual' });
   const personal = path.join(DATA, 'suggest', 'personal');
   assert.equal((await get()).status.training.state, 'idle', 'manual: nothing is waiting');
+  // The worker is up: it lets go of the model's files before the new one takes their place.
+  await ask({ surface: 'chat', text: 'wake the worker for training' });
+  await until('the worker', async () => svc.pids().worker);
   const r = await app.inject({ method: 'POST', url: '/api/suggest/train' });
   assert.equal(r.statusCode, 200);
   await until('the model to be in place', async () => fs.existsSync(path.join(personal, 'model.safetensors')), 20_000);
@@ -541,6 +564,8 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   const a = t.args as string[];
   const opt = (k: string) => a[a.indexOf(k) + 1];
   assert.equal(opt('--threads'), '3');
+  assert.equal(opt('--device'), 'cpu', 'an Apple GPU is out of the lowest priority’s reach');
+  assert.equal(svc.pids().worker, undefined, 'the worker was stopped for the swap');
   assert.equal(opt('--w-user'), '6');
   assert.equal(opt('--base'), release);
   assert.equal(opt('--init'), release, 'the first run starts from the small model');
@@ -561,7 +586,8 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   await until('the second run to finish', async () => (await get()).status.training.state !== 'running' && !svcActive());
   assert.equal(logLines().filter((l) => l.train).length, before, 'nothing new to learn from, so train.py did not run');
   assert.match((await get()).status.training.detail ?? '', /Nothing new/);
-  chunk.run('claude:typed', 'user', Date.now() + 1000, 'A brand new message after the first run');
+  await sleep(20);
+  chunk.run('claude:typed', 'user', Date.now() - 5, 'A brand new message after the first run');
   await app.inject({ method: 'POST', url: '/api/suggest/train' });
   await until('the second run', async () => logLines().filter((l) => l.train).length === before + 1);
   await until('it is over', async () => !svcActive());
@@ -572,6 +598,7 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   const f = await app.inject({ method: 'DELETE', url: '/api/suggest/personal' });
   assert.equal(f.json().status.model.kind, 'base');
   assert.ok(!fs.existsSync(personal));
+  await ask({ surface: 'chat', text: 'wake the worker again' });
   await until('the worker to load the small model again', async () => logLines().filter((l) => l.op === 'load').pop()?.personal_dir === null);
   // "Learn from what I write" off refuses to train.
   await put({ personalise: false });
@@ -614,6 +641,414 @@ test('setup says why when the model is not published and none was given', async 
   } finally {
     process.env.HYDOR_SUGGEST_MODEL_DIR = saved;
   }
+});
+
+
+// ---- what keeps running, and what stops ----------------------------------------------------------------------------
+
+const flag = (name: string, on: boolean) => (on ? fs.writeFileSync(path.join(fakeDir, name), '') : fs.rmSync(path.join(fakeDir, name), { force: true }));
+const put = (payload: object) => app.inject({ method: 'PUT', url: '/api/suggest', payload });
+const priv = svc as any;
+const exited = (p: ReturnType<typeof spawn>, ms = 4000) => new Promise<boolean>((resolve) => (p.exitCode != null || p.signalCode ? resolve(true) : (p.once('exit', () => resolve(true)), setTimeout(() => resolve(false), ms).unref())));
+const sleeper = (marker: string) => spawn('python3', ['-c', 'import time; time.sleep(60)', marker], { stdio: 'ignore' });
+
+test('1: programs are kept in pids.json, ended when the server exits, and an earlier server’s leftovers are ended at start', async () => {
+  const pidsFile = path.join(DATA, 'suggest', 'pids.json');
+  await put({ enabled: true, llm: 'off' });
+  await ask({ surface: 'chat', text: 'wake the worker for the pids' });
+  const worker = await until('the worker', async () => svc.pids().worker);
+  const kept = JSON.parse(fs.readFileSync(pidsFile, 'utf8')) as { pid: number; kind: string; marker: string }[];
+  const mine = kept.find((e) => e.pid === worker)!;
+  assert.equal(mine.kind, 'worker');
+  assert.match(mine.marker, /worker\.py$/, 'what it was started with, to tell it from another program that gets its id');
+  assert.equal(fs.statSync(pidsFile).mode & 0o777, 0o600);
+  assert.ok(process.listeners('exit').includes(killAll), 'the programs are ended as the server exits, whatever the way');
+  await put({ enabled: false });
+  await until('the worker to stop and be forgotten', async () => !alive(worker) && !fs.existsSync(pidsFile));
+  // A leftover of an earlier server that still is what was started: ended.
+  const a = sleeper('/leftover/worker.py');
+  fs.writeFileSync(pidsFile, JSON.stringify([{ pid: a.pid, kind: 'worker', marker: '/leftover/worker.py' }]));
+  assert.equal(reapLeftovers(), 1);
+  assert.ok(await exited(a), 'the leftover was ended');
+  // The same id given to another program since: left alone.
+  const b = sleeper('/something/else');
+  fs.writeFileSync(pidsFile, JSON.stringify([{ pid: b.pid, kind: 'llama', marker: '/leftover/model.gguf' }, { pid: process.pid, kind: 'worker', marker: 'node' }, { pid: 1, kind: 'worker', marker: 'init' }]));
+  assert.equal(reapLeftovers(), 0);
+  assert.ok(alive(b.pid!), 'a process that is not what was started is not touched');
+  assert.ok(!fs.existsSync(pidsFile), 'and the list is cleared');
+  b.kill('SIGKILL');
+  // Everything tracked is ended at once (what runs at the server's exit).
+  const c = sleeper('/tracked/train.py');
+  track('train', c, '/tracked/train.py');
+  assert.ok(fs.existsSync(pidsFile));
+  killAll();
+  assert.ok(await exited(c), 'ended');
+  assert.ok(!fs.existsSync(pidsFile));
+});
+
+test('2: turning it off while the worker starts stops it, and one that is stopped while a port is found starts nothing', async () => {
+  flag('slowstart', true);
+  const before = logLines().length;
+  await put({ enabled: true, llm: 'off' });
+  await ask({ surface: 'chat', text: 'start slowly' });
+  const boot = (await until('the worker process', async () => logLines().slice(before).find((l) => l.boot))).boot as number;
+  assert.ok(alive(boot));
+  await put({ enabled: false });
+  await until('the starting worker to be stopped', async () => !alive(boot));
+  await sleep(2500);
+  assert.equal((await get()).status.state, 'off');
+  assert.equal(svc.pids().worker, undefined);
+  assert.ok(!logLines().slice(before).some((l) => l.op === 'load'), 'it never got to load');
+  flag('slowstart', false);
+  // The language model: a stop while a port is being found.
+  const argsFile = path.join(fakeDir, 'llama-args.json');
+  fs.rmSync(argsFile, { force: true });
+  const llm = new LlamaServer(() => {});
+  const p1 = llm.start({ binary: fakeLlama, gguf, threads: 1 });
+  llm.stop('Turned off');
+  assert.equal(await p1, null);
+  await sleep(700);
+  assert.equal(llm.pid, undefined);
+  assert.ok(!fs.existsSync(argsFile), 'nothing was started');
+  assert.deepEqual(llm.state, { state: 'off', detail: 'Turned off' }, 'and the state is the stop’s');
+  // A stop and then a start (a size changed) is a new start, not the old one still going.
+  const q1 = llm.start({ binary: fakeLlama, gguf, threads: 1 });
+  llm.stop();
+  const q2 = llm.start({ binary: fakeLlama, gguf, threads: 1 });
+  assert.notEqual(q1, q2);
+  assert.equal(await q1, null);
+  const url = await q2;
+  assert.match(url ?? '', /^http:\/\/127\.0\.0\.1:\d+$/);
+  const pid = llm.pid!;
+  llm.stop();
+  await until('it to stop', async () => !alive(pid));
+});
+
+test('3: the language model’s download is one at a time for each size, and not tried again for ten minutes after a failure', async () => {
+  await put({ enabled: true, llm: 'on', quant: 'q8' });
+  priv.llmPrepFailed.clear();
+  const saved = process.env.HYDOR_SUGGEST_GGUF;
+  process.env.HYDOR_SUGGEST_GGUF = path.join(tmp, 'not-there.gguf');
+  try {
+    const p1 = priv.prepareLlm();
+    const p2 = priv.prepareLlm();
+    assert.equal(p1, p2, 'the second asks the first’s download');
+    assert.equal(await p1, false);
+    assert.match(svc.llm.state.detail ?? '', /does not exist/);
+    assert.equal(svc.llm.state.state, 'failed');
+    // A few seconds on, it is not tried again (a retry would fail and say so once more): asked many times, once it failed.
+    let failures = 0;
+    const note = svc.llm.note.bind(svc.llm);
+    svc.llm.note = (st) => (st.state === 'failed' && failures++, note(st));
+    assert.equal(await priv.prepareLlm(), false);
+    assert.equal(await priv.prepareLlm(), false);
+    assert.equal(failures, 0, 'no new attempt within the ten minutes');
+    svc.llm.note = note;
+    // A change of the size (or of the language model) lifts it.
+    await put({ quant: 'q4' });
+    process.env.HYDOR_SUGGEST_GGUF = gguf;
+    assert.equal(await priv.prepareLlm(), true);
+  } finally {
+    process.env.HYDOR_SUGGEST_GGUF = saved;
+    svc.llm.reset();
+    await put({ quant: 'q8', llm: 'off' });
+  }
+});
+
+test('4 and 5: a download with no data for a while is given up, turning it off stops downloads and commands, and the small model does not wait for the language model', async () => {
+  await assert.rejects(withStall(undefined, 200, (sig) => new Promise((_, rej) => sig.addEventListener('abort', () => rej(new Error('aborted'))))), /no data came/);
+  assert.equal(
+    await withStall(undefined, 300, async (_s, alive) => {
+      for (let i = 0; i < 8; i++) (alive(), await sleep(80));
+      return 'done';
+    }),
+    'done',
+    'a download that goes on is not a stalled one',
+  );
+  const ac = new AbortController();
+  let inner: AbortSignal | undefined;
+  const w = withStall(ac.signal, 60_000, (sig) => ((inner = sig), new Promise((_, rej) => sig.addEventListener('abort', () => rej(new Error('aborted'))))));
+  ac.abort();
+  await assert.rejects(w, /^Error: aborted$/);
+  assert.ok(inner!.aborted);
+  // A server that sends a few bytes and then nothing: the stall ends it; so does turning off.
+  const hold = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-length': '1000' });
+    res.write('0123456789');
+  });
+  await new Promise<void>((r) => hold.listen(0, '127.0.0.1', r));
+  const port = (hold.address() as { port: number }).port;
+  const file = { from: 'x', name: 'x.bin', bytes: 1000, sha256: '0'.repeat(64) };
+  const dl = (dir: string, sig: AbortSignal, alive: () => void) => downloadFiles(dir, [file], { url: () => `http://127.0.0.1:${port}/x`, mark: 'm', signal: sig, progress: alive });
+  try {
+    const t0 = Date.now();
+    await assert.rejects(withStall(undefined, 400, (sig, alive) => dl(path.join(tmp, 'dl1'), sig, alive)), /no data came/);
+    assert.ok(Date.now() - t0 < 5000);
+    const off = new AbortController();
+    setTimeout(() => off.abort(), 200);
+    const t1 = Date.now();
+    await assert.rejects(withStall(off.signal, 60_000, (sig, alive) => dl(path.join(tmp, 'dl2'), sig, alive)));
+    assert.ok(Date.now() - t1 < 5000, 'turning off ends the download at once');
+  } finally {
+    hold.closeAllConnections();
+    hold.close();
+  }
+  // A command (pip, uv) that is running is killed.
+  const pidFile = path.join(tmp, 'cmd.pid');
+  const stop = new AbortController();
+  const cmd = runCommand('sh', ['-c', `echo $$ > ${pidFile}; exec sleep 60`], 'Installing', () => {}, stop.signal);
+  const cmdPid = Number(await until('the command', async () => (fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : null)));
+  stop.abort();
+  await assert.rejects(cmd, /Stopped/);
+  await until('the command to be gone', async () => !alive(cmdPid));
+  // The small model is ready when its own files are: the language model's download goes on without holding it.
+  await put({ enabled: true, llm: 'on' });
+  let asked = 0;
+  priv.prepareLlm = () => (asked++, new Promise(() => {}));
+  try {
+    const ready = await Promise.race([priv.ensureSetup(), sleep(2000).then(() => 'waited')]);
+    assert.equal(ready, true, 'set up while the download is not finished');
+    assert.equal(asked, 1, 'and the download was started');
+  } finally {
+    delete priv.prepareLlm;
+    await put({ llm: 'off' });
+  }
+});
+
+const addTyped = async (text: string) => {
+  // A message written after the last run began, and before this one.
+  await sleep(20);
+  chunk.run('claude:typed', 'user', Date.now() - 5, text);
+};
+const workFile = (f: string) => path.join(personalDir(), 'train', f);
+
+test('6, 7 and the exit codes: a stopped run goes on with the same texts, no text stays behind, learning off clears what is left, and 3 is "nothing to learn"', async () => {
+  await put({ enabled: true, personalise: true, schedule: 'manual', llm: 'off', trainThreads: 1 });
+  await app.inject({ method: 'DELETE', url: '/api/suggest/personal' });
+  const trains = () => logLines().filter((l) => l.train);
+  const n0 = trains().length;
+  flag('trainhold', true);
+  await addTyped('A message for the stopped run, written before it');
+  await app.inject({ method: 'POST', url: '/api/suggest/train' });
+  const first = await until('the first run', async () => trains()[n0]);
+  // Something is written while it runs, and it is stopped (turning it off ends it).
+  await addTyped('A message written after the run began, which must wait for the next');
+  await put({ enabled: false });
+  await until('the run to end', async () => !svc.trainer.active);
+  assert.ok(!fs.existsSync(workFile('texts.jsonl')), 'the texts do not stay behind a stopped run');
+  assert.ok(fs.existsSync(workFile('job.json')) && fs.existsSync(workFile('out')), 'its resume state does');
+  flag('trainhold', false);
+  await put({ enabled: true });
+  await app.inject({ method: 'POST', url: '/api/suggest/train' });
+  const second = await until('the run again', async () => trains()[n0 + 1]);
+  assert.equal(second.sha, first.sha, 'the same texts come back (what was written since is not in them)');
+  assert.equal(second.texts, first.texts);
+  await until('it to finish', async () => !svc.trainer.active && fs.existsSync(path.join(personalDir(), 'model.safetensors')));
+  assert.ok(!fs.existsSync(workFile('texts.jsonl')) && !fs.existsSync(workFile('job.json')));
+  // The message that waited is in the next run.
+  await sleep(20);
+  const third = trains().length;
+  await app.inject({ method: 'POST', url: '/api/suggest/train' });
+  await until('the next run', async () => trains().length === third + 1);
+  assert.equal(trains()[third].texts, 1, 'only the one written since');
+  await until('it to finish', async () => !svc.trainer.active);
+  // A failure leaves no texts; 3 is nothing to learn from (not a failure), 2 is a failure (a wrong command line).
+  for (const [name, state, detail] of [
+    ['trainfail', 'failed', /exit 1/],
+    ['traincode2', 'failed', /exit 2/],
+    ['trainnothing', 'idle', /Nothing new/],
+  ] as const) {
+    flag(name, true);
+    await addTyped(`A message for the ${name} run`);
+    const k = trains().length;
+    await app.inject({ method: 'POST', url: '/api/suggest/train' });
+    await until(`the ${name} run`, async () => trains().length === k + 1 && !svc.trainer.active);
+    const t = (await get()).status.training;
+    assert.equal(t.state, state, name);
+    assert.match(t.detail ?? '', detail, name);
+    assert.ok(!fs.existsSync(workFile('texts.jsonl')), `${name}: no texts left`);
+    flag(name, false);
+  }
+  // Learning turned off: a run stops, and what it left goes, the resume state too.
+  flag('trainhold', true);
+  await addTyped('A message for the run that is turned off');
+  const k = trains().length;
+  await app.inject({ method: 'POST', url: '/api/suggest/train' });
+  await until('the run', async () => trains().length === k + 1);
+  await put({ personalise: false });
+  await until('the run to end', async () => !svc.trainer.active);
+  assert.ok(!fs.existsSync(workFile('job.json')) && !fs.existsSync(workFile('out')) && !fs.existsSync(path.join(personalDir(), 'train')), 'nothing of the run is left');
+  flag('trainhold', false);
+  await put({ personalise: true });
+});
+
+test('13: forgetting a run in progress, or turning learning off while it sets up, puts no model in', async () => {
+  await app.inject({ method: 'DELETE', url: '/api/suggest/personal' });
+  const trains = () => logLines().filter((l) => l.train);
+  flag('trainhold', true);
+  await addTyped('A message for a run that is forgotten');
+  const k = trains().length;
+  await app.inject({ method: 'POST', url: '/api/suggest/train' });
+  await until('the run', async () => trains().length === k + 1);
+  await app.inject({ method: 'DELETE', url: '/api/suggest/personal' });
+  flag('trainhold', false);
+  await until('the run to end', async () => !svc.trainer.active);
+  await sleep(300);
+  assert.ok(!fs.existsSync(path.join(personalDir(), 'model.safetensors')), 'the forgotten run did not put its model in');
+  assert.equal((await get()).status.model.kind, 'base');
+  // Settings that changed while it waited for the set-up are asked again.
+  await addTyped('A message that must not be learned from');
+  const before = trains().length;
+  svc.train();
+  await put({ personalise: false });
+  await sleep(500);
+  assert.equal(trains().length, before, 'learning was turned off before it began');
+  assert.equal(svc.trainer.active, false);
+  await put({ personalise: true });
+});
+
+test('12: a swap that a crash cut short is finished or undone at start; the new model is private', () => {
+  const dir = personalDir();
+  const clear = () => [dir, `${dir}.next`, `${dir}.prev`].forEach((d) => fs.rmSync(d, { recursive: true, force: true }));
+  const model = (d: string, at?: number) => {
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, 'model.safetensors'), 'w');
+    fs.writeFileSync(path.join(d, 'config.json'), '{}');
+    if (at) fs.writeFileSync(path.join(d, 'state.json'), JSON.stringify({ trainedAt: at, since: at }));
+  };
+  const at = () => JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')).trainedAt;
+  clear();
+  model(`${dir}.prev`, 1);
+  recoverPersonal();
+  assert.equal(at(), 1, 'cut after the old one moved aside, before the new one came: the old one comes back');
+  assert.ok(!fs.existsSync(`${dir}.prev`));
+  clear();
+  model(`${dir}.next`, 2);
+  recoverPersonal();
+  assert.equal(at(), 2, 'the new one is whole: it takes the place');
+  assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(path.join(dir, 'model.safetensors')).mode & 0o777, 0o600);
+  clear();
+  model(dir, 1);
+  model(`${dir}.next`, 2);
+  recoverPersonal();
+  assert.equal(at(), 2, 'cut before the swap began: it is made');
+  assert.ok(!fs.existsSync(`${dir}.next`) && !fs.existsSync(`${dir}.prev`));
+  clear();
+  model(dir, 1);
+  model(`${dir}.next`);
+  recoverPersonal();
+  assert.equal(at(), 1, 'a new model that is not whole is not used');
+  assert.ok(!fs.existsSync(`${dir}.next`));
+  clear();
+  model(dir, 3);
+  model(`${dir}.prev`, 1);
+  recoverPersonal();
+  assert.equal(at(), 3);
+  assert.ok(!fs.existsSync(`${dir}.prev`), 'an old one left behind goes');
+  clear();
+});
+
+test('10: only what is newer is read, and the event loop gets its turns', async () => {
+  const big = openDb(path.join(tmp, 'big.db'));
+  memorySchema(big);
+  initPages(big);
+  big.exec(`create table if not exists app_runs (id text primary key, key text); create table if not exists task_runs (id text primary key, key text); create table if not exists tasks (id text primary key, last_key text);`);
+  const ses = big.prepare("insert into sessions (key, agent, id, path, cwd, source, parent_key, created_at) values (?, 'claude', ?, '', '/home/x/p', 'cli', null, ?)");
+  const app2 = big.prepare("insert into app_sessions (key, agent, extra, created_at, updated_at) values (?, 'claude', '{}', 1, 1)");
+  const ch = big.prepare('insert into chunk_text (key, kind, ts, text) values (?, ?, ?, ?)');
+  big.exec('begin');
+  for (let i = 0; i < 60; i++) {
+    const key = `claude:big${i}`;
+    ses.run(key, `b${i}`, i);
+    app2.run(key);
+    const base = i < 30 ? 100 : 5000;
+    for (let j = 0; j < 10; j++) {
+      ch.run(key, 'user', base + j * 2, `Message ${i} number ${j} that somebody typed`);
+      ch.run(key, 'assistant', base + j * 2 + 1, `Reply ${i} number ${j} that the agent wrote back`);
+    }
+  }
+  big.exec('commit');
+  let reads = 0;
+  const spy = new Proxy(big, {
+    get(t: any, k) {
+      if (k === 'prepare')
+        return (sql: string) => {
+          const st = t.prepare(sql);
+          return sql.includes('select id, kind, coalesce') ? { all: (...a: unknown[]) => (reads++, st.all(...a)) } : st;
+        };
+      const v = t[k];
+      return typeof v === 'function' ? v.bind(t) : v;
+    },
+  }) as typeof big;
+  let ticks = 0;
+  let going = true;
+  const spin = () => {
+    ticks++;
+    if (going) setImmediate(spin);
+  };
+  setImmediate(spin);
+  const lines = await extractTexts(spy, { since: 1000, sources: { messages: true, replies: true, notes: false, docs: false } });
+  going = false;
+  assert.equal(reads, 30, 'only the sessions with something newer were read');
+  assert.equal(lines.filter((l) => l.kind === 'user').length, 300);
+  assert.ok(lines.every((l) => l.ts > 1000));
+  assert.ok(ticks >= 2, `the event loop ran while the texts were read (${ticks} turns)`);
+  // Bounded above too: the same texts again after more were written.
+  const bounded = await extractTexts(spy, { since: 1000, until: 5009, sources: { messages: true, replies: false, notes: false, docs: false } });
+  assert.equal(bounded.length, 30 * 5, 'only the messages up to the time the run began');
+  big.close();
+});
+
+test('11: an Intel Mac is refused at once, before anything is downloaded', async () => {
+  assert.equal(unsupportedSystem('linux', 'x64'), null);
+  assert.equal(unsupportedSystem('darwin', 'arm64'), null);
+  assert.equal(unsupportedSystem('win32', 'x64'), null);
+  const python = process.env.HYDOR_SUGGEST_PYTHON;
+  delete process.env.HYDOR_SUGGEST_PYTHON;
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+  const arch = Object.getOwnPropertyDescriptor(process, 'arch')!;
+  const mac = openDb(path.join(tmp, 'mac.db'));
+  try {
+    assert.equal(unsupportedSystem('darwin', 'x64'), 'Word suggestions need a Mac with Apple silicon');
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    Object.defineProperty(process, 'arch', { value: 'x64' });
+    const own = new SuggestService(mac);
+    const st = own.configure({ enabled: true }).status;
+    assert.equal(st.state, 'failed');
+    assert.equal(st.detail, 'Word suggestions need a Mac with Apple silicon');
+    assert.ok(!fs.existsSync(path.join(DATA, 'suggest', 'venv')), 'no environment was made');
+    own.stop();
+  } finally {
+    Object.defineProperty(process, 'platform', platform);
+    Object.defineProperty(process, 'arch', arch);
+    process.env.HYDOR_SUGGEST_PYTHON = python;
+    mac.close();
+  }
+});
+
+test('14: a worker takes requests only once it has its models; short memory is not asked about on every request', async () => {
+  await put({ enabled: true, llm: 'off', personalise: true });
+  priv.stopWorker();
+  await until('it to be gone', async () => svc.pids().worker === undefined);
+  flag('slowload', true);
+  const before = logLines().length;
+  assert.equal((await ask({ surface: 'chat', text: 'wake slowly' })).statusCode, 204);
+  await until('the load to begin', async () => logLines().slice(before).some((l) => l.op === 'load'));
+  assert.equal(svc.pids().worker, undefined, 'not yet the worker that requests go to');
+  assert.equal((await ask({ surface: 'chat', text: 'too early' })).statusCode, 204);
+  assert.ok(!logLines().slice(before).some((l) => l.op === 'suggest'), 'and none reached it');
+  await until('the worker', async () => svc.pids().worker);
+  flag('slowload', false);
+  assert.equal((await ask({ surface: 'chat', text: 'now' })).statusCode, 200);
+  // Memory found short: asked again only after a while.
+  priv.stopWorker();
+  priv.memShortUntil = Date.now() + 5000;
+  const b = logLines().length;
+  assert.equal((await ask({ surface: 'chat', text: 'no memory' })).statusCode, 204);
+  await sleep(400);
+  assert.ok(!logLines().slice(b).some((l) => l.boot), 'no worker was started while memory is known to be short');
+  priv.memShortUntil = 0;
 });
 
 const only = process.argv[2];

@@ -75,6 +75,7 @@ import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
+import { suggestService } from './suggest/index.ts';
 import { shareRoutes } from './share-target.ts';
 import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
 import { registerAway } from './away/index.ts';
@@ -2346,6 +2347,8 @@ const shutdown = async () => {
   kernels.flush();
   indexer.stop();
   codex.shutdown();
+  // Word suggestions' programs (the worker, llama-server, a run of personalising) end with the server.
+  suggestService()?.stop();
   for (const ws of app.websocketServer?.clients ?? []) ws.terminate();
   await app.close().catch(() => {});
   process.exit(0);

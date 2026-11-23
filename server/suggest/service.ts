@@ -10,8 +10,9 @@ import { availableMemory } from '../models/machine.ts';
 import { childEnv, PyWorker, type Reply } from './engine.ts';
 import { LlamaServer } from './llm.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
-import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, workerScript } from './setup.ts';
-import { forgetPersonal, hasPersonal, personalDir, personalState, Trainer } from './train.ts';
+import { reapLeftovers } from './procs.ts';
+import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, unsupportedSystem, workerScript } from './setup.ts';
+import { forgetPersonal, hasPersonal, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
 
 /** The worker quits after this long without a request. */
@@ -30,8 +31,10 @@ const CHECK_MS = 10 * 60_000;
 /** The gap between runs: about a day (a computer that is off at night too), a week. */
 const GAP_MS = { nightly: 20 * 3600_000, weekly: 164 * 3600_000 };
 const ATTEMPT_KEY = 'suggest.train.at';
-
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** A failed download of the language model is not tried again for this long (a request that wants it would otherwise start it again and again). */
+export const PREPARE_COOLDOWN_MS = 10 * 60_000;
+/** Memory found short is not asked about again for this long (every keystroke asks for a suggestion). */
+const SHORT_MEMORY_MS = 30_000;
 
 interface Job {
   req: SuggestRequest;
@@ -60,6 +63,15 @@ export class SuggestService {
   private lastRequest = 0;
   private llmTried = 0;
   private startingLlm: Promise<string | null> | null = null;
+  private startingLlmGen = 0;
+  /** Count the stops: a start that began before one gives up at its next step, and what it started is stopped. */
+  private gen = 0;
+  private llmGen = 0;
+  /** The worker's process while it starts (it is not yet used for requests, but a stop must reach it). */
+  private pendingWorker: PyWorker | null = null;
+  private llmPrep = new Map<string, Promise<boolean>>();
+  private llmPrepFailed = new Map<string, number>();
+  private memShortUntil = 0;
   private loading: Promise<void> | null = null;
   private loadInfo: { kind: 'base' | 'personal'; languages?: Record<string, number> } | null = null;
   private queue: Job[] = [];
@@ -130,6 +142,7 @@ export class SuggestService {
       training: this.trainingStatus(),
     };
     if (s.enabled && suggestDisabled()) Object.assign(status, { detail: 'Word suggestions are off on this server (HYDOR_SUGGEST=off)' });
+    else if (s.enabled && unsupportedSystem()) Object.assign(status, { state: 'failed', detail: unsupportedSystem() });
     else if (s.enabled) {
       if (this.setupP) Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' });
       else if (this.failure) Object.assign(status, { state: 'failed', detail: this.failure.why });
@@ -192,19 +205,24 @@ export class SuggestService {
         this.failure = null;
         this.crashes = [];
         this.llmTried = 0;
+        this.llmPrepFailed.clear();
         this.abort = new AbortController();
         void this.ensureSetup();
       } else {
         if (next.threads !== before.threads) {
           this.stopWorker();
+          this.llmGen++;
           this.llm.stop();
         } else if (next.llm !== before.llm || next.quant !== before.quant) {
+          this.llmGen++;
           this.llm.stop(next.llm === 'off' ? 'Turned off in the settings' : undefined);
           this.llmTried = 0;
+          this.llmPrepFailed.clear();
           if (next.llm !== 'off' && this.worker?.ready) void this.startLlm();
           else if (next.llm !== 'off') void this.prepareLlm();
         }
-        if (!next.personalise && before.personalise) this.trainer.stop();
+        // Learning turned off: a run stops, and the texts and resume state it left go.
+        if (!next.personalise && before.personalise) this.trainer.stopAndClean();
       }
     }
     this.changed();
@@ -223,14 +241,24 @@ export class SuggestService {
     return s.llm === 'on' || os.totalmem() / 2 ** 20 >= LLM_TOTAL_MB;
   }
 
-  /** Sets up what is not there yet (Python, the small model, and when the language model is wanted, llama.cpp and its file). */
+  /**
+   * Sets up what the small model needs (Python, its files). The language model's download goes on in the background: the
+   * small model works meanwhile.
+   */
   private ensureSetup(): Promise<boolean> {
     if (suggestDisabled()) return Promise.resolve(false);
+    const unsupported = unsupportedSystem();
+    if (unsupported) {
+      this.fail(unsupported);
+      return Promise.resolve(false);
+    }
     if (this.setupP) return this.setupP;
-    if (this.isSetUp() && (!this.llmWanted() || this.llmFilesReady())) {
+    if (this.isSetUp()) {
       this.setupDone = true;
+      if (this.llmWanted()) void this.prepareLlm();
       return Promise.resolve(true);
     }
+    const signal = this.abort.signal;
     const report = (d: string) => {
       this.setupDetail = d;
       this.changed();
@@ -241,16 +269,17 @@ export class SuggestService {
       try {
         // Before downloading anything: is there a small model to run?
         if (!releaseDir()) throw new Error('The word-suggestion model is not published yet');
-        await setupPython(report);
-        await setupRelease(report);
+        await setupPython(report, signal);
+        await setupRelease(report, signal);
         const problem = releaseProblem();
         if (problem) throw new Error(problem);
-        // The language model is a help, not a need: its failure leaves the small model alone.
-        if (this.llmWanted()) await this.prepareLlm(report);
         this.setupDone = true;
+        // The language model is a help, not a need: it comes meanwhile, and its failure leaves the small model alone.
+        if (this.llmWanted()) void this.prepareLlm();
         return true;
       } catch (e) {
-        this.fail((e as Error).message);
+        // Turned off meanwhile: not a failure.
+        if (!signal.aborted) this.fail((e as Error).message);
         return false;
       }
     })().finally(() => {
@@ -264,25 +293,38 @@ export class SuggestService {
     return !!llamaBinary() && !!ggufPath(this.st.quant);
   }
 
-  /** llama.cpp and the language model's file; a failure goes in the language model's state. */
-  private async prepareLlm(report?: (d: string) => void): Promise<boolean> {
-    if (this.llmFilesReady()) return true;
-    const say = (d: string) => {
-      report?.(d);
-      this.llm.note({ state: 'starting', detail: d });
-    };
-    try {
-      await setupLlama(say, this.abort.signal);
-      await setupGguf(this.st.quant, say);
-      return true;
-    } catch (e) {
-      if (this.abort.signal.aborted) return false;
-      this.llm.note({ state: 'failed', detail: (e as Error).message });
-      return false;
-    } finally {
-      // Downloaded: it is not starting until a request starts it (a failure stays in its state).
-      if (this.llm.state.state === 'starting') this.llm.reset();
-    }
+  /**
+   * llama.cpp and the language model's file, one download at a time for each size, and not again for ten minutes after a
+   * failure (which is in the language model's state).
+   */
+  private prepareLlm(): Promise<boolean> {
+    if (this.llmFilesReady()) return Promise.resolve(true);
+    const quant = this.st.quant;
+    const failed = this.llmPrepFailed.get(quant);
+    if (failed && Date.now() - failed < PREPARE_COOLDOWN_MS) return Promise.resolve(false);
+    const going = this.llmPrep.get(quant);
+    if (going) return going;
+    const signal = this.abort.signal;
+    const say = (d: string) => this.llm.note({ state: 'starting', detail: d });
+    const p: Promise<boolean> = (async () => {
+      try {
+        await setupLlama(say, signal);
+        await setupGguf(quant, say, signal);
+        return true;
+      } catch (e) {
+        if (signal.aborted) return false;
+        this.llmPrepFailed.set(quant, Date.now());
+        this.llm.note({ state: 'failed', detail: (e as Error).message });
+        return false;
+      } finally {
+        // Downloaded: it is not starting until a request starts it (a failure stays in its state).
+        if (this.llm.state.state === 'starting') this.llm.reset();
+      }
+    })().finally(() => {
+      if (this.llmPrep.get(quant) === p) this.llmPrep.delete(quant);
+    });
+    this.llmPrep.set(quant, p);
+    return p;
   }
 
   private fail(why: string) {
@@ -295,39 +337,50 @@ export class SuggestService {
   /** Starts llama-server when the settings and the memory allow; its address, or null (its state says why). */
   private startLlm(): Promise<string | null> {
     if (this.llm.url && this.llm.running) return Promise.resolve(this.llm.url);
-    if (this.startingLlm) return this.startingLlm;
+    // (One that a stop has passed over ends by itself: this is a new start.)
+    if (this.startingLlm && this.startingLlmGen === this.llmGen) return this.startingLlm;
     this.llmTried = Date.now();
-    this.startingLlm = (async () => {
+    const g = this.llmGen;
+    const gone = () => g !== this.llmGen;
+    const p: Promise<string | null> = (async () => {
       const s = this.st;
       if (s.llm === 'off') return null;
       if (!llamaSupported()) return null;
       const total = os.totalmem() / 2 ** 20;
       if (s.llm === 'auto') {
         const free = Math.round((await availableMemory()) / 2 ** 20);
+        if (gone()) return null;
         if (total < LLM_TOTAL_MB) return void this.llm.note({ state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB`, totalMb: Math.round(total), needMb: 8192 }), null;
         if (free < LLM_NEED_MB) return void this.llm.note({ state: 'memory', detail: `Only ${(free / 1024).toFixed(1)} GB of memory is free now; the language model needs ${(LLM_NEED_MB / 1024).toFixed(1)} GB. Suggestions use the small model alone until then`, freeMb: free, needMb: LLM_NEED_MB }), null;
       }
-      if (!(await this.prepareLlm())) return null;
+      if (!(await this.prepareLlm()) || gone()) return null;
       const binary = llamaBinary();
       const gguf = ggufPath(s.quant);
       if (!binary || !gguf) return null;
       return this.llm.start({ binary, gguf, threads: llmThreads(s) });
     })()
       .catch((e) => {
-        this.llm.note({ state: 'failed', detail: (e as Error).message });
+        if (!gone()) this.llm.note({ state: 'failed', detail: (e as Error).message });
         return null;
       })
       .finally(() => {
-        this.startingLlm = null;
+        if (this.startingLlm === p) this.startingLlm = null;
       });
-    return this.startingLlm;
+    this.startingLlm = p;
+    this.startingLlmGen = g;
+    return p;
   }
 
   // ---- the worker -----------------------------------------------------------------------------------------------
 
   private stopWorker() {
+    this.gen++;
     const w = this.worker;
     this.worker = null;
+    // One that is still starting: stopped too (its start finds out and gives up).
+    const starting = this.pendingWorker;
+    this.pendingWorker = null;
+    starting?.stop();
     clearTimeout(this.idleTimer);
     this.sent.clear();
     this.loadInfo = null;
@@ -363,11 +416,17 @@ export class SuggestService {
       this.failure = null;
       this.crashes = [];
     }
+    const g = this.gen;
+    const gone = () => g !== this.gen || !this.st.enabled;
     this.startingWorker = (async () => {
-      if (!(await this.ensureSetup())) return null;
+      if (!(await this.ensureSetup()) || gone()) return null;
+      // Memory found short is not asked about again for a while (a request for a suggestion comes with every keystroke).
+      if (Date.now() < this.memShortUntil) return null;
       const free = (await availableMemory()) / 2 ** 20;
+      if (gone()) return null;
       if (free < WORKER_NEED_MB) {
         this.short = { free, need: WORKER_NEED_MB };
+        this.memShortUntil = Date.now() + SHORT_MEMORY_MS;
         return null;
       }
       this.short = null;
@@ -376,17 +435,31 @@ export class SuggestService {
       const llmUp = this.startLlm();
       const r = await PyWorker.start(pythonPath(), workerScript(), childEnv(), {
         loadMs: LOAD_MS,
+        onSpawn: (w) => {
+          // Turned off (or restarted) before it was ready: it is stopped at once.
+          if (gone()) w.stop();
+          else this.pendingWorker = w;
+        },
         onExit: (w, why, was) => this.workerEnded(w, why, was),
       });
       if (typeof r === 'string') {
-        this.crash(r, false);
+        if (!gone()) this.crash(r, false);
         return null;
       }
+      if (this.pendingWorker === r) this.pendingWorker = null;
+      if (gone()) return void r.stop(), null;
+      // Up to 45 s for the language model's address, which the worker is given with the models it loads.
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([llmUp, new Promise<void>((res) => ((timer = setTimeout(res, 45_000)), timer.unref?.()))]);
+      clearTimeout(timer);
+      if (gone()) return void r.stop(), null;
+      // The worker takes requests only once it has its models.
+      if (!(await this.loadInto(r)) || gone()) return void r.stop(), null;
       this.worker = r;
       this.idleLater();
-      await Promise.race([llmUp, sleep(45_000)]);
-      await this.syncLoad();
-      return this.worker === r && r.ready ? r : null;
+      // (The language model may have come up, or gone, while it loaded.)
+      void this.syncLoad();
+      return r;
     })().finally(() => {
       this.startingWorker = null;
       this.changed();
@@ -412,34 +485,43 @@ export class SuggestService {
     if (this.crashes.length >= 3 || !wasReady) this.fail(why);
   }
 
-  /** Tells the worker what to load (the small model, the personal one, the language model's address) when that is not what it has. */
+  /** Tells the running worker what to load (the small model, the personal one, the language model's address) when that is not what it has. */
   private syncLoad(): Promise<void> {
     if (this.loading) return this.loading.then(() => this.syncLoad());
     const w = this.worker;
     if (!w?.ready) return Promise.resolve();
+    const p: Promise<void> = this.loadInto(w)
+      .then(() => {})
+      .finally(() => {
+        if (this.loading === p) this.loading = null;
+        this.changed();
+      });
+    this.loading = p;
+    return p;
+  }
+
+  /** Has a worker load what it should (nothing when it already has it): true when it has. A failure stops it and says why. */
+  private async loadInto(w: PyWorker): Promise<boolean> {
     const s = this.st;
     const personal = hasPersonal();
     const url = this.llm.running ? this.llm.url : null;
     const key = JSON.stringify([personal ? this.trainedAt() || 1 : 0, url, workerThreads(s)]);
-    if (w.loadedKey === key) return Promise.resolve();
+    if (w.loadedKey === key) return true;
     const release = releaseDir();
-    if (!release) return Promise.resolve();
-    this.loading = (async () => {
-      try {
-        const r = await w.request({ op: 'load', model_dir: release, personal_dir: personal ? personalDir() : null, llm_url: url, threads: workerThreads(s), options: { k: 1000 } }, LOAD_MS).done;
-        w.loadedKey = key;
-        this.loadInfo = { kind: r.model === 'personal' ? 'personal' : 'base', languages: r.languages && typeof r.languages === 'object' ? r.languages : undefined };
-      } catch (e) {
-        if (this.worker === w) {
-          this.fail(`The language models could not be loaded: ${(e as Error).message}`);
-          this.stopWorker();
-        }
+    if (!release) return false;
+    try {
+      const r = await w.request({ op: 'load', model_dir: release, personal_dir: personal ? personalDir() : null, llm_url: url, threads: workerThreads(s), options: { k: 1000 } }, LOAD_MS).done;
+      w.loadedKey = key;
+      this.loadInfo = { kind: r.model === 'personal' ? 'personal' : 'base', languages: r.languages && typeof r.languages === 'object' ? r.languages : undefined };
+      return true;
+    } catch (e) {
+      if (this.worker === w || this.pendingWorker === w) {
+        this.fail(`The language models could not be loaded: ${(e as Error).message}`);
+        if (this.worker === w) this.stopWorker();
+        else w.stop();
       }
-    })().finally(() => {
-      this.loading = null;
-      this.changed();
-    });
-    return this.loading;
+      return false;
+    }
   }
 
   // ---- suggestions ----------------------------------------------------------------------------------------------
@@ -631,8 +713,14 @@ export class SuggestService {
 
   private async runTraining() {
     if (!(await this.ensureSetup())) return;
-    const out = await this.trainer.run(this.db, this.st);
-    kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
+    // Turned off while it was setting up: nothing is started.
+    if (!this.st.enabled || !this.st.personalise) return;
+    const out = await this.trainer.run(this.db, this.st, {
+      // The worker lets go of the personal model's files before the new one takes their place; it starts again with the new one.
+      hooks: { beforeSwap: () => this.stopWorker() },
+    });
+    // A run that was stopped is not an attempt (the schedule is not moved by it).
+    if (out.ok || out.why !== 'Stopped') kvSet(this.db, ATTEMPT_KEY, String(Date.now()));
     if (out.ok) void this.syncLoad();
     this.changed();
   }
@@ -663,6 +751,14 @@ export class SuggestService {
 
   /** Once, when the server is up: what was turned on is set up, and the schedule is watched. */
   start() {
+    // Programs an earlier server left running (killed, or stopped with its service's children left alone) end now, and a
+    // model swap that a crash cut short is finished.
+    try {
+      reapLeftovers();
+      recoverPersonal();
+    } catch (e) {
+      console.warn(`[suggest] ${(e as Error).message}`);
+    }
     if (suggestDisabled()) return;
     if (this.st.enabled) setTimeout(() => void this.ensureSetup(), 5000).unref?.();
     const tick = () => {
@@ -678,6 +774,7 @@ export class SuggestService {
   private shutdown() {
     this.abort.abort();
     this.stopWorker();
+    this.llmGen++;
     this.llm.stop();
     this.trainer.stop();
     this.failure = null;

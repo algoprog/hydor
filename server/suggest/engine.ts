@@ -3,6 +3,7 @@
 // {"ready": true} once loaded, and it is given a few minutes to do so.
 import { spawn, type ChildProcess } from 'node:child_process';
 import readline from 'node:readline';
+import { track } from './procs.ts';
 
 export type Reply = Record<string, any>;
 
@@ -37,7 +38,7 @@ export class PyWorker {
    * Starts `python -I script`; resolves with the worker once it says it is ready, or with why it could not (it stopped,
    * did not start, took more than `loadMs`). `onExit` hears of its end afterwards, with why (null: it was stopped).
    */
-  static start(python: string, script: string, env: NodeJS.ProcessEnv, o: { loadMs: number; onExit(w: PyWorker, why: string | null, wasReady: boolean): void }): Promise<PyWorker | string> {
+  static start(python: string, script: string, env: NodeJS.ProcessEnv, o: { loadMs: number; onExit(w: PyWorker, why: string | null, wasReady: boolean): void; /** The process exists (before it is ready): to stop it if it is no longer wanted. */ onSpawn?(w: PyWorker): void }): Promise<PyWorker | string> {
     return new Promise((resolve) => {
       let proc: ChildProcess;
       try {
@@ -46,6 +47,8 @@ export class PyWorker {
         return resolve((e as Error).message);
       }
       const w = new PyWorker(proc);
+      track('worker', proc, script);
+      o.onSpawn?.(w);
       let settled = false;
       const done = (v: PyWorker | string) => {
         if (settled) return;
