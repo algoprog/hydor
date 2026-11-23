@@ -118,6 +118,13 @@ export interface TrainHooks {
  */
 export const GRACE = { stop: 5000, pause: 3 * 60_000 };
 
+/**
+ * The seed of a run (train.py's --seed): from the time its texts were read up to, so each run draws other passages of the
+ * replayed public text (with one seed for all, every night replayed the same few passages, which the model could learn by
+ * heart while the rest of the sample went unused), and a run that is resumed keeps its seed (its bounds are kept in job.json).
+ */
+export const runSeed = (until: number) => Math.floor(until / 1000) % 2_147_483_647;
+
 /** halted: the run was ended on purpose, by a stop (what it did is dropped) or a pause (it goes on from its resume state). */
 export type TrainOutcome = { ok: true; tokens?: number } | { ok: false; why: string; nothing?: boolean; halted?: 'stop' | 'pause' };
 
@@ -277,10 +284,15 @@ export class Trainer {
       // the same time (nothing written since is in them), so train.py sees the same texts file.
       let since = hasPersonal() ? (personalState()?.since ?? 0) : 0;
       let until = startedAt;
+      let seed = runSeed(until);
       let resumed = false;
       try {
-        const j = JSON.parse(fs.readFileSync(job, 'utf8')) as { since: number; until?: number };
-        if (typeof j.since === 'number' && typeof j.until === 'number' && fs.existsSync(outDir())) (since = j.since), (until = j.until), (resumed = true);
+        const j = JSON.parse(fs.readFileSync(job, 'utf8')) as { since: number; until?: number; seed?: number };
+        if (typeof j.since === 'number' && typeof j.until === 'number' && fs.existsSync(outDir())) {
+          (since = j.since), (until = j.until), (resumed = true);
+          // A run begun by a version that drew every run's replay with seed 0 goes on with it (its resume state is made with it).
+          seed = Number.isInteger(j.seed) ? j.seed! : 0;
+        }
       } catch {}
       if (!resumed) fs.rmSync(outDir(), { recursive: true, force: true });
       const n = await writeTexts(db, texts, { since, until, sources: s.sources });
@@ -290,7 +302,7 @@ export class Trainer {
         fs.rmSync(job, { force: true });
         return fail('Nothing new to learn from', true);
       }
-      fs.writeFileSync(job, JSON.stringify({ since, until, texts: n }), { mode: 0o600 });
+      fs.writeFileSync(job, JSON.stringify({ since, until, seed, texts: n }), { mode: 0o600 });
       const threads = trainThreads(s);
       const init = hasPersonal() ? personalDir() : release;
       this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}` });
@@ -308,7 +320,7 @@ export class Trainer {
       }
       const attempt = (p: DevicePick, py: string) => {
         this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}`, device: { kind: p.device.kind, name: p.device.name } });
-        return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p }), this.envFor(threads, p));
+        return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p, seed }), this.envFor(threads, p));
       };
       let done = await attempt(pick, python);
       if (!done.ok && !done.nothing && !this.stopping && pick.device.kind !== 'cpu') {
@@ -381,14 +393,14 @@ export class Trainer {
   }
 
   /** train.py's command line for where it learns. */
-  private args(o: { texts: string; release: string; init: string; s: SuggestSettings; threads: number; pick: DevicePick }): string[] {
+  private args(o: { texts: string; release: string; init: string; s: SuggestSettings; threads: number; pick: DevicePick; seed: number }): string[] {
     const batch = 4096;
     return [
       '-I', trainScript(), '--texts', o.texts, '--base', o.release, '--init', o.init, '--out', outDir(), '--replay', path.join(o.release, 'replay'),
       '--lr', '5e-4', '--batch-tokens', String(batch), '--w-user', String(o.s.userWeight), '--replay-ratio', '1.0', '--epochs', '1',
       // Said outright, never `auto`: the processor unless the choice was a card. A card with room runs the batch in one piece (the
       // same gradient); one with less keeps train.py's smaller pieces.
-      '--threads', String(o.threads), '--device', o.pick.device.kind, '--resume',
+      '--threads', String(o.threads), '--device', o.pick.device.kind, '--resume', '--seed', String(o.seed),
       ...(o.pick.device.kind === 'cuda' && (o.pick.device.freeMb ?? Infinity) >= GPU_ROOMY_MB ? ['--micro-tokens', String(batch)] : []),
     ];
   }
