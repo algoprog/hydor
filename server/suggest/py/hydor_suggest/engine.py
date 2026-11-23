@@ -20,7 +20,7 @@ from . import cache as cache_mod
 from . import mix as mix_mod
 from . import vocab as V
 from .decode import decode, next_word_text, text_after
-from .lid import Lid
+from .lid import Lid, mostly_letters
 from .llm import LlamaClient, LlmError, dense_from_top
 from .model import SLM, State, build_model, config_from_dict, last_logits
 from .tokbytes import PrefixIndex, end_token_ids, token_bytes
@@ -241,13 +241,17 @@ class Engine:
         self.caches.set(session, [self.encode(t) for t in texts])
 
     # ---- the plan ---------------------------------------------------------------------------------------------------------
-    def choose_plan(self, surface: str, typed_ids: np.ndarray, ctx_ids: np.ndarray, use_switch: bool) -> tuple:
-        """(plan, language guessed or None)."""
+    def choose_plan(self, surface: str, typed_ids: np.ndarray, ctx_ids: np.ndarray, use_switch: bool, typed_text: str = '',
+                    ctx_text: str = '') -> tuple:
+        """(plan, language guessed or None). The language is guessed on the typed text (with the context's when fewer than 8 tokens were
+        typed), and only when that text is mostly letters."""
         rel = self.release
         lang = None
         if rel.lid is not None and surface != 'doc':
-            ids = typed_ids if len(typed_ids) >= 8 else np.concatenate([ctx_ids, typed_ids])
-            lang, _, _ = rel.lid.guess(ids)
+            short = len(typed_ids) < 8
+            ids = np.concatenate([ctx_ids, typed_ids]) if short else typed_ids
+            if mostly_letters(f'{ctx_text} {typed_text}' if short else typed_text):
+                lang, _, _ = rel.lid.guess(ids)
         if surface == 'doc':
             return ('llm' if self.client else 'slm'), lang
         if not self.client:
@@ -293,7 +297,8 @@ class Engine:
         surface, R, target_ids, llm_prompt, slm_ids = pr.surface, pr.R, pr.target_ids, pr.llm_prompt, pr.slm_ids
         if len(R) > MAX_TYPED_BYTES:
             return self._empty(t0, req)
-        plan, lang = self.choose_plan(surface, target_ids, np.concatenate([pr.agent_ids, pr.doc_ids]), bool(req.get('switch', True)))
+        plan, lang = self.choose_plan(surface, target_ids, np.concatenate([pr.agent_ids, pr.doc_ids]), bool(req.get('switch', True)),
+                                      pr.target_text, pr.agent_ctx or pr.doc_ctx)
         want_cache = bool(req.get('cache', True)) and surface == 'chat' and self.caches is not None
         extras, extra_key = [], None
         if want_cache:

@@ -4,7 +4,7 @@ import unittest
 import helpers
 import numpy as np
 
-from hydor_suggest.lid import Lid
+from hydor_suggest.lid import Lid, mostly_letters
 
 
 class LidTests(unittest.TestCase):
@@ -65,6 +65,15 @@ class LidTests(unittest.TestCase):
                 f.write(b'\0')
             with self.assertRaises(ValueError):
                 Lid.load(d)
+
+    def test_only_text_is_guessed_on(self):
+        self.assertTrue(mostly_letters('the quick brown fox, jumps over 2 dogs.'))
+        self.assertTrue(mostly_letters('मुझे आपकी मदद के लिए बहुत धन्यवाद, कृपया यह फ़ाइल भेजें'))       # vowel signs are marks, not letters
+        self.assertTrue(mostly_letters('ευχαριστώ πολύ'))
+        self.assertFalse(mostly_letters('def foo(x): return x[0] + 1  # /usr/bin/env'))
+        self.assertFalse(mostly_letters('https://example.com/a/b?c=1&d=2'))
+        self.assertFalse(mostly_letters('   '))
+        self.assertFalse(mostly_letters(''))
 
     def test_no_files_no_guess(self):
         with helpers.tmpdir() as d:

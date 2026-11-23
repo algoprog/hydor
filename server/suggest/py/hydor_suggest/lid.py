@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import unicodedata
 from typing import Optional, Sequence
 
 import numpy as np
@@ -16,6 +17,22 @@ import numpy as np
 FORMAT = 'hydor-suggest-lid/1'
 MIN_TOKENS = 8
 MIN_POSTERIOR = 0.9
+MIN_LETTER_SHARE = 0.8
+
+
+def mostly_letters(text: str, share: float = MIN_LETTER_SHARE) -> bool:
+    """Whether letters are at least `share` of the non-space characters of the text: a language is only guessed on text, not on code,
+    paths or URLs (which were guessed as some language with a posterior over 0.9). Letters are Unicode categories L* and M*: the vowel
+    signs of Indic scripts are marks, and Hindi or Bengali text would fall to 64-69% with L* alone."""
+    n = k = 0
+    for ch in text:
+        if ch.isspace():
+            continue
+        n += 1
+        c = unicodedata.category(ch)
+        if c[0] == 'L' or c[0] == 'M':
+            k += 1
+    return n > 0 and k >= share * n
 
 
 class Lid:

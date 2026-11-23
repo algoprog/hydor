@@ -230,6 +230,10 @@ class EngineTests(unittest.TestCase):
         self.assertEqual((out['plan'], out.get('lang')), ('mix', 'ell_Grek'))
         out = e.suggest({'surface': 'chat', 'text': en + ' th', 'reply': '', 'switch': False})
         self.assertEqual(out['plan'], 'mix')
+        code = 'the quick brown fox = foo(bar[0]) + /usr/bin/the_lazy_dog_x.sh th'
+        out = e.suggest({'surface': 'chat', 'text': code, 'reply': ''})
+        self.assertEqual(out['plan'], 'mix')                                              # code is not a language
+        self.assertNotIn('lang', out)
         out = e.suggest({'surface': 'chat', 'text': 'the qu', 'reply': ''})
         self.assertEqual(out['plan'], 'mix')                                              # too few tokens to guess a language
         self.assertNotIn('lang', out)
