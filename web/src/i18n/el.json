@@ -27570,5 +27570,15 @@
   "{0}: text": "{0}: κείμενο",
   "Delete…": "Διαγραφή…",
   "Schedule": "Πρόγραμμα",
-  "Stop it on its board": "Διακοπή στο ταμπλό του"
+  "Stop it on its board": "Διακοπή στο ταμπλό του",
+  "Automatic (no)": "Αυτόματα (όχι)",
+  "Automatic (yes)": "Αυτόματα (ναι)",
+  "Hide what each model can do": "Απόκρυψη των δυνατοτήτων κάθε μοντέλου",
+  "No such option": "Δεν υπάρχει τέτοια επιλογή",
+  "Reasoning effort": "Ένταση σκέψης",
+  "Set what each model can do": "Ορισμός των δυνατοτήτων κάθε μοντέλου",
+  "The endpoint does not say": "Το endpoint δεν το αναφέρει",
+  "The endpoint says no": "Το endpoint λέει όχι",
+  "The endpoint says yes": "Το endpoint λέει ναι",
+  "There is no such endpoint": "Δεν υπάρχει τέτοιο endpoint"
 }

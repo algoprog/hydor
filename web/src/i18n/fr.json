@@ -25711,5 +25711,15 @@
   "{0}: text": "{0} : texte",
   "Delete…": "Supprimer…",
   "Schedule": "Planification",
-  "Stop it on its board": "L’arrêter sur son tableau de bord"
+  "Stop it on its board": "L’arrêter sur son tableau de bord",
+  "Automatic (no)": "Automatique (non)",
+  "Automatic (yes)": "Automatique (oui)",
+  "Hide what each model can do": "Masquer ce que peut faire chaque modèle",
+  "No such option": "Option inexistante",
+  "Reasoning effort": "Effort de raisonnement",
+  "Set what each model can do": "Définir ce que peut faire chaque modèle",
+  "The endpoint does not say": "Le point de terminaison ne le précise pas",
+  "The endpoint says no": "Le point de terminaison répond non",
+  "The endpoint says yes": "Le point de terminaison répond oui",
+  "There is no such endpoint": "Ce point d’accès n’existe pas"
 }

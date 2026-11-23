@@ -22,7 +22,7 @@ Custom reads the project's `AGENTS.md` or `CLAUDE.md` files and follows your [Ag
 
 1. On the start page, click **Agent** and pick **Custom** ("Any model: OpenRouter, Ollama, vLLM").
 2. Click **Model** and pick one of your models, or **Automatic** when the menu offers it: Custom's tiers fill themselves in from the models it has (your Claude plan's, then your ChatGPT plan's, then those you added that are not on this computer), and once its Best tier names a model, a session on Automatic starts on it and leads subagents (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). If the list is empty, add a model first: **Agent** → **Models for Custom**.
-3. Under **Options**, pick **Permissions** (see [Choose what Custom may do without asking](#choose-what-custom-may-do-without-asking)). Custom has no Effort setting.
+3. Under **Options**, pick **Permissions** (see [Choose what Custom may do without asking](#choose-what-custom-may-do-without-asking)). **Effort** is offered for an [endpoint](/guide/agents-models#other-openai-compatible-endpoints)'s model that reasons (the endpoint says so, or you set its **Reasoning effort** to **Yes**); for the other models Custom has no Effort setting.
 4. Type the task and press Enter.
 
 A model on this computer served by vLLM starts the first time a session uses it; the session says "Starting … with vLLM (the first time takes a minute or two)…".
@@ -35,7 +35,7 @@ You can switch the model during a session from the menu under the message box. C
 
 - **Files**: read them (text with line numbers, a part of a long file at a time, a folder's contents), create, rewrite and edit them, list folders, and find files by name or by what they contain. Before it rewrites a whole file it hasn't read in this session, it is asked to read it first.
 - **Documents**: PDF, Word, Excel, PowerPoint, OpenDocument, RTF and EPUB files are read as text.
-- **Images**: pictures you attach, image files it opens, and images from web pages or tools. A model that sees images gets the picture; for one that doesn't, the helper model describes it (see [Images for models that don't see](#images-for-models-that-dont-see)).
+- **Images**: pictures you attach, image files it opens, and images from web pages or tools. A model that sees images gets the picture (for an endpoint's model, when the endpoint says so or you set **Sees images** to **Yes**); for one that doesn't, the helper model describes it (see [Images for models that don't see](#images-for-models-that-dont-see)).
 - **Commands**: run shell commands in the session's folder, for up to two minutes by default and ten at most. Servers, watchers and other commands that keep running go in the background: Custom reads their output when it needs to, and can stop them. They also stop when Custom exits, and its next turn is told which ones still run.
 - **Web pages**: fetch a page as clean text with its headings, links, lists and tables; PDFs and Office files online are read as text. It only reaches public addresses; for this computer or its network it uses a command such as `curl`.
 - **A plan**: for work with several steps it keeps a checklist, shown in the session, and ticks items off.
@@ -203,7 +203,7 @@ When Custom stops a turn for one of these reasons, the reply ends with "(Stopped
 
 ## Images for models that don't see
 
-A model that sees images gets your pictures directly. Pictures are made smaller first when this computer has ffmpeg or ImageMagick.
+A model that sees images gets your pictures directly. An endpoint's model is taken as one that doesn't, unless the endpoint says it sees images or you set **Sees images** to **Yes** in its [row](/guide/agents-models#other-openai-compatible-endpoints). Pictures are made smaller first when this computer has ffmpeg or ImageMagick.
 
 For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" in the **Model** menu of the **Helper model** group. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures (a model of your plans never does).
 

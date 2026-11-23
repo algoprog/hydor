@@ -26347,5 +26347,15 @@
   "{0}: a short text": "{0}: ein kurzer Text",
   "{0}: text": "{0}: Text",
   "Delete…": "Löschen …",
-  "Stop it on its board": "Auf ihrem Board stoppen"
+  "Stop it on its board": "Auf ihrem Board stoppen",
+  "Automatic (no)": "Automatisch (nein)",
+  "Automatic (yes)": "Automatisch (ja)",
+  "Hide what each model can do": "Funktionen der Modelle ausblenden",
+  "No such option": "Keine solche Option",
+  "Reasoning effort": "Denkaufwand",
+  "Set what each model can do": "Funktionen der Modelle festlegen",
+  "The endpoint does not say": "Der Endpunkt gibt dazu nichts an",
+  "The endpoint says no": "Der Endpunkt sagt nein",
+  "The endpoint says yes": "Der Endpunkt sagt ja",
+  "There is no such endpoint": "Diesen Endpunkt gibt es nicht"
 }

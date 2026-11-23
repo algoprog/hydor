@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Brain, Check, Cpu, Download, ExternalLink, Eye, HardDrive, KeyRound, Lock, MemoryStick, Play, Plug, Plus, Search, Square, Trash2, Wrench, X } from 'lucide-react';
-import type { HfInspect, HfModel, HfSort, LocalModel, ModelFit, ModelsState, OpenRouterModel, OpenRouterSort } from '@shared/types';
+import { Brain, Check, ChevronRight, Cpu, Download, ExternalLink, Eye, HardDrive, KeyRound, Lock, MemoryStick, Play, Plug, Plus, Search, Square, Trash2, Wrench, X } from 'lucide-react';
+import type { EndpointModelCaps, HfInspect, HfModel, HfSort, LocalModel, ModelFit, ModelsState, OpenRouterModel, OpenRouterSort } from '@shared/types';
 import type { LocalPickView } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
@@ -1166,6 +1166,54 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
 
 // ---- Ollama, vLLM, other endpoints, Hugging Face token ------------------------------------------------
 
+type Setting = 'auto' | 'yes' | 'no';
+const settingOf = (v?: boolean): Setting => (v === undefined ? 'auto' : v ? 'yes' : 'no');
+
+/** An endpoint's models, each with what Custom does with it: sees images, reasons. Automatic follows what the endpoint says. */
+function EndpointModels({ endpoint: e, save }: { endpoint: ModelsState['endpoints'][number]; save: (body: Record<string, unknown>) => Promise<unknown> }) {
+  const [open, setOpen] = useState(false);
+  const set = (model: string, field: 'vision' | 'reasoning', v: Setting) => save({ endpointModel: { endpoint: e.id, model, [field]: v === 'auto' ? null : v === 'yes' } });
+  const options = (said: boolean | undefined): { value: Setting; label: string; hint?: string }[] => [
+    said === undefined
+      ? { value: 'auto', label: 'Automatic (no)', hint: 'The endpoint does not say' }
+      : said
+        ? { value: 'auto', label: 'Automatic (yes)', hint: 'The endpoint says yes' }
+        : { value: 'auto', label: 'Automatic (no)', hint: 'The endpoint says no' },
+    { value: 'yes', label: 'Yes' },
+    { value: 'no', label: 'No' },
+  ];
+  const pick = (model: string, c: EndpointModelCaps, field: 'vision' | 'reasoning', label: string) => (
+    <label className="flex items-center gap-2 text-[12px] whitespace-nowrap text-fg-3">
+      <span>{label}</span>
+      <Select width={240} label={`${label}: ${model}`} value={settingOf(c.set[field])} options={options(c.endpoint[field])} onChange={(v) => void set(model, field, v)} />
+    </label>
+  );
+  return (
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-[12.5px] text-accent hover:underline">
+        <ChevronRight size={13} className={cx('transition-transform duration-200', open && 'rotate-90')} />
+        {open ? 'Hide what each model can do' : 'Set what each model can do'}
+      </button>
+      {open && (
+        <div className="mt-2 max-h-80 divide-y divide-line-2 overflow-y-auto rounded-lg ring-1 ring-line-2 ring-inset">
+          {e.models.map((m) => {
+            const c = e.modelCaps[m];
+            return (
+              <div key={m} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2">
+                <span className="min-w-[min(100%,10rem)] flex-1 basis-full truncate font-mono text-[12px] text-fg sm:basis-0" title={m} translate="no">
+                  {m}
+                </span>
+                {c && pick(m, c, 'vision', 'Sees images')}
+                {c && pick(m, c, 'reasoning', 'Reasoning effort')}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Runtimes({ st }: { st: ModelsState }) {
   const [ollama, setOllama] = useState(st.ollama.url);
   const [vllm, setVllm] = useState(st.vllm.command ?? '');
@@ -1245,7 +1293,9 @@ function Runtimes({ st }: { st: ModelsState }) {
               <X size={14} />
             </IconButton>
           }
-        />
+        >
+          {e.models.length > 0 && <EndpointModels endpoint={e} save={save} />}
+        </Row>
       ))}
       <Row
         label="Hugging Face token"

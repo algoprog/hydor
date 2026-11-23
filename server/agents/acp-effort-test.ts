@@ -18,7 +18,7 @@ const MODELS: Json[] = [
 ];
 
 /** An agent that answers like Grok Build: models with efforts, a thought-level option, set_config_option. */
-function fakeRunner(opts: { thought: boolean }) {
+function fakeRunner(opts: { thought: boolean; withDefault?: boolean }) {
   const runner: any = new EventEmitter();
   runner.meta = { runId: 'run1' };
   runner.stop = () => {};
@@ -34,7 +34,7 @@ function fakeRunner(opts: { thought: boolean }) {
             category: 'thought_level',
             type: 'select',
             currentValue: effort,
-            options: (model === 'grok-4.6' ? ['xhigh', 'high', 'medium', 'low'] : ['high', 'medium', 'low']).map((value) => ({ value })),
+            options: [...(opts.withDefault ? ['default'] : []), ...(model === 'grok-4.6' ? ['xhigh', 'high', 'medium', 'low'] : ['high', 'medium', 'low'])].map((value) => ({ value })),
           },
         ]
       : []),
@@ -74,8 +74,8 @@ function fakeRunner(opts: { thought: boolean }) {
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-acp-effort-'));
 const def: AcpAgentDef = { id: 'grok', name: 'Grok Build', command: 'grok', args: [] };
-const open = async (o: { effort?: string; model?: string; thought?: boolean; id: string }) => {
-  const f = fakeRunner({ thought: o.thought !== false });
+const open = async (o: { effort?: string; model?: string; thought?: boolean; withDefault?: boolean; id: string }) => {
+  const f = fakeRunner({ thought: o.thought !== false, withDefault: o.withDefault });
   const live = new AcpLive(f.runner, { cwd: dir, id: o.id, def, transcript: path.join(dir, `${o.id}.jsonl`), effort: o.effort, model: o.model });
   await live.boot(false);
   return { live, ...f };
@@ -101,6 +101,20 @@ const sets = (calls: { method: string; params: Json }[]) => calls.filter((c) => 
   // A value the agent refuses is a 400.
   await assert.rejects(live.configure({ effort: 'ultra' }), (e: any) => e.status === 400);
   assert.equal(live.state.effort, 'low', 'what was set stays');
+  // Default (null) for an agent whose thought level has no "default": nothing is sent, its own effort stays.
+  const asked = sets(calls).length;
+  await live.configure({ effort: null });
+  assert.equal(sets(calls).length, asked);
+  assert.equal(live.state.effort, 'low');
+}
+
+// Default (null) for an agent whose thought level offers "default" (Custom): "default" is sent, back to the model's own.
+{
+  const { live, calls } = await open({ id: 'e', effort: 'high', withDefault: true });
+  assert.deepEqual(sets(calls), [{ sessionId: 's1', configId: 'reasoning_effort', value: 'high' }]);
+  await live.configure({ effort: null });
+  assert.deepEqual(sets(calls).at(-1), { sessionId: 's1', configId: 'reasoning_effort', value: 'default' });
+  assert.equal(live.state.effort, 'default');
 }
 
 // An effort asked at start is set once the model is.

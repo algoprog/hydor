@@ -4,7 +4,7 @@
 // through Claude Code's and Codex's sign-ins, come after your own (server/models/subscription.ts).
 import fs from 'node:fs';
 import path from 'node:path';
-import { modelSource, type AgentModel, type HfInspect, type LocalModel, type ModelDownload, type ModelEntry, type ModelOption, type ModelsState, type SubscriptionModels, type VllmServer } from '../../shared/types.ts';
+import { modelSource, type AgentModel, type EndpointModelCaps, type HfInspect, type LocalModel, type ModelDownload, type ModelEntry, type ModelOption, type ModelsState, type SubscriptionModels, type VllmServer } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { isLocalAddress } from '../../shared/confidential.ts';
 import { keyHint, loadConfig, MODELS_DIR, saveConfig, writeAgentModels, type Endpoint, type ModelsConfig } from './config.ts';
@@ -12,6 +12,7 @@ import * as hf from './hf.ts';
 import { machine } from './machine.ts';
 import { localPicks } from './picks.ts';
 import { OPENROUTER_PICKS } from '../../shared/model-picks.ts';
+import * as endpointCaps from './endpoint.ts';
 import * as ollama from './ollama.ts';
 import * as openrouter from './openrouter.ts';
 import * as vllm from './vllm.ts';
@@ -26,6 +27,10 @@ export class ModelManager {
   private ollamaVersion: string | null = null;
   private endpointModels = new Map<string, string[]>();
   private endpointContext = new Map<string, number>();
+  /** What each endpoint says of its models (the entries of /models, or LiteLLM's /model/info), by `endpoint/model`. */
+  private endpointSaid = new Map<string, endpointCaps.Said>();
+  /** Endpoints whose /model/info answered with an error: not asked again until their settings change or the app restarts. */
+  private noModelInfo = new Set<string>();
   private pinnedInfo = new Map<string, openrouter.OrModel>();
   private emitTimer: NodeJS.Timeout | null = null;
   /** Your plans' models (Claude Code's and Codex's sign-ins), and how each program stands. */
@@ -60,13 +65,16 @@ export class ModelManager {
     this.ollamaModels = this.ollamaVersion ? await ollama.models(c.ollama.url).catch(() => []) : [];
     for (const e of c.endpoints) {
       try {
-        const r = await fetch(`${e.baseUrl.replace(/\/+$/, '')}/models`, { headers: e.apiKey ? { authorization: `Bearer ${e.apiKey}` } : {}, signal: AbortSignal.timeout(5000) });
-        const d: any = await r.json();
-        this.endpointModels.set(e.id, (d.data ?? []).map((m: any) => String(m.id)));
-        // Their context, where the server says (vLLM's max_model_len, others' context_length).
-        for (const m of d.data ?? []) {
-          const n = Number(m.max_model_len ?? m.context_length ?? m.context_window ?? m.max_context_length);
-          if (n > 0) this.endpointContext.set(`${e.id}/${m.id}`, n);
+        const r = await endpointCaps.read(e.baseUrl, e.apiKey, !this.noModelInfo.has(e.id));
+        this.endpointModels.set(e.id, r.ids);
+        if (r.noInfo) this.noModelInfo.add(e.id);
+        for (const id of r.ids) {
+          const k = `${e.id}/${id}`;
+          // Their context, where the server says (vLLM's max_model_len, others' context_length, LiteLLM's max_input_tokens).
+          const n = r.context.get(id);
+          if (n) this.endpointContext.set(k, n);
+          else this.endpointContext.delete(k);
+          this.endpointSaid.set(k, r.said.get(id) ?? {});
         }
       } catch {
         this.endpointModels.set(e.id, []);
@@ -136,7 +144,8 @@ export class ModelManager {
       });
     }
     for (const e of c.endpoints)
-      for (const m of this.endpointModels.get(e.id) ?? [])
+      for (const m of this.endpointModels.get(e.id) ?? []) {
+        const caps = this.capsOf(e, m);
         out.push({
           id: `endpoint/${e.id}/${m}`,
           label: `${m} (${e.name})`,
@@ -146,11 +155,19 @@ export class ModelManager {
           model: m,
           tools: 'native',
           contextLength: this.endpointContext.get(`${e.id}/${m}`),
+          ...(caps.vision ? { vision: true } : {}),
+          ...(caps.reasoning ? { reasoning: true } : {}),
           ...(isLocalAddress(e.baseUrl) ? { local: true } : {}),
         });
+      }
     // Your plans' models come after your own: a session with no model of its own starts on one you added.
     out.push(...this.plans);
     return out;
+  }
+
+  /** What Custom does with an endpoint's model: the person's setting, else what the endpoint says, else no. */
+  private capsOf(e: Endpoint, model: string): EndpointModelCaps {
+    return endpointCaps.resolve(e.models?.[model], this.endpointSaid.get(`${e.id}/${model}`));
   }
 
   /**
@@ -191,7 +208,7 @@ export class ModelManager {
         value: m.id,
         label: m.label,
         description: [where, m.contextLength ? `${Math.round(m.contextLength / 1000)}K context` : '', m.start ? 'starts when used' : ''].filter(Boolean).join(' · '),
-        efforts: [],
+        efforts: m.provider === 'endpoint' && m.reasoning ? endpointCaps.ENDPOINT_EFFORTS : [],
         source,
         via,
         ...(m.local ? { local: true } : {}),
@@ -242,7 +259,7 @@ export class ModelManager {
       },
       ollama: { url: c.ollama.url, version: this.ollamaVersion ?? undefined },
       vllm: { command: c.vllm.command, path: v?.path, version: v?.version },
-      endpoints: c.endpoints.map((e) => ({ id: e.id, name: e.name, baseUrl: e.baseUrl, keyHint: keyHint(e.apiKey), models: this.endpointModels.get(e.id) ?? [] })),
+      endpoints: c.endpoints.map((e) => ({ id: e.id, name: e.name, baseUrl: e.baseUrl, keyHint: keyHint(e.apiKey), models: this.endpointModels.get(e.id) ?? [], modelCaps: Object.fromEntries((this.endpointModels.get(e.id) ?? []).map((m) => [m, this.capsOf(e, m)])) })),
       hfTokenHint: keyHint(c.hfToken),
       local,
       downloads: [...this.downloads.values()].map(({ abort: _a, ...d }) => d),
@@ -260,7 +277,9 @@ export class ModelManager {
     ollamaUrl?: string;
     vllmCommand?: string | null;
     hfToken?: string | null;
-    endpoint?: Partial<Endpoint> & { remove?: boolean };
+    endpoint?: Partial<Omit<Endpoint, 'models'>> & { remove?: boolean };
+    /** What one endpoint's model can do, set by hand; null is Automatic (what the endpoint says). */
+    endpointModel?: { endpoint: string; model: string; vision?: boolean | null; reasoning?: boolean | null };
   }) {
     const c = this.cfg;
     if (p.openrouterKey !== undefined) c.openrouter.apiKey = p.openrouterKey?.trim() || undefined;
@@ -277,13 +296,35 @@ export class ModelManager {
     if (p.hfToken !== undefined) c.hfToken = p.hfToken?.trim() || undefined;
     if (p.endpoint) {
       const e = p.endpoint;
-      if (e.remove) c.endpoints = c.endpoints.filter((x) => x.id !== e.id);
-      else {
+      if (e.remove) {
+        c.endpoints = c.endpoints.filter((x) => x.id !== e.id);
+        if (e.id) this.noModelInfo.delete(e.id);
+      } else {
         if (!e.name?.trim() || !/^https?:\/\/\S+$/.test(e.baseUrl?.trim() ?? '')) throw new HttpError(400, 'Give the endpoint a name and its address (…/v1)');
         const id = e.id ?? (e.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24) || 'endpoint');
         const prev = c.endpoints.find((x) => x.id === id);
-        c.endpoints = [...c.endpoints.filter((x) => x.id !== id), { id, name: e.name.trim(), baseUrl: e.baseUrl!.trim(), apiKey: e.apiKey === undefined ? prev?.apiKey : e.apiKey || undefined }];
+        c.endpoints = [...c.endpoints.filter((x) => x.id !== id), { id, name: e.name.trim(), baseUrl: e.baseUrl!.trim(), apiKey: e.apiKey === undefined ? prev?.apiKey : e.apiKey || undefined, ...(prev?.models ? { models: prev.models } : {}) }];
+        // Its settings changed: its /model/info is asked again.
+        this.noModelInfo.delete(id);
       }
+    }
+    if (p.endpointModel) {
+      const { endpoint, model, vision, reasoning } = p.endpointModel;
+      // A model's name as its endpoint lists it (never one of an object's own keys), each setting yes, no or null (Automatic).
+      if (typeof model !== 'string' || !model.trim() || model.length > 500 || ['__proto__', 'constructor', 'prototype'].includes(model)) throw new HttpError(400, 'No such option');
+      if ([vision, reasoning].some((v) => v !== undefined && v !== null && typeof v !== 'boolean')) throw new HttpError(400, 'No such option');
+      const e = c.endpoints.find((x) => x.id === endpoint);
+      if (!e) throw new HttpError(404, 'There is no such endpoint');
+      const set = { ...e.models?.[model] };
+      if (vision === null) delete set.vision;
+      else if (vision !== undefined) set.vision = !!vision;
+      if (reasoning === null) delete set.reasoning;
+      else if (reasoning !== undefined) set.reasoning = !!reasoning;
+      const models = { ...e.models };
+      if (Object.keys(set).length) models[model] = set;
+      else delete models[model];
+      if (Object.keys(models).length) e.models = models;
+      else delete e.models;
     }
     saveConfig(c);
     await this.refresh();

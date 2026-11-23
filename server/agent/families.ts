@@ -70,8 +70,12 @@ export function callId(seed?: string): string {
   return out;
 }
 
-/** Sampling and reasoning options for a request, as far as the model's server takes them. */
-export function requestOptions(m: AgentModel, fam: Family): Record<string, unknown> {
+/**
+ * Sampling and reasoning options for a request, as far as the model's server takes them. `chosen` is the effort picked
+ * for the session: an endpoint's reasoning model gets it as `reasoning_effort` (the OpenAI Chat Completions parameter),
+ * and nothing when none is picked (the endpoint's own default).
+ */
+export function requestOptions(m: AgentModel, fam: Family, chosen?: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const s = fam.sampling;
   // vLLM already uses the model's own generation settings; others get the maker's recommendation.
@@ -79,6 +83,9 @@ export function requestOptions(m: AgentModel, fam: Family): Record<string, unkno
   for (const k of keys) if (s[k] !== undefined) out[k] = s[k];
   const effort = (process.env.HYDOR_EFFORT ?? 'medium').toLowerCase();
   if (m.provider === 'openrouter' && m.reasoning && effort !== 'default') out.reasoning = { effort };
-  else if (fam.effort && (m.provider === 'vllm' || m.provider === 'ollama') && /^(low|medium|high)$/.test(effort)) out.reasoning_effort = effort;
+  else if (m.provider === 'endpoint' && m.reasoning) {
+    const e = (chosen ?? '').toLowerCase();
+    if (e && e !== 'default') out.reasoning_effort = e;
+  } else if (fam.effort && (m.provider === 'vllm' || m.provider === 'ollama') && /^(low|medium|high)$/.test(effort)) out.reasoning_effort = effort;
   return out;
 }

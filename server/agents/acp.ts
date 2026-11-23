@@ -726,6 +726,8 @@ export class AcpLive extends LiveAdapter {
     if (cfg.model) await this.setModel(cfg.model).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     // A new model that does not take the effort set keeps the agent's own choice (its update says which).
     if (cfg.effort) await this.setEffort(cfg.effort).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
+    // Default (null) goes back to the model's own effort, for an agent whose thought level offers "default" (Custom).
+    else if (cfg.effort === null && this.thought?.options.includes('default')) await this.setEffort('default').catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     this.changed();
   }
 

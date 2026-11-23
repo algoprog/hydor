@@ -19,6 +19,14 @@ export interface Endpoint {
   /** An OpenAI-compatible API, e.g. http://localhost:1234/v1 */
   baseUrl: string;
   apiKey?: string;
+  /** What the person set for a model by hand (absent: Automatic, what the endpoint says). */
+  models?: Record<string, EndpointModelSetting>;
+}
+
+/** Whether a model sees images and whether it reasons, set by hand; a field left out follows the endpoint. */
+export interface EndpointModelSetting {
+  vision?: boolean;
+  reasoning?: boolean;
 }
 
 export interface ModelsConfig {

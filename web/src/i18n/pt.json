@@ -25712,5 +25712,15 @@
   "{0}: text": "{0}: texto",
   "Delete…": "Excluir…",
   "Schedule": "Agendamento",
-  "Stop it on its board": "Parar no painel"
+  "Stop it on its board": "Parar no painel",
+  "Automatic (no)": "Automático (não)",
+  "Automatic (yes)": "Automático (sim)",
+  "Hide what each model can do": "Ocultar o que cada modelo pode fazer",
+  "No such option": "Essa opção não existe",
+  "Reasoning effort": "Esforço de raciocínio",
+  "Set what each model can do": "Definir o que cada modelo pode fazer",
+  "The endpoint does not say": "O endpoint não informa",
+  "The endpoint says no": "O endpoint diz que não",
+  "The endpoint says yes": "O endpoint diz que sim",
+  "There is no such endpoint": "Esse endpoint não existe"
 }

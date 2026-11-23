@@ -22,7 +22,7 @@ Custom liest die `AGENTS.md`- oder `CLAUDE.md`-Dateien des Projekts und folgt de
 
 1. Klicke auf der Startseite auf **Agent** und wähle **Custom** („Jedes Modell: OpenRouter, Ollama, vLLM“).
 2. Klicke auf **Modell** und wähle eines deiner Modelle, oder **Automatisch**, wenn das Menü es anbietet: Die Leistungsstufen von Custom füllen sich selbst aus den Modellen, die es hat (zuerst die deines Claude-Abos, dann die deines ChatGPT-Abos, dann die, die du hinzugefügt hast und die nicht auf diesem Computer laufen). Sobald die Stufe „Am besten“ ein Modell nennt, startet eine Sitzung auf „Automatisch“ damit und leitet Subagents an (siehe [Leistungsstufen: ein Modell für jede Art von Aufgabe](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). Wenn die Liste leer ist, füge zuerst ein Modell hinzu: **Agent** → **Modelle für Custom**.
-3. Wähle unter **Optionen** die **Berechtigungen** (siehe [Festlegen, was Custom ohne Nachfrage tun darf](#choose-what-custom-may-do-without-asking)). Custom hat keine Aufwand-Einstellung.
+3. Wähle unter **Optionen** die **Berechtigungen** (siehe [Festlegen, was Custom ohne Nachfrage tun darf](#choose-what-custom-may-do-without-asking)). **Aufwand** wird für das Modell eines [Endpunkts](/guide/agents-models#other-openai-compatible-endpoints) angeboten, das logisch schlussfolgert (der Endpunkt meldet das, oder du stellst seinen **Denkaufwand** auf **Ja**); für die anderen Modelle hat Custom keine Aufwand-Einstellung.
 4. Tippe die Aufgabe ein und drücke die Eingabetaste.
 
 Ein Modell auf diesem Computer, das über vLLM läuft, startet beim ersten Mal, wenn eine Sitzung es nutzt; die Sitzung meldet „Starting … with vLLM (the first time takes a minute or two)…“.
@@ -35,7 +35,7 @@ Du kannst das Modell während einer Sitzung über das Menü unter dem Nachrichte
 
 - **Dateien**: Sie lesen (Text mit Zeilennummern, bei langen Dateien jeweils einen Teil, den Inhalt eines Ordners), erstellen, neu schreiben und bearbeiten, Ordner auflisten und Dateien nach Namen oder nach Inhalt finden. Bevor es eine ganze Datei neu schreibt, die es in dieser Sitzung nicht gelesen hat, wird es aufgefordert, sie zuerst zu lesen.
 - **Dokumente**: PDF-, Word-, Excel-, PowerPoint-, OpenDocument-, RTF- und EPUB-Dateien werden als Text gelesen.
-- **Bilder**: Bilder, die du anhängst, Bilddateien, die es öffnet, und Bilder von Webseiten oder aus Werkzeugen. Ein Modell, das Bilder sieht, bekommt das Bild; bei einem, das das nicht kann, beschreibt das Hilfsmodell es (siehe [Bilder für Modelle, die nicht sehen](#images-for-models-that-dont-see)).
+- **Bilder**: Bilder, die du anhängst, Bilddateien, die er öffnet, und Bilder von Webseiten oder aus Tools. Ein Modell, das Bilder verarbeitet, bekommt das Bild (bei einem Endpunkt-Modell, wenn der Endpunkt das meldet oder du **Verarbeitet Bilder** auf **Ja** stellst); bei einem Modell, das das nicht kann, beschreibt das Hilfsmodell das Bild (siehe [Bilder für Modelle, die nichts sehen](#images-for-models-that-dont-see)).
 - **Befehle**: Shell-Befehle im Ordner der Sitzung ausführen, standardmäßig bis zu zwei Minuten und höchstens zehn. Server, Watcher und andere Befehle, die weiterlaufen, laufen im Hintergrund: Custom liest ihre Ausgabe, wenn es sie braucht, und kann sie stoppen. Sie enden auch, wenn Custom beendet wird, und sein nächster Durchgang erfährt, welche noch laufen.
 - **Webseiten**: Eine Seite als sauberen Text mit Überschriften, Links, Listen und Tabellen abrufen; PDFs und Office-Dateien im Netz werden als Text gelesen. Es erreicht nur öffentliche Adressen; für diesen Computer oder sein Netzwerk nutzt es einen Befehl wie `curl`.
 - **Ein Plan**: Bei Arbeit mit mehreren Schritten führt es eine Checkliste, die in der Sitzung angezeigt wird, und hakt Punkte ab.
@@ -203,7 +203,7 @@ Wenn Custom einen Durchgang aus einem dieser Gründe stoppt, endet die Antwort m
 
 ## Bilder für Modelle, die nichts sehen
 
-Ein Modell, das Bilder sehen kann, bekommt deine Bilder direkt. Die Bilder werden vorher verkleinert, wenn auf diesem Computer ffmpeg oder ImageMagick vorhanden ist.
+Ein Modell, das Bilder verarbeitet, bekommt deine Bilder direkt. Das Modell eines Endpunkts gilt als eines, das das nicht kann, es sei denn, der Endpunkt gibt an, dass es Bilder verarbeitet, oder du stellst **Verarbeitet Bilder** in seiner [Zeile](/guide/agents-models#other-openai-compatible-endpoints) auf **Ja**. Bilder werden zuerst verkleinert, wenn auf diesem Computer ffmpeg oder ImageMagick vorhanden ist.
 
 Bei einem Modell, das keine Bilder sehen kann, beschreibt das Hilfsmodell jedes Bild in Worten: was es zeigt, wo sich die Dinge befinden und welcher Text darin steht, wortgetreu abgeschrieben. Dafür brauchst du ein Hilfsmodell, das Bilder sehen kann: Öffne [Einstellungen → Agenten → Modelle](/settings?s=models&find=Helper%20model) und wähle im Menü **Modell** der Gruppe **Hilfsmodell** eines mit dem Hinweis „sieht Bilder“. „Automatisch“ funktioniert dafür nicht. Ohne ein solches Modell teilt Custom dem Modell mit, dass es ein Bild gibt, das es nicht sehen kann. In einer vertraulichen Sitzung beschreibt nur ein Hilfsmodell auf diesem Computer Bilder (ein Modell deiner Abos tut das nie).
 

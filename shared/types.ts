@@ -1780,13 +1780,25 @@ export interface SubscriptionModels {
   models: { id: string; label: string }[];
 }
 
+/** What an endpoint's model can do: what Custom uses (the person's setting, else what the endpoint says, else no), and where each comes from. */
+export interface EndpointModelCaps {
+  /** Custom sends it images as images (else it gets a description of them). */
+  vision: boolean;
+  /** Custom offers it a reasoning effort and sends the one chosen. */
+  reasoning: boolean;
+  /** What the endpoint says (absent: it does not say). */
+  endpoint: { vision?: boolean; reasoning?: boolean };
+  /** The person's setting (absent: Automatic, what the endpoint says). */
+  set: { vision?: boolean; reasoning?: boolean };
+}
+
 export interface ModelsState {
   /** The plans' models Custom can use through Claude Code's and Codex's sign-ins. */
   subscriptions: SubscriptionModels[];
   openrouter: { keyHint?: string; pinned: OpenRouterModel[] };
   ollama: { url: string; version?: string };
   vllm: { command?: string; path?: string; version?: string };
-  endpoints: { id: string; name: string; baseUrl: string; keyHint?: string; models: string[] }[];
+  endpoints: { id: string; name: string; baseUrl: string; keyHint?: string; models: string[]; modelCaps: Record<string, EndpointModelCaps> }[];
   hfTokenHint?: string;
   local: LocalModel[];
   downloads: ModelDownload[];

@@ -22,7 +22,7 @@ O Custom lê os arquivos `AGENTS.md` ou `CLAUDE.md` do projeto e segue as suas [
 
 1. Na página inicial, clique em **Agente** e escolha **Custom** (“Qualquer modelo: OpenRouter, Ollama, vLLM”).
 2. Clique em **Modelo** e escolha um dos seus modelos, ou **Automático** quando o menu oferecer: os níveis do Custom se preenchem sozinhos a partir dos modelos que ele tem (primeiro os do seu plano do Claude, depois os do seu plano do ChatGPT, depois os que você adicionou que não estão neste computador), e quando o nível Melhor indica um modelo, uma sessão em Automático começa com ele e lidera os subagentes (veja [Níveis: um modelo para cada tipo de trabalho](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). Se a lista estiver vazia, adicione um modelo primeiro: **Agente** → **Modelos do Custom**.
-3. Em **Opções**, escolha **Permissões** (veja [Escolher o que o Custom pode fazer sem perguntar](#choose-what-custom-may-do-without-asking)). O Custom não tem configuração de Esforço.
+3. Em **Opções**, escolha **Permissões** (veja [Escolher o que o Custom pode fazer sem perguntar](#choose-what-custom-may-do-without-asking)). **Esforço** é oferecido para o modelo de um [endpoint](/guide/agents-models#other-openai-compatible-endpoints) que raciocina (o endpoint informa isso, ou você define o **Esforço de raciocínio** como **Sim**); para os outros modelos, o Custom não tem a configuração Esforço.
 4. Digite a tarefa e pressione Enter.
 
 Um modelo neste computador servido pelo vLLM começa na primeira vez que uma sessão o usa; a sessão mostra “Starting … with vLLM (the first time takes a minute or two)…”.
@@ -35,7 +35,7 @@ Você pode trocar o modelo durante uma sessão pelo menu abaixo da caixa de mens
 
 - **Arquivos**: lê-los (texto com números de linha, uma parte de um arquivo longo por vez, o conteúdo de uma pasta), criar, reescrever e editar, listar pastas e encontrar arquivos pelo nome ou pelo que contêm. Antes de reescrever um arquivo inteiro que ainda não leu nesta sessão, ele é instruído a lê-lo primeiro.
 - **Documentos**: arquivos PDF, Word, Excel, PowerPoint, OpenDocument, RTF e EPUB são lidos como texto.
-- **Imagens**: imagens que você anexa, arquivos de imagem que ele abre e imagens de páginas da web ou de ferramentas. Um modelo que enxerga imagens recebe a imagem; para um que não enxerga, o modelo auxiliar a descreve (veja [Imagens para modelos que não enxergam](#images-for-models-that-dont-see)).
+- **Imagens**: imagens que você anexa, arquivos de imagem que ele abre e imagens de páginas da web ou de ferramentas. Um modelo que vê imagens recebe a imagem (para o modelo de um endpoint, quando o endpoint informa isso ou você define **Vê imagens** como **Sim**); para um que não vê, o modelo auxiliar a descreve (veja [Imagens para modelos que não veem](#images-for-models-that-dont-see)).
 - **Comandos**: executam comandos de shell na pasta da sessão, por até dois minutos por padrão e dez no máximo. Servidores, watchers e outros comandos que continuam rodando vão para segundo plano: o Custom lê a saída deles quando precisa e pode pará-los. Eles também param quando o Custom é encerrado, e a próxima vez dele é informada de quais ainda estão rodando.
 - **Páginas da web**: busca uma página como texto limpo, com títulos, links, listas e tabelas; PDFs e arquivos do Office online são lidos como texto. Só acessa endereços públicos; para este computador ou a rede dele, usa um comando como `curl`.
 - **Um plano**: para trabalhos com várias etapas, mantém uma lista de verificação, exibida na sessão, e vai marcando os itens.
@@ -203,7 +203,7 @@ Quando o Custom interrompe uma vez por um desses motivos, a resposta termina com
 
 ## Imagens para modelos que não enxergam
 
-Um modelo que enxerga imagens recebe suas imagens diretamente. As imagens são reduzidas antes, quando este computador tem ffmpeg ou ImageMagick.
+Um modelo que vê imagens recebe suas imagens diretamente. O modelo de um endpoint é tratado como um modelo que não vê, a menos que o endpoint diga que vê imagens ou que você defina **Vê imagens** como **Sim** na [linha](/guide/agents-models#other-openai-compatible-endpoints) dele. As imagens são reduzidas antes quando este computador tem ffmpeg ou ImageMagick.
 
 Para um modelo que não enxerga imagens, o modelo auxiliar descreve cada imagem em palavras: o que ela mostra, onde as coisas estão e qualquer texto que apareça nela, copiado exatamente. Isso exige um modelo auxiliar que enxergue imagens: abra [Configurações → Agentes → Modelos](/settings?s=models&find=Helper%20model) e escolha um marcado como "enxerga imagens" no menu **Modelo** do grupo **Modelo auxiliar**. "Automático" não serve. Sem um, o Custom avisa ao modelo que há uma imagem que ele não consegue ver. Em uma sessão confidencial, apenas um modelo auxiliar neste computador descreve imagens (um modelo dos seus planos nunca faz isso).
 

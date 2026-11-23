@@ -43,6 +43,8 @@ const OWN = 'hydor';
 /** A public app's run (server/apps/publicRun.ts): no shell, no files, only the app's own server. */
 const PUBLIC_RUN = publicRunOf(process.env[PUBLIC_RUN_ENV]);
 const MAX_STEPS = 200;
+/** The reasoning efforts Custom offers a model that reasons (server/models/endpoint.ts ENDPOINT_EFFORTS). */
+const EFFORTS = ['low', 'medium', 'high'];
 // A model of your Claude or ChatGPT plan is asked through the app, which holds Claude Code's and Codex's sign-ins.
 if (RUNTIME) setPlanGateway(planClient(RUNTIME));
 
@@ -103,6 +105,8 @@ interface Session {
   cwd: string;
   mode: Mode;
   model?: string;
+  /** The reasoning effort picked for the session (an endpoint's reasoning model gets it); none: the model's own default. */
+  effort?: string;
   messages: ChatMessage[];
   /** What "Always allow" covers: "edit", "cmd:npm test", "mcp:<tool>", "read:<folder>", "write:<folder>", "secret:<file>". */
   allow: string[];
@@ -178,6 +182,18 @@ function offers(s: Session) {
   return {
     modes: { currentModeId: s.mode, availableModes: MODES.map((m) => ({ id: m.id, name: m.name, description: m.description })) },
     models: { currentModelId: s.model ?? list[0]?.id ?? '', availableModels: list.map((m) => ({ modelId: m.id, name: m.label, description: m.provider })) },
+    // The reasoning effort (used for models that reason: the app's pickers offer it only for those).
+    configOptions: [
+      {
+        id: 'reasoning_effort',
+        name: 'Reasoning effort',
+        category: 'thought_level',
+        type: 'select',
+        ...(s.effort ? { currentValue: s.effort } : {}),
+        // "default" first: Default in the app's menu clears the effort (the model's own default again).
+        options: ['default', ...EFFORTS].map((value) => ({ value, name: value })),
+      },
+    ],
   };
 }
 
@@ -635,7 +651,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
         onText: (t) => filter.push(t),
         onReasoning: (t) => say(s.id, 'agent_thought_chunk', t),
         maxTokens: budget ?? room,
-        extra: requestOptions(m, fam),
+        extra: requestOptions(m, fam, s.effort),
         cacheKey: s.id,
       });
       filter.end();
@@ -894,6 +910,14 @@ async function handle(m: any): Promise<unknown> {
       s.mode = p.modeId;
       save(s);
       return {};
+    }
+    case 'session/set_config_option': {
+      const s = sessions.get(p.sessionId);
+      if (!s || p.configId !== 'reasoning_effort' || !['default', ...EFFORTS].includes(String(p.value))) throw new Error('No such option');
+      if (p.value === 'default') delete s.effort;
+      else s.effort = String(p.value);
+      save(s);
+      return offers(s);
     }
     case 'session/set_model': {
       const s = sessions.get(p.sessionId);

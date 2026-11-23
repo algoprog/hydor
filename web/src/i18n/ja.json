@@ -25711,5 +25711,15 @@
   "{0}: text": "{0}：テキスト",
   "Delete…": "削除…",
   "Schedule": "スケジュール",
-  "Stop it on its board": "ボードで停止"
+  "Stop it on its board": "ボードで停止",
+  "Automatic (no)": "自動（いいえ）",
+  "Automatic (yes)": "自動（はい）",
+  "Hide what each model can do": "各モデルでできることを非表示",
+  "No such option": "そのようなオプションはありません",
+  "Reasoning effort": "推論の思考レベル",
+  "Set what each model can do": "各モデルでできることを設定",
+  "The endpoint does not say": "エンドポイントは対応状況を示していません",
+  "The endpoint says no": "エンドポイントは非対応と示しています",
+  "The endpoint says yes": "エンドポイントは対応と示しています",
+  "There is no such endpoint": "そのようなエンドポイントはありません"
 }

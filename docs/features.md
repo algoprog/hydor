@@ -1633,7 +1633,11 @@ Its models come from Settings → Models:
 - **vLLM**: Hugging Face models downloaded here and served on a GPU (a 16-bit model too big for it at 8-bit, FP8),
   split across 2, 4 or 8 GPUs when one has too little memory, or on a Mac's Apple silicon (vllm-metal), started
   when a session first uses them.
-- **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, another provider).
+- **Any OpenAI-compatible endpoint** (LM Studio, llama.cpp's server, a LiteLLM gateway, another provider), with what
+  each of its models can do: whether it sees images (screenshots and pictures reach it as pictures) and whether it
+  reasons (the Effort menu offers Low, Medium and High, sent as `reasoning_effort`). Hydor reads it from the endpoint's
+  model list (OpenRouter's, Mistral's and other styles) or LiteLLM's model information, and you set it by hand,
+  per model, when the endpoint says nothing or says it wrong.
 
 Before any search, the models suggested for this computer show by what it can run, each with how it would run here
 and Install: LFM3-VL 2B (almost any computer), Gemma 4 12B (a good graphics card), Flint (a Mac with Apple silicon and

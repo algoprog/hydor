@@ -27567,5 +27567,15 @@
   "{0}: text": "{0}：文字",
   "Delete…": "删除…",
   "Schedule": "定时运行",
-  "Stop it on its board": "在看板上停止"
+  "Stop it on its board": "在看板上停止",
+  "Automatic (no)": "自动（否）",
+  "Automatic (yes)": "自动（是）",
+  "Hide what each model can do": "隐藏每个模型的能力",
+  "No such option": "没有这个选项",
+  "Reasoning effort": "推理强度",
+  "Set what each model can do": "设置每个模型的能力",
+  "The endpoint does not say": "端点未说明",
+  "The endpoint says no": "端点表示不支持",
+  "The endpoint says yes": "端点表示支持",
+  "There is no such endpoint": "没有这个端点"
 }
