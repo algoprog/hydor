@@ -313,6 +313,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Language model size**](/settings?s=suggest&find=Language%20model%20size): The language model in 8 bits (better) or 4 bits (smaller, a little worse).
 - [**How sure before showing**](/settings?s=suggest&find=How%20sure%20before%20showing): How sure a suggestion must be to show: more of them, or fewer and more often right.
 - [**Show the next word**](/settings?s=suggest&find=Show%20the%20next%20word): Also the word after it, dimmer.
+- [**Reset the numbers**](/settings?s=suggest&find=Reset%20the%20numbers): Starts counting the keystrokes saved and the suggestions that were right from nothing again.
 - [**In message boxes**](/settings?s=suggest&find=In%20message%20boxes): Suggestions in the box you write a message to an agent in.
 - [**In documents**](/settings?s=suggest&find=In%20documents): Suggestions as you write in a document.
 - [**In notes**](/settings?s=suggest&find=In%20notes): Suggestions in notes.

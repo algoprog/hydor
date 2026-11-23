@@ -227,7 +227,7 @@
 - [**ログイン済みのサイトでの送信前に確認**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：ログイン済みのサイトで、エージェントが送信、投稿、削除、送金を行う前。
 - [**ブックマーク**](/settings?s=browser&find=Bookmarks)：自分のものと、このコンピューターの他のブラウザのものを統合。
 - [**拡張機能**](/settings?s=browser&find=Extensions)：Chrome拡張機能（デスクトップアプリ）。
-- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：ホームページ、検索エンジン、検索ショートカット、ページのズーム、スペルチェック、翻訳、ダークページ、フィルタリスト・言語・広告を許可するサイトを含む広告ブロック、履歴と保存されたデータの消去。
 
 ### コンピューターの操作
 
@@ -313,6 +313,7 @@
 - [**言語モデルのサイズ**](/settings?s=suggest&find=Language%20model%20size)：言語モデルを8ビット（高精度）または4ビット（小さい分、やや精度が下がる）で使います。
 - [**表示する確信度**](/settings?s=suggest&find=How%20sure%20before%20showing)：候補を表示するために必要な確信度：多めに表示するか、少なめでより正確にするか。
 - [**次の単語を表示**](/settings?s=suggest&find=Show%20the%20next%20word)：その次の単語も、薄く表示します。
+- [**数値をリセット**](/settings?s=suggest&find=Reset%20the%20numbers)：節約したキー入力数と、正解した提案数を、ゼロから数え直します。
 - [**メッセージ欄**](/settings?s=suggest&find=In%20message%20boxes)：エージェントにメッセージを書く欄での候補。
 - [**ドキュメント内**](/settings?s=suggest&find=In%20documents)：ドキュメントを書くときの候補。
 - [**メモ内**](/settings?s=suggest&find=In%20notes)：メモでの候補。

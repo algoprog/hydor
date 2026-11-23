@@ -227,7 +227,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Demander avant d’envoyer sur les sites connectés**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) : Avant qu’un agent n’envoie, ne publie, ne supprime ou ne transfère quoi que ce soit sur un site où il est connecté.
 - [**Favoris**](/settings?s=browser&find=Bookmarks) : Les vôtres, avec ceux des autres navigateurs de cet ordinateur.
 - [**Extensions**](/settings?s=browser&find=Extensions) : Extensions Chrome, dans l’app de bureau.
-- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Page d’accueil, moteur de recherche, raccourcis de recherche, zoom des pages, correction orthographique, traduction, pages sombres, bloqueur de publicités avec ses listes de filtres, langues et sites où les publicités sont autorisées, historique et effacement de ce qu’il a gardé.
 
 ### Utilisation de l’ordinateur
 
@@ -313,6 +313,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Taille du modèle de langage**](/settings?s=suggest&find=Language%20model%20size) : Le modèle de langage en 8 bits (meilleur) ou en 4 bits (plus petit, un peu moins bon).
 - [**Certitude avant d’afficher**](/settings?s=suggest&find=How%20sure%20before%20showing) : Niveau de certitude requis pour afficher une suggestion : plus de suggestions, ou moins mais plus souvent justes.
 - [**Afficher le mot suivant**](/settings?s=suggest&find=Show%20the%20next%20word) : Affiche aussi le mot suivant, en plus pâle.
+- [**Réinitialiser les chiffres**](/settings?s=suggest&find=Reset%20the%20numbers) : Recommence à compter de zéro les frappes économisées et les suggestions qui étaient justes.
 - [**Dans les zones de message**](/settings?s=suggest&find=In%20message%20boxes) : Suggestions dans la zone où vous écrivez un message à un agent.
 - [**Dans les documents**](/settings?s=suggest&find=In%20documents) : Suggestions pendant que vous écrivez dans un document.
 - [**Dans les notes**](/settings?s=suggest&find=In%20notes) : Suggestions dans les notes.

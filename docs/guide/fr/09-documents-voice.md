@@ -376,6 +376,12 @@ Par défaut, le petit modèle apprend aussi vos propres mots : les noms, les ter
 
 La ligne sous l’interrupteur indique quel petit modèle est utilisé, quand il a appris pour la dernière fois, et où en est un cycle d’apprentissage.
 
+### Ce que cela vous apporte
+
+Sous **Comment ça vous aide**, dans la même section, deux lignes montrent ce que les suggestions ont fait pour vous jusqu’ici : les **frappes économisées** (et la part de votre saisie qu’elles représentent), et le nombre de suggestions **justes** parmi celles qui ont été évaluées, avec le nombre de celles que vous avez prises avec Tab. Une suggestion est juste quand vous l’avez acceptée (Tab, ou → pour deux mots) ou que vous avez tapé vous-même tout le mot gris ; elle est fausse quand vous avez tapé autre chose pendant qu’elle s’affichait. Une suggestion que vous avez masquée avec Esc, ou qui a disparu parce que vous avez cliqué ailleurs, envoyé le message ou déplacé le curseur, n’est ni l’un ni l’autre. Chaque Tab ou → économise les lettres qu’il ajoute, moins la touche que vous avez pressée.
+
+**Afficher les détails** ajoute aujourd’hui, cette semaine et le total depuis le début des compteurs, et **[Réinitialiser les chiffres](/settings?s=suggest&find=Reset%20the%20numbers)** les remet à zéro, après confirmation. Seuls des totaux sont conservés, jamais ce que vous avez tapé, et ils ne changent pas le fonctionnement des suggestions.
+
 ## Dicter un message
 
 Le microphone de la zone de message (sur la page d’accueil et dans chaque session) transforme ce que vous dites en texte dans votre message. Rien n’est envoyé automatiquement : vous relisez, puis vous envoyez comme d’habitude.
@@ -502,6 +508,7 @@ Il cesse d’écouter pour dire ces messages, puis écoute de nouveau. Les sessi
 - « Empêche les suggestions de mots d’apprendre à partir des réponses des agents, et fais-les apprendre uniquement quand je le demande. »
 - « Le modèle de langage tourne-t-il pour les suggestions de mots ? Sinon, pourquoi ? »
 - « Désactive les suggestions de mots dans ce navigateur uniquement. »
+- « Combien de frappes les suggestions de mots m’ont-elles fait économiser ? »
 - « Active la reconnaissance vocale sur cet ordinateur, avec le modèle Petit. »
 - « Utilise mon serveur de reconnaissance vocale à l’adresse http://192.168.1.20:8000/v1 pour la dictée, avec le modèle whisper-large-v3. »
 - « Quels modèles whisper se trouvent sur cet ordinateur, et quelle place prennent-ils ? Retire ceux qui ne sont pas utilisés. »

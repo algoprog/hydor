@@ -1475,8 +1475,11 @@ agents that speak ACP and take MCP servers.
   and other sessions put there), agents' replies, the notes you wrote and the documents you wrote, each source with its
   switch and your own words weighted higher, every night, every week or when you press Retrain now, in the background at
   the lowest priority and when you have not typed for ten minutes; the first time can take hours without a graphics card.
-  Forget what it learned goes back to the model that came with the app. Agents read and change all of it
-  (`GET` and `PUT /api/suggest`, and the settings table), and the browser's switch through `PUT /device`.
+  Forget what it learned goes back to the model that came with the app. **How it's helping** counts how many keystrokes
+  the suggestions saved (and their share of your typing) and how many were right (taken with Tab or →, or typed through
+  by you, against the ones where you typed something else), with today, this week and the total behind a button and
+  **Reset the numbers**; only counts are kept, never any text. Agents read and change all of it
+  (`GET` and `PUT /api/suggest`, whose status has the numbers, and the settings table), and the browser's switch through `PUT /device`.
 - **Your language**: the app in English, German, Spanish, French, Brazilian Portuguese, Greek, Japanese or Chinese
   (Simplified) (Settings → General → Language), and the guide too, with dates and times written that way and
   notifications in it too, and agents write to you in it. At first the app follows the browser's language. Translations

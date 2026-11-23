@@ -376,6 +376,12 @@ By default, the small model also learns your own words: the names, terms and way
 
 The line under the switch says which small model is in use, when it last learned, and how far a learning run has got.
 
+### How much it helps
+
+Under **How it's helping** in the same section, two lines show what the suggestions have done for you so far: the **keystrokes saved** (and what share of your typing that is), and how many suggestions were **right** of those that were judged, with how many you took with Tab. A suggestion is right when you took it (Tab, or → for two words) or typed the whole grey word yourself; it is wrong when you typed something else while it showed. One you hid with Esc, or that went away when you clicked elsewhere, sent the message or moved the cursor, is neither. Each Tab or → saves the letters it adds, less the one key you pressed.
+
+**Show the details** adds today, this week and the total since the numbers began, and **[Reset the numbers](/settings?s=suggest&find=Reset%20the%20numbers)** starts them again from nothing, after you confirm. Only counts are kept, never what you typed, and they do not change how suggestions work.
+
 ## Dictate a message
 
 The microphone in the message box (on the start page and in every session) turns what you say into text in your message. Nothing is sent by itself: you read it over and send it as usual.
@@ -502,6 +508,7 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Stop word suggestions from learning from agents' replies, and make it learn only when I ask."
 - "Is the language model running for word suggestions? If not, why?"
 - "Turn word suggestions off in this browser only."
+- "How many keystrokes have word suggestions saved me?"
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
 - "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."

@@ -376,6 +376,12 @@ Por padrão, o modelo pequeno também aprende as suas palavras: os nomes, os ter
 
 A linha embaixo do interruptor diz qual modelo pequeno está em uso, quando ele aprendeu pela última vez e em que ponto está uma execução de aprendizado.
 
+### Quanto ajuda
+
+Em **Como está ajudando**, na mesma seção, duas linhas mostram o que as sugestões fizeram por você até agora: as **teclas economizadas** (e que parte da sua digitação isso representa) e quantas sugestões estavam **certas** entre as que foram avaliadas, com quantas você aceitou com Tab. Uma sugestão está certa quando você a aceitou (Tab, ou → para duas palavras) ou digitou você mesmo a palavra inteira em cinza; está errada quando você digitou outra coisa enquanto ela aparecia. Uma que você escondeu com Esc, ou que sumiu quando você clicou em outro lugar, enviou a mensagem ou moveu o cursor, não conta como nenhuma das duas. Cada Tab ou → economiza as letras que acrescenta, menos a tecla que você pressionou.
+
+**Mostrar os detalhes** acrescenta hoje, esta semana e o total desde que os números começaram, e **[Zerar os números](/settings?s=suggest&find=Reset%20the%20numbers)** recomeça a contagem do zero, depois que você confirma. Só as contagens são guardadas, nunca o que você digitou, e elas não mudam o funcionamento das sugestões.
+
 ## Ditar uma mensagem
 
 O microfone na caixa de mensagem (na página inicial e em cada sessão) transforma o que você diz em texto na sua mensagem. Nada é enviado sozinho: você lê e envia como de costume.
@@ -502,6 +508,7 @@ Ele para de escutar para dizer isso e depois escuta de novo. Sessões em suas ou
 - "Impeça as sugestões de palavras de aprenderem com as respostas dos agentes e faça-as aprender só quando eu pedir."
 - "O modelo de linguagem das sugestões de palavras está em execução? Se não, por quê?"
 - "Desative as sugestões de palavras só neste navegador."
+- “Quantas teclas as sugestões de palavras me pouparam de digitar?”
 - "Ative o reconhecimento de fala neste computador, com o modelo Pequeno."
 - "Use meu servidor de fala em http://192.168.1.20:8000/v1 para o ditado, com o modelo whisper-large-v3."
 - "Quais modelos whisper estão neste computador e quanto espaço ocupam? Remova os que não estão em uso."

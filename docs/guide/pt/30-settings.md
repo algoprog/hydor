@@ -227,7 +227,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Perguntar antes de enviar em sites com login**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de um agente enviar, publicar, excluir ou transferir algo em um site em que ele esteja conectado.
 - [**Favoritos**](/settings?s=browser&find=Bookmarks): Os seus, junto com os dos outros navegadores deste computador.
 - [**Extensões**](/settings?s=browser&find=Extensions): Extensões do Chrome, no app para computador.
-- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Página inicial, mecanismo de busca, atalhos de pesquisa, zoom da página, verificação ortográfica, tradução, páginas escuras, bloqueador de anúncios com suas listas de filtros, idiomas e sites onde anúncios são permitidos, histórico e limpeza do que ele guardou.
 
 ### Uso do computador
 
@@ -313,6 +313,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Tamanho do modelo de linguagem**](/settings?s=suggest&find=Language%20model%20size): O modelo de linguagem em 8 bits (melhor) ou 4 bits (menor, um pouco pior).
 - [**Segurança antes de mostrar**](/settings?s=suggest&find=How%20sure%20before%20showing): Quão segura uma sugestão precisa ser para aparecer: mais sugestões, ou menos sugestões e mais acertos.
 - [**Mostrar a palavra seguinte**](/settings?s=suggest&find=Show%20the%20next%20word): Também a palavra seguinte, mais apagada.
+- [**Zerar os números**](/settings?s=suggest&find=Reset%20the%20numbers): Recomeça do zero a contagem das teclas economizadas e das sugestões que acertaram.
 - [**Em caixas de mensagem**](/settings?s=suggest&find=In%20message%20boxes): Sugestões na caixa em que você escreve uma mensagem para um agente.
 - [**Em documentos**](/settings?s=suggest&find=In%20documents): Sugestões enquanto você escreve em um documento.
 - [**Em notas**](/settings?s=suggest&find=In%20notes): Sugestões nas notas.

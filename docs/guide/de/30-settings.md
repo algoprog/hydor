@@ -227,7 +227,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Vor dem Senden auf angemeldeten Websites fragen**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist.
 - [**Lesezeichen**](/settings?s=browser&find=Bookmarks): Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer.
 - [**Erweiterungen**](/settings?s=browser&find=Extensions): Chrome-Erweiterungen in der Desktop-App.
-- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Startseite, Suchmaschine, Suchkürzel, Seitenzoom, Rechtschreibprüfung, Übersetzung, dunkle Seiten, Werbeblocker mit seinen Filterlisten, Sprachen und Seiten, auf denen Werbung erlaubt ist, Verlauf und das Löschen gespeicherter Daten.
 
 ### Computer Use
 
@@ -313,6 +313,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Größe des Sprachmodells**](/settings?s=suggest&find=Language%20model%20size): Das Sprachmodell in 8 Bit (besser) oder 4 Bit (kleiner, etwas schlechter).
 - [**Wie sicher, bevor angezeigt wird**](/settings?s=suggest&find=How%20sure%20before%20showing): Wie sicher ein Vorschlag sein muss, um angezeigt zu werden: mehr Vorschläge oder weniger, die öfter stimmen.
 - [**Nächstes Wort anzeigen**](/settings?s=suggest&find=Show%20the%20next%20word): Auch das Wort danach, blasser.
+- [**Zahlen zurücksetzen**](/settings?s=suggest&find=Reset%20the%20numbers): Beginnt die Zählung der gesparten Tastenanschläge und der richtigen Vorschläge wieder bei null.
 - [**In Nachrichtenfeldern**](/settings?s=suggest&find=In%20message%20boxes): Vorschläge im Feld, in dem du eine Nachricht an einen Agenten schreibst.
 - [**In Dokumenten**](/settings?s=suggest&find=In%20documents): Vorschläge beim Schreiben in einem Dokument.
 - [**In Notizen**](/settings?s=suggest&find=In%20notes): Vorschläge in Notizen.

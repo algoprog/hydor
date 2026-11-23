@@ -376,6 +376,12 @@ Standardmäßig lernt das kleine Modell auch deine eigenen Wörter: die Namen, B
 
 Die Zeile unter dem Schalter sagt, welches kleine Modell gerade verwendet wird, wann es zuletzt gelernt hat und wie weit ein Lerndurchlauf ist.
 
+### Wie viel es hilft
+
+Unter **So hilft es dir** im selben Bereich zeigen zwei Zeilen, was die Vorschläge bisher für dich getan haben: die **gesparten Tastenanschläge** (und welchen Anteil deines Tippens das ausmacht) und wie viele Vorschläge von den bewerteten **Richtig** waren, dazu, wie viele du mit Tab übernommen hast. Ein Vorschlag ist richtig, wenn du ihn übernommen hast (Tab oder → für zwei Wörter) oder das ganze graue Wort selbst getippt hast; er ist falsch, wenn du etwas anderes getippt hast, während er angezeigt wurde. Einer, den du mit Esc ausgeblendet hast oder der verschwunden ist, weil du woanders geklickt, die Nachricht gesendet oder den Cursor bewegt hast, zählt weder als richtig noch als falsch. Jedes Tab oder → spart die Buchstaben, die es einfügt, abzüglich der einen Taste, die du gedrückt hast.
+
+**Details anzeigen** ergänzt heute, diese Woche und die Gesamtsumme seit Beginn der Zählung, und **[Zahlen zurücksetzen](/settings?s=suggest&find=Reset%20the%20numbers)** beginnt nach deiner Bestätigung wieder bei null. Es werden nur Zähler gespeichert, nie das, was du getippt hast, und sie ändern nichts an der Funktionsweise der Vorschläge.
+
 ## Eine Nachricht diktieren
 
 Das Mikrofon im Nachrichtenfeld (auf der Startseite und in jeder Sitzung) verwandelt das, was du sagst, in Text in deiner Nachricht. Nichts wird von selbst gesendet: Du liest es durch und sendest es wie gewohnt.
@@ -502,6 +508,7 @@ Sie hört dafür auf zuzuhören, um das zu sagen, und hört danach wieder zu. Si
 - „Sorge dafür, dass die Wortvorschläge nicht aus den Antworten von Agenten lernen, sondern nur, wenn ich es verlange.“
 - „Läuft das Sprachmodell für die Wortvorschläge? Wenn nicht, warum?“
 - „Schalte die Wortvorschläge nur in diesem Browser aus.“
+- „Wie viele Tastenanschläge haben mir die Wortvorschläge erspart?“
 - „Schalte die Spracherkennung auf diesem Computer ein, mit dem Modell Klein.“
 - „Verwende meinen Sprachserver unter http://192.168.1.20:8000/v1 für das Diktieren, mit dem Modell whisper-large-v3.“
 - „Welche Whisper-Modelle sind auf diesem Computer, und wie viel Platz brauchen sie? Entferne die, die nicht verwendet werden.“

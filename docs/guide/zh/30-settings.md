@@ -227,7 +227,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷方式、页面缩放、拼写检查、翻译、深色网页、带过滤列表的广告拦截器、语言和允许显示广告的网站、历史记录，以及清除浏览器保留的数据。
 
 ### 电脑操控
 
@@ -313,6 +313,7 @@
 - [**语言模型大小**](/settings?s=suggest&find=Language%20model%20size)：8 位（更好）或 4 位（更小，稍差）的语言模型。
 - [**显示前的把握程度**](/settings?s=suggest&find=How%20sure%20before%20showing)：建议需要多确定才会显示：显示更多，或显示更少但更常猜对。
 - [**显示下一个词**](/settings?s=suggest&find=Show%20the%20next%20word)：同时显示其后的一个词，颜色更淡。
+- [**重置数字**](/settings?s=suggest&find=Reset%20the%20numbers)：从零开始重新统计节省的按键次数和正确的建议数。
 - [**在消息框中**](/settings?s=suggest&find=In%20message%20boxes)：在你给智能体写消息的输入框中给出建议。
 - [**在文档中**](/settings?s=suggest&find=In%20documents)：在文档中写作时给出建议。
 - [**在备注中**](/settings?s=suggest&find=In%20notes)：在备注中给出建议。

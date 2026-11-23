@@ -376,6 +376,12 @@ Por defecto, el modelo pequeño también aprende tus propias palabras: los nombr
 
 La línea bajo el interruptor indica qué modelo pequeño se está usando, cuándo aprendió por última vez y cuánto lleva avanzado un proceso de aprendizaje.
 
+### Cómo te ayuda
+
+En **Cómo te está ayudando**, dentro de la misma sección, dos líneas muestran lo que han hecho por ti las sugerencias hasta ahora: las **pulsaciones ahorradas** (y qué parte de lo que escribes representan), y cuántas sugerencias fueron **acertadas** de las que se evaluaron, con cuántas aceptaste con Tab. Una sugerencia es correcta cuando la aceptaste (con Tab, o con → para dos palabras) o escribiste tú mismo la palabra gris completa; es errónea cuando escribiste otra cosa mientras se mostraba. Una que ocultaste con Esc, o que desapareció al hacer clic en otro sitio, enviar el mensaje o mover el cursor, no cuenta como ninguna de las dos. Cada Tab o → ahorra las letras que añade, menos la tecla que pulsaste.
+
+**Mostrar los detalles** añade hoy, esta semana y el total desde que empezaron los números, y **[Restablecer los números](/settings?s=suggest&find=Reset%20the%20numbers)** los vuelve a poner en cero, después de que lo confirmes. Solo se guardan recuentos, nunca lo que escribiste, y no cambian el funcionamiento de las sugerencias.
+
 ## Dictar un mensaje
 
 El micrófono del cuadro de mensaje (en la página de inicio y en cada sesión) convierte lo que dices en texto dentro de tu mensaje. No se envía nada por sí solo: lo revisas y lo envías como de costumbre.
@@ -502,6 +508,7 @@ Deja de escuchar para decir esto, y luego vuelve a escuchar. Las sesiones de tus
 - «Haz que las sugerencias de palabras dejen de aprender de las respuestas de los agentes, y que aprendan solo cuando yo lo pida.»
 - «¿Está funcionando el modelo de lenguaje de las sugerencias de palabras? Si no, ¿por qué?»
 - «Desactiva las sugerencias de palabras solo en este navegador.»
+- «¿Cuántas pulsaciones de teclas me han ahorrado las sugerencias de palabras?»
 - «Activa el reconocimiento de voz en esta computadora, con el modelo Pequeño.»
 - «Usa mi servidor de voz en http://192.168.1.20:8000/v1 para el dictado, con el modelo whisper-large-v3.»
 - «¿Qué modelos whisper hay en esta computadora y cuánto espacio ocupan? Quita los que no se usen.»
