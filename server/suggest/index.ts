@@ -5,6 +5,7 @@ import type { SuggestRequest } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { SuggestService } from './service.ts';
+import { cleanUsage } from './usage.ts';
 
 let svc: SuggestService | null = null;
 /** The service, once the routes are up. */
@@ -66,6 +67,9 @@ export const suggest: Feature = {
     d.app.post('/api/suggest/warm', async () => s.warm());
     d.app.post('/api/suggest/train', async () => s.train());
     d.app.delete('/api/suggest/personal', async () => s.forget());
+    // What suggestions did, as counts: the page sends them in batches.
+    d.app.post('/api/suggest/usage', async (req) => ({ usage: s.addUsage(cleanUsage(req.body ?? {})) }));
+    d.app.delete('/api/suggest/usage', async () => s.resetUsage());
   },
   start() {
     svc?.start();

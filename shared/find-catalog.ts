@@ -297,6 +297,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['suggest', 'Language model size', 'quantization 8-bit 4-bit q8 q4 smaller download memory better worse quality qwen', 'The language model in 8 bits (better) or 4 bits (smaller, a little worse)'],
   ['suggest', 'How sure before showing', 'precision confidence threshold more suggestions fewer surer accuracy wrong right how often show', 'How sure a suggestion must be to show: more of them, or fewer and more often right'],
   ['suggest', 'Show the next word', 'next word second word dimmer lighter two words ahead', 'Also the word after it, dimmer'],
+  ['suggest', 'Reset the numbers', 'reset clear zero statistics stats usage numbers counts keystrokes saved suggestions right wrong how many typing share start over', 'Starts counting the keystrokes saved and the suggestions that were right from nothing again'],
   ['suggest', 'In message boxes', 'message box composer chat prompt where messages agents send follow up', 'Suggestions in the box you write a message to an agent in'],
   ['suggest', 'In documents', 'documents docs editor paragraph writing page where', 'Suggestions as you write in a document'],
   ['suggest', 'In notes', 'notes memory note editor where', 'Suggestions in notes'],

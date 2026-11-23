@@ -110,6 +110,38 @@ export const SUGGEST_LIMITS = {
   trainThreads: [0, 64],
 } as const;
 
+/**
+ * What suggestions did, as counts only (never any text). `shown`: suggestions shown (one grey word at the caret; the
+ * next word becoming the grey word is a new one). `taken`: inserted with Tab or → (→ takes the word and the next: two).
+ * `typedThrough`: the person typed the whole grey word themselves. Right is taken + typedThrough; `wrong`: something
+ * else was typed while it showed (a different letter, Backspace). `saved`: for each Tab or →, the characters inserted
+ * minus the key pressed. `typedChars`: what was typed in boxes where suggestions are on (never what Tab inserted).
+ */
+export interface SuggestCounts {
+  shown: number;
+  taken: number;
+  typedThrough: number;
+  wrong: number;
+  saved: number;
+  typedChars: number;
+}
+
+export const SUGGEST_COUNT_KEYS = ['shown', 'taken', 'typedThrough', 'wrong', 'saved', 'typedChars'] as const satisfies readonly (keyof SuggestCounts)[];
+
+/** The most one POST /api/suggest/usage may add to each count. */
+export const SUGGEST_USAGE_CAP = 5000;
+
+/** How many local days of counts are kept (today and the 30 before). */
+export const SUGGEST_USAGE_DAYS = 31;
+
+/** The counts since `since` (ms), today (the local day) and the last 7 days (today and the 6 before). */
+export interface SuggestUsage {
+  since: number;
+  total: SuggestCounts;
+  today: SuggestCounts;
+  week: SuggestCounts;
+}
+
 /** What word suggestions are doing (GET /api/suggest). */
 export interface SuggestStatus {
   /** off: not turned on; setting-up: installing Python libraries and downloading models; starting: loading them; ready; failed. */
@@ -134,6 +166,8 @@ export interface SuggestStatus {
   };
   /** Requests answered since the worker started, and their time (ms). */
   stats?: { requests: number; p50Ms?: number; p90Ms?: number };
+  /** How many keystrokes suggestions saved and how many were right (counts kept on the server; Reset starts them again). */
+  usage: SuggestUsage;
 }
 
 /** GET and PUT /api/suggest */

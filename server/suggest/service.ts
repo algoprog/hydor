@@ -2,7 +2,7 @@
 // llama-server for Qwen3.5), the suggestions asked of them (only the newest of each browser tab is kept), what the session
 // cache is fed, and personalising on its schedule. docs/plans/word-suggestions.md describes the whole.
 import os from 'node:os';
-import { type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestStatus } from '../../shared/suggest.ts';
+import { type SuggestCounts, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestStatus, type SuggestUsage } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { ownWords } from '../memory/learn.ts';
@@ -14,6 +14,7 @@ import { reapLeftovers } from './procs.ts';
 import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, unsupportedSystem, workerScript } from './setup.ts';
 import { forgetPersonal, hasPersonal, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
+import { addUsage, readUsage, resetUsage } from './usage.ts';
 
 /** The worker quits after this long without a request. */
 const WORKER_IDLE_MS = 10 * 60_000;
@@ -140,6 +141,7 @@ export class SuggestService {
       llm: this.llmStatus(),
       model: this.modelStatus(),
       training: this.trainingStatus(),
+      usage: readUsage(this.db),
     };
     if (s.enabled && suggestDisabled()) Object.assign(status, { detail: 'Word suggestions are off on this server (HYDOR_SUGGEST=off)' });
     else if (s.enabled && unsupportedSystem()) Object.assign(status, { state: 'failed', detail: unsupportedSystem() });
@@ -189,6 +191,21 @@ export class SuggestService {
     const total = os.totalmem() / 2 ** 20;
     if (s.llm === 'auto' && total < LLM_TOTAL_MB) return { state: 'memory', detail: `This computer has ${(total / 1024).toFixed(1)} GB of memory; the language model needs at least 8 GB (set it to On to use it anyway)`, totalMb: Math.round(total), needMb: 8192 };
     return { state: 'off', detail: l.detail ?? 'Starts when you type, and stops after half an hour without a suggestion' };
+  }
+
+  // ---- what it did ----------------------------------------------------------------------------------------------
+
+  /** Adds counts the page sent (checked by `cleanUsage`): nothing is broadcast, the page reads them when it needs them. */
+  addUsage(c: SuggestCounts): SuggestUsage {
+    addUsage(this.db, c);
+    return readUsage(this.db);
+  }
+
+  /** Starts the counts again from nothing. */
+  resetUsage(): SuggestState {
+    resetUsage(this.db);
+    this.changed();
+    return this.state();
   }
 
   // ---- the settings ---------------------------------------------------------------------------------------------

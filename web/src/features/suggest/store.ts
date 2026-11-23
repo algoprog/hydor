@@ -78,6 +78,11 @@ export async function forgetPersonal(): Promise<void> {
   await loadSuggest();
 }
 
+/** Start the numbers again from nothing (Settings: Reset the numbers). */
+export async function resetUsage(): Promise<void> {
+  take(await del<SuggestState>('/api/suggest/usage'));
+}
+
 /** The settings page: loaded when it opens and every so often while it is open (more often while something is going on). */
 export function useSuggestOpen() {
   useEffect(() => {

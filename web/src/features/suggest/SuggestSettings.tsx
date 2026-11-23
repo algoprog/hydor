@@ -2,15 +2,18 @@
 // word, dimmer), from a small model of the app's own, learning from what you write, and a larger language model, both
 // on this computer. At the top the switch and how it is doing (set-up, the language model and why it is not running,
 // which model is in use, when it last learned, learning under way); then every option, in groups.
-import { useState, type ReactNode } from 'react';
-import { SUGGEST_LIMITS, type SuggestSettings as Settings, type SuggestStatus } from '@shared/suggest';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useSearch } from 'wouter';
+import { SUGGEST_LIMITS, type SuggestCounts, type SuggestSettings as Settings, type SuggestStatus } from '@shared/suggest';
 import { Button, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
 import { DownloadBar } from '../../components/DownloadBar';
 import { ago } from '../../lib/format';
 import { LOCALE } from '../../i18n/locale';
 import { toastError, useUI } from '../../lib/store';
 import { Group, Notice, Row, Select, Stack, Stepper } from '../settings/kit';
-import { forgetPersonal, retrainNow, setSuggest, useSuggest, useSuggestOpen } from './store';
+import { hasCounts, summarise } from './logic';
+import { forgetPersonal, resetUsage, retrainNow, setSuggest, useSuggest, useSuggestOpen } from './store';
+import { discardUsage, flushUsage } from './usage';
 
 const automatic = (n: number) => (n === 0 ? 'Automatic' : String(n));
 
@@ -24,6 +27,11 @@ const nearestSure = (p: number) => SURE.reduce((a, b) => (Math.abs(b.value - p) 
 
 /** A memory size in GB with one decimal, written as the app's language writes numbers. */
 const gb = (mb: number) => (mb / 1024).toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** A whole number as the app's language writes it. */
+const int = (n: number) => n.toLocaleString(LOCALE);
+
+const day = (ts: number) => new Date(ts).toLocaleDateString(LOCALE, { dateStyle: 'medium' });
 
 const when = (ts: number) => new Date(ts).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -110,8 +118,86 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
   );
 }
 
+/** What a set of counts says, in two whole sentences (only numbers in them, so each is translated as one). */
+function Numbers({ counts }: { counts: SuggestCounts }) {
+  const n = summarise(counts);
+  return (
+    <>
+      <span className="block">{`Keystrokes saved: ${int(n.saved)} (${int(n.savedShare)}% of your typing)`}</span>
+      <span className="block">{`Suggestions right: ${int(n.right)} of ${int(n.judged)} (${int(n.rightShare)}%), taken with Tab: ${int(n.taken)}`}</span>
+    </>
+  );
+}
+
+/** How it is helping: the keystrokes saved and the suggestions that were right, always in view; today, this week and the date it started behind a button. */
+function Helping({ status, off }: { status: SuggestStatus; off: boolean }) {
+  const u = status.usage;
+  const [open, setOpen] = useState(false);
+  const [confirm, confirmNode] = useConfirm();
+  const [busy, setBusy] = useState(false);
+  // The search box points at "Reset the numbers", which is in the folded part: open it.
+  const find = new URLSearchParams(useSearch()).get('find');
+  useEffect(() => {
+    if (find && /reset the numbers/i.test(find)) setOpen(true);
+  }, [find]);
+  const counted = !!u && hasCounts(u.total);
+  const total = u ? summarise(u.total) : null;
+  const period = (label: string, c: SuggestCounts) => (
+    <Row label={label} hint={hasCounts(c) ? <Numbers counts={c} /> : 'Nothing counted.'} />
+  );
+  return (
+    <Group title="How it's helping">
+      {confirmNode}
+      {counted && total ? (
+        <Row
+          label={`Keystrokes saved: ${int(total.saved)} (${int(total.savedShare)}% of your typing)`}
+          hint={`Suggestions right: ${int(total.right)} of ${int(total.judged)} (${int(total.rightShare)}%), taken with Tab: ${int(total.taken)}`}
+          control={
+            <Button size="sm" variant="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+              {open ? 'Hide the details' : 'Show the details'}
+            </Button>
+          }
+        />
+      ) : (
+        <Row label={off ? 'Nothing has been counted yet. Turn word suggestions on, and the numbers show here as you type.' : 'Nothing has been counted yet. The numbers show here as you type.'} />
+      )}
+      {open && u && (
+        <>
+          {counted && period('Today', u.today)}
+          {counted && period('This week', u.week)}
+          {counted && <Row label={`Since ${day(u.since)}`} hint={<Numbers counts={u.total} />} />}
+          <Row
+            label="Reset the numbers"
+            hint="Starts counting again from nothing; it does not change how suggestions work"
+            control={
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy || !counted}
+                onClick={async () => {
+                  const ok = await confirm({ title: 'Reset the numbers?', body: 'The keystrokes saved and the suggestions that were right go back to zero, and counting starts again now. Nothing else changes.', confirm: 'Reset', danger: true });
+                  if (!ok) return;
+                  setBusy(true);
+                  discardUsage();
+                  resetUsage()
+                    .catch(toastError)
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Reset
+              </Button>
+            }
+          />
+        </>
+      )}
+    </Group>
+  );
+}
+
 export function SuggestSettings() {
   useSuggestOpen();
+  // What this tab counted but has not sent yet is in the numbers when the page opens.
+  useEffect(() => void flushUsage(), []);
   const settings = useSuggest((s) => s.settings);
   const status = useSuggest((s) => s.status);
   const here = useUI((s) => s.wordSuggestions);
@@ -183,6 +269,7 @@ export function SuggestSettings() {
         />
         <Row label="Show the next word" hint="Also shows the word after it, dimmer; press Tab again to take it" control={<Switch on={settings.nextWord} label="Show the next word" onChange={(nextWord) => set({ nextWord })} />} />
       </Group>
+      <Helping status={status} off={off} />
       <Group title="Where">
         {where('chat', 'In message boxes', 'When you write to an agent, on the start page or in a conversation')}
         {where('docs', 'In documents', 'While you write in Docs')}

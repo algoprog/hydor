@@ -776,6 +776,16 @@ row('suggest', 'How sure before showing', 'choice', {
   note: 'The share of the suggestions shown that is meant to be right.',
 });
 row('suggest', 'Show the next word', 'switch', { read: rd('/api/suggest', 'settings.nextWord'), write: put('/api/suggest', (v) => ({ nextWord: v })) });
+row('suggest', 'Reset the numbers', 'action', {
+  act: {
+    question: 'Start counting the keystrokes saved and the suggestions that were right from nothing again?',
+    run: async (api) => {
+      await api('DELETE', '/api/suggest/usage');
+      return ['The numbers are back to zero; counting starts again now.'];
+    },
+  },
+  note: 'The numbers are in GET /api/suggest, status.usage: for today, the last 7 days and since the last reset.',
+});
 row('suggest', 'In message boxes', 'switch', { read: rd('/api/suggest', 'settings.where.chat'), write: put('/api/suggest', (v) => ({ where: { chat: v } })) });
 row('suggest', 'In documents', 'switch', { read: rd('/api/suggest', 'settings.where.docs'), write: put('/api/suggest', (v) => ({ where: { docs: v } })) });
 row('suggest', 'In notes', 'switch', { read: rd('/api/suggest', 'settings.where.notes'), write: put('/api/suggest', (v) => ({ where: { notes: v } })) });

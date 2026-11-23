@@ -12,7 +12,7 @@ import http from 'node:http';
 import Fastify from 'fastify';
 import { SUGGEST_DEFAULTS, type SuggestState } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
-import { kvGet, openDb } from '../db.ts';
+import { kvGet, kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { memorySchema } from '../memory/store.ts';
 import { initPages } from '../pages/store.ts';
@@ -26,6 +26,7 @@ import { personalDir, recoverPersonal } from './train.ts';
 import { merge, readSettings, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
+import { addUsage, cleanUsage, dayBefore, dayKey, readUsage, resetUsage, USAGE_KEY } from './usage.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -1066,6 +1067,100 @@ test('14: a worker takes requests only once it has its models; short memory is n
   await sleep(400);
   assert.ok(!logLines().slice(b).some((l) => l.boot), 'no worker was started while memory is known to be short');
   priv.memShortUntil = 0;
+});
+
+// ---- what suggestions did: counts only -----------------------------------------------------------------------------
+
+const zero = { shown: 0, taken: 0, typedThrough: 0, wrong: 0, saved: 0, typedChars: 0 };
+const counts = (c: Partial<typeof zero>) => ({ ...zero, ...c });
+const postUsage = (payload: unknown) => app.inject({ method: 'POST', url: '/api/suggest/usage', payload: payload as any });
+
+test('usage routes: counts add up, GET and PUT show them, nothing but counts is kept, and Reset starts again', async () => {
+  await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+  const before = Date.now();
+  const first = (await get()).status.usage;
+  assert.deepEqual([first.total, first.today, first.week], [zero, zero, zero], 'nothing counted at first');
+  assert.ok(first.since >= before - 5000);
+  const a = await postUsage({ shown: 10, taken: 3, typedThrough: 2, wrong: 4, saved: 20, typedChars: 90 });
+  assert.equal(a.statusCode, 200);
+  assert.deepEqual(a.json().usage.total, counts({ shown: 10, taken: 3, typedThrough: 2, wrong: 4, saved: 20, typedChars: 90 }));
+  const b = await postUsage({ shown: 1, saved: 2 });
+  assert.deepEqual(b.json().usage.total, counts({ shown: 11, taken: 3, typedThrough: 2, wrong: 4, saved: 22, typedChars: 90 }), 'a count left out is 0');
+  assert.equal((await postUsage({})).statusCode, 200, 'nothing to add is fine');
+  const u = (await get()).status.usage;
+  assert.deepEqual(u.total, b.json().usage.total);
+  assert.deepEqual(u.today, u.total, 'all of it was today');
+  assert.deepEqual(u.week, u.total);
+  const put = await app.inject({ method: 'PUT', url: '/api/suggest', payload: {} });
+  assert.deepEqual(put.json().status.usage, u, 'PUT shows the same');
+  // Only numbers are kept: nothing a body could carry besides them.
+  assert.deepEqual(Object.keys(JSON.parse(kvGet(db, USAGE_KEY)!)).sort(), ['days', 'since', 'total']);
+  const reset = await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+  assert.equal(reset.statusCode, 200);
+  const r = reset.json().status.usage;
+  assert.deepEqual([r.total, r.today, r.week], [zero, zero, zero]);
+  assert.ok(r.since >= before, 'counting starts again now');
+  assert.deepEqual(Object.keys(JSON.parse(kvGet(db, USAGE_KEY)!).days), []);
+});
+
+test('usage routes: whole numbers from 0 to 5,000, known counts only; a refused body adds nothing', async () => {
+  await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+  const bad = async (payload: unknown, field: string) => {
+    const r = await postUsage(payload);
+    assert.equal(r.statusCode, 400, JSON.stringify(payload));
+    assert.match(r.json().message, new RegExp(field), JSON.stringify(payload));
+  };
+  await bad({ shown: -1 }, 'shown');
+  await bad({ taken: 1.5 }, 'taken');
+  await bad({ wrong: '3' }, 'wrong');
+  await bad({ saved: null }, 'saved');
+  await bad({ typedChars: 5001 }, 'typedChars');
+  await bad({ typedThrough: Infinity }, 'typedThrough');
+  await bad({ text: 'hello' }, 'text');
+  await bad({ shown: 1, taken: 2, extra: 1 }, 'extra');
+  await bad([1, 2], 'object');
+  assert.deepEqual((await get()).status.usage.total, zero, 'none of them added anything, not even the valid counts beside a bad one');
+  const edge = await postUsage({ shown: 5000, typedChars: 5000, taken: 0 });
+  assert.equal(edge.statusCode, 200, '5,000 is allowed');
+  assert.deepEqual(edge.json().usage.total, counts({ shown: 5000, typedChars: 5000 }));
+  assert.throws(() => cleanUsage({ shown: 5001 }), HttpError);
+  await app.inject({ method: 'DELETE', url: '/api/suggest/usage' });
+});
+
+test('usage: today and the week are summed by local day, the last 31 days are kept, and what is kept is only counts', () => {
+  const udb = openDb(path.join(tmp, 'usage.db'));
+  const at = (back: number, hour = 10) => new Date(2026, 5, 20 - back, hour).getTime();
+  const now = at(0, 15);
+  assert.equal(dayKey(now), '2026-06-20');
+  assert.equal(dayBefore(now, 0), '2026-06-20');
+  assert.equal(dayBefore(now, 7), '2026-06-13');
+  assert.equal(dayBefore(now, 20), '2026-05-31', 'across a month');
+  assert.equal(dayBefore(new Date(2026, 0, 3, 9).getTime(), 5), '2025-12-29', 'and a year');
+  resetUsage(udb, at(40));
+  // One count of each size on days 40 (the start), 31, 30, 7, 6, 1 and 0 before `now`: the day is the local one.
+  addUsage(udb, counts({ shown: 1 }), at(31));
+  addUsage(udb, counts({ shown: 2 }), at(30, 0)); // just after midnight
+  addUsage(udb, counts({ shown: 4 }), at(7, 23)); // just before midnight
+  addUsage(udb, counts({ shown: 8 }), at(6, 0));
+  addUsage(udb, counts({ shown: 16, saved: 5 }), at(1));
+  addUsage(udb, counts({ shown: 32, saved: 7 }), now);
+  const u = readUsage(udb, now);
+  assert.equal(u.since, at(40));
+  assert.deepEqual(u.today, counts({ shown: 32, saved: 7 }), 'today is the local day');
+  assert.deepEqual(u.week, counts({ shown: 8 + 16 + 32, saved: 12 }), 'the week is today and the six days before it');
+  const kept = JSON.parse(kvGet(udb, USAGE_KEY)!);
+  assert.deepEqual(Object.keys(kept.days).sort(), ['2026-05-21', '2026-06-13', '2026-06-14', '2026-06-19', '2026-06-20'], 'the 31st day back is gone (the 30 before today stay)');
+  assert.equal(kept.total.shown, 63, 'the total keeps what the pruned days held');
+  assert.deepEqual(readUsage(udb, now + 40 * 86400_000).week, zero, 'a later week is empty');
+  assert.deepEqual(readUsage(udb, now + 40 * 86400_000).total, kept.total, 'and the total is not');
+  assert.deepEqual(Object.keys(JSON.parse(kvGet(udb, USAGE_KEY)!).days).length, 5, 'reading changes nothing kept');
+  // A damaged value reads as nothing counted.
+  kvSet(udb, USAGE_KEY, '{nonsense');
+  assert.deepEqual(readUsage(udb, now).total, zero);
+  kvSet(udb, USAGE_KEY, JSON.stringify({ since: 5, total: { shown: -3, taken: 'x', saved: 4.9 }, days: { 'not a day': { shown: 1 }, '2026-06-20': { shown: 2, typedChars: NaN } } }));
+  const d = readUsage(udb, now);
+  assert.deepEqual([d.since, d.total, d.today], [5, counts({ saved: 4 }), counts({ shown: 2 })], 'what is not a count reads as 0');
+  udb.close();
 });
 
 const only = process.argv[2];

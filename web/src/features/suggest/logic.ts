@@ -2,7 +2,7 @@
 // shows, what Tab and → take. No React and no DOM here, so each rule is a plain function a test can run
 // (logic-test.ts); controller.ts keeps the state of one text box and calls them, and the textarea and Docs adapters
 // only read and write their field.
-import type { SuggestRequest, SuggestResponse, SuggestSettings, SuggestState, SuggestSurface } from '@shared/suggest';
+import { SUGGEST_COUNT_KEYS, SUGGEST_USAGE_CAP, type SuggestCounts, type SuggestRequest, type SuggestResponse, type SuggestSettings, type SuggestState, type SuggestSurface } from '@shared/suggest';
 
 /** Where a text box is, as Settings → Capabilities → Word suggestions names the places: message boxes, documents, notes, other boxes. */
 export type Place = 'chat' | 'docs' | 'notes' | 'other';
@@ -140,3 +140,102 @@ export function typedBetween(prev: Field | null, cur: Field): string | null {
 
 /** Whether the caret is just after whitespace: a new word begins here (Esc's hiding lasts until it does). */
 export const startsWord = (f: Field) => /\s$/.test(f.before);
+
+// ---- what suggestions did: counts only, never any text (shared/suggest.ts SuggestCounts)
+
+/** No counts. */
+export const noCounts = (): SuggestCounts => ({ shown: 0, taken: 0, typedThrough: 0, wrong: 0, saved: 0, typedChars: 0 });
+
+/** `a` and `b` added up. */
+export function addCounts(a: SuggestCounts, b: Partial<SuggestCounts>): SuggestCounts {
+  const out = { ...a };
+  for (const k of SUGGEST_COUNT_KEYS) out[k] += b[k] ?? 0;
+  return out;
+}
+
+/** Whether any count is more than 0. */
+export const hasCounts = (c: SuggestCounts) => SUGGEST_COUNT_KEYS.some((k) => c[k] > 0);
+
+/**
+ * `c` cut into pieces the server accepts: no count above `cap` in any one (the rest goes in the next piece). Nothing
+ * for no counts.
+ */
+export function splitCounts(c: SuggestCounts, cap = SUGGEST_USAGE_CAP): SuggestCounts[] {
+  const out: SuggestCounts[] = [];
+  const left = { ...c };
+  while (hasCounts(left)) {
+    const piece = noCounts();
+    for (const k of SUGGEST_COUNT_KEYS) {
+      piece[k] = Math.min(left[k], cap);
+      left[k] -= piece[k];
+    }
+    out.push(piece);
+  }
+  return out;
+}
+
+/** The characters of a text, as a person counts them (an emoji or a letter with its accents is one). */
+export const charCount = (s: string) => Array.from(s).length;
+
+/** The most characters one change of a box may add and still be counted as typing (more is a paste or dictation). */
+export const TYPED_MAX = 4;
+
+/** What a change that grew the text before the caret by `typed` ('' or null: not a growth) adds to the characters typed: 1 to 4, else 0. */
+export function typedChars(typed: string | null): number {
+  if (!typed) return 0;
+  const n = charCount(typed);
+  return n <= TYPED_MAX ? n : 0;
+}
+
+/** The keystrokes one Tab or → saved: the characters it inserted, minus the key pressed (never below 0). */
+export const savedBy = (inserted: string) => Math.max(0, charCount(inserted) - 1);
+
+/** What Tab or → did to the counts: the words taken (→ takes the word and the next: two), and the keystrokes saved by what it inserted. */
+export function takenCounts(g: Grey, insert: string, all: boolean): SuggestCounts {
+  const words = all && g.word && g.next ? 2 : 1;
+  // A second word taken without ever being the grey word was shown too (dimmer), so right is never more than shown.
+  return { ...noCounts(), taken: words, shown: words - 1, saved: savedBy(insert) };
+}
+
+/** What typing `typed` did to the suggestion showing: nothing, its words typed through, or something else typed. */
+export interface Typed {
+  /** The words of what showed that the typing completed (0 to 2: the word, and the next one). */
+  through: number;
+  /** The next word became the grey word because of it: a new suggestion (so `shown` goes up). */
+  fresh: boolean;
+  /** Something other than what showed was typed. */
+  wrong: boolean;
+}
+
+/**
+ * The verdict on typing `typed` (a growth of the text before the caret) while `g` showed: the letters it shows used up
+ * are right once a whole word is typed (its last letter, or the space after it, typed in the same change); a letter
+ * that differs is wrong. The unit is the word, or the next word when the word is empty (it is all that shows).
+ */
+export function judgeTyped(g: Grey, typed: string): Typed {
+  const rest = consume(g, typed);
+  if (rest === undefined) return { through: 0, fresh: false, wrong: true };
+  const n = charCount(typed);
+  const w = charCount(g.word);
+  const all = w + charCount(g.next);
+  if (!w) return { through: n >= all ? 1 : 0, fresh: false, wrong: false };
+  if (n < w) return { through: 0, fresh: false, wrong: false };
+  if (!g.next) return { through: 1, fresh: false, wrong: false };
+  // The word is done and the next one is now the word being typed (or is typed too).
+  return { through: n >= all ? 2 : 1, fresh: true, wrong: false };
+}
+
+/** Whether `cur` is `prev` with some characters just before the caret deleted (Backspace, or Ctrl+Backspace), nothing else changed. */
+export function backspaced(prev: Field | null, cur: Field): boolean {
+  return !!prev && prev.after === cur.after && prev.id === cur.id && cur.before.length < prev.before.length && prev.before.startsWith(cur.before);
+}
+
+/** A share as a whole percent (0 when there is nothing to divide by). */
+const percent = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) : 0);
+
+/** The numbers Settings shows for a set of counts: keystrokes saved and their share of the typing, suggestions right of those judged. */
+export function summarise(c: SuggestCounts) {
+  const right = c.taken + c.typedThrough;
+  const judged = right + c.wrong;
+  return { saved: c.saved, savedShare: percent(c.saved, c.typedChars + c.saved), right, judged, rightShare: percent(right, judged), taken: c.taken };
+}

@@ -185,6 +185,23 @@ threads). Kept by each browser (`shared/device.ts`): show word suggestions in th
 - `POST /api/suggest` (`SuggestRequest`) → `SuggestResponse`; 204 when off or not ready.
 - `POST /api/suggest/warm`: start what is set up (a message box got the focus).
 - `POST /api/suggest/train`: personalise now; `DELETE /api/suggest/personal`: forget the personal model.
+- `POST /api/suggest/usage` `{shown, taken, typedThrough, wrong, saved, typedChars}` (whole numbers, 0 to 5,000 each, no
+  other field): adds to the counts kept in `kv` (`suggest.usage`: totals since `since`, and one bucket per local day, the
+  last 31); `DELETE /api/suggest/usage` starts them again. `status.usage` = `{since, total, today, week}` (week: the last
+  7 days). Counts only, never any text.
+
+## What it counts (`shared/suggest.ts` SuggestCounts)
+
+- A **suggestion** is one grey word shown at the caret (the `word` part; the next word becoming the grey word, after a
+  Tab or after the word was typed through, is a new one; → also counts the next word, dimmer, as shown when it takes it).
+- **Taken**: inserted with Tab or → (→ with a next word: two). **Typed through**: the person typed the whole grey word
+  (its last letter, or the space after it) without Tab. **Right** = taken + typed through. **Wrong**: something else
+  typed while it showed (a letter that differs, Backspace). Hidden with Esc, a blur, a caret move or sending: neither.
+- **Keystrokes saved**: for each Tab or →, the characters it inserted minus 1. **Characters typed**: the growth of the
+  text before the caret in boxes where suggestions are on, only for growth of 1 to 4 characters at once (more is a paste
+  or dictation), never what Tab or → inserted, and not an input method's text. **Share saved** = saved / (typed + saved).
+- The controller counts (`suggester.ts`, with the pure rules in `logic.ts`); `usage.ts` batches them for the tab and
+  sends them every 15 s while there is something to send and when the page is hidden (`keepalive`).
 
 ## The web client
 
@@ -203,3 +220,4 @@ threads). Kept by each browser (`shared/device.ts`): show word suggestions in th
   paragraph.
 - **Settings → Capabilities → Word suggestions**: the switch and the status (set-up progress, the LLM's state and why,
   the model: base or personalised, when it last learned, Retrain now, Forget my personal model), then every option.
+  **How it's helping** (the keystrokes saved, the suggestions right; today, this week and the total folded; Reset the numbers).

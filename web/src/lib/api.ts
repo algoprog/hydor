@@ -21,7 +21,7 @@ export function onUnauthorized(fn: Listener) {
 }
 
 /** `base`: the machine to ask ('' for this server's own, "/m/<id>" for another), whichever machine the page shows. */
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; signal?: AbortSignal; base?: string } = {}): Promise<T> {
+export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; signal?: AbortSignal; base?: string; keepalive?: boolean } = {}): Promise<T> {
   const method = opts.method ?? (opts.body !== undefined ? 'POST' : 'GET');
   const res = await fetch(opts.base !== undefined ? opts.base + path : mu(path), {
     method,
@@ -29,6 +29,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
     credentials: 'same-origin',
     signal: opts.signal,
+    keepalive: opts.keepalive,
   });
   let data: any = null;
   try {

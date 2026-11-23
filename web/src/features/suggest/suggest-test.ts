@@ -1,7 +1,7 @@
 // Script tests for word suggestions' rules (logic.ts) and one text box's controller (suggester.ts). Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/suggest/suggest-test.ts && node dist/dev/suggest-test.js
-import type { SuggestRequest, SuggestResponse } from '@shared/suggest';
-import { afterSpace, allowed, atWordEnd, consume, greyOf, requestOf, startsWord, takeAll, takeWord, typedBetween, type Field, type Gate } from './logic';
+import type { SuggestCounts, SuggestRequest, SuggestResponse } from '@shared/suggest';
+import { addCounts, afterSpace, allowed, atWordEnd, backspaced, charCount, consume, greyOf, hasCounts, judgeTyped, noCounts, requestOf, savedBy, splitCounts, startsWord, summarise, takeAll, takenCounts, takeWord, typedBetween, typedChars, type Field, type Gate } from './logic';
 import { DEBOUNCE_MS, Suggester, type Adapter } from './suggester';
 
 let failed = 0;
@@ -96,6 +96,41 @@ eq(typedBetween(f('abc'), f('ab')), null, 'Backspace');
 eq(typedBetween(f('ab', 'x'), f('abc', 'x')), 'c', 'typed before text that follows');
 eq(typedBetween(f('ab', 'x'), f('abc', 'y')), null, 'the text after changed');
 eq(typedBetween(null, f('a')), null, 'no earlier state');
+
+// ---- the counts: what typing and Tab did to the suggestion showing, and what was typed
+eq(typedChars('a'), 1, 'one letter typed');
+eq(typedChars('abcd'), 4, 'four characters at once still count');
+eq(typedChars('abcde'), 0, 'five at once is a paste or dictation');
+eq(typedChars(''), 0, 'nothing grew');
+eq(typedChars(null), 0, 'not a growth (Backspace, a caret move)');
+eq(typedChars('日本語'), 3, 'characters, not code units');
+eq(typedChars('😀😀😀😀'), 4, 'an emoji is one');
+eq(charCount('😀a'), 2, 'characters of a text');
+eq(savedBy('orld'), 3, 'the characters it inserted minus the key');
+eq(savedBy('a'), 0, 'one character saves nothing');
+eq(savedBy(''), 0, 'never below zero');
+eq(takenCounts({ word: 'orld', next: ' is' }, 'orld', false), { shown: 0, taken: 1, typedThrough: 0, wrong: 0, saved: 3, typedChars: 0 }, 'Tab takes one word');
+eq(takenCounts({ word: 'orld', next: ' is' }, 'orld is', true), { shown: 1, taken: 2, typedThrough: 0, wrong: 0, saved: 6, typedChars: 0 }, '→ takes two: the next was shown too, and one key saved the rest');
+eq(takenCounts({ word: 'orld', next: '' }, 'orld', true), { shown: 0, taken: 1, typedThrough: 0, wrong: 0, saved: 3, typedChars: 0 }, '→ with no next word takes one');
+eq(takenCounts({ word: '', next: ' is' }, ' is', false), { shown: 0, taken: 1, typedThrough: 0, wrong: 0, saved: 2, typedChars: 0 }, 'Tab on only the next word');
+const shows = { word: 'orld', next: ' is' };
+eq(judgeTyped(shows, 'o'), { through: 0, fresh: false, wrong: false }, 'a letter of it');
+eq(judgeTyped(shows, 'orld'), { through: 1, fresh: true, wrong: false }, 'the whole word: right, and the next word is now the grey word');
+eq(judgeTyped(shows, 'orld '), { through: 1, fresh: true, wrong: false }, 'the word and its space');
+eq(judgeTyped(shows, 'orld is'), { through: 2, fresh: true, wrong: false }, 'both words in one change');
+eq(judgeTyped(shows, 'x'), { through: 0, fresh: false, wrong: true }, 'another letter is wrong');
+eq(judgeTyped(shows, 'orx'), { through: 0, fresh: false, wrong: true }, 'a letter that differs inside it');
+eq(judgeTyped({ word: 'orld', next: '' }, 'orld'), { through: 1, fresh: false, wrong: false }, 'the last word typed through');
+eq(judgeTyped({ word: '', next: ' is' }, ' '), { through: 0, fresh: false, wrong: false }, 'only the next word showing: its first character');
+eq(judgeTyped({ word: '', next: ' is' }, ' is'), { through: 1, fresh: false, wrong: false }, 'only the next word showing: all of it');
+ok(backspaced(f('abc'), f('ab')) && backspaced(f('abc', 'x'), f('a', 'x')), 'Backspace, and Ctrl+Backspace');
+ok(!backspaced(f('abc'), f('abcd')) && !backspaced(f('abc', 'x'), f('ab', 'xy')) && !backspaced(f('abc'), f('xy')) && !backspaced(null, f('a')), 'not a deletion before the caret');
+eq(addCounts(noCounts(), { shown: 2, saved: 5 }), { shown: 2, taken: 0, typedThrough: 0, wrong: 0, saved: 5, typedChars: 0 }, 'counts add up');
+ok(!hasCounts(noCounts()) && hasCounts(addCounts(noCounts(), { wrong: 1 })), 'whether anything was counted');
+eq(splitCounts(noCounts()), [], 'nothing to send');
+eq(splitCounts({ ...noCounts(), typedChars: 12000, saved: 7 }, 5000).map((c) => [c.typedChars, c.saved]), [[5000, 7], [5000, 0], [2000, 0]], 'no count above the cap in one piece');
+eq(summarise({ shown: 10, taken: 3, typedThrough: 2, wrong: 5, saved: 30, typedChars: 70 }), { saved: 30, savedShare: 30, right: 5, judged: 10, rightShare: 50, taken: 3 }, 'the numbers shown');
+eq(summarise(noCounts()), { saved: 0, savedShare: 0, right: 0, judged: 0, rightShare: 0, taken: 0 }, 'no division by nothing');
 
 // ---- one box
 interface Box {
@@ -281,6 +316,195 @@ async function run() {
   s.sync();
   await settle();
   eq(s.grey, null, 'nothing to show');
+  s.reset();
+
+  // ---- the counts: what each outcome adds, and what typing adds
+  let tally: SuggestCounts = noCounts();
+  const mkCounting = (b: ReturnType<typeof box>, gate = () => g.gate) =>
+    new Suggester(b.adapter, () => {}, {
+      send: () => Promise.resolve(answer),
+      gate,
+      client: 'tab1',
+      count: (c) => (tally = addCounts(tally, c)),
+    });
+  const fresh = () => ((tally = noCounts()), (answer = ans({ word: 'orld', next: ' is' })));
+  const say = (what: string, want: Partial<SuggestCounts>) => eq(tally, { ...noCounts(), ...want }, what);
+  const typeIn = (b: ReturnType<typeof box>, s: Suggester, text: string) => {
+    for (const c of text) (b.type(c), s.sync());
+  };
+
+  // typed through: each letter counts as typed; the whole word is right, and the next word is a new suggestion
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  say('a suggestion showing is counted once', { shown: 1 });
+  typeIn(b, s, 'or');
+  say('letters of it: typed, nothing decided', { shown: 1, typedChars: 2 });
+  typeIn(b, s, 'ld');
+  say('its last letter typed: right, and the next word is now the grey word', { shown: 2, typedThrough: 1, typedChars: 4 });
+  typeIn(b, s, ' is');
+  say('the next word typed through too', { shown: 2, typedThrough: 2, typedChars: 7 });
+  answer = null;
+  await settle();
+  say('and nothing more', { shown: 2, typedThrough: 2, typedChars: 7 });
+  s.reset();
+
+  // wrong: a letter that differs; Backspace
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = null;
+  typeIn(b, s, 'x');
+  say('a letter that differs is wrong', { shown: 1, wrong: 1, typedChars: 1 });
+  typeIn(b, s, 'y');
+  say('and only once', { shown: 1, wrong: 1, typedChars: 2 });
+  s.reset();
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = null;
+  b.back();
+  s.sync();
+  say('Backspace is wrong (and is not typing)', { shown: 1, wrong: 1 });
+  s.reset();
+
+  // hidden without a verdict: Esc, a blur, a caret move, the switch turned off
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  ok(s.key(key('Escape')), 'Esc hides');
+  typeIn(b, s, 'o');
+  say('Esc: neither right nor wrong (the letter is typing)', { shown: 1, typedChars: 1 });
+  s.reset();
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  b.focused = false;
+  s.sync();
+  b.focused = true;
+  s.sync();
+  say('a blur: neither', { shown: 1 });
+  answer = null;
+  b.moveTo(2);
+  s.sync();
+  b.type('x');
+  say('a caret move, then typing it does not read as an answer: neither', { shown: 1 });
+  s.reset();
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = null;
+  b.moveTo(3);
+  s.sync();
+  say('a caret move: neither', { shown: 1 });
+  s.reset();
+  fresh();
+  b = box('Hello w');
+  const gate2 = { on: true };
+  s = mkCounting(b, () => ({ ...on, enabled: gate2.on }));
+  s.sync();
+  await settle();
+  gate2.on = false;
+  b.type('o');
+  s.sync();
+  say('switched off: neither, and nothing typed is counted', { shown: 1 });
+  s.reset();
+
+  // Tab and →: taken, the keystrokes saved, and what they insert is never counted as typed
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  ok(s.key(key('Tab')), 'Tab');
+  answer = ans({ word: '', next: ' is' });
+  s.sync();
+  await settle();
+  say('Tab: right, 3 keystrokes saved (4 characters, one key), the next word is a new suggestion, nothing typed', { shown: 2, taken: 1, saved: 3 });
+  ok(s.key(key('Tab')), 'Tab again');
+  s.sync();
+  answer = null;
+  await settle();
+  say('the next word taken: 2 more saved, still nothing typed', { shown: 2, taken: 2, saved: 5 });
+  s.reset();
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = null;
+  ok(s.key(key('ArrowRight')), '→');
+  s.sync();
+  await settle();
+  say('→ takes the word and the next: two taken, one key pressed, 7 characters inserted', { shown: 2, taken: 2, saved: 6 });
+  s.reset();
+
+  // a suggestion replaced by another one: the first is neither
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = ans({ word: 'ill', next: '' });
+  b.type('o');
+  s.sync();
+  b.back();
+  s.sync();
+  await settle();
+  say('wrong for the Backspace, then a new suggestion', { shown: 2, wrong: 1, typedChars: 1 });
+  s.reset();
+
+  // the 4-character rule: typing counts when a change adds 1 to 4 characters; a paste is not typing
+  tally = noCounts();
+  answer = null;
+  b = box('Hello ');
+  s = mkCounting(b);
+  s.sync();
+  b.type('abcd');
+  s.sync();
+  say('four at once', { typedChars: 4 });
+  b.type('abcde');
+  s.sync();
+  say('five at once is a paste: not counted', { typedChars: 4 });
+  b.type('é');
+  s.sync();
+  say('and typing goes on counting', { typedChars: 5 });
+  b.back();
+  s.sync();
+  say('Backspace is not typing', { typedChars: 5 });
+  s.reset();
+  // a paste over a suggestion is not typing either, but what it is says it was not the suggestion
+  fresh();
+  b = box('Hello w');
+  s = mkCounting(b);
+  s.sync();
+  await settle();
+  answer = null;
+  b.type('pasted text');
+  s.sync();
+  say('a paste of something else: wrong, not typed', { shown: 1, wrong: 1 });
+  s.reset();
+  // an input method's text is not counted
+  tally = noCounts();
+  b = box('Hello ');
+  const ime = { ...b.adapter, read: () => ({ ...b.adapter.read()!, composing: true }) };
+  s = new Suggester(ime, () => {}, { send: () => Promise.resolve(null), gate: () => g.gate, client: 'tab1', count: (c) => (tally = addCounts(tally, c)) });
+  s.sync();
+  b.type('ab');
+  s.sync();
+  say('while composing nothing is counted', {});
   s.reset();
 }
 

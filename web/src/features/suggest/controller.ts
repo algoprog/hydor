@@ -4,6 +4,7 @@ import type { SuggestRequest, SuggestResponse } from '@shared/suggest';
 import { api } from '../../lib/api';
 import { Suggester, type Adapter } from './suggester';
 import { gateNow } from './store';
+import { recordUsage } from './usage';
 import type { Grey } from './logic';
 
 export type { Adapter } from './suggester';
@@ -18,4 +19,4 @@ export const CLIENT = (() => {
 export const askServer = (req: SuggestRequest, signal: AbortSignal) => api<SuggestResponse | null>('/api/suggest', { method: 'POST', body: req, signal });
 
 /** A controller for the box `adapter` reaches; `on` is told what to show after the caret (null: nothing). */
-export const makeSuggester = (adapter: Adapter, on: (g: Grey | null) => void) => new Suggester(adapter, on, { send: askServer, gate: gateNow, client: CLIENT });
+export const makeSuggester = (adapter: Adapter, on: (g: Grey | null) => void) => new Suggester(adapter, on, { send: askServer, gate: gateNow, client: CLIENT, count: recordUsage });
