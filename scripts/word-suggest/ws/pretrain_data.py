@@ -1,7 +1,8 @@
 """The pretraining shards of data/pretrain*/ (data/pretrain.py, data/pretrain200.py) as a list of lazily built SLM sequences.
 
 Used by scripts/pretrain_slm.py (the pretraining) and scripts/train_slm.py (--replay-pretrain: pretraining text mixed into the
-personalisation).  Web text: ``<bos> <doc> chunk <eos>``; conversations: ``<bos> <user> turn <agent> turn ...`` (ws/train.py formats).
+personalisation).  Web text: ``<bos> <doc> chunk <eos>``; conversations: ``<bos> <user> turn <agent> turn ...`` (ws/train.py formats; a turn of role 2, an assistant turn of the typed conversations,
+is context: no loss on it).
 """
 from __future__ import annotations
 
@@ -13,6 +14,11 @@ import numpy as np
 
 from .train import Seq
 from .vocab import AGENT, BOS, DOC, EOS, USER, Vocab
+
+
+def is_conversation(name: str) -> bool:
+    """The shards read as conversations: chat (oasst2, aya) and typed_conv* (what people typed to an assistant, data/typed.py)."""
+    return name == 'chat' or name.startswith('typed_conv')
 
 
 class Shards:
@@ -32,7 +38,7 @@ class Shards:
             base = os.path.join(pre_dir, f'{n}.{part}')
             self.tok[si] = np.load(base + '.tok.npy', mmap_mode='r')
             off = np.load(base + '.off.npy')
-            if n == 'chat':
+            if is_conversation(n):
                 self.role[si] = np.load(base + '.role.npy')
                 self.turn_off[si] = off
                 conv = np.load(base + '.conv.npy')
@@ -67,13 +73,13 @@ class Shards:
     def __getitem__(self, i: int) -> Seq:
         si, a, b = int(self.item_src[i]), int(self.a[i]), int(self.b[i])
         l2s = self.vocab.llm2slm
-        if self.names[si] == 'chat':
+        if is_conversation(self.names[si]):
             off, tok, role = self.turn_off[si], self.tok[si], self.role[si]
             parts, w = [np.array([BOS])], [np.zeros(1, np.float32)]
             for t in range(a, b):
                 body = l2s[np.asarray(tok[off[t]:off[t + 1]])]
-                parts += [np.array([USER if role[t] else AGENT]), body]
-                w += [np.zeros(1, np.float32), np.ones(len(body), np.float32)]
+                parts += [np.array([USER if role[t] == 1 else AGENT]), body]
+                w += [np.zeros(1, np.float32), (np.zeros if role[t] == 2 else np.ones)(len(body), np.float32)]    # role 2: an assistant turn kept as context only
             parts.append(np.array([EOS])); w.append(np.ones(1, np.float32))
             ids = np.concatenate(parts).astype(np.int32)[:self.chat_max]
             w = np.concatenate(w)[:self.chat_max]
@@ -122,9 +128,11 @@ _SHARD_RE = re.compile(r'^web_(.+?)(?:_f\d+|_b)?$')
 
 
 def shard_language(name: str):
-    """The language config a shard belongs to: web_deu_Latn, web_deu_Latn_f012 and web_deu_Latn_b are 'deu_Latn'; chat is 'chat'; else None."""
+    """The language config a shard belongs to: web_deu_Latn, web_deu_Latn_f012 and web_deu_Latn_b are 'deu_Latn'; chat is 'chat'; typed_conv* is 'typed_conv', typed_email_enron is 'typed_email_enron'; else None."""
     if name == 'chat':
         return 'chat'
+    if name.startswith('typed_'):                      # typed_conv -> 'typed_conv'; typed_email_enron stays as it is (one mix entry per source)
+        return 'typed_conv' if name.startswith('typed_conv') else name
     m = _SHARD_RE.match(name)
     return m.group(1) if m else None
 
