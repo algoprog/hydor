@@ -568,7 +568,7 @@ Quand une page de votre propre navigateur demande à utiliser votre caméra, vot
 
 Les sites de la barre de favoris sont épinglés en haut de la colonne des onglets dès que vous avez un favori dessus (sur un téléphone, il n’y a pas de colonne des onglets\u00a0; vos favoris se trouvent dans le menu). Cliquez sur l’un d’eux pour l’ouvrir dans l’onglet actif\u00a0; Ctrl+clic (⌘+clic sur un Mac) ou un clic central l’ouvre dans un nouvel onglet. Un dossier ouvre la liste de son contenu, et dix vignettes sont le maximum affiché (une vignette **…** liste le reste). Faites un clic droit sur une vignette pour **Ouvrir**, **Ouvrir dans un nouvel onglet**, **Modifier** (**Renommer** pour un dossier) et **Supprimer**.
 
-Pour les voir tous, appuyez sur **Menu** (⋯) → **Favoris**, ou allez sur [Favoris](/browser?panel=bookmarks). Le panneau comporte deux emplacements, **Barre de favoris** et **Autres favoris**, et les dossiers qu’ils contiennent s’ouvrent et se ferment.
+Pour les voir tous, appuyez sur **Menu** (⋯) → **Favoris**, ou allez sur [Favoris](/browser?panel=bookmarks). Le panneau comporte deux emplacements, **Barre de favoris** et **Autres favoris**, et les dossiers qu’ils contiennent s’ouvrent et se ferment&nbsp;; chacun reste tel que vous l’avez laissé la prochaine fois que vous ouvrez le panneau.
 
 - **Rechercher dans vos favoris** (la zone en haut) trouve un favori grâce à ses mots (voir [Rechercher dans vos favoris](/guide/web#search-your-bookmarks)).
 - **Nouveau dossier** (en haut) ajoute un dossier à la barre et demande son nom.

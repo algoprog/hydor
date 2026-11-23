@@ -568,7 +568,7 @@ Möchte eine Seite in deinem eigenen Browser deine Kamera, dein Mikrofon, deinen
 
 Die Websites der Lesezeichenleiste sind oben in der Tab-Spalte angepinnt, sobald du ein Lesezeichen darauf hast (auf einem Smartphone gibt es keine Tab-Spalte; deine Lesezeichen sind im Menü). Klicke auf eine, um sie im geöffneten Tab zu öffnen; Strg+Klick (⌘+Klick auf dem Mac) oder ein Mittelklick öffnet sie in einem neuen Tab. Ein Ordner öffnet eine Liste seines Inhalts, und zehn Kacheln sind das Höchste, was gezeigt wird (eine Kachel **…** listet den Rest). Rechtsklick auf eine Kachel bietet **Öffnen**, **In neuem Tab öffnen**, **Bearbeiten** (**Umbenennen** bei einem Ordner) und **Löschen**.
 
-Für alle drücke **Menü** (⋯) → **Lesezeichen** oder gehe zu [Lesezeichen](/browser?panel=bookmarks). Der Bereich hat zwei Orte, **Lesezeichenleiste** und **Andere Lesezeichen**, und die Ordner darin öffnen und schließen sich.
+Für alle drücke **Menü** (⋯) → **Lesezeichen** oder gehe zu [Lesezeichen](/browser?panel=bookmarks). Der Bereich hat zwei Orte, **Lesezeichenleiste** und **Andere Lesezeichen**, und die Ordner darin öffnen und schließen sich; jeder bleibt beim nächsten Öffnen des Bereichs so, wie du ihn gelassen hast.
 
 - **Lesezeichen durchsuchen** (das Feld oben) findet ein Lesezeichen anhand seiner Wörter (siehe [Lesezeichen durchsuchen](/guide/web#search-your-bookmarks)).
 - **Neuer Ordner** (oben) fügt der Leiste einen Ordner hinzu und fragt nach seinem Namen.

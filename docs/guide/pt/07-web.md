@@ -568,7 +568,7 @@ Quando uma página no seu próprio navegador pede para usar sua câmera, seu mic
 
 Os sites da barra de favoritos ficam fixados no topo da coluna de abas assim que você tem um favorito nela (no celular não há coluna de abas; seus favoritos ficam no menu). Clique em um para abri-lo na aba aberta; Ctrl+clique (⌘+clique no Mac) ou um clique com o botão do meio o abre em uma nova aba. Uma pasta abre uma lista do que há nela, e dez blocos é o máximo que ela mostra (um bloco **…** lista o restante). Clique com o botão direito em um bloco para ver **Abrir**, **Abrir em uma nova aba**, **Editar** (**Renomear** para uma pasta) e **Excluir**.
 
-Para ver todos, clique em **Menu** (⋯) → **Favoritos**, ou acesse [Favoritos](/browser?panel=bookmarks). O painel tem dois lugares, **Barra de favoritos** e **Outros favoritos**, e as pastas dentro deles abrem e fecham.
+Para ver todos, clique em **Menu** (⋯) → **Favoritos**, ou acesse [Favoritos](/browser?panel=bookmarks). O painel tem dois lugares, **Barra de favoritos** e **Outros favoritos**, e as pastas dentro deles abrem e fecham; cada uma continua como você a deixou na próxima vez que abrir o painel.
 
 - **Pesquisar nos seus favoritos** (a caixa no topo) encontra um favorito pelas palavras dele (veja [Pesquisar nos seus favoritos](/guide/web#search-your-bookmarks)).
 - **Nova pasta** (no topo) adiciona uma pasta à barra e pede o nome dela.

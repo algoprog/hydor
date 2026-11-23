@@ -568,7 +568,7 @@ When a page in your own browser asks to use your camera, your microphone, your l
 
 The sites on the bookmarks bar are pinned at the top of the tab column once you have a bookmark on it (on a phone there is no tab column; your bookmarks are in the menu). Click one to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it, and ten tiles are the most it shows (a **…** tile lists the rest). Right-click a tile for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**.
 
-For all of them, press **Menu** (⋯) → **Bookmarks**, or go to [Bookmarks](/browser?panel=bookmarks). The panel has two places, **Bookmarks bar** and **Other bookmarks**, and the folders in them open and close.
+For all of them, press **Menu** (⋯) → **Bookmarks**, or go to [Bookmarks](/browser?panel=bookmarks). The panel has two places, **Bookmarks bar** and **Other bookmarks**, and the folders in them open and close; each stays as you left it the next time you open the panel.
 
 - **Search your bookmarks** (the box at the top) finds a bookmark by its words (see [Search your bookmarks](/guide/web#search-your-bookmarks)).
 - **New folder** (at the top) adds a folder to the bar and asks for its name.

@@ -568,7 +568,7 @@ Cuando una página de tu propio navegador pide usar tu cámara, tu micrófono, t
 
 Los sitios de la barra de marcadores se fijan en la parte superior de la columna de pestañas en cuanto tienes un marcador en ella (en un teléfono no hay columna de pestañas; tus marcadores están en el menú). Haz clic en uno para abrirlo en la pestaña actual; Ctrl+clic (⌘+clic en una Mac) o un clic con el botón central lo abre en una pestaña nueva. Una carpeta abre una lista de lo que contiene, y diez recuadros es lo máximo que muestra (un recuadro **…** muestra el resto). Haz clic derecho en un recuadro para ver **Abrir**, **Abrir en una pestaña nueva**, **Editar** (**Cambiar nombre** en una carpeta) y **Eliminar**.
 
-Para verlos todos, pulsa **Menú** (⋯) → **Marcadores**, o ve a [Marcadores](/browser?panel=bookmarks). El panel tiene dos lugares, **Barra de marcadores** y **Otros marcadores**, y las carpetas que contienen se abren y se cierran.
+Para verlos todos, pulsa **Menú** (⋯) → **Marcadores**, o ve a [Marcadores](/browser?panel=bookmarks). El panel tiene dos lugares, **Barra de marcadores** y **Otros marcadores**, y las carpetas que contienen se abren y se cierran; cada una sigue como la dejaste la próxima vez que abras el panel.
 
 - **Buscar en tus marcadores** (el cuadro de la parte superior) encuentra un marcador por sus palabras (consulta [Buscar en tus marcadores](/guide/web#search-your-bookmarks)).
 - **Nueva carpeta** (en la parte superior) agrega una carpeta a la barra y pide su nombre.

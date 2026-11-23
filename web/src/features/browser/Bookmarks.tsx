@@ -1,6 +1,6 @@
-// The bookmarks panel: the tree (folders open and close; drag a row to move it, or use its arrows), searching it, sorting it
-// into folders with the helper model (Organize with AI), adding a folder, renaming and deleting, and bringing bookmarks in
-// from the browsers on this computer or from a file, or out.
+// The bookmarks panel: the tree (folders open and close, and stay so the next time; drag a row to move it, or use its
+// arrows), searching it, sorting it into folders with the helper model (Organize with AI), adding a folder, renaming and
+// deleting, and bringing bookmarks in from the browsers on this computer or from a file, or out.
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearch } from 'wouter';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Download, FileUp, Folder, FolderOpen, FolderPlus, FolderSearch, Globe, Pencil, Search, Sparkles, Trash2, X } from 'lucide-react';
@@ -130,13 +130,39 @@ function Place({ root, folders }: { root: 'bar' | 'other'; folders: string[] }) 
 
 const shown = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
+/** Which folders are open, kept on this device so the panel opens again as it was left. */
+const FOLDS_KEY = 'wa.browser.bookmarkFolds';
+interface Folds {
+  /** Folders opened (false) or closed (true) by hand. */
+  closed: Record<string, boolean>;
+  /** The others are closed (once a sort has made new folders), else open. */
+  foldAll: boolean;
+}
+function keptFolds(): Folds {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLDS_KEY) ?? 'null') as Partial<Folds> | null;
+    return { closed: v?.closed && typeof v.closed === 'object' ? v.closed : {}, foldAll: v?.foldAll === true };
+  } catch {
+    return { closed: {}, foldAll: false };
+  }
+}
+
 export function BookmarksPanel({ onClose }: { onClose: () => void }) {
   const nodes = useBookmarks((s) => s.nodes);
   const loaded = useBookmarks((s) => s.loaded);
   const mobile = useIsMobile();
-  // Folders opened or closed by hand; the others are open, or all closed once a sort has made new folders.
-  const [closed, setClosed] = useState<Record<string, boolean>>({});
-  const [foldAll, setFoldAll] = useState(false);
+  // Folders opened or closed by hand; the others are open, or all closed once a sort has made new folders. Both are
+  // kept as they change, without the folders that are gone.
+  const [closed, setClosed] = useState(() => keptFolds().closed);
+  const [foldAll, setFoldAll] = useState(() => keptFolds().foldAll);
+  useEffect(() => {
+    if (!loaded) return;
+    const folders = new Set(nodes.filter((n) => !n.url).map((n) => n.id));
+    const kept: Folds = { closed: Object.fromEntries(Object.entries(closed).filter(([id]) => folders.has(id))), foldAll };
+    try {
+      localStorage.setItem(FOLDS_KEY, JSON.stringify(kept));
+    } catch {}
+  }, [closed, foldAll, nodes, loaded]);
   const [rename, setRename] = useState<BookmarkNode | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
