@@ -227,7 +227,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Ask before sending on signed-in sites**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Before an agent sends, posts, deletes or transfers anything on a site it’s signed in to.
 - [**Bookmarks**](/settings?s=browser&find=Bookmarks): Yours, with those from the other browsers on this computer.
 - [**Extensions**](/settings?s=browser&find=Extensions): Chrome extensions, in the desktop app.
-- [**Browser settings**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker, history and clearing what it kept.
+- [**Browser settings**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Computer use
 
@@ -302,6 +302,36 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Language you speak**](/settings?s=voice&find=Language%20you%20speak): The language dictation listens for.
 - [**Speech recognition on the server**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server): Recognize speech on this computer or with a service.
 - [**Read aloud**](/settings?s=voice&find=Read%20aloud): Have replies read aloud.
+
+### Word suggestions
+
+[Settings → Word suggestions](/settings?s=suggest): the rest of the word you are typing in grey, and the next word, from a small model that learns from your writing. More in [Documents, images, videos and voice](/guide/documents-voice).
+
+- [**Word suggestions**](/settings?s=suggest&find=Word%20suggestions): The rest of the word you are typing and the next one, in grey after the caret, from models that run on this computer; the first time it downloads about 1.3 GB.
+- [**Show in this browser**](/settings?s=suggest&find=Show%20in%20this%20browser): Whether this browser shows word suggestions (each browser keeps its own).
+- [**Language model**](/settings?s=suggest&find=Language%20model): Qwen3.5 beside the small model: automatically when the computer has the memory, always, or never.
+- [**Language model size**](/settings?s=suggest&find=Language%20model%20size): The language model in 8 bits (better) or 4 bits (smaller, a little worse).
+- [**How sure before showing**](/settings?s=suggest&find=How%20sure%20before%20showing): How sure a suggestion must be to show: more of them, or fewer and more often right.
+- [**Show the next word**](/settings?s=suggest&find=Show%20the%20next%20word): Also the word after it, dimmer.
+- [**In message boxes**](/settings?s=suggest&find=In%20message%20boxes): Suggestions in the box you write a message to an agent in.
+- [**In documents**](/settings?s=suggest&find=In%20documents): Suggestions as you write in a document.
+- [**In notes**](/settings?s=suggest&find=In%20notes): Suggestions in notes.
+- [**In other text boxes**](/settings?s=suggest&find=In%20other%20text%20boxes): Suggestions in other places you type: follow-ups, the queue, an earlier prompt, Ask panels.
+- [**Words of what you typed**](/settings?s=suggest&find=Words%20of%20what%20you%20typed): How many of the words you typed before the caret it reads.
+- [**Words of the reply or document**](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document): How many words of the agent’s last reply, or of the document before the paragraph, it reads.
+- [**Choose by language**](/settings?s=suggest&find=Choose%20by%20language): Picks the model that does best for the language of what you write.
+- [**Learn from the conversation**](/settings?s=suggest&find=Learn%20from%20the%20conversation): Uses the words used earlier in the conversation, as you type a message.
+- [**Threads**](/settings?s=suggest&find=Threads): Processor threads for suggestions (automatic by default).
+- [**Learn from what I write**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): The small model learns from what you write, on this computer, in the background.
+- [**When it learns**](/settings?s=suggest&find=When%20it%20learns): Every night, every week, or only when you press Retrain now; it waits until you have not typed for ten minutes.
+- [**From my messages**](/settings?s=suggest&find=From%20my%20messages): Learn from the messages you wrote to agents.
+- [**From agents' replies**](/settings?s=suggest&find=From%20agents'%20replies): Learn from what agents replied to you.
+- [**From my notes**](/settings?s=suggest&find=From%20my%20notes): Learn from the memory notes you wrote.
+- [**From my documents**](/settings?s=suggest&find=From%20my%20documents): Learn from the documents and pages you wrote.
+- [**Weight of my own words**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): How much more the words you typed count than the rest it learns from.
+- [**Threads for learning**](/settings?s=suggest&find=Threads%20for%20learning): Processor threads for learning (automatic by default).
+- [**Retrain now**](/settings?s=suggest&find=Retrain%20now): Learns from what you wrote since the last time, now, in the background.
+- [**Forget what it learned**](/settings?s=suggest&find=Forget%20what%20it%20learned): Deletes the model that learned from you; the one that came with the app is used again.
 
 ### Your agents
 

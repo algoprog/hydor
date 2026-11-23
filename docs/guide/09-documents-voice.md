@@ -313,6 +313,69 @@ In a [confidential session](/guide/sessions#keep-a-session-confidential) none of
 
 **Keep**, under a picture, a video or a sound an agent made, keeps a copy of it in the files of a project, where a model writes a title and a description for it (for a sound, from the words it was made from, since no model can hear it; the model is picked in [Settings → Capabilities → Images, video and audio → Captions for what you keep](/settings?s=images&find=Captions%20for%20what%20you%20keep)), and where it stays after the session's folder is cleaned up. When you have projects, a short menu asks where it goes (**Keep it in**): the session's own project first, then your other projects, and **No project**, which keeps it with the conversation, where the search box (Ctrl+K) finds it. The button then reads **Kept** and opens it. A picture you kept shows among its project's files (the project's details → **Files**, as a tile with its picture), and in the editor, **Keep** keeps an edited picture as a new one, while **Save** puts it back where it came from and **Save a copy** keeps another beside it.
 
+## Word suggestions as you type
+
+While you type, Hydor can show the rest of the word you are writing in grey after the cursor, and the next word dimmer still. It does this in the message box, in documents, in notes and in other text boxes, in whatever language you write.
+
+- **Tab** takes the grey word. Press it again to take the next one.
+- **→** (the right arrow), with the cursor at the end of the text, takes both words at once.
+- **Esc** hides them until the next word. Keep typing and they go away by themselves; type the letters they show and they stay, shorter.
+- In the message box, an open `@` or `/` menu keeps Tab and Esc for itself, and **Shift+Tab** still changes the permission mode. When nothing grey is showing, every key does what it always did.
+
+Nothing you type leaves your computer: the guesses are made by models that run on it. It is off until you turn it on.
+
+### Turn it on
+
+Open **[Settings → Capabilities → Word suggestions](/settings?s=suggest)** and turn on **[Word suggestions](/settings?s=suggest&find=Word%20suggestions)**. The first time, it installs and downloads what it needs, about 1.3 GB in all, with a line under the switch that says how far it is: the Python libraries it runs on (from PyPI and PyTorch's own download address), llama.cpp (from GitHub), the language model and the small model (from Hugging Face). Nothing is downloaded before you turn it on, and nothing again afterwards. When the line says **Ready: suggestions show as you type**, it works; the first suggestion after a long pause takes a moment longer while the models load, because they are let go again after a while without typing. Turning it off stops them; what was downloaded stays. Everything runs on the processor, so it needs no graphics card.
+
+### The two models, and the memory they need
+
+Two models work together, both on your computer:
+
+- **The small model** is one of the app's own, small enough to run on any computer and trained on text in 200 languages. It also learns from what you write ([below](#learn-from-what-you-write)).
+- **The language model** is Qwen3.5-0.8B, a larger model that guesses better, especially in documents. It needs a computer with at least 8 GB of memory and 2.5 GB of it free at that moment.
+
+**[Language model](/settings?s=suggest&find=Language%20model)** has three choices. **Automatic** uses it when the computer has the memory and the small model alone when it hasn't; the line under the switch says which is happening, and why. **On** uses it even then (it may slow the computer down). **Off** never does. Without it, suggestions still work, a little less well. **[Language model size](/settings?s=suggest&find=Language%20model%20size)** picks **8-bit**, which guesses a little better, or **4-bit**, which takes less memory and a smaller download (about 560 MB instead of 830 MB).
+
+Changing the size downloads the other file the first time. **[Choose by language](/settings?s=suggest&find=Choose%20by%20language)**, on by default, lets the app use whichever of the two models does better in the language it sees you writing.
+
+### Where it shows
+
+Under **Where** in the same section, each place has its switch:
+
+- **[In message boxes](/settings?s=suggest&find=In%20message%20boxes)**: where you write to an agent, on the start page and in a conversation.
+- **[In documents](/settings?s=suggest&find=In%20documents)**: while you write in Docs. The "Suggest as I type" of **View** in Docs, which asks the helper model how a sentence might go on, waits while a word suggestion shows.
+- **[In notes](/settings?s=suggest&find=In%20notes)**: memory notes and your profile.
+- **[In other text boxes](/settings?s=suggest&find=In%20other%20text%20boxes)**: follow-ups, the queue, an earlier prompt you edit, the Ask panels and other small boxes.
+
+These are set once for the app. **[Show in this browser](/settings?s=suggest&find=Show%20in%20this%20browser)** is the exception: it is kept by each browser, so you can turn the grey words off on one device and keep them on another. An agent can change it for the browsers showing its session too.
+
+### How sure it must be
+
+Every guess has a chance of being right, and a guess is shown only when that chance is high enough. **[How sure before showing](/settings?s=suggest&find=How%20sure%20before%20showing)** sets the bar: **More** shows more guesses, and more of them are wrong; **Balanced** is the middle, aiming at about four right guesses in ten shown; **Surer** shows fewer, and more of those are right. An agent can also set the bar higher still, for the surest ones only. **[Show the next word](/settings?s=suggest&find=Show%20the%20next%20word)** turns the dimmer second word off, so only the rest of the word you are typing shows.
+
+### What it reads
+
+To guess, it reads the words you typed before the cursor, and what you are answering: the agent's last reply in a message, or the text above the paragraph in a document.
+
+- **[Words of what you typed](/settings?s=suggest&find=Words%20of%20what%20you%20typed)**: how many of your last words it reads, from 20 to 200 (100 at first). More is slower.
+- **[Words of the reply or document](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document)**: how many words of the reply or the document it reads, from 0 to 200; 0 reads none.
+- **[Learn from the conversation](/settings?s=suggest&find=Learn%20from%20the%20conversation)**: picks up the words and names used earlier in the conversation as you type a message. It is separate from the learning below.
+- **[Threads](/settings?s=suggest&find=Threads)**: how many processor threads suggestions use. **Automatic** chooses from the computer's cores.
+
+### Learn from what you write
+
+By default, the small model also learns your own words: the names, terms and way of writing you use, so its guesses fit you. This happens on your computer, and what you wrote never leaves it. The learned model is kept in the app's data folder and is not shared with anyone.
+
+- **[Learn from what I write](/settings?s=suggest&find=Learn%20from%20what%20I%20write)** turns it on or off.
+- It learns from the sources you leave on: **[From my messages](/settings?s=suggest&find=From%20my%20messages)** (what you typed to agents, but not in sessions with memory turned off or [confidential ones](/guide/sessions#keep-a-session-confidential), and not what apps, scheduled tasks or other sessions wrote for you), **[From agents' replies](/settings?s=suggest&find=From%20agents'%20replies)**, **[From my notes](/settings?s=suggest&find=From%20my%20notes)** (the memory notes you wrote yourself) and **[From my documents](/settings?s=suggest&find=From%20my%20documents)** (the pages and documents you wrote). Turn off the agents' replies, for instance, to keep its guesses to your own style.
+- **[Weight of my own words](/settings?s=suggest&find=Weight%20of%20my%20own%20words)** says how much more what you typed counts than the rest, from 1 (alike) to 16; 4 at first.
+- **[When it learns](/settings?s=suggest&find=When%20it%20learns)**: **Every night** (about once a day, when you have not typed for ten minutes and the computer has the memory), **Every week**, or **Only when I ask**. It runs in the background at the lowest priority, so your work is not slowed, and it picks up where it stopped if the computer is turned off. The first time reads all you have written, and on a computer without a graphics card that can take hours; the later ones read only what is new and take minutes. **[Threads for learning](/settings?s=suggest&find=Threads%20for%20learning)** limits the processor it may use.
+- **[Retrain now](/settings?s=suggest&find=Retrain%20now)** learns from what you wrote since the last time, straight away.
+- **[Forget what it learned](/settings?s=suggest&find=Forget%20what%20it%20learned)** deletes the model made from your writing, after you confirm, and goes back to the one that came with the app. It learns again at its next time, unless you turned learning off.
+
+The line under the switch says which small model is in use, when it last learned, and how far a learning run has got.
+
 ## Dictate a message
 
 The microphone in the message box (on the start page and in every session) turns what you say into text in your message. Nothing is sent by itself: you read it over and send it as usual.
@@ -434,6 +497,11 @@ It stops listening to say these, then listens again. Sessions on your other mach
 - "Fill in the form ~/Downloads/visa-application.pdf with my details from my profile, and ask me for the rest."
 - "Write today's date and my name on the lines of ~/Documents/permission-slip.pdf, and tick Yes."
 - "Take pages 3 to 5 out of ~/Documents/contract.pdf into a file of their own."
+- "Turn on word suggestions, and tell me when they are ready."
+- "Make word suggestions show only the ones you are surer of, and not the next word."
+- "Stop word suggestions from learning from agents' replies, and make it learn only when I ask."
+- "Is the language model running for word suggestions? If not, why?"
+- "Turn word suggestions off in this browser only."
 - "Turn on speech recognition on this computer, with the Small model."
 - "Use my speech server at http://192.168.1.20:8000/v1 for dictation, with the model whisper-large-v3."
 - "Which whisper models are on this computer, and how much space do they take? Remove the ones not in use."

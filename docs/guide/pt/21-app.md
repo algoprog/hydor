@@ -259,7 +259,8 @@ O app guarda seus próprios dados em uma única pasta, a pasta de dados: `~/.hyd
 - os anexos à espera de envio (as cópias do app são excluídas após 14 dias e mantidas abaixo de 2 GB no total);
 - a lixeira da página Arquivos;
 - os kernels de notebook e o servidor privado em que os terminais rodam;
-- depois que a Busca por significado é ativada, o ambiente Python privado dela.
+- depois que a Busca por significado é ativada, o ambiente Python privado dela;
+- depois que as [sugestões de palavras](/guide/documents-voice#word-suggestions-as-you-type) são ativadas, o ambiente Python privado delas, o llama.cpp e o modelo que aprendeu com o que você escreve.
 
 As conversas em si ficam onde os agentes as gravam, `~/.claude/projects` para o Claude Code e `~/.codex/sessions` para o Codex: o app as lê nesses locais (o (i) ao lado da versão em Configurações → Geral explica isso). Com Docker, tudo isso fica em `/home/node` dentro do contêiner, mantido no volume de dados dele.
 
@@ -272,7 +273,7 @@ Algumas escolhas pertencem ao navegador em que você as faz, então cada disposi
 - quanto as coisas se movem (**Movimento**);
 - o tamanho do texto (**Tamanho do texto**);
 - o que a tecla Enter faz enquanto um agente trabalha;
-- as sugestões do terminal, o som de notificação e se este dispositivo recebe notificações;
+- as sugestões do terminal, as [sugestões de palavras](/guide/documents-voice#word-suggestions-as-you-type), o som de notificação e se este dispositivo recebe notificações;
 - a pasta da página Arquivos, os arquivos abertos, os arquivos recentes e como as pastas aparecem (lista ou blocos, e a ordem delas); as pastas fixadas ficam guardadas no servidor, iguais em todos os dispositivos;
 - os arquivos marcados como **Visto** ao revisar um branch;
 - se a nota “Novidades” já foi exibida.

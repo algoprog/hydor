@@ -259,7 +259,8 @@ The app keeps its own data in one folder, its data folder: `~/.hydor` in your ho
 - attachments waiting to be sent (the app's copies are deleted after 14 days, and kept under 2 GB in all);
 - the trash of the Files page;
 - notebook kernels and the private server the terminals run in;
-- once search by meaning is on, its private Python environment.
+- once search by meaning is on, its private Python environment;
+- once [word suggestions](/guide/documents-voice#word-suggestions-as-you-type) are on, their private Python environment, llama.cpp and the model that learned from your writing.
 
 Conversations themselves stay where the agents write them, `~/.claude/projects` for Claude Code and `~/.codex/sessions` for Codex: the app reads them there (the (i) beside the version in Settings → General says so). With Docker, all of this lives in the container's `/home/node`, kept in its data volume.
 
@@ -272,7 +273,7 @@ Some choices belong to the browser you make them in, so each device can differ:
 - how much moves (**Motion**);
 - how big the text is (**Text size**);
 - what Enter does while an agent works;
-- terminal suggestions, the notification sound, and whether this device gets notifications;
+- terminal suggestions, [word suggestions](/guide/documents-voice#word-suggestions-as-you-type), the notification sound, and whether this device gets notifications;
 - the Files page's folder, open files, recent files, and how folders show (a list or tiles, and their order); pinned folders are kept on the server, the same on every device;
 - files marked **Viewed** when reviewing a branch;
 - whether the "What's new" note was shown.

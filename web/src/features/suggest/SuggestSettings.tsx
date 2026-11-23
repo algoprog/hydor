@@ -22,6 +22,9 @@ const SURE = [
 ] as const;
 const nearestSure = (p: number) => SURE.reduce((a, b) => (Math.abs(b.value - p) < Math.abs(a.value - p) ? b : a)).id;
 
+/** A memory size in GB with one decimal, written as the app's language writes numbers. */
+const gb = (mb: number) => (mb / 1024).toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 const when = (ts: number) => new Date(ts).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
 /** What the language model is doing, in words: running, or not and why. */
@@ -30,10 +33,17 @@ function llmLine(s: SuggestStatus, wanted: Settings['llm']): { tone: 'ok' | 'inf
   if (l.state === 'ready') return { tone: 'ok', text: 'The language model is running, so guesses are better.' };
   if (l.state === 'starting') return { tone: 'info', text: 'The language model is loading…' };
   if (l.state === 'memory') {
-    const free = l.freeMb ? ` ${(l.freeMb / 1024).toFixed(1)} GB is free; it needs about ${((l.needMb ?? 2500) / 1024).toFixed(1)} GB.` : '';
-    return { tone: 'warn', text: `The language model is not running: this computer has too little free memory.${free} The small model alone is making the suggestions.` };
+    // Whole sentences with only numbers in them, so each is translated as one.
+    return {
+      tone: 'warn',
+      text: l.freeMb
+        ? `The language model is not running: this computer has too little free memory. ${gb(l.freeMb)} GB is free; it needs about ${gb(l.needMb ?? 2500)} GB. The small model alone is making the suggestions.`
+        : 'The language model is not running: this computer has too little free memory. The small model alone is making the suggestions.',
+    };
   }
-  if (l.state === 'failed') return { tone: 'err', text: `The language model could not start${l.detail ? `: ${l.detail}` : ''}. The small model alone is making the suggestions.` };
+  if (l.state === 'failed') {
+    return { tone: 'err', text: l.detail ? `The language model could not start: ${l.detail}. The small model alone is making the suggestions.` : 'The language model could not start. The small model alone is making the suggestions.' };
+  }
   return { tone: 'info', text: wanted === 'off' ? 'The language model is turned off here. The small model alone is making the suggestions.' : 'The language model is not running (it starts when you next type).' };
 }
 
@@ -67,9 +77,9 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
         <Notice>
           {status.model.kind === 'personal' ? (
             <>
-              The small model is the one made on this computer from what you write
-              {status.model.trainedAt ? `, last learned ${ago(status.model.trainedAt)}` : ''}
-              {status.model.tokens ? ` (${status.model.tokens.toLocaleString(LOCALE)} tokens of yours)` : ''}.
+              <span>The small model is the one made on this computer from what you write.</span>
+              {status.model.trainedAt ? <span className="block">{`Last learned ${ago(status.model.trainedAt)}.`}</span> : null}
+              {status.model.tokens ? <span className="block">{`${status.model.tokens.toLocaleString(LOCALE)} tokens of yours.`}</span> : null}
             </>
           ) : (
             <>The small model is the one that came with the app; it has not learned from your writing yet.</>
@@ -78,7 +88,7 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
       )}
       {t.state === 'running' && (
         <Notice icon={<Throbber size={15} />}>
-          Learning from your writing{t.progress && t.progress.total ? `: ${Math.round((100 * t.progress.done) / t.progress.total)}%` : '…'}
+          {t.progress && t.progress.total ? `Learning from your writing: ${Math.round((100 * t.progress.done) / t.progress.total)}%` : 'Learning from your writing…'}
           {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2 w-64 max-w-full" />}
         </Notice>
       )}

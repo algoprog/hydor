@@ -227,7 +227,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Preguntar antes de enviar en sitios con sesión iniciada**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de que un agente envíe, publique, elimine o transfiera algo en un sitio donde ha iniciado sesión.
 - [**Marcadores**](/settings?s=browser&find=Bookmarks): Los tuyos, junto con los de los otros navegadores de esta computadora.
 - [**Extensiones**](/settings?s=browser&find=Extensions): Extensiones de Chrome, en la app de escritorio.
-- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Página de inicio, buscador, atajos de búsqueda, zoom de página, revisión ortográfica, traducción, páginas oscuras, bloqueador de anuncios, historial y borrado de lo que guardó.
+- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Uso de la computadora
 
@@ -302,6 +302,36 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Idioma que hablas**](/settings?s=voice&find=Language%20you%20speak): El idioma que escucha el dictado.
 - [**Reconocimiento de voz en el servidor**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server): Reconocer voz en esta computadora o con un servicio.
 - [**Leer en voz alta**](/settings?s=voice&find=Read%20aloud): Leer las respuestas en voz alta.
+
+### Sugerencias de palabras
+
+[Configuración → Sugerencias de palabras](/settings?s=suggest): el resto de la palabra que escribes en gris, y la palabra siguiente, de un modelo pequeño que aprende de lo que escribes. Más en [Documentos, imágenes, videos y voz](/guide/documents-voice).
+
+- [**Sugerencias de palabras**](/settings?s=suggest&find=Word%20suggestions): El resto de la palabra que escribes y la siguiente, en gris después del cursor, con modelos que se ejecutan en esta computadora; la primera vez descarga cerca de 1,3 GB.
+- [**Mostrar en este navegador**](/settings?s=suggest&find=Show%20in%20this%20browser): Si este navegador muestra sugerencias de palabras (cada navegador guarda las suyas).
+- [**Modelo de lenguaje**](/settings?s=suggest&find=Language%20model): Qwen3.5 junto al modelo pequeño: automáticamente cuando la computadora tiene memoria, siempre o nunca.
+- [**Tamaño del modelo de lenguaje**](/settings?s=suggest&find=Language%20model%20size): El modelo de lenguaje en 8 bits (mejor) o en 4 bits (más pequeño, algo peor).
+- [**Seguridad antes de mostrar**](/settings?s=suggest&find=How%20sure%20before%20showing): Qué tan segura debe ser una sugerencia para mostrarse: más sugerencias, o menos pero con más aciertos.
+- [**Mostrar la palabra siguiente**](/settings?s=suggest&find=Show%20the%20next%20word): También la palabra siguiente, más tenue.
+- [**En los cuadros de mensaje**](/settings?s=suggest&find=In%20message%20boxes): Sugerencias en el cuadro donde escribes un mensaje a un agente.
+- [**En documentos**](/settings?s=suggest&find=In%20documents): Sugerencias mientras escribes en un documento.
+- [**En notas**](/settings?s=suggest&find=In%20notes): Sugerencias en las notas.
+- [**En otros cuadros de texto**](/settings?s=suggest&find=In%20other%20text%20boxes): Sugerencias en otros lugares donde escribes: seguimientos, la cola, un mensaje anterior, paneles de Preguntar.
+- [**Palabras de lo que escribiste**](/settings?s=suggest&find=Words%20of%20what%20you%20typed): Cuántas de las palabras que escribiste antes del cursor lee.
+- [**Palabras de la respuesta o del documento**](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document): Cuántas palabras de la última respuesta del agente, o del documento anterior al párrafo, lee.
+- [**Elegir según el idioma**](/settings?s=suggest&find=Choose%20by%20language): Elige el modelo que funciona mejor para el idioma en el que escribes.
+- [**Aprender de la conversación**](/settings?s=suggest&find=Learn%20from%20the%20conversation): Usa las palabras empleadas antes en la conversación mientras escribes un mensaje.
+- [**Threads**](/settings?s=suggest&find=Threads): Hilos del procesador para las sugerencias (automático por defecto).
+- [**Aprender de lo que escribo**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): El modelo pequeño aprende de lo que escribes, en esta computadora y en segundo plano.
+- [**Cuándo aprende**](/settings?s=suggest&find=When%20it%20learns): Cada noche, cada semana o solo cuando pulses Volver a entrenar ahora; espera a que lleves diez minutos sin escribir.
+- [**De mis mensajes**](/settings?s=suggest&find=From%20my%20messages): Aprender de los mensajes que escribiste a los agentes.
+- [**De las respuestas de los agentes**](/settings?s=suggest&find=From%20agents'%20replies): Aprender de lo que los agentes te respondieron.
+- [**De mis notas**](/settings?s=suggest&find=From%20my%20notes): Aprender de las notas de memoria que escribiste.
+- [**De mis documentos**](/settings?s=suggest&find=From%20my%20documents): Aprender de los documentos y páginas que escribiste.
+- [**Peso de mis propias palabras**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Cuánto más pesan las palabras que escribiste frente al resto de lo que aprende.
+- [**Hilos para el aprendizaje**](/settings?s=suggest&find=Threads%20for%20learning): Hilos del procesador para el aprendizaje (automático por defecto).
+- [**Volver a entrenar ahora**](/settings?s=suggest&find=Retrain%20now): Aprende ahora, en segundo plano, de lo que escribiste desde la última vez.
+- [**Olvidar lo aprendido**](/settings?s=suggest&find=Forget%20what%20it%20learned): Elimina el modelo que aprendió de ti; se vuelve a usar el que venía con la app.
 
 ### Tus agentes
 

@@ -35,6 +35,23 @@ the app's sessions (the `sessions` and `app_sessions` tables): it takes them for
 subagents to deliver their reports, in processes of its own beside the app at work. Deleting its `DATA_DIR` stops
 any agent it left running within a minute.
 
+Word suggestions (`server/suggest/`, `web/src/features/suggest/`, the spec in [the plan](plans/word-suggestions.md)) run
+two processes of their own, llama.cpp's `llama-server` and a Python worker (`server/suggest/py/`). `server/suggest/suggest-test.ts`
+needs neither: it plays them with a stand-in worker and a stand-in `llama-server`, and checks the settings, the routes, cancelling,
+the texts personalising reads and their filters, and the schedule; the web side's rules (when to ask, what Tab and → take) have
+their own test beside them. Neither downloads anything. The Python engine's tests need a Python with PyTorch (the CPU build),
+tokenizers, NumPy and safetensors:
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs server/suggest/suggest-test.ts && DATA_DIR=/tmp/hydor-test-suggest node dist/dev/suggest-test.js
+cd server/suggest/py && /path/to/that/python -m unittest discover -s tests
+```
+
+To run the engine in a scratch copy of the app before its model is published (or with one of your own), point
+`HYDOR_SUGGEST_MODEL_DIR` at a folder holding the model's files, `HYDOR_SUGGEST_PYTHON` at that Python and, when you have
+them, `HYDOR_SUGGEST_GGUF` and `HYDOR_SUGGEST_LLAMA_SERVER` at the language model and a `llama-server`: nothing is then downloaded
+([configuration](configuration.md)). Do not put PyTorch into search by meaning's private environment (`memory/venv`): the app rebuilds it whenever its packages differ.
+
 Use on your phone (`server/phone/`) never runs the computer's own `tailscale` in tests: `phone-test.ts` plays it with
 `server/phone/fake-tailscale.mjs`, a stand-in that answers `version`, `status --json` and `serve` from a state file
 beside it (its first lines say how). To try the section in a scratch copy of the app, copy the fake into a folder of its

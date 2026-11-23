@@ -9,14 +9,14 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const GUIDE = path.join(ROOT, 'docs', 'guide');
 const src = fs.readFileSync(path.join(ROOT, 'shared', 'find-catalog.ts'), 'utf8');
 
-/** The single-quoted strings of each `[…]` row of an exported list. */
+/** The quoted strings (single, or double where one has an apostrophe) of each `[…]` row of an exported list. */
 function rows(name) {
   const at = src.indexOf(`export const ${name}`);
   const body = src.slice(at, src.indexOf('];', at));
   return body
     .split('\n')
     .filter((l) => l.trim().startsWith('['))
-    .map((l) => [...l.matchAll(/'([^']*)'/g)].map((m) => m[1]));
+    .map((l) => [...l.matchAll(/'([^']*)'|"([^"]*)"/g)].map((m) => m[1] ?? m[2]));
 }
 const SECTIONS = rows('SECTIONS'); // [id, label, tab, sub]
 /** A section whose label is the words of one part of the app (data-i18n in the page): the dictionary may hold its own entry ("goal::Goals"). */

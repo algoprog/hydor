@@ -227,7 +227,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷词、页面缩放、拼写检查、翻译、深色网页、广告拦截器、历史记录，以及清除它保存的内容。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
 
 ### 电脑操控
 
@@ -302,6 +302,36 @@
 - [**你说的语言**](/settings?s=voice&find=Language%20you%20speak)：听写所识别的语言。
 - [**服务器端语音识别**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server)：在这台电脑上或通过某个服务识别语音。
 - [**朗读**](/settings?s=voice&find=Read%20aloud)：朗读回复。
+
+### 词语建议
+
+[设置 → 词语建议](/settings?s=suggest)：以灰色显示你正在输入的词的其余部分和下一个词，由会从你的写作中学习的小模型生成。详见[文档、图片、视频和语音](/guide/documents-voice)。
+
+- [**词语建议**](/settings?s=suggest&find=Word%20suggestions)：你正在输入的词的其余部分和下一个词，以灰色显示在光标后，由在这台电脑上运行的模型生成；首次使用会下载约 1.3 GB。
+- [**在此浏览器中显示**](/settings?s=suggest&find=Show%20in%20this%20browser)：此浏览器是否显示词语建议（每个浏览器各自保存设置）。
+- [**语言模型**](/settings?s=suggest&find=Language%20model)：在小模型之外加用 Qwen3.5：电脑内存足够时自动使用、始终使用，或从不使用。
+- [**语言模型大小**](/settings?s=suggest&find=Language%20model%20size)：8 位（更好）或 4 位（更小，稍差）的语言模型。
+- [**显示前的把握程度**](/settings?s=suggest&find=How%20sure%20before%20showing)：建议需要多确定才会显示：显示更多，或显示更少但更常答对。
+- [**显示下一个词**](/settings?s=suggest&find=Show%20the%20next%20word)：同时显示其后的一个词，颜色更淡。
+- [**在消息框中**](/settings?s=suggest&find=In%20message%20boxes)：在你给智能体写消息的输入框中给出建议。
+- [**在文档中**](/settings?s=suggest&find=In%20documents)：在文档中写作时给出建议。
+- [**在备注中**](/settings?s=suggest&find=In%20notes)：在备注中给出建议。
+- [**在其他文本框中**](/settings?s=suggest&find=In%20other%20text%20boxes)：在你输入的其他位置给出建议：跟进、队列、之前的提示词、询问面板。
+- [**你输入的词数**](/settings?s=suggest&find=Words%20of%20what%20you%20typed)：它会读取你在光标前输入的多少个词。
+- [**回复或文档的词数**](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document)：它会读取智能体上一条回复，或段落之前文档中的多少个词。
+- [**按语言选择**](/settings?s=suggest&find=Choose%20by%20language)：根据你写作的语言，选择表现最好的模型。
+- [**从对话中学习**](/settings?s=suggest&find=Learn%20from%20the%20conversation)：输入消息时，使用对话中之前出现过的词。
+- [**Threads**](/settings?s=suggest&find=Threads)：用于建议的处理器线程数（默认自动）。
+- [**从我写的内容中学习**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小模型会在这台电脑上于后台从你的写作中学习。
+- [**学习时间**](/settings?s=suggest&find=When%20it%20learns)：每晚、每周，或仅在你点击“立即重新训练”时；会等到你已有十分钟没有输入。
+- [**来自我的消息**](/settings?s=suggest&find=From%20my%20messages)：从你发给智能体的消息中学习。
+- [**来自智能体的回复**](/settings?s=suggest&find=From%20agents'%20replies)：从智能体给你的回复中学习。
+- [**来自我的备注**](/settings?s=suggest&find=From%20my%20notes)：从你写的记忆备注中学习。
+- [**来自我的文档**](/settings?s=suggest&find=From%20my%20documents)：从你写的文档和网页中学习。
+- [**我自己输入的词的权重**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：你输入的词比它学习的其余内容重要多少。
+- [**用于学习的线程数**](/settings?s=suggest&find=Threads%20for%20learning)：用于学习的处理器线程数（默认自动）。
+- [**立即重新训练**](/settings?s=suggest&find=Retrain%20now)：现在在后台学习你自上次以来写的内容。
+- [**忘记已学内容**](/settings?s=suggest&find=Forget%20what%20it%20learned)：删除从你这里学习的模型；改回使用应用自带的模型。
 
 ### 你的智能体
 

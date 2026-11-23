@@ -259,7 +259,8 @@ L’app conserve ses propres données dans un seul dossier, son dossier de donn�
 - les pièces jointes en attente d’envoi (les copies de l’app sont supprimées après 14 jours et limitées à 2 Go au total) ;
 - la corbeille de la page Fichiers ;
 - les noyaux des notebooks et le serveur privé dans lequel s’exécutent les terminaux ;
-- une fois la Recherche par le sens activée, son environnement Python privé.
+- une fois la Recherche par le sens activée, son environnement Python privé ;
+- une fois les [suggestions de mots](/guide/documents-voice#word-suggestions-as-you-type) activées, leur environnement Python privé, llama.cpp et le modèle qui a appris de ce que vous écrivez.
 
 Les conversations elles-mêmes restent là où les agents les écrivent, `~/.claude/projects` pour Claude Code et `~/.codex/sessions` pour Codex : l’app les lit à cet endroit (le (i) à côté de la version dans Paramètres → Général l’indique). Avec Docker, tout cela se trouve dans le dossier `/home/node` du conteneur, conservé dans son volume de données.
 
@@ -272,7 +273,7 @@ Certains choix appartiennent au navigateur dans lequel vous les faites, si bien 
 - l’importance des mouvements (**Animations**) ;
 - la taille du texte (**Taille du texte**) ;
 - l’action de la touche Entrée pendant qu’un agent travaille ;
-- les suggestions du terminal, le son des notifications, et si cet appareil reçoit des notifications ;
+- les suggestions du terminal, les [suggestions de mots](/guide/documents-voice#word-suggestions-as-you-type), le son des notifications, et si cet appareil reçoit des notifications ;
 - le dossier de la page Fichiers, les fichiers ouverts, les fichiers récents et l’affichage des dossiers (liste ou vignettes, et leur ordre) ; les dossiers épinglés sont conservés sur le serveur, les mêmes sur tous les appareils ;
 - les fichiers marqués **Vu** lors de la relecture d’une branche ;
 - l’affichage ou non de la note « Nouveautés ».
