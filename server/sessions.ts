@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
-import { ClaudeLive, CLAUDE_MODES, claudeSpec, precompactCopy } from './agents/claude.ts';
+import { ClaudeLive, CLAUDE_MODES, claudeSpec, mcpRunFiles, precompactCopy, removeMcpRunFiles } from './agents/claude.ts';
 import { grokControl } from './agents/grok.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
@@ -454,9 +454,41 @@ export class SessionManager extends EventEmitter {
 
   // ---- startup ---------------------------------------------------------------
 
+  /**
+   * Removes the MCP files (server/agents/claude.ts mcpRunFiles) no running agent reads any more: each run's are its own
+   * and go when it ends, and those of runs that ended while no server watched them go here. A file named by a
+   * session (before they were named by run) stays while that session's agent still runs.
+   */
+  private sweepMcpRunFiles() {
+    const dir = path.dirname(mcpRunFiles('x').config);
+    let names: string[];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    const keep = new Set<string>();
+    for (const l of this.lives.values()) {
+      keep.add(l.runner.meta.runId);
+      keep.add(l.key.slice(l.key.indexOf(':') + 1).replace(/[^\w-]/g, ''));
+    }
+    for (const n of names) {
+      const m = /^(.+?)(-instructions\.md|\.json)$/.exec(n);
+      if (!m || keep.has(m[1])) continue;
+      const p = path.join(dir, n);
+      try {
+        // A run starting this very moment (its process may not have read its file yet) keeps it.
+        if (Date.now() - fs.statSync(p).mtimeMs < 120_000) continue;
+        fs.rmSync(p, { force: true });
+      } catch {}
+    }
+  }
+
   /** Reconnects to agents started before this server process. */
   async restore() {
-    for (const runner of Runner.discover()) {
+    // Oldest first: a session with two agent processes still running (two starts that raced) keeps its newest, the one
+    // the app was following, and attach() stops the older one.
+    for (const runner of Runner.discover().sort((a, b) => (a.meta.createdAt ?? 0) - (b.meta.createdAt ?? 0))) {
       if (!runner.isAlive()) {
         runner.cleanup();
         continue;
@@ -501,6 +533,7 @@ export class SessionManager extends EventEmitter {
       // Still at work: what agents queued for it goes out when its turn ends, as it would have without the restart.
       if (isRunningStatus(adapter.state.status)) this.keepQueueGoing(k);
     }
+    this.sweepMcpRunFiles();
     await this.resumeGates();
   }
 
@@ -1252,6 +1285,16 @@ export class SessionManager extends EventEmitter {
   // ---- lifecycle ---------------------------------------------------------------
 
   private attach(l: Live) {
+    // One agent process per session. Another one still here (two starts that raced, or two left running across a
+    // restart) would go on unseen: it gets no messages, its tools stop answering, and it may still act. It stops.
+    const before = this.lives.get(l.key);
+    if (before && before !== l) {
+      console.warn(`[sessions] ${l.key} had two agent processes (runs ${before.runner.meta.runId} and ${l.runner.meta.runId}): the older one stops`);
+      this.lives.delete(l.key);
+      try {
+        before.adapter.stop();
+      } catch {}
+    }
     this.lives.set(l.key, l);
     const { adapter, key } = l;
     const emitLive = () => {
@@ -1391,6 +1434,7 @@ export class SessionManager extends EventEmitter {
       setTimeout(() => {
         if (this.lives.get(key)?.adapter === adapter) this.lives.delete(key);
         l.runner.cleanup();
+        removeMcpRunFiles(l.runner.meta.runId);
         const tl = this.timelines.get(key);
         tl?.readMore()
           .then(() => tl.finish())
@@ -1485,7 +1529,7 @@ export class SessionManager extends EventEmitter {
       // What the app's capabilities add: instructions (memory, the assistant), MCP servers, environment.
       const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt, model: opts.model });
       Object.assign(env, add.env);
-      const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
+      const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add, runId };
       const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account, apiCredit: !!credit || undefined } };
       const runner = await Runner.start(meta, claudeSpec(o, env));
       const adapter = new ClaudeLive(runner, o);
@@ -2465,7 +2509,28 @@ export class SessionManager extends EventEmitter {
     return a?.cwd ?? null;
   }
 
-  async start(key: string, cfg: LiveConfig = {}, prompt?: string): Promise<void> {
+  /** The starts under way, by session: a session's agent process starts once, however many ask for it at the same time. */
+  private agentStarts = new Map<string, Promise<void>>();
+
+  /**
+   * Starts the session's agent process if it is not running. One at a time per session: the process is only known as
+   * the session's once its start has finished (several awaits), so two callers at once (a usage limit's "continue on
+   * the next account" and a queued message, 105 ms apart on 23 November 2026) each started one; the second one
+   * silently took the session over and the first ran on unseen, its tools answering "No session runs with that
+   * address". A second caller now waits for the first's start.
+   */
+  start(key: string, cfg: LiveConfig = {}, prompt?: string): Promise<void> {
+    if (this.lives.has(key)) return Promise.resolve();
+    const going = this.agentStarts.get(key);
+    if (going) return going;
+    const p = this.startNow(key, cfg, prompt).finally(() => {
+      if (this.agentStarts.get(key) === p) this.agentStarts.delete(key);
+    });
+    this.agentStarts.set(key, p);
+    return p;
+  }
+
+  private async startNow(key: string, cfg: LiveConfig = {}, prompt?: string): Promise<void> {
     refuseSubagent(leadsOf(this), key);
     if (this.lives.has(key)) return;
     checkModelSwitch(this.db, key, cfg.model);

@@ -41,6 +41,8 @@ export interface ClaudeOpts {
   pageServer?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
   add?: GivenAdditions;
+  /** The run this process is: its files of MCP servers and instructions are its own (mcpRunFiles). */
+  runId?: string;
 }
 
 export const CLAUDE_MODES = [
@@ -51,11 +53,27 @@ export const CLAUDE_MODES = [
   { value: 'bypassPermissions', label: 'Bypass', description: 'Never ask (full access)' },
 ];
 
+/**
+ * The files a run's process reads at its start: its MCP servers (their addresses carry the run's own token) and, on
+ * Windows, its instructions. Named by the run, never by the session: a second run of one session (two starts at once)
+ * rewriting the first's file gave the first process the second's token, and once the app followed only one of them,
+ * the other's tools answered "No session runs with that address" for good.
+ */
+export function mcpRunFiles(name: string): { config: string; instructions: string } {
+  const base = path.join(config.dataDir, 'mcp', name.replace(/[^\w-]/g, ''));
+  return { config: `${base}.json`, instructions: `${base}-instructions.md` };
+}
+
+/** Removes a run's files once its process is gone. */
+export function removeMcpRunFiles(runId: string) {
+  const f = mcpRunFiles(runId);
+  for (const p of [f.config, f.instructions]) fs.rmSync(p, { force: true });
+}
+
 /** The MCP servers for a session's run, written where only this user can read them; returns the path. */
-function mcpConfigFile(sessionId: string, cfg: object): string {
-  const dir = path.join(config.dataDir, 'mcp');
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${sessionId.replace(/[^\w-]/g, '')}.json`);
+function mcpConfigFile(name: string, cfg: object): string {
+  fs.mkdirSync(path.join(config.dataDir, 'mcp'), { recursive: true, mode: 0o700 });
+  const file = mcpRunFiles(name).config;
   fs.writeFileSync(file, JSON.stringify(cfg), { mode: 0o600 });
   return file;
 }
@@ -242,7 +260,7 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   for (const [name, d] of Object.entries(o.add?.mcpServers ?? {})) servers[name] = { ...(d.type === 'http' ? { type: 'http', url: d.url, ...(d.headers ? { headers: d.headers } : {}) } : { type: 'stdio', command: d.command, args: d.args ?? [], env: d.env ?? {} }), timeout: TOOL_TIMEOUT_MS };
   if (o.pageServer) servers[PAGE_SERVER] = { type: 'http', url: o.pageServer, timeout: TOOL_TIMEOUT_MS };
   // In a file only this user can read, not on the command line: its addresses carry the run's token.
-  if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.sessionId, { mcpServers: servers }));
+  if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.runId ?? o.sessionId, { mcpServers: servers }));
   // The page server's tools, and a connected account's tools on Ask first (Hydor holds their calls for your OK
   // in the Outbox, so Claude Code asking first as well would only ask twice).
   const allowed = [...(o.pageServer ? [`mcp__${PAGE_SERVER}`] : []), ...(o.add?.allowedTools ?? [])];
@@ -251,9 +269,8 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
     const text = o.add.instructions.join('\n\n');
     // Windows takes command lines of 32,767 characters at most: there the instructions go in a file of their own.
     if (process.platform === 'win32') {
-      const dir = path.join(config.dataDir, 'mcp');
-      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-      const file = path.join(dir, `${o.sessionId.replace(/[^\w-]/g, '')}-instructions.md`);
+      fs.mkdirSync(path.join(config.dataDir, 'mcp'), { recursive: true, mode: 0o700 });
+      const file = mcpRunFiles(o.runId ?? o.sessionId).instructions;
       fs.writeFileSync(file, text, { mode: 0o600 });
       args.push('--append-system-prompt-file', file);
     } else args.push('--append-system-prompt', text);
