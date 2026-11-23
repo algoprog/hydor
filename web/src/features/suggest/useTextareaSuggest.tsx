@@ -147,12 +147,24 @@ export function useTextareaSuggest(ref: RefObject<HTMLTextAreaElement | null>, o
     unbind.current?.();
     bound.current = el;
     if (!el) return;
-    const sync = () => ctl.sync();
-    const start = () => ((composing.current = true), ctl.sync());
-    const end = () => ((composing.current = false), ctl.sync());
-    const focus = () => (warmSuggest(), ctl.sync());
-    const blur = () => ((composing.current = false), ctl.reset());
-    const sel = () => document.activeElement === el && ctl.sync();
+    // Never while the box's own event is still being handled: these listeners run before React's onChange, and a grey
+    // word hidden or changed right there re-rendered the box with the text it had before the key, so a controlled
+    // textarea put that text back. The key was lost: with a suggestion showing, Backspace and any letter but the
+    // grey one did nothing. The check waits for the event to be over (a task later), once per burst of events.
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => {
+      if (pending === undefined) pending = setTimeout(() => ((pending = undefined), ctl.sync()), 0);
+    };
+    const start = () => ((composing.current = true), sync());
+    const end = () => ((composing.current = false), sync());
+    const focus = () => (warmSuggest(), sync());
+    const blur = () => {
+      clearTimeout(pending);
+      pending = undefined;
+      composing.current = false;
+      ctl.reset();
+    };
+    const sel = () => document.activeElement === el && sync();
     const on: [EventTarget, string, EventListener][] = [
       [el, 'input', sync],
       [el, 'compositionstart', start],
@@ -164,7 +176,10 @@ export function useTextareaSuggest(ref: RefObject<HTMLTextAreaElement | null>, o
       [document, 'selectionchange', sel],
     ];
     for (const [t, n, f] of on) t.addEventListener(n, f);
-    unbind.current = () => on.forEach(([t, n, f]) => t.removeEventListener(n, f));
+    unbind.current = () => {
+      clearTimeout(pending);
+      on.forEach(([t, n, f]) => t.removeEventListener(n, f));
+    };
     if (document.activeElement === el) focus();
   });
   useEffect(

@@ -85,15 +85,26 @@ export function useDocSuggest(o: { engine: DocEngine | null; st: SelState | null
   useEffect(() => {
     const root = o.engine?.root;
     if (!root) return;
-    const start = () => ((composing.current = true), ctl.sync());
-    const end = () => ((composing.current = false), ctl.sync());
-    const blur = () => ctl.reset();
-    const focus = () => (warmSuggest(), ctl.sync());
+    // As in a textarea (useTextareaSuggest): what shows changes once the editor has handled its own event, never in
+    // the middle of it (an input method's composition included).
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const later = () => {
+      if (pending === undefined) pending = setTimeout(() => ((pending = undefined), ctl.sync()), 0);
+    };
+    const start = () => ((composing.current = true), later());
+    const end = () => ((composing.current = false), later());
+    const blur = () => {
+      clearTimeout(pending);
+      pending = undefined;
+      ctl.reset();
+    };
+    const focus = () => (warmSuggest(), later());
     root.addEventListener('compositionstart', start);
     root.addEventListener('compositionend', end);
     root.addEventListener('blur', blur);
     root.addEventListener('focus', focus);
     return () => {
+      clearTimeout(pending);
       root.removeEventListener('compositionstart', start);
       root.removeEventListener('compositionend', end);
       root.removeEventListener('blur', blur);
