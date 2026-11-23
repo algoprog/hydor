@@ -291,7 +291,7 @@ If you pick a project on the start page where the agent picked doesn't work, the
 An agent works when you start a session as it, when another agent hands it work, and on its schedules. A schedule is a scheduled task that runs as the agent: at a time, every so often, once, when a page or feed changes, or when another service calls its webhook (see [Scheduled tasks](/guide/tasks)).
 
 - On the agent's page, **Add a schedule** opens the task editor with the agent picked and a time filled in: give it a name and the message each run starts with, and save.
-- Click a schedule in the list to change it, pause it or run it now.
+- Each schedule in the list has a switch that pauses it or turns it on, and a bin that deletes it after asking "Delete *name*?". Click its name to change it: the form has **Delete** too, beside **Test run**. This holds for the built-in agents as well: a schedule on the Researcher can be paused or deleted like any other. The same switch and **Delete** are in [Schedules](/agents/schedules), on its calendar's menu and in its list.
 - A schedule drafted with a new agent is made with it.
 - A schedule an agent adds to one of your agents starts on **Automatic** where it is offered (see [Scheduled tasks](/guide/tasks#model-effort-permissions-and-other-options)), unless that agent names a model of its own. An agent that thinks with a tier still runs on its tier.
 - An agent in any session can add, change or remove an agent's schedules for you (see [Ask an agent to make one](#ask-an-agent-to-make-one)).

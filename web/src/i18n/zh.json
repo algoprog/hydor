@@ -27564,5 +27564,8 @@
   "weight own words typed more than replies how much count heavier user": "权重 自己的词 输入的比回复多 重要多少 更重 用户",
   "{0} tokens of yours.": "你的 {0} 个词元。",
   "{0}: a short text": "{0}：一小段文字",
-  "{0}: text": "{0}：文字"
+  "{0}: text": "{0}：文字",
+  "Delete…": "删除…",
+  "Schedule": "定时运行",
+  "Stop it on its board": "在看板上停止"
 }

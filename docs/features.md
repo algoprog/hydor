@@ -1912,7 +1912,7 @@ programs shows each program's version and what is out, with Check now, Update no
   run that happened as a block at its time coloured by how it went (opening its session or its app run), the runs to
   come drawn faintly with their names, what runs more than eight times a day, watchers and webhooks as one band a
   day with counts, five at once gathered under "+N", each day's cost, filters by kind, and a list of them all with
-  the last result, the next run, a pause switch and a link to where each is changed; on a phone, a day at a time.
+  the last result, the next run, a pause switch, a delete button (not for a board card's refresh, which is stopped on its board) and a link to where each is changed; a right-click on a calendar entry or a list row opens a menu to edit, pause or turn it on, or delete it, and a tapped entry's card has the same buttons; on a phone, a day at a time. An agent's page, built-in agents' too, lists its schedules with a pause switch and a delete button each, and a saved task's form has Delete.
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
   usage limits is on); one you stopped yourself never does.

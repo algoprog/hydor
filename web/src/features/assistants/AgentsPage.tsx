@@ -10,11 +10,11 @@ import { agentFileName } from '@shared/agent-files';
 import { DEFAULT_ASSISTANT, hasOutput, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
-import { api, del, enc, put } from '../../lib/api';
+import { api, del, enc, post, put } from '../../lib/api';
 import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
-import { Badge, Button, cx, IconButton, MenuItem, Popover, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { Badge, Button, cx, IconButton, MenuItem, Popover, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { ColumnScroll } from '../layout/ColumnScroll';
 import { NavButton, PageHeader } from '../layout/PageHeader';
@@ -160,6 +160,10 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
         if (t) setTask({ task: t });
       })
       .catch(toastError);
+  const removeTask = async (s: { id: string; name: string }) => {
+    if (!(await confirm({ title: `Delete ${s.name}?`, body: 'It stops running, and its history goes. Sessions it started stay.', confirm: 'Delete', danger: true }))) return;
+    await del(`/api/tasks/${enc(s.id)}`).then(loadActivity, toastError);
+  };
   const spent = act?.monthUsd ?? 0;
   // Download as a file: a .hydor-agent, with nothing of yours in it.
   const download = () => {
@@ -259,18 +263,24 @@ function AgentDetail({ id, onEdit, wide }: { id: string; onEdit: (a: Partial<Ass
           ) : (
             <div className="-my-1 divide-y divide-line">
               {act.schedules.map((s) => (
-                <button key={s.id} type="button" onClick={() => editTask(s.id)} className="flex w-full items-center gap-3 py-2 text-left">
-                  <CalendarClock size={15} className="shrink-0 text-fg-3" />
-                  <span className="min-w-0 flex-1">
-                    <span translate="no" className="block truncate text-[13.5px]">
-                      {s.name}
+                <div key={s.id} className="flex items-center gap-2 py-2">
+                  <button type="button" onClick={() => editTask(s.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <CalendarClock size={15} className="shrink-0 text-fg-3" />
+                    <span className="min-w-0 flex-1">
+                      <span translate="no" className="block truncate text-[13.5px]">
+                        {s.name}
+                      </span>
+                      <span className="block truncate text-[12px] text-fg-3">
+                        {s.enabled ? (s.nextAt ? `Next ${untilText(s.nextAt)}` : 'On') : 'Paused'}
+                        {s.lastStatus && s.lastStatus !== 'ok' ? ` · ${s.lastStatus}` : ''}
+                      </span>
                     </span>
-                    <span className="block truncate text-[12px] text-fg-3">
-                      {s.enabled ? (s.nextAt ? `Next ${untilText(s.nextAt)}` : 'On') : 'Paused'}
-                      {s.lastStatus && s.lastStatus !== 'ok' ? ` · ${s.lastStatus}` : ''}
-                    </span>
-                  </span>
-                </button>
+                  </button>
+                  <Switch on={s.enabled} label={s.enabled ? 'Pause' : 'Turn on'} onChange={(on) => post(`/api/automations/tasks/${enc(s.id)}/enabled`, { on }).then(loadActivity, toastError)} />
+                  <IconButton label="Delete" size="sm" onClick={() => removeTask(s)}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                </div>
               ))}
             </div>
           )}

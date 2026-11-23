@@ -25708,5 +25708,8 @@
   "weight own words typed more than replies how much count heavier user": "重み 自分の言葉 入力 返信より 重視 ユーザー weight",
   "{0} tokens of yours.": "入力分のトークン：{0}。",
   "{0}: a short text": "{0}：短いテキスト",
-  "{0}: text": "{0}：テキスト"
+  "{0}: text": "{0}：テキスト",
+  "Delete…": "削除…",
+  "Schedule": "スケジュール",
+  "Stop it on its board": "ボードで停止"
 }

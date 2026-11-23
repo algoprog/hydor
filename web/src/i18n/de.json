@@ -26345,5 +26345,7 @@
   "weight own words typed more than replies how much count heavier user": "Gewicht eigene Wörter getippt mehr als Antworten wie stark zählen schwerer Nutzer weight own words user",
   "{0} tokens of yours.": "{0} Tokens von dir.",
   "{0}: a short text": "{0}: ein kurzer Text",
-  "{0}: text": "{0}: Text"
+  "{0}: text": "{0}: Text",
+  "Delete…": "Löschen …",
+  "Stop it on its board": "Auf ihrem Board stoppen"
 }

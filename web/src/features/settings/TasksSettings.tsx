@@ -509,6 +509,22 @@ export function TaskEditor({
       setBusy(false);
     }
   };
+  // A saved task (not a new one, nor an agent's proposal) can be deleted from its form.
+  const [confirm, confirmNode] = useConfirm();
+  const remove = async () => {
+    if (!task) return;
+    if (!(await confirm({ title: `Delete ${task.name}?`, body: 'It stops running, and its history goes. Sessions it started stay.', confirm: 'Delete', danger: true }))) return;
+    setBusy(true);
+    try {
+      await del(`/api/tasks/${enc(task.id)}`);
+      onSaved?.();
+      onClose();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   const [testMenu, setTestMenu] = useState(false);
   const [testAnchor, setTestAnchor] = useState<HTMLElement | null>(null);
   const runTest = async (dry = false) => {
@@ -550,6 +566,11 @@ export function TaskEditor({
                 <span className="block text-[11.5px] leading-snug text-fg-3">Nothing goes out: what it would send is listed</span>
               </MenuItem>
             </Popover>
+            {task && !onSubmit && (
+              <Button variant="ghost" className="ml-1 text-err hover:text-err" icon={<Trash2 size={14} />} onClick={remove} disabled={busy}>
+                Delete
+              </Button>
+            )}
           </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -750,6 +771,7 @@ export function TaskEditor({
         </div>
         {test && <TestStrip run={test} />}
       </div>
+      {confirmNode}
     </Dialog>
   );
 }

@@ -25709,5 +25709,8 @@
   "weight own words typed more than replies how much count heavier user": "peso palavras próprias digitadas mais que respostas quanto contam mais pesado usuário weight own words user",
   "{0} tokens of yours.": "{0} tokens seus.",
   "{0}: a short text": "{0}: um texto curto",
-  "{0}: text": "{0}: texto"
+  "{0}: text": "{0}: texto",
+  "Delete…": "Excluir…",
+  "Schedule": "Agendamento",
+  "Stop it on its board": "Parar no painel"
 }

@@ -25708,5 +25708,8 @@
   "weight own words typed more than replies how much count heavier user": "poids mots à soi saisis plus que les réponses combien compter plus lourd utilisateur",
   "{0} tokens of yours.": "{0} tokens de vos écrits.",
   "{0}: a short text": "{0} : un texte court",
-  "{0}: text": "{0} : texte"
+  "{0}: text": "{0} : texte",
+  "Delete…": "Supprimer…",
+  "Schedule": "Planification",
+  "Stop it on its board": "L’arrêter sur son tableau de bord"
 }

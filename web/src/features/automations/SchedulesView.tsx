@@ -5,16 +5,17 @@
 // schedule, watcher and webhook, with its last result, its next run, a switch to pause it and a link to where it is
 // changed (editing stays where it was). On a phone, one day at a time (arrows, or a swipe) and the list.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
-import { AppWindow, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Eye, LayoutDashboard, Pencil, Plus, Repeat, Webhook } from 'lucide-react';
+import { AppWindow, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Eye, LayoutDashboard, Pause, Pencil, Play, Plus, Repeat, Trash2, Webhook } from 'lucide-react';
 import { OUTCOME_LABEL, TRIGGER_LABEL, type RunStatus } from '@shared/automations';
 import { addDate, mondayOf, type ScheduleItem, type ScheduleWeek, type WeekBand, type WeekDay, type WeekNext, type WeekRun } from '@shared/schedules';
-import { api, enc, post } from '../../lib/api';
+import { api, del, enc, post } from '../../lib/api';
 import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toastError } from '../../lib/store';
-import { Badge, Button, cx, IconButton, Popover, Segmented, Switch, Throbber, useIsMobile } from '../../components/ui';
+import { Badge, Button, cx, IconButton, Popover, Segmented, Switch, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 import { AssistantIcon } from '../assistants/icons';
+import { ContextMenu, isMenuKey, type ContextMenuAt, type MenuEntry } from '../pages/common/menus';
 import { layLanes } from './lanes';
 import { localTime, OutcomeBadge, RunDots } from './parts';
 
@@ -159,6 +160,30 @@ function Source({ it }: { it: ScheduleItem }) {
 
 const editTitle = (it: ScheduleItem) => (it.agent ? 'Change it on its agent’s page' : it.app ? 'Change it on its app’s page' : it.board ? 'Change it on its board' : 'Change it in Settings → Scheduled tasks');
 
+/** What can be done with an item where it is listed: pause or resume it, and delete it (a board card's refresh is stopped on its board). */
+interface ItemActions {
+  toggle: (it: ScheduleItem) => void;
+  remove: (it: ScheduleItem) => void;
+}
+
+/** Its right-click menu: change it, pause or resume it, delete it (a board card's refresh: where to stop it). */
+function menuOf(it: ScheduleItem, a: ItemActions): MenuEntry[] {
+  return [
+    { label: 'Edit', icon: <Pencil size={14} />, run: () => go(it.edit) },
+    { label: it.enabled ? 'Pause' : 'Turn on', icon: it.enabled ? <Pause size={14} /> : <Play size={14} />, run: () => a.toggle(it) },
+    '-',
+    it.source === 'board'
+      ? { label: 'Stop it on its board', icon: <LayoutDashboard size={14} />, run: () => go(it.edit) }
+      : { label: 'Delete…', icon: <Trash2 size={14} />, danger: true, run: () => a.remove(it) },
+  ];
+}
+
+/** Where a menu key pressed on a button opens its menu: just under it. */
+const menuKeyAt = (el: HTMLElement): ContextMenuAt => {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + 12, y: r.bottom, keyed: true };
+};
+
 // ---- what a click opens -----------------------------------------------------------------------------------------
 
 type Pick =
@@ -172,7 +197,7 @@ type Entry = { kind: 'run'; run: WeekRun } | { kind: 'next'; next: WeekNext };
 /** A block's task, minute and a key of its own. */
 const entryOf = (e: Entry) => (e.kind === 'run' ? { task: e.run.task, min: e.run.min, key: e.run.id } : { task: e.next.task, min: e.next.min, key: `n${e.next.task}${e.next.at}` });
 
-function Detail({ pick, data, items, onPick, onClose }: { pick: Pick; data: ScheduleWeek; items: Map<string, ScheduleItem>; onPick: (p: Pick) => void; onClose: () => void }) {
+function Detail({ pick, data, items, actions, onPick, onClose }: { pick: Pick; data: ScheduleWeek; items: Map<string, ScheduleItem>; actions: ItemActions; onPick: (p: Pick) => void; onClose: () => void }) {
   const open = (f: () => void) => () => (onClose(), f());
   if (pick.kind === 'crowd')
     return (
@@ -197,9 +222,19 @@ function Detail({ pick, data, items, onPick, onClose }: { pick: Pick; data: Sche
   const it = items.get(pick.kind === 'run' ? pick.run.task : pick.kind === 'next' ? pick.next.task : pick.item.id);
   if (!it) return null;
   const edit = (
-    <Button size="sm" variant="ghost" icon={<Pencil size={13} />} title={editTitle(it)} onClick={open(() => go(it.edit))}>
-      Edit
-    </Button>
+    <>
+      <Button size="sm" variant="ghost" icon={<Pencil size={13} />} title={editTitle(it)} onClick={open(() => go(it.edit))}>
+        Edit
+      </Button>
+      <Button size="sm" variant="ghost" icon={it.enabled ? <Pause size={13} /> : <Play size={13} />} onClick={open(() => actions.toggle(it))}>
+        {it.enabled ? 'Pause' : 'Turn on'}
+      </Button>
+      {it.source !== 'board' && (
+        <Button size="sm" variant="ghost" className="text-err hover:text-err" icon={<Trash2 size={13} />} onClick={open(() => actions.remove(it))}>
+          Delete
+        </Button>
+      )}
+    </>
   );
   const head = (top: ReactNode) => (
     <>
@@ -312,7 +347,7 @@ const PX = HOUR / 60;
 const MIN_BLOCK = 22;
 const GUTTER = 46;
 
-function Block({ entry, top, height, lane, lanes, wide, items, onPick }: { entry: Entry; top: number; height: number; lane: number; lanes: number; wide: boolean; items: Map<string, ScheduleItem>; onPick: (p: Pick, el: HTMLElement) => void }) {
+function Block({ entry, top, height, lane, lanes, wide, items, onPick, onMenu }: { entry: Entry; top: number; height: number; lane: number; lanes: number; wide: boolean; items: Map<string, ScheduleItem>; onPick: (p: Pick, el: HTMLElement) => void; onMenu: (at: ContextMenuAt, id: string) => void }) {
   const r = entry.kind === 'run' ? entry.run : null;
   const { task, min } = entryOf(entry);
   const it = items.get(task);
@@ -321,6 +356,8 @@ function Block({ entry, top, height, lane, lanes, wide, items, onPick }: { entry
     <button
       type="button"
       onClick={(e) => onPick(entry, e.currentTarget)}
+      onContextMenu={(e) => (e.preventDefault(), onMenu({ x: e.clientX, y: e.clientY }, task))}
+      onKeyDown={(e) => isMenuKey(e) && (e.preventDefault(), onMenu(menuKeyAt(e.currentTarget), task))}
       title={`${it?.name ?? ''} · ${fmtMin(min)}${r ? ` · ${OUTCOME_LABEL[r.status]}` : ''}`}
       className={cx(
         'absolute overflow-hidden rounded-md border text-left text-[11.5px] leading-tight transition-[filter] hover:brightness-110 focus-visible:z-10',
@@ -338,7 +375,7 @@ function Block({ entry, top, height, lane, lanes, wide, items, onPick }: { entry
   );
 }
 
-function BandRow({ it, data, bands, cols, onPick }: { it: ScheduleItem; data: ScheduleWeek; bands: Map<string, WeekBand>; cols: string; onPick: (p: Pick, el: HTMLElement) => void }) {
+function BandRow({ it, data, bands, cols, onPick, onMenu }: { it: ScheduleItem; data: ScheduleWeek; bands: Map<string, WeekBand>; cols: string; onPick: (p: Pick, el: HTMLElement) => void; onMenu: (at: ContextMenuAt, id: string) => void }) {
   return (
     <div className="grid" style={{ gridTemplateColumns: cols }}>
       <div className="flex min-w-0 items-center gap-1.5 px-2 pt-1.5 text-[11.5px] text-fg-3" style={{ gridColumn: '1 / -1', paddingLeft: GUTTER + 6 }}>
@@ -356,6 +393,8 @@ function BandRow({ it, data, bands, cols, onPick }: { it: ScheduleItem; data: Sc
             key={d.date}
             type="button"
             onClick={(e) => onPick({ kind: 'band', item: it, day: d, band: b }, e.currentTarget)}
+            onContextMenu={(e) => (e.preventDefault(), onMenu({ x: e.clientX, y: e.clientY }, it.id))}
+            onKeyDown={(e) => isMenuKey(e) && (e.preventDefault(), onMenu(menuKeyAt(e.currentTarget), it.id))}
             className="mx-1 my-1 flex h-5 min-w-0 items-center gap-1.5 rounded-md px-1.5 hover:bg-bg-2"
             title={b ? `${b.runs} ran${b.planned ? ` · ${b.planned} to come` : ''}` : undefined}
           >
@@ -375,6 +414,7 @@ function WeekGrid({
   shown,
   tally,
   onPick,
+  onMenu,
   onSwipe,
 }: {
   data: ScheduleWeek;
@@ -382,6 +422,7 @@ function WeekGrid({
   shown: (id: string) => boolean;
   tally: Tally[];
   onPick: (p: Pick, el: HTMLElement) => void;
+  onMenu: (at: ContextMenuAt, id: string) => void;
   onSwipe?: (dir: -1 | 1) => void;
 }) {
   const n = data.days.length;
@@ -463,7 +504,7 @@ function WeekGrid({
             <ChevronDown size={13} className={cx('transition-transform', !bandsOpen && '-rotate-90')} />
             Every few minutes, watchers and webhooks · {bandItems.length}
           </button>
-          {bandsOpen && bandItems.map((it) => <BandRow key={it.id} it={it} data={data} bands={bands} cols={cols} onPick={onPick} />)}
+          {bandsOpen && bandItems.map((it) => <BandRow key={it.id} it={it} data={data} bands={bands} cols={cols} onPick={onPick} onMenu={onMenu} />)}
         </div>
       )}
       {/* The hours. */}
@@ -482,7 +523,7 @@ function WeekGrid({
                 <span key={h} className="pointer-events-none absolute inset-x-0 border-t border-line/60" style={{ top: (h + 1) * HOUR }} />
               ))}
               {columns[day].placed.map((p) => (
-                <Block key={entryOf(p.item).key} wide={n === 1} entry={p.item} top={p.top} height={p.height} lane={p.lane} lanes={p.lanes} items={items} onPick={onPick} />
+                <Block key={entryOf(p.item).key} wide={n === 1} entry={p.item} top={p.top} height={p.height} lane={p.lane} lanes={p.lanes} items={items} onPick={onPick} onMenu={onMenu} />
               ))}
               {columns[day].crowds.map((c) => (
                 <button
@@ -561,7 +602,7 @@ function MonthGrid({ data, month, tally, onDay }: { data: ScheduleWeek; month: s
 
 // ---- the list ----------------------------------------------------------------------------------------------------
 
-function ItemRow({ it, onChanged }: { it: ScheduleItem; onChanged: () => void }) {
+function ItemRow({ it, onChanged, onDelete, onMenu }: { it: ScheduleItem; onChanged: () => void; onDelete: () => void; onMenu: (at: ContextMenuAt) => void }) {
   const [busy, setBusy] = useState(false);
   const failedStart = it.lastStatus && it.lastStatus !== 'ok';
   const toggle = (on: boolean) => {
@@ -571,7 +612,11 @@ function ItemRow({ it, onChanged }: { it: ScheduleItem; onChanged: () => void })
       .finally(() => setBusy(false));
   };
   return (
-    <div className="flex items-start gap-3 px-3.5 py-3 sm:px-4">
+    <div
+      className="flex items-start gap-3 px-3.5 py-3 sm:px-4"
+      onContextMenu={(e) => (e.preventDefault(), onMenu({ x: e.clientX, y: e.clientY }))}
+      onKeyDown={(e) => isMenuKey(e) && (e.preventDefault(), onMenu(menuKeyAt(e.target as HTMLElement)))}
+    >
       <span className="mt-0.5 flex w-4 shrink-0 justify-center text-fg-3">
         <KindIcon it={it} />
       </span>
@@ -622,6 +667,11 @@ function ItemRow({ it, onChanged }: { it: ScheduleItem; onChanged: () => void })
         <IconButton label={editTitle(it)} size="sm" onClick={() => go(it.edit)}>
           <Pencil size={14} />
         </IconButton>
+        {it.source !== 'board' && (
+          <IconButton label="Delete" size="sm" onClick={onDelete}>
+            <Trash2 size={14} />
+          </IconButton>
+        )}
       </div>
     </div>
   );
@@ -641,6 +691,8 @@ export function SchedulesView() {
   const [filter, setFilter] = useState<Filter>('all');
   const [pick, setPick] = useState<Pick | null>(null);
   const anchor = useRef<HTMLElement | null>(null);
+  const [menu, setMenu] = useState<{ at: ContextMenuAt; id: string } | null>(null);
+  const [confirm, confirmNode] = useConfirm();
   const shownMode = mobile ? 'day' : mode;
   const query =
     shownMode === 'day'
@@ -674,6 +726,14 @@ export function SchedulesView() {
     const it = items.get(id);
     return !!it && matches(it, filter);
   }, [items, filter]);
+  const actions: ItemActions = {
+    toggle: (it) => void post(`/api/automations/tasks/${enc(it.id)}/enabled`, { on: !it.enabled }).then(load, toastError),
+    remove: async (it) => {
+      if (!(await confirm({ title: `Delete ${it.name}?`, body: 'It stops running, and its history goes. Sessions it started stay.', confirm: 'Delete', danger: true }))) return;
+      await del(`/api/tasks/${enc(it.id)}`).then(load, toastError);
+    },
+  };
+  const menuItem = menu ? items.get(menu.id) : undefined;
   const onPick = (p: Pick, el: HTMLElement) => {
     anchor.current = el;
     setPick(p);
@@ -822,7 +882,7 @@ export function SchedulesView() {
             }}
           />
         ) : (
-          <WeekGrid data={data} items={items} shown={shown} tally={tally} onPick={onPick} onSwipe={shownMode === 'day' ? shift : undefined} />
+          <WeekGrid data={data} items={items} shown={shown} tally={tally} onPick={onPick} onMenu={(at, id) => setMenu({ at, id })} onSwipe={shownMode === 'day' ? shift : undefined} />
         )}
         {data.capped && <div className="border-t border-line px-4 py-1.5 text-[12px] text-fg-3">Some runs to come are left out here: there are too many to draw.</div>}
       </section>
@@ -834,15 +894,17 @@ export function SchedulesView() {
         </div>
         <div className="divide-y divide-line rounded-2xl border border-line bg-panel">
           {list.map((it) => (
-            <ItemRow key={it.id} it={it} onChanged={load} />
+            <ItemRow key={it.id} it={it} onChanged={load} onDelete={() => void actions.remove(it)} onMenu={(at) => setMenu({ at, id: it.id })} />
           ))}
           {!list.length && <div className="px-4 py-6 text-center text-[13px] text-fg-3">None here.</div>}
         </div>
       </section>
 
       <Popover anchor={anchor} open={!!pick} onClose={() => setPick(null)} width={pick?.kind === 'crowd' ? 280 : 320} sheet>
-        {pick && <Detail pick={pick} data={data} items={items} onPick={(p) => setPick(p)} onClose={() => setPick(null)} />}
+        {pick && <Detail pick={pick} data={data} items={items} actions={actions} onPick={(p) => setPick(p)} onClose={() => setPick(null)} />}
       </Popover>
+      <ContextMenu at={menu?.at ?? null} items={menuItem ? menuOf(menuItem, actions) : []} onClose={() => setMenu(null)} title="Schedule" />
+      {confirmNode}
     </div>
   );
 }

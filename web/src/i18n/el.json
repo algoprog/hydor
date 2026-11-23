@@ -27567,5 +27567,8 @@
   "weight own words typed more than replies how much count heavier user": "weight own words typed more than replies how much count heavier user βάρος δικές μου λέξεις πληκτρολογημένες περισσότερο από απαντήσεις πόσο μετράνε χρήστης",
   "{0} tokens of yours.": "{0} tokens δικά σας.",
   "{0}: a short text": "{0}: ένα σύντομο κείμενο",
-  "{0}: text": "{0}: κείμενο"
+  "{0}: text": "{0}: κείμενο",
+  "Delete…": "Διαγραφή…",
+  "Schedule": "Πρόγραμμα",
+  "Stop it on its board": "Διακοπή στο ταμπλό του"
 }

@@ -291,7 +291,7 @@ Se você escolher na página inicial um projeto em que o agente selecionado não
 Um agente trabalha quando você começa uma sessão como ele, quando outro agente passa trabalho para ele e nos agendamentos dele. Um agendamento é uma tarefa agendada executada como o agente: em um horário, de tempos em tempos, uma única vez, quando uma página ou um feed muda, ou quando outro serviço chama o webhook dele (veja [Tarefas agendadas](/guide/tasks)).
 
 - Na página do agente, **Adicionar um agendamento** abre o editor de tarefas com o agente selecionado e um horário preenchido: dê um nome e a mensagem com que cada execução começa, e salve.
-- Clique em um agendamento na lista para alterá-lo, pausá-lo ou executá-lo agora.
+- Cada agendamento da lista tem um interruptor que o pausa ou o ativa e uma lixeira que o exclui depois de perguntar "Excluir *nome*?". Clique no nome para alterá-lo: o formulário também tem **Excluir**, ao lado de **Execução de teste**. Isso vale também para os agentes integrados: um agendamento do Pesquisador pode ser pausado ou excluído como qualquer outro. O mesmo interruptor e **Excluir** estão em [Agendamentos](/agents/schedules), no menu do calendário e na lista.
 - Um agendamento rascunhado com um novo agente é criado com ele.
 - Um agendamento que um agente adiciona a um dos seus agentes começa em **Automático** onde isso é oferecido (veja [Tarefas agendadas](/guide/tasks#model-effort-permissions-and-other-options)), a menos que esse agente indique um modelo próprio. Um agente que pensa com um nível continua executando no nível dele.
 - Um agente, em qualquer sessão, pode adicionar, alterar ou remover agendamentos de um agente para você (veja [Peça a um agente para criar um](#ask-an-agent-to-make-one)).
