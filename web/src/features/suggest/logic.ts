@@ -49,12 +49,15 @@ const lastChar = (s: string) => (s ? Array.from(s.slice(-2)).pop()! : '');
 /**
  * Whether the caret is where a suggestion makes sense: collapsed, not mid-composition, nothing more on its line
  * (the grey text would sit on top of it), and right after a letter (the end of a word) or after whitespace (a new
- * word). After punctuation or nothing at all there is no word to suggest.
+ * word). After punctuation or nothing at all there is no word to suggest, nor in an @file, a /command or an address.
  */
 export function atWordEnd(f: Field): boolean {
   if (f.selected || f.composing || !/\S/.test(f.before)) return false;
   if (f.after && !/^[ \t]*(\r?\n|$)/.test(f.after)) return false;
   const c = lastChar(f.before);
+  // A file or command being picked from the box's @ and / menus, or an address, is not a word to complete.
+  const token = /\S*$/.exec(f.before)![0];
+  if (token && (/^[@/]/.test(token) || token.includes('://'))) return false;
   return /\s/.test(c) || WORD.test(c);
 }
 

@@ -79,7 +79,7 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
       {t.state === 'running' && (
         <Notice icon={<Throbber size={15} />}>
           Learning from your writing{t.progress && t.progress.total ? `: ${Math.round((100 * t.progress.done) / t.progress.total)}%` : '…'}
-          {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2" />}
+          {t.progress && t.progress.total > 0 && <DownloadBar share={t.progress.done / t.progress.total} label="Learning" className="mt-2 w-64 max-w-full" />}
         </Notice>
       )}
       {t.state === 'waiting' && settings.personalise && <Notice>{t.next ? `It learns from your writing next at ${when(t.next)}, when the computer is quiet.` : 'It learns from your writing when the computer is quiet.'}</Notice>}

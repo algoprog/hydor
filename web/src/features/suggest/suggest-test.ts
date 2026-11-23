@@ -32,6 +32,11 @@ ok(!atWordEnd(f('Hel', 'lo')), 'mid-word');
 ok(atWordEnd(f('Hello wor', '\nnext line')), 'more text only on later lines');
 ok(!atWordEnd(f('Hello wor', '', { composing: true })), 'while an input method composes');
 ok(!atWordEnd(f('Hello wor', '', { selected: true })), 'a selection');
+ok(!atWordEnd(f('look at @src/ma')), 'an @file being picked');
+ok(!atWordEnd(f('/comp')), 'a /command being picked');
+ok(!atWordEnd(f('see https://exam')), 'an address');
+ok(atWordEnd(f('either and/or')), 'a slash inside a word');
+ok(atWordEnd(f('@src/main.ts and then ')), 'after a space once the file is done');
 ok(startsWord(f('a ')) && !startsWord(f('a')), 'a new word begins after whitespace');
 
 // ---- the switches
