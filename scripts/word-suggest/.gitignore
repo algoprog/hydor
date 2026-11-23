@@ -1,0 +1,23 @@
+# Everything this code makes stays out of git: your own messages (data/extract.py's files and stats), the public
+# corpora and test sets it downloads, and every run, checkpoint, benchmark and release folder.
+# Only the code, the tests and the three small JSON files in data/ are tracked.
+
+# data/: nothing but the corpus builders and the three tracked JSON files
+/data/*
+!/data/*.py
+!/data/iso3to1.json
+!/data/mix_complement.json
+!/data/pretrain50b_manifest.json
+
+# what the scripts write
+/runs/
+/bench/
+/release/
+/third_party/
+/hf/
+
+# Python environments and caches
+/.venv/
+/.venv-*/
+__pycache__/
+*.pyc

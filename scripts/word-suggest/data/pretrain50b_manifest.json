@@ -1,0 +1,4201 @@
+{
+ "totals": {
+  "web_train_tokens": 49413030494,
+  "fineweb2": 48785879805,
+  "wikipedia": 371308470,
+  "madlad": 255842219,
+  "web_dev_tokens": 248481286,
+  "chat_train_tokens": 76134680,
+  "languages": 202,
+  "tasks_pending": 0
+ },
+ "groups": {
+  "Latin": {
+   "languages": 126,
+   "tokens": 29777237985
+  },
+  "CJK": {
+   "languages": 4,
+   "tokens": 3329825021
+  },
+  "Cyrillic": {
+   "languages": 12,
+   "tokens": 4867552344
+  },
+  "Arabic": {
+   "languages": 22,
+   "tokens": 3017361558
+  },
+  "other": {
+   "languages": 9,
+   "tokens": 2119074868
+  },
+  "SE Asian": {
+   "languages": 5,
+   "tokens": 1472483377
+  },
+  "Indic": {
+   "languages": 22,
+   "tokens": 4508889435
+  },
+  "Ethiopic": {
+   "languages": 2,
+   "tokens": 320605906
+  }
+ },
+ "languages": {
+  "deu_Latn": {
+   "config": "deu_Latn",
+   "flores": [
+    "deu_Latn"
+   ],
+   "target": 1419459136,
+   "fineweb2": 1419674429,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 7057085,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1419674429,
+   "group": "Latin"
+  },
+  "jpn_Jpan": {
+   "config": "jpn_Jpan",
+   "flores": [
+    "jpn_Jpan"
+   ],
+   "target": 1313393247,
+   "fineweb2": 1313626108,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 6532553,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1313626108,
+   "group": "CJK"
+  },
+  "spa_Latn": {
+   "config": "spa_Latn",
+   "flores": [
+    "spa_Latn"
+   ],
+   "target": 1296981900,
+   "fineweb2": 1297254851,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 6454392,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1297254851,
+   "group": "Latin"
+  },
+  "fra_Latn": {
+   "config": "fra_Latn",
+   "flores": [
+    "fra_Latn"
+   ],
+   "target": 1282690784,
+   "fineweb2": 1282869018,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 6546439,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1282869018,
+   "group": "Latin"
+  },
+  "ita_Latn": {
+   "config": "ita_Latn",
+   "flores": [
+    "ita_Latn"
+   ],
+   "target": 1111912525,
+   "fineweb2": 1112094052,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 5489881,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1112094052,
+   "group": "Latin"
+  },
+  "por_Latn": {
+   "config": "por_Latn",
+   "flores": [
+    "por_Latn"
+   ],
+   "target": 1022567133,
+   "fineweb2": 1022678021,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 5091287,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1022678021,
+   "group": "Latin"
+  },
+  "nld_Latn": {
+   "config": "nld_Latn",
+   "flores": [
+    "nld_Latn"
+   ],
+   "target": 972617212,
+   "fineweb2": 972692641,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4862675,
+   "tasks": 1,
+   "reasons": [],
+   "total": 972692641,
+   "group": "Latin"
+  },
+  "pol_Latn": {
+   "config": "pol_Latn",
+   "flores": [
+    "pol_Latn"
+   ],
+   "target": 874356552,
+   "fineweb2": 874389432,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4516597,
+   "tasks": 1,
+   "reasons": [],
+   "total": 874389432,
+   "group": "Latin"
+  },
+  "swe_Latn": {
+   "config": "swe_Latn",
+   "flores": [
+    "swe_Latn"
+   ],
+   "target": 805827296,
+   "fineweb2": 805847862,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4233664,
+   "tasks": 1,
+   "reasons": [],
+   "total": 805847862,
+   "group": "Latin"
+  },
+  "kor_Hang": {
+   "config": "kor_Hang",
+   "flores": [
+    "kor_Hang"
+   ],
+   "target": 805195853,
+   "fineweb2": 805292075,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4115380,
+   "tasks": 1,
+   "reasons": [],
+   "total": 805292075,
+   "group": "CJK"
+  },
+  "ces_Latn": {
+   "config": "ces_Latn",
+   "flores": [
+    "ces_Latn"
+   ],
+   "target": 800730557,
+   "fineweb2": 800904881,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3963787,
+   "tasks": 1,
+   "reasons": [],
+   "total": 800904881,
+   "group": "Latin"
+  },
+  "rus_Cyrl": {
+   "config": "rus_Cyrl",
+   "flores": [
+    "rus_Cyrl"
+   ],
+   "target": 1595979659,
+   "fineweb2": 1177407359,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 5844405,
+   "tasks": 2,
+   "reasons": [],
+   "total": 1177407359,
+   "group": "Cyrillic"
+  },
+  "ind_Latn": {
+   "config": "ind_Latn",
+   "flores": [
+    "ind_Latn"
+   ],
+   "target": 788860328,
+   "fineweb2": 789178962,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3988220,
+   "tasks": 1,
+   "reasons": [],
+   "total": 789178962,
+   "group": "Latin"
+  },
+  "vie_Latn": {
+   "config": "vie_Latn",
+   "flores": [
+    "vie_Latn"
+   ],
+   "target": 774139349,
+   "fineweb2": 774567042,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3994525,
+   "tasks": 1,
+   "reasons": [],
+   "total": 774567042,
+   "group": "Latin"
+  },
+  "cmn_Hani": {
+   "config": "cmn_Hani",
+   "flores": [
+    "zho_Hans",
+    "zho_Hant"
+   ],
+   "target": 1541963879,
+   "fineweb2": 1097983738,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 5618888,
+   "tasks": 2,
+   "reasons": [],
+   "total": 1097983738,
+   "group": "CJK"
+  },
+  "hun_Latn": {
+   "config": "hun_Latn",
+   "flores": [
+    "hun_Latn"
+   ],
+   "target": 745281857,
+   "fineweb2": 745395001,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3695364,
+   "tasks": 1,
+   "reasons": [],
+   "total": 745395001,
+   "group": "Latin"
+  },
+  "nob_Latn": {
+   "config": "nob_Latn",
+   "flores": [
+    "nob_Latn"
+   ],
+   "target": 733146984,
+   "fineweb2": 733455153,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3605109,
+   "tasks": 1,
+   "reasons": [],
+   "total": 733455153,
+   "group": "Latin"
+  },
+  "fin_Latn": {
+   "config": "fin_Latn",
+   "flores": [
+    "fin_Latn"
+   ],
+   "target": 728048486,
+   "fineweb2": 728393942,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3724482,
+   "tasks": 1,
+   "reasons": [],
+   "total": 728393942,
+   "group": "Latin"
+  },
+  "tur_Latn": {
+   "config": "tur_Latn",
+   "flores": [
+    "tur_Latn"
+   ],
+   "target": 721641315,
+   "fineweb2": 721728383,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3668937,
+   "tasks": 1,
+   "reasons": [],
+   "total": 721728383,
+   "group": "Latin"
+  },
+  "dan_Latn": {
+   "config": "dan_Latn",
+   "flores": [
+    "dan_Latn"
+   ],
+   "target": 701827000,
+   "fineweb2": 701940828,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3658821,
+   "tasks": 1,
+   "reasons": [],
+   "total": 701940828,
+   "group": "Latin"
+  },
+  "ron_Latn": {
+   "config": "ron_Latn",
+   "flores": [
+    "ron_Latn"
+   ],
+   "target": 661012392,
+   "fineweb2": 661091538,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3217156,
+   "tasks": 1,
+   "reasons": [],
+   "total": 661091538,
+   "group": "Latin"
+  },
+  "fas_Arab": {
+   "config": "fas_Arab",
+   "flores": [
+    "pes_Arab"
+   ],
+   "target": 657944750,
+   "fineweb2": 658269905,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3347064,
+   "tasks": 1,
+   "reasons": [],
+   "total": 658269905,
+   "group": "Arabic"
+  },
+  "ell_Grek": {
+   "config": "ell_Grek",
+   "flores": [
+    "ell_Grek"
+   ],
+   "target": 647504761,
+   "fineweb2": 647886149,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3095104,
+   "tasks": 1,
+   "reasons": [],
+   "total": 647886149,
+   "group": "other"
+  },
+  "ukr_Cyrl": {
+   "config": "ukr_Cyrl",
+   "flores": [
+    "ukr_Cyrl"
+   ],
+   "target": 638078258,
+   "fineweb2": 638245641,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3180701,
+   "tasks": 1,
+   "reasons": [],
+   "total": 638245641,
+   "group": "Cyrillic"
+  },
+  "tha_Thai": {
+   "config": "tha_Thai",
+   "flores": [
+    "tha_Thai"
+   ],
+   "target": 618803627,
+   "fineweb2": 619134115,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3106495,
+   "tasks": 1,
+   "reasons": [],
+   "total": 619134115,
+   "group": "SE Asian"
+  },
+  "bul_Cyrl": {
+   "config": "bul_Cyrl",
+   "flores": [
+    "bul_Cyrl"
+   ],
+   "target": 592455452,
+   "fineweb2": 592530841,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2939340,
+   "tasks": 1,
+   "reasons": [],
+   "total": 592530841,
+   "group": "Cyrillic"
+  },
+  "arb_Arab": {
+   "config": "arb_Arab",
+   "flores": [
+    "arb_Arab"
+   ],
+   "target": 590287830,
+   "fineweb2": 590528860,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 3031978,
+   "tasks": 1,
+   "reasons": [],
+   "total": 590528860,
+   "group": "Arabic"
+  },
+  "hin_Deva": {
+   "config": "hin_Deva",
+   "flores": [
+    "hin_Deva"
+   ],
+   "target": 584886763,
+   "fineweb2": 585221388,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2904020,
+   "tasks": 1,
+   "reasons": [],
+   "total": 585221388,
+   "group": "Indic"
+  },
+  "lit_Latn": {
+   "config": "lit_Latn",
+   "flores": [
+    "lit_Latn"
+   ],
+   "target": 559625183,
+   "fineweb2": 559838213,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2880811,
+   "tasks": 1,
+   "reasons": [],
+   "total": 559838213,
+   "group": "Latin"
+  },
+  "slk_Latn": {
+   "config": "slk_Latn",
+   "flores": [
+    "slk_Latn"
+   ],
+   "target": 550536020,
+   "fineweb2": 550833090,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2733268,
+   "tasks": 1,
+   "reasons": [],
+   "total": 550833090,
+   "group": "Latin"
+  },
+  "heb_Hebr": {
+   "config": "heb_Hebr",
+   "flores": [
+    "heb_Hebr"
+   ],
+   "target": 536303518,
+   "fineweb2": 536322682,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2708169,
+   "tasks": 1,
+   "reasons": [],
+   "total": 536322682,
+   "group": "other"
+  },
+  "ben_Beng": {
+   "config": "ben_Beng",
+   "flores": [
+    "ben_Beng"
+   ],
+   "target": 525322676,
+   "fineweb2": 525689567,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2645882,
+   "tasks": 1,
+   "reasons": [],
+   "total": 525689567,
+   "group": "Indic"
+  },
+  "ekk_Latn": {
+   "config": "ekk_Latn",
+   "flores": [
+    "est_Latn"
+   ],
+   "target": 508957353,
+   "fineweb2": 509135614,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2563432,
+   "tasks": 1,
+   "reasons": [],
+   "total": 509135614,
+   "group": "Latin"
+  },
+  "slv_Latn": {
+   "config": "slv_Latn",
+   "flores": [
+    "slv_Latn"
+   ],
+   "target": 496310767,
+   "fineweb2": 496678523,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2470757,
+   "tasks": 1,
+   "reasons": [],
+   "total": 496678523,
+   "group": "Latin"
+  },
+  "bos_Latn": {
+   "config": "bos_Latn",
+   "flores": [
+    "bos_Latn"
+   ],
+   "target": 496227364,
+   "fineweb2": 496349169,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2519218,
+   "tasks": 1,
+   "reasons": [],
+   "total": 496349169,
+   "group": "Latin"
+  },
+  "lvs_Latn": {
+   "config": "lvs_Latn",
+   "flores": [
+    "lvs_Latn"
+   ],
+   "target": 490165294,
+   "fineweb2": 490189743,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2396553,
+   "tasks": 1,
+   "reasons": [],
+   "total": 490189743,
+   "group": "Latin"
+  },
+  "cat_Latn": {
+   "config": "cat_Latn",
+   "flores": [
+    "cat_Latn"
+   ],
+   "target": 484529263,
+   "fineweb2": 484776460,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2432498,
+   "tasks": 1,
+   "reasons": [],
+   "total": 484776460,
+   "group": "Latin"
+  },
+  "azj_Latn": {
+   "config": "azj_Latn",
+   "flores": [
+    "azj_Latn"
+   ],
+   "target": 454190156,
+   "fineweb2": 454496891,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2206279,
+   "tasks": 1,
+   "reasons": [],
+   "total": 454496891,
+   "group": "Latin"
+  },
+  "eng_Latn": {
+   "config": "eng_Latn",
+   "flores": [
+    "eng_Latn"
+   ],
+   "target": 2141959415,
+   "fineweb2": 1861116498,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 9439733,
+   "tasks": 5,
+   "reasons": [],
+   "total": 1861116498,
+   "group": "Latin"
+  },
+  "zsm_Latn": {
+   "config": "zsm_Latn",
+   "flores": [
+    "zsm_Latn"
+   ],
+   "target": 415043224,
+   "fineweb2": 415291917,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2062305,
+   "tasks": 1,
+   "reasons": [],
+   "total": 415291917,
+   "group": "Latin"
+  },
+  "hrv_Latn": {
+   "config": "hrv_Latn",
+   "flores": [
+    "hrv_Latn"
+   ],
+   "target": 397682452,
+   "fineweb2": 397704463,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1924896,
+   "tasks": 1,
+   "reasons": [],
+   "total": 397704463,
+   "group": "Latin"
+  },
+  "urd_Arab": {
+   "config": "urd_Arab",
+   "flores": [
+    "urd_Arab"
+   ],
+   "target": 397312439,
+   "fineweb2": 397659625,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2028318,
+   "tasks": 1,
+   "reasons": [],
+   "total": 397659625,
+   "group": "Arabic"
+  },
+  "tam_Taml": {
+   "config": "tam_Taml",
+   "flores": [
+    "tam_Taml"
+   ],
+   "target": 395557741,
+   "fineweb2": 395784541,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2015140,
+   "tasks": 1,
+   "reasons": [],
+   "total": 395784541,
+   "group": "Indic"
+  },
+  "npi_Deva": {
+   "config": "npi_Deva",
+   "flores": [
+    "npi_Deva"
+   ],
+   "target": 384366819,
+   "fineweb2": 384557035,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1933408,
+   "tasks": 1,
+   "reasons": [],
+   "total": 384557035,
+   "group": "Indic"
+  },
+  "kaz_Cyrl": {
+   "config": "kaz_Cyrl",
+   "flores": [
+    "kaz_Cyrl"
+   ],
+   "target": 371001341,
+   "fineweb2": 371062930,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1832486,
+   "tasks": 1,
+   "reasons": [],
+   "total": 371062930,
+   "group": "Cyrillic"
+  },
+  "srp_Cyrl": {
+   "config": "srp_Cyrl",
+   "flores": [
+    "srp_Cyrl"
+   ],
+   "target": 360721851,
+   "fineweb2": 360935079,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1767201,
+   "tasks": 1,
+   "reasons": [],
+   "total": 360935079,
+   "group": "Cyrillic"
+  },
+  "mar_Deva": {
+   "config": "mar_Deva",
+   "flores": [
+    "mar_Deva"
+   ],
+   "target": 346287831,
+   "fineweb2": 346632968,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1697919,
+   "tasks": 1,
+   "reasons": [],
+   "total": 346632968,
+   "group": "Indic"
+  },
+  "mal_Mlym": {
+   "config": "mal_Mlym",
+   "flores": [
+    "mal_Mlym"
+   ],
+   "target": 340969912,
+   "fineweb2": 341017037,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1668879,
+   "tasks": 1,
+   "reasons": [],
+   "total": 341017037,
+   "group": "Indic"
+  },
+  "als_Latn": {
+   "config": "als_Latn",
+   "flores": [
+    "als_Latn"
+   ],
+   "target": 338909252,
+   "fineweb2": 339157032,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1650870,
+   "tasks": 1,
+   "reasons": [],
+   "total": 339157032,
+   "group": "Latin"
+  },
+  "kat_Geor": {
+   "config": "kat_Geor",
+   "flores": [
+    "kat_Geor"
+   ],
+   "target": 336536656,
+   "fineweb2": 336972107,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1706064,
+   "tasks": 1,
+   "reasons": [],
+   "total": 336972107,
+   "group": "other"
+  },
+  "khm_Khmr": {
+   "config": "khm_Khmr",
+   "flores": [
+    "khm_Khmr"
+   ],
+   "target": 330766372,
+   "fineweb2": 331232594,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1592901,
+   "tasks": 1,
+   "reasons": [],
+   "total": 331232594,
+   "group": "SE Asian"
+  },
+  "mkd_Cyrl": {
+   "config": "mkd_Cyrl",
+   "flores": [
+    "mkd_Cyrl"
+   ],
+   "target": 322008417,
+   "fineweb2": 322236872,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1568870,
+   "tasks": 1,
+   "reasons": [],
+   "total": 322236872,
+   "group": "Cyrillic"
+  },
+  "isl_Latn": {
+   "config": "isl_Latn",
+   "flores": [
+    "isl_Latn"
+   ],
+   "target": 317848360,
+   "fineweb2": 318228526,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1593070,
+   "tasks": 1,
+   "reasons": [],
+   "total": 318228526,
+   "group": "Latin"
+  },
+  "kan_Knda": {
+   "config": "kan_Knda",
+   "flores": [
+    "kan_Knda"
+   ],
+   "target": 308590932,
+   "fineweb2": 308882180,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1580106,
+   "tasks": 1,
+   "reasons": [],
+   "total": 308882180,
+   "group": "Indic"
+  },
+  "bel_Cyrl": {
+   "config": "bel_Cyrl",
+   "flores": [
+    "bel_Cyrl"
+   ],
+   "target": 305225848,
+   "fineweb2": 305620402,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1642255,
+   "tasks": 1,
+   "reasons": [],
+   "total": 305620402,
+   "group": "Cyrillic"
+  },
+  "tel_Telu": {
+   "config": "tel_Telu",
+   "flores": [
+    "tel_Telu"
+   ],
+   "target": 299734488,
+   "fineweb2": 300088122,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1547134,
+   "tasks": 1,
+   "reasons": [],
+   "total": 300088122,
+   "group": "Indic"
+  },
+  "ary_Arab": {
+   "config": "ary_Arab",
+   "flores": [
+    "ary_Arab"
+   ],
+   "target": 289890229,
+   "fineweb2": 289924411,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1424306,
+   "tasks": 1,
+   "reasons": [],
+   "total": 289924411,
+   "group": "Arabic"
+  },
+  "uzn_Latn": {
+   "config": "uzn_Latn",
+   "flores": [
+    "uzn_Latn"
+   ],
+   "target": 286423820,
+   "fineweb2": 286590579,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1448414,
+   "tasks": 1,
+   "reasons": [],
+   "total": 286590579,
+   "group": "Latin"
+  },
+  "mya_Mymr": {
+   "config": "mya_Mymr",
+   "flores": [
+    "mya_Mymr"
+   ],
+   "target": 285799996,
+   "fineweb2": 286308067,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1442160,
+   "tasks": 1,
+   "reasons": [],
+   "total": 286308067,
+   "group": "SE Asian"
+  },
+  "guj_Gujr": {
+   "config": "guj_Gujr",
+   "flores": [
+    "guj_Gujr"
+   ],
+   "target": 278091307,
+   "fineweb2": 278133583,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1423035,
+   "tasks": 1,
+   "reasons": [],
+   "total": 278133583,
+   "group": "Indic"
+  },
+  "fil_Latn": {
+   "config": "fil_Latn",
+   "flores": [
+    "tgl_Latn"
+   ],
+   "target": 276751863,
+   "fineweb2": 276910981,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1450013,
+   "tasks": 1,
+   "reasons": [],
+   "total": 276910981,
+   "group": "Latin"
+  },
+  "glg_Latn": {
+   "config": "glg_Latn",
+   "flores": [
+    "glg_Latn"
+   ],
+   "target": 273035527,
+   "fineweb2": 273130758,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1447508,
+   "tasks": 1,
+   "reasons": [],
+   "total": 273130758,
+   "group": "Latin"
+  },
+  "ory_Orya": {
+   "config": "ory_Orya",
+   "flores": [
+    "ory_Orya"
+   ],
+   "target": 270538220,
+   "fineweb2": 270964590,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1333315,
+   "tasks": 1,
+   "reasons": [],
+   "total": 270964590,
+   "group": "Indic"
+  },
+  "hye_Armn": {
+   "config": "hye_Armn",
+   "flores": [
+    "hye_Armn"
+   ],
+   "target": 269272588,
+   "fineweb2": 269787001,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1331796,
+   "tasks": 1,
+   "reasons": [],
+   "total": 269787001,
+   "group": "other"
+  },
+  "eus_Latn": {
+   "config": "eus_Latn",
+   "flores": [
+    "eus_Latn"
+   ],
+   "target": 261091662,
+   "fineweb2": 261406045,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1239119,
+   "tasks": 1,
+   "reasons": [],
+   "total": 261406045,
+   "group": "Latin"
+  },
+  "kir_Cyrl": {
+   "config": "kir_Cyrl",
+   "flores": [
+    "kir_Cyrl"
+   ],
+   "target": 260577108,
+   "fineweb2": 261003758,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1323209,
+   "tasks": 1,
+   "reasons": [],
+   "total": 261003758,
+   "group": "Cyrillic"
+  },
+  "afr_Latn": {
+   "config": "afr_Latn",
+   "flores": [
+    "afr_Latn"
+   ],
+   "target": 257508321,
+   "fineweb2": 257851870,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1267130,
+   "tasks": 1,
+   "reasons": [],
+   "total": 257851870,
+   "group": "Latin"
+  },
+  "sin_Sinh": {
+   "config": "sin_Sinh",
+   "flores": [
+    "sin_Sinh"
+   ],
+   "target": 257398302,
+   "fineweb2": 257824090,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1345341,
+   "tasks": 1,
+   "reasons": [],
+   "total": 257824090,
+   "group": "Indic"
+  },
+  "khk_Cyrl": {
+   "config": "khk_Cyrl",
+   "flores": [
+    "khk_Cyrl"
+   ],
+   "target": 251700581,
+   "fineweb2": 252202323,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1352202,
+   "tasks": 1,
+   "reasons": [],
+   "total": 252202323,
+   "group": "Cyrillic"
+  },
+  "tgk_Cyrl": {
+   "config": "tgk_Cyrl",
+   "flores": [
+    "tgk_Cyrl"
+   ],
+   "target": 251435855,
+   "fineweb2": 251596967,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1163416,
+   "tasks": 1,
+   "reasons": [],
+   "total": 251596967,
+   "group": "Cyrillic"
+  },
+  "mri_Latn": {
+   "config": "mri_Latn",
+   "flores": [
+    "mri_Latn"
+   ],
+   "target": 140643317,
+   "fineweb2": 146044823,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 713427,
+   "tasks": 1,
+   "reasons": [],
+   "total": 146044823,
+   "group": "Latin"
+  },
+  "pan_Guru": {
+   "config": "pan_Guru",
+   "flores": [
+    "pan_Guru"
+   ],
+   "target": 238832783,
+   "fineweb2": 239237994,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1243829,
+   "tasks": 1,
+   "reasons": [],
+   "total": 239237994,
+   "group": "Indic"
+  },
+  "gla_Latn": {
+   "config": "gla_Latn",
+   "flores": [
+    "gla_Latn"
+   ],
+   "target": 138194918,
+   "fineweb2": 179956141,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 843939,
+   "tasks": 1,
+   "reasons": [],
+   "total": 179956141,
+   "group": "Latin"
+  },
+  "yue_Hani": {
+   "config": "yue_Hani",
+   "flores": [
+    "yue_Hant"
+   ],
+   "target": 136446438,
+   "fineweb2": 112923100,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 576917,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 112923100,
+   "group": "CJK"
+  },
+  "nya_Latn": {
+   "config": "nya_Latn",
+   "flores": [
+    "nya_Latn"
+   ],
+   "target": 132471980,
+   "fineweb2": 111553624,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 588664,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 111553624,
+   "group": "Latin"
+  },
+  "cym_Latn": {
+   "config": "cym_Latn",
+   "flores": [
+    "cym_Latn"
+   ],
+   "target": 230649363,
+   "fineweb2": 230759252,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1160407,
+   "tasks": 1,
+   "reasons": [],
+   "total": 230759252,
+   "group": "Latin"
+  },
+  "zul_Latn": {
+   "config": "zul_Latn",
+   "flores": [
+    "zul_Latn"
+   ],
+   "target": 128653728,
+   "fineweb2": 139881762,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 696108,
+   "tasks": 1,
+   "reasons": [],
+   "total": 139881762,
+   "group": "Latin"
+  },
+  "swh_Latn": {
+   "config": "swh_Latn",
+   "flores": [
+    "swh_Latn"
+   ],
+   "target": 226455920,
+   "fineweb2": 226584097,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1158423,
+   "tasks": 1,
+   "reasons": [],
+   "total": 226584097,
+   "group": "Latin"
+  },
+  "pbt_Arab": {
+   "config": "pbt_Arab",
+   "flores": [
+    "pbt_Arab"
+   ],
+   "target": 225328463,
+   "fineweb2": 225709684,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1093558,
+   "tasks": 1,
+   "reasons": [],
+   "total": 225709684,
+   "group": "Arabic"
+  },
+  "smo_Latn": {
+   "config": "smo_Latn",
+   "flores": [
+    "smo_Latn"
+   ],
+   "target": 124051883,
+   "fineweb2": 120785421,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 628864,
+   "tasks": 1,
+   "reasons": [],
+   "total": 120785421,
+   "group": "Latin"
+  },
+  "nno_Latn": {
+   "config": "nno_Latn",
+   "flores": [
+    "nno_Latn"
+   ],
+   "target": 222820970,
+   "fineweb2": 222882549,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1110805,
+   "tasks": 1,
+   "reasons": [],
+   "total": 222882549,
+   "group": "Latin"
+  },
+  "amh_Ethi": {
+   "config": "amh_Ethi",
+   "flores": [
+    "amh_Ethi"
+   ],
+   "target": 220124646,
+   "fineweb2": 220390843,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1113312,
+   "tasks": 1,
+   "reasons": [],
+   "total": 220390843,
+   "group": "Ethiopic"
+  },
+  "som_Latn": {
+   "config": "som_Latn",
+   "flores": [
+    "som_Latn"
+   ],
+   "target": 217426391,
+   "fineweb2": 217565190,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1090095,
+   "tasks": 1,
+   "reasons": [],
+   "total": 217565190,
+   "group": "Latin"
+  },
+  "tir_Ethi": {
+   "config": "tir_Ethi",
+   "flores": [
+    "tir_Ethi"
+   ],
+   "target": 113898136,
+   "fineweb2": 97332038,
+   "wikipedia": 161979,
+   "madlad": 2721046,
+   "dev": 492573,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 100215063,
+   "group": "Ethiopic"
+  },
+  "gle_Latn": {
+   "config": "gle_Latn",
+   "flores": [
+    "gle_Latn"
+   ],
+   "target": 213532731,
+   "fineweb2": 213533502,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1024361,
+   "tasks": 1,
+   "reasons": [],
+   "total": 213533502,
+   "group": "Latin"
+  },
+  "sot_Latn": {
+   "config": "sot_Latn",
+   "flores": [
+    "sot_Latn"
+   ],
+   "target": 107721712,
+   "fineweb2": 99805081,
+   "wikipedia": 198256,
+   "madlad": 0,
+   "dev": 571013,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 100003337,
+   "group": "Latin"
+  },
+  "sun_Latn": {
+   "config": "sun_Latn",
+   "flores": [
+    "sun_Latn"
+   ],
+   "target": 106339846,
+   "fineweb2": 100510164,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 487938,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 100510164,
+   "group": "Latin"
+  },
+  "ibo_Latn": {
+   "config": "ibo_Latn",
+   "flores": [
+    "ibo_Latn"
+   ],
+   "target": 104393633,
+   "fineweb2": 106479950,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 521208,
+   "tasks": 1,
+   "reasons": [],
+   "total": 106479950,
+   "group": "Latin"
+  },
+  "arz_Arab": {
+   "config": "arz_Arab",
+   "flores": [
+    "arz_Arab"
+   ],
+   "target": 202957608,
+   "fineweb2": 164650113,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 844687,
+   "tasks": 1,
+   "reasons": [],
+   "total": 164650113,
+   "group": "Arabic"
+  },
+  "snd_Arab": {
+   "config": "snd_Arab",
+   "flores": [
+    "snd_Arab"
+   ],
+   "target": 101087402,
+   "fineweb2": 131615040,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 637155,
+   "tasks": 1,
+   "reasons": [],
+   "total": 131615040,
+   "group": "Arabic"
+  },
+  "mlt_Latn": {
+   "config": "mlt_Latn",
+   "flores": [
+    "mlt_Latn"
+   ],
+   "target": 200558336,
+   "fineweb2": 200757652,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1010022,
+   "tasks": 1,
+   "reasons": [],
+   "total": 200757652,
+   "group": "Latin"
+  },
+  "hau_Latn": {
+   "config": "hau_Latn",
+   "flores": [
+    "hau_Latn"
+   ],
+   "target": 198717321,
+   "fineweb2": 199006154,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 986281,
+   "tasks": 1,
+   "reasons": [],
+   "total": 199006154,
+   "group": "Latin"
+  },
+  "lao_Laoo": {
+   "config": "lao_Laoo",
+   "flores": [
+    "lao_Laoo"
+   ],
+   "target": 197927876,
+   "fineweb2": 198545662,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 971958,
+   "tasks": 1,
+   "reasons": [],
+   "total": 198545662,
+   "group": "SE Asian"
+  },
+  "ckb_Arab": {
+   "config": "ckb_Arab",
+   "flores": [
+    "ckb_Arab"
+   ],
+   "target": 197743033,
+   "fineweb2": 197879158,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 958585,
+   "tasks": 1,
+   "reasons": [],
+   "total": 197879158,
+   "group": "Arabic"
+  },
+  "jav_Latn": {
+   "config": "jav_Latn",
+   "flores": [
+    "jav_Latn"
+   ],
+   "target": 90242048,
+   "fineweb2": 117775393,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 674372,
+   "tasks": 1,
+   "reasons": [],
+   "total": 117775393,
+   "group": "Latin"
+  },
+  "yor_Latn": {
+   "config": "yor_Latn",
+   "flores": [
+    "yor_Latn"
+   ],
+   "target": 86083685,
+   "fineweb2": 85488970,
+   "wikipedia": 4399939,
+   "madlad": 10148281,
+   "dev": 506092,
+   "tasks": 1,
+   "reasons": [],
+   "total": 100037190,
+   "group": "Latin"
+  },
+  "pap_Latn": {
+   "config": "pap_Latn",
+   "flores": [
+    "pap_Latn"
+   ],
+   "target": 79224614,
+   "fineweb2": 103073651,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 529738,
+   "tasks": 1,
+   "reasons": [],
+   "total": 103073651,
+   "group": "Latin"
+  },
+  "epo_Latn": {
+   "config": "epo_Latn",
+   "flores": [
+    "epo_Latn"
+   ],
+   "target": 179057738,
+   "fineweb2": 179285055,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 901560,
+   "tasks": 1,
+   "reasons": [],
+   "total": 179285055,
+   "group": "Latin"
+  },
+  "tuk_Latn": {
+   "config": "tuk_Latn",
+   "flores": [
+    "tuk_Latn"
+   ],
+   "target": 178240678,
+   "fineweb2": 178327811,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 912952,
+   "tasks": 1,
+   "reasons": [],
+   "total": 178327811,
+   "group": "Latin"
+  },
+  "bak_Cyrl": {
+   "config": "bak_Cyrl",
+   "flores": [
+    "bak_Cyrl"
+   ],
+   "target": 173799599,
+   "fineweb2": 173730716,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 949166,
+   "tasks": 1,
+   "reasons": [],
+   "total": 173730716,
+   "group": "Cyrillic"
+  },
+  "sna_Latn": {
+   "config": "sna_Latn",
+   "flores": [
+    "sna_Latn"
+   ],
+   "target": 72855147,
+   "fineweb2": 95317035,
+   "wikipedia": 3055565,
+   "madlad": 1768074,
+   "dev": 525180,
+   "tasks": 1,
+   "reasons": [],
+   "total": 100140674,
+   "group": "Latin"
+  },
+  "kin_Latn": {
+   "config": "kin_Latn",
+   "flores": [
+    "kin_Latn"
+   ],
+   "target": 170098574,
+   "fineweb2": 170162159,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 871896,
+   "tasks": 1,
+   "reasons": [],
+   "total": 170162159,
+   "group": "Latin"
+  },
+  "xho_Latn": {
+   "config": "xho_Latn",
+   "flores": [
+    "xho_Latn"
+   ],
+   "target": 169131076,
+   "fineweb2": 169227699,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 799065,
+   "tasks": 1,
+   "reasons": [],
+   "total": 169227699,
+   "group": "Latin"
+  },
+  "ltz_Latn": {
+   "config": "ltz_Latn",
+   "flores": [
+    "ltz_Latn"
+   ],
+   "target": 163479333,
+   "fineweb2": 163680346,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 841307,
+   "tasks": 1,
+   "reasons": [],
+   "total": 163680346,
+   "group": "Latin"
+  },
+  "azb_Arab": {
+   "config": "azb_Arab",
+   "flores": [
+    "azb_Arab"
+   ],
+   "target": 63245037,
+   "fineweb2": 44544806,
+   "wikipedia": 37340816,
+   "madlad": 0,
+   "dev": 407117,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 81885622,
+   "group": "Arabic"
+  },
+  "kmr_Latn": {
+   "config": "kmr_Latn",
+   "flores": [
+    "kmr_Latn"
+   ],
+   "target": 162297315,
+   "fineweb2": 162327968,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 829632,
+   "tasks": 1,
+   "reasons": [],
+   "total": 162327968,
+   "group": "Latin"
+  },
+  "lus_Latn": {
+   "config": "lus_Latn",
+   "flores": [
+    "lus_Latn"
+   ],
+   "target": 61552074,
+   "fineweb2": 61269361,
+   "wikipedia": 0,
+   "madlad": 38779236,
+   "dev": 515133,
+   "tasks": 1,
+   "reasons": [],
+   "total": 100048597,
+   "group": "Latin"
+  },
+  "tat_Cyrl": {
+   "config": "tat_Cyrl",
+   "flores": [
+    "tat_Cyrl"
+   ],
+   "target": 160926065,
+   "fineweb2": 160979456,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 797030,
+   "tasks": 1,
+   "reasons": [],
+   "total": 160979456,
+   "group": "Cyrillic"
+  },
+  "bod_Tibt": {
+   "config": "bod_Tibt",
+   "flores": [
+    "bod_Tibt"
+   ],
+   "target": 155967799,
+   "fineweb2": 156067791,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 803408,
+   "tasks": 1,
+   "reasons": [],
+   "total": 156067791,
+   "group": "other"
+  },
+  "plt_Latn": {
+   "config": "plt_Latn",
+   "flores": [
+    "plt_Latn"
+   ],
+   "target": 154098350,
+   "fineweb2": 154338370,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 776593,
+   "tasks": 1,
+   "reasons": [],
+   "total": 154338370,
+   "group": "Latin"
+  },
+  "ceb_Latn": {
+   "config": "ceb_Latn",
+   "flores": [
+    "ceb_Latn"
+   ],
+   "target": 153596092,
+   "fineweb2": 153900642,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 802730,
+   "tasks": 1,
+   "reasons": [],
+   "total": 153900642,
+   "group": "Latin"
+  },
+  "uig_Arab": {
+   "config": "uig_Arab",
+   "flores": [
+    "uig_Arab"
+   ],
+   "target": 152831669,
+   "fineweb2": 153151093,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 801509,
+   "tasks": 1,
+   "reasons": [],
+   "total": 153151093,
+   "group": "Arabic"
+  },
+  "hat_Latn": {
+   "config": "hat_Latn",
+   "flores": [
+    "hat_Latn"
+   ],
+   "target": 151974648,
+   "fineweb2": 152302470,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 814454,
+   "tasks": 1,
+   "reasons": [],
+   "total": 152302470,
+   "group": "Latin"
+  },
+  "asm_Beng": {
+   "config": "asm_Beng",
+   "flores": [
+    "asm_Beng"
+   ],
+   "target": 150502400,
+   "fineweb2": 150669872,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 750441,
+   "tasks": 1,
+   "reasons": [],
+   "total": 150669872,
+   "group": "Indic"
+  },
+  "run_Latn": {
+   "config": "run_Latn",
+   "flores": [
+    "run_Latn"
+   ],
+   "target": 50292220,
+   "fineweb2": 37605134,
+   "wikipedia": 158961,
+   "madlad": 455755,
+   "dev": 195811,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 38219850,
+   "group": "Latin"
+  },
+  "ars_Arab": {
+   "config": "ars_Arab",
+   "flores": [
+    "ars_Arab"
+   ],
+   "target": 147143700,
+   "fineweb2": 112274557,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 609150,
+   "tasks": 1,
+   "reasons": [],
+   "total": 112274557,
+   "group": "Arabic"
+  },
+  "ydd_Hebr": {
+   "config": "ydd_Hebr",
+   "flores": [
+    "ydd_Hebr"
+   ],
+   "target": 146423394,
+   "fineweb2": 146673971,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 720037,
+   "tasks": 1,
+   "reasons": [],
+   "total": 146673971,
+   "group": "other"
+  },
+  "fao_Latn": {
+   "config": "fao_Latn",
+   "flores": [
+    "fao_Latn"
+   ],
+   "target": 146186003,
+   "fineweb2": 146335945,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 773715,
+   "tasks": 1,
+   "reasons": [],
+   "total": 146335945,
+   "group": "Latin"
+  },
+  "oci_Latn": {
+   "config": "oci_Latn",
+   "flores": [
+    "oci_Latn"
+   ],
+   "target": 41240917,
+   "fineweb2": 42082328,
+   "wikipedia": 27363835,
+   "madlad": 30586857,
+   "dev": 513547,
+   "tasks": 1,
+   "reasons": [],
+   "total": 100033020,
+   "group": "Latin"
+  },
+  "ast_Latn": {
+   "config": "ast_Latn",
+   "flores": [
+    "ast_Latn"
+   ],
+   "target": 38128458,
+   "fineweb2": 48556795,
+   "wikipedia": 51459439,
+   "madlad": 0,
+   "dev": 501996,
+   "tasks": 1,
+   "reasons": [],
+   "total": 100016234,
+   "group": "Latin"
+  },
+  "gaz_Latn": {
+   "config": "gaz_Latn",
+   "flores": [
+    "gaz_Latn"
+   ],
+   "target": 37372004,
+   "fineweb2": 37605767,
+   "wikipedia": 746377,
+   "madlad": 21957437,
+   "dev": 309527,
+   "tasks": 1,
+   "reasons": [],
+   "total": 60309581,
+   "group": "Latin"
+  },
+  "dzo_Tibt": {
+   "config": "dzo_Tibt",
+   "flores": [
+    "dzo_Tibt"
+   ],
+   "target": 33855151,
+   "fineweb2": 19565697,
+   "wikipedia": 981444,
+   "madlad": 719081,
+   "dev": 103137,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 21266222,
+   "group": "other"
+  },
+  "crh_Latn": {
+   "config": "crh_Latn",
+   "flores": [
+    "crh_Latn"
+   ],
+   "target": 29778373,
+   "fineweb2": 21580804,
+   "wikipedia": 2112133,
+   "madlad": 2048,
+   "dev": 124605,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 23694985,
+   "group": "Latin"
+  },
+  "san_Deva": {
+   "config": "san_Deva",
+   "flores": [
+    "san_Deva"
+   ],
+   "target": 27307227,
+   "fineweb2": 25147114,
+   "wikipedia": 7661977,
+   "madlad": 10629430,
+   "dev": 248555,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 43438521,
+   "group": "Indic"
+  },
+  "lim_Latn": {
+   "config": "lim_Latn",
+   "flores": [
+    "lim_Latn"
+   ],
+   "target": 26471875,
+   "fineweb2": 16192794,
+   "wikipedia": 7977345,
+   "madlad": 0,
+   "dev": 111553,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 24170139,
+   "group": "Latin"
+  },
+  "shn_Mymr": {
+   "config": "shn_Mymr",
+   "flores": [
+    "shn_Mymr"
+   ],
+   "target": 22864318,
+   "fineweb2": 30378585,
+   "wikipedia": 5681189,
+   "madlad": 1203165,
+   "dev": 202620,
+   "tasks": 1,
+   "reasons": [],
+   "total": 37262939,
+   "group": "SE Asian"
+  },
+  "lug_Latn": {
+   "config": "lug_Latn",
+   "flores": [
+    "lug_Latn"
+   ],
+   "target": 21399110,
+   "fineweb2": 23731457,
+   "wikipedia": 1810874,
+   "madlad": 14566635,
+   "dev": 184703,
+   "tasks": 1,
+   "reasons": [],
+   "total": 40108966,
+   "group": "Latin"
+  },
+  "srd_Latn": {
+   "config": "srd_Latn",
+   "flores": [
+    "srd_Latn"
+   ],
+   "target": 18509860,
+   "fineweb2": 16147749,
+   "wikipedia": 3038911,
+   "madlad": 0,
+   "dev": 110310,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 19186660,
+   "group": "Latin"
+  },
+  "fij_Latn": {
+   "config": "fij_Latn",
+   "flores": [
+    "fij_Latn"
+   ],
+   "target": 17854914,
+   "fineweb2": 12614873,
+   "wikipedia": 151598,
+   "madlad": 5789680,
+   "dev": 86916,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 18556151,
+   "group": "Latin"
+  },
+  "lin_Latn": {
+   "config": "lin_Latn",
+   "flores": [
+    "lin_Latn"
+   ],
+   "target": 16259695,
+   "fineweb2": 12341056,
+   "wikipedia": 595490,
+   "madlad": 4597766,
+   "dev": 83407,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 17534312,
+   "group": "Latin"
+  },
+  "mai_Deva": {
+   "config": "mai_Deva",
+   "flores": [
+    "mai_Deva"
+   ],
+   "target": 15890537,
+   "fineweb2": 20049100,
+   "wikipedia": 3074952,
+   "madlad": 1595749,
+   "dev": 138267,
+   "tasks": 1,
+   "reasons": [],
+   "total": 24719801,
+   "group": "Indic"
+  },
+  "bho_Deva": {
+   "config": "bho_Deva",
+   "flores": [
+    "bho_Deva"
+   ],
+   "target": 15787091,
+   "fineweb2": 13434938,
+   "wikipedia": 0,
+   "madlad": 5004218,
+   "dev": 94814,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 18439156,
+   "group": "Indic"
+  },
+  "ilo_Latn": {
+   "config": "ilo_Latn",
+   "flores": [
+    "ilo_Latn"
+   ],
+   "target": 15428636,
+   "fineweb2": 14852816,
+   "wikipedia": 4845021,
+   "madlad": 14891268,
+   "dev": 182536,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 34589105,
+   "group": "Latin"
+  },
+  "ban_Latn": {
+   "config": "ban_Latn",
+   "flores": [
+    "ban_Latn"
+   ],
+   "target": 14457019,
+   "fineweb2": 8898578,
+   "wikipedia": 4789000,
+   "madlad": 862196,
+   "dev": 59482,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 14549774,
+   "group": "Latin"
+  },
+  "fur_Latn": {
+   "config": "fur_Latn",
+   "flores": [
+    "fur_Latn"
+   ],
+   "target": 12032162,
+   "fineweb2": 15921345,
+   "wikipedia": 1117802,
+   "madlad": 0,
+   "dev": 87919,
+   "tasks": 1,
+   "reasons": [],
+   "total": 17039147,
+   "group": "Latin"
+  },
+  "hne_Deva": {
+   "config": "hne_Deva",
+   "flores": [
+    "hne_Deva"
+   ],
+   "target": 11636418,
+   "fineweb2": 9921086,
+   "wikipedia": 0,
+   "madlad": 210384,
+   "dev": 33177,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 10131470,
+   "group": "Indic"
+  },
+  "lmo_Latn": {
+   "config": "lmo_Latn",
+   "flores": [
+    "lmo_Latn"
+   ],
+   "target": 10352269,
+   "fineweb2": 6887313,
+   "wikipedia": 10326999,
+   "madlad": 0,
+   "dev": 95706,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 17214312,
+   "group": "Latin"
+  },
+  "gug_Latn": {
+   "config": "gug_Latn",
+   "flores": [
+    "grn_Latn"
+   ],
+   "target": 9932056,
+   "fineweb2": 10040478,
+   "wikipedia": 1901685,
+   "madlad": 5519583,
+   "dev": 69445,
+   "tasks": 1,
+   "reasons": [],
+   "total": 17461746,
+   "group": "Latin"
+  },
+  "tso_Latn": {
+   "config": "tso_Latn",
+   "flores": [
+    "tso_Latn"
+   ],
+   "target": 9805054,
+   "fineweb2": 8856390,
+   "wikipedia": 255687,
+   "madlad": 7796019,
+   "dev": 104166,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 16908096,
+   "group": "Latin"
+  },
+  "ltg_Latn": {
+   "config": "ltg_Latn",
+   "flores": [
+    "ltg_Latn"
+   ],
+   "target": 9385618,
+   "fineweb2": 9243935,
+   "wikipedia": 306680,
+   "madlad": 4434928,
+   "dev": 62544,
+   "tasks": 1,
+   "reasons": [],
+   "total": 13985543,
+   "group": "Latin"
+  },
+  "kab_Latn": {
+   "config": "kab_Latn",
+   "flores": [
+    "kab_Latn"
+   ],
+   "target": 8043287,
+   "fineweb2": 8538570,
+   "wikipedia": 1452407,
+   "madlad": 0,
+   "dev": 68890,
+   "tasks": 1,
+   "reasons": [],
+   "total": 9990977,
+   "group": "Latin"
+  },
+  "twi_Latn": {
+   "config": "twi_Latn",
+   "flores": [
+    "aka_Latn",
+    "twi_Latn"
+   ],
+   "target": 8011086,
+   "fineweb2": 8676362,
+   "wikipedia": 2789990,
+   "madlad": 7488832,
+   "dev": 100173,
+   "tasks": 1,
+   "reasons": [],
+   "total": 18955184,
+   "group": "Latin"
+  },
+  "nso_Latn": {
+   "config": "nso_Latn",
+   "flores": [
+    "nso_Latn"
+   ],
+   "target": 7718623,
+   "fineweb2": 7314945,
+   "wikipedia": 670343,
+   "madlad": 6719367,
+   "dev": 91201,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 14704655,
+   "group": "Latin"
+  },
+  "tsn_Latn": {
+   "config": "tsn_Latn",
+   "flores": [
+    "tsn_Latn"
+   ],
+   "target": 7715907,
+   "fineweb2": 7155642,
+   "wikipedia": 825514,
+   "madlad": 5791192,
+   "dev": 54715,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 13772348,
+   "group": "Latin"
+  },
+  "ewe_Latn": {
+   "config": "ewe_Latn",
+   "flores": [
+    "ewe_Latn"
+   ],
+   "target": 7706510,
+   "fineweb2": 9994514,
+   "wikipedia": 302150,
+   "madlad": 7280730,
+   "dev": 75037,
+   "tasks": 1,
+   "reasons": [],
+   "total": 17577394,
+   "group": "Latin"
+  },
+  "scn_Latn": {
+   "config": "scn_Latn",
+   "flores": [
+    "scn_Latn"
+   ],
+   "target": 6919248,
+   "fineweb2": 5406356,
+   "wikipedia": 4550987,
+   "madlad": 0,
+   "dev": 54620,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 9957343,
+   "group": "Latin"
+  },
+  "kac_Latn": {
+   "config": "kac_Latn",
+   "flores": [
+    "kac_Latn"
+   ],
+   "target": 6263563,
+   "fineweb2": 7313587,
+   "wikipedia": 0,
+   "madlad": 3110608,
+   "dev": 47925,
+   "tasks": 1,
+   "reasons": [],
+   "total": 10424195,
+   "group": "Latin"
+  },
+  "sag_Latn": {
+   "config": "sag_Latn",
+   "flores": [
+    "sag_Latn"
+   ],
+   "target": 5630191,
+   "fineweb2": 5112455,
+   "wikipedia": 25389,
+   "madlad": 3450903,
+   "dev": 42865,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 8588747,
+   "group": "Latin"
+  },
+  "mni_Beng": {
+   "config": "mni_Beng",
+   "flores": [
+    "mni_Beng"
+   ],
+   "target": 5209714,
+   "fineweb2": 4447271,
+   "wikipedia": 0,
+   "madlad": 548081,
+   "dev": 23902,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 4995352,
+   "group": "Indic"
+  },
+  "tpi_Latn": {
+   "config": "tpi_Latn",
+   "flores": [
+    "tpi_Latn"
+   ],
+   "target": 5011254,
+   "fineweb2": 4046382,
+   "wikipedia": 101532,
+   "madlad": 0,
+   "dev": 18424,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 4147914,
+   "group": "Latin"
+  },
+  "szl_Latn": {
+   "config": "szl_Latn",
+   "flores": [
+    "szl_Latn"
+   ],
+   "target": 4970494,
+   "fineweb2": 4721716,
+   "wikipedia": 6247331,
+   "madlad": 0,
+   "dev": 67364,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 10969047,
+   "group": "Latin"
+  },
+  "wol_Latn": {
+   "config": "wol_Latn",
+   "flores": [
+    "wol_Latn"
+   ],
+   "target": 4484115,
+   "fineweb2": 4342786,
+   "wikipedia": 571686,
+   "madlad": 1126699,
+   "dev": 37110,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 6041171,
+   "group": "Latin"
+  },
+  "sat_Olck": {
+   "config": "sat_Olck",
+   "flores": [
+    "sat_Olck"
+   ],
+   "target": 3725490,
+   "fineweb2": 3630456,
+   "wikipedia": 16505280,
+   "madlad": 0,
+   "dev": 100963,
+   "tasks": 1,
+   "reasons": [],
+   "total": 20135736,
+   "group": "Indic"
+  },
+  "ace_Latn": {
+   "config": "ace_Latn",
+   "flores": [
+    "ace_Latn"
+   ],
+   "target": 3500085,
+   "fineweb2": 2648197,
+   "wikipedia": 1208426,
+   "madlad": 1203681,
+   "dev": 32708,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 5060304,
+   "group": "Latin"
+  },
+  "ayr_Latn": {
+   "config": "ayr_Latn",
+   "flores": [
+    "ayr_Latn"
+   ],
+   "target": 3391318,
+   "fineweb2": 2610783,
+   "wikipedia": 1522590,
+   "madlad": 3493626,
+   "dev": 43234,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 7626999,
+   "group": "Latin"
+  },
+  "pag_Latn": {
+   "config": "pag_Latn",
+   "flores": [
+    "pag_Latn"
+   ],
+   "target": 3113689,
+   "fineweb2": 2279531,
+   "wikipedia": 134839,
+   "madlad": 2447173,
+   "dev": 19240,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 4861543,
+   "group": "Latin"
+  },
+  "lij_Latn": {
+   "config": "lij_Latn",
+   "flores": [
+    "lij_Latn"
+   ],
+   "target": 2789890,
+   "fineweb2": 2730791,
+   "wikipedia": 2631970,
+   "madlad": 0,
+   "dev": 27339,
+   "tasks": 1,
+   "reasons": [],
+   "total": 5362761,
+   "group": "Latin"
+  },
+  "vec_Latn": {
+   "config": "vec_Latn",
+   "flores": [
+    "vec_Latn"
+   ],
+   "target": 2767076,
+   "fineweb2": 2071191,
+   "wikipedia": 8026521,
+   "madlad": 11769491,
+   "dev": 118886,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 21867203,
+   "group": "Latin"
+  },
+  "bjn_Arab": {
+   "config": "bjn_Arab",
+   "flores": [
+    "bjn_Arab"
+   ],
+   "target": 2559014,
+   "fineweb2": 676884,
+   "wikipedia": 303,
+   "madlad": 0,
+   "dev": 3800,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 677187,
+   "group": "Arabic"
+  },
+  "ssw_Latn": {
+   "config": "ssw_Latn",
+   "flores": [
+    "ssw_Latn"
+   ],
+   "target": 2405626,
+   "fineweb2": 2567883,
+   "wikipedia": 313701,
+   "madlad": 1499984,
+   "dev": 16251,
+   "tasks": 1,
+   "reasons": [],
+   "total": 4381568,
+   "group": "Latin"
+  },
+  "quy_Latn": {
+   "config": "quy_Latn",
+   "flores": [
+    "quy_Latn"
+   ],
+   "target": 2348336,
+   "fineweb2": 1303065,
+   "wikipedia": 5513595,
+   "madlad": 2971348,
+   "dev": 33012,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 9788008,
+   "group": "Latin"
+  },
+  "kik_Latn": {
+   "config": "kik_Latn",
+   "flores": [
+    "kik_Latn"
+   ],
+   "target": 2039139,
+   "fineweb2": 1124389,
+   "wikipedia": 116463,
+   "madlad": 0,
+   "dev": 3841,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 1240852,
+   "group": "Latin"
+  },
+  "awa_Deva": {
+   "config": "awa_Deva",
+   "flores": [
+    "awa_Deva"
+   ],
+   "target": 1951753,
+   "fineweb2": 1161929,
+   "wikipedia": 423575,
+   "madlad": 206677,
+   "dev": 8768,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 1792181,
+   "group": "Indic"
+  },
+  "bam_Latn": {
+   "config": "bam_Latn",
+   "flores": [
+    "bam_Latn"
+   ],
+   "target": 1939703,
+   "fineweb2": 1403270,
+   "wikipedia": 167919,
+   "madlad": 1004877,
+   "dev": 9773,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 2576066,
+   "group": "Latin"
+  },
+  "dyu_Latn": {
+   "config": "dyu_Latn",
+   "flores": [
+    "dyu_Latn"
+   ],
+   "target": 1845471,
+   "fineweb2": 2301357,
+   "wikipedia": 0,
+   "madlad": 860340,
+   "dev": 11410,
+   "tasks": 1,
+   "reasons": [],
+   "total": 3161697,
+   "group": "Latin"
+  },
+  "kbp_Latn": {
+   "config": "kbp_Latn",
+   "flores": [
+    "kbp_Latn"
+   ],
+   "target": 1760286,
+   "fineweb2": 1554371,
+   "wikipedia": 2163881,
+   "madlad": 5183315,
+   "dev": 40389,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 8901567,
+   "group": "Latin"
+  },
+  "fon_Latn": {
+   "config": "fon_Latn",
+   "flores": [
+    "fon_Latn"
+   ],
+   "target": 1744428,
+   "fineweb2": 1953511,
+   "wikipedia": 286593,
+   "madlad": 1923369,
+   "dev": 19280,
+   "tasks": 1,
+   "reasons": [],
+   "total": 4163473,
+   "group": "Latin"
+  },
+  "arb_Latn": {
+   "config": "arb_Latn",
+   "flores": [
+    "arb_Latn"
+   ],
+   "target": 1540459,
+   "fineweb2": 723041,
+   "wikipedia": 2048,
+   "madlad": 6755,
+   "dev": 4095,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 731844,
+   "group": "Latin"
+  },
+  "kmb_Latn": {
+   "config": "kmb_Latn",
+   "flores": [
+    "kmb_Latn"
+   ],
+   "target": 1406949,
+   "fineweb2": 1323831,
+   "wikipedia": 0,
+   "madlad": 860019,
+   "dev": 4416,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 2183850,
+   "group": "Latin"
+  },
+  "war_Latn": {
+   "config": "war_Latn",
+   "flores": [
+    "war_Latn"
+   ],
+   "target": 1320852,
+   "fineweb2": 1151789,
+   "wikipedia": 98864341,
+   "madlad": 0,
+   "dev": 499109,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 100016130,
+   "group": "Latin"
+  },
+  "bjn_Latn": {
+   "config": "bjn_Latn",
+   "flores": [
+    "bjn_Latn"
+   ],
+   "target": 1073140,
+   "fineweb2": 1305575,
+   "wikipedia": 1375873,
+   "madlad": 0,
+   "dev": 10121,
+   "tasks": 1,
+   "reasons": [],
+   "total": 2681448,
+   "group": "Latin"
+  },
+  "kwy_Latn": {
+   "config": "kwy_Latn",
+   "flores": [
+    "kon_Latn"
+   ],
+   "target": 1042627,
+   "fineweb2": 1159082,
+   "wikipedia": 81391,
+   "madlad": 564688,
+   "dev": 7628,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1805161,
+   "group": "Latin"
+  },
+  "min_Latn": {
+   "config": "min_Latn",
+   "flores": [
+    "min_Latn"
+   ],
+   "target": 436449,
+   "fineweb2": 373073,
+   "wikipedia": 29590729,
+   "madlad": 1839636,
+   "dev": 158298,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 31803438,
+   "group": "Latin"
+  },
+  "tum_Latn": {
+   "config": "tum_Latn",
+   "flores": [
+    "tum_Latn"
+   ],
+   "target": 360398,
+   "fineweb2": 325407,
+   "wikipedia": 2117759,
+   "madlad": 0,
+   "dev": 8229,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 2443166,
+   "group": "Latin"
+  },
+  "mag_Deva": {
+   "config": "mag_Deva",
+   "flores": [
+    "mag_Deva"
+   ],
+   "target": 269198,
+   "fineweb2": 242169,
+   "wikipedia": 0,
+   "madlad": 251992,
+   "dev": 10240,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 494161,
+   "group": "Indic"
+  },
+  "kas_Arab": {
+   "config": "kas_Arab",
+   "flores": [
+    "kas_Arab"
+   ],
+   "target": 253050,
+   "fineweb2": 251305,
+   "wikipedia": 775910,
+   "madlad": 0,
+   "dev": 4654,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1027215,
+   "group": "Arabic"
+  },
+  "kas_Deva": {
+   "config": "kas_Deva",
+   "flores": [
+    "kas_Deva"
+   ],
+   "target": 127868,
+   "fineweb2": 25317,
+   "wikipedia": 14773,
+   "madlad": 0,
+   "dev": 3106,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 40090,
+   "group": "Indic"
+  },
+  "bug_Latn": {
+   "config": "bug_Latn",
+   "flores": [
+    "bug_Latn"
+   ],
+   "target": 46252,
+   "fineweb2": 40240,
+   "wikipedia": 418584,
+   "madlad": 0,
+   "dev": 1858,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 458824,
+   "group": "Latin"
+  },
+  "ace_Arab": {
+   "config": "ace_Arab",
+   "flores": [
+    "ace_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 123,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 123,
+   "group": "Arabic"
+  },
+  "acq_Arab": {
+   "config": "acq_Arab",
+   "flores": [
+    "acq_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 0,
+   "group": "Arabic"
+  },
+  "ajp_Arab": {
+   "config": "ajp_Arab",
+   "flores": [
+    "ajp_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 0,
+   "group": "Arabic"
+  },
+  "knc_Arab": {
+   "config": "knc_Arab",
+   "flores": [
+    "knc_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 0,
+   "group": "Arabic"
+  },
+  "min_Arab": {
+   "config": "min_Arab",
+   "flores": [
+    "min_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 0,
+   "group": "Arabic"
+  },
+  "prs_Arab": {
+   "config": "prs_Arab",
+   "flores": [
+    "prs_Arab"
+   ],
+   "target": 0,
+   "fineweb2": 0,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 0,
+   "tasks": 1,
+   "reasons": [],
+   "total": 0,
+   "group": "Arabic"
+  },
+  "apc_Arab": {
+   "config": "apc_Arab",
+   "flores": [
+    "apc_Arab"
+   ],
+   "target": 25673273,
+   "fineweb2": 4530098,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 16634,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 4530098,
+   "group": "Arabic"
+  },
+  "aeb_Arab": {
+   "config": "aeb_Arab",
+   "flores": [
+    "aeb_Arab"
+   ],
+   "target": 10266983,
+   "fineweb2": 6094080,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 24819,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 6094080,
+   "group": "Arabic"
+  },
+  "acm_Arab": {
+   "config": "acm_Arab",
+   "flores": [
+    "acm_Arab"
+   ],
+   "target": 5977928,
+   "fineweb2": 1484787,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 5812,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 1484787,
+   "group": "Arabic"
+  },
+  "tzm_Tfng": {
+   "config": "tzm_Tfng",
+   "flores": [
+    "tzm_Tfng"
+   ],
+   "target": 4689195,
+   "fineweb2": 4017847,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 16726,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 4017847,
+   "group": "other"
+  },
+  "lua_Latn": {
+   "config": "lua_Latn",
+   "flores": [
+    "lua_Latn"
+   ],
+   "target": 2677505,
+   "fineweb2": 2992492,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 13612,
+   "tasks": 1,
+   "reasons": [],
+   "total": 2992492,
+   "group": "Latin"
+  },
+  "bem_Latn": {
+   "config": "bem_Latn",
+   "flores": [
+    "bem_Latn"
+   ],
+   "target": 2358136,
+   "fineweb2": 2240022,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 8142,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 2240022,
+   "group": "Latin"
+  },
+  "kea_Latn": {
+   "config": "kea_Latn",
+   "flores": [
+    "kea_Latn"
+   ],
+   "target": 2202019,
+   "fineweb2": 1594278,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 7477,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 1594278,
+   "group": "Latin"
+  },
+  "mos_Latn": {
+   "config": "mos_Latn",
+   "flores": [
+    "mos_Latn"
+   ],
+   "target": 2201956,
+   "fineweb2": 2516253,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 17788,
+   "tasks": 1,
+   "reasons": [],
+   "total": 2516253,
+   "group": "Latin"
+  },
+  "luo_Latn": {
+   "config": "luo_Latn",
+   "flores": [
+    "luo_Latn"
+   ],
+   "target": 2191148,
+   "fineweb2": 2334547,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 13764,
+   "tasks": 1,
+   "reasons": [],
+   "total": 2334547,
+   "group": "Latin"
+  },
+  "dik_Latn": {
+   "config": "dik_Latn",
+   "flores": [
+    "dik_Latn"
+   ],
+   "target": 1448969,
+   "fineweb2": 873019,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4020,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 873019,
+   "group": "Latin"
+  },
+  "kam_Latn": {
+   "config": "kam_Latn",
+   "flores": [
+    "kam_Latn"
+   ],
+   "target": 1393895,
+   "fineweb2": 1036493,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 8679,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 1036493,
+   "group": "Latin"
+  },
+  "umb_Latn": {
+   "config": "umb_Latn",
+   "flores": [
+    "umb_Latn"
+   ],
+   "target": 1304466,
+   "fineweb2": 1389508,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 9404,
+   "tasks": 1,
+   "reasons": [],
+   "total": 1389508,
+   "group": "Latin"
+  },
+  "fuv_Latn": {
+   "config": "fuv_Latn",
+   "flores": [
+    "fuv_Latn"
+   ],
+   "target": 1038553,
+   "fineweb2": 387838,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 4714,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 387838,
+   "group": "Latin"
+  },
+  "taq_Latn": {
+   "config": "taq_Latn",
+   "flores": [
+    "taq_Latn"
+   ],
+   "target": 796682,
+   "fineweb2": 627037,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 6191,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 627037,
+   "group": "Latin"
+  },
+  "taq_Tfng": {
+   "config": "taq_Tfng",
+   "flores": [
+    "taq_Tfng"
+   ],
+   "target": 227060,
+   "fineweb2": 81098,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2048,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 81098,
+   "group": "other"
+  },
+  "nus_Latn": {
+   "config": "nus_Latn",
+   "flores": [
+    "nus_Latn"
+   ],
+   "target": 191366,
+   "fineweb2": 187633,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 10240,
+   "tasks": 1,
+   "reasons": [],
+   "total": 187633,
+   "group": "Latin"
+  },
+  "knc_Latn": {
+   "config": "knc_Latn",
+   "flores": [
+    "knc_Latn"
+   ],
+   "target": 109610,
+   "fineweb2": 102194,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 1410,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 102194,
+   "group": "Latin"
+  },
+  "cjk_Latn": {
+   "config": "cjk_Latn",
+   "flores": [
+    "cjk_Latn"
+   ],
+   "target": 30959,
+   "fineweb2": 24177,
+   "wikipedia": 0,
+   "madlad": 0,
+   "dev": 2048,
+   "tasks": 1,
+   "reasons": [
+    "FineWeb-2 ran out"
+   ],
+   "total": 24177,
+   "group": "Latin"
+  }
+ },
+ "chat": {
+  "dataset": "OpenAssistant/oasst2 + CohereLabs/aya_dataset",
+  "target_tokens": 40000000000,
+  "train_tokens": 76134680,
+  "dev_tokens": 754467,
+  "train_conversations": 263779,
+  "dev_conversations": 2605,
+  "train_turns": 624607,
+  "oasst2_paths_available": 64036,
+  "dropped_contaminated": 4,
+  "oasst2_messages": 135174,
+  "oasst2_messages_kept": 128124,
+  "oasst2_trees": 13852,
+  "aya": {
+   "dataset": "CohereLabs/aya_dataset",
+   "rows": 202362,
+   "conversations_used": 202348,
+   "languages_in_dataset": 70
+  },
+  "train_by_dataset_and_language": {
+   "oasst2": {
+    "en": {
+     "conversations": 29939,
+     "tokens": 11660521
+    },
+    "es": {
+     "conversations": 15756,
+     "tokens": 5059557
+    },
+    "ru": {
+     "conversations": 5397,
+     "tokens": 2184418
+    },
+    "zh": {
+     "conversations": 3350,
+     "tokens": 989024
+    },
+    "de": {
+     "conversations": 2671,
+     "tokens": 953334
+    },
+    "pt-BR": {
+     "conversations": 1182,
+     "tokens": 561587
+    },
+    "fr": {
+     "conversations": 1695,
+     "tokens": 547701
+    },
+    "ca": {
+     "conversations": 804,
+     "tokens": 195049
+    },
+    "uk-UA": {
+     "conversations": 290,
+     "tokens": 123257
+    },
+    "it": {
+     "conversations": 499,
+     "tokens": 117000
+    },
+    "th": {
+     "conversations": 565,
+     "tokens": 66826
+    },
+    "ja": {
+     "conversations": 355,
+     "tokens": 57279
+    },
+    "pl": {
+     "conversations": 203,
+     "tokens": 48037
+    },
+    "eo": {
+     "conversations": 117,
+     "tokens": 47137
+    },
+    "eu": {
+     "conversations": 202,
+     "tokens": 34030
+    },
+    "fi": {
+     "conversations": 49,
+     "tokens": 18088
+    },
+    "vi": {
+     "conversations": 127,
+     "tokens": 16312
+    },
+    "hu": {
+     "conversations": 59,
+     "tokens": 8391
+    },
+    "nl": {
+     "conversations": 32,
+     "tokens": 5714
+    },
+    "ar": {
+     "conversations": 52,
+     "tokens": 5412
+    },
+    "da": {
+     "conversations": 33,
+     "tokens": 3735
+    },
+    "tr": {
+     "conversations": 26,
+     "tokens": 3052
+    },
+    "he": {
+     "conversations": 11,
+     "tokens": 1683
+    },
+    "id": {
+     "conversations": 9,
+     "tokens": 984
+    },
+    "ko": {
+     "conversations": 15,
+     "tokens": 590
+    },
+    "cs": {
+     "conversations": 6,
+     "tokens": 344
+    }
+   },
+   "aya": {
+    "yor": {
+     "conversations": 11656,
+     "tokens": 9244558
+    },
+    "pan": {
+     "conversations": 6308,
+     "tokens": 5881949
+    },
+    "tam": {
+     "conversations": 13990,
+     "tokens": 5043109
+    },
+    "sin": {
+     "conversations": 14376,
+     "tokens": 4250626
+    },
+    "tel": {
+     "conversations": 8377,
+     "tokens": 3931898
+    },
+    "vie": {
+     "conversations": 8582,
+     "tokens": 3527620
+    },
+    "guj": {
+     "conversations": 3951,
+     "tokens": 2053024
+    },
+    "som": {
+     "conversations": 7638,
+     "tokens": 1882522
+    },
+    "kir": {
+     "conversations": 8544,
+     "tokens": 1404654
+    },
+    "plt": {
+     "conversations": 14435,
+     "tokens": 1386156
+    },
+    "zsm": {
+     "conversations": 9986,
+     "tokens": 1198159
+    },
+    "zul": {
+     "conversations": 1810,
+     "tokens": 1069124
+    },
+    "arb": {
+     "conversations": 4944,
+     "tokens": 897202
+    },
+    "npi": {
+     "conversations": 3964,
+     "tokens": 702887
+    },
+    "jpn": {
+     "conversations": 6194,
+     "tokens": 680368
+    },
+    "por": {
+     "conversations": 8883,
+     "tokens": 634225
+    },
+    "ben": {
+     "conversations": 1520,
+     "tokens": 595418
+    },
+    "mar": {
+     "conversations": 3507,
+     "tokens": 560298
+    },
+    "eng": {
+     "conversations": 3905,
+     "tokens": 524991
+    },
+    "mal": {
+     "conversations": 1726,
+     "tokens": 507747
+    },
+    "hau": {
+     "conversations": 3473,
+     "tokens": 488207
+    },
+    "tur": {
+     "conversations": 3993,
+     "tokens": 463623
+    },
+    "spa": {
+     "conversations": 3810,
+     "tokens": 436111
+    },
+    "urd": {
+     "conversations": 650,
+     "tokens": 350705
+    },
+    "zho": {
+     "conversations": 4861,
+     "tokens": 301097
+    },
+    "pes": {
+     "conversations": 1563,
+     "tokens": 277929
+    },
+    "gle": {
+     "conversations": 1237,
+     "tokens": 274780
+    },
+    "pbt": {
+     "conversations": 979,
+     "tokens": 274340
+    },
+    "nld": {
+     "conversations": 1717,
+     "tokens": 260758
+    },
+    "ibo": {
+     "conversations": 1521,
+     "tokens": 254000
+    },
+    "wol": {
+     "conversations": 2882,
+     "tokens": 253212
+    },
+    "sna": {
+     "conversations": 1351,
+     "tokens": 238657
+    },
+    "hin": {
+     "conversations": 1143,
+     "tokens": 237430
+    },
+    "ary": {
+     "conversations": 8006,
+     "tokens": 217813
+    },
+    "mya": {
+     "conversations": 468,
+     "tokens": 213362
+    },
+    "fra": {
+     "conversations": 1408,
+     "tokens": 207600
+    },
+    "amh": {
+     "conversations": 1195,
+     "tokens": 201760
+    },
+    "pol": {
+     "conversations": 1469,
+     "tokens": 182571
+    },
+    "swe": {
+     "conversations": 1296,
+     "tokens": 169871
+    },
+    "snd": {
+     "conversations": 274,
+     "tokens": 168855
+    },
+    "fin": {
+     "conversations": 738,
+     "tokens": 168047
+    },
+    "lit": {
+     "conversations": 908,
+     "tokens": 159166
+    },
+    "nya": {
+     "conversations": 686,
+     "tokens": 149339
+    },
+    "ind": {
+     "conversations": 780,
+     "tokens": 145088
+    },
+    "fil": {
+     "conversations": 1229,
+     "tokens": 142696
+    },
+    "ell": {
+     "conversations": 609,
+     "tokens": 136605
+    },
+    "ukr": {
+     "conversations": 520,
+     "tokens": 114446
+    },
+    "eus": {
+     "conversations": 936,
+     "tokens": 97788
+    },
+    "kan": {
+     "conversations": 332,
+     "tokens": 85856
+    },
+    "ita": {
+     "conversations": 729,
+     "tokens": 76854
+    },
+    "arz": {
+     "conversations": 525,
+     "tokens": 76728
+    },
+    "xho": {
+     "conversations": 374,
+     "tokens": 68338
+    },
+    "tha": {
+     "conversations": 721,
+     "tokens": 66668
+    },
+    "rus": {
+     "conversations": 414,
+     "tokens": 61963
+    },
+    "kor": {
+     "conversations": 358,
+     "tokens": 59943
+    },
+    "srp": {
+     "conversations": 152,
+     "tokens": 48959
+    },
+    "swh": {
+     "conversations": 364,
+     "tokens": 47221
+    },
+    "ceb": {
+     "conversations": 721,
+     "tokens": 43390
+    },
+    "hat": {
+     "conversations": 106,
+     "tokens": 40962
+    },
+    "jav": {
+     "conversations": 247,
+     "tokens": 38720
+    },
+    "deu": {
+     "conversations": 238,
+     "tokens": 30153
+    },
+    "nso": {
+     "conversations": 141,
+     "tokens": 25695
+    },
+    "dan": {
+     "conversations": 96,
+     "tokens": 16675
+    },
+    "sun": {
+     "conversations": 189,
+     "tokens": 16491
+    },
+    "hun": {
+     "conversations": 95,
+     "tokens": 15206
+    },
+    "acq": {
+     "conversations": 126,
+     "tokens": 14394
+    },
+    "ars": {
+     "conversations": 133,
+     "tokens": 13427
+    },
+    "als": {
+     "conversations": 120,
+     "tokens": 6434
+    },
+    "ajp": {
+     "conversations": 78,
+     "tokens": 5445
+    },
+    "ckb": {
+     "conversations": 78,
+     "tokens": 3705
+    }
+   }
+  },
+  "train_tokens_by_dataset": {
+   "oasst2": 22709062,
+   "aya": 53425618
+  },
+  "seconds": 570,
+  "id": "chat"
+ },
+ "under_5M": [
+  {
+   "config": "acq_Arab",
+   "tokens": 0
+  },
+  {
+   "config": "ajp_Arab",
+   "tokens": 0
+  },
+  {
+   "config": "knc_Arab",
+   "tokens": 0
+  },
+  {
+   "config": "min_Arab",
+   "tokens": 0
+  },
+  {
+   "config": "prs_Arab",
+   "tokens": 0
+  },
+  {
+   "config": "ace_Arab",
+   "tokens": 123
+  },
+  {
+   "config": "cjk_Latn",
+   "tokens": 24177
+  },
+  {
+   "config": "kas_Deva",
+   "tokens": 40090
+  },
+  {
+   "config": "taq_Tfng",
+   "tokens": 81098
+  },
+  {
+   "config": "knc_Latn",
+   "tokens": 102194
+  },
+  {
+   "config": "nus_Latn",
+   "tokens": 187633
+  },
+  {
+   "config": "fuv_Latn",
+   "tokens": 387838
+  },
+  {
+   "config": "bug_Latn",
+   "tokens": 458824
+  },
+  {
+   "config": "mag_Deva",
+   "tokens": 494161
+  },
+  {
+   "config": "taq_Latn",
+   "tokens": 627037
+  },
+  {
+   "config": "bjn_Arab",
+   "tokens": 677187
+  },
+  {
+   "config": "arb_Latn",
+   "tokens": 731844
+  },
+  {
+   "config": "dik_Latn",
+   "tokens": 873019
+  },
+  {
+   "config": "kas_Arab",
+   "tokens": 1027215
+  },
+  {
+   "config": "kam_Latn",
+   "tokens": 1036493
+  },
+  {
+   "config": "kik_Latn",
+   "tokens": 1240852
+  },
+  {
+   "config": "umb_Latn",
+   "tokens": 1389508
+  },
+  {
+   "config": "acm_Arab",
+   "tokens": 1484787
+  },
+  {
+   "config": "kea_Latn",
+   "tokens": 1594278
+  },
+  {
+   "config": "awa_Deva",
+   "tokens": 1792181
+  },
+  {
+   "config": "kwy_Latn",
+   "tokens": 1805161
+  },
+  {
+   "config": "kmb_Latn",
+   "tokens": 2183850
+  },
+  {
+   "config": "bem_Latn",
+   "tokens": 2240022
+  },
+  {
+   "config": "luo_Latn",
+   "tokens": 2334547
+  },
+  {
+   "config": "tum_Latn",
+   "tokens": 2443166
+  },
+  {
+   "config": "mos_Latn",
+   "tokens": 2516253
+  },
+  {
+   "config": "bam_Latn",
+   "tokens": 2576066
+  },
+  {
+   "config": "bjn_Latn",
+   "tokens": 2681448
+  },
+  {
+   "config": "lua_Latn",
+   "tokens": 2992492
+  },
+  {
+   "config": "dyu_Latn",
+   "tokens": 3161697
+  },
+  {
+   "config": "tzm_Tfng",
+   "tokens": 4017847
+  },
+  {
+   "config": "tpi_Latn",
+   "tokens": 4147914
+  },
+  {
+   "config": "fon_Latn",
+   "tokens": 4163473
+  },
+  {
+   "config": "ssw_Latn",
+   "tokens": 4381568
+  },
+  {
+   "config": "apc_Arab",
+   "tokens": 4530098
+  },
+  {
+   "config": "pag_Latn",
+   "tokens": 4861543
+  },
+  {
+   "config": "mni_Beng",
+   "tokens": 4995352
+  }
+ ],
+ "short_of_target": [
+  [
+   "acm_Arab",
+   1484787,
+   5977928
+  ],
+  [
+   "aeb_Arab",
+   6094080,
+   10266983
+  ],
+  [
+   "apc_Arab",
+   4530098,
+   25673273
+  ],
+  [
+   "arb_Latn",
+   731844,
+   1540459
+  ],
+  [
+   "ars_Arab",
+   112274557,
+   147143700
+  ],
+  [
+   "arz_Arab",
+   164650113,
+   202957608
+  ],
+  [
+   "bjn_Arab",
+   677187,
+   2559014
+  ],
+  [
+   "cjk_Latn",
+   24177,
+   30959
+  ],
+  [
+   "cmn_Hani",
+   1097983738,
+   1541963879
+  ],
+  [
+   "crh_Latn",
+   23694985,
+   29778373
+  ],
+  [
+   "dik_Latn",
+   873019,
+   1448969
+  ],
+  [
+   "dzo_Tibt",
+   21266222,
+   33855151
+  ],
+  [
+   "eng_Latn",
+   1861116498,
+   2141959415
+  ],
+  [
+   "fuv_Latn",
+   387838,
+   1038553
+  ],
+  [
+   "hne_Deva",
+   10131470,
+   11636418
+  ],
+  [
+   "kam_Latn",
+   1036493,
+   1393895
+  ],
+  [
+   "kas_Deva",
+   40090,
+   127868
+  ],
+  [
+   "kea_Latn",
+   1594278,
+   2202019
+  ],
+  [
+   "kik_Latn",
+   1240852,
+   2039139
+  ],
+  [
+   "nya_Latn",
+   111553624,
+   132471980
+  ],
+  [
+   "run_Latn",
+   38219850,
+   50292220
+  ],
+  [
+   "rus_Cyrl",
+   1177407359,
+   1595979659
+  ],
+  [
+   "taq_Latn",
+   627037,
+   796682
+  ],
+  [
+   "taq_Tfng",
+   81098,
+   227060
+  ],
+  [
+   "tir_Ethi",
+   100215063,
+   113898136
+  ],
+  [
+   "tpi_Latn",
+   4147914,
+   5011254
+  ],
+  [
+   "tzm_Tfng",
+   4017847,
+   4689195
+  ],
+  [
+   "yue_Hani",
+   112923100,
+   136446438
+  ]
+ ],
+ "pending": [],
+ "topped_up": {
+  "tir_Ethi": {
+   "wikipedia": 161979,
+   "madlad": 2721046
+  },
+  "sot_Latn": {
+   "wikipedia": 198256,
+   "madlad": 0
+  },
+  "yor_Latn": {
+   "wikipedia": 4399939,
+   "madlad": 10148281
+  },
+  "sna_Latn": {
+   "wikipedia": 3055565,
+   "madlad": 1768074
+  },
+  "azb_Arab": {
+   "wikipedia": 37340816,
+   "madlad": 0
+  },
+  "lus_Latn": {
+   "wikipedia": 0,
+   "madlad": 38779236
+  },
+  "run_Latn": {
+   "wikipedia": 158961,
+   "madlad": 455755
+  },
+  "oci_Latn": {
+   "wikipedia": 27363835,
+   "madlad": 30586857
+  },
+  "ast_Latn": {
+   "wikipedia": 51459439,
+   "madlad": 0
+  },
+  "gaz_Latn": {
+   "wikipedia": 746377,
+   "madlad": 21957437
+  },
+  "dzo_Tibt": {
+   "wikipedia": 981444,
+   "madlad": 719081
+  },
+  "crh_Latn": {
+   "wikipedia": 2112133,
+   "madlad": 2048
+  },
+  "san_Deva": {
+   "wikipedia": 7661977,
+   "madlad": 10629430
+  },
+  "lim_Latn": {
+   "wikipedia": 7977345,
+   "madlad": 0
+  },
+  "shn_Mymr": {
+   "wikipedia": 5681189,
+   "madlad": 1203165
+  },
+  "lug_Latn": {
+   "wikipedia": 1810874,
+   "madlad": 14566635
+  },
+  "srd_Latn": {
+   "wikipedia": 3038911,
+   "madlad": 0
+  },
+  "fij_Latn": {
+   "wikipedia": 151598,
+   "madlad": 5789680
+  },
+  "lin_Latn": {
+   "wikipedia": 595490,
+   "madlad": 4597766
+  },
+  "mai_Deva": {
+   "wikipedia": 3074952,
+   "madlad": 1595749
+  },
+  "bho_Deva": {
+   "wikipedia": 0,
+   "madlad": 5004218
+  },
+  "ilo_Latn": {
+   "wikipedia": 4845021,
+   "madlad": 14891268
+  },
+  "ban_Latn": {
+   "wikipedia": 4789000,
+   "madlad": 862196
+  },
+  "fur_Latn": {
+   "wikipedia": 1117802,
+   "madlad": 0
+  },
+  "hne_Deva": {
+   "wikipedia": 0,
+   "madlad": 210384
+  },
+  "lmo_Latn": {
+   "wikipedia": 10326999,
+   "madlad": 0
+  },
+  "gug_Latn": {
+   "wikipedia": 1901685,
+   "madlad": 5519583
+  },
+  "tso_Latn": {
+   "wikipedia": 255687,
+   "madlad": 7796019
+  },
+  "ltg_Latn": {
+   "wikipedia": 306680,
+   "madlad": 4434928
+  },
+  "kab_Latn": {
+   "wikipedia": 1452407,
+   "madlad": 0
+  },
+  "twi_Latn": {
+   "wikipedia": 2789990,
+   "madlad": 7488832
+  },
+  "nso_Latn": {
+   "wikipedia": 670343,
+   "madlad": 6719367
+  },
+  "tsn_Latn": {
+   "wikipedia": 825514,
+   "madlad": 5791192
+  },
+  "ewe_Latn": {
+   "wikipedia": 302150,
+   "madlad": 7280730
+  },
+  "scn_Latn": {
+   "wikipedia": 4550987,
+   "madlad": 0
+  },
+  "kac_Latn": {
+   "wikipedia": 0,
+   "madlad": 3110608
+  },
+  "sag_Latn": {
+   "wikipedia": 25389,
+   "madlad": 3450903
+  },
+  "mni_Beng": {
+   "wikipedia": 0,
+   "madlad": 548081
+  },
+  "tpi_Latn": {
+   "wikipedia": 101532,
+   "madlad": 0
+  },
+  "szl_Latn": {
+   "wikipedia": 6247331,
+   "madlad": 0
+  },
+  "wol_Latn": {
+   "wikipedia": 571686,
+   "madlad": 1126699
+  },
+  "sat_Olck": {
+   "wikipedia": 16505280,
+   "madlad": 0
+  },
+  "ace_Latn": {
+   "wikipedia": 1208426,
+   "madlad": 1203681
+  },
+  "ayr_Latn": {
+   "wikipedia": 1522590,
+   "madlad": 3493626
+  },
+  "pag_Latn": {
+   "wikipedia": 134839,
+   "madlad": 2447173
+  },
+  "lij_Latn": {
+   "wikipedia": 2631970,
+   "madlad": 0
+  },
+  "vec_Latn": {
+   "wikipedia": 8026521,
+   "madlad": 11769491
+  },
+  "bjn_Arab": {
+   "wikipedia": 303,
+   "madlad": 0
+  },
+  "ssw_Latn": {
+   "wikipedia": 313701,
+   "madlad": 1499984
+  },
+  "quy_Latn": {
+   "wikipedia": 5513595,
+   "madlad": 2971348
+  },
+  "kik_Latn": {
+   "wikipedia": 116463,
+   "madlad": 0
+  },
+  "awa_Deva": {
+   "wikipedia": 423575,
+   "madlad": 206677
+  },
+  "bam_Latn": {
+   "wikipedia": 167919,
+   "madlad": 1004877
+  },
+  "dyu_Latn": {
+   "wikipedia": 0,
+   "madlad": 860340
+  },
+  "kbp_Latn": {
+   "wikipedia": 2163881,
+   "madlad": 5183315
+  },
+  "fon_Latn": {
+   "wikipedia": 286593,
+   "madlad": 1923369
+  },
+  "arb_Latn": {
+   "wikipedia": 2048,
+   "madlad": 6755
+  },
+  "kmb_Latn": {
+   "wikipedia": 0,
+   "madlad": 860019
+  },
+  "war_Latn": {
+   "wikipedia": 98864341,
+   "madlad": 0
+  },
+  "bjn_Latn": {
+   "wikipedia": 1375873,
+   "madlad": 0
+  },
+  "kwy_Latn": {
+   "wikipedia": 81391,
+   "madlad": 564688
+  },
+  "min_Latn": {
+   "wikipedia": 29590729,
+   "madlad": 1839636
+  },
+  "tum_Latn": {
+   "wikipedia": 2117759,
+   "madlad": 0
+  },
+  "mag_Deva": {
+   "wikipedia": 0,
+   "madlad": 251992
+  },
+  "kas_Arab": {
+   "wikipedia": 775910,
+   "madlad": 0
+  },
+  "kas_Deva": {
+   "wikipedia": 14773,
+   "madlad": 0
+  },
+  "bug_Latn": {
+   "wikipedia": 418584,
+   "madlad": 0
+  },
+  "ace_Arab": {
+   "wikipedia": 123,
+   "madlad": 0
+  }
+ }
+}

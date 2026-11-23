@@ -55,6 +55,11 @@ Word suggestions are on by default and set themselves up (about 1.3 GB) the firs
 a scratch copy driven in a browser needs `HYDOR_SUGGEST=off` unless it has all of these; `scripts/guide-shots` and the
 desktop app's tests set it.
 
+The code that built the small model, and its tests, are in [`scripts/word-suggest/`](../scripts/word-suggest/) (its
+README says how the released model was made). To run its tests, install the packages that README lists, then
+`cd scripts/word-suggest && CUDA_VISIBLE_DEVICES= python -m unittest discover -s tests`: they need no corpus, no data
+and no GPU.
+
 Use on your phone (`server/phone/`) never runs the computer's own `tailscale` in tests: `phone-test.ts` plays it with
 `server/phone/fake-tailscale.mjs`, a stand-in that answers `version`, `status --json` and `serve` from a state file
 beside it (its first lines say how). To try the section in a scratch copy of the app, copy the fake into a folder of its
