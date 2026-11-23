@@ -47,8 +47,8 @@ OUTDIR=dist/dev node scripts/build-server.mjs server/suggest/suggest-test.ts && 
 cd server/suggest/py && /path/to/that/python -m unittest discover -s tests
 ```
 
-To run the engine in a scratch copy of the app before its model is published (or with one of your own), point
-`HYDOR_SUGGEST_MODEL_DIR` at a folder holding the model's files, `HYDOR_SUGGEST_PYTHON` at that Python and, when you have
+To run the engine in a scratch copy of the app without downloading its model ([algoprog/hydor-suggest-49m](https://huggingface.co/algoprog/hydor-suggest-49m),
+at the revision `server/suggest/pins.ts` pins) or with one of your own, point `HYDOR_SUGGEST_MODEL_DIR` at a folder holding the model's files, `HYDOR_SUGGEST_PYTHON` at that Python and, when you have
 them, `HYDOR_SUGGEST_GGUF` and `HYDOR_SUGGEST_LLAMA_SERVER` at the language model and a `llama-server`: nothing is then downloaded
 ([configuration](configuration.md)). Do not put PyTorch into search by meaning's private environment (`memory/venv`): the app rebuilds it whenever its packages differ.
 

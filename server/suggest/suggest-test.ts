@@ -628,18 +628,27 @@ test('personalising: the schedule waits for the gap and for a quiet ten minutes'
   assert.equal((await get()).status.training.next, undefined);
 });
 
-test('setup says why when the model is not published and none was given', async () => {
-  const saved = process.env.HYDOR_SUGGEST_MODEL_DIR;
+test('with no local copy given, setup downloads the published release, and says why when it cannot', async () => {
+  const { SMALL_MODEL } = await import('./pins.ts');
+  assert.ok(SMALL_MODEL.revision && SMALL_MODEL.files.length, 'the release is pinned (algoprog/hydor-suggest-49m)');
+  const keys = ['HYDOR_SUGGEST_MODEL_DIR', 'HF_ENDPOINT', 'XDG_CACHE_HOME', 'HOME'] as const;
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  // Nothing reaches Hugging Face: its address is a port nothing listens on, and the cache is a scratch folder.
+  const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-suggest-cache-'));
   delete process.env.HYDOR_SUGGEST_MODEL_DIR;
+  Object.assign(process.env, { HF_ENDPOINT: 'http://127.0.0.1:9', XDG_CACHE_HOME: cache, HOME: cache });
   try {
     const own = new (await import('./service.ts')).SuggestService(db);
     own.configure({ enabled: false });
     own.configure({ enabled: true });
     await until('it to fail', async () => own.state().status.state === 'failed');
-    assert.equal(own.state().status.detail, 'The word-suggestion model is not published yet');
+    const detail = own.state().status.detail ?? '';
+    assert.notEqual(detail, 'The word-suggestion model is not published yet', 'it tried the published release');
+    assert.ok(fs.readdirSync(path.join(cache, 'hydor', 'suggest')).some((d) => d.startsWith('hydor-suggest-49m-')), `the release's folder in the cache (${detail})`);
     own.stop();
   } finally {
-    process.env.HYDOR_SUGGEST_MODEL_DIR = saved;
+    for (const k of keys) saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]);
+    fs.rmSync(cache, { recursive: true, force: true });
   }
 });
 

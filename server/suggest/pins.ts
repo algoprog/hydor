@@ -1,6 +1,6 @@
 // What word suggestions download, pinned: llama.cpp's prebuilt llama-server (one release, each asset's size and SHA-256),
 // Qwen3.5-0.8B-Base as GGUF files (one revision of ggml-org's repository), and the small model of the app's own (a
-// release on Hugging Face that is not published yet, so its list is empty and HYDOR_SUGGEST_MODEL_DIR runs a local copy).
+// release on Hugging Face, algoprog/hydor-suggest-49m, at one revision; HYDOR_SUGGEST_MODEL_DIR runs a local copy instead).
 import type { ModelFile } from '../memory/embed.ts';
 
 /**
@@ -33,13 +33,29 @@ export const GGUF_FILES: Record<'q8' | 'q4', ModelFile> = {
 };
 
 /**
- * The small model's release: its repository, a pinned revision and its files. Empty until it is published: until then
- * HYDOR_SUGGEST_MODEL_DIR (a folder holding these files) is the way to run it.
+ * The small model's release (https://huggingface.co/algoprog/hydor-suggest-49m, AGPL-3.0-only; its tokenizer Apache-2.0):
+ * its repository, a pinned revision and its files, each checked by its SHA-256 as it downloads. HYDOR_SUGGEST_MODEL_DIR
+ * (a folder holding these files) still runs another copy instead.
  */
 export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[] } = {
   repo: 'algoprog/hydor-suggest-49m',
-  revision: '',
-  files: [],
+  revision: 'f4408ab53c77a960df1c68d629acab56d7a0de56',
+  files: [
+    { from: 'LICENSE', name: 'LICENSE', bytes: 34_523, sha256: '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0' },
+    { from: 'LICENSE.Apache-2.0', name: 'LICENSE.Apache-2.0', bytes: 11_358, sha256: 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30' },
+    { from: 'NOTICE', name: 'NOTICE', bytes: 690, sha256: '97249394e99179d156041d3584a52514dd84446b1ea8d9cee94db1e2abc7ed03' },
+    { from: 'README.md', name: 'README.md', bytes: 14_927, sha256: 'f330ea42598aebc550a89ca608b99718f46cfba72ee53ec41055abb5a92b3bc0' },
+    { from: 'calibration.json', name: 'calibration.json', bytes: 313, sha256: '47b8c4fb2992cdfb561ffdb050a49c27625724e9572e4c99308db1e408dae744' },
+    { from: 'config.json', name: 'config.json', bytes: 638, sha256: '52d3a69a5b7553138c1cea66fa873eb185c500de19fc1bbb4b081b7a1913934f' },
+    { from: 'gate.json', name: 'gate.json', bytes: 887, sha256: '675f95ec6a477ff047c29d090a7dee26b4e8d28b6bb1a8b0662e73c75e48878c' },
+    { from: 'lid.bin', name: 'lid.bin', bytes: 23_160_000, sha256: 'b0c735486d3699115dd1a9e05e86b09f58da309ade393621a8a20a63f16b1663' },
+    { from: 'lid.json', name: 'lid.json', bytes: 4_482, sha256: '2d0c7fc81cbe0a2b098e7f05cbb7ba7a17b626a44a45c8e5b8132d85f760c04d' },
+    { from: 'model.safetensors', name: 'model.safetensors', bytes: 195_076_072, sha256: '2a7a65386ce7686801d90f2614d430464311d9f4cd1afb0a159abadc3708d5f0' },
+    { from: 'replay/index.json', name: 'replay/index.json', bytes: 2_864_722, sha256: '341a125eb80438a50583294c4cae64fac4c045ff596a74776283edc9ca592c71' },
+    { from: 'replay/replay.u32', name: 'replay/replay.u32', bytes: 80_000_628, sha256: 'f21beeda1c0d69f9571f77bf14e4e1817c900a1598e5315831f3736607285007' },
+    { from: 'switch.json', name: 'switch.json', bytes: 4_555, sha256: '19afa0f370ffadc8c2805649abfa8fe69d120ff87b970368755c5279b2a918e9' },
+    { from: 'tokenizer.json', name: 'tokenizer.json', bytes: 12_807_196, sha256: 'fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927' },
+  ],
 };
 /** The files a folder must hold to run the small model (a release has more: the card and the licence). */
 export const SMALL_MODEL_NEEDS = ['config.json', 'model.safetensors', 'tokenizer.json', 'gate.json', 'switch.json', 'calibration.json', 'lid.json', 'lid.bin', 'replay/replay.u32', 'replay/index.json'];
