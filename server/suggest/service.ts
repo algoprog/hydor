@@ -19,7 +19,7 @@ import { addUsage, readUsage, resetUsage } from './usage.ts';
 /** The worker quits after this long without a request. */
 const WORKER_IDLE_MS = 10 * 60_000;
 const LOAD_MS = 3 * 60_000;
-/** Free memory the worker needs to start (the small model and PyTorch: about 0.6 GB loaded). */
+/** Free memory the worker needs to start (the small model on ONNX Runtime: about 0.6 GB loaded). */
 const WORKER_NEED_MB = 1024;
 /** Memory the language model needs: 2.5 GB free, on a computer of at least 8 GB (a computer sold as 8 GB reports 7.7). */
 const LLM_NEED_MB = 2560;

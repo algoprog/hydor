@@ -81,6 +81,21 @@ Ported from `research/word-suggest` (not in the repository): `ws/slm.py` (model,
 confidence) and `ws/train.py` + `scripts/train_slm.py` (personalising with replay). The port must give the research
 code's numbers for the same inputs (its tests compare them).
 
+### The small model on ONNX Runtime
+
+Suggesting imports no torch. `hydor_suggest/ort_slm.py` runs the model's body as an ONNX graph, one chunk of new tokens at a
+time (`slm.onnx`, 313 KB, made from `graph.py` by `export_onnx.py`; it ships with the app, since it holds no weights). Its inputs are
+the new tokens' embedding rows, the position and the state (each convolution layer's last values, each attention layer's keys and
+values); its outputs the last token's hidden state taken to the embedding's width and the new state (the inputs are never
+changed). The embedding table (248k rows) and the output layer stay in NumPy: the table is the biggest part of the model, and the
+output layer is the table times that vector, split over the threads. The weights are named initializers with no data in the file;
+the session is made with each one replaced from a `model.safetensors` (`SessionOptions.add_initializer`), the release's or the
+person's (the same names as `model.py`'s state_dict), so one graph serves both. A graph in the release folder or the personal one
+(`slm.onnx`) is used before the bundled one when its architecture matches. `model.py` stays for learning (`train.py`).
+If ONNX Runtime cannot be loaded, the worker ends with why ("ONNX Runtime could not be loaded on this computer (…)"), which the status
+shows. Dynamic int8 quantisation of the body's matrix products was tried and not used: it halves the body's time but disagrees with
+PyTorch on the top token 4 times in 10 (60% agreement), against 100% for float32.
+
 ### The worker: JSON lines on stdin and stdout
 
 Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "loading"}` and, once loaded,
@@ -136,7 +151,8 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
 6. **Showing**: `theta` = calibration.json's θ for the plan at the asked precision (between the listed precisions:
    linear); `show = conf ≥ theta`; `show_next = show and conf_next ≥ theta`.
 
-A suggestion takes about 100–150 ms with the LLM at 4 threads, 30–60 ms with the small model alone.
+A suggestion takes about 100–150 ms with the LLM at 4 threads; with the small model alone, median 20 ms and 90th percentile 53 ms at 4 threads
+(32 and 80 ms at 1; PyTorch took 59 and 150 ms), a worker of about 610 MB (PyTorch: 905 MB) that is ready to answer in about 2 s.
 
 ### Personalising (`server/suggest/py/train.py`)
 
