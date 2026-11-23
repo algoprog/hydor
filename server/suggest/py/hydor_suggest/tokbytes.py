@@ -6,6 +6,7 @@ markers) and ids beyond the tokenizer's vocabulary (the model's padded rows) hav
 from __future__ import annotations
 
 import re
+import unicodedata
 from bisect import bisect_left
 from collections import OrderedDict
 from typing import Optional, Sequence
@@ -98,6 +99,9 @@ class PrefixIndex:
         self.valid = np.zeros(self.V, dtype=bool)
         self.valid[self.sorted_ids] = True
         self.valid_ids = np.flatnonzero(self.valid)               # sorted by id
+        # tokens that are only whitespace: a lone " " before a letter is never how the tokenizer writes a word (the space joins the word's
+        # first token), so they are kept out of the first step of a word (step_allowed)
+        self.ws_only = np.array([bool(b) and not b.strip(_WS_BYTES) for b in self.tb], dtype=bool)
         self.end_ids = list(end_ids)
         self.end_set = set(self.end_ids)
         ws = np.zeros(self.V, dtype=bool)
@@ -110,6 +114,7 @@ class PrefixIndex:
         self.ends_word = ws
         self.ends_ids = np.flatnonzero(ws)
         self._cache: OrderedDict = OrderedDict()
+        self._step_cache: dict = {}
         self._cache_size = cache_size
 
     def range_for(self, R: bytes) -> tuple:
@@ -140,6 +145,42 @@ class PrefixIndex:
         if len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)
         return ids
+
+
+    def step_allowed(self, R: bytes, started: bool = False) -> np.ndarray:
+        """The ids a decoding step may take: allowed(R) without the tokens that are only whitespace where one would not be written.
+
+        The tokenizer joins one space to the word after it (" gain" is one token; a lone " " precedes digits, and whitespace runs
+        and newlines have tokens of their own). So with R = whitespace W + the rest of the word, a whitespace-only token is kept only
+        if it leaves W's last character for the word (shorter than W), or it is all of W and W ends with a newline or the word
+        starts with a digit. With R only whitespace (the person already typed the separator; or R empty, a whole next word is
+        wanted) no whitespace-only token may be the word, except one that is exactly a typed newline run, after which the
+        word follows. `started`: a word is already under way (R empty then means mid-word: nothing is filtered)."""
+        if not R and started:
+            return self.valid_ids
+        key = (R, started)
+        hit = self._step_cache.get(key)
+        if hit is not None:
+            return hit
+        base = self.allowed(R)
+        W = len(R) - len(R.lstrip(_WS_BYTES))
+        out = base
+        if R == b'' or W > 0:
+            ws = self.ws_only[base]
+            if ws.any():
+                lead, rest = R[:W], R[W:]
+                nl = lead[-1:] in (b'\n', b'\r')
+                first = rest[:4].decode('utf-8', errors='ignore')[:1]
+                digit = bool(first) and unicodedata.category(first)[0] == 'N'
+                keep = ~ws
+                for j in np.flatnonzero(ws):
+                    n = len(self.tb[int(base[j])])
+                    keep[j] = (n < W or (n == W and (nl or digit))) if rest else (n == W and W > 0 and nl)
+                out = base[keep]
+        if len(self._step_cache) > 4000:
+            self._step_cache.clear()
+        self._step_cache[key] = out
+        return out
 
 
 def word_start_flags(tb: Sequence, target_ids: Sequence) -> list:

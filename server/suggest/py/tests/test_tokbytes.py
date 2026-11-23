@@ -41,6 +41,23 @@ class TokBytesTests(unittest.TestCase):
         self.assertEqual(sorted(idx.allowed(b'a').tolist()), [0, 1])
         self.assertEqual(sorted(idx.allowed(b'abc').tolist()), [0, 1])        # the tokens that are prefixes of the typed bytes
 
+    def test_whitespace_only_tokens_are_not_taken_where_the_tokenizer_would_not_write_them(self):
+        tb = [b' ', b'  ', b'\n', b'\n\n', b' ga', b' g', b'ga', b'1', b' the', b'\n ', b' 3', b'x']
+        ix = PrefixIndex(tb, [])
+        step = lambda R, started=False: sorted(tb[i] for i in ix.step_allowed(R, started))
+        self.assertEqual(step(b' ga'), [b' g', b' ga'])                   # a lone space never comes before a letter
+        self.assertEqual(step(b' g'), [b' g', b' ga'])
+        self.assertEqual(step(b' 1'), [b' '])                             # before a digit it does
+        self.assertEqual(step(b'  ga'), [b' '])                           # two spaces: the first is a token of its own
+        self.assertEqual(step(b' '), [b' 3', b' g', b' ga', b' the'])     # the separator is typed: the word is the next one
+        self.assertEqual(step(b'\n'), [b'\n'])                            # a typed newline run is consumed exactly, the word follows
+        self.assertEqual(step(b'\n\nx'), [b'\n', b'\n\n'])
+        self.assertNotIn(b' ', step(b''))                                 # a whole word wanted: no whitespace-only token
+        self.assertNotIn(b'\n', step(b''))
+        self.assertIn(b'ga', step(b''))
+        self.assertEqual(len(ix.step_allowed(b'', True)), len(ix.valid_ids))      # mid-word nothing is filtered
+        self.assertTrue(ix.ws_only[0] and ix.ws_only[3] and not ix.ws_only[4])
+
     def test_ends_word_marks_whitespace_tokens_and_end_of_text(self):
         eot = self.tok.token_to_id('<|endoftext|>')
         self.assertTrue(self.index.ends_word[eot])

@@ -198,6 +198,31 @@ class EngineTests(unittest.TestCase):
         self.assertEqual((first['n_predict'], first['n_probs'], first['temperature'], first['cache_prompt']), (1, 1000, 0, True))
         self.assertGreater(out['ms']['llm'], 0)
 
+    def lone_space_script(self, text, base_len):
+        """A language model that likes a lone space token first (as Qwen does), then spells `text` as the tokenizer writes it."""
+        spell = llm_script(self.tok, self.Vq, text, base_len)
+        space = self.tok.token_to_id('\u0120')
+
+        def script(prompt):
+            top = spell(prompt)
+            return [(space, float(np.log(0.6)))] + [(i, lp) for i, lp in top if i != space] if len(prompt) == base_len else top
+        return script
+
+    def test_a_lone_space_is_not_taken_for_the_word(self):
+        fake = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake.stop)
+        e = self.engine(fake.url)
+        base = len(self.tok.encode('\n\n', add_special_tokens=False).ids) + len(self.tok.encode('is it the', add_special_tokens=False).ids)
+        # typed after a word: the word is the one after the separator, without a second space
+        fake.script = self.lone_space_script(' project plan', base)
+        out = e.suggest({'surface': 'doc', 'text': 'is it the ', 'next': True})
+        self.assertEqual((out['word'], out['next']), ('project', ' plan'))
+        self.assertGreater(out['conf'], 0.7)                         # not 0.6/0.9 of a path through the lone space
+        # typed letters of a word: the lone space is the likeliest allowed token, but a word does not begin with it
+        out = e.suggest({'surface': 'doc', 'text': 'is it the proj', 'next': False})
+        self.assertEqual(out['word'], 'ect')
+        self.assertGreater(out['conf'], 0.7)
+
     def test_without_next_the_next_word_is_not_decoded(self):
         fake = helpers.FakeLlama(self.Vq)
         self.addCleanup(fake.stop)
@@ -278,21 +303,21 @@ class EngineTests(unittest.TestCase):
     def test_session_cache_steers_the_word(self):
         e = self.engine(options={'max_tokens': 16})         # the tiny tokenizer cuts a word into many small tokens
         e.release.cache_fits['slm'] = CacheFit(8.0, 0.0, 8.0)            # a cache that decides
-        e.session('s1', ['please send the quarterly spreadsheet', 'the quarterly spreadsheet is attached'])
-        with_cache = e.suggest({'surface': 'chat', 'text': 'could you open the quar', 'session': 's1', 'cache': True, 'next': False})
-        without = e.suggest({'surface': 'chat', 'text': 'could you open the quar', 'session': 's1', 'cache': False, 'next': False})
-        self.assertEqual(with_cache['word'], 'terly')
+        e.session('s1', ['please send the project plan', 'the project is attached'])
+        with_cache = e.suggest({'surface': 'chat', 'text': 'could you open the proj', 'session': 's1', 'cache': True, 'next': False})
+        without = e.suggest({'surface': 'chat', 'text': 'could you open the proj', 'session': 's1', 'cache': False, 'next': False})
+        self.assertEqual(with_cache['word'], 'ect')
         self.assertGreater(with_cache['conf'], 0.02)
         self.assertGreater(with_cache['conf'], without['conf'])
-        other = e.suggest({'surface': 'chat', 'text': 'could you open the quar', 'session': 'unknown', 'cache': True, 'next': False})
+        other = e.suggest({'surface': 'chat', 'text': 'could you open the proj', 'session': 'unknown', 'cache': True, 'next': False})
         self.assertLess(other['conf'], with_cache['conf'])
 
     def test_the_agents_reply_and_the_previous_message_feed_the_cache(self):
         e = self.engine(options={'max_tokens': 16})
         e.release.cache_fits['slm'] = CacheFit(8.0, 0.0, 8.0)
-        out = e.suggest({'surface': 'chat', 'text': 'could you open the quar', 'reply': 'The quarterly spreadsheet is ready.',
-                         'prev': 'send the quarterly spreadsheet', 'next': False})
-        self.assertEqual(out['word'], 'terly')
+        out = e.suggest({'surface': 'chat', 'text': 'could you open the proj', 'reply': 'The project is ready.',
+                         'prev': 'send the project plan', 'next': False})
+        self.assertEqual(out['word'], 'ect')
 
     def test_sessions_are_kept_for_the_last_few(self):
         e = self.engine(options={'sessions': 2})

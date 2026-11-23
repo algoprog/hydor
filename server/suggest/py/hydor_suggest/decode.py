@@ -43,10 +43,11 @@ def decode(row_fn: Callable, index: PrefixIndex, R: bytes, path: tuple = (), max
     for step in range(max_tokens):
         if cancelled is not None and cancelled():
             raise Cancelled()
-        allowed = index.allowed(R)
+        started = bool(produced.strip())
+        allowed = index.step_allowed(R, started)
         if not len(allowed):
             return Decoded(produced, 0.0, False, path, len(path) - n0)
-        want_end = (not R) and bool(produced)               # a word is under way: does it end here?
+        want_end = (not R) and started                      # a word is under way: does it end here?
         row = row_fn(path)
         vals = row[allowed]
         total = float(vals.sum(dtype=np.float64))
@@ -63,7 +64,7 @@ def decode(row_fn: Callable, index: PrefixIndex, R: bytes, path: tuple = (), max
         b = tb[tok]
         produced += b
         R = R[len(b):] if len(b) < len(R) else b''
-        if not R and b[-1:] in WS_END:                      # the token carries the whitespace that ends the word
+        if not R and b[-1:] in WS_END and produced.strip():     # the token carries the whitespace that ends the word
             return Decoded(produced, conf, True, path + (tok,), len(path) + 1 - n0)
         if step == max_tokens - 1:                          # the token limit: the next row would not be read
             return Decoded(produced, conf, False, path, len(path) - n0)

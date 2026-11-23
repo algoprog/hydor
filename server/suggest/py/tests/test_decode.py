@@ -90,6 +90,28 @@ class DecodeTests(unittest.TestCase):
         self.assertEqual(next_word_text(b'world '), ' world')
         self.assertEqual(next_word_text(b''), '')
 
+    def test_a_lone_space_is_not_the_word(self):
+        ix = index()
+        T = {t: i for i, t in enumerate(TOKENS) if t is not None}
+        # the person typed the separator (R is a space): the likeliest token is a lone space, which must not be taken
+        rows = {(): row_of({T[b' ']: 0.6, T[b' world']: 0.1, T[b' there']: 0.05}), (T[b' world'],): row_of({T[b'!']: 0.2, T[b' there']: 0.8}),
+                (T[b' world'], T[b' there']): row_of({T[b' world']: 1.0})}
+        d = decode(lambda p: rows[p], ix, b' ')
+        self.assertEqual(d.produced, b' world')
+        self.assertEqual(text_after(d.produced, b' '), 'world')
+        self.assertTrue(d.ended)
+        self.assertAlmostEqual(d.conf, (0.1 / 0.15) * 0.8, places=5)
+        d2 = decode(lambda p: rows[p], ix, b'', d.path)                  # the next word, too, is not a lone space
+        self.assertEqual(d2.produced, b' there')
+
+    def test_a_typed_newline_is_consumed_and_the_word_follows(self):
+        ix = index()
+        T = {t: i for i, t in enumerate(TOKENS) if t is not None}
+        rows = {(): row_of({T[b'\n']: 0.9, T[b'hello']: 0.1}), (T[b'\n'],): row_of({T[b'hello']: 0.7, T[b'a ']: 0.2}), (T[b'\n'], T[b'hello']): row_of({T[b' world']: 1.0})}
+        d = decode(lambda p: rows[p], ix, b'\n')
+        self.assertEqual(d.produced, b'\nhello')
+        self.assertEqual(text_after(d.produced, b'\n'), 'hello')
+
     def test_cancel_between_steps(self):
         ix = index()
         T = {t: i for i, t in enumerate(TOKENS) if t is not None}
