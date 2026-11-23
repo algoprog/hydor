@@ -803,7 +803,7 @@ test('start() with no transcript yet resumes nothing: Claude Code starts afresh 
   db.prepare('insert into app_sessions (key, agent, cwd, created_at, updated_at) values (?, ?, ?, ?, ?)').run(key, 'claude', folder, Date.now(), Date.now());
   const spawned: any[] = [];
   const m: any = Object.create(proto);
-  Object.assign(m, { db, lives: new Map(), external: { get: () => null }, summary: () => ({ prefs: {} }), sessionCwd: () => folder, transcriptFor: () => path.join(tmp, 'none.jsonl'), accountOf: () => undefined, accountOf2: undefined, spawn: async (...a: unknown[]) => (spawned.push(a), { key }) });
+  Object.assign(m, { db, lives: new Map(), agentStarts: new Map(), external: { get: () => null }, summary: () => ({ prefs: {} }), sessionCwd: () => folder, transcriptFor: () => path.join(tmp, 'none.jsonl'), accountOf: () => undefined, accountOf2: undefined, spawn: async (...a: unknown[]) => (spawned.push(a), { key }) });
   await m.start(key, {}, 'Fix the checkout tests');
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0][0], 'claude');
