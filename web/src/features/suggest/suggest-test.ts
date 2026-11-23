@@ -1,7 +1,7 @@
 // Script tests for word suggestions' rules (logic.ts) and one text box's controller (suggester.ts). Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/suggest/suggest-test.ts && node dist/dev/suggest-test.js
 import type { SuggestRequest, SuggestResponse } from '@shared/suggest';
-import { allowed, atWordEnd, consume, greyOf, requestOf, startsWord, takeAll, takeWord, typedBetween, type Field, type Gate } from './logic';
+import { afterSpace, allowed, atWordEnd, consume, greyOf, requestOf, startsWord, takeAll, takeWord, typedBetween, type Field, type Gate } from './logic';
 import { DEBOUNCE_MS, Suggester, type Adapter } from './suggester';
 
 let failed = 0;
@@ -65,6 +65,10 @@ eq(greyOf(ans({ word: 'ld', next: ' is' })), { word: 'ld', next: ' is' }, 'word 
 eq(greyOf(ans({ word: 'ld', next: ' is', showNext: false })), { word: 'ld', next: '' }, 'next not shown');
 eq(greyOf(ans({ word: 'ld', next: ' is', show: false, showNext: false })), null, 'not shown');
 eq(greyOf(ans({ word: '', next: ' is' })), { word: '', next: ' is' }, 'only the next word');
+eq(afterSpace({ word: '', next: ' 100' }, 'at gain '), { word: '100', next: '' }, 'after a typed space, no second space: the next word becomes the word');
+eq(afterSpace({ word: ' the', next: ' end' }, 'to '), { word: 'the', next: ' end' }, 'after a typed space, the word loses its leading space');
+eq(afterSpace({ word: 'ld', next: ' is' }, 'wor'), { word: 'ld', next: ' is' }, 'mid-word: unchanged');
+eq(afterSpace({ word: '', next: ' ' }, 'a '), null, 'nothing but whitespace: nothing to show');
 eq(greyOf(ans({ word: '', next: '' })), null, 'nothing');
 eq(greyOf(null), null, 'no content');
 

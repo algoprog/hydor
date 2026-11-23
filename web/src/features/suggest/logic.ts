@@ -86,6 +86,18 @@ export function greyOf(r: SuggestResponse | null | undefined): Grey | null {
   return word || next ? { word, next } : null;
 }
 
+/**
+ * What shows right after whitespace that was typed: never more whitespace (a second space). The grey text loses the
+ * whitespace it begins with, and when the word itself is empty the next word becomes the word.
+ */
+export function afterSpace(g: Grey | null, before: string): Grey | null {
+  if (!g || !/\s$/.test(before)) return g;
+  let word = g.word.replace(/^\s+/, '');
+  let next = g.next;
+  if (!word) (word = next.replace(/^\s+/, '')), (next = '');
+  return word || next ? { word, next } : null;
+}
+
 /** Whether two things to show read the same (an answer that only repeats what is on screen changes nothing). */
 export const sameGrey = (a: Grey | null, b: Grey | null) => (a?.word ?? '') + (a?.next ?? '') === (b?.word ?? '') + (b?.next ?? '');
 

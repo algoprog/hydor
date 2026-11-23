@@ -3,7 +3,7 @@
 // anything that may have changed the box (typing, a caret move, a focus); `key` offers a key press first. Nothing
 // here reaches the network or the stores: the request and the switches are given (controller.ts), so a test can run it.
 import type { SuggestRequest, SuggestResponse } from '@shared/suggest';
-import { allowed, atWordEnd, consume, greyOf, requestOf, sameGrey, startsWord, takeAll, takeWord, typedBetween, type Field, type Gate, type Grey, type Place } from './logic';
+import { afterSpace, allowed, atWordEnd, consume, greyOf, requestOf, sameGrey, startsWord, takeAll, takeWord, typedBetween, type Field, type Gate, type Grey, type Place } from './logic';
 
 /** What the box is to the controller. */
 export interface Adapter {
@@ -97,7 +97,7 @@ export class Suggester {
       const ctl = (this.ctl = new AbortController());
       const req = requestOf(this.ad.place, f, this.ad.context(), this.out.client);
       this.out.send(req, ctl.signal)
-        .then((r) => greyOf(r))
+        .then((r) => afterSpace(greyOf(r), f.before))
         .catch(() => null)
         .then((g) => {
           if (mine !== this.seq || ctl.signal.aborted) return;
