@@ -221,7 +221,7 @@ agents that speak ACP and take MCP servers.
   the session, or not. It knows every option of Settings and what it is set to now (`GET /api/settings`, the same
   table `hydor settings` uses), changes any of them as its page would (the card asks as the calls the change makes
   would), and for the few only you can change it says where. The settings each device keeps (theme, language,
-  motion, text size, the chime, what Enter does, the sidebar, and voice: the language you speak, dictation, the
+  motion, text size, the chime, what Enter does, the grey word suggestions, the sidebar, and voice: the language you speak, dictation, the
   reading voice and speed) are reported by every open page, so an agent reads them as well as changes them, on the
   device showing its session or on another open one it names. Your agents have tools of their own (`list_agents`, `save_agent`, `delete_agent`): any agent
   makes one from what you say, changes only what you ask (a new version by An agent), adds, changes or removes its
@@ -1459,6 +1459,24 @@ agents that speak ACP and take MCP servers.
   the background; else, or when the GPU fails, on the processor); replies can be read aloud. Hands-free mode (the
   headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
   answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
+- **Word suggestions**: while you type, the rest of the word shows in grey after the caret and the next word dimmer; Tab takes
+  the word (again, the next one), → at the end of the text takes both, Esc hides them until the next word. Settings →
+  Capabilities → Word suggestions turns it on (it is off at first, and the first time it installs its Python libraries and
+  downloads about 1.3 GB: llama.cpp from GitHub, the language model and the small model from Hugging Face); everything
+  runs on this computer, and what you type never leaves it. A small model of the app's own (49M parameters, 200 languages)
+  is mixed with Qwen3.5-0.8B (8-bit or 4-bit, through llama.cpp), which runs when the computer has at least 8 GB of memory
+  and 2.5 GB of it free (Automatic, On or Off; without it the small model alone makes the suggestions, and the section says
+  why); Choose by language picks, for the language of the text, the better of the two. It shows in message boxes, in
+  Docs, in notes and in other text boxes (follow-ups, the queue, the Ask panels), each with its switch, and each browser
+  can turn it off for itself. How sure before showing (more, balanced, surer; an agent can set up to 60%), the next word,
+  and how many words it reads of what you typed and of the agent's reply or the document above the paragraph are set
+  there too, and the session's earlier words feed its guesses as you type a message. The small model learns from what you
+  write: your messages to agents (not in sessions with memory off or confidential, and not the text apps, scheduled tasks
+  and other sessions put there), agents' replies, the notes you wrote and the documents you wrote, each source with its
+  switch and your own words weighted higher, every night, every week or when you press Retrain now, in the background at
+  the lowest priority and when you have not typed for ten minutes; the first time can take hours without a graphics card.
+  Forget what it learned goes back to the model that came with the app. Agents read and change all of it
+  (`GET` and `PUT /api/suggest`, and the settings table), and the browser's switch through `PUT /device`.
 - **Your language**: the app in English, German, Spanish, French, Brazilian Portuguese, Greek, Japanese or Chinese
   (Simplified) (Settings → General → Language), and the guide too, with dates and times written that way and
   notifications in it too, and agents write to you in it. At first the app follows the browser's language. Translations

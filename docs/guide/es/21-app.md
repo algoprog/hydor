@@ -259,7 +259,8 @@ La app guarda sus propios datos en una sola carpeta, su carpeta de datos: `~/.hy
 - los adjuntos que esperan a ser enviados (las copias de la app se eliminan después de 14 días y en total se mantienen por debajo de 2 GB);
 - la papelera de la página Archivos;
 - los kernels de los cuadernos y el servidor privado en el que se ejecutan las terminales;
-- una vez activada la búsqueda por significado, su entorno privado de Python.
+- una vez activada la búsqueda por significado, su entorno privado de Python;
+- una vez activadas las [sugerencias de palabras](/guide/documents-voice#word-suggestions-as-you-type), su entorno privado de Python, llama.cpp y el modelo que aprendió de lo que escribes.
 
 Las conversaciones en sí se quedan donde los agentes las escriben, `~/.claude/projects` para Claude Code y `~/.codex/sessions` para Codex: la app las lee ahí (la (i) junto a la versión en Configuración → General lo indica). Con Docker, todo esto vive en `/home/node` del contenedor, guardado en su volumen de datos.
 
@@ -272,7 +273,7 @@ Algunas opciones pertenecen al navegador en el que las eliges, así que cada dis
 - cuánto se mueve la interfaz (**Movimiento**);
 - el tamaño del texto (**Tamaño del texto**);
 - qué hace Enter mientras un agente trabaja;
-- las sugerencias de la terminal, el sonido de las notificaciones y si este dispositivo recibe notificaciones;
+- las sugerencias de la terminal, las [sugerencias de palabras](/guide/documents-voice#word-suggestions-as-you-type), el sonido de las notificaciones y si este dispositivo recibe notificaciones;
 - la carpeta de la página Archivos, los archivos abiertos, los archivos recientes y cómo se muestran las carpetas (lista o mosaicos, y su orden); las carpetas fijadas se guardan en el servidor y son las mismas en todos los dispositivos;
 - los archivos marcados como **Visto** al revisar una rama;
 - si ya se mostró la nota “Novedades”.

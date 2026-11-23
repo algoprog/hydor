@@ -26,7 +26,12 @@ for the service and the desktop apps; on Windows `%USERPROFILE%\.config\hydor.en
 | `HYDOR_EMBED_THREADS` | half the CPU's cores, at most 4 | Threads memory's search by meaning uses (it runs on the CPU, through ONNX Runtime) |
 | `HYDOR_EMBED_PYTHON` | a private environment the app sets up | A Python with ONNX Runtime 1.23+, tokenizers and NumPy to run it with instead |
 | `HYDOR_EMBED_MODEL_DIR` | `~/.cache/hydor/mDenseOn-ONNX-<revision>` (`~/Library/Caches/hydor/…` on a Mac, `%LOCALAPPDATA%\hydor\cache\…` on Windows, the data folder in Docker) | Where its model's files are kept (`model_q8.onnx`, `tokenizer.json`, `tokenizer_config.json`, from algoprog/mDenseOn-ONNX on Hugging Face) |
-| `HF_ENDPOINT` | `https://huggingface.co` | A Hugging Face mirror to download that model from |
+| `HF_ENDPOINT` | `https://huggingface.co` | A Hugging Face mirror to download that model from, and the models of word suggestions |
+| `HYDOR_SUGGEST` | `on` | `off`: word suggestions are never set up on this server (Settings → Capabilities → Word suggestions says so, and turning it on is refused): for a test's or a demo's copy |
+| `HYDOR_SUGGEST_PYTHON` | a private environment the app sets up in `DATA_DIR/suggest/venv` | A Python that has PyTorch (the CPU build), tokenizers, NumPy and safetensors, used as it is, to run word suggestions' engine and its learning |
+| `HYDOR_SUGGEST_MODEL_DIR` | `~/.cache/hydor/suggest/…` (`~/Library/Caches/hydor/suggest/…` on a Mac, `%LOCALAPPDATA%\hydor\cache\suggest\…` on Windows, `DATA_DIR/suggest/models/…` in Docker) | A folder that holds the small model's files (`config.json`, `model.safetensors`, `tokenizer.json`, `gate.json`, `switch.json`, `calibration.json`, `lid.json`, `lid.bin` and `replay/`): used as it is, with no download |
+| `HYDOR_SUGGEST_GGUF` | the 8-bit or 4-bit Qwen3.5-0.8B-Base file the app downloads from `ggml-org/Qwen3.5-0.8B-Base-GGUF` | A GGUF file to run as word suggestions' language model instead |
+| `HYDOR_SUGGEST_LLAMA_SERVER` | llama.cpp's ready-made `llama-server` for this system, from GitHub, in `DATA_DIR/suggest/llama` | A `llama-server` of your own (one built for your graphics card, say), used as it is. Where llama.cpp has no ready-made build for the system (a Raspberry Pi, say), word suggestions need it |
 | `HYDOR_PICTURES_DEVICE` | the graphics card when there is one they can use | `cpu`: the picture tools (taking backgrounds out, erasing) run on the CPU and set up without ONNX Runtime's NVIDIA build (2.1 GB), leaving the graphics card to other work. Otherwise an NVIDIA GPU runs them through CUDA (the GPUs in `CUDA_VISIBLE_DEVICES` when it is set) and a Mac's through Core ML |
 | `HYDOR_FFMPEG`, `HYDOR_FFPROBE` | `ffmpeg`, `ffprobe` on the `PATH` | The ffmpeg programs that take videos' frames and stills (and the pictures of videos in a project's Files) and sounds' lengths and shapes, and voice samples are read with |
 | `HYDOR_UPDATE_FEED` | the newest GitHub release's `hydor-mac.json`, `hydor-windows.json` or `hydor-linux.json` | Where a desktop app looks for new versions |
@@ -41,7 +46,9 @@ browser (`trash/`), the pictures of files shown in a project's Files, kept for a
 notebooks run in (`notebooks/`), notebook kernels and the terminal server, the `hydor` command's token (`cli-token`)
 and its input history (`terminal-history`), and search by meaning's private Python
 environment (`memory/venv`: set up a minute after the app first starts, unless it was turned off in Settings → Memory). Its model goes to Hugging Face's cache
-(`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents
+(`~/.cache/huggingface`, or `memory/hf` in Docker). Once word suggestions are turned on, `suggest/` holds their Python environment (`venv/`),
+llama.cpp (`llama/`) and the small model that learned from what you write (`personal/`, readable by you alone); their other models go to a cache folder
+of your user account, as `HYDOR_SUGGEST_MODEL_DIR` says. Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.
 
 Wiki memory's files are not in `DATA_DIR`: they are plain Markdown in the wiki folder from Settings → Memory → Wiki memory, an

@@ -259,7 +259,8 @@ Die App-Daten liegen normalerweise in `~/.hydor`, bei Installationen vor Version
 - noch zu sendende Anhänge, deren App-Kopien nach 14 Tagen entfernt und insgesamt unter 2 GB gehalten werden;
 - der Dateipapierkorb;
 - Notebook-Kernel und der private Server, in dem die Terminals laufen;
-- bei aktiver Bedeutungssuche deren private Python-Umgebung.
+- bei aktiver Bedeutungssuche deren private Python-Umgebung;
+- bei aktiven [Wortvorschlägen](/guide/documents-voice#word-suggestions-as-you-type) deren private Python-Umgebung, llama.cpp und das Modell, das aus deinem Geschriebenen gelernt hat.
 
 Unterhaltungen bleiben an den Speicherorten der Agenten, bei Claude Code unter `~/.claude/projects`, bei Codex unter `~/.codex/sessions`. Die App liest sie dort; darauf weist auch das (i) neben der Version hin. Unter Docker liegt alles in `/home/node` des Containers und wird über das Datenvolume erhalten.
 
@@ -272,7 +273,7 @@ Einige Einstellungen gelten pro Browser und können sich je Gerät unterscheiden
 - wie viel sich bewegt (**Bewegung**);
 - wie groß der Text ist (**Textgröße**);
 - Enter-Verhalten während der Agentenarbeit;
-- Terminalvorschläge, der Benachrichtigungston und ob dieses Gerät Benachrichtigungen bekommt;
+- Terminalvorschläge, [Wortvorschläge](/guide/documents-voice#word-suggestions-as-you-type), der Benachrichtigungston und ob dieses Gerät Benachrichtigungen bekommt;
 - aktueller Ordner, offene und zuletzt verwendete Dateien sowie Listen- oder Kachelansicht und Sortierung. Angeheftete Ordner liegen serverseitig und sind überall gleich;
 - bei Branch-Reviews als **Gesehen** markierte Dateien;
 - ob der Hinweis „Was ist neu“ gezeigt wurde.

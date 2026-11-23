@@ -226,6 +226,10 @@ On a Mac, the app puts the command on your PATH by itself.
 - **Boards** keep the cards you pin from replies together, each brought up to date by an agent on a schedule if you
   like, within a monthly cap ([pages, documents and pictures](docs/guide/11-library.md)).
 - Pictures, video, music and voice-overs made with AI, and edits to your own.
+- **Word suggestions** as you type: the rest of the word in grey after the cursor, and the next word dimmer (Tab takes it),
+  from a small model of the app's own that learns from what you write and, when the computer has the memory,
+  Qwen3.5-0.8B beside it, both on your computer (off until you turn it on; about 1.3 GB the first time). Nothing you
+  type leaves it ([word suggestions](docs/guide/09-documents-voice.md#word-suggestions-as-you-type)).
 - **Everything you keep is in the files of its project**: a project's details (from the sidebar) have a **Files** tab
   with tiles that show each file's picture, an **Upload** button, and the pages, documents, slides, spreadsheets,
   pictures, videos and sounds that agents made for it, next to the files in its folder ([projects](docs/guide/04-projects.md)).

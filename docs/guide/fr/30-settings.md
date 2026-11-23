@@ -227,7 +227,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Demander avant d’envoyer sur les sites connectés**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) : Avant qu’un agent n’envoie, ne publie, ne supprime ou ne transfère quoi que ce soit sur un site où il est connecté.
 - [**Favoris**](/settings?s=browser&find=Bookmarks) : Les vôtres, avec ceux des autres navigateurs de cet ordinateur.
 - [**Extensions**](/settings?s=browser&find=Extensions) : Extensions Chrome, dans l’app de bureau.
-- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Page d’accueil, moteur de recherche, raccourcis de recherche, zoom de page, correction orthographique, traduction, pages sombres, bloqueur de publicités, historique et effacement de ce qu’il a conservé.
+- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Utilisation de l’ordinateur
 
@@ -302,6 +302,36 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Langue que vous parlez**](/settings?s=voice&find=Language%20you%20speak) : La langue que la dictée écoute.
 - [**Reconnaissance vocale sur le serveur**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server) : Reconnaître la voix sur cet ordinateur ou avec un service.
 - [**Lire à voix haute**](/settings?s=voice&find=Read%20aloud) : Faire lire les réponses à voix haute.
+
+### Suggestions de mots
+
+[Paramètres → Suggestions de mots](/settings?s=suggest) : la fin du mot que vous tapez, et le suivant, en gris après le curseur : Tab l’accepte. Pour en savoir plus : [Documents, images, vidéos et voix](/guide/documents-voice).
+
+- [**Suggestions de mots**](/settings?s=suggest&find=Word%20suggestions) : La fin du mot que vous tapez et le suivant, en gris après le curseur, grâce à des modèles qui s’exécutent sur cet ordinateur ; la première fois, il télécharge environ 1,3 Go.
+- [**Afficher dans ce navigateur**](/settings?s=suggest&find=Show%20in%20this%20browser) : Indique si ce navigateur affiche les suggestions de mots (chaque navigateur garde les siennes).
+- [**Modèle de langage**](/settings?s=suggest&find=Language%20model) : Qwen3.5 en plus du petit modèle : automatiquement quand l’ordinateur a assez de mémoire, toujours, ou jamais.
+- [**Taille du modèle de langage**](/settings?s=suggest&find=Language%20model%20size) : Le modèle de langage en 8 bits (meilleur) ou en 4 bits (plus petit, un peu moins bon).
+- [**Certitude avant d’afficher**](/settings?s=suggest&find=How%20sure%20before%20showing) : Niveau de certitude requis pour afficher une suggestion : plus de suggestions, ou moins mais plus souvent justes.
+- [**Afficher le mot suivant**](/settings?s=suggest&find=Show%20the%20next%20word) : Affiche aussi le mot suivant, en plus pâle.
+- [**Dans les zones de message**](/settings?s=suggest&find=In%20message%20boxes) : Suggestions dans la zone où vous écrivez un message à un agent.
+- [**Dans les documents**](/settings?s=suggest&find=In%20documents) : Suggestions pendant que vous écrivez dans un document.
+- [**Dans les notes**](/settings?s=suggest&find=In%20notes) : Suggestions dans les notes.
+- [**Dans les autres zones de texte**](/settings?s=suggest&find=In%20other%20text%20boxes) : Suggestions aux autres endroits où vous écrivez : suivis, file d’attente, un message précédent, panneaux Demander.
+- [**Mots de ce que vous avez saisi**](/settings?s=suggest&find=Words%20of%20what%20you%20typed) : Combien des mots que vous avez saisis avant le curseur il lit.
+- [**Mots de la réponse ou du document**](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document) : Combien de mots de la dernière réponse de l’agent, ou du document avant le paragraphe, il lit.
+- [**Choisir selon la langue**](/settings?s=suggest&find=Choose%20by%20language) : Choisit le modèle le plus performant pour la langue de ce que vous écrivez.
+- [**Apprendre de la conversation**](/settings?s=suggest&find=Learn%20from%20the%20conversation) : Utilise les mots employés plus tôt dans la conversation pendant que vous écrivez un message.
+- [**Threads**](/settings?s=suggest&find=Threads) : Threads de processeur pour les suggestions (automatique par défaut).
+- [**Apprendre de ce que j’écris**](/settings?s=suggest&find=Learn%20from%20what%20I%20write) : Le petit modèle apprend de ce que vous écrivez, sur cet ordinateur, en arrière-plan.
+- [**Quand il apprend**](/settings?s=suggest&find=When%20it%20learns) : Chaque nuit, chaque semaine, ou seulement quand vous appuyez sur « Réentraîner maintenant » ; il attend que vous n’ayez rien tapé depuis dix minutes.
+- [**De mes messages**](/settings?s=suggest&find=From%20my%20messages) : Apprendre à partir des messages que vous avez écrits aux agents.
+- [**Des réponses des agents**](/settings?s=suggest&find=From%20agents'%20replies) : Apprendre à partir de ce que les agents vous ont répondu.
+- [**De mes notes**](/settings?s=suggest&find=From%20my%20notes) : Apprendre à partir des notes de mémoire que vous avez écrites.
+- [**De mes documents**](/settings?s=suggest&find=From%20my%20documents) : Apprendre à partir des documents et des pages que vous avez écrits.
+- [**Poids de mes propres mots**](/settings?s=suggest&find=Weight%20of%20my%20own%20words) : Combien les mots que vous avez saisis comptent de plus que le reste de ce qu’il apprend.
+- [**Threads pour l’apprentissage**](/settings?s=suggest&find=Threads%20for%20learning) : Threads de processeur pour l’apprentissage (automatique par défaut).
+- [**Réentraîner maintenant**](/settings?s=suggest&find=Retrain%20now) : Apprend maintenant, en arrière-plan, de ce que vous avez écrit depuis la dernière fois.
+- [**Oublier ce qu’il a appris**](/settings?s=suggest&find=Forget%20what%20it%20learned) : Supprime le modèle qui a appris de vous ; celui fourni avec l’app est de nouveau utilisé.
 
 ### Vos agents
 

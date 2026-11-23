@@ -227,7 +227,7 @@
 - [**ログイン済みのサイトでの送信前に確認**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：ログイン済みのサイトで、エージェントが送信、投稿、削除、送金を行う前。
 - [**ブックマーク**](/settings?s=browser&find=Bookmarks)：自分のものと、このコンピューターの他のブラウザのものを統合。
 - [**拡張機能**](/settings?s=browser&find=Extensions)：Chrome拡張機能（デスクトップアプリ）。
-- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：ホームページ、検索エンジン、検索ショートカット、ページのズーム、スペルチェック、翻訳、ダークページ、広告ブロック、履歴、保存されたデータの消去。
+- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
 
 ### コンピューターの操作
 
@@ -302,6 +302,36 @@
 - [**話す言語**](/settings?s=voice&find=Language%20you%20speak)：音声入力が聞き取る言語。
 - [**サーバーでの音声認識**](/settings?s=voice&find=Speech%20recognition%20on%20the%20server)：このコンピューターまたはサービスで音声を認識します。
 - [**読み上げ**](/settings?s=voice&find=Read%20aloud)：返信を読み上げる。
+
+### 単語候補
+
+[設定 → 単語候補](/settings?s=suggest)：入力中の単語の続きと次の単語を、カーソルの後ろにグレーで表示します。Tabで確定します。詳しくは[ドキュメント、画像、動画、音声](/guide/documents-voice)。
+
+- [**単語候補**](/settings?s=suggest&find=Word%20suggestions)：入力中の単語の続きと次の単語を、このコンピューター上で動くモデルがカーソルの後ろにグレーで表示します。初回は約1.3 GBをダウンロードします。
+- [**このブラウザで表示**](/settings?s=suggest&find=Show%20in%20this%20browser)：このブラウザで単語候補を表示するかどうか（ブラウザごとに保持されます）。
+- [**言語モデル**](/settings?s=suggest&find=Language%20model)：小型モデルに加えてQwen3.5を使います：コンピューターに十分なメモリがあるときは自動、常に使用、または使用しない。
+- [**言語モデルのサイズ**](/settings?s=suggest&find=Language%20model%20size)：言語モデルを8ビット（高精度）または4ビット（小さい分、やや精度が下がる）で使います。
+- [**表示する確信度**](/settings?s=suggest&find=How%20sure%20before%20showing)：候補を表示するために必要な確信度：多めに表示するか、少なめでより正確にするか。
+- [**次の単語を表示**](/settings?s=suggest&find=Show%20the%20next%20word)：その次の単語も、薄く表示します。
+- [**メッセージ欄**](/settings?s=suggest&find=In%20message%20boxes)：エージェントにメッセージを書く欄での候補。
+- [**ドキュメント内**](/settings?s=suggest&find=In%20documents)：ドキュメントを書くときの候補。
+- [**メモ内**](/settings?s=suggest&find=In%20notes)：メモでの候補。
+- [**その他のテキスト欄**](/settings?s=suggest&find=In%20other%20text%20boxes)：フォローアップ、キュー、以前のプロンプト、質問パネルなど、その他の入力場所での候補。
+- [**入力した単語数**](/settings?s=suggest&find=Words%20of%20what%20you%20typed)：カーソルより前に入力した単語のうち、どのくらいを読み取るか。
+- [**返信またはドキュメントの単語数**](/settings?s=suggest&find=Words%20of%20the%20reply%20or%20document)：エージェントの最後の返信、または段落より前のドキュメントのうち、どのくらいの単語数を読み取るか。
+- [**言語で選ぶ**](/settings?s=suggest&find=Choose%20by%20language)：書いている言語に最も合うモデルを選びます。
+- [**会話から学習**](/settings?s=suggest&find=Learn%20from%20the%20conversation)：メッセージの入力中に、会話の前半で使われた単語を利用します。
+- [**Threads**](/settings?s=suggest&find=Threads)：候補に使うプロセッサスレッド数（デフォルトは自動）。
+- [**入力内容から学習**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小型モデルが、このコンピューター上でバックグラウンドで入力内容から学習します。
+- [**学習するタイミング**](/settings?s=suggest&find=When%20it%20learns)：毎晩、毎週、または「今すぐ再学習」を押したときだけ。10分間入力がないときに実行されます。
+- [**自分のメッセージから**](/settings?s=suggest&find=From%20my%20messages)：エージェントに書いたメッセージから学習します。
+- [**エージェントの返信から**](/settings?s=suggest&find=From%20agents'%20replies)：エージェントからの返信から学習します。
+- [**自分のメモから**](/settings?s=suggest&find=From%20my%20notes)：書いたメモリのメモから学習します。
+- [**自分のドキュメントから**](/settings?s=suggest&find=From%20my%20documents)：書いたドキュメントやページから学習します。
+- [**自分の言葉の重み**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：学習の対象のうち、入力した単語を他のテキストよりどのくらい重視するか。
+- [**学習用スレッド数**](/settings?s=suggest&find=Threads%20for%20learning)：学習に使うプロセッサスレッド数（デフォルトは自動）。
+- [**今すぐ再学習**](/settings?s=suggest&find=Retrain%20now)：前回以降に書いた内容を、バックグラウンドで今すぐ学習します。
+- [**学習内容を消去**](/settings?s=suggest&find=Forget%20what%20it%20learned)：あなたの入力から学習したモデルを削除し、アプリに付属のモデルに戻します。
 
 ### 自分のエージェント
 
