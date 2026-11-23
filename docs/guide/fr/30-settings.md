@@ -227,7 +227,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Demander avant d’envoyer sur les sites connectés**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) : Avant qu’un agent n’envoie, ne publie, ne supprime ou ne transfère quoi que ce soit sur un site où il est connecté.
 - [**Favoris**](/settings?s=browser&find=Bookmarks) : Les vôtres, avec ceux des autres navigateurs de cet ordinateur.
 - [**Extensions**](/settings?s=browser&find=Extensions) : Extensions Chrome, dans l’app de bureau.
-- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Page d’accueil, moteur de recherche, raccourcis de recherche, zoom des pages, correction orthographique, traduction, pages sombres, bloqueur de publicités avec ses listes de filtres, langues et sites où les publicités sont autorisées, historique et effacement de ce qu’il a gardé.
+- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Utilisation de l’ordinateur
 

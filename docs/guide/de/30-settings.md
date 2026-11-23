@@ -227,7 +227,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Vor dem Senden auf angemeldeten Websites fragen**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist.
 - [**Lesezeichen**](/settings?s=browser&find=Bookmarks): Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer.
 - [**Erweiterungen**](/settings?s=browser&find=Extensions): Chrome-Erweiterungen in der Desktop-App.
-- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Startseite, Suchmaschine, Suchkürzel, Seitenzoom, Rechtschreibprüfung, Übersetzung, dunkle Seiten, Werbeblocker mit seinen Filterlisten, Sprachen und Seiten, auf denen Werbung erlaubt ist, Verlauf und das Löschen gespeicherter Daten.
+- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Computer Use
 

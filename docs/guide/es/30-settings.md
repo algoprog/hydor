@@ -227,7 +227,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Preguntar antes de enviar en sitios con sesión iniciada**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de que un agente envíe, publique, elimine o transfiera algo en un sitio donde ha iniciado sesión.
 - [**Marcadores**](/settings?s=browser&find=Bookmarks): Los tuyos, junto con los de los otros navegadores de esta computadora.
 - [**Extensiones**](/settings?s=browser&find=Extensions): Extensiones de Chrome, en la app de escritorio.
-- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Página de inicio, motor de búsqueda, atajos de búsqueda, zoom de página, revisión ortográfica, traducción, páginas oscuras, bloqueador de anuncios con sus listas de filtros, idiomas y sitios donde se permiten anuncios, historial y borrado de lo que guardó.
+- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Uso de la computadora
 

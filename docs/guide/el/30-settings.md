@@ -227,7 +227,7 @@
 - [**Ερώτηση πριν από την αποστολή σε ιστότοπους όπου έχετε συνδεθεί**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Πριν ένας πράκτορας στείλει, δημοσιεύσει, διαγράψει ή μεταφέρει οτιδήποτε σε ιστότοπο όπου έχει συνδεθεί.
 - [**Σελιδοδείκτες**](/settings?s=browser&find=Bookmarks): Οι δικοί σας, μαζί με αυτούς των άλλων προγραμμάτων περιήγησης σε αυτόν τον υπολογιστή.
 - [**Επεκτάσεις**](/settings?s=browser&find=Extensions): Επεκτάσεις του Chrome, στην εφαρμογή υπολογιστή.
-- [**Ρυθμίσεις προγράμματος περιήγησης**](/settings?s=browser&find=Browser%20settings): Αρχική σελίδα, μηχανή αναζήτησης, συντομεύσεις αναζήτησης, ζουμ σελίδας, έλεγχος ορθογραφίας, μετάφραση, σκούρες σελίδες, αποκλεισμός διαφημίσεων με τις λίστες φίλτρων του, γλώσσες και ιστότοποι όπου επιτρέπονται οι διαφημίσεις, ιστορικό και εκκαθάριση όσων έχει κρατήσει.
+- [**Ρυθμίσεις προγράμματος περιήγησης**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Χρήση υπολογιστή
 

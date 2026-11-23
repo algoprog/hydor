@@ -227,7 +227,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Perguntar antes de enviar em sites com login**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de um agente enviar, publicar, excluir ou transferir algo em um site em que ele esteja conectado.
 - [**Favoritos**](/settings?s=browser&find=Bookmarks): Os seus, junto com os dos outros navegadores deste computador.
 - [**Extensões**](/settings?s=browser&find=Extensions): Extensões do Chrome, no app para computador.
-- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Página inicial, mecanismo de busca, atalhos de pesquisa, zoom da página, verificação ortográfica, tradução, páginas escuras, bloqueador de anúncios com suas listas de filtros, idiomas e sites onde anúncios são permitidos, histórico e limpeza do que ele guardou.
+- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
 
 ### Uso do computador
 

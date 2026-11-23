@@ -227,7 +227,7 @@
 - [**ログイン済みのサイトでの送信前に確認**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：ログイン済みのサイトで、エージェントが送信、投稿、削除、送金を行う前。
 - [**ブックマーク**](/settings?s=browser&find=Bookmarks)：自分のものと、このコンピューターの他のブラウザのものを統合。
 - [**拡張機能**](/settings?s=browser&find=Extensions)：Chrome拡張機能（デスクトップアプリ）。
-- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：ホームページ、検索エンジン、検索ショートカット、ページのズーム、スペルチェック、翻訳、ダークページ、フィルタリスト・言語・広告を許可するサイトを含む広告ブロック、履歴と保存されたデータの消去。
+- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
 
 ### コンピューターの操作
 
