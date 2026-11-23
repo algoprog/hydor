@@ -9,7 +9,7 @@ import compress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
-import type { AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, MachineCounts, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
+import type { AccountAgent, AcpAgentDef, Agent, AgentUsage, ClientEvent, FileChange, KernelOp, LimitResetResult, LoginFlow, MachineCounts, McpSpec, NotifyEvent, ServerEvent, SessionSummary, TimelineItem, ToolItem } from '../shared/types.ts';
 import { isSubscription } from '../shared/types.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { AuthManager, clientAddress, HttpError, SESSION_COOKIE } from './auth.ts';
@@ -51,8 +51,10 @@ import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { accountById, accountEnv, accountPool, addAccount, addedAccounts, apiCreditOn, autoSwitchOn, hasApiKey, setApiKey, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
-import { dropGrokControl, grokControl, grokFlows, type GrokControl } from './agents/grok.ts';
-import { ACCOUNT_AGENT_NAMES, isGrok } from '../shared/grok.ts';
+import { grokFlows } from './agents/grok.ts';
+import { antigravityFlows } from './agents/antigravity.ts';
+import { acpControl, dropAcpControls, type AcpAccountAgent, type AcpAccountControl } from './agents/acp-accounts.ts';
+import { ACCOUNT_AGENT_NAMES, acpAccountAgent, isAcpAccountAgent } from '../shared/account-agents.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
@@ -437,6 +439,8 @@ app.post('/api/sessions', async (req) => {
     remember: extra?.help || extra?.page || extra?.file ? false : undefined,
     // The start page says a person started it (nothing else does): in a project with no wiki memory it may ask to build it first.
     askMemory: b.askMemory === true && !others,
+    // A person's start (the page, the terminal app): not an agent's, which comes from inside the server (its app_api).
+    person: !isInternal(req),
   };
   // The page's own id for this press of Start: sent again (its answer lost on the way), it makes no second session.
   const startId = typeof b.startId === 'string' && START_ID.test(b.startId) ? b.startId : undefined;
@@ -703,6 +707,8 @@ app.post('/api/tasks/:id/run', async (req) => ({ key: await scheduler.runNow((re
 app.post('/api/tasks/:id/rotate', async (req) => ({ task: scheduler.rotate((req.params as { id: string }).id) }));
 /** Continue a session when its usage limit resets; the time then follows the reset as it moves (scheduler.syncResumes). */
 app.post('/api/sessions/:key/resume-at', async (req) => {
+  // Antigravity CLI takes only turns a person starts (Google's terms for its plans).
+  if (sessions.acpAccountAgentOf(K(req)) === 'antigravity') throw new HttpError(400, 'Antigravity CLI does not continue by itself: Google’s terms for its plans allow only turns you start. Send a message once its limit resets.');
   const at = Number(((req.body ?? {}) as any).at);
   if (!Number.isFinite(at) || at < Date.now() - 60_000) throw new HttpError(400, 'Pick a time in the future');
   scheduler.resumeAt(K(req), at);
@@ -804,11 +810,12 @@ app.post('/api/sessions/:key/config', async (req) => {
   return { ok: true };
 });
 // The account a Claude Code, Codex or Grok Build session runs as ('' or none: the CLI's own sign-in): its history moves there,
-// and its agent starts there with the next message.
+// and its agent starts there with the next message. Antigravity CLI has its own sign-in only.
 app.post('/api/sessions/:key/account', async (req) => {
   const id = String((req.body as { account?: unknown } | undefined)?.account ?? '');
   const key = K(req);
-  const agent = key.startsWith('codex:') ? 'codex' : key.startsWith('claude:') ? 'claude' : sessions.isGrokSession(key) ? 'grok' : null;
+  const acct = sessions.acpAccountAgentOf(key);
+  const agent = key.startsWith('codex:') ? 'codex' : key.startsWith('claude:') ? 'claude' : acct === 'grok' ? 'grok' : null;
   if (!agent) throw new HttpError(400, 'Only a Claude Code, Codex or Grok Build session runs as an account');
   if (id && accountById(db, id)?.agent !== agent) throw new HttpError(404, `No such ${ACCOUNT_AGENT_NAMES[agent]} account`);
   await sessions.moveToAccount(key, id || undefined);
@@ -1072,14 +1079,24 @@ app.delete('/api/acp-agents/:id', async (req) => {
 let usageAt = 0;
 const extraUsage: Record<string, AgentUsage> = {};
 
-/** Grok Build is set up: its agent is added in Settings → More agents, or an account of it exists. */
-const grokSetUp = () => acpAgents(db).some((a) => isGrok(a)) || addedAccounts(db).some((a) => a.agent === 'grok');
+/**
+ * An ACP agent with accounts (Grok Build, Antigravity CLI) is set up: its agent is added in Settings → More agents, or an
+ * account of it exists.
+ */
+const acpSetUp = (agent: AcpAccountAgent) => acpAgents(db).some((a) => acpAccountAgent(a) === agent) || addedAccounts(db).some((a) => a.agent === agent);
+/** The ACP agents with accounts that are set up, whose own sign-ins Settings → Accounts and the Usage page show. */
+const acpAccountAgents = (): AcpAccountAgent[] => (['grok', 'antigravity'] as const).filter(acpSetUp);
 
 /**
- * Grok's plan usage costs a process started for a second, so a reading stands for 4 minutes (the page asks every 5, and
- * Claude and Codex are read every 2) unless the Usage page's Refresh asks for a new one.
+ * An ACP agent's plan usage costs a process started for a second, so a reading stands for 4 minutes (the page asks every 5,
+ * and Claude and Codex are read every 2) unless the Usage page's Refresh asks for a new one.
  */
-const grokUsageOf = (c: GrokControl, force: boolean) => (!force && c.lastUsage && Date.now() - c.lastUsage.fetchedAt < 4 * 60_000 ? c.lastUsage : c.usage());
+const acpUsageOf = (c: AcpAccountControl, force: boolean) => (!force && c.lastUsage && Date.now() - c.lastUsage.fetchedAt < 4 * 60_000 ? c.lastUsage : c.usage());
+
+/** The usage of each set-up ACP agent's own sign-in, by the agent ({ grok, antigravity }). */
+async function acpUsage(force: boolean): Promise<Partial<Record<AcpAccountAgent, AgentUsage>>> {
+  return Object.fromEntries(await Promise.all(acpAccountAgents().map(async (a) => [a, await acpUsageOf(acpControl(db, a), force)] as const)));
+}
 
 /** Usage of every added account (each through its own control process). */
 async function addedUsage(force = false): Promise<Record<string, AgentUsage>> {
@@ -1087,7 +1104,7 @@ async function addedUsage(force = false): Promise<Record<string, AgentUsage>> {
   const got = await Promise.all(
     list.map(
       async (a) =>
-        [a.id, a.agent === 'grok' ? await grokUsageOf(grokControl(db, a.id), force) : a.agent === 'claude' ? await sessions.controlFor('claude', a.id).usage(sessions.liveClaudeUsage(a.id)) : await sessions.controlFor('codex', a.id).usage()] as const,
+        [a.id, isAcpAccountAgent(a.agent) ? await acpUsageOf(acpControl(db, a.agent, a.id), force) : a.agent === 'claude' ? await sessions.controlFor('claude', a.id).usage(sessions.liveClaudeUsage(a.id)) : await sessions.controlFor('codex', a.id).usage()] as const,
     ),
   );
   for (const k of Object.keys(extraUsage)) if (!list.some((a) => a.id === k)) delete extraUsage[k];
@@ -1098,18 +1115,18 @@ async function addedUsage(force = false): Promise<Record<string, AgentUsage>> {
 /** Reads every account's usage now, tells the open pages, and keeps sessions waiting out a limit on its reset. */
 async function readUsage(force = false) {
   usageAt = Date.now();
-  const [c, x, g, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), grokSetUp() ? grokUsageOf(grokControl(db), force) : undefined, addedUsage(force)]);
-  broadcast({ t: 'usage', claude: c, codex: x, ...(g ? { grok: g } : {}), accounts });
+  const [c, x, acp, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), acpUsage(force), addedUsage(force)]);
+  broadcast({ t: 'usage', claude: c, codex: x, ...acp, accounts });
   scheduler.syncResumes();
-  return { claude: c, codex: x, ...(g ? { grok: g } : {}), accounts };
+  return { claude: c, codex: x, ...acp, accounts };
 }
 
 app.get('/api/usage', async (req) => {
   const refresh = (req.query as Record<string, string>).refresh === '1';
   const stale = Date.now() - usageAt > 120_000;
-  const g = grokSetUp() ? grokControl(db) : undefined;
-  if (refresh || stale || !claude.lastUsage || !codex.lastUsage || (g && !g.lastUsage)) return readUsage(refresh);
-  return { claude: claude.lastUsage, codex: codex.lastUsage, ...(g?.lastUsage ? { grok: g.lastUsage } : {}), accounts: { ...extraUsage } };
+  const acp = acpAccountAgents().map((a) => [a, acpControl(db, a).lastUsage] as const);
+  if (refresh || stale || !claude.lastUsage || !codex.lastUsage || acp.some(([, u]) => !u)) return readUsage(refresh);
+  return { claude: claude.lastUsage, codex: codex.lastUsage, ...Object.fromEntries(acp), accounts: { ...extraUsage } };
 });
 
 // While a session waits to continue after a usage limit, usage is read now and then, more often as the
@@ -1147,18 +1164,17 @@ app.post('/api/usage/:agent/reset', async (req) => {
 
 app.get('/api/accounts', async () => {
   const added = addedAccounts(db);
-  // Grok Build shows once it is set up: its agent is added in Settings → More agents, or an account of it exists.
-  const grok = grokSetUp();
-  const [c, x, g, extra] = await Promise.all([
+  // Grok Build and Antigravity CLI show once they are set up: the agent is added in Settings → More agents, or an account of it exists.
+  const [c, x, acp, extra] = await Promise.all([
     claude.account(),
     codex.account(),
-    grok ? grokControl(db).account() : undefined,
-    Promise.all(added.map(async (a) => ({ ...a, status: await (a.agent === 'grok' ? grokControl(db, a.id) : sessions.controlFor(a.agent, a.id)).account() }))),
+    Promise.all(acpAccountAgents().map(async (a) => [a, await acpControl(db, a).account()] as const)),
+    Promise.all(added.map(async (a) => ({ ...a, status: await accountStatus(a.agent, a.id) }))),
   ]);
   // Which Claude accounts have an API key for API credit ("main": the CLI's own sign-in).
   const apiKeys: Record<string, boolean> = { main: hasApiKey(db, undefined) };
   for (const a of extra) if (a.agent === 'claude') apiKeys[a.id] = hasApiKey(db, a.id);
-  return { claude: c, codex: x, ...(g ? { grok: g } : {}), extra, apiKeys };
+  return { claude: c, codex: x, ...Object.fromEntries(acp), extra, apiKeys };
 });
 
 /** A Claude account's Anthropic API key, the API credit its sessions use when every account is at its limit (Settings → Accounts). */
@@ -1198,7 +1214,7 @@ app.delete('/api/agent-accounts/:id', async (req) => {
   const id = (req.params as { id: string }).id;
   if ([...sessions.lives.values()].some((l) => l.account === id)) throw new HttpError(409, 'Sessions are running as this account: stop them first');
   sessions.dropControl(id);
-  dropGrokControl(id);
+  dropAcpControls(id);
   sessions.forgetAccount(id);
   removeAgentAccount(db, id, (req.query as Record<string, string>).wipe === '1');
   delete extraUsage[id];
@@ -1211,7 +1227,7 @@ function broadcastAccounts() {
 }
 
 /** An account's sign-in state, as GET /api/accounts reads it. */
-const accountStatus = (agent: 'claude' | 'codex' | 'grok', account: string | undefined) => (agent === 'grok' ? grokControl(db, account).account() : sessions.controlFor(agent, account).account());
+const accountStatus = (agent: AccountAgent, account: string | undefined) => (isAcpAccountAgent(agent) ? acpControl(db, agent, account).account() : sessions.controlFor(agent, account).account());
 
 /** The accounts the app found signed out and asks the user to sign in to again (Settings → Agents → Accounts shows them too). */
 app.get('/api/accounts/sign-in', async () => ({ needs: signInNeeds() }));
@@ -1233,9 +1249,9 @@ app.post('/api/accounts/sign-in/:agent/check', async (req) => {
   return { signedIn, needs: signInNeeds() };
 });
 
-/** The sign-in calls of an agent's accounts: Claude Code, Codex and Grok Build have them; any other agent is unknown. */
-const loginAgent = (agent: string): 'claude' | 'codex' | 'grok' => {
-  if (agent !== 'claude' && agent !== 'codex' && agent !== 'grok') throw new HttpError(404, 'Unknown agent');
+/** The sign-in calls of an agent's accounts: Claude Code, Codex, Grok Build and Antigravity CLI have them; any other agent is unknown. */
+const loginAgent = (agent: string): AccountAgent => {
+  if (agent !== 'claude' && agent !== 'codex' && agent !== 'grok' && agent !== 'antigravity') throw new HttpError(404, 'Unknown agent');
   return agent;
 };
 
@@ -1243,7 +1259,7 @@ app.post('/api/accounts/:agent/login', async (req) => {
   const agent = loginAgent((req.params as { agent: string }).agent);
   const method = String((req.body as any)?.method ?? '');
   const account = acctOf(req);
-  if (agent === 'grok') return publicFlow(await grokControl(db, account).startLogin());
+  if (isAcpAccountAgent(agent)) return publicFlow(await acpControl(db, agent, account).startLogin());
   const flow = agent === 'claude' ? await sessions.controlFor('claude', account).startLogin(method === 'console' ? 'console' : 'claudeai') : await sessions.controlFor('codex', account).startLogin(method === 'browser' ? 'browser' : 'device');
   return publicFlow(flow);
 });
@@ -1254,6 +1270,8 @@ app.post('/api/accounts/:agent/login/:flow', async (req) => {
   if (agent === 'grok') throw new HttpError(400, 'Grok Build’s sign-in needs nothing pasted: confirm the code in your browser');
   const b = (req.body ?? {}) as { code?: string; url?: string };
   const account = acctOf(req);
+  // Antigravity CLI's sign-in ends with the code Google's page shows, pasted back.
+  if (agent === 'antigravity') return publicFlow(acpControl(db, agent, account).submitCode!(flow, String(b.code ?? '')));
   const f = agent === 'claude' ? sessions.controlFor('claude', account).submitCode(flow, String(b.code ?? '')) : await sessions.controlFor('codex', account).submitRedirect(flow, String(b.url ?? ''));
   return publicFlow(f);
 });
@@ -1262,7 +1280,7 @@ app.delete('/api/accounts/:agent/login/:flow', async (req) => {
   const { agent: a, flow } = req.params as { agent: string; flow: string };
   const agent = loginAgent(a);
   const account = acctOf(req);
-  if (agent === 'grok') grokControl(db, account).cancelLogin(flow);
+  if (isAcpAccountAgent(agent)) acpControl(db, agent, account).cancelLogin(flow);
   else if (agent === 'claude') sessions.controlFor('claude', account).cancelLogin(flow);
   else await sessions.controlFor('codex', account).cancelLogin(flow);
   return { ok: true };
@@ -1271,7 +1289,7 @@ app.delete('/api/accounts/:agent/login/:flow', async (req) => {
 app.post('/api/accounts/:agent/logout', async (req) => {
   const agent = loginAgent((req.params as { agent: string }).agent);
   const account = acctOf(req);
-  if (agent === 'grok') await grokControl(db, account).logout();
+  if (isAcpAccountAgent(agent)) await acpControl(db, agent, account).logout();
   else if (agent === 'claude') await sessions.controlFor('claude', account).logout();
   else await sessions.controlFor('codex', account).logout();
   return { ok: true };
@@ -1853,6 +1871,7 @@ claude.on('flow', (f: LoginFlow) => onFlow(f));
 codex.on('flow', (f: LoginFlow) => onFlow(f));
 sessions.on('flow', onFlow);
 grokFlows.on('flow', onFlow);
+antigravityFlows.on('flow', onFlow);
 // Projects found in Claude Code and Codex (server/spaces/found.ts): a session that works in a project's folder joins it as the
 // indexer reads it, and the folders those programs work in become projects once the first pass is over, then as they change.
 const foundSync = () => {

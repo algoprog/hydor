@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Works with:</b> Claude Code · Codex · Gemini CLI · Kimi CLI · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp <b>and more</b></sub>
+  <sub><b>Works with:</b> Claude Code · Codex · Gemini CLI · Antigravity CLI · Kimi CLI · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp <b>and more</b></sub>
 </p>
 
 <p align="center">
@@ -165,9 +165,12 @@ On a Mac, the app puts the command on your PATH by itself.
 
 **Coming from another agent**
 
-- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and Grok Build run as agents of
+- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build and Antigravity CLI run as agents of
   Hydor, beside Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
-  ([agents and models](docs/guide/16-agents-models.md)). Sign in to Claude Code, Codex and Grok Build with your
+  ([agents and models](docs/guide/16-agents-models.md)). Antigravity CLI is Google's agent for a Google AI Pro, Ultra
+  or Plus plan (Gemini CLI now serves a Gemini API key or a Gemini Code Assist Standard or Enterprise licence); it
+  has one sign-in and runs only in sessions you start yourself, as Google's terms ask
+  ([Antigravity CLI](docs/guide/16-agents-models.md#antigravity-cli)). Sign in to Claude Code, Codex and Grok Build with your
   subscriptions, and add more than one account of each, a work and a personal one say
   ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)). When one hits its limit or
   is signed out, the work carries on with another, and you're asked to sign in again only when nothing else can do it

@@ -4,7 +4,7 @@ import type { Agent, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
 import { goalMessageOf } from '@shared/goals';
-import { accountAgentOf } from '@shared/grok';
+import { accountAgentOf } from '@shared/account-agents';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
 import { chatContext } from '../suggest/chat';
@@ -170,7 +170,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const lv = useLive((x) => x.byKey[key]);
   const live = lv?.live ?? s.live ?? null;
   const running = !!live && live.status !== 'exited';
-  // Whose plan limit it could hit: Claude Code, Codex or Grok Build (an ACP agent); the other ACP agents have none.
+  // Whose plan limit it could hit: Claude Code, Codex, Grok Build or Antigravity CLI (ACP agents); the other ACP agents have none.
   const acpDef = useApp((x) => (s.agent === 'acp' ? x.boot?.acpAgents?.find((a) => a.id === s.acpAgent) : undefined));
   const limitAgent = accountAgentOf(s.agent, acpDef);
   // The account this session runs on is signed out: it continues once it is signed in again (whatever Not now said).

@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, mcpRunFiles, precompactCopy, removeMcpRunFiles } from './agents/claude.ts';
-import { grokControl } from './agents/grok.ts';
+import { acpControl } from './agents/acp-accounts.ts';
+import { antigravityControl } from './agents/antigravity.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
@@ -17,7 +18,7 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
 import { formContent } from '../shared/forms.ts';
-import { ACCOUNT_AGENT_NAMES, accountAgentOf, isGrok } from '../shared/grok.ts';
+import { ACCOUNT_AGENT_NAMES, acpAccountAgent, accountAgentOf, isAcpAccountAgent } from '../shared/account-agents.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
 import { keptOfTranscript, type Indexer } from './indexer/index.ts';
@@ -243,7 +244,16 @@ export interface CreateOpts {
   extra?: SessionExtra;
   /** A person started it on the start page: in a project with no wiki memory, it may first ask to build it (server/wiki/ask.ts). */
   askMemory?: boolean;
+  /**
+   * A person started it and drives it (the start page, the terminal app, a chat app, hands-free voice), not the app or an agent
+   * (a schedule, a subagent, an app run, a goal). Only such a session may run Antigravity CLI (Google's terms for its plans).
+   */
+  person?: boolean;
 }
+
+/** Why Antigravity CLI does not run a session the app or an agent starts. */
+export const ANTIGRAVITY_PERSON_ONLY =
+  'Antigravity CLI runs only in sessions you start and drive yourself: Google’s terms for its plans rule out work that the app or another agent starts (schedules, subagents, apps). Pick another agent for this.';
 
 interface Live {
   key: string;
@@ -930,7 +940,9 @@ export class SessionManager extends EventEmitter {
    */
   private afterTurn(s: SessionSummary, hit: boolean, now: number) {
     const agent = this.accountAgentOf(s.key, s.agent);
-    if (!agent || !this.onLimited) return;
+    // Antigravity CLI has one sign-in and takes only turns a person starts (Google's terms for its plans): at its limit it
+    // waits for you, its notice saying when the limit lifts.
+    if (!agent || agent === 'antigravity' || !this.onLimited) return;
     // A resume is set already: it continues then.
     const resumes = this.resumeLookup?.(s.key);
     if (resumes) {
@@ -940,7 +952,7 @@ export class SessionManager extends EventEmitter {
     const switching = autoSwitchOn(this.db) && !s.external;
     const failed = (e: Error) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${e.message}` });
     if (!hit) {
-      if (agent !== 'grok' && switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
+      if (!isAcpAccountAgent(agent) && switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
       return;
     }
     const carry = () => {
@@ -956,8 +968,9 @@ export class SessionManager extends EventEmitter {
           ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
           : Promise.resolve(null);
     };
-    // Grok Build's limit hit says nothing of when it lifts: its usage is read afresh first (see the limithit handler).
-    const read = agent === 'grok' ? this.limitReads.get(s.key) : undefined;
+    // An ACP agent's limit hit (Grok Build's, Antigravity CLI's) may say nothing of when it lifts: its usage is read afresh
+    // first (see the limithit handler).
+    const read = isAcpAccountAgent(agent) ? this.limitReads.get(s.key) : undefined;
     const after: Promise<LimitAfter | null | void> = read ? read.then(carry, carry) : carry();
     this.limitAfter.set(s.key, { at: now, after: after.then((a) => a ?? null) });
   }
@@ -1366,11 +1379,19 @@ export class SessionManager extends EventEmitter {
       }
     });
     // A turn you stopped yourself is not one the limit interrupted, even when the limit's error came first.
-    adapter.on('limithit', () => {
+    // Antigravity CLI names the account's plan when a session opens: Settings → Accounts and the Usage page show it.
+    adapter.on('tier', (tier: unknown) => {
+      if (this.acpAccountAgentOf(key) === 'antigravity') antigravityControl(this.db).notePlan(tier);
+    });
+    adapter.on('limithit', (hit?: { label: string; resetsAt: number | null }) => {
       if (!this.userStopped.has(key)) this.limitHits.add(key);
-      // Grok Build's account has no rate-limit event: its usage is read now, so the limit and its reset are known.
-      if (adapter.agent === 'acp' && this.isGrokSession(key)) {
-        const read = this.usageOf('grok', this.lives.get(key)?.account, 0)
+      // Antigravity CLI's limit comes from its error alone (its usage is never read): which one, and when it lifts.
+      if (adapter.agent === 'acp' && hit?.label && this.acpAccountAgentOf(key) === 'antigravity') antigravityControl(this.db).noteLimit(hit);
+      // An ACP agent's account has no rate-limit event (Grok Build, Antigravity CLI): its usage is read now, so the limit and
+      // its reset are known.
+      const acct = adapter.agent === 'acp' ? this.acpAccountAgentOf(key) : null;
+      if (acct) {
+        const read = this.usageOf(acct, this.lives.get(key)?.account, 0)
           .then(() => undefined)
           .catch(() => undefined)
           .finally(() => {
@@ -1383,6 +1404,8 @@ export class SessionManager extends EventEmitter {
     // over the session moves to another one or the user is asked to sign in again (afterSignOut). A session on API
     // credit runs on a key, not the account's sign-in: its refusal says nothing of the account.
     adapter.on('signedout', () => {
+      // Antigravity CLI's sign-in ended: its account shows signed out until you sign in again (its session waits for you).
+      if (adapter.agent === 'acp' && this.acpAccountAgentOf(key) === 'antigravity') return antigravityControl(this.db).noteSignedOut();
       if (this.lives.get(key)?.apiCredit || (adapter.agent !== 'claude' && adapter.agent !== 'codex')) return;
       markSignedOut(adapter.agent, this.lives.get(key)?.account, adapter.state.error);
       if (!this.userStopped.has(key)) this.signedOutHits.add(key);
@@ -1579,10 +1602,11 @@ export class SessionManager extends EventEmitter {
   private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
-    // Grok Build is the one ACP agent with accounts: an added one is its own GROK_HOME (sign-in and sessions), and the
-    // session resumes as it, also after a restart of the app (the run's options keep it).
-    const account = isGrok(def) ? opts.account || undefined : undefined;
-    if (account) Object.assign(env, accountEnv(this.db, 'grok', account));
+    // Grok Build and Antigravity CLI are the ACP agents with accounts. An added Grok account is its own GROK_HOME (sign-in
+    // and sessions), and the session resumes as it, also after a restart of the app (the run's options keep it).
+    const acct = acpAccountAgent(def);
+    const account = acct ? opts.account || undefined : undefined;
+    if (acct && account) Object.assign(env, accountEnv(this.db, acct, account));
     // Missing: installed now when the app knows its package (Gemini CLI, OpenCode…).
     const cmd = findCommand(def.command, env) ?? (await ensureCommand(def.command).catch(() => null));
     if (!cmd) throw new HttpError(400, `${def.name} is not installed here (no ${def.command} on the PATH)${def.hint ? `. Install it: ${def.hint}` : ''}`);
@@ -1608,6 +1632,8 @@ export class SessionManager extends EventEmitter {
     } catch (e) {
       const tail = lastWords(runner.stderrTail());
       adapter.stop();
+      // Antigravity CLI is not signed in: its account shows so (Settings → Agents → Accounts signs it in).
+      if (e instanceof HttpError && e.status === 401 && acct === 'antigravity') antigravityControl(this.db).noteSignedOut();
       if (e instanceof HttpError) throw e;
       throw new HttpError(500, `${def.name} did not start: ${(e as Error).message}${tail ? ` (${tail})` : ''}`);
     }
@@ -1731,10 +1757,11 @@ export class SessionManager extends EventEmitter {
     if (ask) o = { ...o, extra: { ...o.extra, memoryBuild: true } };
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
     let account = o.account || undefined;
-    // Only Grok Build has accounts among the ACP agents.
-    if (o.agent === 'acp' && !isGrok(acpAgent(this.db, o.acpAgent))) account = undefined;
+    // Among the ACP agents only Grok Build and Antigravity CLI have accounts.
+    if (o.agent === 'acp' && !acpAccountAgent(acpAgent(this.db, o.acpAgent))) account = undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
     const acctAgent = accountAgentOf(o.agent, o.agent === 'acp' ? acpAgent(this.db, o.acpAgent) : null);
+    if (acctAgent === 'antigravity' && !o.person) throw new HttpError(400, ANTIGRAVITY_PERSON_ONLY);
     if (acctAgent && autoSwitchOn(this.db)) {
       const lim = this.lastUsageOf(acctAgent, account)?.limited;
       if (lim?.resetsAt && lim.resetsAt > Date.now()) {
@@ -2056,7 +2083,7 @@ export class SessionManager extends EventEmitter {
     const id = `${agent}:${account ?? ''}`;
     let read = this.usageReads.get(id);
     if (!read) {
-      const ctl = agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account);
+      const ctl = isAcpAccountAgent(agent) ? acpControl(this.db, agent, account) : this.controlFor(agent, account);
       read = (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage())
         .then((u) => {
           this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
@@ -2073,15 +2100,15 @@ export class SessionManager extends EventEmitter {
   /** Grok Build sessions whose plan-limit hit is being followed by a fresh usage reading (afterTurn waits for it). */
   private limitReads = new Map<string, Promise<void>>();
 
-  /** Whose accounts a session runs as: Claude Code's, Codex's, Grok Build's (an ACP session of it), or none. */
+  /** Whose accounts a session runs as: Claude Code's, Codex's, Grok Build's or Antigravity CLI's (an ACP session of one), or none. */
   private accountAgentOf(key: string, agent: Agent = agentOfKey(key)): AccountAgent | null {
     if (agent === 'claude' || agent === 'codex') return agent;
-    return this.isGrokSession(key) ? 'grok' : null;
+    return this.acpAccountAgentOf(key);
   }
 
   /** An account's usage as it last said, without reading it again. */
   private lastUsageOf(agent: AccountAgent, account: string | null | undefined): AgentUsage | null {
-    return (agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account)).lastUsage;
+    return (isAcpAccountAgent(agent) ? acpControl(this.db, agent, account) : this.controlFor(agent, account)).lastUsage;
   }
 
   private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
@@ -2102,8 +2129,8 @@ export class SessionManager extends EventEmitter {
   /** An account as people know it: an added one's name, the CLI's own by its email. */
   accountName(agent: AccountAgent, account: string | undefined): string {
     if (account) return accountById(this.db, account)?.name ?? 'another account';
-    // Grok Build's usage has no email: its sign-in check kept it.
-    const email = agent === 'grok' ? grokControl(this.db).email : this.controlFor(agent).lastUsage?.account?.email;
+    // An ACP agent's usage may have no email (Grok Build's): its sign-in check kept it.
+    const email = isAcpAccountAgent(agent) ? (acpControl(this.db, agent).email ?? acpControl(this.db, agent).lastUsage?.account?.email) : this.controlFor(agent).lastUsage?.account?.email;
     return email ? `${email}` : `your main ${ACCOUNT_AGENT_NAMES[agent].split(' ')[0]} account`;
   }
 
@@ -2120,8 +2147,8 @@ export class SessionManager extends EventEmitter {
       if (!agent) return null;
       const from = this.accountOf(key);
       // Its own subagents still at work stop at their next request to this account, their work kept: the move waits
-      // for them rather than cut them off mid-step, so each can be continued on the next account (not Grok Build's).
-      if (agent !== 'grok' && (await this.subagentsStop(key))) {
+      // for them rather than cut them off mid-step, so each can be continued on the next account (not an ACP agent's).
+      if (!isAcpAccountAgent(agent) && (await this.subagentsStop(key))) {
         // Meanwhile you stopped it, or it went on (it moved already, or a turn got through).
         if (this.userStopped.has(key)) return null;
         const moved = this.accountOf(key);
@@ -2155,7 +2182,7 @@ export class SessionManager extends EventEmitter {
     this.switching.add(key);
     try {
       const agent = this.accountAgentOf(key);
-      if (!agent || agent === 'grok') return;
+      if (!agent || isAcpAccountAgent(agent)) return;
       const from = this.accountOf(key);
       // A usage that could not be read never moves a session that is getting on with its work.
       const own = await this.usageOf(agent, from, 60_000);
@@ -2400,15 +2427,15 @@ export class SessionManager extends EventEmitter {
     if (this.lives.get(key) === l) this.lives.delete(key);
   }
 
-  /** Whether an ACP session is one of Grok Build, the one ACP agent with accounts. */
-  isGrokSession(key: string): boolean {
-    if (!key.startsWith('acp:')) return false;
+  /** Which of the ACP agents with accounts (Grok Build, Antigravity CLI) an ACP session runs, or null for another agent. */
+  acpAccountAgentOf(key: string): 'grok' | 'antigravity' | null {
+    if (!key.startsWith('acp:')) return null;
     const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
     const id = this.lives.get(key)?.acpAgent ?? r?.acp_agent;
     try {
-      return !!id && isGrok(acpAgent(this.db, id));
+      return id ? acpAccountAgent(acpAgent(this.db, id)) : null;
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -2419,7 +2446,8 @@ export class SessionManager extends EventEmitter {
   async moveToAccount(key: string, to: string | undefined) {
     refuseSubagent(leadsOf(this), key);
     const agent = agentOfKey(key);
-    if (agent === 'acp' && !this.isGrokSession(key)) throw new HttpError(400, 'Not available for this agent');
+    // Among the ACP agents only Grok Build has more than one account (Antigravity CLI has its own sign-in only).
+    if (agent === 'acp' && this.acpAccountAgentOf(key) !== 'grok') throw new HttpError(400, 'Not available for this agent');
     const from = this.accountOf(key);
     if ((from ?? '') === (to ?? '')) return;
     accountEnv(this.db, agent === 'acp' ? 'grok' : agent, to);
@@ -2675,7 +2703,7 @@ export class SessionManager extends EventEmitter {
       return;
     }
     if (action === 'pause' || action === 'resume') throw new HttpError(400, 'Claude Code goals can be set or cleared, not paused');
-    await this.deliverOrQueue(key, action === 'set' ? `/goal ${text}` : '/goal clear');
+    await this.deliverOrQueue(key, action === 'set' ? `/goal ${text}` : '/goal clear', { person: true });
   }
 
   async interrupt(key: string) {
@@ -3248,11 +3276,25 @@ export class SessionManager extends EventEmitter {
   /** Set by the scheduler: continue this session at `at` (a usage limit stopped it). */
   onLimited?: (key: string, at: number) => void;
 
-  /** Sends now when the agent is free, or queues the message for after the running turn. */
-  async deliverOrQueue(key: string, text: string) {
+  /**
+   * Sends now when the agent is free, or queues the message for after the running turn. `person`: it carries something a
+   * person did (an answer on a card, a key saved, their voice), not the app's or another agent's own news.
+   */
+  async deliverOrQueue(key: string, text: string, o: { person?: boolean } = {}) {
+    // Antigravity CLI takes only turns a person starts (Google's terms for its plans): what the app would send it by itself
+    // (a subagent's result, an app's answer, a schedule's prompt) shows in the session for the person to pass on.
+    if (!o.person && this.acpAccountAgentOf(key) === 'antigravity') return this.holdForPerson(key, text);
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') this.enqueue(key, text);
     else await this.send(key, text);
+  }
+
+  /** A message the app would have sent an Antigravity CLI session by itself: a note in the session with it, never sent. */
+  private holdForPerson(key: string, text: string) {
+    const note = `Not sent to Antigravity CLI, which takes only the messages you send yourself (Google’s terms for its plans). To pass it on, send it yourself:\n\n${text}`;
+    const l = this.lives.get(key);
+    if (l?.adapter instanceof AcpLive) l.adapter.note(note);
+    else fs.appendFileSync(acpTranscriptPath(key.slice(4)), JSON.stringify({ t: 'note', text: note, ts: Date.now() }) + '\n');
   }
 
   /** Saves attachments on their own (an answer to a question carries their paths), returning where they went. */
@@ -3652,9 +3694,10 @@ export class SessionManager extends EventEmitter {
     if (agent === 'acp' && acpId === CONSOLE_ID && this.consoleOffers) return this.consoleOffers();
     if (agent === 'acp') {
       const o = this.acpOffers.get(acpId ?? '');
-      // Grok Build says its models and their efforts before any session: its agent is asked briefly.
-      if (!o?.models.length && isGrok(acpAgents(this.db).find((a) => a.id === acpId))) {
-        const models = await grokControl(this.db).models().catch(() => []);
+      // Grok Build and Antigravity CLI say their models (and their efforts) before any session: their agent is asked briefly.
+      const acct = acpAccountAgent(acpAgents(this.db).find((a) => a.id === acpId));
+      if (!o?.models.length && acct) {
+        const models = await acpControl(this.db, acct).models().catch(() => []);
         return { models, modes: o?.modes ?? [], defaultMode: '' };
       }
       return { models: o?.models ?? [], modes: o?.modes ?? [], defaultMode: '' };

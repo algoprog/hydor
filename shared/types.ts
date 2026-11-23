@@ -10,10 +10,10 @@ import type { SignatureCard } from './signatures.ts';
 export type Agent = 'claude' | 'codex' | 'acp';
 
 /**
- * A program whose sign-ins the app manages as accounts (Settings → Agents → Accounts): Claude Code, Codex, and Grok Build
- * (an ACP agent, the `grok` program: shared/grok.ts tells it apart).
+ * A program whose sign-ins the app manages as accounts (Settings → Agents → Accounts): Claude Code, Codex, Grok Build and
+ * Antigravity CLI (the last two ACP agents, the `grok` and `agy` programs: shared/account-agents.ts tells them apart).
  */
-export type AccountAgent = 'claude' | 'codex' | 'grok';
+export type AccountAgent = 'claude' | 'codex' | 'grok' | 'antigravity';
 
 /** An ACP agent the app can start (Settings → More agents). */
 export interface AcpAgentDef {
@@ -1030,7 +1030,7 @@ export type ServerEvent =
   | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
   | { t: 'items'; key: string; items: TimelineItem[]; total: number; reset?: boolean }
   | { t: 'live'; key: string; live: LiveState | null; overlay: LiveOverlay }
-  | { t: 'usage'; claude?: AgentUsage; codex?: AgentUsage; grok?: AgentUsage; accounts?: Record<string, AgentUsage> }
+  | { t: 'usage'; claude?: AgentUsage; codex?: AgentUsage; grok?: AgentUsage; antigravity?: AgentUsage; accounts?: Record<string, AgentUsage> }
   | { t: 'accounts'; accounts: AgentAccount[] }
   | { t: 'acpAgents'; agents: AcpAgentDef[] }
   | { t: 'login'; flow: LoginFlow }

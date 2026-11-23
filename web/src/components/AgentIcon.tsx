@@ -27,13 +27,15 @@ function GrokMark({ size, className, spinning }: { size: number; className?: str
 
 /**
  * Small agent marks: a starburst for Claude Code, a knot for Codex, a ring and slash for Grok Build ('grok' for its
- * accounts; its ACP agent by name), a letter on a tile for other ACP agents; `spinning` turns it slowly while it works.
+ * accounts; its ACP agent by name), a letter on a tile for other ACP agents (Antigravity CLI's is its 'A': 'antigravity'
+ * for its sign-in, its ACP agent by name); `spinning` turns it slowly while it works.
  */
-export function AgentIcon({ agent, size = 16, className, spinning, name }: { agent: Agent | 'grok'; size?: number; className?: string; spinning?: boolean; name?: string }) {
+export function AgentIcon({ agent, size = 16, className, spinning, name }: { agent: Agent | 'grok' | 'antigravity'; size?: number; className?: string; spinning?: boolean; name?: string }) {
   if (agent === 'grok' || (agent === 'acp' && name && /^grok\b/i.test(name.trim()))) return <GrokMark size={size} className={className} spinning={spinning} />;
   // Custom was once called Console.
   if (agent === 'acp' && (name === 'Custom' || name === 'Console')) return <CustomMark size={size} className={className} working={spinning} />;
-  if (agent === 'acp') {
+  if (agent === 'antigravity') name = 'Antigravity CLI';
+  if (agent === 'acp' || agent === 'antigravity') {
     // Another agent (Gemini CLI, OpenCode…): its first letter on a rounded tile.
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" className={cx('shrink-0 text-info', spinning && 'spin-gentle', className)} aria-label={name ?? 'Agent'} role="img">

@@ -1,12 +1,12 @@
 # Usage, limits and costs
 
-Claude Code, Codex and Grok Build run on plans with usage limits, and every model call has a price. This topic shows where to see how much of each plan you've used and when it resets, what happens at a limit (and how to have sessions continue by themselves), what the agents did over time, and how the app estimates costs, including prices you set yourself.
+Claude Code, Codex and Grok Build run on plans with usage limits, Antigravity CLI runs on your Google AI plan (its own terminal shows what is left of it), and every model call has a price. This topic shows where to see how much of each plan you've used and when it resets, what happens at a limit (and how to have sessions continue by themselves), what the agents did over time, and how the app estimates costs, including prices you set yourself.
 
 ![Usage: how much of each plan you have used, and when it resets](images/usage.webp)
 
 ## Open the Usage page
 
-Open **Usage** on the rail (on a phone, open the sidebar first). A thin bar under the Usage icon shows at a glance how much is left across all your paid Claude Code, Codex and Grok Build subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left.
+Open **Usage** on the rail (on a phone, open the sidebar first). A thin bar under the Usage icon shows at a glance how much is left across all your paid Claude Code, Codex and Grok Build subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left. Antigravity CLI does not count in this bar: the app does not read its quota.
 
 The [Usage page](/usage) has three tabs:
 
@@ -18,13 +18,14 @@ The app reads your usage when you open the page, and every five minutes while th
 
 ## Read a plan's limits
 
-The **Limits** tab has a card for Claude Code, one for Codex, one for Grok Build (once you have added it in [Settings → Agents → More agents](/settings?s=agents)), and one for each account you added in [Settings → Agents → Accounts](/settings?s=accounts). On a wide screen they sit two to a row; on a phone, one under the other.
+The **Limits** tab has a card for Claude Code, one for Codex, one for Grok Build and one for Antigravity CLI (once you have added them in [Settings → Agents → More agents](/settings?s=agents)), and one for each account you added in [Settings → Agents → Accounts](/settings?s=accounts). On a wide screen they sit two to a row; on a phone, one under the other.
 
 Each card shows the account's email and plan, how long ago the numbers were read, and one row per limit (a window of time with a cap on use):
 
 - Claude Code: **Current session (5 h)**, **Weekly · all models**, and weekly limits for one model, such as **Weekly · Sonnet only**.
 - Codex: **5-hour window**, **Weekly**, or windows of other lengths. When Codex has several limits, each row starts with the limit's name.
 - Grok Build: **Weekly**, with when it resets. The card also names the plan (SuperGrok, SuperGrok Plus or SuperGrok Heavy). Grok's own sign-in has its card, and each Grok account you added has one.
+- Antigravity CLI: no rows. Once you have added it, its **Antigravity CLI** card shows the email and plan, and says "Antigravity CLI shows how much of your plan is left with /usage in its own terminal." The app does not read its quota, because Google's guidance rules out calls made in the background. Its Google AI Pro and Ultra plans refresh every five hours up to a weekly limit; Free and Plus have a weekly limit.
 
 Each row gives the percentage used, a bar, the percentage left, and when it resets ("resets in 2 h 15 min"; hover for the exact time). A warning sign appears at 90% or more.
 
@@ -47,7 +48,7 @@ When something is wrong, the card says so:
 
 ## What happens when you hit a limit
 
-When a plan's usage runs out, the agent's turn stops. For Grok Build that means its weekly limit, its credit limit or its pay-as-you-go spending cap; a short rate limit (a burst of requests) is not one, and passes by itself. A notice says whose limit it hit, which limit it is and when it resets: "You've hit the Claude Code usage limit" (or Codex or Grok Build) with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some. It shows:
+When a plan's usage runs out, the agent's turn stops. For Grok Build that means its weekly limit, its credit limit or its pay-as-you-go spending cap; a short rate limit (a burst of requests) is not one, and passes by itself. A notice says whose limit it hit, which limit it is and when it resets: "You've hit the Claude Code usage limit" (or Codex, Grok Build or Antigravity CLI) with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some. It shows:
 
 - on the start page, above the message box, for the agent (and account) you picked;
 - in a session, above the message box;
@@ -60,9 +61,11 @@ The notice offers what you can do:
 
 Once usage is back but a session is still due to continue, the notice reads "Continues by itself in …", with **Cancel**.
 
+Antigravity CLI is different. When its quota runs out ("Individual quota reached… Resets in 2h39m52s"), the turn stops, and the notice says it hit its usage limit and when it resets, with the line "Antigravity CLI doesn’t continue by itself (Google’s terms for its plans allow only turns you start), so send a message once it resets." It has no **Resume at reset** button, and **Resume after usage limits** does not apply to it. The notice also tells you when Google AI credits run too low ("AI credits").
+
 ## Continue sessions automatically after a limit
 
-To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** (when a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets). It is off until you turn it on. It works while no browser is open. With it on, a session shows no warning when a limit stops it: a line above the message box says whose limit it hit (as the notice does), which limit and "Continues by itself in …", with **Use a reset** when the account holds one, and **Cancel**.
+To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** (when a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets). It is off until you turn it on. It works while no browser is open. It never applies to an Antigravity CLI session: Google's terms for its plans allow only turns you start yourself, so send a message once its limit resets. With it on, a session shows no warning when a limit stops it: a line above the message box says whose limit it hit (as the notice does), which limit and "Continues by itself in …", with **Use a reset** when the account holds one, and **Cancel**.
 
 How the timing works, with the switch or with **Resume at reset**:
 
@@ -175,6 +178,7 @@ There is no button to clear Activity. Deleting a session yourself (its menu → 
 
 - "How much of my Claude plan is left this week, and when does it reset?"
 - "How much of my Grok plan is left this week?"
+- "How much of my Antigravity CLI plan is left, and when does it reset?"
 - "Turn on resuming sessions after usage limits."
 - "Continue my session 'Refactor auth' when the Codex limit resets."
 - "What would last month's work have cost at API prices, by model?"

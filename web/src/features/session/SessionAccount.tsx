@@ -2,7 +2,7 @@
 // (Settings → Accounts). Another moves its history there, and its agent starts there with the next message.
 import { useMemo } from 'react';
 import type { SessionSummary } from '@shared/types';
-import { accountAgentOf } from '@shared/grok';
+import { accountAgentOf } from '@shared/account-agents';
 import { enc, post } from '../../lib/api';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AccountPicker } from '../home/AccountPicker';
@@ -10,7 +10,7 @@ import { AccountPicker } from '../home/AccountPicker';
 export function SessionAccount({ s }: { s: SessionSummary }) {
   const all = useApp((x) => x.boot?.accounts);
   const acp = useApp((x) => (s.agent === 'acp' ? x.boot?.acpAgents?.find((a) => a.id === s.acpAgent) : undefined));
-  // Claude Code, Codex and Grok Build (an ACP agent) have accounts; the other ACP agents none.
+  // Claude Code, Codex, Grok Build and Antigravity CLI (ACP agents) have accounts; the other ACP agents none.
   const agent = accountAgentOf(s.agent, acp);
   const accounts = useMemo(() => (all ?? []).filter((a) => a.agent === agent), [all, agent]);
   if (!agent || !accounts.length) return null;

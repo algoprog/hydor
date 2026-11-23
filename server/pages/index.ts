@@ -1440,7 +1440,7 @@ function routes(d: Deps) {
     const request = decideRequest(db, P(req).id, b.publish === true, b.visibility);
     tell(d, { what: 'request', request });
     if (request.site) tell(d, { what: 'sites' });
-    d.sessions.deliverOrQueue(request.sessionKey, outcome(request, d.publicBase())).catch((e) => console.error(`[pages] could not tell the agent: ${(e as Error).message}`));
+    d.sessions.deliverOrQueue(request.sessionKey, outcome(request, d.publicBase()), { person: true }).catch((e) => console.error(`[pages] could not tell the agent: ${(e as Error).message}`));
     return { request };
   });
 

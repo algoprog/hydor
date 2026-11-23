@@ -1,4 +1,4 @@
-// Accounts that are signed out when the app needs them (Claude Code, Codex or Grok Build, with nothing else able to do the
+// Accounts that are signed out when the app needs them (Claude Code, Codex, Grok Build or Antigravity CLI, with nothing else able to do the
 // work). The server keeps the list (/api/accounts/sign-in) and tells every change on the event socket ({ t: 'signin' }).
 import { create } from 'zustand';
 import type { SignInNeed } from '@shared/types';

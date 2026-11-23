@@ -77,7 +77,7 @@ export const WAYS: Record<string, Way> = {
   'connect.what-they-can-do': { how: 'GET /api/mcp/tokens lists the tokens; DELETE /api/mcp/tokens/:id revokes one. A token gives list_sessions, read_session, start_session, send_message, list_models and the apps offered to other agents.' },
   'machines.add-a-machine': { how: 'GET /api/machines; PATCH /api/machines/:id, POST /api/machines/:id/reconnect and DELETE /api/machines/:id change one. Adding one takes a token from the other machine, which only the person enters (Settings → Machines).' },
   'machines.access-from-other-machines': { how: 'GET /api/access-tokens lists them; DELETE /api/access-tokens/:id revokes one. Only the person makes one (Settings → Machines), so its value never passes through an agent.' },
-  'accounts.accounts': { how: 'GET /api/accounts; POST /api/agent-accounts { agent: "claude"|"codex"|"grok", name } adds one, PATCH /api/agent-accounts/:id { name } renames it, DELETE /api/agent-accounts/:id removes it. Signing in and out is the person’s (Settings → Accounts).' },
+  'accounts.accounts': { how: 'GET /api/accounts; POST /api/agent-accounts { agent: "claude"|"codex"|"grok", name } adds one (Antigravity CLI has its own sign-in only), PATCH /api/agent-accounts/:id { name } renames it, DELETE /api/agent-accounts/:id removes it. Signing in and out is the person’s (Settings → Accounts).' },
   'agents.your-agents': { how: ACP },
   'agents.add-your-own': { how: ACP },
   'agents.agents-that-speak-acp': { how: ACP },

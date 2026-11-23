@@ -1,6 +1,6 @@
 # Agents, accounts and models
 
-Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI, OpenCode, Qwen Code, Goose or Grok Build. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
+Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI, OpenCode, Qwen Code, Goose, Grok Build or Antigravity CLI (Google's agent for your Google AI plan). This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
 
 ![Picking the agent on the start page: Claude Code, Codex or Custom](images/agents-models.webp)
 
@@ -11,14 +11,14 @@ An agent is the program that does the work in a session: it reads your message, 
 - **Claude Code** (Anthropic). Runs on your Claude plan, or bills an Anthropic API account. Its models are Anthropic's (Opus, Sonnet, Haiku). It has its own usage limits, which the [Usage page](/usage) shows.
 - **Codex** (OpenAI). Runs on your ChatGPT plan. Its models are OpenAI's. It has usage limits too, shown on the Usage page. Codex comes with the app.
 - **Custom**, the app's own agent. It runs the models of your Claude and ChatGPT plans (through Claude Code's and Codex's sign-ins), and any model you add in [Settings → Agents → Models](/settings?s=models): models through OpenRouter, models on this computer (with Ollama or vLLM), or any OpenAI-compatible endpoint. Use it for open models, cheaper models, or models that never leave your computer. See [Custom, the app's own agent](/guide/custom).
-- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build (xAI's coding agent, with its Grok models) and others, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
+- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build (xAI's coding agent, with its Grok models), Antigravity CLI (Google's coding agent, with your Google AI plan) and others, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once and uses its own models: most in their own program, Grok Build and Antigravity CLI under [Settings → Agents → Accounts](/settings?s=accounts). Since 18 June 2026, Gemini CLI no longer serves Google AI Pro and Ultra (or Gemini Code Assist for individuals): for those plans Google's terminal agent is Antigravity CLI (see [Antigravity CLI](#antigravity-cli)). Gemini CLI stays for a Gemini API key or a Gemini Code Assist Standard or Enterprise licence.
 
 What each can do in the app:
 
 - Goals (the app keeps the agent working, round after round, until checks you agree hold; see [Goals](/guide/goals)): every agent, Claude Code, Codex, Custom and the other ACP agents. A `/goal` typed in a Claude Code or Codex chat is that program's own, simpler goal. Forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
 - **Continue in…** (hand the conversation to another agent): from Claude Code or Codex, to the other one or to Custom.
-- Effort (how hard the model thinks): Claude Code, Codex and Grok Build, and any other ACP agent whose models offer it.
-- More than one account, plan usage limits and switching accounts at a limit: Claude Code, Codex and Grok Build.
+- Effort (how hard the model thinks): Claude Code, Codex, Grok Build and Antigravity CLI, and any other ACP agent whose models offer it.
+- More than one account and switching accounts at a limit: Claude Code, Codex and Grok Build. Plan usage limits shown on the Usage page: those three, and a card for Antigravity CLI that says where to see its usage (it has one sign-in only, and works only in sessions you start yourself: see [Antigravity CLI](#antigravity-cli)).
 - Limit resets and API credit at a limit: Claude Code and Codex only.
 
 ## Pick the agent and model for a new session
@@ -31,7 +31,7 @@ On the start page (`/`), the row under the message box says who does the work.
 
 The start page remembers what you picked for each place you work in (each project, each folder and **New task folder**), on every device: each program's model, effort and permissions come back there as you left them (see [What the start page remembers](/guide/sessions#what-the-start-page-remembers)).
 
-An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran. Grok Build is the exception: its models, with the efforts each takes, show as soon as it is added, because the app asks Grok for them.
+An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran. Grok Build is the exception: its models, with the efforts each takes, show as soon as it is added, because the app asks Grok for them. Antigravity CLI's models and efforts show after its first session, when the app learns them as the session opens.
 
 With **Options** → **Confidential** on, **Runs on** is **Custom** and **Model** lists only the models on this computer or your private network, the best of them picked first: see [Keep a session confidential](/guide/sessions#keep-a-session-confidential).
 
@@ -78,7 +78,7 @@ Two switches in the **Tiers in sessions** group under the tiers say how sessions
 
 ## Agent programs install and update themselves
 
-Claude Code, Codex, Gemini CLI, Grok Build and the others are programs on this computer. You don't have to install them by hand.
+Claude Code, Codex, Gemini CLI, Grok Build and the others are programs on this computer. You don't have to install them by hand. The exception is Antigravity CLI: Google asks that people install it themselves, so the app does not (see [Antigravity CLI](#antigravity-cli)). It updates itself.
 
 Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and look at the **Agent programs** group. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build (once you have added it) and the agents that need an ACP adapter, each with the version the sessions run and where it comes from:
 
@@ -91,7 +91,7 @@ A row also says "… is out" when a newer version is out. Codex's row adds "your
 
 A missing program also installs by itself the first time it is needed: Claude Code when you sign in to it or start a Claude Code session, an ACP agent when you add it in Settings → Agents → More agents or start a session with it. The app installs them with npm into its own folder, so you need no administrator rights.
 
-Goose, Kimi CLI and some other agents aren't in this list: install them yourself (Settings → Agents → More agents shows where to get them). An agent that needs an ACP adapter installs in two parts, the adapter and the agent itself; the list shows one row for both.
+Goose, Kimi CLI, Antigravity CLI and some other agents aren't in this list: install them yourself (Settings → Agents → More agents shows where to get them). An agent that needs an ACP adapter installs in two parts, the adapter and the agent itself; the list shows one row for both.
 
 ## Keep the agent programs up to date
 
@@ -133,6 +133,8 @@ To sign in:
 
 When it works you see "Claude Code is signed in" (or Codex, or Grok Build). If it fails, the dialog says why; click **Try again**.
 
+Antigravity CLI, Google's agent for your Google AI plan, has an **Antigravity CLI** row of its own in the same group once you have added it. Its sign-in works a little differently: see [Antigravity CLI](#antigravity-cli).
+
 Once signed in, the button reads **Switch account**: it starts the same sign-in for another account (for Grok Build, a new code). **Sign out** is in the row's **⋯** menu: it signs the program out on this computer, for every terminal and editor that uses it, after you confirm.
 
 If you start a Grok Build session while it is signed out, the session stops with "Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again." Sign in there and send your message again. An xAI API key in `XAI_API_KEY`, in the agents' environment, works for Grok Build instead of a subscription.
@@ -145,7 +147,7 @@ You can sign in more than one Claude Code, Codex or Grok Build account, for exam
 
 1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts).
 2. Click **Add an account**, beside the title of the **Accounts** group.
-3. Choose **Claude Code**, **Codex** or **Grok Build** (it is offered once Grok Build is set up), type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
+3. Choose **Claude Code**, **Codex** or **Grok Build** (it is offered once Grok Build is set up; Antigravity CLI is never offered: it has one sign-in only, see [Antigravity CLI](#antigravity-cli)), type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
 4. The sign-in dialog opens for the new account. Sign in as described above.
 
 Each added account signs in on its own and keeps its own session history. Your settings, instructions, skills and plugins are shared with the agent's main sign-in, so changes apply to both. For Claude Code, a folder you trusted with the main sign-in is trusted with an added account too, so the folder's own permission rules apply in its sessions. Two accounts of the same agent can't have the same name.
@@ -179,7 +181,7 @@ With two or more accounts for the same agent, the app can use them all: when one
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A short note at the bottom of the screen says which account it moved to.
 - The subagents a Claude Code session runs in the background carry on too. Those still working when the limit hits stop at their next step with their work kept, and the app waits for them (two minutes at most) before it moves the session. The message then names them, and the agent continues each one where it stopped. If only the subagents hit a limit (one for their model alone), the session moves once its turn has ended and none of them is still working.
 - Hydor subagents (the sessions an agent starts to do part of its work) are sessions of their own, so each one moves by itself when a limit stops its turn. The agent that started it hears that it carries on, not that it failed, and gets its reply when it finishes.
-- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex, Grok Build from Grok Build.
+- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex, Grok Build from Grok Build. Antigravity CLI has no other accounts to move to, so this never applies to it (see [Antigravity CLI](#antigravity-cli)).
 - A Grok Build account is at its limit when it reaches its weekly limit, its credit limit or its pay-as-you-go spending cap. The session then moves to another signed-in Grok account with usage left (the least used one) and continues with "… reached its usage limit, so this session now runs on …". A short rate limit (a burst of requests) moves nothing: it passes by itself. The limit notice above the message box shows for Grok sessions too.
 - A goal the app drives is the app's, so it keeps going on the new account. A goal typed as `/goal` in Codex moves with the session and keeps going.
 - When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below, for Claude Code). With **Resume after usage limits** on, the session continues when the first account resets, on that account. This holds for Grok Build sessions too. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
@@ -192,6 +194,8 @@ With two or more accounts for the same agent, the app can use them all: when one
 ## When an account is signed out
 
 An account of Claude Code, Codex or Grok Build can get signed out: its sign-in ended or was revoked, and the program says "Not logged in · Please run /login" or "401 Unauthorized". The app works around it where it can, and asks you to sign in again only when nothing else could do the job.
+
+Antigravity CLI has no other account to move to. If you start a session while it is signed out, the session stops with "Antigravity CLI is not signed in: sign in with your Google account in Settings → Agents → Accounts, then try again.", and its row there shows it signed out. Sign in there and send your message again.
 
 - **Your sessions.** When a session's turn is turned away because its account is signed out, and [Switch accounts at a limit](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) is on (it is from the start), the session moves, with all its history, to another signed-in account of the same agent that has usage left, and carries on. A short note at the bottom of the screen says "<session>: <account> is signed out, so it continues on <other account>", and the agent is told "… is signed out, so this session now runs on …. Continue where you left off." A message you send to a session whose account was found signed out a little while ago moves it first in the same way, so the message isn't turned away.
 - **When a session can't move.** With **Switch accounts at a limit** off, or when no other account of that agent has usage left, the session stops. A banner above its message box says "<account> is signed out" and "This session continues once you sign in again.", with a **Sign in** button. Once you are signed in again, here or in a terminal, the session continues by itself, and the agent is told "Signed in again. Continue where you left off."
@@ -222,13 +226,15 @@ What happens then:
 Open [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP).
 
 - **Your agents** (they show next to Claude Code and Codex when you start a session) lists Custom first, then the agents you added. Each shows a check when its program is installed here, or a cross and "not installed".
-- **Agents that speak ACP** (install one, sign in once in its own CLI, then add it here) lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build and others. The installed ones come first. A row that says "Not installed" says how to get it. The list shows the first few that are not installed; **Show all** shows the rest.
+- **Agents that speak ACP** (install one, sign in once in its own CLI, then add it here) lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build, Antigravity CLI and others. The installed ones come first. A row that says "Not installed" says how to get it. The list shows the first few that are not installed; **Show all** shows the rest.
 
 To add one:
 
 1. Click **Add** at the end of its row. The button stands out when the program is already installed.
-2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build and the agents that need an ACP adapter), it installs it now, in the background. Goose, Kimi CLI and the others you install yourself, with the command or address in their row.
-3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again."
+2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build and the agents that need an ACP adapter), it installs it now, in the background. Goose, Kimi CLI, Antigravity CLI and the others you install yourself, with the command or address in their row.
+3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again." Grok Build and Antigravity CLI are the exceptions: they sign in under [Settings → Agents → Accounts](/settings?s=accounts).
+
+Gemini CLI is for a Gemini API key or a Gemini Code Assist Standard or Enterprise licence; its preset here starts it with `--acp`. Since 18 June 2026 it no longer serves Google AI Pro and Ultra (or Gemini Code Assist for individuals): use Antigravity CLI for those plans.
 
 The agent now shows in the start page's **Runs on** list.
 
@@ -240,6 +246,45 @@ To change an added agent, click **Edit**. To take it out, open its **⋯** menu,
 
 It signs in differently from the other ACP agents: not in the Terminal, but under [Settings → Agents → Accounts](/settings?s=accounts), where a **Grok Build** row appears as soon as it is added (see [Sign Claude Code, Codex and Grok Build in](#sign-claude-code-codex-and-grok-build-in)). You can add more Grok accounts there too.
 
+### Antigravity CLI
+
+**Antigravity CLI** is Google's coding agent for the terminal (the `agy` program), and the one that works with your Google AI plan. Since 18 June 2026 Gemini CLI no longer serves Google AI Pro and Ultra (or Gemini Code Assist for individuals). Gemini CLI stays for a Gemini API key or a Gemini Code Assist Standard or Enterprise licence.
+
+**Install it yourself.** Google asks that people install it themselves, so the app does not. Its row in [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP) (under **Agents that speak ACP**, named **Antigravity CLI**, with the command `agy acp`) shows Google's installer. On macOS and Linux, run this in the [Terminal](/terminal); it puts `agy` in `~/.local/bin`:
+
+```
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+```
+
+On Windows, run this in PowerShell:
+
+```
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+
+It updates itself, so it is not among the **Agent programs** the app keeps up to date. Once it is installed, click **Add** in its row.
+
+**Sign in.** Once added, [Settings → Agents → Accounts](/settings?s=accounts) shows an **Antigravity CLI** row, with a sign-in of its own:
+
+1. Click **Sign in**, then **Get sign-in link**.
+2. Click **1. Open this link**: it is Google's sign-in page. Sign in with your Google account, a personal one with Google AI Pro, Ultra, Plus or Antigravity's free plan. The page then shows a code.
+3. Paste the code into **2. Paste the code from the page** (or the whole address of the page you land on) and click **Finish sign-in**.
+
+The row then shows the email, and the plan (Google AI Pro, say) once a session has opened. **Sign out**, in the row's **⋯** menu, signs Antigravity CLI out on this computer, for every program that uses it. In the terminal app, `hydor accounts sign-in antigravity` does the same sign-in. If you start a session while it is signed out, it stops with "Antigravity CLI is not signed in: sign in with your Google account in Settings → Agents → Accounts, then try again."
+
+**Models and effort.** In a session, **Model** lists Antigravity CLI's own models (Gemini 4 models, Gemini 3.8 Flash and others your plan offers), **Effort** its thinking levels (low, medium, high, xhigh and max) and **Permissions** its permission modes. They show after its first session, when the app learns them as the session opens. The app's own tools and approval cards work as for other ACP agents.
+
+**What Google's terms mean here.** Under the row, the app says: "Google’s terms for its plans allow Antigravity CLI only in sessions you start and drive yourself, so it has one sign-in and never works in the background." In Hydor that means:
+
+- **One sign-in only.** You can't add more Antigravity CLI accounts: **Add an account** does not offer it, and **Switch accounts at a limit** never applies to it.
+- **Only sessions you start.** The start page, the terminal app, a chat app (Telegram and the like) and hands-free voice can start one. A schedule, a subagent another agent starts, an [app](/guide/apps) run, the arena or anything else the app starts is refused: "Antigravity CLI runs only in sessions you start and drive yourself: Google’s terms for its plans rule out work that the app or another agent starts (schedules, subagents, apps). Pick another agent for this."
+- **No messages of the app's own.** The app never sends it a message by itself. What it would send (a subagent's result, an app's answer, a reminder) shows in the session as a note: "Not sent to Antigravity CLI, which takes only the messages you send yourself (Google’s terms for its plans). To pass it on, send it yourself:" followed by the text. What you do yourself (answering a card, saving a key, your voice) still reaches it.
+- **No carrying on by itself.** After a limit it never continues on its own: there is no **Resume after usage limits** for it and no **Resume at reset** button. See [Usage, limits and costs](/guide/usage#what-happens-when-you-hit-a-limit).
+
+Using its sign-in from any other program, or rotating accounts, can get the Google account's Antigravity access suspended (Google says so in its FAQ), so use it only as described here. For unattended work, such as schedules, subagents and apps, a Gemini API key with Gemini CLI is the way.
+
+Its usage shows as a card on the [Usage page](/usage), with the email and plan but no meters: see [Read a plan's limits](/guide/usage#read-a-plans-limits).
+
 ### Add an agent of your own
 
 Any program that speaks ACP can run here.
@@ -248,7 +293,7 @@ Any program that speaks ACP can run here.
 2. Fill in:
    - **Name**: how it shows in the lists, for example "Gemini CLI".
    - **Command**: the program to start, for example `gemini`, or a full path.
-   - **Arguments**: what starts it in ACP mode, for example `--experimental-acp`.
+   - **Arguments**: what starts it in ACP mode, for example `--acp`.
    - **Environment (optional, NAME=value per line)**: settings the program needs, such as an API key variable.
 3. Click **Save**.
 
@@ -272,6 +317,7 @@ The app opens a session in the folder you pick, shows the agent's messages and s
 - An agent that can't reopen earlier sessions starts afresh when you continue an old one, without the conversation above it. The session says so. The same happens when an agent could reopen a session before but can no longer: it carries on afresh, with a note, instead of failing.
 - Pictures you attach reach it only if it accepts images.
 - Forks and hand-offs aren't available (Custom has forks). Goals are: the app's own loop drives them for every agent.
+- Antigravity CLI works only in sessions you start and drive yourself, with one sign-in (see [Antigravity CLI](#antigravity-cli)).
 - The app's tools (pages, search, memory…) reach an agent as an MCP server: by address when the agent accepts that, otherwise through a small program the app starts for it. An agent that takes none of them works with its own tools alone, but still gets the guidelines, memory notes and skills.
 
 ## Where Custom's models come from
@@ -463,6 +509,9 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Are Claude Code and Codex up to date? Update them now."
 - "Add OpenCode to my agents."
 - "Add Grok Build to my agents and sign it in with my Grok subscription."
+- "Set up Antigravity CLI with my Google AI Pro plan."
+- "Is Antigravity CLI installed here, and am I signed in to it?"
+- "Why can't a scheduled task use Antigravity CLI?"
 - "Add a second Grok account for work, and start my next session on it."
 - "Start my next Grok session on xhigh effort."
 - "How much of my Grok plan is left this week?"

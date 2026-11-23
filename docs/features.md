@@ -115,7 +115,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   network (bubblewrap on Linux, Seatbelt on a Mac), or ask each time where that can't be done (Windows, some containers); its title, notices and memory send nothing out; a
   lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode,
-  Qwen Code, Goose, Kimi CLI, Auggie, Grok Build, or a command of your own). Their approvals become approval cards you can answer
+  Qwen Code, Goose, Kimi CLI, Auggie, Grok Build, Antigravity CLI, or a command of your own). Their approvals become approval cards you can answer
   from a phone, and the app's guidelines, memory notes and skills reach them with the first message; the app's tools
   reach every one that takes MCP servers (through a small bridge when it takes only commands). The app installs the
   ones it can get with npm by itself (with an ACP adapter when the agent needs one, without install scripts); the
@@ -128,6 +128,20 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   a reasoning effort (xhigh, high, medium or low as each model takes them; Grok 4.5 has no xhigh), offered on the start
   page as soon as Grok Build is added, changed in a running session and taken by app runs; a model that does not take
   the effort you had shows its own default. Any ACP agent whose models offer efforts gets the same picker.
+- Antigravity CLI, Google's coding agent (the `agy` program), runs with your Google AI plan (Pro, Ultra, Plus or
+  Antigravity's free plan) over ACP, with the app's tools and approval cards. Since 18 June 2026 Gemini CLI no longer
+  serves Google AI Pro and Ultra (or Gemini Code Assist for individuals): it stays for a Gemini API key or a Gemini
+  Code Assist Standard or Enterprise licence, and Antigravity CLI is the agent for those plans. The app does not
+  install it, as Google asks people to do it themselves: its row in More agents shows Google's installer, and it
+  updates itself. Sign in under Settings → Accounts (Google's page, then paste the code it shows; `hydor accounts
+  sign-in antigravity` in the terminal app); its models and thinking levels (low to max) show in a session's Model and
+  Effort after its first session. Google's terms for its plans allow it only in sessions you start and drive yourself,
+  so it has one sign-in (no added accounts, no switching at a limit), runs from the start page, the terminal app, a chat
+  app or hands-free voice but never from a schedule, subagent, app run or the arena, is never sent a message by the app
+  itself (what the app would send shows in the session as a note to pass on yourself) and never continues by itself
+  after a limit. Its Usage card shows the email and plan and points to /usage in its own terminal: the app does not read
+  its quota. Using its sign-in from another program, or rotating accounts, can get the Google account's Antigravity
+  access suspended; for unattended work, a Gemini API key with Gemini CLI is the way.
 - Several accounts per agent: sign in more than one Claude Code, Codex or Grok Build account and pick one per session
   (Grok accounts each keep their own sign-in and Grok history, and share the CLI's config, rules, skills, plugins and
   MCP sign-ins; a Grok session's Account chip moves it to another from the next message, its history with it); each
@@ -1661,7 +1675,7 @@ with one click. Models without native tool calls are told about the tools in the
 prompt, and their calls are read from what they write.
 
 The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode, Grok Build…,
-with npm into the app's folder), and stay up to date: once a day each is brought to its newest version, the
+with npm into the app's folder; not Antigravity CLI, which you install yourself and which updates itself), and stay up to date: once a day each is brought to its newest version, the
 app's copies with npm and your own installs with their own updater (`claude update`, `codex update`,
 `opencode upgrade`, `grok update`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
 new version is kept only once it starts and answers the way the sessions use it (no sign-in or usage needed),
@@ -1929,7 +1943,7 @@ programs shows each program's version and what is out, with Check now, Update no
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
   usage limits is on); one you stopped yourself never does.
-- Usage: how much of each plan's limits (Claude Code, Codex and Grok Build, each account) you have used and when they reset, what the same work would cost
+- Usage: how much of each plan's limits (Claude Code, Codex and Grok Build, each account; Antigravity CLI's card points to its own /usage) you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one: today, this week, this month or this year so far, against the period before up to the same point,
   with a bar for each day, week, month or year.

@@ -8,7 +8,7 @@ import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
 import { placeKey } from '@shared/start';
-import { accountAgentOf } from '@shared/grok';
+import { accountAgentOf } from '@shared/account-agents';
 import { AUTO_MODEL } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
@@ -229,7 +229,7 @@ function StartComposer({
   const [worktree, setWorktree] = useState(!!src.worktree);
   // Accounts added for this agent (Settings → Accounts); '' is the CLI's own sign-in.
   const allAccounts = useApp((s) => s.boot?.accounts);
-  // Grok Build, an ACP agent, has them too; the other ACP agents have none.
+  // Grok Build and Antigravity CLI, ACP agents, have them too (Antigravity CLI only its own sign-in); the other ACP agents have none.
   const acpDef = agent === 'acp' ? acpList?.find((a) => a.id === acpId) : undefined;
   const accountAgent = accountAgentOf(agent, acpDef);
   const accounts = useMemo(() => (allAccounts ?? []).filter((a) => a.agent === accountAgent), [allAccounts, accountAgent]);

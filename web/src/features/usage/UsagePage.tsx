@@ -4,7 +4,7 @@ import type { AccountAgent, AgentAccount, AgentUsage, UsageWindow } from '@share
 import { ago, compact, pct, untilText } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp, useUsage } from '../../lib/store';
-import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { ACCOUNT_AGENT_NAMES, isAcpAccountAgent } from '@shared/account-agents';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, Meter, severityColor } from '../../components/charts';
 import { Button, cx, Throbber, Tabs } from '../../components/ui';
@@ -41,6 +41,8 @@ const dollars = (n: number | null | undefined, currency?: string | null) => (n =
 
 function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent; account?: AgentAccount }) {
   const grok = agent === 'grok';
+  // Grok Build and Antigravity CLI are ACP agents: their sign-in is checked in Settings → Accounts.
+  const acp = isAcpAccountAgent(agent);
   return (
     <section className="min-w-0 rounded-2xl border border-line bg-panel p-4 sm:p-5">
       <header className="mb-3 flex items-center gap-2.5">
@@ -63,7 +65,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
       ) : !u.ok && !u.windows.length ? (
         <div className="rounded-lg border border-err/30 bg-err/5 px-3 py-2.5 text-[12.5px]">
           <div className="text-err">{u.error ?? 'Usage is unavailable'}</div>
-          <button className="mt-1 text-accent hover:underline" onClick={() => go(grok ? '/settings?s=accounts' : '/settings')}>
+          <button className="mt-1 text-accent hover:underline" onClick={() => go(acp ? '/settings?s=accounts' : '/settings')}>
             Check the sign-in in Settings
           </button>
         </div>
@@ -75,7 +77,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
               <WindowRow key={w.id} w={w} />
             ))}
             {!u.windows.length &&
-              (u.account || grok ? (
+              (u.account || acp ? (
                 <div className="py-3 text-[12.5px] text-fg-3">{u.note ?? (grok && (u.credits || u.extra) ? 'No weekly limit reported for this plan.' : 'No usage limits reported for this plan.')}</div>
               ) : (
                 <div className="py-3 text-[12.5px] text-fg-3">
@@ -149,7 +151,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
 const SUBS = { limits: 'How much of each plan is left, and when it resets', activity: 'Lines changed, tokens and sessions over time', arena: 'Which models win on your own tasks' };
 
 export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
-  const { claude, codex, grok, accounts: usageByAccount, loading, refresh } = useUsage();
+  const { claude, codex, grok, antigravity, accounts: usageByAccount, loading, refresh } = useUsage();
   const added = useApp((s) => s.boot?.accounts) ?? [];
   useEffect(() => {
     refresh().catch(() => {});
@@ -187,6 +189,7 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
               <Card u={claude} agent="claude" />
               <Card u={codex} agent="codex" />
               {grok && <Card u={grok} agent="grok" />}
+              {antigravity && <Card u={antigravity} agent="antigravity" />}
               {added.map((a) => (
                 <Card key={a.id} u={usageByAccount[a.id] ?? null} agent={a.agent} account={a} />
               ))}

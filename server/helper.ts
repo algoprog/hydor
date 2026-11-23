@@ -12,7 +12,7 @@ import type { ModelManager } from './models/manager.ts';
 import { oneShot, signedOutOf } from './oneshot.ts';
 import { costOf } from './prices.ts';
 import { accountLabel, backgroundDone, needSignIn } from './signin.ts';
-import { ACCOUNT_AGENT_NAMES } from '../shared/grok.ts';
+import { ACCOUNT_AGENT_NAMES } from '../shared/account-agents.ts';
 import { tiersOf } from './assistants/tiers.ts';
 
 export interface HelperAsk {

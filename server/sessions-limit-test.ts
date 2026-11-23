@@ -105,7 +105,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     resumeAfterLimit: async () => {},
   };
   m.accountAgentOf = proto.accountAgentOf.bind(m);
-  m.isGrokSession = proto.isGrokSession.bind(m);
+  m.acpAccountAgentOf = proto.acpAccountAgentOf.bind(m);
   m.lastUsageOf = proto.lastUsageOf.bind(m);
   m.afterTurn = proto.afterTurn.bind(m);
   m.finishedNotice = proto.finishedNotice.bind(m);
@@ -711,7 +711,7 @@ const grokUsage = (limited: boolean, used = 10) => ({ agent: 'grok', ok: true, f
 function grokManager(opts: Parameters<typeof manager>[0] = {}) {
   const t = manager(opts);
   t.m.lives.set(GROK_KEY, { adapter: { ...t.adapter, agent: 'acp' } });
-  t.m.isGrokSession = (key: string) => key === GROK_KEY;
+  t.m.acpAccountAgentOf = (key: string) => (key === GROK_KEY ? 'grok' : null);
   t.m.accountAgentOf = proto.accountAgentOf.bind(t.m);
   return t;
 }
@@ -787,7 +787,7 @@ test('a Grok session waits for the usage reading its limit hit started, to know 
 
 test('an ACP session of another agent, and a Grok turn with no hit, move nothing', async () => {
   const other = grokManager();
-  other.m.isGrokSession = () => false;
+  other.m.acpAccountAgentOf = () => null;
   other.m.limitHits.add(GROK_KEY);
   other.m.statuses.set(GROK_KEY, { status: 'working', turnStart: Date.now() });
   other.watchStatus([grokSummary('idle')]);

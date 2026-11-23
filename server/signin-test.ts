@@ -100,6 +100,23 @@ test('a refusal for a sign-in is told from a limit and from a timeout', () => {
     assert.equal(t(agent, 'it did not answer within 180 s'), false, agent);
     assert.equal(t(agent, ''), false, agent);
   }
+  // Antigravity CLI and Grok Build: the ways they say they are signed out, and not a limit or a timeout.
+  for (const said of [
+    'Error: Please sign in to view available models. Launch the CLI without arguments to sign in.',
+    'Authentication required',
+    'You are not logged into Antigravity',
+    'stored credentials are expired or revoked',
+    'Authentication expired. Please log back in.',
+    'request failed: 401',
+    '401 Unauthorized',
+  ])
+    assert.equal(t('antigravity', said), true, said);
+  assert.equal(t('grok', 'You are not authenticated.'), true);
+  for (const agent of ['antigravity', 'grok'] as const) {
+    assert.equal(t(agent, 'Resource exhausted: you have reached your usage limit, resets in 3 hours'), false, agent);
+    assert.equal(t(agent, 'it did not answer within 180 s'), false, agent);
+    assert.equal(t(agent, ''), false, agent);
+  }
 });
 
 // ---- marks and prompts -------------------------------------------------------------------------------

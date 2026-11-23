@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Settings2, UserRound } from 'lucide-react';
 import type { AccountAgent, AgentAccount } from '@shared/types';
-import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { ACCOUNT_AGENT_NAMES } from '@shared/account-agents';
 import { go } from '../../lib/nav';
 import { MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
 
@@ -15,7 +15,7 @@ export function AccountPicker({ agent, accounts, value, onChange }: { agent: Acc
     <>
       <SettingChip ref={ref} label="Account" icon={<UserRound size={14} />} value={current?.name ?? 'Your sign-in'} title="The account this session runs as" open={open} onClick={() => setOpen((o) => !o)} />
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={240} title="Account">
-        <OptionRow label="Your sign-in" hint={`The ${ACCOUNT_AGENT_NAMES[agent]} CLI's own account`} selected={!current} onClick={() => (onChange(''), setOpen(false))} />
+        <OptionRow label="Your sign-in" hint={`The ${ACCOUNT_AGENT_NAMES[agent].replace(/ CLI$/, '')} CLI's own account`} selected={!current} onClick={() => (onChange(''), setOpen(false))} />
         {accounts.map((a) => (
           <OptionRow key={a.id} label={a.name} selected={a.id === value} onClick={() => (onChange(a.id), setOpen(false))} />
         ))}

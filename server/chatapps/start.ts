@@ -138,7 +138,8 @@ export async function deliver(d: Deps, c: ChatSide, m: ChatMessage): Promise<voi
     }
     let made: string;
     try {
-      made = await d.sessions.create({ ...startOf(a, c.program), cwd, prompt, ...(paths.length ? { paths } : {}), remember: false });
+      // A person's message from a chat app starts it, and they drive it from there.
+      made = await d.sessions.create({ ...startOf(a, c.program), cwd, prompt, ...(paths.length ? { paths } : {}), remember: false, person: true });
     } catch (e) {
       await c.say(`Could not start a session: ${(e as Error).message}`);
       return;

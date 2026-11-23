@@ -1,4 +1,4 @@
-// Agents that speak the Agent Client Protocol (agentclientprotocol.com): Gemini CLI, OpenCode, Grok Build,
+// Agents that speak the Agent Client Protocol (agentclientprotocol.com): Gemini CLI, Antigravity CLI, OpenCode, Grok Build,
 // Qwen Code, Goose and others, each started as `<command> <args>` and driven over JSON-RPC on stdio.
 //
 // The app is the ACP client. It opens a session (session/new, or session/load to continue one when the
@@ -9,7 +9,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isGrok } from '../../shared/grok.ts';
+import { acpAccountAgent } from '../../shared/account-agents.ts';
+import { signedOutText } from '../signin.ts';
 import { CONTEXT_PARTS, type AcpAgentDef, type ApprovalOption, type LiveState, type ModelOption } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
@@ -29,7 +30,13 @@ export const ACP_DIR = path.join(config.dataDir, 'acp');
 
 /** Agents known to speak ACP, as they are usually installed; any of them can be changed, others added. */
 export const ACP_PRESETS: AcpAgentDef[] = [
-  { id: 'gemini', name: 'Gemini CLI', command: 'gemini', args: ['--experimental-acp'], hint: 'npm install -g @google/gemini-cli' },
+  // Gemini CLI serves a Gemini API key or a Gemini Code Assist Standard or Enterprise licence (Google AI Pro and Ultra moved to
+  // Antigravity CLI). It takes --acp; --experimental-acp still works in 0.70, deprecated.
+  { id: 'gemini', name: 'Gemini CLI', command: 'gemini', args: ['--acp'], hint: 'npm install -g @google/gemini-cli' },
+  // Antigravity CLI (Google's `agy`) runs a Google AI Pro or Ultra plan, or Antigravity's free one. You install it with Google's
+  // installer (the app does not); it signs in from Settings → Agents → Accounts (server/agents/antigravity.ts), and Google's
+  // terms for its plans allow it only in sessions a person starts and drives, which server/sessions.ts keeps to.
+  { id: 'antigravity', name: 'Antigravity CLI', command: 'agy', args: ['acp'], hint: 'curl -fsSL https://antigravity.google/cli/install.sh | bash' },
   { id: 'opencode', name: 'OpenCode', command: 'opencode', args: ['acp'], hint: 'npm install -g opencode-ai' },
   // Grok Build (xAI) signs in with a Grok subscription (Settings → Agents → Accounts) or an xAI API key (XAI_API_KEY).
   // --no-leader: each session runs its own agent rather than joining a shared Grok leader, so it keeps its account's GROK_HOME.
@@ -60,12 +67,29 @@ const HEADLESS_AUTH = ['cached_token', 'xai.api_key'];
 /** The session's thought-level option (ACP config options, category `thought_level`): its id, the values it takes, the one set. */
 export function thoughtOption(configOptions: unknown): { id: string; options: string[]; current?: string } | null {
   if (!Array.isArray(configOptions)) return null;
-  const o = configOptions.find((c: Json) => c?.category === 'thought_level' || c?.id === 'reasoning_effort');
+  // Antigravity CLI's is `thinking_level`.
+  const o = configOptions.find((c: Json) => c?.category === 'thought_level' || c?.id === 'reasoning_effort' || c?.id === 'thinking_level');
   if (!o || !Array.isArray(o.options)) return null;
   // Options may come in groups ({ group, options }).
   const flat: Json[] = o.options.flatMap((x: Json) => (Array.isArray(x?.options) ? x.options : [x]));
   const options = flat.map((x) => String(x?.value ?? x?.id ?? '')).filter(Boolean);
   return options.length ? { id: String(o.id), options, current: o.currentValue != null ? String(o.currentValue) : undefined } : null;
+}
+
+/**
+ * A session option of the newer ACP kind (config options) that stands for a picker the protocol also has of its own: the
+ * model (category or id `model`) or the mode (`mode`), for an agent that offers it this way rather than as `models` or
+ * `modes` (Antigravity CLI): its id, its values and the one set.
+ */
+export function selectOption(configOptions: unknown, kind: 'model' | 'mode'): { id: string; values: { value: string; name: string; description?: string }[]; current?: string } | null {
+  if (!Array.isArray(configOptions)) return null;
+  const o = configOptions.find((c: Json) => c?.category === kind || c?.id === kind);
+  if (!o || !Array.isArray(o.options)) return null;
+  const flat: Json[] = o.options.flatMap((x: Json) => (Array.isArray(x?.options) ? x.options : [x]));
+  const values = flat
+    .map((x) => ({ value: String(x?.value ?? x?.id ?? ''), name: String(x?.name ?? x?.label ?? x?.value ?? x?.id ?? ''), description: x?.description ? String(x.description) : undefined }))
+    .filter((v) => v.value);
+  return values.length ? { id: String(o.id), values, current: o.currentValue != null ? String(o.currentValue) : undefined } : null;
 }
 
 /**
@@ -240,6 +264,44 @@ export function planLimitHit(turn: { error?: string; code?: number; data?: unkno
   return !turn.tools && text.length > 0 && text.length <= 160 && PLAN_ANSWER.test(text);
 }
 
+/** "143h57m55s", "2h 39m", "1d2h", "45s": a duration in ms, or null. */
+export function durationMs(t: string): number | null {
+  let ms = 0;
+  let any = false;
+  for (const [, n, u] of t.matchAll(/(\d+)\s*([dhms])/gi)) {
+    any = true;
+    ms += Number(n) * { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 }[u.toLowerCase() as 'd' | 'h' | 'm' | 's'];
+  }
+  return any ? ms : null;
+}
+
+/**
+ * Whether an Antigravity CLI turn stopped on the plan's quota, which limit, and when it lifts. Its error (in an API error too:
+ * "RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets
+ * in 2h39m52s.") or, with none, the agent's whole short answer says so; a weekly quota error, or "Your AI credits balance is
+ * too low to continue." Short rate limits agy waits out by itself (up to four minutes) and never shows; a refusal that only
+ * says RESOURCE_EXHAUSTED or 429 may be one of those, or Google turning the client away, and is not taken for the plan's.
+ */
+const AGY_LIMIT = /individual quota reached|quota (?:reached|exhausted)|\b(?:weekly|five[- ]hour|5[- ]hour) (?:quota|limit)\b[^.]{0,40}\b(?:reached|hit|exceeded|exhausted)|ai credits balance is too low/i;
+export function antigravityLimit(turn: { error?: string; data?: unknown; text?: string; tools?: number }, now = Date.now()): { label: string; resetsAt: number | null } | null {
+  let said = '';
+  if (turn.error != null) {
+    let data = '';
+    try {
+      data = turn.data == null ? '' : JSON.stringify(turn.data).slice(0, 2000);
+    } catch {}
+    said = `${turn.error} ${data}`;
+  } else {
+    const text = (turn.text ?? '').trim();
+    if (!turn.tools && text.length <= 400) said = text;
+  }
+  if (!said || !AGY_LIMIT.test(said)) return null;
+  const left = /\bresets? in\s+((?:\d+\s*[dhms]\s*)+)/i.exec(said);
+  const ms = left ? durationMs(left[1]) : null;
+  const label = /credits balance/i.test(said) ? 'AI credits' : /\bweek/i.test(said) ? 'Weekly limit' : /five[- ]hour|5[- ]hour/i.test(said) ? 'Five-hour limit' : 'Usage limit';
+  return { label, resetsAt: ms != null ? now + ms : null };
+}
+
 /** Why a turn ended when a restart of the app cut its agent's model call (its lead does not run it again a tier up for that). */
 export const CUT_BY_RESTART = 'The app restarted while this turn was waiting for its model, so the turn stopped there: send a message to carry on';
 
@@ -268,6 +330,9 @@ export class AcpLive extends LiveAdapter {
   models: ModelOption[] = [];
   /** The agent's thought-level option (Grok Build's `reasoning_effort`), when it has one: the values it takes and the one set. */
   private thought: { id: string; options: string[]; current?: string } | null = null;
+  /** The config options that stand for the model and the mode, for an agent that offers them that way (Antigravity CLI). */
+  private modelOption?: string;
+  private modeOption?: string;
 
   constructor(
     runner: Runner,
@@ -287,6 +352,11 @@ export class AcpLive extends LiveAdapter {
     fs.appendFileSync(this.o.transcript, JSON.stringify({ ...e, ts: Date.now(), ln: this.ln }) + '\n');
     this.touch();
     this.emit('activity');
+  }
+
+  /** A line of the app's own in the session (shown to the person, never sent to the agent). */
+  note(text: string) {
+    this.record({ t: 'note', text });
   }
 
   /** Starts the protocol and opens the session: a new one, or the old one again when the agent can load it. */
@@ -318,8 +388,10 @@ export class AcpLive extends LiveAdapter {
     const unsigned = (e: unknown) => /auth/i.test((e as Error).message) || (e as { code?: number }).code === -32000;
     const auth = (e: unknown) => {
       if (!unsigned(e)) throw e;
-      // Grok Build signs in here, in Settings → Agents → Accounts; other agents in their own CLI (in a terminal), once.
-      if (isGrok(this.o.def)) throw new HttpError(401, `${this.o.def.name} is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again.`);
+      // Grok Build and Antigravity CLI sign in here, in Settings → Agents → Accounts; other agents in their own CLI (in a
+      // terminal), once.
+      const acct = acpAccountAgent(this.o.def);
+      if (acct) throw new HttpError(401, `${this.o.def.name} is not signed in: sign in with your ${acct === 'grok' ? 'Grok' : 'Google'} account in Settings → Agents → Accounts, then try again.`);
       throw new HttpError(401, `${this.o.def.name} is not signed in. Run ${SIGN_IN[this.o.def.id] ?? this.o.def.command} once in a terminal and sign in there, then try again.`);
     };
     // An agent that wants a sign-in named first (Grok Build) is asked to use one it offers that needs nobody at a browser, once.
@@ -425,7 +497,7 @@ export class AcpLive extends LiveAdapter {
     return this.caught;
   }
 
-  /** Modes and models the agent offers for the session. */
+  /** Modes and models the agent offers for the session (as `modes` and `models`, or as config options), and its plan. */
   private offers(r: Json | null | undefined) {
     if (Array.isArray(r?.modes?.availableModes)) {
       this.modes = r!.modes.availableModes.map((m: Json) => ({ id: String(m.id), name: String(m.name ?? m.id), description: m.description ?? undefined }));
@@ -436,11 +508,35 @@ export class AcpLive extends LiveAdapter {
       this.models = acpModelOptions(r!.models, this.thought);
       if (r!.models.currentModelId) this.state.model = String(r!.models.currentModelId);
     }
+    this.pickersFrom(r?.configOptions, !Array.isArray(r?.models?.availableModels), !Array.isArray(r?.modes?.availableModes));
     if (this.thought?.current) this.state.effort = this.thought.current;
+    // Antigravity CLI names the account's plan (its tier) when a session opens.
+    const tier = r?._meta?.antigravity?.tier;
+    if (tier != null && tier !== '') this.emit('tier', tier);
+  }
+
+  /** The model and mode pickers from config options, for an agent that offers them only that way (Antigravity CLI). */
+  private pickersFrom(configOptions: unknown, models: boolean, modes: boolean) {
+    const m = models || this.modelOption ? selectOption(configOptions, 'model') : null;
+    if (m) {
+      this.modelOption = m.id;
+      this.models = m.values.map((v) => ({ value: v.value, label: v.name, description: v.description, efforts: this.thought?.options ?? [], isDefault: v.value === m.current ? true : undefined }));
+      if (m.current) this.state.model = m.current;
+    }
+    const o = modes || this.modeOption ? selectOption(configOptions, 'mode') : null;
+    if (o) {
+      this.modeOption = o.id;
+      this.modes = o.values.map((v) => ({ id: v.value, name: v.name, description: v.description }));
+      if (o.current) this.state.mode = o.current;
+    }
   }
 
   /** The agent's own change to its options (after a model switch, say): the thought level, and the efforts the current model takes. */
   private optionsChanged(configOptions: unknown) {
+    if (this.modelOption || this.modeOption) {
+      this.pickersFrom(configOptions, false, false);
+      this.changed();
+    }
     const thought = thoughtOption(configOptions);
     if (!thought) return;
     const was = this.thought?.options ?? [];
@@ -675,10 +771,18 @@ export class AcpLive extends LiveAdapter {
       if (r.error) this.state.error = r.error;
     }
     this.changed();
-    // A Grok Build turn the plan's usage limit stopped: said before its result, as the other agents do.
-    if (isGrok(this.o.def) && planLimitHit({ error: r.error, ...why, text: this.turn.text, tools: this.turn.tools })) {
+    // A Grok Build or Antigravity CLI turn the plan's usage limit stopped: said before its result, as the other agents do
+    // (Antigravity's says when it lifts).
+    const acct = acpAccountAgent(this.o.def);
+    const turn = { error: r.error, ...why, text: this.turn.text, tools: this.turn.tools };
+    const hit = acct === 'grok' ? (planLimitHit(turn) ? {} : null) : acct === 'antigravity' ? antigravityLimit(turn) : null;
+    if (hit) {
       this.limitStopped = true;
-      this.emit('limithit');
+      this.emit('limithit', hit);
+    } else if (acct === 'antigravity' && r.error && signedOutText('antigravity', `${r.error} ${why?.code === -32000 ? 'authentication required' : ''}`)) {
+      // Its sign-in ended mid-session ("Authentication expired. Please log back in."): the account shows signed out.
+      this.signedOut = true;
+      this.emit('signedout');
     }
     this.emit('result');
   }
@@ -711,14 +815,22 @@ export class AcpLive extends LiveAdapter {
   }
 
   private async setMode(modeId: string) {
-    await this.rpc.call('session/set_mode', { sessionId: this.acpSession, modeId }, 15_000);
+    if (this.modeOption) await this.setOption(this.modeOption, modeId);
+    else await this.rpc.call('session/set_mode', { sessionId: this.acpSession, modeId }, 15_000);
     this.state.mode = modeId;
   }
 
   private async setModel(modelId: string) {
-    await this.rpc.call('session/set_model', { sessionId: this.acpSession, modelId }, 15_000);
+    if (this.modelOption) await this.setOption(this.modelOption, modelId);
+    else await this.rpc.call('session/set_model', { sessionId: this.acpSession, modelId }, 15_000);
     this.state.model = modelId;
     this.record({ t: 'model', model: modelId });
+  }
+
+  /** Sets a config option; the agent answers with them all, which may change the others (a model's own thought levels). */
+  private async setOption(configId: string, value: string) {
+    const r = await this.rpc.call('session/set_config_option', { sessionId: this.acpSession, configId, value }, 15_000);
+    if (Array.isArray(r?.configOptions)) this.optionsChanged(r.configOptions);
   }
 
   async configure(cfg: LiveConfig): Promise<void> {

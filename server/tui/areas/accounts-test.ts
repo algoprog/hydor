@@ -1,7 +1,7 @@
 // Checks for `hydor accounts` against a fake connection (test-kit.ts): list shows each program's own sign-in and the added
 // accounts and which one new sessions use; add makes an account and signs it in; sign-in follows the page's flow (a link, then a
 // pasted code or address for Claude Code and Codex's browser sign-in, or a one-time code noticed on the event socket for Codex's
-// device sign-in) and cancels it when it is given up; sign-out and remove ask first; use sets what new sessions start with.
+// device sign-in; Antigravity CLI's: a link, then the code Google's page shows, pasted back) and cancels it when it is given up; sign-out and remove ask first; use sets what new sessions start with.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/tui/areas/accounts-test.ts && DATA_DIR=/tmp/hydor-test-accounts node dist/dev/accounts-test.js
 import assert from 'node:assert/strict';
@@ -116,7 +116,7 @@ test('add makes the account, and with --no-sign-in stops there', async () => {
   const t = await run(conn, ['accounts', 'add', 'codex', 'Lab', 'box', '--no-sign-in']);
   assert.deepEqual(calls.at(-1), { method: 'POST', path: '/api/agent-accounts', body: { agent: 'codex', name: 'Lab box' } });
   assert.match(t.out, /Added “Lab box” \(acc3\) for Codex\.\nIt is not signed in yet: hydor accounts sign-in acc3/);
-  await assert.rejects(run(conn, ['accounts', 'add', 'gemini', 'x']), (e) => e instanceof UsageError && /claude, codex or grok/.test((e as Error).message));
+  await assert.rejects(run(conn, ['accounts', 'add', 'gemini', 'x']), (e) => e instanceof UsageError && /claude, codex, grok or antigravity/.test((e as Error).message));
   await assert.rejects(run(conn, ['accounts', 'add', 'claude']), (e) => e instanceof UsageError && /Say the name/.test((e as Error).message));
 });
 
@@ -184,6 +184,69 @@ test('Grok Build: listed once the API sends it; its sign-in shows the link and t
   assert.equal(s.typed.length, 0, 'nothing is asked for');
   await run(conn, ['accounts', 'use', 'grok:work', '-y']);
   assert.deepEqual(calls.filter((c) => c.method === 'PUT').at(-1)!.body, { runs: { 'acp:grok': { account: 'acc4' } } });
+});
+
+test('Antigravity CLI: listed once the API sends it, one sign-in only (add is refused), usage of its own, a sign-in with Google’s link and the code pasted back', async () => {
+  const withAgy = { ...accountsAnswer, antigravity: { agent: 'antigravity', loggedIn: true, email: 'me@gmail.example', plan: 'Google AI Pro', method: 'Google' } };
+  const agyUsage = {
+    ...usage,
+    antigravity: { agent: 'antigravity', ok: true, fetchedAt: 1, windows: [], account: { email: 'me@gmail.example', plan: 'Google AI Pro' }, note: 'Antigravity CLI shows how much of your plan is left with /usage in its own terminal.', limited: { label: 'Weekly limit', resetsAt: Date.now() + 86_400_000 * 2 } },
+  };
+  const link = 'https://accounts.google.com/o/oauth2/auth?client_id=x&state=y';
+  const { conn, calls } = fakeConn({
+    'GET /api/accounts': withAgy,
+    'GET /api/bootstrap': { start: { runs: { 'acp:antigravity': { account: '' } } } },
+    'GET /api/usage': agyUsage,
+    'GET /api/app-settings': { autoSwitch: true, apiCredit: false },
+    'POST /api/accounts/antigravity/login': { id: 'fl5', agent: 'antigravity', method: 'google', state: 'waiting', url: link, needsInput: 'code' },
+    'POST /api/accounts/antigravity/login/fl5': { id: 'fl5', agent: 'antigravity', method: 'google', state: 'verifying' },
+    'POST /api/accounts/antigravity/logout': { ok: true },
+    'PUT /api/start': { ok: true },
+  });
+  const t = await run(conn, ['accounts']);
+  assert.match(t.out, /●\s+Antigravity CLI\s+its own sign-in\s+Antigravity CLI\s+me@gmail\.example · Google AI Pro · Google/);
+  // Without it in the answer, no Antigravity CLI row.
+  assert.doesNotMatch((await run(fakeConn(routes).conn, ['accounts'])).out, /Antigravity/);
+  // Every spelling of the program; no accounts are added for it, and nothing is made before it says so.
+  for (const word of ['antigravity', 'Antigravity-CLI', 'agy', 'antigravity cli']) {
+    await assert.rejects(
+      run(conn, ['accounts', 'add', word, 'Work']),
+      (e) => e instanceof UsageError && (e as Error).message === 'Antigravity CLI has its own sign-in only: Google’s terms for its plans rule out switching between accounts',
+      word,
+    );
+  }
+  assert.ok(!calls.some((c) => c.path === '/api/agent-accounts'), 'no account was made');
+  // Its own usage, the note, and that it does not move on to another account at a limit.
+  const s = await run(conn, ['accounts', 'show', 'antigravity']);
+  assert.match(s.out, /^Antigravity CLI$/m);
+  assert.match(s.out, /^Who +me@gmail\.example$/m);
+  assert.match(s.out, /^Plan +Google AI Pro$/m);
+  assert.match(s.out, /^New sessions +● start with it$/m);
+  assert.match(s.out, /^At a limit +stays on its own sign-in and does not continue by itself$/m);
+  assert.match(s.out, /^API key +not used by Antigravity CLI$/m);
+  assert.match(s.out, /At its limit \(Weekly limit\), lifts in 2 days/);
+  assert.match(s.out, /\/usage in its own terminal/);
+  assert.equal(((await run(conn, ['accounts', 'show', 'antigravity', '--json'])).json[0] as any).usage.account.plan, 'Google AI Pro');
+  // Signing in: Google's link, then the code (or the address) Google's page shows, pasted back here.
+  const ev = withEvents(conn);
+  setTimeout(() => ev.push({ id: 'fl5', agent: 'antigravity', method: 'google', state: 'done' }), 15);
+  const si = await run(conn, ['accounts', 'sign-in', 'antigravity', '-y'], { interactive: true, typed: ['4/0AbCd-code'] });
+  assert.match(si.out, /1\. Open this link and sign in:\n\s+https:\/\/accounts\.google\.com\/o\/oauth2\/auth\?client_id=x&state=y/);
+  assert.deepEqual(si.typed, [{ question: 'Paste the code Google’s page shows (or the whole address of the page): ', hidden: false }]);
+  assert.deepEqual(
+    calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body]),
+    [
+      ['/api/accounts/antigravity/login', { method: 'device' }],
+      ['/api/accounts/antigravity/login/fl5', { code: '4/0AbCd-code' }],
+    ],
+  );
+  assert.match(si.out, /Antigravity CLI is signed in\./);
+  assert.ok(!calls.some((c) => c.method === 'DELETE'), 'a finished sign-in is not cancelled');
+  // Its picks are kept under acp:antigravity; signing out is the program's own.
+  await run(conn, ['accounts', 'use', 'antigravity', '-y']);
+  assert.deepEqual(calls.filter((c) => c.method === 'PUT').at(-1)!.body, { runs: { 'acp:antigravity': { account: '' } } });
+  assert.equal((await run(conn, ['accounts', 'sign-out', 'antigravity', '-y'])).out, 'Signed out of Antigravity CLI.\n');
+  await assert.rejects(run(conn, ['accounts', 'remove', 'antigravity', '-y']), (e) => e instanceof UsageError && /own sign-in cannot be removed/.test((e as Error).message));
 });
 
 test('sign-in with Codex’s browser method asks for the address; failing or backing out cancels the flow', async () => {

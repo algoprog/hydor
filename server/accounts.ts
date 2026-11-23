@@ -1,14 +1,15 @@
 // More than one account per agent: a work and a personal Claude plan, say. The default account is
 // the CLI's own (~/.claude, ~/.codex); each added one lives in a folder of its own under the app's data
-// (CLAUDE_CONFIG_DIR / CODEX_HOME), with its own sign-in and history. Settings, instructions, skills
-// and plugins are linked in from the default account, so only the sign-in differs.
+// (CLAUDE_CONFIG_DIR / CODEX_HOME / GROK_HOME), with its own sign-in and history. Settings, instructions, skills
+// and plugins are linked in from the default account, so only the sign-in differs. Antigravity CLI has its own sign-in
+// only: Google's terms for its consumer plans rule out rotating accounts automatically, so none are added for it.
 import crypto from 'node:crypto';
 import { linkPath } from './platform.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AccountAgent, Agent, AgentAccount } from '../shared/types.ts';
-import { ACCOUNT_AGENT_NAMES } from '../shared/grok.ts';
+import { ACCOUNT_AGENT_NAMES, takesAddedAccounts } from '../shared/account-agents.ts';
 import { HttpError } from './auth.ts';
 import { agentRoots, config } from './config.ts';
 import { agentBaseEnv } from './env.ts';
@@ -38,7 +39,7 @@ export const grokHome = () => {
   return env.GROK_HOME || path.join(env.HOME || os.homedir(), '.grok');
 };
 
-const SHARED: Record<AccountAgent, { from: string; names: string[] }> = {
+const SHARED: Record<Exclude<AccountAgent, 'antigravity'>, { from: string; names: string[] }> = {
   claude: { from: CLAUDE_HOME, names: ['settings.json', 'CLAUDE.md', 'skills', 'agents', 'commands', 'output-styles', 'plugins', 'rules'] },
   codex: { from: config.codexHome, names: ['config.toml', 'AGENTS.md', 'AGENTS.override.md', 'prompts', 'rules', 'skills'] },
   // Never the sign-in (auth.json), the sessions, the logs, agent_id, lock files or sockets.
@@ -110,7 +111,10 @@ export function accountEnv(db: DB, agent: AccountAgent, id: string | null | unde
     return {};
   }
   if (a.agent !== agent) throw new HttpError(400, `That is a ${ACCOUNT_AGENT_NAMES[a.agent]} account`);
-  return a.agent === 'claude' ? { CLAUDE_CONFIG_DIR: a.dir } : a.agent === 'codex' ? { CODEX_HOME: a.dir } : { GROK_HOME: a.dir };
+  if (a.agent === 'claude') return { CLAUDE_CONFIG_DIR: a.dir };
+  if (a.agent === 'codex') return { CODEX_HOME: a.dir };
+  if (a.agent === 'grok') return { GROK_HOME: a.dir };
+  throw new HttpError(400, `${ACCOUNT_AGENT_NAMES[a.agent]} has its own sign-in only`);
 }
 
 /** The default Claude Code account's own settings: ~/.claude.json, or .claude.json in CLAUDE_CONFIG_DIR. */
@@ -311,6 +315,7 @@ export function moveAcross(src: string, dst: string) {
 }
 
 export function addAccount(db: DB, agent: AccountAgent, name: string): AgentAccount {
+  if (agent === 'antigravity' || (agent && !takesAddedAccounts(agent))) throw new HttpError(400, 'Antigravity CLI has its own sign-in only: Google’s terms for its plans rule out switching between accounts');
   if (agent !== 'claude' && agent !== 'codex' && agent !== 'grok') throw new HttpError(400, 'Pick Claude Code, Codex or Grok Build');
   const n = name.replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!n) throw new HttpError(400, 'Name the account (Work, Personal…)');

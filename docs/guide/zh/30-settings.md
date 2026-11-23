@@ -102,9 +102,9 @@
 
 ### 账户
 
-[设置 → 账户](/settings?s=accounts)：每个会话都使用的 Claude Code、Codex 和 Grok Build 登录。详见[智能体、账户和模型](/guide/agents-models)。
+[设置 → 账户](/settings?s=accounts)：每个会话所使用的 Claude Code、Codex、Grok Build 和 Antigravity CLI 登录。详见[智能体、账户和模型](/guide/agents-models)。
 
-- [**账户**](/settings?s=accounts&find=Accounts)：会话使用的 Claude Code、Codex 和 Grok Build 登录，以及你添加的更多账户。
+- [**账户**](/settings?s=accounts&find=Accounts)：会话所使用的 Claude Code、Codex、Grok Build 和 Antigravity CLI 登录，还可以添加更多。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
 - [**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：所有 Claude Code 账户都达到上限时，会话继续运行，费用记在一个 Anthropic API 密钥上。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序（包括 Grok Build），以及安装其他程序。
@@ -112,11 +112,11 @@
 
 ### 更多智能体
 
-[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、Grok Build、OpenCode、Goose 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
+[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、Antigravity CLI、Grok Build、OpenCode、Goose 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**你的智能体**](/settings?s=agents&find=Your%20agents)：显示在 Claude Code 和 Codex 旁边的智能体。
 - [**添加你自己的**](/settings?s=agents&find=Add%20your%20own)：任何支持 ACP 的智能体（通过其命令）。
-- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、OpenCode、Qwen Code、Goose 和 Grok Build，可随时添加。
+- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、Antigravity CLI、OpenCode、Qwen Code、Goose 和 Grok Build，可随时添加。
 
 ### 模型
 
@@ -227,7 +227,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷方式、网页缩放、拼写检查、翻译、深色网页、带过滤列表的广告拦截器、语言和允许显示广告的网站、历史记录，以及清除浏览器保留的内容。
 
 ### 电脑操控
 

@@ -102,9 +102,9 @@
 
 ### アカウント
 
-[設定 → アカウント](/settings?s=accounts)：すべてのセッションが使うClaude Code、Codex、Grok Buildのサインイン。詳しくは[エージェント、アカウント、モデル](/guide/agents-models)。
+[設定 → アカウント](/settings?s=accounts)：すべてのセッションが使うClaude Code、Codex、Grok Build、Antigravity CLIのサインイン。詳しくは[エージェント、アカウント、モデル](/guide/agents-models)。
 
-- [**アカウント**](/settings?s=accounts&find=Accounts)：セッションが使うClaude Code、Codex、Grok Buildのサインインと、追加したその他のサインイン。
+- [**アカウント**](/settings?s=accounts&find=Accounts)：セッションが使うClaude Code、Codex、Grok Build、Antigravity CLIのサインインと、追加したサインイン。
 - [**上限時にアカウントを切り替え**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：使用量を使い切ったセッションは、別のアカウントで続行します。
 - [**上限時にAPIクレジットを使う**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：すべてのClaude Codeアカウントが上限に達したとき、セッションはAnthropic APIキーの課金で続行されます。
 - [**エージェントプログラム**](/settings?s=accounts&find=Agent%20programs)：Grok Buildを含め、どのエージェントプログラムがインストールされているか。他のプログラムのインストール。
@@ -112,11 +112,11 @@
 
 ### その他のエージェント
 
-[設定 → その他のエージェント](/settings?s=agents)：Gemini CLI、Grok Build、OpenCode、Goose、そのほかACPに対応したエージェント。詳しくは[エージェント、アカウント、モデル](/guide/agents-models)。
+[設定 → その他のエージェント](/settings?s=agents)：Gemini CLI、Antigravity CLI、Grok Build、OpenCode、Gooseなど、ACPに対応したエージェント。詳しくは[エージェント、アカウント、モデル](/guide/agents-models)。
 
 - [**自分のエージェント**](/settings?s=agents&find=Your%20agents)：Claude CodeやCodexと並んで表示されるエージェント。
 - [**自分で追加**](/settings?s=agents&find=Add%20your%20own)：ACPに対応したエージェントを、コマンドで追加。
-- [**ACPに対応したエージェント**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：追加できるGemini CLI、OpenCode、Qwen Code、Goose、Grok Build。
+- [**ACPに対応したエージェント**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、Antigravity CLI、OpenCode、Qwen Code、Goose、Grok Buildを追加できます。
 
 ### モデル
 
@@ -227,7 +227,7 @@
 - [**ログイン済みのサイトでの送信前に確認**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：ログイン済みのサイトで、エージェントが送信、投稿、削除、送金を行う前。
 - [**ブックマーク**](/settings?s=browser&find=Bookmarks)：自分のものと、このコンピューターの他のブラウザのものを統合。
 - [**拡張機能**](/settings?s=browser&find=Extensions)：Chrome拡張機能（デスクトップアプリ）。
-- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：ホームページ、検索エンジン、検索ショートカット、ページのズーム、スペルチェック、翻訳、ダークページ、フィルタリストや言語、広告を許可するサイトを含む広告ブロック、履歴と保存されたデータの削除。
 
 ### コンピューターの操作
 

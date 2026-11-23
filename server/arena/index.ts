@@ -51,7 +51,8 @@ export async function startMatch(d: Pick<Deps, 'db' | 'sessions' | 'broadcast'>,
   const started = await Promise.all(
     others.map(async (c): Promise<ArenaEntry | null> => {
       try {
-        const key = await d.sessions.create({ ...opts, agent: c.agent, acpAgent: c.acpAgent, model: c.model, effort: undefined, mode: undefined, account: undefined, remember: false, extra: { ...extra, arena: id } });
+        // The app starts these beside the person's own session, so Antigravity CLI is not among them (Google's terms for its plans).
+        const key = await d.sessions.create({ ...opts, agent: c.agent, acpAgent: c.acpAgent, model: c.model, effort: undefined, mode: undefined, account: undefined, remember: false, person: false, extra: { ...extra, arena: id } });
         return { ...c, key };
       } catch (e) {
         d.broadcast({ t: 'toast', level: 'error', text: `Arena: ${(e as Error).message}` });

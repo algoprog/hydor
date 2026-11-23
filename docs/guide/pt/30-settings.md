@@ -102,9 +102,9 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 ### Contas
 
-[Configurações → Contas](/settings?s=accounts): os logins do Claude Code, do Codex e do Grok Build que toda sessão usa. Mais em [Agentes, contas e modelos](/guide/agents-models).
+[Configurações → Contas](/settings?s=accounts): os logins do Claude Code, Codex, Grok Build e Antigravity CLI que toda sessão usa. Mais em [Agentes, contas e modelos](/guide/agents-models).
 
-- [**Contas**](/settings?s=accounts&find=Accounts): Os logins do Claude Code, do Codex e do Grok Build que as sessões usam, e outros que você adicionar.
+- [**Contas**](/settings?s=accounts&find=Accounts): Os logins do Claude Code, Codex, Grok Build e Antigravity CLI que as sessões usam, e outros que você adicionar.
 - [**Trocar de conta no limite**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Uma sessão que fica sem uso continua com outra conta.
 - [**Usar crédito de API no limite**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): Quando todas as contas do Claude Code atingem o limite, as sessões continuam cobradas em uma chave de API da Anthropic.
 - [**Programas de agentes**](/settings?s=accounts&find=Agent%20programs): Quais programas de agentes estão instalados, incluindo o Grok Build, e a instalação dos outros.
@@ -112,11 +112,11 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 
 ### Mais agentes
 
-[Configurações → Mais agentes](/settings?s=agents): Gemini CLI, Grok Build, OpenCode, Goose e outros agentes que falam ACP. Mais em [Agentes, contas e modelos](/guide/agents-models).
+[Configurações → Mais agentes](/settings?s=agents): Gemini CLI, Antigravity CLI, Grok Build, OpenCode, Goose e outros agentes que usam ACP. Mais em [Agentes, contas e modelos](/guide/agents-models).
 
 - [**Seus agentes**](/settings?s=agents&find=Your%20agents): Agentes que aparecem ao lado do Claude Code e do Codex.
 - [**Adicionar o seu**](/settings?s=agents&find=Add%20your%20own): Qualquer agente que fale ACP, pelo comando dele.
-- [**Agentes que falam ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose e Grok Build, prontos para adicionar.
+- [**Agentes que falam ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, Antigravity CLI, OpenCode, Qwen Code, Goose e Grok Build, prontos para adicionar.
 
 ### Modelos
 
@@ -227,7 +227,7 @@ Você não precisa saber onde fica uma opção: digite o que quer na caixa de bu
 - [**Perguntar antes de enviar em sites com login**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de um agente enviar, publicar, excluir ou transferir algo em um site em que ele esteja conectado.
 - [**Favoritos**](/settings?s=browser&find=Bookmarks): Os seus, junto com os dos outros navegadores deste computador.
 - [**Extensões**](/settings?s=browser&find=Extensions): Extensões do Chrome, no app para computador.
-- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Configurações do navegador**](/settings?s=browser&find=Browser%20settings): Página inicial, mecanismo de busca, atalhos de busca, zoom da página, verificação ortográfica, tradução, páginas escuras, bloqueador de anúncios com suas listas de filtros, idiomas e sites onde anúncios são permitidos, histórico e limpeza do que ele guardou.
 
 ### Uso do computador
 

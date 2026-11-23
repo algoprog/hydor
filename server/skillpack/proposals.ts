@@ -288,7 +288,7 @@ export async function decide(d: Deps, id: string, yes: boolean, o: { text?: stri
   const text = yes
     ? `The user approved ${what}${edited ? ', after editing it' : ''}. It is ${where}: Custom has it from its next turn, and Claude Code and Codex from their next sessions. Just acknowledge this briefly.`
     : `The user dismissed ${what}; nothing was saved.${data.note ? ` Their note: ${data.note}` : ''} Do not propose it again unless they ask. Just acknowledge this briefly.`;
-  await d.sessions.deliverOrQueue(p.key, text).catch(() => {});
+  await d.sessions.deliverOrQueue(p.key, text, { person: true }).catch(() => {});
   return out;
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRightLeft, Clock3, RotateCcw } from 'lucide-react';
 import type { AccountAgent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
-import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { ACCOUNT_AGENT_NAMES } from '@shared/account-agents';
 import { del, enc, post, put } from '../../lib/api';
 import { pct, untilText } from '../../lib/format';
 import { toast, toastError, useApp, useAppSettings, usedUp, useUsage } from '../../lib/store';
@@ -103,6 +103,8 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
   const title = useLimitTitle(agent, account, spare);
   const autoSwitch = useAppSettings((s) => s.autoSwitch);
   const autoResume = useAppSettings((s) => s.autoResume);
+  // Antigravity CLI's sessions never continue by themselves (Google's terms for its plans allow only turns you start).
+  const byHand = agent === 'antigravity';
   useEffect(() => void useAppSettings.getState().load(), []);
   // Another account has usage left and Switch accounts at a limit is on: the session (or a new one) just moves there.
   const lim = session?.busy || (spare && autoSwitch) ? null : u?.limited;
@@ -114,7 +116,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
   // In a session with Resume after usage limits on, a turn the limit stopped continues by itself: no warning,
   // only whose limit it hit, which one, and when it continues (and a reset, if there is one). Not known yet
   // whether it is on: nothing, rather than a flash.
-  if (session && autoResume !== false) {
+  if (session && autoResume !== false && !byHand) {
     if (!resumeAt || autoResume === null) return null;
     return (
       <div className={cx('flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-line-2 bg-panel px-4 py-2.5 text-[13.5px]', className)} role="status">
@@ -183,9 +185,9 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
               {lim.resetsAt ? ` · resets ${untilText(lim.resetsAt)}` : ''}
             </div>
           </div>
-          {((session && !resumeAt && lim.resetsAt) || usable.length > 0) && (
+          {((session && !byHand && !resumeAt && lim.resetsAt) || usable.length > 0) && (
             <div className="flex flex-wrap items-center gap-2">
-              {session && !resumeAt && lim.resetsAt && (
+              {session && !byHand && !resumeAt && lim.resetsAt && (
                 <Button
                   size="sm"
                   variant={usable.length ? 'secondary' : 'primary'}
@@ -207,6 +209,12 @@ export function LimitBanner({ agent, account, className, session }: { agent: Acc
             </div>
           )}
         </div>
+        {session && byHand && (
+          <div className="mt-2 flex items-center gap-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
+            <Clock3 size={13} className="shrink-0 text-fg-3" />
+            <span className="min-w-0 flex-1">Antigravity CLI doesn’t continue by itself (Google’s terms for its plans allow only turns you start), so send a message once it resets.</span>
+          </div>
+        )}
         {spare && autoSwitch === false && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-warn/20 pt-2 text-[12.5px] text-fg-2">
             <ArrowRightLeft size={13} className="shrink-0 text-fg-3" />

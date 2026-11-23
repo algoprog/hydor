@@ -102,9 +102,9 @@
 
 ### Λογαριασμοί
 
-[Ρυθμίσεις → Λογαριασμοί](/settings?s=accounts): οι συνδέσεις Claude Code, Codex και Grok Build που χρησιμοποιεί κάθε συνεδρία. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
+[Ρυθμίσεις → Λογαριασμοί](/settings?s=accounts): οι συνδέσεις Claude Code, Codex, Grok Build και Antigravity CLI που χρησιμοποιεί κάθε συνεδρία. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
-- [**Λογαριασμοί**](/settings?s=accounts&find=Accounts): Οι συνδέσεις του Claude Code, του Codex και του Grok Build που χρησιμοποιούν οι συνεδρίες, και όσοι λογαριασμοί προσθέσετε.
+- [**Λογαριασμοί**](/settings?s=accounts&find=Accounts): Οι συνδέσεις Claude Code, Codex, Grok Build και Antigravity CLI που χρησιμοποιούν οι συνεδρίες, και όσες άλλες προσθέσετε.
 - [**Αλλαγή λογαριασμού στο όριο**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Μια συνεδρία που εξαντλεί τη χρήση της συνεχίζει με άλλον λογαριασμό.
 - [**Χρήση πίστωσης API στο όριο**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): Όταν κάθε λογαριασμός Claude Code φτάσει στο όριό του, οι συνεδρίες συνεχίζουν με χρέωση σε ένα κλειδί API της Anthropic.
 - [**Προγράμματα πρακτόρων**](/settings?s=accounts&find=Agent%20programs): Ποια προγράμματα πρακτόρων, μεταξύ τους το Grok Build, είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων.
@@ -112,11 +112,11 @@
 
 ### Περισσότεροι πράκτορες
 
-[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που μιλούν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
+[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, Antigravity CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που υποστηρίζουν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
 - [**Οι πράκτορές σας**](/settings?s=agents&find=Your%20agents): Πράκτορες που εμφανίζονται δίπλα στο Claude Code και το Codex.
 - [**Προσθήκη δικού σας**](/settings?s=agents&find=Add%20your%20own): Οποιοσδήποτε πράκτορας που υποστηρίζει ACP, μέσω της εντολής του.
-- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose και Grok Build, έτοιμα για προσθήκη.
+- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, Antigravity CLI, OpenCode, Qwen Code, Goose και Grok Build, έτοιμα για προσθήκη.
 
 ### Μοντέλα
 
@@ -227,7 +227,7 @@
 - [**Ερώτηση πριν από την αποστολή σε ιστότοπους όπου έχετε συνδεθεί**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Πριν ένας πράκτορας στείλει, δημοσιεύσει, διαγράψει ή μεταφέρει οτιδήποτε σε ιστότοπο όπου έχει συνδεθεί.
 - [**Σελιδοδείκτες**](/settings?s=browser&find=Bookmarks): Οι δικοί σας, μαζί με αυτούς των άλλων προγραμμάτων περιήγησης σε αυτόν τον υπολογιστή.
 - [**Επεκτάσεις**](/settings?s=browser&find=Extensions): Επεκτάσεις του Chrome, στην εφαρμογή υπολογιστή.
-- [**Ρυθμίσεις προγράμματος περιήγησης**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Ρυθμίσεις προγράμματος περιήγησης**](/settings?s=browser&find=Browser%20settings): Αρχική σελίδα, μηχανή αναζήτησης, συντομεύσεις αναζήτησης, ζουμ σελίδας, ορθογραφικός έλεγχος, μετάφραση, σκούρες σελίδες, ad blocker με τις λίστες φίλτρων, τις γλώσσες και τους ιστότοπους όπου επιτρέπονται οι διαφημίσεις, ιστορικό και διαγραφή όσων κράτησε.
 
 ### Χρήση υπολογιστή
 

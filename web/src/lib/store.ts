@@ -383,27 +383,30 @@ export const useUsage = create<{
   codex: AgentUsage | null;
   /** Grok Build's own sign-in: none until Grok Build is set up. */
   grok: AgentUsage | null;
+  /** Antigravity CLI's own sign-in: none until Antigravity CLI is set up. */
+  antigravity: AgentUsage | null;
   /** Added accounts' usage, by account id. */
   accounts: Record<string, AgentUsage>;
   loading: boolean;
   refresh: (force?: boolean) => Promise<void>;
-  set: (p: { claude?: AgentUsage; codex?: AgentUsage; grok?: AgentUsage; accounts?: Record<string, AgentUsage> }) => void;
+  set: (p: { claude?: AgentUsage; codex?: AgentUsage; grok?: AgentUsage; antigravity?: AgentUsage; accounts?: Record<string, AgentUsage> }) => void;
 }>((set) => ({
   claude: null,
   codex: null,
   grok: null,
+  antigravity: null,
   accounts: {},
   loading: false,
   refresh: async (force) => {
     set({ loading: true });
     try {
-      const r = await api<{ claude: AgentUsage; codex: AgentUsage; grok?: AgentUsage; accounts?: Record<string, AgentUsage> }>(`/api/usage${force ? '?refresh=1' : ''}`);
-      set({ claude: r.claude, codex: r.codex, grok: r.grok ?? null, accounts: r.accounts ?? {} });
+      const r = await api<{ claude: AgentUsage; codex: AgentUsage; grok?: AgentUsage; antigravity?: AgentUsage; accounts?: Record<string, AgentUsage> }>(`/api/usage${force ? '?refresh=1' : ''}`);
+      set({ claude: r.claude, codex: r.codex, grok: r.grok ?? null, antigravity: r.antigravity ?? null, accounts: r.accounts ?? {} });
     } finally {
       set({ loading: false });
     }
   },
-  set: (p) => set((s) => ({ claude: p.claude ?? s.claude, codex: p.codex ?? s.codex, grok: p.grok ?? s.grok, accounts: p.accounts ? { ...s.accounts, ...p.accounts } : s.accounts })),
+  set: (p) => set((s) => ({ claude: p.claude ?? s.claude, codex: p.codex ?? s.codex, grok: p.grok ?? s.grok, antigravity: p.antigravity ?? s.antigravity, accounts: p.accounts ? { ...s.accounts, ...p.accounts } : s.accounts })),
 }));
 
 /** App-wide switches kept on the server (/api/app-settings); read once, then kept in step by whoever changes them. */
@@ -650,7 +653,7 @@ export function handleEvent(e: ServerEvent) {
       break;
     }
     case 'usage':
-      useUsage.getState().set({ claude: e.claude, codex: e.codex, grok: e.grok, accounts: e.accounts });
+      useUsage.getState().set({ claude: e.claude, codex: e.codex, grok: e.grok, antigravity: e.antigravity, accounts: e.accounts });
       break;
     case 'accounts': {
       const boot = useApp.getState().boot;

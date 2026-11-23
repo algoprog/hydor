@@ -16,13 +16,16 @@ export const NOT_NOW_MS = 60 * 60_000;
 /**
  * Whether a program's refusal is about its sign-in: Claude Code's "Not logged in · Please run /login" or "Failed to
  * authenticate. API Error: 401 …", Codex's "401 Unauthorized: Missing bearer …" or its turn error "unauthorized",
- * Grok Build's "not authenticated".
+ * Grok Build's "not authenticated", Antigravity CLI's "Please sign in to view available models", "Authentication required" or
+ * "stored credentials are expired or revoked".
  */
 export function signedOutText(agent: AccountAgent, text: string): boolean {
   if (!text) return false;
   if (agent === 'claude')
     return /not logged in|please run \/login|failed to authenticate|invalid api key|oauth (?:access )?token (?:is invalid|has expired|expired|(?:has been |was )?revoked)|authentication_error|\b401\b/i.test(text);
   if (agent === 'codex') return /\b401\b|unauthori[sz]ed|not (?:logged|signed) in|(?:log|sign) ?in again|please (?:log|sign) ?in|refresh[_ ]token|token (?:has )?expired|missing bearer/i.test(text);
+  if (agent === 'antigravity')
+    return /please sign in|sign in to view|authentication (?:required|expired)|not (?:authenticated|logged|signed) (?:in|into)|log back in|credentials (?:are |have )?(?:expired|revoked)|expired or revoked|\b401\b|unauthori[sz]ed/i.test(text);
   return /not (?:authenticated|logged in|signed in)|\b401\b|unauthori[sz]ed/i.test(text);
 }
 

@@ -692,7 +692,7 @@ export async function askRun(r: RunRecord, text: string) {
   const { sessions } = d();
   if (isFlowRun(r) && (!r.key || !sessions.summary(r.key))) return changeFlowRun(r, text);
   if (!r.key) throw new HttpError(409, 'It has not started yet: ask once it has.');
-  await sessions.deliverOrQueue(r.key, text);
+  await sessions.deliverOrQueue(r.key, text, { person: true });
   // Sent: its turn has begun (a queued one opens the run when it goes out).
   if (sessions.summary(r.key)?.live?.status === 'working') reopen(r.id);
 }

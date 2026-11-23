@@ -147,12 +147,14 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
         mode: run.mode ?? undefined,
         remember: false,
         extra: { ...(assistant ? { assistant } : {}), ...(st.space ? { space: st.space } : {}) },
+        // Started by the person's own voice.
+        person: true,
       });
       return { say: plan.say || 'Started. I will tell you when it is done.', focus: k, did: 'started' };
     }
     case 'send': {
       if (!key) return { say: plan.say || 'Which session should I tell?', did: 'answer' };
-      await d.sessions.deliverOrQueue(key, (plan.text || text).trim());
+      await d.sessions.deliverOrQueue(key, (plan.text || text).trim(), { person: true });
       return { say: plan.say || `Sent to ${named(key)}.`, focus: key, did: 'sent' };
     }
     case 'approve':

@@ -273,7 +273,7 @@ function routes(d: Deps) {
       d.toSubscribers(r.key, { t: 'feature', id: 'connections', key: r.key, data: { changed: 'request' } });
       if (!keyGiven(r.key, value))
         await d.sessions
-          .deliverOrQueue(r.key, 'I added my OpenRouter key in Settings → Models: the models that run through OpenRouter (pictures, drawings, videos, sounds) can be used now.')
+          .deliverOrQueue(r.key, 'I added my OpenRouter key in Settings → Models: the models that run through OpenRouter (pictures, drawings, videos, sounds) can be used now.', { person: true })
           .catch((e) => console.warn(`[connections] could not tell ${r.key} that the OpenRouter key was saved: ${(e as Error).message}`));
       return { request: getRequest(db, r.id) };
     }
@@ -323,7 +323,7 @@ function routes(d: Deps) {
     ]
       .filter(Boolean)
       .join(' ');
-    await d.sessions.deliverOrQueue(r.key, text).catch((e) => console.warn(`[connections] could not tell ${r.key} that ${r.name} was saved: ${(e as Error).message}`));
+    await d.sessions.deliverOrQueue(r.key, text, { person: true }).catch((e) => console.warn(`[connections] could not tell ${r.key} that ${r.name} was saved: ${(e as Error).message}`));
     return { request: getRequest(db, r.id) };
   });
   app.post('/api/connections/requests/:id/dismiss', async (req) => {
@@ -334,7 +334,7 @@ function routes(d: Deps) {
     // A tool waiting for the OpenRouter key hears it was skipped and says so itself.
     if (r.name === OPENROUTER_REQUEST && keySkipped(r.key)) return { request: getRequest(db, r.id) };
     const what = r.fields?.length ? listNames(r.fields.filter((f) => f.secret).map((f) => f.key)) : r.name;
-    await d.sessions.deliverOrQueue(r.key, `I'd rather not give ${what} now. Carry on without it, or tell me what else would work.`).catch(() => {});
+    await d.sessions.deliverOrQueue(r.key, `I'd rather not give ${what} now. Carry on without it, or tell me what else would work.`, { person: true }).catch(() => {});
     return { request: getRequest(db, r.id) };
   });
 

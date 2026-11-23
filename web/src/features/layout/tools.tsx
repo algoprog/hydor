@@ -32,9 +32,9 @@ function leftOf(u: AgentUsage): number {
  * are no paid ones, each counted once (an added account can be the agent's own sign-in too). No subscriptions, no bar.
  */
 export function UsageHint({ compact }: { compact?: boolean } = {}) {
-  const { claude, codex, grok, accounts } = useUsage();
+  const { claude, codex, grok, antigravity, accounts } = useUsage();
   const seen = new Set<string>();
-  const subs = [claude, codex, grok, ...Object.values(accounts)].filter((u): u is AgentUsage => {
+  const subs = [claude, codex, grok, antigravity, ...Object.values(accounts)].filter((u): u is AgentUsage => {
     if (!u?.ok || !u.windows.some((w) => w.usedPercent != null)) return false;
     const key = u.account?.email ? `${u.agent}:${u.account.email.toLowerCase()}` : null;
     if (key && seen.has(key)) return false;
@@ -47,7 +47,7 @@ export function UsageHint({ compact }: { compact?: boolean } = {}) {
   const left = counted.reduce((n, u) => n + leftOf(u), 0) / counted.length;
   const title = [
     `${Math.round(left)}% left across ${counted.length} ${paid.length ? 'paid' : 'free'} subscription${counted.length === 1 ? '' : 's'}`,
-    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
+    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : u.agent === 'antigravity' ? 'Antigravity' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
   ].join('\n');
   return (
     <span className={cx('absolute left-1/2 h-[3px] -translate-x-1/2 overflow-hidden rounded-full bg-fg/10', compact ? 'bottom-[3px] w-5' : 'bottom-[7px] w-8')} title={title}>

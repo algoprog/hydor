@@ -1,9 +1,9 @@
-// Settings → Accounts: the Claude Code, Codex and Grok Build sign-ins every session uses, switching accounts and API credit at a
+// Settings → Accounts: the Claude Code, Codex, Grok Build and Antigravity CLI sign-ins every session uses, switching accounts and API credit at a
 // limit, and the agents’ programs on this machine.
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExternalLink, KeyRound, LogIn, LogOut, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { AccountAgent, AccountStatus, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow } from '@shared/types';
-import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { ACCOUNT_AGENT_NAMES, takesAddedAccounts } from '@shared/account-agents';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toast, toastError, useAppSettings, useLogins } from '../../lib/store';
@@ -56,7 +56,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
     if (!flowId) return;
     setBusy(true);
     try {
-      const f = await post<LoginFlow>(`/api/accounts/${agent}/login/${flowId}${q}`, agent === 'claude' ? { code: input } : { url: input });
+      const f = await post<LoginFlow>(`/api/accounts/${agent}/login/${flowId}${q}`, agent === 'claude' || agent === 'antigravity' ? { code: input } : { url: input });
       useLogins.getState().put(f);
     } catch (e) {
       toastError(e);
@@ -73,7 +73,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
     <Dialog open={open} onClose={cancel} title={`Sign in to ${who}`} width={520}>
       {!flow ? (
         <div className="space-y-4">
-          {agent !== 'grok' && (
+          {agent !== 'grok' && agent !== 'antigravity' && (
             <Segmented
               value={method}
               onChange={setMethod}
@@ -93,7 +93,9 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
           <p className="text-[13px] text-fg-2">
             {agent === 'claude'
               ? 'You get a sign-in link. Approve access in your browser; the page then shows a code to paste back here.'
-              : agent === 'grok'
+              : agent === 'antigravity'
+                ? 'You get a sign-in link. Sign in with your Google account; the page then shows a code. Paste it back here (or the whole address of the page you land on).'
+                : agent === 'grok'
                 ? 'You get a link and a one-time code. Open the link on any device, sign in with your Grok account, and confirm the code. This page notices when you are done.'
                 : method === 'device'
                   ? 'You get a link and a one-time code. Open the link on any device, sign in to ChatGPT, and enter the code. This page notices when you are done.'
@@ -151,7 +153,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && input.trim() && submit()}
-                placeholder={flow.needsInput === 'code' ? 'code#state' : 'http://localhost:1455/auth/callback?code=…'}
+                placeholder={flow.needsInput === 'code' ? (agent === 'antigravity' ? 'Paste the code or the page’s address' : 'code#state') : 'http://localhost:1455/auth/callback?code=…'}
                 className="h-9 w-full rounded-lg border border-line-2 bg-bg-1 px-3 font-mono text-[12.5px] outline-none focus:border-accent/70"
               />
               <div className="mt-2 flex justify-end">
@@ -192,6 +194,7 @@ function AccountRow({
   onChange,
   actions = [],
   apiKey,
+  note,
 }: {
   agent: AccountAgent;
   a: AccountStatus | null;
@@ -199,6 +202,8 @@ function AccountRow({
   onChange: () => void;
   actions?: RowAction[];
   apiKey?: boolean;
+  /** A quiet line under the row. */
+  note?: string;
 }) {
   const q = account ? `?account=${encodeURIComponent(account.id)}` : '';
   const [login, setLogin] = useState(false);
@@ -289,7 +294,9 @@ function AccountRow({
             )}
           </>
         }
-      />
+      >
+        {note && <p className="text-[12px] leading-snug text-fg-3">{note}</p>}
+      </Row>
       <LoginDialog agent={agent} account={account} open={login} onClose={() => setLogin(false)} onDone={onChange} />
       {node}
     </>
@@ -403,7 +410,7 @@ function ApiKeyDialog({ target, onClose, onDone }: { target: { id: string; name:
   );
 }
 
-type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; grok?: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[]; apiKeys?: Record<string, boolean> };
+type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; grok?: AccountStatus; antigravity?: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[]; apiKeys?: Record<string, boolean> };
 
 export function AccountSettings() {
   const [accounts, setAccounts] = useState<AccountsInfo | null>(null);
@@ -458,11 +465,12 @@ export function AccountSettings() {
   ];
   // Each agent’s own sign-in, then the accounts added for it.
   const rows = (agent: AccountAgent, main: AccountStatus | undefined) => [
-    // Grok Build's own sign-in only when it is set up; its added accounts show either way.
-    (main || agent !== 'grok') && (
+    // Grok Build's and Antigravity CLI's own sign-ins only when they are set up (Grok Build's added accounts show either way).
+    (main || (agent !== 'grok' && agent !== 'antigravity')) && (
       <AccountRow
         key={agent}
         agent={agent}
+        note={agent === 'antigravity' ? 'Google’s terms for its plans allow Antigravity CLI only in sessions you start and drive yourself, so it has one sign-in and never works in the background.' : undefined}
         a={main ?? null}
         onChange={load}
         apiKey={agent === 'claude' && !!accounts?.apiKeys?.main}
@@ -493,7 +501,7 @@ export function AccountSettings() {
     <Stack>
       <Group
         title="Accounts"
-        info="The Claude Code, Codex and Grok Build sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
+        info="The Claude Code, Codex, Grok Build and Antigravity CLI sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add an account
@@ -503,6 +511,7 @@ export function AccountSettings() {
         {rows('claude', accounts?.claude)}
         {rows('codex', accounts?.codex)}
         {(accounts?.grok || accounts?.extra.some((x) => x.agent === 'grok')) && rows('grok', accounts?.grok)}
+        {accounts?.antigravity && rows('antigravity', accounts.antigravity)}
       </Group>
       {limits && (
         <Group title="At a usage limit">
@@ -693,11 +702,11 @@ function AddAgentAccount({ open, grok, onClose, onAdded }: { open: boolean; grok
           <Segmented<AccountAgent>
             value={agent}
             onChange={setAgent}
-            options={[
+            options={([
               { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={14} /> },
               { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={14} /> },
-              ...(grok ? [{ value: 'grok' as const, label: 'Grok Build', icon: <AgentIcon agent="grok" size={14} /> }] : []),
-            ]}
+              ...(grok ? [{ value: 'grok', label: 'Grok Build', icon: <AgentIcon agent="grok" size={14} /> }] : []),
+            ] as { value: AccountAgent; label: string; icon: ReactNode }[]).filter((o) => takesAddedAccounts(o.value))}
           />
           <label className="block">
             <span className="mb-1 block text-fg-2">Name</span>

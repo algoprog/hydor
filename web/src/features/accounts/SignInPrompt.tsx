@@ -1,10 +1,10 @@
-// The app needs a Claude Code, Codex or Grok Build account that is signed out, and nothing else could do the work: a card
+// The app needs a Claude Code, Codex, Grok Build or Antigravity CLI account that is signed out, and nothing else could do the work: a card
 // asks to sign in again (SignInPrompt, above the toasts on every page; Not now hides it for an hour), and a session it
 // stopped says so in its message box (SignInBanner), whatever Not now said. Both open the same sign-in (LoginDialog).
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, LogIn } from 'lucide-react';
 import type { SignInNeed } from '@shared/types';
-import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { ACCOUNT_AGENT_NAMES } from '@shared/account-agents';
 import { del, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toastError, useApp, useSessions } from '../../lib/store';
