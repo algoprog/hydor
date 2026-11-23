@@ -174,17 +174,36 @@ const test = (name: string, fn: () => void | Promise<void>) => tests.push([name,
 
 test('settings: defaults, checked changes that merge, and what is kept is only what differs', () => {
   assert.deepEqual(readSettings(db), SUGGEST_DEFAULTS);
-  assert.equal(readSettings(db).enabled, false, 'off until turned on');
-  const a = merge(SUGGEST_DEFAULTS, { enabled: true, where: { docs: false }, sources: { notes: false }, precision: 0.5 }, true);
-  assert.equal(a.enabled, true);
+  assert.equal(readSettings(db).enabled, true, 'on from the start');
+  const a = merge(SUGGEST_DEFAULTS, { enabled: false, where: { docs: false }, sources: { notes: false }, precision: 0.5 }, true);
+  assert.equal(a.enabled, false);
   assert.deepEqual(a.where, { chat: true, docs: false, notes: true, other: true });
   assert.deepEqual(a.sources, { messages: true, replies: true, notes: false, docs: true });
   assert.equal(SUGGEST_DEFAULTS.where.docs, true, 'the defaults are never changed');
   writeSettings(db, a);
-  assert.deepEqual(JSON.parse(kvGet(db, 'suggest.settings')!), { enabled: true, where: { chat: true, docs: false, notes: true, other: true }, sources: { messages: true, replies: true, notes: false, docs: true }, precision: 0.5 });
+  assert.deepEqual(JSON.parse(kvGet(db, 'suggest.settings')!), { enabled: false, where: { chat: true, docs: false, notes: true, other: true }, sources: { messages: true, replies: true, notes: false, docs: true }, precision: 0.5 });
   assert.deepEqual(readSettings(db), a);
   writeSettings(db, SUGGEST_DEFAULTS);
   assert.deepEqual(readSettings(db), SUGGEST_DEFAULTS);
+});
+
+test('on by default, it waits to be used: no personalising scheduled until a message box asks, and a warm-up marks it used', async () => {
+  const db2 = openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-suggest-used-')), 'used.db'));
+  memorySchema(db2);
+  initPages(db2);
+  const own = new SuggestService(db2);
+  try {
+    assert.equal(own.state().settings.enabled, true);
+    const later = Date.now() + 30 * 24 * 3600_000;
+    assert.equal(own.trainDue(later), false, 'never used: nothing to personalise');
+    assert.equal(own.state().status.training.next, undefined);
+    assert.ok(!kvGet(db2, 'suggest.used'), 'not used yet');
+    own.warm();
+    assert.ok(Number(kvGet(db2, 'suggest.used')) > 0, 'a message box used marks it');
+    assert.equal(own.trainDue(later), true, 'from then on the schedule runs');
+  } finally {
+    own.stop();
+  }
 });
 
 test('settings: a wrong value is a 400 that names the field; limits are inclusive', () => {
@@ -233,10 +252,16 @@ const svc = suggestService()!;
 const get = async () => (await app.inject({ method: 'GET', url: '/api/suggest' })).json() as SuggestState;
 const ask = (payload: Record<string, unknown>) => app.inject({ method: 'POST', url: '/api/suggest', payload });
 
-test('routes: GET shows the defaults and off; PUT merges and refuses what is wrong; the route list is the spec’s', async () => {
-  const s = await get();
+test('routes: GET shows the defaults, on but nothing started; off when turned off; PUT merges and refuses what is wrong', async () => {
+  const on = await get();
+  assert.deepEqual(on.settings, SUGGEST_DEFAULTS);
+  assert.equal(on.settings.enabled, true, 'on from the start');
+  assert.notEqual(on.status.state, 'off');
+  assert.equal(svc.pids().worker, undefined, 'nothing starts before a message box is used');
+  // Turned off for what follows (each test goes on from the one before).
+  const s = (await app.inject({ method: 'PUT', url: '/api/suggest', payload: { enabled: false } })).json() as SuggestState;
   assert.equal(s.status.state, 'off');
-  assert.deepEqual(s.settings, SUGGEST_DEFAULTS);
+  assert.equal(s.settings.enabled, false);
   assert.equal(s.status.model.kind, 'base');
   assert.equal(s.status.training.state, 'idle');
   const bad = await app.inject({ method: 'PUT', url: '/api/suggest', payload: { precision: 2 } });

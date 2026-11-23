@@ -32,6 +32,12 @@ const CHECK_MS = 10 * 60_000;
 /** The gap between runs: about a day (a computer that is off at night too), a week. */
 const GAP_MS = { nightly: 20 * 3600_000, weekly: 164 * 3600_000 };
 const ATTEMPT_KEY = 'suggest.train.at';
+/**
+ * When word suggestions were first wanted: a message box used (warm or a request) or the switch turned on. On by default,
+ * they set themselves up only from then on, so a server nobody types on (headless, Docker) downloads nothing, and the
+ * small model is never personalised for hours on a computer whose person never used them.
+ */
+const USED_KEY = 'suggest.used';
 /** A failed download of the language model is not tried again for this long (a request that wants it would otherwise start it again and again). */
 export const PREPARE_COOLDOWN_MS = 10 * 60_000;
 /** Memory found short is not asked about again for this long (every keystroke asks for a suggestion). */
@@ -124,7 +130,7 @@ export class SuggestService {
   /** When the schedule says the next run may start (ms): the gap since the last run. */
   private dueAt(): number | undefined {
     const s = this.st;
-    if (!s.enabled || !s.personalise || s.schedule === 'manual') return undefined;
+    if (!s.enabled || !s.personalise || s.schedule === 'manual' || !this.used()) return undefined;
     return this.lastAttempt() + GAP_MS[s.schedule];
   }
 
@@ -132,6 +138,21 @@ export class SuggestService {
   private nextAt(): number | undefined {
     const due = this.dueAt();
     return due == null ? undefined : Math.max(due, Date.now());
+  }
+
+  private usedAt: number | null = null;
+
+  /** Whether word suggestions were ever wanted here (USED_KEY). */
+  private used(): boolean {
+    if (this.usedAt === null) this.usedAt = Number(kvGet(this.db, USED_KEY)) || 0;
+    return this.usedAt > 0;
+  }
+
+  /** They are wanted: from now on they set themselves up at start and the schedule of personalising runs. */
+  private markUsed() {
+    if (this.used()) return;
+    this.usedAt = Date.now();
+    kvSet(this.db, USED_KEY, String(this.usedAt));
   }
 
   state(): SuggestState {
@@ -149,7 +170,8 @@ export class SuggestService {
       if (this.setupP) Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' });
       else if (this.failure) Object.assign(status, { state: 'failed', detail: this.failure.why });
       else if (this.startingWorker) Object.assign(status, { state: 'starting', detail: 'Loading the language models' });
-      else if (!this.setupDone && !this.isSetUp()) Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? 'Getting ready' });
+      else if (!this.setupDone && !this.isSetUp())
+        Object.assign(status, { state: 'setting-up', detail: this.setupDetail ?? (this.used() ? 'Getting ready' : 'Sets itself up the first time you type in a message box (it downloads about 1.3 GB)') });
       else
         Object.assign(status, {
           state: 'ready',
@@ -219,6 +241,7 @@ export class SuggestService {
     if (before.enabled && !next.enabled) this.shutdown();
     else if (next.enabled) {
       if (!before.enabled) {
+        this.markUsed();
         this.failure = null;
         this.crashes = [];
         this.llmTried = 0;
@@ -553,6 +576,7 @@ export class SuggestService {
   async suggest(req: SuggestRequest, signal?: AbortSignal): Promise<SuggestResponse | null> {
     const s = this.st;
     if (!s.enabled || suggestDisabled() || !this.surfaceOn(req.surface)) return null;
+    this.markUsed();
     this.lastRequest = Date.now();
     const w = this.worker?.ready ? this.worker : null;
     if (!w) {
@@ -698,6 +722,7 @@ export class SuggestService {
   /** A message box has the focus: what is set up starts now. */
   warm(): SuggestState {
     if (this.st.enabled && !suggestDisabled()) {
+      this.markUsed();
       this.lastRequest = Date.now();
       if (this.worker?.ready) {
         this.idleLater();
@@ -777,7 +802,9 @@ export class SuggestService {
       console.warn(`[suggest] ${(e as Error).message}`);
     }
     if (suggestDisabled()) return;
-    if (this.st.enabled) setTimeout(() => void this.ensureSetup(), 5000).unref?.();
+    // Set up (or a setup a stop cut short, carried on) at start only where they were wanted already; elsewhere the first
+    // message box used starts it (warm).
+    if (this.st.enabled && this.used()) setTimeout(() => void this.ensureSetup(), 5000).unref?.();
     const tick = () => {
       void this.check();
       this.checkTimer = setTimeout(tick, CHECK_MS);

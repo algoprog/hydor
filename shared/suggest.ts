@@ -48,7 +48,7 @@ export type SuggestSchedule = 'nightly' | 'weekly' | 'manual';
 
 /** The settings, kept on the server (GET and PUT /api/suggest). */
 export interface SuggestSettings {
-  /** On or off (off until turned on: it downloads about 1.3 GB the first time). */
+  /** On or off. On from the start: it sets itself up the first time a message box is used (downloading about 1.3 GB then). */
   enabled: boolean;
   /** Qwen3.5-0.8B beside the small model: auto (when the computer has the memory), on, or off. */
   llm: SuggestLlmMode;
@@ -82,7 +82,7 @@ export interface SuggestSettings {
 }
 
 export const SUGGEST_DEFAULTS: SuggestSettings = {
-  enabled: false,
+  enabled: true,
   llm: 'auto',
   quant: 'q8',
   precision: 0.3,
