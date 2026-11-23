@@ -12,6 +12,9 @@ Personalising a pretrained base (E7): --init <pretrained ckpt> with no --from-ts
 Against forgetting the languages the base was pretrained on: --replay-pretrain data/pretrain --replay-pretrain-ratio 1.0 puts R tokens
 of pretraining text (the corpus's own language mix, held-out documents excluded, loss weight 1, the formats pretrain_slm.py uses) into
 every batch per token of local data; --freeze-embeddings keeps the embedding (and the tied output factors) as pretrained.
+LoRA instead of full fine-tuning: add --lora-rank 8 (adapters on the attention, MLP and convolution projections, everything else frozen;
+--train-proj / --train-embed also train the embedding projection / the embedding table, which is the output layer, in full). The checkpoint
+written has the adapters merged into the weights: every evaluation script loads it as before.
 """
 import argparse
 import os
@@ -74,6 +77,12 @@ def get_args(argv=None):
     p.add_argument('--replay-sources', default=None, help='comma list of shard names to replay (default: all)')
     p.add_argument('--freeze-embeddings', action='store_true', help='keep the embedding and the tied output factors fixed')
     p.add_argument('--replay', type=float, default=1.0, help='mix R x as many older tokens into a continued run')
+    p.add_argument('--lora-rank', type=int, default=0, help='LoRA (ws/lora.py): adapters of this rank on the projections, the rest of a continued model frozen (0: full fine-tuning)')
+    p.add_argument('--lora-alpha', type=float, default=None, help='LoRA scale alpha (the update is multiplied by alpha / rank; default 2 x rank)')
+    p.add_argument('--lora-targets', default='attn,mlp,conv', help='LoRA: groups of projections: attn (q k v o), mlp (gate up down), conv (in_proj out_proj of the convolution layers)')
+    p.add_argument('--lora-dropout', type=float, default=0.0)
+    p.add_argument('--train-proj', action='store_true', help='LoRA: also train the embedding projection (emb_proj, d <-> rank), in full')
+    p.add_argument('--train-embed', action='store_true', help='LoRA: also train the embedding table (vocabulary x rank; it is the output layer too), in full')
     return p.parse_args(argv)
 
 
@@ -161,6 +170,14 @@ def main(argv=None):
                    max_seconds=a.max_seconds, seed=a.seed)
     if not (cfg.epochs or cfg.tokens or cfg.steps):
         cfg.epochs = 1
+    if a.lora_rank:
+        if not continued:
+            raise SystemExit('--lora-rank personalises a pretrained model: it needs --init')
+        from ws.lora import apply_lora
+        metrics.emit({'lora': apply_lora(model, a.lora_rank, a.lora_alpha, [g for g in a.lora_targets.split(',') if g],
+                                         train_proj=a.train_proj, train_embed=a.train_embed, dropout=a.lora_dropout)})
+    elif a.train_proj or a.train_embed:
+        raise SystemExit('--train-proj and --train-embed go with --lora-rank (full fine-tuning trains everything)')
     if a.freeze_embeddings:
         frozen = [model.embed.weight] + ([model.emb_proj.weight] if model.emb_proj is not None else [])
         for q in frozen:

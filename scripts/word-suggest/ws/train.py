@@ -313,9 +313,9 @@ class TrainCfg:
 def make_optimizer(model: SLM, lr: float, wd: float, fused: bool = False):
     dec, nodec = [], []
     for n, p in model.named_parameters():
-        if not p.requires_grad:                # frozen (train_slm.py --freeze-embeddings)
+        if not p.requires_grad:                # frozen (train_slm.py --freeze-embeddings, a LoRA run)
             continue
-        (dec if p.ndim >= 2 and 'embed' not in n and 'conv' not in n and 'lm_head' not in n else nodec).append(p)
+        (dec if p.ndim >= 2 and 'embed' not in n and 'conv' not in n and 'lm_head' not in n and 'lora_' not in n else nodec).append(p)
     return torch.optim.AdamW([{'params': dec, 'weight_decay': wd}, {'params': nodec, 'weight_decay': 0.0}],
                              lr=lr, betas=(0.9, 0.95), eps=1e-8, **({'fused': True} if fused else {}))
 
@@ -338,7 +338,7 @@ def train_step(model: SLM, opt, batch: list[Seq], lr: float, clip: float, bf16: 
     loss = sw / sws.clamp(min=1e-8)
     opt.zero_grad(set_to_none=True)
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+    torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], clip)
     opt.step()
     return float(loss.detach()), int(ids.numel())
 

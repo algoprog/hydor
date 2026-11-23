@@ -392,6 +392,9 @@ def save_ckpt(path: str, model: SLM, vocab_path: str, extra: Optional[dict] = No
     os.makedirs(d, exist_ok=True)
     vp = os.path.abspath(vocab_path)
     sd = {k: v.detach().cpu() for k, v in model.state_dict().items()}      # always a plain CPU state dict
+    if any(k.endswith(('lora_A', 'lora_B')) for k in sd):                  # a LoRA run (ws/lora.py): the adapters merged, the plain model's keys
+        from .lora import export_state_dict
+        sd = export_state_dict(model)
     torch.save({'config': asdict(model.cfg), 'state_dict': sd, 'vocab': os.path.relpath(vp, d),
                 'vocab_abs': vp, 'extra': extra or {}}, path + '.tmp')
     os.replace(path + '.tmp', path)
