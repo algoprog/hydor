@@ -840,7 +840,8 @@ agents that speak ACP and take MCP servers.
   Excel, PowerPoint, PDF, LaTeX, CSV, notebooks), Markdown, LaTeX and CSV files as their text comes and the others
   once they are there, each change an agent makes landing as it is made. The first page or document a turn makes or
   changes opens there by itself, asked for or not; a turn that goes on to a second one puts the panel back as it
-  was, and each opens from its card. Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,
+  was, and each opens from its card (a page with the title of one the turn made already, such as a mock-up written to
+  an HTML file to check and then shown, is that page again, and the panel moves on to it). Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,

@@ -32,7 +32,7 @@ import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
 import { draftKind, useEmptyModel, useLiveDraft, usePageDraft } from './live';
-import { noteDoc, opened, quiet, type TurnDocs } from './beside-rule';
+import { htmlTitle, noteDoc, opened, quiet, titleName, whichDoc, type TurnDocs } from './beside-rule';
 import { SessionFile } from './BesideFile';
 import { sendToSession, useCommentAi } from './common/commentAi';
 import { pageNamed } from '@shared/comment-asks';
@@ -138,7 +138,13 @@ export function callDoc(it: ToolItem): BesideDoc {
   const kind = pageCall(it.tool);
   const page = kind === 'save_page' ? savedPageOf(it.tool) : undefined;
   const path = (it.tool.input as { file_path?: unknown } | undefined)?.file_path;
-  return { names: [it.id, ...(page ? [page] : []), ...(kind === 'file' && typeof path === 'string' ? [fileName(path)] : [])], target: { kind: 'item', id: it.id } };
+  // A page of HTML is written anew by each call, as its draft is: the newest shows.
+  const follow = kind === 'show_html' || kind === 'file' || nagetTool(it.tool.name) === 'save_page';
+  return {
+    names: [it.id, ...(page ? [page] : []), ...(kind === 'file' && typeof path === 'string' ? [fileName(path)] : [])],
+    target: { kind: 'item', id: it.id },
+    ...(follow ? { follow: true } : {}),
+  };
 }
 
 /** A call as it comes in, as a document: a page, a save of another kind, an HTML file, or a document written as text. */
@@ -162,19 +168,56 @@ function turnOf(key: string, item?: string): string {
   return '';
 }
 
-/** What else a document's name is known as by now: the page its call saved, once it has. */
+const HTML_FILE = /\.html?$/i;
+
+/**
+ * The titles a page of HTML a call shows or keeps (show_html, save_page) goes by, as names: the one it was given (once
+ * its HTML has started, so it is whole) and its HTML's own.
+ */
+function pageTitles(d: PageDraft | undefined, tool: ToolInfo | undefined): string[] {
+  const bare = d ? d.tool : tool && nagetTool(tool.name);
+  if (bare !== 'show_html' && bare !== 'save_page') return [];
+  const input = (tool?.input ?? {}) as { title?: unknown; html?: unknown };
+  const title = d ? (d.done || d.text ? d.title : undefined) : typeof input.title === 'string' ? input.title : undefined;
+  const html = d ? d.text : typeof input.html === 'string' ? input.html : undefined;
+  return [...new Set([titleName(title), htmlTitle(html)].filter((x): x is string => !!x))];
+}
+
+/** The HTML files a session's agent wrote whole (Write), by the titles their HTML gives them. */
+function htmlFilesByTitle(key: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const add = (path: unknown, html: unknown) => {
+    if (typeof path !== 'string' || !HTML_FILE.test(path) || typeof html !== 'string') return;
+    const t = htmlTitle(html);
+    if (t) out.set(t, [...(out.get(t) ?? []), fileName(path)]);
+  };
+  for (const d of Object.values(useDrafts.getState().byKey[key] ?? {})) if (d.tool === 'file') add(d.path, d.text);
+  const ov = useLive.getState().byKey[key]?.overlay;
+  for (const list of [useTimeline.getState().byKey[key]?.items ?? [], ov?.items ?? []])
+    for (const it of list)
+      if (it.kind === 'tool' && it.tool.name === 'Write') {
+        const input = it.tool.input as { file_path?: unknown; content?: unknown } | undefined;
+        add(input?.file_path, input?.content);
+      }
+  return out;
+}
+
+/**
+ * What else a document's name is known as by now: the page its call saved, once it has; for a page of HTML, its title
+ * and the HTML files of that title (an agent that writes a mock-up to a file to check it, then shows it, made one page).
+ */
 function alsoKnown(key: string): (name: string) => string[] {
+  let files: Map<string, string[]> | undefined;
   return (name) => {
-    if (name.startsWith('file:') || /^[a-f0-9]{10}$/.test(name)) return [];
+    if (name.startsWith('file:') || name.startsWith('title:') || /^[a-f0-9]{10}$/.test(name)) return [];
     const d = useDrafts.getState().byKey[key]?.[name];
-    const drafted = d?.saved?.pageId ?? d?.pageId;
-    if (drafted) return [drafted];
     const ov = useLive.getState().byKey[key]?.overlay;
     const it = useTimeline.getState().byKey[key]?.items.find((x) => x.id === name) ?? ov?.items.find((x) => x.id === name);
-    if (it?.kind !== 'tool') return [];
-    const tool = { ...it.tool, ...ov?.patches?.[name] };
-    const page = pageCall(tool) === 'save_page' ? savedPageOf(tool) : undefined;
-    return page ? [page] : [];
+    const tool = it?.kind === 'tool' ? { ...it.tool, ...ov?.patches?.[name] } : undefined;
+    const page = d?.saved?.pageId ?? d?.pageId ?? (tool && pageCall(tool) === 'save_page' ? savedPageOf(tool) : undefined);
+    const titles = pageTitles(d, tool);
+    if (titles.length) files ??= htmlFilesByTitle(key);
+    return [...(page ? [page] : []), ...titles, ...titles.flatMap((t) => files?.get(t) ?? [])];
   };
 }
 
@@ -248,13 +291,34 @@ function closedByHand(key: string) {
   if (st) turns.set(key, { docs: quiet(st.docs) });
 }
 
+/** How long a page's draft waits for its title, at most, to see whether it is a document its turn has already. */
+const TITLE_MS = 2500;
+
+/** A page of HTML being written whose title may still come: none yet, and its head has not ended. */
+function titleComing(d: PageDraft): boolean {
+  const html = d.tool === 'show_html' || d.tool === 'save_page' || (d.tool === 'file' && !!d.path && HTML_FILE.test(d.path));
+  return html && !d.done && d.text.length < 8000 && !/<\/title\s*>|<body[\s>]|<\/head\s*>/i.test(d.text);
+}
+
+/** Whether a draft is, so far, none of the documents its turn has already (whose count it would add to). */
+function another(key: string, d: PageDraft): boolean {
+  const st = turns.get(key)?.docs;
+  if (!st || st.quiet || st.turn !== turnOf(key, d.id)) return false;
+  const others = st.docs.filter((x) => !x.includes(d.id));
+  return others.length > 0 && whichDoc({ ...st, docs: others }, draftDoc(d).names, alsoKnown(key)) < 0;
+}
+
 onDraftStart((key, started) => {
   // Which document it is shows once the call says so: the page a save of another kind changes (its id comes first,
-  // mostly; a new one has none), the file a Write writes. Until then, a moment's wait.
+  // mostly; a new one has none), the file a Write writes, the title of a page of HTML when its turn has another
+  // document (the HTML file it was written in first, say). Until then, a moment's wait (the title's, by this
+  // browser's clock: the server's may differ by more than it).
+  const heard = Date.now();
   const decide = () => {
     const now = useDrafts.getState().byKey[key]?.[started.id];
-    if (!now || now.done) return;
-    if (draftKind(now) && !now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
+    if (!now || (now.done && draftKind(now))) return;
+    if (!now.done && draftKind(now) && !now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
+    if (Date.now() - heard < TITLE_MS && titleComing(now) && another(key, now)) return void setTimeout(decide, 150);
     offerBeside(key, [draftDoc(now)], now.id);
   };
   decide();

@@ -2,7 +2,8 @@
 // that goes on to make or change a second document shows none of them there (each has its card in the conversation),
 // and the panel goes back to what it showed before. A document is counted once however often the turn saves it and
 // whatever it goes by: the call that made it, the page that call saved, a file (in each of its forms: "report.md" and
-// the "report.pdf" made from it are one document). This keeps the count and says what to do; Canvas.tsx does it.
+// the "report.pdf" made from it are one document), and a page of HTML's title (a mock-up written to an HTML file to
+// check, then shown with the same title, is one page). This keeps the count and says what to do; Canvas.tsx does it.
 
 /** A turn's documents so far. */
 export interface TurnDocs {
@@ -54,6 +55,34 @@ export function noteDoc(was: TurnDocs | undefined, turn: string, names: string[]
     else if (fresh && docs.length > 1 && opened !== undefined) step = 'put-back';
   }
   return { now, at, step };
+}
+
+/** Which of a turn's documents one going by `names` is, by now (`more` as for noteDoc); -1 when it is none of them. */
+export function whichDoc(t: TurnDocs, names: string[], more?: (name: string) => string[]): number {
+  const wide = (list: string[]) => uniq(more ? [...list, ...list.flatMap(more)] : list);
+  const all = wide(names);
+  return t.docs.findIndex((d) => wide(d).some((n) => all.includes(n)));
+}
+
+const ENTITIES = new Map(Object.entries({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', ndash: '–', mdash: '—', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”' }));
+
+const plainText = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e: string) => {
+    if (e[0] !== '#') return ENTITIES.get(e.toLowerCase()) ?? all;
+    const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : all;
+  });
+
+/** A page's title as a name it goes by: on one line, whatever its case. None for an empty one. */
+export function titleName(title: string | undefined): string | undefined {
+  const t = title?.replace(/\s+/g, ' ').trim().toLowerCase();
+  return t ? `title:${t}` : undefined;
+}
+
+/** The title a page's HTML gives itself (its whole <title> element, so none while that is still being written), as a name. */
+export function htmlTitle(html: string | undefined): string | undefined {
+  const m = html ? /<title(?:\s[^>]*)?>([\s\S]*?)<\/title\s*>/i.exec(html.slice(0, 200_000)) : null;
+  return m ? titleName(plainText(m[1])) : undefined;
 }
 
 /** The document at `at` shows beside the conversation now (it opened by itself, or was there already). */
