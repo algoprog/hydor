@@ -126,13 +126,15 @@ export const appsMakeShot = (id) => ({
   },
 });
 
-/** Word suggestions in a session's message box: what the demo has no models for is answered to the page (the same
- * answer the app's own endpoint gives, 204 while the words are not there yet), then the box, mid-sentence, with the grey
- * rest of the word and the dimmer next one (readme-suggest, the website's app-suggest). */
+/** Word suggestions in a session's message box, as a close-up (the README shows a tile about 430 pixels wide, where the grey words
+ * of a whole window are too small to see): a narrow window at nearly four times the resolution, cut to the message box and the end of
+ * the reply above it, 1600×1000. What the demo has no models for is answered to the page (the same answer the app's own endpoint
+ * gives, 204 while the words are not there yet): "…and would like to try one bef" with the grey rest of the word and the dimmer
+ * next one (readme-suggest, the website's app-suggest). */
 export const suggestShot = (id) => ({
   id,
   async take(p, ctx) {
-    const typed = 'Thanks. Does it come in a smaller frame? I am 165 cm tall and would like to try one ';
+    const typed = 'Thanks. I would like to try one bef';
     await p.route(/\/api\/suggest(\/warm)?(\?|$)/, async (req) => {
       if (req.method === 'GET' || req.url.includes('/warm')) {
         const real = await ctx.api('GET', '/api/suggest');
@@ -140,15 +142,20 @@ export const suggestShot = (id) => ({
       }
       if (req.method !== 'POST') return null;
       const text = JSON.parse(req.postData ?? '{}').text ?? '';
-      if (!text.endsWith('try one ')) return { status: 204, body: '' };
-      return { json: { word: 'before', next: ' buying', conf: 0.93, confNext: 0.71, show: true, showNext: true, plan: 'mix', lang: 'eng_Latn', ms: 14 } };
+      if (!text.endsWith('try one bef')) return { status: 204, body: '' };
+      return { json: { word: 'ore', next: ' buying', conf: 0.93, confNext: 0.71, show: true, showNext: true, plan: 'mix', lang: 'eng_Latn', ms: 14 } };
     });
+    // 416 × 260 CSS pixels at 1600 / 416 times the size is 1600 × 1000.
+    await p.viewport(416, 800, { scale: 1600 / 416 });
     await ctx.go(keyOf(ctx, ctx.sessions.ebike), { settle: 2500 });
     await p.click('textarea');
     await p.type(typed);
-    await p.waitFor(`[...document.querySelectorAll('[aria-hidden="true"][translate="no"] span')].some((e) => e.textContent === 'before')`, { what: 'the grey words' });
+    await p.waitFor(`[...document.querySelectorAll('[aria-hidden="true"][translate="no"] span')].some((e) => e.textContent === 'ore')`, { what: 'the grey words' });
     await sleep(600);
-    return p.shot(ctx.file);
+    await p.park();
+    const box = await p.box('textarea');
+    const bottom = Math.min(p.size.height, Math.round(box.y + box.height + 64));
+    return p.shot(ctx.file, { clip: { x: 0, y: bottom - 260, width: 416, height: 260 } });
   },
 });
 
