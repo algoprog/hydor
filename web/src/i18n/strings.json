@@ -16138,7 +16138,7 @@
 "Projects":"web/src/features/assistants/start.tsx",
 "Projects and knowledge":"docs/guide/04-projects.md",
 "Projects and topics":"server/apps/templates-research.ts",
-"Projects keep each piece of work together, Apps are the tasks you run again and again, Inbox is everything waiting on you, Search finds anything in the app, Usage shows what your plans have left, System holds this computer’s files and its Experiments, runs that wait for a free GPU, and Help is the guide to every part of the app.":"web/src/features/tour/Tour.tsx",
+"Projects keep each piece of work together, Apps are the tasks you run again and again, Inbox is everything waiting on you, Search finds anything in the app, Usage shows what your plans have left, System holds this computer’s files and Experiments (training runs that wait for a free GPU), and Help is the guide to every part of the app.":"web/src/features/tour/Tour.tsx",
 "projects spaces project workspace group groups all projects find a project search sort recent activity name most sessions new project new group of projects cards folders you work in make a project sessions working finished project details name files project files kept documents knowledge memory notes wiki memory tab guidelines instructions skills folder overview settings tab most documents to read into its wiki limit":"shared/find-catalog.ts",
 "Projects that switch it the other way for their sessions:":"web/src/features/skillpack/SkillsPage.tsx",
 "Projects{0}":"web/src/features/spaces/ProjectsPage.tsx",
