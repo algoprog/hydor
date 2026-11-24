@@ -705,6 +705,35 @@ Two tracks that meet at the end.
 - **Done when** an agent with the kit's commands and notes makes a landing page with a waitlist and a small
   customer list from a description, both are used inside Hydor from a phone, and their access tests pass.
 
+### What Phase 1 found (24 November 2026)
+
+Phase 1 is done: its test passed in all three parts. Two agents who had never seen the kit each made an app from a
+description with only the kit's command and the app's own notes (a landing page with a waitlist for a tide-times
+service; a bike shop's customers and repair jobs with three numbers on its home page); the tool's access checks
+passed (94 of them); and both were registered, built, started and used inside Hydor on a phone-sized screen. The
+Hydor side is still a branch, not merged.
+
+| Built | What it is now |
+|---|---|
+| The core | Nine seams; drivers for SQLite, D1 and Postgres; conditions, ordering, sums and writes that happen together with no Drizzle in app code; security defaults; jobs, files and a mail outbox; access checks that write themselves; a build that fails on a key in browser code |
+| The interface package | Four themes and `defineTheme`; the parts, with charts, pickers and a file upload; five shells; landing sections in variants; fonts loaded from the package; the parts' words in eight languages |
+| Blocks | Waitlist, accounts, admin, landing: each keeps 69 to 73% of its lines in its package |
+| Resources | `kit add resource` writes a list's table, rules, pages and tests; the pages are a few lines over parts of the interface package, so 93% of the code doing the work is in packages and a further list adds about 110 lines to an app |
+| Releasing | The kit ships JavaScript; a block is one package; a release is a store of tarballs with an index, every version kept |
+| Starters | Landing and internal tool, from one command each, both also running on Cloudflare's runtime locally |
+| Hydor | A store and routes for web apps; a host that starts, idles, restarts and sandboxes them; two ways in; the kit's store read and its commands run as jobs; six tools for agents; the Apps page and an app's page with Overview, Preview, Features and Data |
+
+**What the builders tripped over, and what changed.** A name that came out as a slug in mails; notes that described
+the bare template; a second migration nobody needed; themes nobody had described, none of them calm and coastal
+(`kit new --brand` now makes one from a colour); an invited colleague who saw nothing until made an admin (an app is
+now one team unless it says otherwise); sums done in JavaScript (the data layer now has them); a starter's example
+data to remove by hand. A second proof now rebuilds both apps from scratch with none of those fixes needed.
+
+**What using them inside Hydor showed.** An app was not told its own address; a browser could pass its own
+forwarded address through to an app; both fixed. A landing page cannot collect sign-ups from the public while it
+lives inside Hydor, since a visitor without a session is refused: that is the rule chosen, and it makes Launch what
+a landing page needs.
+
 ### Phase 2: the guide
 
 - The App builder covers both halves; the `web-app-builder` skill with a reference for each stage; the sketch with a
