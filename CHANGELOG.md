@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.110.0 · 24 November 2026
+
+Word suggestions that keep getting better as they learn your writing, instead of slowly losing what they knew, and
+pages an agent shows that open beside the conversation.
+
+- **Learning without drift**: each time word suggestions learn from your writing, they now start again from the model
+  that came with the app and learn from all you have written (its newest part). Before, every night's short run built on
+  the last one, and over weeks the model got worse, both at other languages and, in the end, at your own writing.
+- **Your languages, and everyone else's**: the model that learned from you is used for the languages you write in, and
+  the one that came with the app for every other language, so learning never costs a language you do not use. It takes
+  about 250 MB more memory while suggestions run.
+- **Faster learning**: each run replays half as much public text beside yours, with the same suggestions as a result.
+- **Pages beside the conversation**: a page an agent shows opens in the panel beside the conversation even when the
+  agent first wrote it to an HTML file with the same title.
+
 ## 0.109.0 · 24 November 2026
 
 Hydor shows you what it can do: tips for the features people miss, a page of them in Help, and a tour that brings in
