@@ -106,7 +106,8 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
   Sent first and again after training or when the LLM starts or stops (a `null` llm_url: the small model alone).
 - `{"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?,
   "precision": 0.3, "next": true, "cache": true, "switch": true}` → `{"id", "word", "next", "conf", "conf_next",
-  "theta", "show", "show_next", "plan", "lang", "ms": {"total", "llm", "slm"}}`.
+  "theta", "show", "show_next", "plan", "lang", "model", "ms": {"total", "llm", "slm"}}` (`model`: `"base"` or
+  `"personal"`, the small model that answered; absent when Qwen3.5 alone did).
 - `{"id", "op": "session", "session", "texts": [str]}`: the session's earlier text for its cache (Node sends it once
   per session and when it grows); the worker keeps the last 20 sessions' caches.
 - `{"id", "op": "cancel", "target": <id>}`: drop a suggest that is waiting or stop it between decoding steps (its
@@ -130,10 +131,17 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
 3. **The plan** (the distribution suggestions are decoded from):
    - `doc` → `llm` (Qwen3.5 alone; `slm` when the LLM is not running).
    - `chat` and `text` → `slm` when the LLM is not running; else the language guess on the context (posterior ≥ 0.9
-     over at least 8 tokens, else no language): a language the personal model was trained on with at least 2,000 of
-     the person's own tokens → `mix` (personalisation is what helps there, and the base switch would turn it off: it
-     gives English, Greek and every major language to the LLM); else, with `switch` on and a language guessed, the
-     switch's choice; else `mix`.
+     over at least 8 tokens, else no language) decides the small model and the plan together. The personal model is
+     used where the guess is a language it was trained on with at least 2,000 of the person's own tokens
+     (`PERSONAL_LANG_TOKENS`, from `meta.json`'s `languages`), and where no language was guessed: the plan is `mix`
+     (personalisation is what helps there, and the switch would turn it off: it gives English, Greek and every major
+     language to the LLM). Every other language keeps the published model (personalising costs the languages the person
+     does not write in: in the simulation of 96 nights, one personalised run lost on FLORES): with `switch` on the
+     switch's choice (`llm`, Qwen3.5 alone, or `mix` with the published model), else `mix`. A document keeps `llm`
+     (or `slm` without the LLM, then with the personal model when there is one).
+   - Both small models are loaded when there is a personal one (`Slot` in `engine.py`: the model, its own incremental
+     state and its gate; one ONNX graph, two weight sets); the answer says which one was used (`model`). A personal
+     model that cannot be loaded leaves the published one alone (`personal_error` in the load answer).
    - `mix` = per step `λ·P_llm + (1 − λ)·P_slm` (λ is the LLM's weight, as in the research's gate), λ from the gate (the personal gate when personalisation made one,
      else the release's).
 4. **The LLM's distribution**: llama-server's `/completion` with the prompt as token ids, `n_predict: 1`,
@@ -156,18 +164,25 @@ A suggestion takes about 100–150 ms with the LLM at 4 threads; with the small 
 
 ### Personalising (`server/suggest/py/train.py`)
 
-`train.py --texts <jsonl> --base <release dir> --init <release dir|personal dir> --out <new personal dir>
---replay <release dir>/replay --lr 5e-4 --batch-tokens 4096 --w-user 4 --replay-ratio 1.0 --epochs 1 --threads N
+`train.py --texts <jsonl> --base <release dir> --init <release dir> --out <new personal dir>
+--replay <release dir>/replay --lr 5e-4 --batch-tokens 4096 --w-user 4 --replay-ratio 0.5 --epochs 1 --holdout 0 --max-tokens 4000000 --threads N
 --device auto --resume`. Each line of the texts file: `{"kind": "user"|"agent"|"doc", "text", "ts", "session"?,
 "reply"?}` (a user message carries the agent reply it answered, for its chat format). The research recipe: chat
-sequences in the small model's own format, user-typed tokens weighted `--w-user`, the rest 1; the last 5% of the
-person's messages held out (dev loss printed); public text replayed at the same token count; AdamW, bf16 autocast on
-CPU, one pass. It prints `{"progress": {"done", "total"}, "loss"}` lines and ends with `{"done": true, "dev_nll",
-"tokens", "seconds", "languages": {lang: the person's tokens}}`; it saves a resume state every 10 minutes and writes
+sequences in the small model's own format, user-typed tokens weighted `--w-user`, the rest 1; public text replayed at
+half a token per token of the person's (`--replay-ratio 0.5`); AdamW, bf16 autocast on CPU, one pass. The person's own
+text is bounded to its newest `--max-tokens` (4 million: after tokenising, newest first by time, the record that
+crosses the bound kept; replies only from that stretch of time and at most a quarter as many tokens); `--holdout`
+defaults to 5% of the messages when starting from the release, but the server passes 0 (every message is learned from,
+so no dev loss: `dev_nll` is in the output only when something was held out). It prints `{"progress": {"done",
+"total"}, "loss"}` lines and ends with `{"done": true, "tokens", "seconds", "languages": {lang: the person's tokens}}`; it saves a resume state every 10 minutes and writes
 `model.safetensors`, `config.json` and `meta.json` into `--out` only at the end (Node then swaps the folder in).
-On a CPU it learns about 1,000 tokens a second at 8 threads: the first personalisation on a long history takes hours
-(it runs when the computer is idle, at the lowest priority, and resumes after a stop); the daily ones read only the new
-text (`--init` the personal model) and take minutes.
+On a CPU it learns about 1,000 tokens a second at 8 threads: a run on a long history takes hours (it runs when the
+computer is idle, at the lowest priority, and resumes after a stop), and every run is like that, because every run starts
+from the published model and reads all the person's writing (up to the bound). Incremental runs (from the personal model,
+on what was new) were tried and drifted: in a simulation of 96 nights (`scripts/word-suggest/scripts/nights_sim.py`) each
+short run started a fresh AdamW at 5e-4 with a warm-up of one to three steps, and the held-out public loss went from 4.46
+to 7.75, other languages' FLORES accuracy from 0.22 to 0.10, and the keystrokes saved on the person's chat fell below
+Qwen3.5 alone (29.7% against 30.5%); one run from the published model on everything was best (31.4%).
 
 ## The server (Node)
 
@@ -186,7 +201,9 @@ text (`--init` the personal model) and take minutes.
 - **Personalising**: with `personalise` on and the schedule due (`nightly`: when 20 h have passed and the person has
   not typed for 10 minutes, as memory's tidy-up; `weekly`; `manual`: only "Retrain now"), Node writes the texts
   (below) and runs `train.py` at `nice 19` (Windows: below-normal priority), then `load`s the new personal model.
-  The first run reads everything; later ones the texts since the last run, from the personal model. A run is paused
+  Every run starts from the published model (never the personal one) and reads all the texts, not only the new ones;
+  it is skipped ("Nothing new to learn from") when nothing was written since the last run's cut-off (`state.json`'s
+  `since`). The new model takes the old one's place only when whole. A run is paused
   (`POST /api/suggest/train/pause`: SIGTERM, train.py saves its resume state; the pause is kept in `kv`, so it holds the
   schedule across restarts), resumed (`POST /api/suggest/train`) or stopped (`DELETE /api/suggest/train`: the work folder goes
   and the schedule counts it as an attempt). With `trainGpu` on, each run picks its device first (`server/suggest/gpu.ts`):
