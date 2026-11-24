@@ -38,13 +38,29 @@
 </p>
 
 <p align="center">
-  <b>140+</b> answer UIs · <b>37</b> ready-made apps · <b>70+</b> skills · <b>8</b> languages · <b>zero</b> telemetry
+  <b>150</b> answer UIs · <b>45</b> ready-made apps · <b>70+</b> skills · <b>8</b> languages · <b>zero</b> telemetry
 </p>
 
 > [!TIP]
 > **A team that costs less.** A strong model leads and hands the clear parts to cheaper subagents. In our benchmark the
 > team passed every check at 9% less than the best tier alone, and 67% less than running everything on the strongest
 > model ([the numbers](docs/plans/tiers-and-the-team.md)).
+
+## Coming from ChatGPT or Claude?
+
+You keep your plan, and you don't start from nothing.
+
+1. **Keep the plan you pay for.** Sign in with your Claude plan (Pro, Max or Team) or your ChatGPT plan (Plus, Pro,
+   Business or Enterprise): Hydor runs Claude Code and Codex on it, so there is nothing more to pay. Or use any model:
+   pay as you go through OpenRouter, or free and private on your own computer
+   ([agents and models](docs/guide/16-agents-models.md)).
+2. **Bring what it knows about you.** [**Settings → Memory → Bring in**](docs/guide/06-memory.md#bring-in-from-other-assistants)
+   reads the export ChatGPT or Claude emails you (in ChatGPT, Settings → Data controls → Export data; in Claude,
+   Settings → Privacy → Export data). Your custom instructions or memory, and what you wrote in your chats, become
+   proposed notes, and you pick what to keep.
+3. **Get everything else**: apps you make yourself, answers as cards, documents, slides and spreadsheets you edit,
+   tasks that run by themselves, word suggestions as you type, and your phone, all with your own files on your own
+   computer. [How it compares](#how-it-compares) has the details.
 
 ## What you can hand it
 
@@ -54,7 +70,13 @@
   spreadsheet to open.
 - **"Every Monday at 8, sum up last week's sales"**: an agent of your own does it on schedule and tells you.
 - **"Remember that I'm vegetarian"**: every agent knows it from then on, in every project.
-- **"Turn my paper into a talk, a poster and a thread"**: one of 37 ready-made apps.
+- **"Turn my paper into a talk, a poster and a thread"**: one of 45 ready-made apps.
+- **"Make me an app that sums up a job offer and what to ask before signing"**: an agent builds it, with a form and a
+  view for its answer, and you run it whenever you like.
+- **"Train this on a free GPU and tell me when it's done"**: the run waits for a GPU, then you get live charts and, for
+  a sweep, a results table for your paper.
+- **"Bring in what ChatGPT knows about me"**: add the export it emails you under Settings → Memory → Bring in, and pick
+  the notes to keep.
 - **From Telegram, Discord or Slack**: a photo of a receipt, a file or a voice message to one of your agents.
 
 ## Why Hydor
@@ -81,7 +103,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-answers.webp" alt="The Trip planner app's answer: four days in Lisbon on a map, day by day" />
       <p><b><a href="docs/guide/10-apps.md">Answers you can use</a></b><br />
-      140+ dynamic UIs (charts, maps, tables, quizzes, code you can run) and 37 ready-made apps that open their answer in a view of their own.</p>
+      150 dynamic UIs (charts, maps, tables, quizzes, code you can run) and 45 ready-made apps that open their answer in a view of their own.</p>
     </td>
   </tr>
   <tr>
@@ -96,9 +118,68 @@
       Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf, kept in the files of their project.</p>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-apps-make.webp" alt="The app builder: a described job becoming an app with a form, its steps and a view for its answer" />
+      <p><b><a href="docs/guide/10-apps.md#make-your-own-app">Make your own apps</a></b><br />
+      Describe a job you do often, and an agent builds an app for it: a form, the work, and a view for its answer. Run it, schedule it or share it.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-suggest.webp" alt="A message box with the rest of the word in grey after the cursor, and the next word dimmer" />
+      <p><b><a href="docs/guide/09-documents-voice.md#word-suggestions-as-you-type">Word suggestions</a></b><br />
+      The rest of the word you are typing in grey, and the next one: Tab takes it. Made on your computer by a small model that learns how you write.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-experiments.webp" alt="Experiments: a sweep's runs on shared charts, with the queue and the GPUs at the left" />
+      <p><b><a href="docs/guide/24-experiments.md">Experiments</a></b><br />
+      Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables for your paper. Agents start and watch them.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-boards.webp" alt="A board of pinned answer cards: key figures, a chart, a map and a table" />
+      <p><b><a href="docs/guide/11-library.md#boards">Boards</a></b><br />
+      Pin cards from replies to a board, and an agent can keep each one current on a schedule.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-goals.webp" alt="A goal in a session: what done means, its checks, and the rounds the agent has worked" />
+      <p><b><a href="docs/guide/29-goals.md">Goals</a></b><br />
+      Agree what "done" means (tests that pass, a number to reach) and the agent keeps at it round after round. The app runs the checks itself.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-browser.webp" alt="The browser inside the desktop app, with an agent working in a tab" />
+      <p><b><a href="docs/guide/07-web.md#your-own-browser">A browser of its own</a></b><br />
+      In the desktop apps: tabs, an ad blocker, translation and reader view, and agents that work in it while you watch.</p>
+    </td>
+  </tr>
 </table>
 
 ## How it compares
+
+**Against the ChatGPT and Claude apps.** Both have grown a lot this year, and do things Hydor doesn't: models and
+features first, work that goes on in their cloud with your computer off, shared team workspaces. Hydor's edge is the
+combination, and that it is yours.
+
+| | Hydor | ChatGPT | Claude |
+|---|:-:|:-:|:-:|
+| **Your Claude and ChatGPT plans in one app**: Claude Code and Codex, nothing more to pay | ✓ | — | — |
+| **Any model, local ones too** | ✓ | Partial | — |
+| **One memory** for every agent and model, which you read, edit and bring the other app's into | ✓ | Partial | Partial |
+| **Apps you make** by describing a job, and answers as cards pinned to boards | ✓ | Partial | Partial |
+| **Goals with checks the app runs** itself | ✓ | Partial | Partial |
+| **Word suggestions as you type**, made on your computer | ✓ | Partial | — |
+| **Experiments** for ML research: a GPU queue, sweeps, results tables | ✓ | — | Partial |
+| **Open source**, on your own computer, no telemetry | ✓ | Partial | — |
+
+Checked on 24 November 2026, from OpenAI's and Anthropic's own pages. What each cell says, with its sources:
+[Hydor vs the ChatGPT and Claude apps](docs/compare/chatgpt-and-claude.md).
+
+**Against other agent apps.**
+
+<details>
+<summary>Hermes Agent, pi, Atomic Agent and OpenClaw</summary>
 
 | | Hydor | [Hermes Agent](docs/compare/hermes-agent.md) | [pi](docs/compare/pi.md) | [Atomic Agent](docs/compare/atomic-agent.md) | [OpenClaw](docs/compare/openclaw.md) |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -111,6 +192,8 @@
 
 Checked on 10 November 2026, from each project's own pages. What each "Partial" means, with its sources:
 [the full comparison](docs/compare/README.md).
+
+</details>
 
 ## Quick start
 
@@ -268,7 +351,7 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 - [How memory works](docs/memory.md): what agents are given, how notes and the wiki stay current, and what you control
 - [Memory internals](docs/memory-internals.md): the tables, search and picking, delivery for each agent, the budgets and what runs when
 - [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
-- [Compared with other agents](docs/compare/README.md), with sources
+- [Compared with ChatGPT, Claude and other agents](docs/compare/README.md), with sources
 - [Development](docs/development.md): building and changing the app
 - [Contributing](CONTRIBUTING.md), [security](SECURITY.md) and the [code of conduct](CODE_OF_CONDUCT.md)
 
