@@ -6,11 +6,14 @@ is built: agent apps stay as that plan made them.*
 
 ## In short
 
-- **Apps get a second kind.** *Agent apps* stay what they are: small tools for one job, run by Hydor's agents. *Web
-  apps* are whole products: code projects with their own pages, accounts, database, payments and search.
+- **One kind of app, with two halves.** An *agent app* stays a small tool for one job, run by Hydor's agents and
+  shown as cards. When it needs more it gets **an app of its own** on the kit: real pages, its own data and
+  accounts, behaving like a proper web app, with its flows still run by agents. A *web app* is the same kit without
+  the flows: a whole product with pages, accounts, database, payments and search. An app moves from one to the
+  next without starting over.
 - **One kit, two places to run.** The same code runs inside Hydor (which keeps it running, signs you in and lends it
   its models, agents and embedding model) or standalone (a server, a one-click platform, serverless), with accounts
-  and keys of its own. What differs sits behind eight seams, set by configuration and never by changing the app.
+  and keys of its own. What differs sits behind nine seams, set by configuration and never by changing the app.
 - **Hydor Kit** (MIT, a public repository of its own) is versioned packages for what should be the same in every
   app (the core, each block's engine, the interface parts), thin source copied into the app for what makes it this
   app, **blocks** that bring both (accounts, teams, billing, search, admin, landing sections, blog, store,
@@ -37,6 +40,7 @@ is built: agent apps stay as that plan made them.*
 | How apps inside Hydor and standalone apps relate | One kit, two places to run; agent apps stay and plug in | Sections 2 and 3 |
 | The base stack | React and Vite on one plain Node server | TanStack Start, with a fallback (section 4) |
 | How prebuilt material reaches an app | Source blocks on a small tested core package | Section 4 |
+| Agent apps on the kit (added the same day) | Agent apps can use the same kit when they need more: an interface of their own, not only what an agent shows in a session, behaving like proper web apps | Section 2: one kind of app with a flows half and a web half; a ninth seam, flows |
 | Updates (added the same day) | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
@@ -58,7 +62,8 @@ Say which of these are wrong; the plan changes with them.
    it, and the kit works without Hydor for developers and their own coding agents.
 2. **TypeScript end to end.** A Python worker block comes later, for apps with models of their own (as Hydor runs
    its embedding worker).
-3. **One App builder for both kinds.** It says which kind fits and why, and the maker can overrule it.
+3. **One App builder for every app.** It says which halves an app gets (flows, pages of its own, or both) and why,
+   and the maker can overrule it.
 4. **Accounts are the app's own** (Better Auth), with no sign-in service to rent. Inside Hydor, Hydor's sign-in
    stands in for them.
 5. **Stripe first**, behind an interface, so a second provider that is the merchant of record can follow.
@@ -97,38 +102,60 @@ server running inside Hydor; anywhere to launch to (`publish_site` serves files 
 `compose.yaml` and `render.yaml` in this repository deploy Hydor itself). Nothing says who owns what people make
 with Hydor: this plan adds that sentence (section 4).
 
-## 2. Two kinds of app, one front door
+## 2. One kind of app, with two halves
 
-| | Agent app | Web app |
-|---|---|---|
-| What it is | A small tool for one job: a form, steps, an answer, a view | A product: pages, accounts, data, payments |
-| Made of | A recipe the builder and agents edit | Code in a project folder, on the kit, in git |
-| Who works when it runs | Hydor's agents and models | Its own server; models only where it uses AI |
-| Its data | Records | A database of its own |
-| Its users | You, people with its key, visitors of its public page | Accounts of its own (Hydor's sign-in inside Hydor) |
-| Where it runs | Inside Hydor | Inside Hydor, or anywhere |
-| What a use costs | Model use, every run | Hosting; model use only for AI features |
+An app can have a **flows half** (the recipe an agent app is today: a form, steps, an answer, run by Hydor's
+agents) and a **web half** (an app on the kit: pages, data, accounts). It has either, or both, and it gains the
+other without starting over.
+
+| | Agent app | Agent app with an app of its own | Web app |
+|---|---|---|---|
+| Halves | Flows | Flows and web | Web |
+| What it is | A small tool for one job, shown as cards in a session and on its page | The same work by agents, behind a real interface: its own pages, lists, settings, history | A product: pages, accounts, data, payments |
+| Its interface | A view Hydor draws (cards, elements, widgets) | Pages on the kit, built from the kit's interface parts, with parts made for runs | Pages on the kit |
+| Who works when it runs | Hydor's agents and models | Hydor's agents and models, started from its own pages; its own server for the rest | Its own server; models only where it uses AI |
+| Its data | Records | A database of its own, which its agents reach through the app's functions | A database of its own |
+| Its users | You, people with its key, visitors of its public page | Hydor's sign-in inside Hydor; accounts of its own once launched | Accounts of its own (Hydor's sign-in inside Hydor) |
+| Where it runs | Inside Hydor | Inside Hydor; anywhere once its steps can run outside (Phase 8) | Inside Hydor, or anywhere |
+| What a use costs | Model use, every run | Model use for the runs; hosting once launched | Hosting; model use only for AI features |
+
+**What the web half adds to an agent app.**
+
+- **A ninth seam, flows.** The app's pages start a flow, follow its steps as they go, show its result, answer what
+  it asks a person, and list earlier runs, all through one interface (`flows.run`, `flows.get`, `flows.list`).
+  Inside Hydor the driver is Hydor's own engine, so nothing about how agents run changes. Outside it is the
+  portable runtime of Phase 8; until then the guide marks such an app **Only inside Hydor** when the half is added.
+- **Parts made for runs**, in the kit's interface package: the form of a flow, the run as it goes (its steps, what
+  it found so far), the result (text, tables, pictures, and the cards an answer is made of), a question waiting for
+  a person, a conversation with one of the app's agents, the list of runs.
+- **Its agents work on its data through the app, not around it.** The app's server functions are offered to its
+  agents as tools. A run acts for the person who started it, so every call goes through the same narrowed handle
+  as a click on a page: an agent can no more read another person's rows than that person could.
+- **The recipe lives in the app's folder** (`flows/`, beside `src/`), so the steps, the pages and the tables are
+  one project in git, edited together and updated together.
+- **Everything an agent app has today keeps working**: agents run it in sessions (`use_app`) and show its card,
+  its API keys, its MCP tools, its schedules, its file. **Open the app** on the card opens its own pages.
 
 **The front door.** **New app** on the Apps page keeps its menu and gains one entry: **Describe it to an agent**,
-**Start from a type** (the twelve types as cards, each with a picture and what it comes with), **Start from
-scratch** and **Install from a file**. The App builder's first reply is one sketch, as today, and the sketch now
-names the kind. Its rule of thumb: one job an agent does for you is an agent app; something people sign in to, come
-back to, pay for or find on the web is a web app. It says why, and **Make it the other kind** is on the sketch.
+**Start from a type** (the app types as cards, each with a picture and what it comes with), **Start from scratch**
+and **Install from a file**. The App builder's first reply is one sketch, as today, and the sketch now says which
+halves the app gets. Its rule of thumb: a job an agent does for you, answered in a card, is flows alone; when
+people will come back to it, keep things in it, or need more than a card shows, it gets pages of its own; when no
+agent does the work, it is the web half alone. It says why, and the maker can overrule it.
 
-**How the two connect.**
+**Moving up, later.**
 
-- A web app inside Hydor **calls an agent app** as a function (a trip planner behind a travel site's back office),
-  through the AI seam and within the app's daily cap.
-- Agents in sessions **use a web app** as they use agent apps: they open it, or call the actions it offers (an MCP
-  block, Phase 4).
-- **Make it a web app**, on an agent app, comes with the portable runtime (Phase 8): its form and view become
-  pages, its records tables, its flow runs through Hydor or standalone.
+- **Give it an app of its own**, on an agent app: its form and view become pages on the kit, its records tables,
+  its flows stay as they are. Its address, keys and schedules do not change.
+- **Add flows**, on a web app: the same half from the other side.
+- A web app inside Hydor can also **call another agent app** as a function (a trip planner behind a travel site's
+  back office), within its daily cap.
 - The ready-made **Build a small web app** is retired once the guide covers it (Phase 2): the guide does the same
   job with a kit under it.
 
-**Names.** The Apps page gains **Web apps** among its places, and on a phone a tab beside **Agent apps** and
-**Connected apps**. The Preview page lists the dev servers it finds under "Web apps" today; those that are not kit
-apps become **Running here**.
+**Names.** The Apps page shows one list of apps, with marks for what each has (**Agents**, **Its own pages**),
+and **Connected apps** beside it. The Preview page lists the dev servers it finds under "Web apps" today; those
+that are not kit apps become **Running here**.
 
 ## 3. One kit, two places to run
 
@@ -145,6 +172,7 @@ configuration.
 | **Embeddings** | Hydor's embedding worker (no memory of its own) | A local model in a worker, or an API | An API, or Workers AI |
 | **Mail** | An outbox you read on the app's page; nothing leaves until you set a sender | SMTP or a mail service | A mail service |
 | **Live updates** | In the app's process | The same | Durable Objects on Cloudflare; none on Vercel |
+| **Flows** (an app with agents) | Hydor's own engine: its agents, tools and step kinds | The portable runtime (Phase 8), for the step kinds that need no Hydor agent | The same |
 
 - **Environments.** `dev` (sample data, inside Hydor), `hydor` (your real use inside Hydor) and `production`. Each
   names its drivers and the keys it needs, by name only.
@@ -407,6 +435,7 @@ in the browser's code. The kit's answer is to take those decisions away from gen
 | **Content** | Landing sections (hero, features, proof, pricing, questions, call to action, footer, several variants each), waitlist, blog, docs, changelog, newsletter, forms and surveys |
 | **Data and search** | Resources (the scaffolder), search, directory (listings, categories, a map, submissions, moderation, reviews), import and export |
 | **AI** | Chat, answers over the app's data with citations, an agent that calls the app's functions, caps and credits |
+| **Flows** | The parts an agent app's own pages are made of: a flow's form, the run as it goes, the result and its cards, a question waiting for a person, a conversation with one of the app's agents, the list of runs |
 | **Commerce** | Products, cart and orders, digital goods, discount codes; booking (services, availability, time zones, deposits, reminders, a calendar feed); courses (lessons, progress, timed release); memberships |
 | **Social and live** | Threads and comments, reactions, follows, a feed, moderation; live channels and presence, chat rooms and direct messages, live boards |
 
@@ -419,6 +448,7 @@ Each wave is ordered so that most of what it adds is reused by the next.
 | 1 | Landing page and waitlist | Base, landing sections, waitlist | Design system, landing sections, waitlist, mail, legal |
 | 1 | Internal tool or admin dashboard | Base, accounts, resources, admin | Accounts, roles, resources, admin, charts, import and export |
 | 1 | SaaS: accounts, teams, subscriptions | Landing, accounts, teams, billing, resources | Teams, billing, onboarding, API keys, usage |
+| 1 | Agent app with an app of its own (added to your twelve) | Base, flows, resources | The flows seam and its parts |
 | 2 | Content site: blog, docs, newsletter | Landing, blog, docs, newsletter, search | Blog, docs, changelog, newsletter, search |
 | 2 | AI app: chat and answers over your data | The SaaS starter, chat, answers, agent | The AI blocks, credits |
 | 2 | Portfolio or personal site | Landing, blog, a contact form | Forms; a build with no server |
@@ -612,7 +642,7 @@ Two tracks that meet at the end.
   `dev`, `build`); the blocks of the base, accounts, roles, admin, resources, landing sections and waitlist; the
   starters for a landing page and an internal tool; the reference apps as tests, on Node and on Cloudflare's
   runtime.
-- **Hydor**: the store and routes for web apps, the host for apps, the project kind, **Web apps** on the Apps page,
+- **Hydor**: the store and routes for web apps, the host for apps, the project kind, apps with pages of their own on the Apps page,
   the app's page with **Overview**, **Preview**, **Features** and **Data**, the kit's copy in the release with
   `kit_find` and its vectors, the card for what an app may use.
 - **Done when** an agent with the kit's commands and notes makes a landing page with a waitlist and a small
@@ -620,16 +650,22 @@ Two tracks that meet at the end.
 
 ### Phase 2: the guide
 
-- The App builder covers both kinds; the `web-app-builder` skill with a reference for each stage; the sketch with a
+- The App builder covers both halves; the `web-app-builder` skill with a reference for each stage; the sketch with a
   kind; the features card, the designs card and **View as**; the stages on the app's page; a commit per step and
   **Back to before this**; pointing at a part of the page; helpers by tier.
 - Designs drawn from the real blocks: themes, shells and section variants, pictured for the cards.
 - The Check stage whole: tests, access, keys in the browser's code, phone layout, accessibility, speed.
 - The benchmark's first briefs, for the wave 1 types.
 - The ready-made **Build a small web app** gives way to the guide.
+- **Agent apps on the kit**: the flows seam with Hydor's engine behind it, the parts made for runs, the app's
+  functions offered to its agents as tools acting for the person who started the run, the recipe in the app's
+  folder, **Give it an app of its own** on an agent app and **Add flows** on a web app, and the starter for an
+  agent app with pages of its own. Agent apps without a web half are untouched.
 - **Done when** someone who does not code gets from a paragraph to a working app inside Hydor through the stages,
   picking the type, the features and one of three designs, and at least eight of ten scripted briefs for wave 1 end
-  with every check green and no hand on the code.
+  with every check green and no hand on the code; and one of today's ready-made agent apps (the Trip planner) gets
+  an app of its own, where a trip is started from its own page, followed as the agents work, kept in its own
+  list, and still run for you by an agent in a session.
 
 ### Phase 3: launch on servers, and SaaS
 
@@ -681,8 +717,9 @@ Two tracks that meet at the end.
 
 ### Phase 8: portable flows and sharing
 
-- A runtime for agent-app steps on the AI seam (a model, a tool, a decision, a repeat, data, code), so a flow runs
-  in a standalone app. **Make it a web app** on an agent app.
+- A runtime for agent-app steps on the AI seam (a model, a tool, a decision, a repeat, data, code): the flows
+  seam's second driver, so an agent app with an app of its own can be launched outside Hydor. A step that needs one
+  of Hydor's agents (a Claude Code or Codex session) stays inside Hydor and is marked so.
 - Web apps as files between Hydor servers, with the card for what they use. A catalog of blocks, starters and
   designs that others add to, reviewed and pinned by hash. A gallery on hydor.app.
 - **Done when** an agent app with steps becomes a web app that runs without Hydor, and a block made by someone else
@@ -706,6 +743,7 @@ paying sellers, which Phase 6 needs and which can take a while.
 | 6 | Contributions to the kit: Hydor's agreement or a lighter sign-off | When the repository opens | Hydor's, so the kit can always be offered on other terms |
 | 7 | What a web app inside Hydor may spend on models a day unless you say otherwise | Phase 1 | \$1, raised on its card |
 | 8 | Whether the benchmark of scripted briefs is published | Phase 2 | Yes: it is the kit's best argument, and it invites others to beat it |
+| 9 | The cards an answer is made of (Hydor's 140 answer UIs, AGPL-3.0) inside an agent app's own pages: give them to the kit under MIT, or have Hydor draw them in a frame | Phase 2 | Give the kit the ones results use most, as a step of its own; inside Hydor a frame covers the rest. Yours to decide: it is your code and your licence |
 
 ## 12. Risks
 
@@ -717,6 +755,8 @@ paying sellers, which Phase 6 needs and which can take a while.
 | A generated app leaks data or keys | Section 5: access in the data layer, tests the kit writes, a build that fails on a key in browser code, a gate at Launch |
 | Money and the law: tax, privacy, what makers promise their users | A hosted checkout only; Managed Payments explained; legal pages as drafts; what stays the maker's said at Launch |
 | A generated server running on your computer | Its own process, keys and folder, bubblewrap where it exists, an origin apart from Hydor's, stopped when idle, a card for what it uses |
+| Two ways to give an agent app a face (the view Hydor draws, and pages on the kit) confuse makers and split the work | One ladder with a plain rule in the guide; the view stays for cards in a session and small apps, and is not grown further; the kit's parts for runs draw the same answer fields, so a result looks the same in both |
+| An agent acting inside an app reaches data it should not | Its tools are the app's own functions, called as the person who started the run, through the same narrowed handle as a click; a run with no person behind it (a schedule) names one, or has only what the app marks for it |
 | It works in Hydor and not outside | The check lists what an app takes from Hydor and its stand-in; **Only inside Hydor** is said when a feature is added, not at Launch |
 | Apps drift from their blocks, and updates stop joining | Engines and interface parts are packages, updated by version with nothing to join; copied source is thin; an ejected part is the exception, counted, and a reason to add a setting or a slot; every release is tried on adapted reference apps first |
 | Packages that are hard to bend push agents to eject everything | Settings, properties, slots and events listed in each block's notes; what gets ejected is measured on the benchmark |
