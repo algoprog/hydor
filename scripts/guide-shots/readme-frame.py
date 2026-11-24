@@ -4,6 +4,7 @@ phone's screen over the session's window, dimmed and blurred. Needs Pillow.
 
   python3 scripts/guide-shots/readme-frame.py <folder with the shots> <where the pictures go, docs/media>
 """
+import os
 import sys
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
@@ -36,10 +37,18 @@ def open_shot(name):
     return Image.open(f'{src}/{name}.webp').convert('RGB')
 
 
-for name in ['readme-agents', 'readme-memory', 'readme-automation', 'readme-answers', 'readme-library']:
-    frame(open_shot(name).resize(SIZE, Image.LANCZOS)).save(f'{dst}/{name}.webp', quality=80)
+# A name whose shot is not in the folder is left alone, so a few pictures can be taken again.
+NAMES = [
+    'readme-agents', 'readme-memory', 'readme-automation', 'readme-answers', 'readme-library',
+    'readme-apps-make', 'readme-suggest', 'readme-experiments', 'readme-boards', 'readme-goals', 'readme-bring-in', 'readme-cards', 'readme-browser',
+]
+for name in NAMES:
+    if os.path.exists(f'{src}/{name}.webp'):
+        frame(open_shot(name).resize(SIZE, Image.LANCZOS)).save(f'{dst}/{name}.webp', quality=80)
 
 # The phone over the session's window.
+if not (os.path.exists(f'{src}/readme-agents.webp') and os.path.exists(f'{src}/readme-phone-screen.webp')):
+    sys.exit(0)
 back = open_shot('readme-agents').resize(SIZE, Image.LANCZOS)
 back = ImageEnhance.Brightness(back).enhance(0.3).filter(ImageFilter.GaussianBlur(3))
 screen = open_shot('readme-phone-screen')

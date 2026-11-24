@@ -27,6 +27,11 @@ gives the windows their rounded corners and puts the phone over the session's di
 A list of shots may export `prepare(ctx)`, which run.mjs calls once the demo is seeded (with its API and its database) to
 add what only its pictures show: the README's and the website's add the Trip planner's run in the Lisbon session (its
 card, on the map) and the trip's slides in the Library (`tripRun` and `lisbonDeck` in demo.mjs).
+They also add what the newer pictures show (`showcaseSessions`, `shopBoard`, `bringInState`, `browsingView` in demo.mjs): the App
+builder's sketch of an app and a reply with answer cards as two more sessions, a board of pinned cards, the notes a ChatGPT export
+would give Bring in, and the Browser page's tabs and article (its shot gives the desktop stand-in a `show` that draws the
+article where the native view would be). Word suggestions have no models in the demo: that shot answers the page's request to
+`/api/suggest` itself.
 A list may also export `desktop = true`, as those two do: its window pictures then show the desktop app, with the
 Browser in the rail, which only the desktop app has (run.mjs gives each page a stand-in for the desktop app's bridge;
 a phone's screen stays a phone's). The guide's own pictures show the app as a web browser does.

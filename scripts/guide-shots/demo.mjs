@@ -1268,3 +1268,319 @@ export const CATALOG = {
     { value: 'fable', label: 'Fable 5.2', resolved: 'claude-fable-5-2', description: 'The strongest, for the hardest problems', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' },
   ],
 };
+
+// ---- what the README's and the website's newer pictures show ----------------------------------------------------------
+// (readme-shots.mjs, website/shots.mjs: prepare() calls these once the demo is seeded, so the guide's own pictures keep
+// showing the demo as it was.)
+
+/** The App builder's first answer to "make me an app that writes my weekly client update", as app_sketch gives it back. */
+const SKETCH = {
+  said: 'The user sees this sketch as a card, with Build it and Change it; nothing is saved. End your turn and wait for their answer: build it with app_save when they say Build it (with the choices they picked), else change the sketch as they ask.',
+  sketch: {
+    name: 'Client update email',
+    description: 'A short weekly update for a client: what got done, what is next, what I need from them',
+    icon: 'mail',
+    color: 'teal',
+    fields: [
+      { id: 'client', label: 'Client', type: 'text', required: true, placeholder: 'e.g. Harbor Café' },
+      { id: 'notes', label: 'This week’s notes', type: 'long', required: true, placeholder: 'e.g. Menu page done, photos still missing' },
+    ],
+    answer: [
+      { id: 'subject', label: 'Subject line', type: 'text', required: true },
+      { id: 'email', label: 'The email', type: 'markdown', required: true },
+      { id: 'needs', label: 'What I need from them', type: 'list' },
+    ],
+    steps: [
+      { title: 'Sort the notes into done, next and needs', kind: 'model', how: 'quick' },
+      { title: 'Write the email in your voice', kind: 'model', how: 'standard' },
+      { title: 'Check names, dates and what you ask for', kind: 'code' },
+    ],
+    view: false,
+    tier: 'quick',
+  },
+  estimate: { seconds: [8, 25], usd: [0.01, 0.04], text: 'A run takes about 8–25 s and costs about $0.01–0.04' },
+  assumed: ['One email per run, in plain text, ready to paste into your mail app', 'It keeps your sign-off from About you', 'Dates in the notes are read as this week'],
+  questions: [
+    { ask: 'How long should it be?', choices: ['Under 150 words', 'Up to 250 words', 'As long as the notes need'] },
+    { ask: 'What should it do with the email?', choices: ['Show it to me', 'Save it as a draft'] },
+  ],
+};
+
+/** The reply with three answer cards: what the picture of answer cards shows. */
+const CARDS = {
+  ask: 'Which robot vacuum should I get for a two-room flat with a cat? Compare the three best under $500.',
+  reply: [
+    '**The Roomi S5 at $429 is the best buy for a flat with a cat**: it empties itself, so the cat hair is never your job, and it is the quietest of the three. Here is how they compare.',
+    '```ui comparison\n' +
+      JSON.stringify({
+        title: 'Robot vacuums under $500',
+        items: [
+          { name: 'Roomi S5', subtitle: 'Self-emptying', badge: 'Pick' },
+          { name: 'Tidyr Mini', subtitle: 'Compact' },
+          { name: 'Orbit Pro', subtitle: 'Vacuum and mop' },
+        ],
+        rows: [
+          { label: 'Price', values: [429, 349, 499], prefix: '$', best: 'low' },
+          { label: 'Suction', values: [5000, 3200, 6000], unit: ' Pa', best: 'high' },
+          { label: 'Battery', values: [180, 120, 150], unit: ' min', best: 'high' },
+          { label: 'Noise', values: [58, 62, 65], unit: ' dB', best: 'low' },
+          { label: 'Empties itself', values: [true, false, true] },
+        ],
+        winner: 0,
+      }) +
+      '\n```',
+    '```ui stats\n' +
+      JSON.stringify({
+        title: 'The Roomi S5 in four numbers',
+        stats: [
+          { label: 'Price', value: 429, prefix: '$', change: -13, change_unit: '%', good: 'down', note: 'against its launch price' },
+          { label: 'Battery', value: 180, unit: ' min', change: 50, change_unit: '%', note: 'more than the Tidyr Mini' },
+          { label: 'Noise', value: 58, unit: ' dB', note: 'about a quiet conversation' },
+          { label: 'Rated', value: '4.6 / 5', note: '2,300 owner reviews' },
+        ],
+      }) +
+      '\n```',
+    'Over three years the Roomi costs the least to run, because its bags are cheap and it needs fewer filters:',
+    '```ui chart\n' +
+      JSON.stringify({
+        title: 'What each one costs over three years',
+        kind: 'stacked-bar',
+        x: ['Roomi S5', 'Tidyr Mini', 'Orbit Pro'],
+        series: [
+          { name: 'Price', values: [429, 349, 499] },
+          { name: 'Bags and filters', values: [60, 95, 110] },
+          { name: 'Electricity', values: [18, 15, 24] },
+        ],
+        prefix: '$',
+        note: 'Bags and filters at the maker’s prices; electricity at 16 cents a kWh.',
+      }) +
+      '\n```',
+  ].join('\n\n'),
+};
+
+/**
+ * What only the newer pictures need in the sessions: the App builder's sketch of a new app, and a reply with answer cards.
+ * Written as Claude Code transcripts after the app started, which it reads as they come; run.mjs's own rows mark the
+ * demo's sessions as made in Hydor. Returns what shots need ({ builder, cards }: key, folder, time).
+ */
+export async function showcaseSessions(ctx) {
+  const { home, db, api } = ctx;
+  const projects = path.join(home, '.claude/projects');
+  const now = Date.now();
+  const tasks = path.join(home, 'Hydor/Tasks');
+  const out = {};
+  {
+    const cwd = path.join(tasks, '2026-11-23-client-update-app');
+    fs.mkdirSync(cwd, { recursive: true });
+    const t = new Transcript({ cwd, at: now - 70 * MIN });
+    t.user('Make me an app that writes my weekly client update email. I give it the client and a few notes on the week, and it writes a short email: what got done, what is next, and what I need from them.');
+    t.tool(own('app_get'), { like: 'email update' }, { say: 'I’ll look at the ready-made apps closest to this one first.', text: 'Closest ready-made apps: Cover letter (a form, one writing step, the answer as an email), Meeting notes to actions.', ms: 1200 });
+    t.tool(own('app_sketch'), { name: SKETCH.sketch.name }, { say: 'Here is a sketch of the app. Nothing is made yet.', text: JSON.stringify(SKETCH, null, 1), ms: 900 });
+    t.say(['That is the sketch: a form with three questions, three quick steps, and the email as its answer. Press **Build it** (pick an answer to each question first if you like), or tell me what to change.'], { out: 200 });
+    t.title('Make an app for my weekly client update').save(projects);
+    out.builder = { key: t.key, cwd, at: t.t };
+  }
+  {
+    const cwd = path.join(tasks, '2026-11-23-robot-vacuum');
+    fs.mkdirSync(cwd, { recursive: true });
+    const t = new Transcript({ cwd, at: now - 40 * MIN });
+    t.user(CARDS.ask);
+    t.wait(45_000).say([CARDS.reply], { out: 1100 });
+    t.title('Robot vacuums under $500').save(projects);
+    out.cards = { key: t.key, cwd, at: t.t };
+  }
+  const own_ = db.prepare(
+    `insert into app_sessions (key, agent, created_by_app, created_at, updated_at) values (?, 'claude', 1, ?, ?)
+     on conflict(key) do update set created_by_app = 1, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+  );
+  for (const x of Object.values(out)) own_.run(x.key, x.at - 60_000, x.at);
+  for (let i = 0; i < 60; i++) {
+    const list = await api('GET', '/api/sessions?limit=300');
+    const have = new Set((list.sessions ?? list).map((s) => s.key));
+    if (Object.values(out).every((x) => have.has(x.key))) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  await api('PATCH', `/api/sessions/${encodeURIComponent(out.builder.key)}/extra`, { assistant: 'app-builder' }).catch(() => {});
+  await api('PATCH', `/api/sessions/${encodeURIComponent(out.cards.key)}/extra`, { assistant: 'researcher' }).catch(() => {});
+  return out;
+}
+
+/** The time of day, as "HH:MM" in the demo's time zone, `hours` from now: a schedule that stays well away from the shots. */
+const clockIn = (hours) => new Date(Date.now() + hours * HOUR).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+
+/**
+ * A board of the shop's week, with answer cards pinned from replies (and one an agent put there): numbers, a chart, the
+ * forecast, a checklist and a split. Two keep themselves up to date. Returns its page.
+ */
+export async function shopBoard(api, s, spaceId) {
+  const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const at = Date.now();
+  const card = (id, ui, data, o = {}) => ({ id, ui, data, size: o.size ?? 'l', pinnedAt: at - (o.ago ?? 5) * HOUR, by: o.by ?? 'user', ...(o.from ? { from: { session: o.from.key, title: o.from.title } } : {}), ...(o.refresh ? { refresh: o.refresh, refreshedAt: at - 2 * HOUR } : {}) });
+  const model = {
+    format: 1,
+    cards: [
+      card(
+        'cstats0001',
+        'stats',
+        {
+          title: 'The shop this week',
+          period: 'Monday to today, against the week before',
+          stats: [
+            { label: 'Revenue', value: 18420, prefix: '$', change: 12.4, change_unit: '%', trend: [11200, 12800, 12100, 13900, 15200, 16800, 18420] },
+            { label: 'Orders', value: 312, change: 8.3, change_unit: '%', trend: [210, 224, 240, 251, 270, 289, 312] },
+            { label: 'Conversion', value: 3.4, unit: '%', change: 0.3, change_unit: ' pts', trend: [2.9, 3.0, 3.1, 3.1, 3.2, 3.3, 3.4] },
+            { label: 'Returns', value: 1.9, unit: '%', change: -0.4, change_unit: ' pts', good: 'down', trend: [2.6, 2.5, 2.4, 2.2, 2.1, 2.0, 1.9] },
+          ],
+        },
+        { size: 'wide', from: s.search, refresh: { ask: 'The shop’s numbers this week against the week before: revenue, orders, conversion and returns.', costUsd: 0.03 } },
+      ),
+      card('cchart0002', 'chart', {
+        title: 'Sales by day',
+        kind: 'area',
+        x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        series: [
+          { name: 'This week', values: [2100, 2350, 2280, 2610, 3140, 3480, 2460] },
+          { name: 'Last week', values: [1850, 2050, 2150, 2200, 2760, 3050, 2210] },
+        ],
+        prefix: '$',
+        note: 'Friday and Saturday carry the week; the new search made Thursday’s jump.',
+      }, { from: s.search, ago: 20 }),
+      card(
+        'cweath0003',
+        'weather',
+        {
+          location: 'Portland, Maine',
+          unit: 'F',
+          now: { temp: 41, feels: 36, condition: 'Cloudy', icon: 'cloud', humidity: 71, wind: '12 mph NE', uv: 1 },
+          hourly: [
+            { time: '14:00', temp: 41, icon: 'cloud', rain: 10 },
+            { time: '16:00', temp: 39, icon: 'cloud', rain: 25 },
+            { time: '18:00', temp: 37, icon: 'showers', rain: 55 },
+            { time: '20:00', temp: 36, icon: 'rain', rain: 70 },
+            { time: '22:00', temp: 35, icon: 'rain', rain: 60 },
+          ],
+          daily: [
+            { date: day(0), high: 42, low: 34, icon: 'rain', condition: 'Rain after 5 pm', rain: 70 },
+            { date: day(1), high: 38, low: 29, icon: 'partly', condition: 'Clearing, breezy', rain: 10 },
+            { date: day(2), high: 36, low: 25, icon: 'sun', condition: 'Sunny and cold', rain: 0 },
+            { date: day(3), high: 40, low: 28, icon: 'cloud', condition: 'Clouds, dry', rain: 15 },
+          ],
+        },
+        { by: 'agent', ago: 3, refresh: { ask: 'The weather in Portland, Maine for the next four days.', costUsd: 0.01 } },
+      ),
+      card(
+        'cchecklist4',
+        'checklist',
+        {
+          title: 'Black Friday week',
+          groups: [
+            { name: 'The shop', items: [{ text: 'Discount codes tested at checkout', done: true }, { text: 'Apple Pay live', done: true }, 'Shipping cut-off banner up', 'Stock counts checked against the warehouse'] },
+            { name: 'The team', items: [{ text: 'Support rota for the weekend', done: true }, 'Who answers the 6 am emails', 'Pizza ordered for Friday'] },
+          ],
+        },
+        { size: 'm', ago: 30 },
+      ),
+      card(
+        'cbreak0005',
+        'breakdown',
+        {
+          title: 'Orders by where they came from',
+          parts: [
+            { name: 'Search', value: 128 },
+            { name: 'Email', value: 76 },
+            { name: 'Direct', value: 58 },
+            { name: 'Social', value: 31 },
+            { name: 'Other', value: 19 },
+          ],
+          unit: ' orders',
+        },
+        { size: 'm', ago: 48, from: s.search },
+      ),
+    ],
+  };
+  // A board made with cards that refresh gets them paused (it never starts spending by itself): they are set on a new version, as the card's own settings are.
+  const bare = { ...model, cards: model.cards.map(({ refresh, refreshedAt, ...c }) => c) };
+  const { page } = await api('POST', '/api/pages', { kind: 'board', title: 'The shop this week', description: 'Numbers, the forecast and the Black Friday checklist, pinned from replies; the numbers and the forecast keep themselves up to date.', model: bare, space: spaceId });
+  const v = await api('POST', `/api/pages/${page.id}/versions`, { model, base: page.version ?? 1 });
+  return v.page ?? page;
+}
+
+/** What Settings → Memory → Bring in shows once a ChatGPT export has been read: notes to pick (the helper model's proposals). */
+export function bringInState(shop) {
+  const note = (id, text, scope = 'global', scopeKey = '') => ({ id, text, scope, scopeKey, source: 'ChatGPT' });
+  return {
+    sources: [],
+    files: [{ id: 'chatgpt-export', name: 'chatgpt-export-2026-11-20.zip', size: 48_300_000, kind: 'chatgpt', chats: 412, memory: true, from: Date.now() - 2.6 * 365 * DAY, to: Date.now() - 4 * DAY }],
+    job: {
+      state: 'ready',
+      done: 9,
+      total: 9,
+      missed: 0,
+      sources: ['ChatGPT'],
+      notes: [
+        note(1, 'Alex prefers short answers in plain English, with the conclusion first.'),
+        note(2, 'Alex is a self-employed designer, based in Portland, Maine.'),
+        note(3, 'Alex is writing a master’s thesis on how small towns use public libraries.'),
+        note(4, 'Alex rides to work, 9 km each way, and wants gear that copes with hills and rain.'),
+        note(5, 'Alex keeps a vegetable garden in zone 5b and avoids chemical sprays.'),
+        note(6, 'Alex’s shop runs on a TypeScript API with Vitest; checkout prices are integers in cents.', 'repo', shop),
+        note(7, 'Write commit messages in the imperative, one line, no emoji.', 'repo', shop),
+      ],
+      profile: { base: '', text: '', added: ['Name: Alex', 'Writes in English; likes short, direct answers', 'Works in TypeScript and Python'] },
+    },
+  };
+}
+
+/**
+ * The Browser page's made-up browsing: Alex's tabs (the e-bike research in a group, a few more), as the view the desktop
+ * app's browser would give, and the article its front tab shows (a page of its own, in the colours of a dark site).
+ */
+export function browsingView() {
+  const tab = (id, title, url, o = {}) => ({ id, title, url, active: false, loadedAt: Date.now() - 60_000, canGoBack: true, canGoForward: false, ...o });
+  return {
+    key: 'browsing',
+    open: true,
+    tabs: [
+      tab('t1', 'The best electric bikes for hills in 2026, tested', 'https://www.cyclingreview.example/best-e-bikes-hills', { active: true, group: 'g1', readerable: true }),
+      tab('t2', 'Velora Ridge E5 review: a mid-drive that climbs like a mountain bike', 'https://www.ebiketest.example/velora-ridge-e5', { group: 'g1' }),
+      tab('t3', 'Mid-drive vs hub motor: which is better for hills?', 'https://www.ebikeschool.example/mid-drive-vs-hub', { group: 'g1' }),
+      tab('t4', 'Opening hours · Portland Public Library', 'https://www.portlandlibrary.example/hours', { canGoBack: false }),
+      tab('t5', 'Tram 28 timetable · Lisbon', 'https://www.carris.example/tram-28', { canGoBack: false }),
+      tab('t6', 'Garden calendar for zone 5b', 'https://www.gardencalendar.example/zone-5b', { canGoBack: false }),
+    ],
+    driver: 'user',
+    asks: [],
+    viewport: { w: 1100, h: 640 },
+    downloads: [],
+    groups: [{ id: 'g1', name: 'E-bike research', color: 'blue' }],
+    engine: 'desktop',
+  };
+}
+
+/** The page the Browser picture's front tab shows: an article on a dark site, drawn by the picture's stand-in for the desktop app's native view. */
+export const ARTICLE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The best electric bikes for hills in 2026, tested</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{zoom:.82;margin:0;background:#111418;color:#d9dee5;font:16px/1.6 -apple-system,'Segoe UI',Inter,system-ui,sans-serif}
+header{display:flex;align-items:center;gap:28px;padding:14px 48px;border-bottom:1px solid #232830;background:#14181d}
+header b{font-size:19px;letter-spacing:-.02em;color:#fff}header b i{color:#f2b134;font-style:normal}header span{color:#8b94a0;font-size:14px}
+main{max-width:760px;margin:0 auto;padding:36px 28px 60px}
+.kicker{color:#f2b134;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+h1{font-size:40px;line-height:1.12;letter-spacing:-.03em;margin:10px 0 14px;color:#fff}
+.by{color:#8b94a0;font-size:14px;margin-bottom:26px}
+p{margin:0 0 16px;color:#c3cad3;font-size:17px}
+h2{font-size:22px;margin:28px 0 8px;color:#fff}
+.row{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid #232830;border-radius:10px;background:#161b21;margin-bottom:10px}
+.row b{color:#fff}.row span{color:#8b94a0}.row em{color:#f2b134;font-style:normal;font-weight:700}
+</style></head><body>
+<header><b>Cycling<i>Review</i></b><span>Reviews</span><span>Guides</span><span>Deals</span><span>Newsletter</span></header>
+<main><div class="kicker">Buyer’s guide · Updated September 2026</div>
+<h1>The best electric bikes for hills in 2026, tested</h1>
+<div class="by">By Dana Whitcombe · 14 bikes · 6,200 km of testing</div>
+<svg viewBox="0 0 760 220" style="width:100%;border-radius:14px;margin-bottom:26px;display:block"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2a3a"/><stop offset="1" stop-color="#3b6a52"/></linearGradient></defs><rect width="760" height="220" fill="url(#g)"/><path d="M0 170 Q180 70 360 130 T760 90 V220 H0Z" fill="#16231d"/><g fill="none" stroke="#f2b134" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" transform="translate(330 80)"><circle cx="30" cy="62" r="26"/><circle cx="118" cy="62" r="26"/><path d="M30 62 L58 24 L98 24 L118 62 M58 24 L72 62 H30 M72 62 L98 24 M54 14 H70 M98 24 L92 8 H106"/></g></svg>
+<p>We rode 14 e-bikes up the same 12% climb, ten times each, with the same 80 kg rider. Mid-drive motors with a torque sensor were the clear winners for steep commutes: they use the bike’s own gears, so they keep their pull where hub motors run hot and slow down.</p>
+<h2>The short list</h2>
+<div class="row"><div><b>Velora Ridge E5</b><br><span>85 Nm mid-drive · 625 Wh · lights and rack</span></div><em>$1,890</em></div>
+<div class="row"><div><b>Urbana Climb 2</b><br><span>75 Nm mid-drive · 540 Wh · hydraulic brakes</span></div><em>$1,749</em></div>
+<div class="row"><div><b>Commuter Pro 3</b><br><span>50 Nm hub motor · 500 Wh · belt drive</span></div><em>$1,599</em></div>
+<p>Hub-drive bikes such as the Commuter Pro 3 slowed to 11 km/h on the steepest section, against 17–18 km/h for the Ridge E5.</p>
+</main></body></html>`;

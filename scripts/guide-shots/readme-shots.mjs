@@ -5,8 +5,9 @@
 //   python3 scripts/guide-shots/readme-frame.py /tmp/readme-shots docs/media
 //
 // readme-answers (the Trip planner's answer in a conversation, on its map) and readme-library (the trip's slides in the
-// Library's editor) show a run and a deck that only these pictures need: prepare() adds them to the demo (demo.mjs).
-import { lisbonDeck, tripRun } from './demo.mjs';
+// Library's editor) show a run and a deck that only these pictures need: prepare() adds them to the demo (demo.mjs), and
+// so do the newer ones (an app sketched by the App builder, a reply with answer cards, a board).
+import { ARTICLE, bringInState, browsingView, lisbonDeck, shopBoard, showcaseSessions, tripRun } from './demo.mjs';
 import { sleep } from './cdp.mjs';
 
 /** The desktop app's windows, with the Browser in the rail (a phone's screen stays a phone's). */
@@ -19,7 +20,11 @@ export async function prepare(ctx) {
   const { template } = await ctx.api('GET', '/api/apps/tpl:trip-planner');
   const trip = tripRun(ctx.db, ctx.sessions, template);
   const deck = await lisbonDeck(ctx.api, ctx.sessions);
-  return { trip, deck: deck.id };
+  // What the newer pictures show: the App builder's sketch, a reply with answer cards, the shop's board.
+  const more = await showcaseSessions(ctx);
+  const shop = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Shop website')?.id;
+  const board = await shopBoard(ctx.api, ctx.sessions, shop);
+  return { trip, deck: deck.id, ...more, board: board.id };
 }
 
 /** The whole window on a page (a path, or a function of the demo's context), saved 1600 pixels wide, or a phone's screen. */
@@ -102,6 +107,167 @@ export const deckShot = (id) => ({
   },
 });
 
+
+const keyOf = (ctx, x) => `/s/${encodeURIComponent(x.key)}`;
+
+/** The App builder's answer to "make me an app that writes my weekly client update": its sketch card (what it asks, what it
+ * does, what you get, its questions) under the first message (readme-apps-make, the website's app-apps-make). */
+export const appsMakeShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    await ctx.go(keyOf(ctx, ctx.builder), { settle: 2500 });
+    await p.waitFor(`!!document.querySelector('[data-app-sketch]')`, { what: 'the sketch card' });
+    await sleep(800);
+    // The card's top just under the message above it.
+    await p.eval(`(() => { const c = document.querySelector('[data-app-sketch]'); const box = c.closest('.overflow-y-auto'); box.scrollTop += c.getBoundingClientRect().top - box.getBoundingClientRect().top - 100; })()`);
+    await sleep(900);
+    await p.park();
+    return p.shot(ctx.file);
+  },
+});
+
+/** Word suggestions in a session's message box: what the demo has no models for is answered to the page (the same
+ * answer the app's own endpoint gives, 204 while the words are not there yet), then the box, mid-sentence, with the grey
+ * rest of the word and the dimmer next one (readme-suggest, the website's app-suggest). */
+export const suggestShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    const typed = 'Thanks. Does it come in a smaller frame? I am 165 cm tall and would like to try one ';
+    await p.route(/\/api\/suggest(\/warm)?(\?|$)/, async (req) => {
+      if (req.method === 'GET' || req.url.includes('/warm')) {
+        const real = await ctx.api('GET', '/api/suggest');
+        return { json: { ...real, status: { ...real.status, state: 'ready', llm: { state: 'ready' }, model: { kind: 'personal', trainedAt: Date.now() - 20 * 3600_000, tokens: 184_000, languages: { eng_Latn: 0.96 } } } } };
+      }
+      if (req.method !== 'POST') return null;
+      const text = JSON.parse(req.postData ?? '{}').text ?? '';
+      if (!text.endsWith('try one ')) return { status: 204, body: '' };
+      return { json: { word: 'before', next: ' buying', conf: 0.93, confNext: 0.71, show: true, showNext: true, plan: 'mix', lang: 'eng_Latn', ms: 14 } };
+    });
+    await ctx.go(keyOf(ctx, ctx.sessions.ebike), { settle: 2500 });
+    await p.click('textarea');
+    await p.type(typed);
+    await p.waitFor(`[...document.querySelectorAll('[aria-hidden="true"][translate="no"] span')].some((e) => e.textContent === 'before')`, { what: 'the grey words' });
+    await sleep(600);
+    return p.shot(ctx.file);
+  },
+});
+
+/** System → Experiments: the learning rate sweep's charts, its six runs (the guide's picture, as a whole window). */
+export const experimentsShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    for (let i = 0; i < 90; i++) {
+      const r = await ctx.api('GET', '/api/experiments/runs?status=active&limit=50').catch(() => null);
+      if (r && !r.runs?.length) break;
+      await sleep(1000);
+    }
+    await ctx.go('/system/experiments?e=dense-retriever-lr-sweep&tab=charts', { settle: 2500 });
+    await p.waitFor(`document.querySelectorAll('main svg path.viz-line').length >= 12`, { timeout: 20000 }).catch(() => {});
+    await sleep(1500);
+    await p.park();
+    return p.shot(ctx.file);
+  },
+});
+
+/** The shop's board: cards pinned from replies in a grid (readme-boards, the website's app-boards). */
+export const boardShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    await ctx.go(`/pages/${ctx.board}`, { settle: 3000 });
+    await p.waitFor(`document.querySelectorAll('svg').length > 8`, { timeout: 15000 }).catch(() => {});
+    await sleep(2500);
+    await p.park();
+    return p.shot(ctx.file);
+  },
+});
+
+/** The checkout session working towards its goal: the bar above the message box with its rounds open (readme-goals, app-goals). */
+export const goalShot = (id) => ({
+  id,
+  goal: 'working',
+  async take(p, ctx) {
+    await ctx.go(session(ctx, 'checkout'), { settle: 2500 });
+    await p.click(`js:[...document.querySelectorAll('button')].filter((b) => b.textContent.trim().startsWith('Rounds')).pop()`, { wait: 900 });
+    await p.park();
+    await sleep(600);
+    return p.shot(ctx.file);
+  },
+});
+
+/** Settings → Memory → Bring in, with a ChatGPT export read into notes to pick (the helper model's proposals, answered to the page). */
+export const bringInShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    await p.route(/\/api\/memory\/bring-in(\?|$)/, async (req) => (req.method === 'GET' ? { json: bringInState('/home/alex/code/shop-api') } : null));
+    await ctx.go('/settings?s=memory', { settle: 2000 });
+    // The button is in Your data, further down the page: pressed where it is, so the page behind stays at its top.
+    await p.eval(`[...document.querySelectorAll('button')].filter((b) => b.textContent.trim().startsWith('Bring in')).pop()?.click()`);
+    await sleep(1500);
+    await p.waitFor(`document.body.textContent.includes('Add 7 notes')`, { what: 'the proposed notes' });
+    await p.park();
+    await sleep(600);
+    return p.shot(ctx.file);
+  },
+});
+
+/** A reply with three answer cards: a comparison table, a chart and key numbers (readme-cards, app-cards). */
+export const cardsShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    await ctx.go(keyOf(ctx, ctx.cards), { settle: 3000 });
+    await p.waitFor(`document.querySelectorAll('.aui[data-ui="comparison"]').length > 0`, { timeout: 15000 });
+    await sleep(1800);
+    // The comparison at the top, under the header, and the chart starting below it.
+    await p.eval(`(() => { const c = document.querySelector('.aui[data-ui="comparison"]'); const box = c.closest('.overflow-y-auto'); box.scrollTop += c.getBoundingClientRect().top - box.getBoundingClientRect().top - 14; })()`);
+    await sleep(900);
+    await p.park();
+    return p.shot(ctx.file);
+  },
+});
+
+/** The desktop app's own Browser page (it exists only there): its bridge is the stand-in run.mjs gives every page, except that
+ * `show` draws the front tab's page, a made-up article, inside the box the desktop app would lay its native view over; and the
+ * browsing the server would give is answered to the page (readme-browser, the website's app-browser). */
+export const browserShot = (id) => ({
+  id,
+  async take(p, ctx) {
+    const view = browsingView();
+    await p.initScript(`
+      (() => {
+        const html = ${JSON.stringify(ARTICLE)};
+        const quiet = new Proxy({}, { get: (_, k) => (typeof k !== 'string' || k === 'then' ? undefined : k.startsWith('on') ? () => () => {} : async () => null) });
+        window.hydorDesktop = { browser: new Proxy(quiet, { get: (t, k) => {
+          if (k === 'show') return async (target, rect) => {
+            let el = document.querySelector('[data-fake-page]')?.parentElement ?? document.elementFromPoint(rect.x + rect.w / 2, rect.y + rect.h / 2);
+            if (!el) return false;
+            if (!el.querySelector('[data-fake-page]')) {
+              el.style.position = 'relative';
+              const f = document.createElement('iframe');
+              f.setAttribute('data-fake-page', '');
+              f.srcdoc = html;
+              f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:#111418';
+              el.appendChild(f);
+            }
+            return true;
+          };
+          if (k === 'hide') return async () => {};
+          if (k === 'still') return undefined;
+          return t[k];
+        } }) };
+      })();`);
+    await p.route(/\/api\/browser\/(sessions\/browsing|browsing\/open)(\?|$)/, async (req) => {
+      if (req.method === 'POST' && req.url.includes('/browsing/open')) return { json: { key: 'browsing', view } };
+      if (req.method === 'GET') return { json: { view, options: {} } };
+      return { json: { view } };
+    });
+    await ctx.go('/browser', { settle: 3500 });
+    await p.waitFor(`!!document.querySelector('[data-fake-page]')`, { what: 'the page', timeout: 20000 });
+    await sleep(1500);
+    await p.park();
+    return p.shot(ctx.file);
+  },
+});
+
 export const SHOTS = [
   whole('readme-agents', (ctx) => session(ctx, 'checkout')),
   whole('readme-phone-screen', (ctx) => session(ctx, 'checkout'), { width: 390, height: 844, phone: true }),
@@ -109,4 +275,20 @@ export const SHOTS = [
   whole('readme-automation', '/settings?s=tasks'),
   tripShot('readme-answers'),
   deckShot('readme-library'),
+  // Making your own app by describing it: the App builder's sketch.
+  appsMakeShot('readme-apps-make'),
+  // Word suggestions: the grey rest of the word and the next one, in a session's message box.
+  suggestShot('readme-suggest'),
+  // System → Experiments: a sweep's six runs on their charts.
+  experimentsShot('readme-experiments'),
+  // A board with cards pinned from replies (numbers, a chart, the forecast, a checklist, a split).
+  boardShot('readme-boards'),
+  // A session working towards a goal, its rounds open.
+  goalShot('readme-goals'),
+  // Settings → Memory → Bring in, a ChatGPT export read into notes to pick.
+  bringInShot('readme-bring-in'),
+  // A reply as cards: a comparison table, a chart and key numbers.
+  cardsShot('readme-cards'),
+  // The desktop app's own Browser page, with an article open and tabs in a group.
+  browserShot('readme-browser'),
 ];
