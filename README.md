@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 110-second tour of Hydor: any agent and any model, sessions followed from any device, research with its sources, apps with views of their own, pictures, video and music made with AI, and documents and slides you write in" /></a>
+  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 140-second tour of Hydor: any agent and any model, word suggestions as you type, goals the app checks, research with its sources, Bring in from ChatGPT, sessions followed on your phone, apps with views of their own and apps you make, pictures, video and music made with AI, answers pinned to a board, experiments on your GPUs, and documents and slides you write in" /></a>
 </p>
 
 <p align="center">
@@ -137,7 +137,7 @@ You keep your plan, and you don't start from nothing.
       Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables for your paper. Agents start and watch them.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/media/readme-boards.webp" alt="A board of pinned answer cards: key figures, a chart, a map and a table" />
+      <img src="docs/media/readme-boards.webp" alt="A board of pinned answer cards: the week's key numbers, a sales chart and the weather forecast" />
       <p><b><a href="docs/guide/11-library.md#boards">Boards</a></b><br />
       Pin cards from replies to a board, and an agent can keep each one current on a schedule.</p>
     </td>
@@ -149,7 +149,7 @@ You keep your plan, and you don't start from nothing.
       Agree what "done" means (tests that pass, a number to reach) and the agent keeps at it round after round. The app runs the checks itself.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/media/readme-browser.webp" alt="The browser inside the desktop app, with an agent working in a tab" />
+      <img src="docs/media/readme-browser.webp" alt="The desktop app's own browser: tabs grouped in a column, and a review article open" />
       <p><b><a href="docs/guide/07-web.md#your-own-browser">A browser of its own</a></b><br />
       In the desktop apps: tabs, an ad blocker, translation and reader view, and agents that work in it while you watch.</p>
     </td>

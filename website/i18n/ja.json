@@ -457,5 +457,7 @@
   "System, Experiments: a sweep's six runs on shared charts, each in its own colour, with the queue and the GPUs at the left.": "システム、実験：スイープの6つの実行を共通のグラフに色分けして表示。左にキューとGPU。",
   "Agents work round after round until checks you agree hold": "エージェントは、合意したチェックが成立するまでラウンドを重ねて作業します",
   "Draft a reply to Maria about the budget review and keep it short": "予算レビューについてMariaへの返信を、短めに下書きして",
-  "Summarize the last three meetings and list what is still open": "直近3回の会議を要約して、未解決のことを一覧にして"
+  "Summarize the last three meetings and list what is still open": "直近3回の会議を要約して、未解決のことを一覧にして",
+  "A sketch first, to change before anything is made": "何かを作る前に、まずスケッチで確認",
+  "A board of pinned answer cards: the week’s key numbers, a sales chart and a weather forecast, each with when it was last updated.": "ピン留めした回答カードのボード。今週の主な数字、売上グラフ、天気予報が並び、それぞれに最終更新の時刻が表示されます。"
 }

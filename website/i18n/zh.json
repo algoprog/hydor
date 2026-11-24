@@ -457,5 +457,7 @@
   "System, Experiments: a sweep's six runs on shared charts, each in its own colour, with the queue and the GPUs at the left.": "系统，实验：一次参数扫描的六次运行显示在共用的图表上，各用一种颜色，左侧是队列和 GPU。",
   "Agents work round after round until checks you agree hold": "智能体一轮接一轮地工作，直到你们约定的检查项成立",
   "Draft a reply to Maria about the budget review and keep it short": "帮我给 Maria 写一封关于预算评审的回复，要简短",
-  "Summarize the last three meetings and list what is still open": "总结最近三次会议，并列出还没解决的事项"
+  "Summarize the last three meetings and list what is still open": "总结最近三次会议，并列出还没解决的事项",
+  "A sketch first, to change before anything is made": "先看草图，确认后再动手制作",
+  "A board of pinned answer cards: the week’s key numbers, a sales chart and a weather forecast, each with when it was last updated.": "一块置顶回答卡片的看板：本周关键数字、销售图表和天气预报，每张都标明上次更新的时间。"
 }
