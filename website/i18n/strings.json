@@ -198,7 +198,7 @@
   "Keys agents never see": "Keys agents never see",
   "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.": "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.",
   "Open source": "Open source",
-  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.": "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.",
+  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.": "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.",
   "Questions": "Questions",
   "Good to know": "Good to know",
   "Something else? <0>Ask on GitHub</0>.": "Something else? <0>Ask on GitHub</0>.",

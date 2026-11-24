@@ -118,7 +118,7 @@
   "Keys agents never see": "エージェントには見えないキー",
   "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.": "パスワードやキーは暗号化された保管庫に保存。エージェントは名前で指定して使い、許可したサイトでのみ利用できます。",
   "Open source": "オープンソース",
-  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.": "GNU AGPL 3.0のオープンソース。すべてのコードを読めて、自由に変更できます。変更版を共有したり他の人向けに動かしたりする場合は、その変更も共有します。英語、ドイツ語、スペイン語、フランス語、ポルトガル語、ギリシャ語、日本語、中国語に対応。",
+  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.": "GNU AGPL 3.0のオープンソース。すべてのコードを読めて、自由に変更できます。変更版を共有したり他の人向けに動かしたりする場合は、その変更も共有します。",
   "Questions": "質問",
   "Good to know": "知っておきたいこと",
   "Something else? <0>Ask on GitHub</0>.": "ほかにもご質問は？<0>GitHubで質問</0>してください。",

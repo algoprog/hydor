@@ -118,7 +118,7 @@
   "Keys agents never see": "Κλειδιά που οι πράκτορες δεν βλέπουν ποτέ",
   "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.": "Οι κωδικοί και τα κλειδιά βρίσκονται σε κρυπτογραφημένο θησαυροφυλάκιο. Οι πράκτορες τα χρησιμοποιούν με το όνομά τους, μόνο στους ιστότοπους που επιτρέπετε.",
   "Open source": "Ανοιχτός κώδικας",
-  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.": "Ανοιχτός κώδικας υπό την GNU AGPL 3.0: διαβάστε κάθε γραμμή και αλλάξτε ό,τι θέλετε· όποιος μοιράζεται μια τροποποιημένη έκδοση ή τη τρέχει για άλλους, μοιράζεται και τις αλλαγές του. Στα αγγλικά, γερμανικά, ισπανικά, γαλλικά, πορτογαλικά, ελληνικά, ιαπωνικά ή κινεζικά.",
+  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.": "Ανοιχτός κώδικας υπό την GNU AGPL 3.0: διαβάστε κάθε γραμμή και αλλάξτε ό,τι θέλετε· όποιος μοιράζεται μια τροποποιημένη έκδοση ή την τρέχει για άλλους, μοιράζεται και τις αλλαγές του.",
   "Questions": "Ερωτήσεις",
   "Good to know": "Καλό να γνωρίζετε",
   "Something else? <0>Ask on GitHub</0>.": "Κάτι άλλο; <0>Ρωτήστε στο GitHub</0>.",

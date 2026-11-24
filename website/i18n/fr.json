@@ -118,7 +118,7 @@
   "Keys agents never see": "Des clés que les agents ne voient jamais",
   "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.": "Mots de passe et clés vivent dans un coffre chiffré. Les agents les utilisent par leur nom, uniquement sur les sites que vous autorisez.",
   "Open source": "Open source",
-  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.": "Open source sous licence GNU AGPL 3.0 : lisez chaque ligne et modifiez ce que vous voulez ; quiconque partage une version modifiée, ou en exécute une pour d’autres, partage aussi ses modifications. Disponible en anglais, allemand, espagnol, français, portugais, grec, japonais ou chinois.",
+  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.": "Open source sous licence GNU AGPL 3.0 : lisez chaque ligne et modifiez ce que vous voulez ; quiconque partage une version modifiée, ou en exécute une pour d’autres, partage aussi ses modifications.",
   "Questions": "Questions",
   "Good to know": "Bon à savoir",
   "Something else? <0>Ask on GitHub</0>.": "Autre chose ? <0>Demandez sur GitHub</0>.",

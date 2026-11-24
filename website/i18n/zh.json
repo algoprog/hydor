@@ -118,7 +118,7 @@
   "Keys agents never see": "智能体永远看不到的密钥",
   "Passwords and keys live in an encrypted vault. Agents use them by name, only on the sites you allow.": "密码和密钥保存在加密保险库中。智能体按名称使用它们，而且只在你允许的网站上。",
   "Open source": "开源",
-  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too. In English, German, Spanish, French, Portuguese, Greek, Japanese or Chinese.": "基于 GNU AGPL 3.0 开源：阅读每一行代码，随意修改；分享修改版本或为他人运行修改版本的人，也要分享他们的修改。支持英语、德语、西班牙语、法语、葡萄牙语、希腊语、日语和中文。",
+  "Open source under the GNU AGPL 3.0: read every line and change what you like; whoever shares a changed version, or runs one for others, shares their changes too.": "基于 GNU AGPL 3.0 开源：阅读每一行代码，随意修改；分享修改版本或为他人运行修改版本的人，也要分享他们的修改。",
   "Questions": "常见问题",
   "Good to know": "值得了解",
   "Something else? <0>Ask on GitHub</0>.": "还有其他问题？<0>到 GitHub 上提问</0>。",
