@@ -444,7 +444,7 @@ ${html}
     <section class="wrap docs-hero">
       <p class="eyebrow">${esc(T('Docs'))}</p>
       <h1>${esc(T('How can we help?'))}</h1>
-      <p>${esc(T('Every part of Hydor, in plain words: the same guide the app shows under Help.'))}</p>
+      <p>${esc(T('Every part of Hydor, in plain words.'))}</p>
       ${searchButton('big-search', T)}
     </section>
     <div class="wrap">
