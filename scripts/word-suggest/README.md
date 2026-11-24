@@ -41,6 +41,7 @@ The package `ws/`:
 - `pretrain_data.py`: the pretraining shards as sequences, the replay of public text, and the mix of tokens per
   language.
 - `online.py`, `dayroute.py`: experiments in keeping the small model current day by day.
+- `nights.py`: the nightly runs of the app, simulated (see `scripts/nights_sim.py`).
 - `gpu.py`: the device option, the GPU memory cap (`WS_GPU_MEM_GB`) and GPU versions of the scorer and the metrics.
 
 The pipeline steps in `scripts/`:
@@ -75,6 +76,7 @@ The pipeline steps in `scripts/`:
 - `check_greedy.py`: checks the quick measure against real constrained decoding.
 - `compare_langs.py`, `report.py`: compare runs per language, and gather many runs into one table.
 - `online_sim.py`: keeps a model current over the test days (`ws/online.py`).
+- `nights_sim.py`, `nights_report.py`, `nights_run.sh`: the app's nightly run simulated over the history (`ws/nights.py`, which runs the app's own trainer): does the model drift when it learns a little every night, and do replaying older writing, a check on held-out public text, or a fresh start every 30 days help. Counts and losses only; the data is private.
 - `bench_slm.py`, `bench_full_vocab.py`, `bench_mlm.py`: how fast the small model, the full-vocabulary model and
   mmBERT are on a CPU.
 - `personal_meta.py`: counts the languages in your own messages with the release's language guess. It prints numbers
