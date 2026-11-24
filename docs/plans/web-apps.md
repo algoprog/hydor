@@ -753,6 +753,38 @@ a landing page needs.
   an app of its own, where a trip is started from its own page, followed as the agents work, kept in its own
   list, and still run for you by an agent in a session.
 
+### What Phase 2 found (24 November 2026)
+
+Phase 2 is built, and two of its three tests are met as far as they can be without the feature on a real Hydor.
+The Hydor side is still a branch, not merged, and its pages are in English only.
+
+| Test | Result |
+|---|---|
+| Scripted briefs end with every check green and no hand on the code | 9 of 12 on the first run, each built by an agent that had only the brief, the kit's commands and the app's notes. The three that failed were rebuilt after the kit's fixes and pass. The whole set has not been run again since |
+| The Trip planner gets an app of its own | Met with the real kit: started from its own page, refused in a sentence when a question is left empty, followed live, kept as a row only its person sees, found again by the agent through the app's own function, and still run from a session, whose card opens the row |
+| Someone who does not code goes from a paragraph to a working app through the stages | Not shown. The stages, the cards and the tools exist and are tested with made-up replies; no real agent has led a person through them, which needs the feature on a running Hydor |
+
+| Built | What it is now |
+|---|---|
+| The guide | Brief, Features, Design, Build and Check on the app's page; a sketch with a kind; cards for features, for three designs pictured from the real blocks, and for one of a few; a commit per step and **Back to before this**; pointing at a part of the page in Preview; the `web-app-builder` skill with a reference per stage |
+| Designs and checks in the kit | `kit designs` pictures three directions for a brief from the themes, shells and section variants; **View as** another person or role; `kit check --full` runs the tests, the access checks, the search for keys in browser code, phone layout, accessibility and speed |
+| Agent apps on the kit | The flows seam with Hydor's engine behind it; parts for starting, following and listing runs; the flows block and the agent-app starter; a run acts for the person signed in, checked by Hydor; the app's functions as its agents' tools, each switched on by the owner, one that changes things asking on a card |
+| In Hydor's pages | **Give it an app of its own** on an agent app or a ready-made one, as one job that leaves nothing behind if a step fails; **Add agents' work** on a web app; a **Flows** tab with the flows, the runs, the functions and what was spent today |
+| The benchmark | Twelve briefs with a judge that uses each app as two people over HTTP and in a browser, and a test of the judge itself |
+
+**What the briefs showed.** A form the public fills in had no home (the kit now has public forms); a list name with
+an underscore got an address the notes did not say; the builders reached for the database underneath where the
+data layer lacked a condition; one builder left servers running. Each became a fix in the kit or a line in its
+notes.
+
+**What giving the Trip planner an app showed.** A run started in a session did not act for anyone, so it kept no
+row; Hydor now tells the app when a run ends. An app's tools were cut at 80, which dropped its own functions. A
+kept trip shows its tables and its formatted text raw: the kit's pages need a way to draw both.
+
+**Not done in this phase.** The ready-made **Build a small web app** still stands, until the guide has been used
+for real. Helpers by tier are in the skill's words only, not measured. The briefs cover the kit and a builder,
+not the guide's cards.
+
 ### Phase 3: launch on servers, and SaaS
 
 - Blocks: teams, billing (subscriptions, one-off purchases, the portal, the plans file and its sync, Managed
