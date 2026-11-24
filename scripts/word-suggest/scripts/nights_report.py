@@ -125,13 +125,39 @@ def final(root, arms, base):
         print(line)
 
 
+def costs(root, arms):
+    print('\n## Cost per night (GPU, this machine) and what each run read')
+    print(f"{'arm':>4} {'nights':>6} {'accepted':>8} {'steps/night':>11} {'med steps':>9} {'s/night':>8} {'med s':>6} {'total min':>9} {'fresh runs':>10} {'fresh s':>8}")
+    for a in arms:
+        ns = [r for r in read(os.path.join(root, a, 'log.jsonl')) if r['t'] == 'night']
+        tr = [r for r in ns if 'steps' in r]
+        if not tr:
+            print(f'{a:>4} {len(ns):>6}  (no training)')
+            continue
+        inc = [r for r in tr if not r.get('fresh')]
+        fr = [r for r in tr if r.get('fresh')]
+        acc = sum(1 for r in ns if r.get('accepted', True))
+        print(f"{a:>4} {len(ns):>6} {acc:>8} {np.mean([r['steps'] for r in inc]):11.1f} {np.median([r['steps'] for r in inc]):9.0f} "
+              f"{np.mean([r['seconds'] for r in inc]):8.1f} {np.median([r['seconds'] for r in inc]):6.1f} {sum(r['seconds'] for r in tr) / 60:9.1f} "
+              f"{len(fr):>10} {np.mean([r['seconds'] for r in fr]) if fr else 0:8.0f}")
+
+
+def drift_table(root, arms):
+    """public loss and FLORES at chosen nights, final-minus-start."""
+    print('\n## Public held-out loss (nats/token) at night 1, 10, 30, 60, 96 and the last')
+    for a in arms:
+        ns = [r for r in read(os.path.join(root, a, 'log.jsonl')) if r['t'] == 'night']
+        pos = {r['pos']: r['pub']['macro'] for r in ns}
+        print(f"{a:>4} " + ' '.join(f"{pos.get(p - 1, float('nan')):6.3f}" for p in (1, 10, 30, 60, 96)) + f"  last {ns[-1]['pub']['macro']:.3f}")
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('root')
     ap.add_argument('--arms', required=True)
     ap.add_argument('--every', type=int, default=10)
     ap.add_argument('--base', default='A')
-    ap.add_argument('what', choices=['curves', 'final'])
+    ap.add_argument('what', choices=['curves', 'final', 'costs', 'drift'])
     a = ap.parse_args()
     arms = a.arms.split(',')
-    (curves(a.root, arms, a.every) if a.what == 'curves' else final(a.root, arms, a.base))
+    {'curves': lambda: curves(a.root, arms, a.every), 'final': lambda: final(a.root, arms, a.base), 'costs': lambda: costs(a.root, arms), 'drift': lambda: drift_table(a.root, arms)}[a.what]()
