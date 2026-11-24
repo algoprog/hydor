@@ -1,8 +1,9 @@
-// Where a run of learning is done: on the processor, or on the graphics card when there is one the person has left alone
-// (an NVIDIA card with room and not busy, or a Mac's own). The choice is made at the start of every run, from what the
-// computer says then, and everything it needs from outside (the platform, the environment, nvidia-smi's answers) can be
-// handed in, so the rules are checked without a card.
+// Where a run of learning is done: on the processor, or on the graphics card when there is one to use (an NVIDIA card
+// with room and not busy, one no other program uses first, else one a model server waits on idle; or a Mac's own). The
+// choice is made at the start of every run, from what the computer says then, and everything it needs from outside (the
+// platform, the environment, nvidia-smi's answers) can be handed in, so the rules are checked without a card.
 import { execFile } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { which } from '../documents/tools.ts';
 import type { TrainDevice } from '../../shared/suggest.ts';
 
@@ -15,10 +16,20 @@ export const GPU_BUSY_MAX = 50;
  */
 export const GPU_ROOMY_MB = 6144;
 /**
- * A card where another program already holds this much memory (MiB) is left alone: a model server on it (vLLM, Ollama,
- * llama.cpp) would be slowed while learning ran beside it. A desktop's own use of a card is far below this.
+ * A program that holds this much memory (MiB) on a card is taken for a model server (vLLM, Ollama, llama.cpp…); a
+ * desktop's own use of a card is far below it. A card with no such program is chosen first.
  */
 export const GPU_OTHERS_MAX_MB = 1024;
+/**
+ * When every card with room has a model server on it (a computer that serves models on all its cards), learning shares
+ * one whose server is idle: under this busy (percent) in each of GPU_SHARED_LOOKS looks a second apart, as one look can
+ * fall between two of its requests. A server at work keeps its card well above it, and is not slowed. Refusing every
+ * such card would leave the run hours on the processor instead, slowing everything on the computer, servers included.
+ */
+export const GPU_SHARED_BUSY_MAX = 20;
+export const GPU_SHARED_LOOKS = 3;
+/** On a card it shares, a run leaves this much memory (MiB) free beyond what it takes, for the programs already there. */
+export const GPU_SPARE_MB = 2048;
 
 export interface GpuInfo {
   index: number;
@@ -30,7 +41,7 @@ export interface GpuInfo {
 
 /** The answer: where to learn, and when it is the processor although the graphics card was wanted, why not. */
 export interface DevicePick {
-  device: TrainDevice & { /** cuda: the card's number (CUDA_VISIBLE_DEVICES for the run), and the memory free on it (MiB) when it was chosen. */ index?: number; freeMb?: number };
+  device: TrainDevice & { /** cuda: the card's number (CUDA_VISIBLE_DEVICES for the run), and the memory the run may take on it (MiB): what was free when it was chosen, less GPU_SPARE_MB on a card it shares. */ index?: number; freeMb?: number };
   why?: string;
   /** cuda: the PyTorch build to use, such as cu126 (the newest the driver supports). */
   tag?: string;
@@ -114,10 +125,12 @@ export function othersByCard(uuids: string, apps: string): Map<number, number> {
 }
 
 /**
- * The card to learn on, or why none: the one with the most memory free among those with room, less than half busy and
- * with no other program holding GPU_OTHERS_MAX_MB or more on it.
+ * The card to learn on, or why none. Among the cards with room and less than half busy: the one with the most memory free
+ * that no other program holds GPU_OTHERS_MAX_MB or more on; when a model server is on each of them, the one with the most
+ * free whose server is idle (under GPU_SHARED_BUSY_MAX) and that has GPU_SPARE_MB more than the run needs, which the run
+ * leaves to it (`shared`, with freeMb the memory the run may take).
  */
-export function bestGpu(gpus: GpuInfo[], visible: number[] | null, others: Map<number, number> = new Map()): { gpu: GpuInfo } | { why: string } {
+export function bestGpu(gpus: GpuInfo[], visible: number[] | null, others: Map<number, number> = new Map()): { gpu: GpuInfo; shared?: true } | { why: string } {
   if (!gpus.length) return { why: 'No NVIDIA graphics card was found' };
   const mine = visible ? gpus.filter((g) => visible.includes(g.index)) : gpus;
   if (!mine.length) return { why: 'CUDA_VISIBLE_DEVICES or HYDOR_SUGGEST_GPUS leaves no graphics card for this app' };
@@ -126,12 +139,26 @@ export function bestGpu(gpus: GpuInfo[], visible: number[] | null, others: Map<n
     const top = [...mine].sort((a, b) => b.freeMb - a.freeMb)[0];
     return { why: `No graphics card has ${GPU_NEED_MB / 1024} GB free and is less than half busy (${top.name} has ${(top.freeMb / 1024).toFixed(1)} GB free and is ${top.util}% busy)` };
   }
-  const ok = roomy.filter((g) => (others.get(g.index) ?? 0) < GPU_OTHERS_MAX_MB);
-  if (!ok.length) {
-    const g = roomy[0];
-    return { why: `Every graphics card with room is in use by another program (one holds ${((others.get(g.index) ?? 0) / 1024).toFixed(1)} GB on ${g.name} ${g.index})` };
+  const most = (l: GpuInfo[]) => l.reduce((a, b) => (b.freeMb > a.freeMb ? b : a));
+  const own = roomy.filter((g) => (others.get(g.index) ?? 0) < GPU_OTHERS_MAX_MB);
+  if (own.length) return { gpu: most(own) };
+  const idle = roomy.filter((g) => g.util < GPU_SHARED_BUSY_MAX && g.freeMb >= GPU_NEED_MB + GPU_SPARE_MB);
+  if (idle.length) {
+    const g = most(idle);
+    return { gpu: { ...g, freeMb: g.freeMb - GPU_SPARE_MB }, shared: true };
   }
-  return { gpu: ok.reduce((a, b) => (b.freeMb > a.freeMb ? b : a)) };
+  const g = most(roomy);
+  return {
+    why: `Every graphics card with room has a model server on it that is busy or leaves too little memory beside it (${g.name} ${g.index} is ${g.util}% busy with ${(g.freeMb / 1024).toFixed(1)} GB free; sharing a card takes under ${GPU_SHARED_BUSY_MAX}% busy and ${(GPU_NEED_MB + GPU_SPARE_MB) / 1024} GB free)`,
+  };
+}
+
+/** Each card as the worst of several looks at it: the least memory free and the most busy seen. */
+export function worstOf(looks: GpuInfo[][]): GpuInfo[] {
+  return (looks[0] ?? []).map((g) => {
+    const seen = looks.flatMap((l) => l.filter((h) => h.index === g.index));
+    return { ...g, freeMb: Math.min(...seen.map((h) => h.freeMb)), util: Math.max(...seen.map((h) => h.util)) };
+  });
 }
 
 /** The cards both lists leave (a list that is null leaves all). */
@@ -157,7 +184,11 @@ export interface ChooseOptions {
   env?: NodeJS.ProcessEnv;
   /** nvidia-smi's output for the arguments, or null (by default it runs). */
   smi?: (args: string[]) => Promise<string | null>;
+  /** The time between two looks at a card it would share with a model server (ms; a second by default). */
+  lookGapMs?: number;
 }
+
+const QUERY = ['--query-gpu=index,name,memory.free,utilization.gpu', '--format=csv,noheader,nounits'];
 
 /** Where this run learns. */
 export async function chooseDevice(o: ChooseOptions): Promise<DevicePick> {
@@ -170,13 +201,26 @@ export async function chooseDevice(o: ChooseOptions): Promise<DevicePick> {
   if (platform !== 'linux' && platform !== 'win32') return { ...cpu, why: 'No graphics card support on this system' };
   if (platform === 'win32' && arch !== 'x64') return { ...cpu, why: 'PyTorch has no graphics card build for this computer' };
   const smi = o.smi ?? ((args: string[]) => nvidiaSmi(args, env));
-  const list = await smi(['--query-gpu=index,name,memory.free,utilization.gpu', '--format=csv,noheader,nounits']);
+  const list = await smi(QUERY);
   if (list == null) return { ...cpu, why: 'No NVIDIA graphics card was found' };
   const gpus = parseGpus(list);
-  // What other programs hold on each card (a card they use is left alone); an answer that cannot be read leaves all cards in.
+  // What other programs hold on each card (a card a model server is on is shared only while it is idle); an answer that
+  // cannot be read counts no programs.
   const others = gpus.length ? othersByCard((await smi(['--query-gpu=index,uuid', '--format=csv,noheader,nounits'])) ?? '', (await smi(['--query-compute-apps=gpu_uuid,used_memory', '--format=csv,noheader,nounits'])) ?? '') : new Map<number, number>();
   // The server's own CUDA_VISIBLE_DEVICES, and HYDOR_SUGGEST_GPUS: the cards learning may use (both by number).
-  const best = bestGpu(gpus, both(visibleCards(env.CUDA_VISIBLE_DEVICES), visibleCards(env.HYDOR_SUGGEST_GPUS)), others);
+  const visible = both(visibleCards(env.CUDA_VISIBLE_DEVICES), visibleCards(env.HYDOR_SUGGEST_GPUS));
+  let best = bestGpu(gpus, visible, others);
+  // A card to share is looked at again, a second apart, and chosen only if it stays idle with room in every look (it may
+  // then be another card that did). A look that cannot be read is passed over.
+  if ('gpu' in best && best.shared) {
+    const looks = [gpus];
+    for (let i = 1; i < GPU_SHARED_LOOKS; i++) {
+      await sleep(o.lookGapMs ?? 1000);
+      const again = await smi(QUERY);
+      if (again != null) looks.push(parseGpus(again));
+    }
+    best = bestGpu(worstOf(looks), visible, others);
+  }
   if ('why' in best) return { ...cpu, why: best.why };
   const cuda = parseCuda((await smi([])) ?? '');
   if (!cuda) return { ...cpu, why: 'The graphics card driver did not say which CUDA version it supports' };

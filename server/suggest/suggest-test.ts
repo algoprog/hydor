@@ -23,7 +23,7 @@ import { LlamaServer } from './llm.ts';
 import { killAll, leftoverTraining, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { baseId, run as runCommand, setupRelease, tidyReleases, unsupportedSystem, withStall } from './setup.ts';
-import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
+import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, worstOf, GPU_SHARED_BUSY_MAX, GPU_SHARED_LOOKS, GPU_SPARE_MB, type DevicePick } from './gpu.ts';
 import { GRACE, MAX_OWN_TOKENS, gpuHold, personalDir, personalState, recoverPersonal, runSeed } from './train.ts';
 import { merge, readSettings, trainThreads, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
@@ -1398,7 +1398,7 @@ const smiOf = (rows: string | null, cuda = '12.4', calls: string[][] = []) => as
   if (rows == null) return null;
   return args.length ? rows : `Mon\n| NVIDIA-SMI 550.54     Driver Version: 550.54     CUDA Version: ${cuda}     |\n`;
 };
-const choose = (o: Partial<Parameters<typeof chooseDevice>[0]> = {}) => chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env: {}, smi: smiOf(cards), ...o });
+const choose = (o: Partial<Parameters<typeof chooseDevice>[0]> = {}) => chooseDevice({ enabled: true, platform: 'linux', arch: 'x64', env: {}, smi: smiOf(cards), lookGapMs: 0, ...o });
 
 test('the graphics card: the setting, a Mac, and the card with the most memory free that is not busy', async () => {
   const calls: string[][] = [];
@@ -1432,7 +1432,7 @@ test('the graphics card: the setting, a Mac, and the card with the most memory f
   assert.match((await choose({ smi: smiOf('garbage\n0, Card, [N/A], [N/A]') })).why!, /No NVIDIA/, 'a card that says nothing of its memory is left out');
 });
 
-test('the graphics card: one another program already uses (a model server) is left alone, and HYDOR_SUGGEST_GPUS limits the cards', async () => {
+test('the graphics card: one no other program uses comes first, a model server’s card is shared while it stays idle with room to spare, and HYDOR_SUGGEST_GPUS limits the cards', async () => {
   const uuids = ['0, GPU-aaaa-0000', '1, GPU-bbbb-1111', '2, GPU-cccc-2222', '3, GPU-dddd-3333'].join('\n');
   // Each question answered as nvidia-smi would: the cards, their UUIDs, the programs on them, or the driver's header.
   const smiWith = (apps: string) => async (args: string[]) =>
@@ -1442,9 +1442,51 @@ test('the graphics card: one another program already uses (a model server) is le
   assert.equal(vllm.device.index, 0, 'card 1 holds a model server: the next card with room');
   const small = await choose({ smi: smiWith('GPU-bbbb-1111, 300') });
   assert.equal(small.device.index, 1, "a desktop's small use leaves the card in");
-  const taken = await choose({ smi: smiWith('GPU-aaaa-0000, 4000\nGPU-bbbb-1111, 1024') });
-  assert.equal(taken.device.kind, 'cpu', 'every card with room is in use');
-  assert.match(taken.why!, /in use by another program/);
+  // Cards as nvidia-smi answers them: the card query (counted; the k-th call gets rows(k)), the UUIDs, the programs, the header.
+  const answer = (rows: string | null | ((k: number) => string | null), apps: string, calls = { n: 0 }) => async (args: string[]) => {
+    if (!args.length) return '| NVIDIA-SMI 550.54  Driver Version: 550.54  CUDA Version: 12.4 |';
+    if (args[0].startsWith('--query-compute-apps')) return apps;
+    if (args[0] === '--query-gpu=index,uuid') return uuids;
+    const k = calls.n++;
+    return typeof rows === 'function' ? rows(k) : rows;
+  };
+  const serversOnBoth = 'GPU-aaaa-0000, 4000\nGPU-bbbb-1111, 1024';
+  // Both servers idle: card 1 has the most free, and the run may take what is free less the spare.
+  assert.deepEqual(await choose({ smi: answer(cards, serversOnBoth) }), { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 1, freeMb: 24082 - GPU_SPARE_MB }, tag: 'cu124' }, 'a model server on each of cards 0 and 1, both idle: card 1 is shared');
+  // A busy server's card is passed over for an idle one; 19% busy still counts as idle, 20% does not.
+  const busy = `0, NVIDIA GeForce RTX 4090, 21070, 0\n1, NVIDIA GeForce RTX 4090, 24082, 25`;
+  assert.deepEqual(await choose({ smi: answer(busy, serversOnBoth) }), { device: { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 0, freeMb: 21070 - GPU_SPARE_MB }, tag: 'cu124' }, 'card 1 is 25% busy under its server: card 0, idle, is shared');
+  const nearly = `0, NVIDIA GeForce RTX 4090, 21070, ${GPU_SHARED_BUSY_MAX - 1}\n1, NVIDIA GeForce RTX 4090, 24082, 45`;
+  assert.equal((await choose({ smi: answer(nearly, serversOnBoth) })).device.index, 0, 'one point under the busy limit is still idle');
+  // Every server's card busy: not shared, the processor, and the why says so. Exactly at the limit is busy.
+  const allBusy = `0, NVIDIA GeForce RTX 4090, 21070, ${GPU_SHARED_BUSY_MAX}\n1, NVIDIA GeForce RTX 4090, 24082, 45`;
+  const bothBusy = await choose({ smi: answer(allBusy, serversOnBoth) });
+  assert.equal(bothBusy.device.kind, 'cpu', 'every card a model server is on is busy: the processor');
+  assert.match(bothBusy.why!, /model server on it that is busy/, 'why: a model server is on each card and busy');
+  // Room beside the server: 6 GB free is enough to share (the run takes 4 GB); 6143 MiB is not.
+  assert.deepEqual(await choose({ smi: answer('0, Card, 6144, 0', 'GPU-aaaa-0000, 4000') }), { device: { kind: 'cuda', name: 'Card', index: 0, freeMb: 4096 }, tag: 'cu124' }, 'a server on the only card, 6 GB free: shared, the run takes 4 GB');
+  const tight = await choose({ smi: answer('0, Card, 6143, 0', 'GPU-aaaa-0000, 4000') });
+  assert.equal(tight.device.kind, 'cpu', 'a server on the only card, 6143 MiB free: not shared');
+  assert.match(tight.why!, /too little memory/, 'why: too little memory beside the server');
+  // The looks: a shared card is looked at GPU_SHARED_LOOKS times, and each look must show it idle with room.
+  const looksOf = (...rows: (string | null)[]) => (k: number) => rows[Math.min(k, rows.length - 1)];
+  const idle = '0, NVIDIA GeForce RTX 4090, 21070, 0\n1, NVIDIA GeForce RTX 4090, 24082, 10';
+  const calls = { n: 0 };
+  const allIdle = await choose({ smi: answer(looksOf(idle), serversOnBoth, calls) });
+  assert.deepEqual(allIdle.device, { kind: 'cuda', name: 'NVIDIA GeForce RTX 4090', index: 1, freeMb: 24082 - GPU_SPARE_MB }, 'three looks, all idle: card 1 is shared');
+  assert.equal(calls.n, GPU_SHARED_LOOKS, 'the card was asked about once for each look');
+  assert.equal((await choose({ smi: answer(looksOf(idle, '0, NVIDIA GeForce RTX 4090, 21070, 0\n1, NVIDIA GeForce RTX 4090, 24082, 60', idle), serversOnBoth) })).device.index, 0, 'card 1 at 60% in one look: card 0 is chosen');
+  const busyLast = await choose({ smi: answer(looksOf(idle, idle, '0, NVIDIA GeForce RTX 4090, 21070, 25\n1, NVIDIA GeForce RTX 4090, 24082, 30'), serversOnBoth) });
+  assert.equal(busyLast.device.kind, 'cpu', 'both cards busy in the last look: the processor');
+  assert.match(busyLast.why!, /model server on it that is busy/);
+  assert.equal((await choose({ smi: answer(looksOf(idle, idle, '0, NVIDIA GeForce RTX 4090, 21070, 0\n1, NVIDIA GeForce RTX 4090, 5000, 10'), serversOnBoth) })).device.index, 0, 'card 1 down to 5000 MiB free in a later look: card 0');
+  assert.equal((await choose({ smi: answer(looksOf(idle, null, idle), serversOnBoth) })).device.index, 1, 'a look that cannot be read is passed over: card 1 still');
+  const quiet = { n: 0 };
+  assert.equal((await choose({ smi: answer(looksOf(idle), '', quiet) })).device.index, 1, 'no model server: card 1, not shared');
+  assert.equal(quiet.n, 1, 'a card no other program uses is asked about once only');
+  // worstOf: each card is the least free and the most busy of the looks; no looks, no cards.
+  assert.deepEqual(worstOf([[{ index: 0, name: 'A', freeMb: 10000, util: 0 }], [{ index: 0, name: 'A', freeMb: 8000, util: 15 }], [{ index: 0, name: 'A', freeMb: 9000, util: 5 }]]), [{ index: 0, name: 'A', freeMb: 8000, util: 15 }], 'each card: the least memory free and the most busy of the looks');
+  assert.deepEqual(worstOf([]), [], 'no looks: no cards');
   assert.equal((await choose({ smi: smiWith('') })).device.index, 1, 'no programs: as before');
   // HYDOR_SUGGEST_GPUS: only the cards it lists, together with the server's CUDA_VISIBLE_DEVICES.
   assert.equal((await choose({ env: { HYDOR_SUGGEST_GPUS: '0' } })).device.index, 0);

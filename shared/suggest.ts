@@ -85,7 +85,7 @@ export interface SuggestSettings {
   userWeight: number;
   /** Threads for personalising (0: chosen from the computer's cores). */
   trainThreads: number;
-  /** Learn on the graphics card when there is one (an NVIDIA card with 4 GB free, or a Mac with Apple silicon); else on the processor. */
+  /** Learn on the graphics card when there is one (an NVIDIA card with 4 GB free, shared with a model server only while it is idle, or a Mac with Apple silicon); else on the processor. */
   trainGpu: boolean;
 }
 

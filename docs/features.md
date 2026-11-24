@@ -1497,7 +1497,8 @@ agents that speak ACP and take MCP servers.
   and other sessions put there), agents' replies, the notes you wrote and the documents you wrote, each source with its
   switch and your own words weighted higher, every night, every week or when you press Retrain now, in the background at
   the lowest priority and when you have not typed for ten minutes. Every run starts again from the small model that came with the app and learns from all your writing, its newest part, so what it learned never drifts (and it can take hours without a graphics card); after an update brings a new small model, the next run learns again from it even if nothing new was written; in the languages you do not write in, the one that came with the app keeps suggesting.
-  A run learns on an NVIDIA graphics card with room (4 GB free, under half busy; the one with the most free) or a
+  A run learns on an NVIDIA graphics card with room (4 GB free, under half busy; the one with the most free that no other
+  program uses, else, when a model server such as vLLM or Ollama is on every card, one whose server is idle, leaving it 2 GB) or a
   Mac's own, many times faster, when Learn on the graphics card is on (the first time on an NVIDIA card it downloads
   PyTorch's build for it, about 2.5 GB, and a card that fails is left alone for a day; the first time on the processor it adds PyTorch's processor build, about 200 MB, which only learning needs), and Pause, Resume and Stop on the
   learning line hold or end a run (a pause keeps what it learned and holds the schedule, also after a restart).

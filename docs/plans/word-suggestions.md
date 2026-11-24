@@ -210,7 +210,9 @@ Qwen3.5 alone (29.7% against 30.5%); one run from the published model on everyth
   (`POST /api/suggest/train/pause`: SIGTERM, train.py saves its resume state; the pause is kept in `kv`, so it holds the
   schedule across restarts), resumed (`POST /api/suggest/train`) or stopped (`DELETE /api/suggest/train`: the work folder goes
   and the schedule counts it as an attempt). With `trainGpu` on, each run picks its device first (`server/suggest/gpu.ts`):
-  an NVIDIA card with at least 4 GB free and under 50% use (the most free, among those `CUDA_VISIBLE_DEVICES` leaves), run
+  an NVIDIA card with at least 4 GB free and under 50% use (the most free, among those `CUDA_VISIBLE_DEVICES` and
+  `HYDOR_SUGGEST_GPUS` leave, that no other program holds 1 GB or more on; when a model server is on each, the most free whose
+  server is under 20% busy in three looks a second apart with 6 GB free, the run taking all but 2 GB of it), run
   with `--device cuda` (and `--micro-tokens <batch>`, the batch in one piece, when the card has 6 GB free; a card with less
   keeps train.py's pieces of 1,024, which peak under 4 GB) from a second private environment (`venv-gpu`, PyTorch's CUDA build for the
   newest CUDA the driver supports), or `mps` on a Mac with Apple silicon. A card that cannot be set up or fails in a run
