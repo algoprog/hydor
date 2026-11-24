@@ -355,6 +355,17 @@ They need nothing but the packages: no corpus, no data and no GPU. They take abo
 need Qwen3.5's tokenizer or mmBERT-small download them on first use, and are skipped when the Hugging Face cache does
 not have them and there is no network. The two that need a GPU are skipped without one.
 
+## Pretraining on more typed text (a pilot)
+
+`data/typed.py` builds shards of what people typed (WildChat user turns, ODC-By; Enron email without the writers of the public
+test, no licence stated; Sinabis synthetic multilingual email, CC-BY-4.0), keeping out the FLORES-200 sentences and the public
+tests, and `unity_typed_pilot.sh` continues the released model for 1 billion tokens on 66% of `mix_complement.json` plus 30%
+conversations and 4% email (`typed.py mix`), against a control on `mix_complement.json` alone (lr 3e-4, warm-up 100, 262k-token
+steps, one A100 each, 2 GPU-hours each). Model alone, keystrokes saved at precision 0.4 (pilot - control, paired): messages +1.3,
+email +6.5, the owner's chat +2.9, FLORES-200 (193 languages) -0.04 (no change). Mixed with Qwen3.5 through the existing
+gate or switch the gain does not show beyond parity (the switch gives these languages to Qwen3.5 alone), so a gate fitted on typed
+text is the next step.
+
 ## Licence
 
 AGPL-3.0-only, like the rest of the repository. The model's tokenizer is Qwen3.5's, unchanged, under Apache-2.0
