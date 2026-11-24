@@ -3,7 +3,7 @@ lowest priority, usually when the computer is idle).
 
   python -I train.py --texts texts.jsonl --base <release dir> --init <release dir | personal dir> --out <new personal dir>
       --replay <release dir>/replay --lr 5e-4 --batch-tokens 4096 --w-user 4 --replay-ratio 1.0 --epochs 1 --threads N
-      --device auto --resume
+      --device auto --resume --holdout 0 --max-tokens 4000000
 
 Each line of the texts file: {"kind": "user"|"agent"|"doc", "text", "ts", "session"?, "reply"?}; a user message carries the agent reply it
 answered. The recipe is the research's:
@@ -11,7 +11,10 @@ answered. The recipe is the research's:
   --w-user (a message of more than 100 words is cut into pieces of 100, a later piece reading the 100 words before it); an agent reply
   is `<bos> <agent> chunk <eos>` and a document or note the person wrote `<bos> <doc> chunk <eos>` (chunks of 254 tokens; the person's
   own at --w-user, the replies at 1);
-- the last 5% of the person's messages (by time) are held out and their loss printed;
+- --max-tokens bounds the person's own text (messages and documents): the newest records up to that many tokens are learned from,
+  the rest is left out (agent replies: those from that same stretch of time, at most as many tokens again);
+- the last 5% of the person's messages (by time) are held out and their loss printed (--holdout 0 holds none out: the server learns
+  from every message, each run from the published model, and has no dev loss);
 - public text from the release's replay folder is mixed into every batch at --replay-ratio tokens per token of the person's, weight 1,
   or the other languages are forgotten;
 - AdamW (betas 0.9 / 0.95, weight decay 0.1 except on the embeddings, convolutions and norms), warm-up and cosine decay, gradient
@@ -174,6 +177,34 @@ def dev_version(s: Seq) -> Seq:
     ids = s.ids[:-1] if s.ids[-1] == V.EOS else s.ids
     w = np.where(s.w[:len(ids)] > 0, 1.0, 0.0).astype(np.float32)
     return Seq(ids, w, s.kind, s.ts, s.nbytes)
+
+
+def cap_records(records: list, tokens: Tokens, max_tokens: int) -> list:
+    """The records to learn from, in their order, when the person's own text (user and doc records) is bounded to about max_tokens
+    tokens (the record that crosses the bound is kept, so a little over): the newest first by ts, so what is left out is the oldest.
+    The agent replies are those written since the oldest own record kept (all of them when none was left out), at most max_tokens
+    tokens of them, newest first. max_tokens <= 0: all of them. Only what is kept is tokenized."""
+    if max_tokens <= 0:
+        return records
+
+    def newest(idx, budget):
+        order = sorted(idx, key=lambda i: -records[i]['ts'])       # stable: records of one time stay in file order
+        kept, used = [], 0
+        for a in range(0, len(order), 512):
+            chunk = order[a:a + 512]
+            tokens.many([records[i]['text'] for i in chunk])
+            for j, i in enumerate(chunk):
+                kept.append(i)
+                used += len(tokens(records[i]['text']))
+                if used >= budget:
+                    return kept, a + j + 1 < len(order)
+        return kept, False
+
+    own, own_cut = newest([i for i, r in enumerate(records) if r['kind'] != 'agent'], max_tokens)
+    since = min((records[i]['ts'] for i in own), default=0) if own_cut else None
+    replies, _ = newest([i for i, r in enumerate(records) if r['kind'] == 'agent' and (since is None or r['ts'] >= since)], max_tokens)
+    keep = set(own) | set(replies)
+    return [r for i, r in enumerate(records) if i in keep]
 
 
 def own_tokens_by_language(records: list, tokens: Tokens, lid: Optional[Lid]) -> tuple:
@@ -497,6 +528,7 @@ def main(argv=None) -> None:
     p.add_argument('--micro-tokens', type=int, default=0, help=f'padded tokens of one forward and backward (a batch is run in pieces of this size: the same gradient, less memory); 0: {CPU_MICRO_TOKENS} on the CPU, {DEVICE_MICRO_TOKENS} on a graphics card')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--warmup', type=int, default=50)
+    p.add_argument('--max-tokens', type=int, default=0, help="bound the person's own text to about this many tokens, the newest (0: no bound)")
     p.add_argument('--holdout', type=float, default=None, help="the share of the person's messages, the latest, kept out for the dev loss (default 0.05 when starting from the release; 0 when --init is a personal model, whose later messages would otherwise never be learned from)")
     a = p.parse_args(argv)
     t_start = time.time()
@@ -529,6 +561,7 @@ def main(argv=None) -> None:
     # ---- the texts ----
     records = read_texts(a.texts)
     tokens = Tokens(tok)
+    records = cap_records(records, tokens, a.max_tokens)
     built = build_sequences(records, tokens, st.w_user)
     user_idx = sorted((ri for ri, r in enumerate(records) if r['kind'] == 'user'), key=lambda i: records[i]['ts'])
     n_dev = int(len(user_idx) * holdout) if len(user_idx) >= 20 else 0
@@ -559,7 +592,7 @@ def main(argv=None) -> None:
     sig = hashlib.sha1(json.dumps([file_signature(a.texts), [st.lr, st.batch_tokens, st.w_user, st.replay_ratio, st.epochs, st.seed, warmup],
                                    base_cfg.get('slm'), [os.stat(os.path.join(init, 'model.safetensors')).st_size,
                                                          os.stat(os.path.join(init, 'model.safetensors')).st_mtime_ns],
-                                   len(replay) if replay is not None else 0, round(holdout, 6)]).encode()).hexdigest()
+                                   len(replay) if replay is not None else 0, round(holdout, 6), a.max_tokens]).encode()).hexdigest()
     private_dir(a.out)
     step, trained_tokens = 0, 0
     if a.resume and os.path.isfile(os.path.join(resume_dir, 'state.pt')):

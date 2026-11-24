@@ -206,6 +206,60 @@ class ReplayTests(unittest.TestCase):
                 T.Replay(os.path.join(d, 'replay'))
 
 
+class CapTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tokens = T.Tokens(helpers.make_tokenizer())
+
+    def recs(self):
+        out = [{'kind': 'user', 'text': helpers.ENGLISH[i % 5] + f' {i}', 'ts': 100 + i, 'reply': ''} for i in range(20)]
+        out.append({'kind': 'doc', 'text': 'Notes about the project and its parser.', 'ts': 50, 'reply': ''})
+        out += [{'kind': 'agent', 'text': 'An answer with some words in it.', 'ts': 10 * i, 'reply': ''} for i in range(1, 30)]
+        return out
+
+    def n(self, r):
+        return len(self.tokens(r['text']))
+
+    def test_no_bound_keeps_everything(self):
+        recs = self.recs()
+        self.assertEqual(T.cap_records(recs, self.tokens, 0), recs)
+        self.assertEqual(T.cap_records(recs, self.tokens, 10_000_000), recs)
+
+    def test_the_newest_of_the_persons_own_text_is_kept_up_to_the_bound(self):
+        recs = self.recs()
+        own = [r for r in recs if r['kind'] != 'agent']
+        bound = sum(self.n(r) for r in own) // 2
+        kept = T.cap_records(recs, self.tokens, bound)
+        kept_own = [r for r in kept if r['kind'] != 'agent']
+        self.assertLess(len(kept_own), len(own))
+        total = sum(self.n(r) for r in kept_own)
+        self.assertGreaterEqual(total, bound)                                    # the record that crosses the bound is kept: a little over
+        self.assertLess(total - self.n(min(kept_own, key=lambda r: r['ts'])), bound)
+        left = [r for r in own if r not in kept_own]
+        self.assertLess(max(r['ts'] for r in left), min(r['ts'] for r in kept_own))        # what is left out is the oldest
+        self.assertEqual([r for r in kept if r in recs], kept)                    # in the file's order, nothing made up
+
+    def test_agent_replies_are_those_of_the_kept_stretch_and_bounded_too(self):
+        recs = self.recs()
+        own = [r for r in recs if r['kind'] != 'agent']
+        kept = T.cap_records(recs, self.tokens, sum(self.n(r) for r in own) // 2)
+        oldest = min(r['ts'] for r in kept if r['kind'] != 'agent')
+        agents = [r for r in kept if r['kind'] == 'agent']
+        self.assertTrue(agents)
+        self.assertTrue(all(r['ts'] >= oldest for r in agents))
+        small = T.cap_records(recs, self.tokens, 40)
+        self.assertLess(sum(self.n(r) for r in small if r['kind'] == 'agent'), 40 + max(self.n(r) for r in recs))
+        none_cut = T.cap_records(recs, self.tokens, sum(self.n(r) for r in own) + 1)         # own text not cut: no stretch to keep to
+        self.assertEqual([r for r in none_cut if r['kind'] != 'agent'], own)
+
+    def test_only_what_is_kept_is_tokenized(self):
+        recs = [{'kind': 'user', 'text': f'{helpers.ENGLISH[i % 5]} {i}', 'ts': i, 'reply': ''} for i in range(1500)]
+        tokens = T.Tokens(helpers.make_tokenizer())
+        kept = T.cap_records(recs, tokens, 100)
+        self.assertLess(len(kept), 30)
+        self.assertLess(len(tokens.memo), 600)                                    # a step of 512 records past the bound at most
+
+
 class TrainRunTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -422,6 +476,17 @@ class RobustnessTests(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertNotIn('dev_nll', lines[-1])
 
+    def test_the_bound_keeps_the_newest_text_and_the_counts_follow_it(self):
+        full = run_train(self.release, self.texts, os.path.join(self.dir.name, 'm0'), extra=['--holdout', '0'])
+        self.assertEqual(full[0], 0, full[2])
+        capped = run_train(self.release, self.texts, os.path.join(self.dir.name, 'm1'), extra=['--holdout', '0', '--max-tokens', '60'])
+        self.assertEqual(capped[0], 0, capped[2])
+        a, b = full[1][-1], capped[1][-1]
+        self.assertLess(b['tokens'], a['tokens'])
+        self.assertGreaterEqual(b['tokens'], 60)
+        self.assertLess(b['tokens'], 60 + 20)                                     # a little over: the record that crosses the bound
+        self.assertLess(capped[1][0]['progress']['total'], full[1][0]['progress']['total'])
+
     def test_the_output_is_private(self):
         out = os.path.join(self.dir.name, 'priv')
         code, lines, err = run_train(self.release, self.texts, out)
@@ -525,6 +590,12 @@ class RobustnessTests(unittest.TestCase):
         shutil.rmtree(out)
         stopped(['--holdout', '0.2'], self.release)
         self.assertNotEqual(torch.load(path, map_location='cpu', weights_only=True)['sig'], sig0)      # the hold-out is in it
+        shutil.rmtree(out)
+        stopped(['--epochs', '40'], self.release)
+        sig1 = torch.load(path, map_location='cpu', weights_only=True)['sig']
+        shutil.rmtree(out)
+        stopped(['--epochs', '40', '--max-tokens', '60'], self.release)
+        self.assertNotEqual(torch.load(path, map_location='cpu', weights_only=True)['sig'], sig1)      # and the bound
         shutil.rmtree(out)
         with helpers.tmpdir() as d:                                                # same size, another time and another content
             rel = os.path.join(d, 'r')
