@@ -1,7 +1,7 @@
 # Web apps: whole products on a kit, inside Hydor or anywhere
 
-*A proposal, 24 November 2026, written from your answers to fifteen questions the same day. Nothing here is built yet;
-it is meant to be argued with. It follows [Apps: a plan for building apps on top of agents](apps-framework.md), which
+*A proposal, 24 November 2026, meant to be argued with. Phase 0 was built the same day (section 10 says what it
+found); the rest is not built. It follows [Apps: a plan for building apps on top of agents](apps-framework.md), which
 is built: agent apps stay as that plan made them.*
 
 ## In short
@@ -33,15 +33,15 @@ is built: agent apps stay as that plan made them.*
 - **All twelve app types**, in four waves. The scope is fixed and the dates move, so there is no calendar here: the
   order is the plan, and a phase is over when its "done when" holds.
 
-## What you decided
+## What is decided
 
-| Question | Your answer | Where it lands |
+| Question | Decision | Where it lands |
 |---|---|---|
 | How apps inside Hydor and standalone apps relate | One kit, two places to run; agent apps stay and plug in | Sections 2 and 3 |
 | The base stack | React and Vite on one plain Node server | TanStack Start, with a fallback (section 4) |
 | How prebuilt material reaches an app | Source blocks on a small tested core package | Section 4 |
-| Agent apps on the kit (added the same day) | Agent apps can use the same kit when they need more: an interface of their own, not only what an agent shows in a session, behaving like proper web apps | Section 2: one kind of app with a flows half and a web half; a ninth seam, flows |
-| Updates (added the same day) | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
+| Agent apps on the kit | Agent apps can use the same kit when they need more: an interface of their own, not only what an agent shows in a session, behaving like proper web apps | Section 2: one kind of app with a flows half and a web half; a ninth seam, flows |
+| Updates | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
@@ -448,7 +448,7 @@ Each wave is ordered so that most of what it adds is reused by the next.
 | 1 | Landing page and waitlist | Base, landing sections, waitlist | Design system, landing sections, waitlist, mail, legal |
 | 1 | Internal tool or admin dashboard | Base, accounts, resources, admin | Accounts, roles, resources, admin, charts, import and export |
 | 1 | SaaS: accounts, teams, subscriptions | Landing, accounts, teams, billing, resources | Teams, billing, onboarding, API keys, usage |
-| 1 | Agent app with an app of its own (added to your twelve) | Base, flows, resources | The flows seam and its parts |
+| 1 | Agent app with an app of its own (a thirteenth type) | Base, flows, resources | The flows seam and its parts |
 | 2 | Content site: blog, docs, newsletter | Landing, blog, docs, newsletter, search | Blog, docs, changelog, newsletter, search |
 | 2 | AI app: chat and answers over your data | The SaaS starter, chat, answers, agent | The AI blocks, credits |
 | 2 | Portfolio or personal site | Landing, blog, a contact form | Forms; a build with no server |
@@ -460,7 +460,7 @@ Each wave is ordered so that most of what it adds is reused by the next.
 | 4 | Community: forum, profiles, feed | Accounts, profiles, threads, feed, search | The social blocks |
 | 4 | Real-time: chat, live boards | Accounts, live, chat, boards | The live seam's drivers, chat, boards |
 
-"Directory or marketplace with search" is one of your twelve: the directory comes in wave 2 and selling through it
+"Directory or marketplace with search" is one type of the twelve: the directory comes in wave 2 and selling through it
 in wave 3, because paying sellers is a piece of work of its own.
 
 ### Three blocks worth a closer look
@@ -590,7 +590,7 @@ The kit's own commands run in the project's shell like any others. The method is
 
 ## 10. Roadmap
 
-No calendar, as you chose. A phase ends when its "done when" holds, and nothing is cut to make a date. The earlier
+No calendar. A phase ends when its "done when" holds, and nothing is cut to make a date. The earlier
 Apps plan was sized at fourteen weeks and its first three phases were built in a day, so sizes here are relative
 (Phase 0 is 1). Typing is not what takes the time: trying things against real services (Stripe, mail, hosts), your
 look at designs and flows, and the benchmark runs are.
@@ -632,6 +632,63 @@ that can run side by side in sessions of their own; the numbers are the order I 
 **Done when** the skeleton runs inside Hydor and on a server from the same code with only configuration between
 them, a Standard helper adds a resource from the notes alone at least four times in five, the formats have tests,
 and an adapted app takes a new version of the kit through `kit upgrade` with nothing merged by hand.
+
+### What Phase 0 found (24 November 2026)
+
+Phase 0 is done but for one task. The kit is a repository of its own: a core, the three formats, the commands, the
+first block, a skeleton app, and three benchmarks, with 818 tests. The Hydor side is a branch, `webapps-host-trial`, not merged.
+
+| Task | Result |
+|---|---|
+| 0.3, 0.4 · Skeleton and seams | The same build runs with accounts of its own or with Hydor's sign-in. Nine seams. Route code gets a narrow handle (list, get, add, change, remove, and writes that happen together); a second person can never see or change the first one's rows, tested on every database |
+| 0.5 · Kept running inside Hydor | Works: started on first use, stopped when idle, back after a crash with its data, two people kept apart through the proxy, nothing of Hydor's reaching the app, writable only in its own folder under bubblewrap |
+| 0.6 · Docker on a server | The image builds and runs as a user without rights, its data in a volume. **Open:** a real server with HTTPS (none was at hand) |
+| 0.7 · SQLite and Postgres | One table description serves both; the skeleton's files are the same on each; the same end-to-end run passes on SQLite, an embedded Postgres and Postgres 17 |
+| 0.8 · Cloudflare | The same source builds for Cloudflare's runtime and runs on D1 locally, with accounts and with Hydor's header. Not tried on Cloudflare itself |
+| 0.9 · Formats | `block.json`, `starter.json`, `kit.json` and a registry index, each with a check that explains every problem in plain words |
+| 0.10, 0.14 · A block, and an update | The waitlist as an engine package and a thin surface. An app that reworded it, rearranged its page and ejected its form took a new kit version (an engine fix, a security fix, a table change, source changes) through `kit upgrade` with nothing merged by hand: of 11 copied files, 7 untouched, 3 joined by themselves, 1 taken; 4 engine files by one version number. An edit on the very line the block changed left one file for an agent |
+| 0.11 · Embeddings | Hydor's model is the best (mean nDCG@10 79.0 over eight sets) and does not fit a 1 GB server in practice (822 to 976 MB, 84 ms a query). multilingual-e5-small is 3.4 points lower on average (about 9 on the two English sets, level on Japanese, ahead on Greek), in 467 MB and 4 ms a query |
+| 0.12 · A cheaper agent | A Standard agent with only the kit's notes added a resource to the skeleton: 4 of 5 runs kept every rule at first, 5 of 5 once the kit had an ordering option of its own and a checklist. About two minutes and 80,000 tokens a run |
+
+**Decided from it (0.13).**
+
+- **The framework stays.** TanStack Start held up on Node and on Cloudflare; typed routes and the split between
+  server and browser code worked as documented. Node hosting goes through Nitro, whose current release is a
+  release candidate: pinned, and watched.
+- **better-sqlite3 for now.** It has to be compiled when an image is built. Node's own SQLite takes over when
+  Drizzle's stable release has a driver for it.
+- **Two embedding models, picked by the memory there is**: multilingual-e5-small under 2 GB, Hydor's model above
+  it and inside Hydor. An index is tied to the model that made it, so a change of model means embedding again.
+- **Two ways in, not three.** A hostname of its own for each app is the safe one and the default. A path with a
+  token works for a tunnel with a single hostname, for apps built with a base-path marker the proxy rewrites. A
+  port of its own is dropped: cookies are shared across ports on one host.
+- **A build is one dialect and one kind of place.** The kit's Vite plugin gives a build only the drivers it can
+  run, and refuses a mix in a sentence.
+- **Base copies travel with the app** (`.kit/base`), so an update needs no network and no history, and a block's
+  options reach its code through one generated file, with no placeholders inside copied files.
+
+**What it changes in Phase 1.**
+
+- **A block becomes one npm package** carrying its engine, its manifest, its copied source and its parts, so the
+  package registry keeps every version and nothing else has to.
+- **The kit ships JavaScript.** Its packages are TypeScript source today, which Node will not load from an
+  installed package; the update proof gets past that with a loader.
+- **More of a block in its package.** The waitlist keeps 59% of its lines in the package against the two thirds
+  aimed for; its admin page becomes a packaged part. Wording lives in a file of its own per block, since it is
+  what makers change most and what conflicts most.
+- **Checks for the two ways an update goes wrong quietly**: installed packages that differ from what the app
+  names, and an ejected copy that joined cleanly while the engine under it moved.
+- **Small things blocks asked the core for**: a count, an equals that ignores case, "may this person manage this
+  table", the environment's values passed to blocks.
+- **Hydor's API for runs** needs, for the flows seam: listing an app's runs, answering a waiting question and
+  stopping a run by key, the waiting question in what a run returns, which flow to start, which person a run acts
+  for, and a documented answer.
+- **Running apps safely on every computer.** Under bubblewrap an app cannot read Hydor's files; without it (a Mac,
+  Windows) it could, so those need an answer of their own before apps from other people run there. Also: a cap on
+  an app's memory, and a sweep at start for apps left behind by a crash.
+- **Cloudflare's free plan and sign-in.** Hashing a password took 80 to 115 ms here; if a free Worker gets 10 ms
+  of processor time a request, as its docs are read, sign-in there needs the paid plan or another hasher, and the
+  Launch stage says so.
 
 ### Phase 1: the core, the first blocks, web apps in Hydor
 
@@ -736,14 +793,14 @@ paying sellers, which Phase 6 needs and which can take a while.
 | | Decision | By | What I would do |
 |---|---|---|---|
 | 1 | The kit's public name, repository and npm scope | Phase 0 | "Hydor Kit", in a repository beside Hydor's |
-| 2 | The embedding model outside Hydor: Hydor's own (310 MB on disk, about 1 GB loaded) or a smaller one | After 0.11 | The smaller one by default if it keeps most of the quality, Hydor's where memory allows. Your call: it is your field |
+| 2 | The embedding model outside Hydor: Hydor's own (310 MB on disk, about 1 GB loaded) or a smaller one | Decided in Phase 0 | multilingual-e5-small under 2 GB of memory, Hydor's model above it and inside Hydor (measured: `bench/embeddings` in the kit) |
 | 3 | May a web app inside Hydor be opened to anyone on the internet from your own computer, as an agent app's public page is | Phase 3 | No: share it with people you invite; anyone means Launch |
-| 4 | The SQLite driver on servers: Node's own (no native module, still marked experimental in Node 22) or better-sqlite3 (which Hydor uses) | 0.13 | better-sqlite3 now, Node's own when it is stable |
+| 4 | The SQLite driver on servers: Node's own (no native module, still marked experimental in Node 22) or better-sqlite3 (which Hydor uses) | Decided in Phase 0 | better-sqlite3 now, Node's own when Drizzle's stable release has a driver for it |
 | 5 | The second payment provider: Polar, Paddle, or Stripe's Managed Payments alone | Phase 6 | Managed Payments alone, unless makers ask for another |
 | 6 | Contributions to the kit: Hydor's agreement or a lighter sign-off | When the repository opens | Hydor's, so the kit can always be offered on other terms |
 | 7 | What a web app inside Hydor may spend on models a day unless you say otherwise | Phase 1 | \$1, raised on its card |
 | 8 | Whether the benchmark of scripted briefs is published | Phase 2 | Yes: it is the kit's best argument, and it invites others to beat it |
-| 9 | The cards an answer is made of (Hydor's 140 answer UIs, AGPL-3.0) inside an agent app's own pages: give them to the kit under MIT, or have Hydor draw them in a frame | Phase 2 | Give the kit the ones results use most, as a step of its own; inside Hydor a frame covers the rest. Yours to decide: it is your code and your licence |
+| 9 | The cards an answer is made of (Hydor's 140 answer UIs, AGPL-3.0) inside an agent app's own pages: give them to the kit under MIT, or have Hydor draw them in a frame | Phase 2 | Give the kit the ones results use most, as a step of its own; inside Hydor a frame covers the rest |
 
 ## 12. Risks
 
