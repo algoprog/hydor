@@ -13,7 +13,7 @@ import { which } from '../documents/tools.ts';
 import { childEnv } from './engine.ts';
 import { chooseDevice, GPU_ROOMY_MB, type DevicePick } from './gpu.ts';
 import { track } from './procs.ts';
-import { gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, setupTorch, suggestDir, torchReady, trainScript } from './setup.ts';
+import { baseId, gpuPackagesReady, gpuPythonPath, pythonPath, releaseDir, setupGpuPython, setupTorch, suggestDir, torchReady, trainScript } from './setup.ts';
 import { trainThreads } from './settings.ts';
 import { writeTexts } from './texts.ts';
 
@@ -36,6 +36,8 @@ export interface PersonalState {
   trainedAt: number;
   /** The time its texts were read until: the next run has something to learn only when more was written after it. */
   since: number;
+  /** What it was learnt from (baseId: the published model's revision): another base, or none (a model an older version made), and the next run learns again from the new one. */
+  base?: string;
   tokens?: number;
   languages?: Record<string, number>;
   /** The loss on a held-out part of the writing: runs hold none out now, so it is only in a model that an older version made. */
@@ -301,14 +303,18 @@ export class Trainer {
       // so a model is never a copy of a copy. It has something to learn only when more was written after the last run's cut-off
       // (`since`). A run that was stopped goes on from its resume state with the texts it had: read again up to the same time
       // (nothing written since is in them), so train.py sees the same texts file.
-      let since = hasPersonal() ? (personalState()?.since ?? 0) : 0;
+      // A personal model made from another published model (or from none we know of) has learnt nothing from this one: all the writing counts as new.
+      const saved = hasPersonal() ? personalState() : null;
+      let since = saved && saved.base === baseId() ? saved.since : 0;
+      let base = baseId();
       let until = startedAt;
       let seed = runSeed(until);
       let resumed = false;
       try {
-        const j = JSON.parse(fs.readFileSync(job, 'utf8')) as { since: number; until?: number; seed?: number };
-        if (typeof j.since === 'number' && typeof j.until === 'number' && fs.existsSync(outDir())) {
-          (since = j.since), (until = j.until), (resumed = true);
+        const j = JSON.parse(fs.readFileSync(job, 'utf8')) as { since: number; until?: number; seed?: number; base?: string };
+        // A run begun from another published model (or from none we know of) is not gone on with: it starts over from this one.
+        if (typeof j.since === 'number' && typeof j.until === 'number' && j.base === baseId() && fs.existsSync(outDir())) {
+          (since = j.since), (until = j.until), (base = j.base), (resumed = true);
           // A run begun by a version that drew every run's replay with seed 0 goes on with it (its resume state is made with it).
           seed = Number.isInteger(j.seed) ? j.seed! : 0;
         }
@@ -321,7 +327,7 @@ export class Trainer {
         fs.rmSync(job, { force: true });
         return fail('Nothing new to learn from', true);
       }
-      fs.writeFileSync(job, JSON.stringify({ since, until, seed, texts: n }), { mode: 0o600 });
+      fs.writeFileSync(job, JSON.stringify({ since, until, seed, base, texts: n }), { mode: 0o600 });
       const threads = trainThreads(s);
       this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}` });
       // Where to learn: the graphics card when there is one to use, else the processor (and why not, for the page).
@@ -371,7 +377,7 @@ export class Trainer {
       if (this.dropped) return fail(ended(), true);
       // The new model is complete in outDir: it takes the place of the old one, which stays until it has.
       for (const f of fs.readdirSync(outDir())) if (/^resume|\.pt$|\.part$|\.tmp$/i.test(f)) fs.rmSync(path.join(outDir(), f), { recursive: true, force: true });
-      const state: PersonalState = { trainedAt: Date.now(), since: until, tokens: done.tokens, languages: done.languages, ...(done.devNll != null ? { devNll: done.devNll } : {}), seconds: done.seconds };
+      const state: PersonalState = { trainedAt: Date.now(), since: until, base, tokens: done.tokens, languages: done.languages, ...(done.devNll != null ? { devNll: done.devNll } : {}), seconds: done.seconds };
       fs.writeFileSync(path.join(outDir(), 'state.json'), JSON.stringify(state), { mode: 0o600 });
       // Whoever holds the old model's files lets go first (Windows will not move them otherwise).
       await hooks.beforeSwap?.();

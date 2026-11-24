@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import http from 'node:http';
 import Fastify from 'fastify';
 import { SUGGEST_DEFAULTS, type SuggestState } from '../../shared/suggest.ts';
@@ -21,7 +22,7 @@ import { suggest, suggestService, cleanRequest } from './index.ts';
 import { LlamaServer } from './llm.ts';
 import { killAll, leftoverTraining, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
-import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
+import { baseId, run as runCommand, setupRelease, tidyReleases, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
 import { GRACE, MAX_OWN_TOKENS, gpuHold, personalDir, personalState, recoverPersonal, runSeed } from './train.ts';
 import { merge, readSettings, trainThreads, writeSettings } from './settings.ts';
@@ -754,6 +755,116 @@ test('with no local copy given, setup downloads the published release, and says 
   }
 });
 
+test('a new release downloads only the files that changed: the rest is taken from the older release, which is removed a week after no copy of the app has used it', async () => {
+  const { SMALL_MODEL } = await import('./pins.ts');
+  const saved = { revision: SMALL_MODEL.revision, files: SMALL_MODEL.files };
+  const keys = ['HYDOR_SUGGEST_MODEL_DIR', 'HF_ENDPOINT', 'XDG_CACHE_HOME', 'HOME'] as const;
+  const env = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-suggest-release-'));
+  // Two revisions of a small model: a.bin and replay/c.bin stay the same, b.json changes (to the same size), d.txt is the same size but another file.
+  const same = { 'a.bin': 'A'.repeat(5000), 'replay/c.bin': 'C'.repeat(3000) };
+  const revs: Record<string, Record<string, string>> = {
+    r1111111111111111: { ...same, 'b.json': '{"v":1}', 'd.txt': 'one' },
+    r2222222222222222: { ...same, 'b.json': '{"v":2}', 'd.txt': 'two' },
+  };
+  const filesOf = (rev: string) =>
+    Object.entries(revs[rev]).map(([name, body]) => ({ from: name, name, bytes: Buffer.byteLength(body), sha256: crypto.createHash('sha256').update(body).digest('hex') }));
+  const asked: string[] = [];
+  const server = http.createServer((req, res) => {
+    const m = /^\/test\/small\/resolve\/([^/]+)\/(.+)$/.exec(req.url ?? '');
+    const body = m ? revs[m[1]]?.[m[2]] : undefined;
+    if (body === undefined) return void res.writeHead(404).end();
+    asked.push(`${m![1]}/${m![2]}`);
+    res.writeHead(200, { 'content-length': Buffer.byteLength(body) });
+    res.end(body);
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  delete process.env.HYDOR_SUGGEST_MODEL_DIR;
+  Object.assign(process.env, { HF_ENDPOINT: `http://127.0.0.1:${(server.address() as { port: number }).port}`, XDG_CACHE_HOME: cache, HOME: cache });
+  const noop = () => {};
+  const use = (rev: string) => Object.assign(SMALL_MODEL, { repo: 'test/small', revision: rev, files: filesOf(rev) });
+  try {
+    use('r1111111111111111');
+    await setupRelease(noop);
+    const old = (await import('./setup.ts')).releaseDir()!;
+    assert.equal(asked.length, 4, 'the first release is downloaded whole');
+    assert.equal(fs.readFileSync(path.join(old, '.complete'), 'utf8'), 'r1111111111111111');
+    assert.ok(fs.existsSync(path.join(old, '.used')), 'the release in use is marked');
+    // Another folder of an older release, with a file of the right size that is another file, and one of the wrong size: neither is taken.
+    const decoy = path.join(path.dirname(old), 'hydor-suggest-49m-decoy');
+    fs.mkdirSync(path.join(decoy, 'replay'), { recursive: true });
+    fs.writeFileSync(path.join(decoy, 'b.json'), '{"v":3}');
+    fs.writeFileSync(path.join(decoy, 'a.bin'), 'A'.repeat(10));
+    // When each was last used: the decoy 8 days ago, one a copy of the app is downloading into just now (no mark yet), and one an hour ago.
+    const ago = (d: string, ms: number) => {
+      const t = new Date(Date.now() - ms);
+      for (const f of ['.complete', '.used', '']) if (fs.existsSync(path.join(d, f))) fs.utimesSync(path.join(d, f), t, t);
+    };
+    const DAY = 24 * 3600_000;
+    const hour = path.join(path.dirname(old), 'hydor-suggest-49m-anhourago');
+    const filling = path.join(path.dirname(old), 'hydor-suggest-49m-filling');
+    for (const d of [hour, filling]) fs.mkdirSync(d);
+    fs.writeFileSync(path.join(hour, '.complete'), 'x');
+    fs.writeFileSync(path.join(hour, '.used'), 'x');
+    fs.writeFileSync(path.join(filling, 'big.bin.part'), 'x');
+    ago(hour, 3600_000);
+    ago(decoy, 8 * DAY);
+
+    asked.length = 0;
+    use('r2222222222222222');
+    const fresh = (await import('./setup.ts')).releaseDir()!;
+    assert.notEqual(fresh, old);
+    await setupRelease(noop);
+    assert.deepEqual(asked.sort(), ['r2222222222222222/b.json', 'r2222222222222222/d.txt'], 'only the changed files were fetched');
+    for (const f of SMALL_MODEL.files) assert.equal(fs.readFileSync(path.join(fresh, f.name), 'utf8'), revs.r2222222222222222[f.name], f.name);
+    assert.equal(fs.readFileSync(path.join(fresh, '.complete'), 'utf8'), 'r2222222222222222');
+    assert.equal(fs.statSync(path.join(fresh, 'a.bin')).ino, fs.statSync(path.join(old, 'a.bin')).ino, 'an unchanged file is a link to the older release’s, not a copy');
+    assert.ok(fs.readdirSync(fresh, { recursive: true }).every((n) => !/\.(part|copying)$/.test(String(n))), 'no temporary file is left');
+    assert.ok(fs.existsSync(path.join(fresh, '.used')), 'the new release is marked');
+    assert.ok(!fs.existsSync(decoy), 'a release no copy used for 8 days is removed');
+    assert.ok(fs.existsSync(old) && fs.existsSync(hour) && fs.existsSync(filling), 'one used lately, one used an hour ago and one being downloaded into stay');
+    // Another copy of the app on the older revision shares the cache: its folder is not taken away while it uses it, and goes a week after it stops.
+    asked.length = 0;
+    await setupRelease(noop);
+    assert.equal(asked.length, 0, 'nothing is fetched');
+    assert.ok(fs.existsSync(old) && fs.existsSync(hour) && fs.existsSync(filling), 'the already-whole path keeps them too');
+    ago(old, 8 * DAY);
+    ago(filling, 8 * DAY);
+    await setupRelease(noop);
+    assert.ok(!fs.existsSync(old) && !fs.existsSync(filling), 'on the already-whole path an abandoned one goes');
+    assert.ok(fs.existsSync(hour) && fs.existsSync(fresh));
+    // tidyReleases alone marks the release too, and takes the time to look at as an argument.
+    fs.rmSync(path.join(fresh, '.used'));
+    tidyReleases();
+    assert.ok(fs.existsSync(path.join(fresh, '.used')));
+    tidyReleases(Date.now() + 8 * DAY);
+    assert.ok(!fs.existsSync(hour), 'a week after its last use it goes');
+    // A release not downloaded whole is not marked, and takes nothing away.
+    const keep = path.join(path.dirname(fresh), 'hydor-suggest-49m-keep');
+    fs.mkdirSync(keep);
+    ago(keep, 30 * DAY);
+    fs.rmSync(path.join(fresh, '.complete'));
+    tidyReleases();
+    assert.ok(fs.existsSync(keep));
+    fs.writeFileSync(path.join(fresh, '.complete'), 'r2222222222222222');
+    // A model folder of one's own: nothing is taken, nothing marked, nothing removed.
+    fs.rmSync(path.join(fresh, '.used'));
+    process.env.HYDOR_SUGGEST_MODEL_DIR = path.join(cache, 'own');
+    await assert.rejects(setupRelease(noop), /HYDOR_SUGGEST_MODEL_DIR/);
+    tidyReleases();
+    assert.ok(fs.existsSync(keep) && fs.existsSync(fresh) && !fs.existsSync(path.join(fresh, '.used')));
+    delete process.env.HYDOR_SUGGEST_MODEL_DIR;
+    tidyReleases();
+    assert.ok(!fs.existsSync(keep), 'and with the release as it was, it is removed');
+  } finally {
+    Object.assign(SMALL_MODEL, saved);
+    for (const k of keys) env[k] === undefined ? delete process.env[k] : (process.env[k] = env[k]);
+    server.closeAllConnections();
+    server.close();
+    fs.rmSync(cache, { recursive: true, force: true });
+  }
+});
+
 
 // ---- what keeps running, and what stops ----------------------------------------------------------------------------
 
@@ -1129,6 +1240,60 @@ test('pause: during "Reading what you wrote", before train.py starts, it also en
   await post('/api/suggest/train');
   await until('the run to finish', async () => trainLog().length === k + 1 && !svc.trainer.active);
   assert.equal((await trainState()).state, 'waiting');
+});
+
+test('a new published model: the next run learns from it even with nothing new written, and a paused run from the old one starts over', async () => {
+  await resetTraining();
+  const base = `dir:${release}`;
+  assert.equal(baseId(), base);
+  const state = () => JSON.parse(fs.readFileSync(path.join(personalDir(), 'state.json'), 'utf8'));
+  const setBase = (b: string | null) => {
+    const f = path.join(personalDir(), 'state.json');
+    const { base: _, ...rest } = state();
+    fs.writeFileSync(f, JSON.stringify(b === null ? rest : { ...rest, base: b }));
+  };
+  await addTyped('A message for the model that is made, then replaced by a newer one');
+  let k = trainLog().length;
+  await post('/api/suggest/train');
+  await until('the first run', async () => trainLog().length === k + 1 && !svc.trainer.active && hasModel());
+  assert.equal(state().base, base, 'the model says what it was learnt from');
+  await post('/api/suggest/train');
+  await until('nothing new', async () => /Nothing new/.test((await trainState()).detail ?? ''));
+  assert.equal(trainLog().length, k + 1, 'the same base and nothing written: nothing to learn');
+  // Another base, and one made by an older version (none written): a run goes ahead with nothing new written.
+  for (const was of ['an older published model', null]) {
+    setBase(was);
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    await until('the run', async () => trainLog().length === k + 1 && !svc.trainer.active);
+    assert.equal(state().base, base, `learnt again from the new one (was ${was})`);
+    assert.ok(hasModel());
+  }
+  await post('/api/suggest/train');
+  await until('nothing new again', async () => /Nothing new/.test((await trainState()).detail ?? ''));
+  assert.equal(trainLog().length, k + 1, 'and then it is up to date');
+
+  // A paused run goes on only from the same base.
+  for (const was of ['an older published model', null]) {
+    await del('/api/suggest/personal');
+    const { first } = await startHeld(`A message for the paused run (base: ${was})`);
+    await post('/api/suggest/train/pause');
+    await until('the run to end', async () => !svc.trainer.active);
+    const job = JSON.parse(fs.readFileSync(workFile('job.json'), 'utf8'));
+    assert.equal(job.base, base, 'the run says what it started from');
+    fs.writeFileSync(workFile('job.json'), JSON.stringify(was === null ? { ...job, base: undefined } : { ...job, base: was }));
+    fs.writeFileSync(path.join(workFile('out'), 'left-by-the-old-run'), '');
+    flag('trainhold', false);
+    await addTyped('Written while it was paused: a run that starts over has it');
+    k = trainLog().length;
+    await post('/api/suggest/train');
+    const second = await until('the run again', async () => trainLog()[k]);
+    await until('it to finish', async () => !svc.trainer.active && hasModel());
+    assert.notEqual(second.sha, first.sha, `it started over with the texts as they are now (was ${was})`);
+    assert.equal(second.texts, first.texts + 1);
+    assert.ok(!fs.existsSync(path.join(personalDir(), 'left-by-the-old-run')), 'what the old run left is gone: its resume state was not used');
+    assert.equal(state().base, base, 'the model is from the current base');
+  }
 });
 
 test('stop: what the run learned so far is dropped, the schedule waits its usual gap, and a paused run can be stopped too', async () => {

@@ -11,7 +11,7 @@ import { childEnv, PyWorker, type Reply } from './engine.ts';
 import { LlamaServer } from './llm.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
 import { leftoverTraining, reapLeftovers } from './procs.ts';
-import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, unsupportedSystem, workerScript } from './setup.ts';
+import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, tidyReleases, unsupportedSystem, workerScript } from './setup.ts';
 import { forgetPersonal, gpuHold, hasPersonal, lastDevice, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
 import { addUsage, readUsage, resetUsage } from './usage.ts';
@@ -73,6 +73,7 @@ export class SuggestService {
   private setupP: Promise<boolean> | null = null;
   private setupDetail?: string;
   private setupDone = false;
+  private tidiedAt = 0;
   private abort = new AbortController();
   private failure: { why: string; at: number } | null = null;
   /** Failures in a row since it last worked: each waits twice as long as the one before to be tried again (retryAfter). */
@@ -350,6 +351,8 @@ export class SuggestService {
     if (this.setupP) return this.setupP;
     if (this.isSetUp()) {
       this.setupDone = true;
+      // Marks the release in use and clears older ones nobody has used for a week (at most once an hour: this is asked for with every suggestion).
+      if (Date.now() - this.tidiedAt > 3600_000) (this.tidiedAt = Date.now()), tidyReleases();
       if (this.llmWanted()) void this.prepareLlm();
       return Promise.resolve(true);
     }

@@ -1483,7 +1483,7 @@ agents that speak ACP and take MCP servers.
   the word (again, the next one), → at the end of the text takes both, Esc hides them until the next word. It is on from
   the start and sets itself up the first time you type in a message box or a document: it installs its Python libraries
   and downloads about 1.2 GB then (ONNX Runtime and the tokenizer from PyPI, llama.cpp from GitHub, the language model and the small model from Hugging Face), and
-  nothing before (Settings says Not set up yet); a setup that fails is tried again later, waiting longer each time.
+  nothing before (Settings says Not set up yet); when an update brings a new version of the small model, only its changed files are downloaded and the old copy is removed once no copy of the app has used it for a week; a setup that fails is tried again later, waiting longer each time.
   Settings → Capabilities → Word suggestions turns it off. Everything runs on this computer, and what you type never
   leaves it. A small model of the app's own (49M parameters, 200 languages)
   is mixed with Qwen3.5-0.8B (8-bit or 4-bit, through llama.cpp), which runs when the computer has at least 8 GB of memory
@@ -1496,7 +1496,7 @@ agents that speak ACP and take MCP servers.
   write: your messages to agents (not in sessions with memory off or confidential, and not the text apps, scheduled tasks
   and other sessions put there), agents' replies, the notes you wrote and the documents you wrote, each source with its
   switch and your own words weighted higher, every night, every week or when you press Retrain now, in the background at
-  the lowest priority and when you have not typed for ten minutes. Every run starts again from the small model that came with the app and learns from all your writing, its newest part, so what it learned never drifts (and it can take hours without a graphics card); in the languages you do not write in, the one that came with the app keeps suggesting.
+  the lowest priority and when you have not typed for ten minutes. Every run starts again from the small model that came with the app and learns from all your writing, its newest part, so what it learned never drifts (and it can take hours without a graphics card); after an update brings a new small model, the next run learns again from it even if nothing new was written; in the languages you do not write in, the one that came with the app keeps suggesting.
   A run learns on an NVIDIA graphics card with room (4 GB free, under half busy; the one with the most free) or a
   Mac's own, many times faster, when Learn on the graphics card is on (the first time on an NVIDIA card it downloads
   PyTorch's build for it, about 2.5 GB, and a card that fails is left alone for a day; the first time on the processor it adds PyTorch's processor build, about 200 MB, which only learning needs), and Pause, Resume and Stop on the

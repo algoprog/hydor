@@ -491,7 +491,7 @@ export interface ModelFile {
 /** A file's address on Hugging Face (or the mirror HF_ENDPOINT names), at the model's fixed revision. */
 const fileUrl = (from: string) => `${(process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '')}/${MODEL_REPO}/resolve/${MODEL_REVISION}/${from}`;
 
-async function sha256Of(file: string): Promise<string> {
+export async function sha256Of(file: string): Promise<string> {
   const h = crypto.createHash('sha256');
   await pipeline(fs.createReadStream(file), h);
   return h.digest('hex');

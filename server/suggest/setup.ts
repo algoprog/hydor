@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.ts';
 import { which } from '../documents/tools.ts';
-import { downloadFiles, userCacheDir, type ModelFile } from '../memory/embed.ts';
+import { downloadFiles, sha256Of, userCacheDir, type ModelFile } from '../memory/embed.ts';
 import { fetchFile } from '../voice/fetch.ts';
 import { tagSuits } from './gpu.ts';
 import { GGUF_FILES, GGUF_REPO, GGUF_REVISION, LLAMA_ASSETS, LLAMA_TAG, llamaUrl, SMALL_MODEL, SMALL_MODEL_NEEDS, SUGGEST_PACKAGES, SUGGEST_PACKAGES_TORCH, TORCH_PACKAGE, TRAIN_PACKAGES } from './pins.ts';
@@ -112,6 +112,14 @@ export function releaseDir(): string | null {
   if (process.env.HYDOR_SUGGEST_MODEL_DIR) return process.env.HYDOR_SUGGEST_MODEL_DIR;
   if (!SMALL_MODEL.revision || !SMALL_MODEL.files.length) return null;
   return path.join(modelsRoot(), `hydor-suggest-49m-${SMALL_MODEL.revision.slice(0, 12)}`);
+}
+
+/**
+ * What the personal model is learnt from: the published release's revision, or `dir:<path>` for a folder of one's own
+ * (HYDOR_SUGGEST_MODEL_DIR). A model made from another base is learnt again from this one.
+ */
+export function baseId(): string {
+  return process.env.HYDOR_SUGGEST_MODEL_DIR ? `dir:${process.env.HYDOR_SUGGEST_MODEL_DIR}` : SMALL_MODEL.revision;
 }
 
 /** Why the small model cannot run: it is not published, or its folder lacks a file; null when it is there. */
@@ -391,16 +399,111 @@ function withFolders(to: string, files: ModelFile[]) {
   for (const f of files) fs.mkdirSync(path.dirname(path.join(to, f.name)), { recursive: true });
 }
 
-/** The small model's release (nothing to do for a folder of one's own: HYDOR_SUGGEST_MODEL_DIR). */
+const RELEASE_PREFIX = 'hydor-suggest-49m-';
+
+/** The folders of other revisions of the small model beside `dir`. */
+function otherReleases(dir: string): string[] {
+  try {
+    return fs
+      .readdirSync(path.dirname(dir), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name.startsWith(RELEASE_PREFIX) && e.name !== path.basename(dir))
+      .map((e) => path.join(path.dirname(dir), e.name));
+  } catch {
+    return [];
+  }
+}
+
+/** The file of an older release that is the same as `f` (the same size and SHA-256), or null. */
+async function sameFileIn(olders: string[], f: ModelFile): Promise<string | null> {
+  for (const o of olders) {
+    const p = path.join(o, f.name);
+    try {
+      if (fs.statSync(p).size === f.bytes && (await sha256Of(p)) === f.sha256) return p;
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Puts the file `from` at `dest` without downloading it: a hard link (no room needed), else a copy under a temporary name
+ * that takes its own only when whole (a name ending in .part would be taken for a download cut short). False when neither worked.
+ */
+function bringIn(from: string, dest: string): boolean {
+  try {
+    fs.linkSync(from, dest);
+  } catch {
+    const tmp = `${dest}.copying`;
+    try {
+      fs.copyFileSync(from, tmp);
+      fs.renameSync(tmp, dest);
+    } catch {
+      fs.rmSync(tmp, { force: true });
+      return false;
+    }
+  }
+  fs.rmSync(`${dest}.part`, { force: true });
+  return true;
+}
+
+/** How long an older release's folder is kept after the last time any copy of the app used it (two copies on other revisions can share one cache). */
+export const RELEASE_KEEP_MS = 7 * 24 * 3600_000;
+
+/** The newest time of a release folder's use: the latest of its own, its `.used` and its `.complete` (a folder being downloaded into counts as in use). */
+function lastUsed(dir: string): number {
+  let at = 0;
+  for (const f of ['', '.used', '.complete']) {
+    try {
+      at = Math.max(at, fs.statSync(path.join(dir, f)).mtimeMs);
+    } catch {}
+  }
+  return at;
+}
+
+/**
+ * Marks the release folder in use (the time in its `.used`, its modification time is what counts), then removes the folders of
+ * other releases that no copy of the app has used for a week, each on its own (a file in use refuses on Windows: the folder stays
+ * until a later start). Nothing for a folder of one's own (HYDOR_SUGGEST_MODEL_DIR) or a release that is not downloaded whole.
+ */
+export function tidyReleases(now = Date.now()) {
+  const dir = releaseDir();
+  if (!dir || process.env.HYDOR_SUGGEST_MODEL_DIR || !fs.existsSync(path.join(dir, '.complete'))) return;
+  try {
+    fs.writeFileSync(path.join(dir, '.used'), new Date(now).toISOString());
+  } catch {}
+  for (const o of otherReleases(dir)) {
+    try {
+      if (now - lastUsed(o) > RELEASE_KEEP_MS) fs.rmSync(o, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+/**
+ * The small model's release (nothing to do for a folder of one's own: HYDOR_SUGGEST_MODEL_DIR). The files an older release has
+ * unchanged are taken from it, so an update downloads only what changed; the older release's folders are removed once no copy of the app has used them for a week (tidyReleases).
+ */
 export async function setupRelease(report: Report, signal?: AbortSignal): Promise<void> {
   const problem = releaseProblem();
-  if (!problem) return;
   const dir = releaseDir();
+  if (!problem) {
+    tidyReleases();
+    return;
+  }
   if (!dir || process.env.HYDOR_SUGGEST_MODEL_DIR) throw new Error(problem);
-  const total = SMALL_MODEL.files.reduce((n, f) => n + f.bytes, 0);
+  const olders = otherReleases(dir);
+  const missing = SMALL_MODEL.files.filter((f) => !fs.existsSync(path.join(dir, f.name)));
+  const reuse = new Map<ModelFile, string>();
+  if (olders.length) {
+    report('Looking for what an older small model has');
+    for (const f of missing) {
+      const from = await sameFileIn(olders, f);
+      if (from) reuse.set(f, from);
+    }
+  }
+  const total = missing.filter((f) => !reuse.has(f)).reduce((n, f) => n + f.bytes, 0);
   if (freeDiskGb(path.dirname(dir)) < total / 2 ** 30 + 0.2) throw new Error(`Not enough disk space for the small model (${mb(total)} MB).`);
   fs.mkdirSync(dir, { recursive: true });
   withFolders(dir, SMALL_MODEL.files);
+  for (const [f, from] of reuse) bringIn(from, path.join(dir, f.name));
   const base = (process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '');
   await withStall(signal, STALL_MS, (sig, alive) =>
     downloadFiles(dir, SMALL_MODEL.files, {
@@ -410,6 +513,7 @@ export async function setupRelease(report: Report, signal?: AbortSignal): Promis
       progress: (done, all) => (alive(), report(done >= all ? 'Checking the small model' : `Downloading the small model: ${mb(done)} of ${mb(all)} MB`)),
     }),
   );
+  tidyReleases();
 }
 
 function extract(file: string, to: string): Promise<void> {
