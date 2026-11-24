@@ -12,7 +12,7 @@ answered. The recipe is the research's:
   is `<bos> <agent> chunk <eos>` and a document or note the person wrote `<bos> <doc> chunk <eos>` (chunks of 254 tokens; the person's
   own at --w-user, the replies at 1);
 - --max-tokens bounds the person's own text (messages and documents): the newest records up to that many tokens are learned from,
-  the rest is left out (agent replies: those from that same stretch of time, at most as many tokens again);
+  the rest is left out (agent replies: those from that same stretch of time, at most a quarter as many tokens);
 - the last 5% of the person's messages (by time) are held out and their loss printed (--holdout 0 holds none out: the server learns
   from every message, each run from the published model, and has no dev loss);
 - public text from the release's replay folder is mixed into every batch at --replay-ratio tokens per token of the person's, weight 1,
@@ -183,7 +183,7 @@ def cap_records(records: list, tokens: Tokens, max_tokens: int) -> list:
     """The records to learn from, in their order, when the person's own text (user and doc records) is bounded to about max_tokens
     tokens (the record that crosses the bound is kept, so a little over): the newest first by ts, so what is left out is the oldest.
     The agent replies are those written since the oldest own record kept (all of them when none was left out), at most max_tokens
-    tokens of them, newest first. max_tokens <= 0: all of them. Only what is kept is tokenized."""
+    tokens of them (a quarter of the bound: they are only the context the person's words answered), newest first. max_tokens <= 0: all of them. Only what is kept is tokenized."""
     if max_tokens <= 0:
         return records
 
@@ -202,7 +202,7 @@ def cap_records(records: list, tokens: Tokens, max_tokens: int) -> list:
 
     own, own_cut = newest([i for i, r in enumerate(records) if r['kind'] != 'agent'], max_tokens)
     since = min((records[i]['ts'] for i in own), default=0) if own_cut else None
-    replies, _ = newest([i for i, r in enumerate(records) if r['kind'] == 'agent' and (since is None or r['ts'] >= since)], max_tokens)
+    replies, _ = newest([i for i, r in enumerate(records) if r['kind'] == 'agent' and (since is None or r['ts'] >= since)], max(1, max_tokens // 4))
     keep = set(own) | set(replies)
     return [r for i, r in enumerate(records) if i in keep]
 

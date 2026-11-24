@@ -248,7 +248,7 @@ class CapTests(unittest.TestCase):
         self.assertTrue(agents)
         self.assertTrue(all(r['ts'] >= oldest for r in agents))
         small = T.cap_records(recs, self.tokens, 40)
-        self.assertLess(sum(self.n(r) for r in small if r['kind'] == 'agent'), 40 + max(self.n(r) for r in recs))
+        self.assertLess(sum(self.n(r) for r in small if r['kind'] == 'agent'), 40 // 4 + max(self.n(r) for r in recs))      # a quarter of the bound, and the one that crosses it
         none_cut = T.cap_records(recs, self.tokens, sum(self.n(r) for r in own) + 1)         # own text not cut: no stretch to keep to
         self.assertEqual([r for r in none_cut if r['kind'] != 'agent'], own)
 

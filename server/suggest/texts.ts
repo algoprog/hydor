@@ -320,14 +320,25 @@ export async function extractTexts(db: DB, o: { since: number; until?: number; s
   return out;
 }
 
-/** Writes the texts as JSON lines, readable by the owner alone; returns how many of each kind. */
-export async function writeTexts(db: DB, file: string, o: { since: number; until?: number; sources: SuggestSettings['sources'] }): Promise<{ user: number; agent: number; doc: number }> {
+/**
+ * Writes the texts as JSON lines, readable by the owner alone; returns how many of each kind, and (when `freshSince` is given)
+ * how many of what the person wrote is newer than that time (`fresh`: their messages, notes and documents; the agents' replies
+ * only when those are all that is switched on), so a run can tell that nothing was written since the last one.
+ */
+export async function writeTexts(
+  db: DB,
+  file: string,
+  o: { since: number; until?: number; sources: SuggestSettings['sources']; freshSince?: number },
+): Promise<{ user: number; agent: number; doc: number; fresh?: number }> {
   const lines = await extractTexts(db, o);
   const fd = fs.openSync(file, 'w', 0o600);
-  const n = { user: 0, agent: 0, doc: 0 };
+  const n: { user: number; agent: number; doc: number; fresh?: number } = { user: 0, agent: 0, doc: 0 };
+  const ownOn = o.sources.messages || o.sources.notes || o.sources.docs;
+  if (o.freshSince != null) n.fresh = 0;
   try {
     for (const l of lines) {
       n[l.kind]++;
+      if (o.freshSince != null && l.ts > o.freshSince && (l.kind !== 'agent' || !ownOn)) n.fresh!++;
       fs.writeSync(fd, JSON.stringify(l) + '\n');
     }
   } finally {

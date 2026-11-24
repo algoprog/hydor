@@ -750,6 +750,7 @@ export class SuggestService {
     };
     if (m.plan === 'mix' || m.plan === 'llm' || m.plan === 'slm') out.plan = m.plan;
     if (typeof m.lang === 'string' && m.lang) out.lang = m.lang;
+    if (m.model === 'base' || m.model === 'personal') out.model = m.model;
     const ms = m.ms && typeof m.ms === 'object' ? num((m.ms as Record<string, unknown>).total) : 0;
     if (ms) out.ms = ms;
     return out;

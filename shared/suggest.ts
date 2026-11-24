@@ -39,6 +39,12 @@ export interface SuggestResponse {
   plan?: 'mix' | 'llm' | 'slm';
   /** The language guessed (a FLORES code such as eng_Latn), when it was sure. */
   lang?: string;
+  /**
+   * The small model that answered: `personal` (the one learned from the person's writing: in the languages they write in, and
+   * where no language was guessed) or `base` (the one that came with the app: in every other language). Not there when Qwen3.5
+   * alone answered.
+   */
+  model?: 'base' | 'personal';
   /** Time taken on the server (ms). */
   ms?: number;
 }

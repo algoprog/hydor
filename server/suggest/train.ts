@@ -1,6 +1,7 @@
 // Personalising the small model: the texts (texts.ts) go to the engine's train.py, which runs at the lowest priority
 // beside whatever the person is doing, saves a resume state as it goes and writes the new model only at its end; the new
-// model's folder then takes the place of the old one, which stays until it has.
+// model's folder then takes the place of the old one, which stays until it has. Every run starts from the published model and
+// learns from all of the person's writing (its newest part), so the personal model never drifts from a copy of a copy.
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,13 +22,23 @@ const workDir = () => path.join(personalDir(), 'train');
 const outDir = () => path.join(workDir(), 'out');
 const PERSONAL_FILES = ['model.safetensors', 'config.json'];
 
+/**
+ * How much of the person's own text a run learns from, newest first (train.py's --max-tokens): every run reads all their writing,
+ * so this keeps a run on the processor to a bounded time however much has been written. About 4 million tokens is some 3 million
+ * words, years of typing; only a person who has written more leaves out their oldest.
+ */
+export const MAX_OWN_TOKENS = 4_000_000;
+/** Public text replayed per token of the person's own (train.py's --replay-ratio): half a token, so one of public text to two of theirs. */
+export const REPLAY_RATIO = 0.5;
+
 /** What is known of the personal model: written beside it when it was trained. */
 export interface PersonalState {
   trainedAt: number;
-  /** The time its texts were read until: the next run reads what is newer. */
+  /** The time its texts were read until: the next run has something to learn only when more was written after it. */
   since: number;
   tokens?: number;
   languages?: Record<string, number>;
+  /** The loss on a held-out part of the writing: runs hold none out now, so it is only in a model that an older version made. */
   devNll?: number;
   seconds?: number;
 }
@@ -286,8 +297,10 @@ export class Trainer {
       mkPrivate(personalDir());
       mkPrivate(workDir());
       const job = path.join(workDir(), 'job.json');
-      // A run that was stopped goes on from its resume state with the texts it had: read again from the same time and up to
-      // the same time (nothing written since is in them), so train.py sees the same texts file.
+      // Every run is a fresh run: it starts from the published model and reads all the person's writing (up to the time it began),
+      // so a model is never a copy of a copy. It has something to learn only when more was written after the last run's cut-off
+      // (`since`). A run that was stopped goes on from its resume state with the texts it had: read again up to the same time
+      // (nothing written since is in them), so train.py sees the same texts file.
       let since = hasPersonal() ? (personalState()?.since ?? 0) : 0;
       let until = startedAt;
       let seed = runSeed(until);
@@ -301,16 +314,15 @@ export class Trainer {
         }
       } catch {}
       if (!resumed) fs.rmSync(outDir(), { recursive: true, force: true });
-      const n = await writeTexts(db, texts, { since, until, sources: s.sources });
+      const n = await writeTexts(db, texts, { since: 0, until, sources: s.sources, freshSince: resumed ? undefined : since });
       if (this.stopping) return fail(ended(), true);
       const count = n.user + n.agent + n.doc;
-      if (!count) {
+      if (!count || (!resumed && !n.fresh)) {
         fs.rmSync(job, { force: true });
         return fail('Nothing new to learn from', true);
       }
       fs.writeFileSync(job, JSON.stringify({ since, until, seed, texts: n }), { mode: 0o600 });
       const threads = trainThreads(s);
-      const init = hasPersonal() ? personalDir() : release;
       this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}` });
       // Where to learn: the graphics card when there is one to use, else the processor (and why not, for the page).
       let pick = await this.choose(db, s);
@@ -332,7 +344,7 @@ export class Trainer {
       }
       const attempt = (p: DevicePick, py: string) => {
         this.set({ state: 'running', startedAt, lastAt: this.state.lastAt, progress: { done: 0, total: 0 }, detail: `Learning from ${count} text${count === 1 ? '' : 's'}`, device: { kind: p.device.kind, name: p.device.name } });
-        return this.spawnTrain(py, this.args({ texts, release, init, s, threads, pick: p, seed }), this.envFor(threads, p));
+        return this.spawnTrain(py, this.args({ texts, release, s, threads, pick: p, seed }), this.envFor(threads, p));
       };
       let done = await attempt(pick, python);
       if (!done.ok && !done.nothing && !this.stopping && pick.device.kind !== 'cpu') {
@@ -359,7 +371,7 @@ export class Trainer {
       if (this.dropped) return fail(ended(), true);
       // The new model is complete in outDir: it takes the place of the old one, which stays until it has.
       for (const f of fs.readdirSync(outDir())) if (/^resume|\.pt$|\.part$|\.tmp$/i.test(f)) fs.rmSync(path.join(outDir(), f), { recursive: true, force: true });
-      const state: PersonalState = { trainedAt: Date.now(), since: until, tokens: done.tokens, languages: done.languages, devNll: done.devNll, seconds: done.seconds };
+      const state: PersonalState = { trainedAt: Date.now(), since: until, tokens: done.tokens, languages: done.languages, ...(done.devNll != null ? { devNll: done.devNll } : {}), seconds: done.seconds };
       fs.writeFileSync(path.join(outDir(), 'state.json'), JSON.stringify(state), { mode: 0o600 });
       // Whoever holds the old model's files lets go first (Windows will not move them otherwise).
       await hooks.beforeSwap?.();
@@ -422,11 +434,13 @@ export class Trainer {
   }
 
   /** train.py's command line for where it learns. */
-  private args(o: { texts: string; release: string; init: string; s: SuggestSettings; threads: number; pick: DevicePick; seed: number }): string[] {
+  private args(o: { texts: string; release: string; s: SuggestSettings; threads: number; pick: DevicePick; seed: number }): string[] {
     const batch = 4096;
     return [
-      '-I', trainScript(), '--texts', o.texts, '--base', o.release, '--init', o.init, '--out', outDir(), '--replay', path.join(o.release, 'replay'),
-      '--lr', '5e-4', '--batch-tokens', String(batch), '--w-user', String(o.s.userWeight), '--replay-ratio', '1.0', '--epochs', '1',
+      // From the published model (never the personal one) on all of the person's writing, its newest part, and no hold-out.
+      '-I', trainScript(), '--texts', o.texts, '--base', o.release, '--init', o.release, '--out', outDir(), '--replay', path.join(o.release, 'replay'),
+      '--lr', '5e-4', '--batch-tokens', String(batch), '--w-user', String(o.s.userWeight), '--replay-ratio', String(REPLAY_RATIO), '--epochs', '1',
+      '--holdout', '0', '--max-tokens', String(MAX_OWN_TOKENS),
       // Said outright, never `auto`: the processor unless the choice was a card. A card with room runs the batch in one piece (the
       // same gradient); one with less keeps train.py's smaller pieces.
       '--threads', String(o.threads), '--device', o.pick.device.kind, '--resume', '--seed', String(o.seed),

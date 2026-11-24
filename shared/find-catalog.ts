@@ -307,7 +307,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['suggest', 'Choose by language', 'language switch per language detect which model multilingual english greek german qwen small model', 'Picks the model that does best for the language of what you write'],
   ['suggest', 'Learn from the conversation', 'session cache learn conversation earlier words messages repeat names terms', 'Uses the words used earlier in the conversation, as you type a message'],
   ['suggest', 'Threads', 'threads cpu cores processors speed suggestions faster slower busy', 'Processor threads for suggestions (automatic by default)'],
-  ['suggest', 'Learn from what I write', 'personalise personalize learn train fine-tune your writing style own words personal model on this computer privacy', 'The small model learns from what you write, on this computer, in the background'],
+  ['suggest', 'Learn from what I write', 'personalise personalize learn train fine-tune your writing style own words personal model on this computer privacy', 'The small model learns from what you write, on this computer, in the background; every run starts again from the one that came with the app'],
   ['suggest', 'When it learns', 'schedule nightly weekly manual when train retrain idle night', 'Every night, every week, or only when you press Retrain now; it waits until you have not typed for ten minutes'],
   ['suggest', 'From my messages', 'messages sources learn from what i typed sessions conversations own words', 'Learn from the messages you wrote to agents'],
   ['suggest', "From agents' replies", 'replies sources learn agents answers conversations text', 'Learn from what agents replied to you'],
@@ -316,7 +316,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['suggest', 'Weight of my own words', 'weight own words typed more than replies how much count heavier user', 'How much more the words you typed count than the rest it learns from'],
   ['suggest', 'Threads for learning', 'training threads cpu cores processors learning faster slower busy', 'Processor threads for learning (automatic by default)'],
   ['suggest', 'Learn on the graphics card', 'gpu graphics card nvidia cuda mac apple silicon mps faster speed learning training fast vram', 'Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor'],
-  ['suggest', 'Retrain now', 'retrain train now learn now personalise start update model', 'Learns from what you wrote since the last time, now, in the background'],
+  ['suggest', 'Retrain now', 'retrain train now learn now personalise start update model', 'Learns from all you have written, starting from the small model that came with the app, now, in the background'],
   ['suggest', 'Forget what it learned', 'forget delete reset remove personal model start over privacy', 'Deletes the model that learned from you; the one that came with the app is used again'],
   // Capabilities › Assistants
   ['assistants', 'Your agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],

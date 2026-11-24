@@ -23,7 +23,7 @@ import { killAll, leftoverTraining, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
 import { run as runCommand, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, type DevicePick } from './gpu.ts';
-import { GRACE, gpuHold, personalDir, recoverPersonal, runSeed } from './train.ts';
+import { GRACE, MAX_OWN_TOKENS, gpuHold, personalDir, personalState, recoverPersonal, runSeed } from './train.ts';
 import { merge, readSettings, trainThreads, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
 import { SMALL_MODEL_NEEDS } from './pins.ts';
@@ -82,7 +82,7 @@ if any(a.endswith('train.py') for a in args):
     open(os.path.join(a['--out'], 'model.safetensors'), 'w').write('weights')
     open(os.path.join(a['--out'], 'config.json'), 'w').write('{}')
     open(os.path.join(a['--out'], 'resume.pt'), 'w').write('state')
-    out({'done': True, 'dev_nll': 3.2, 'tokens': 1234, 'seconds': 1, 'languages': {'eng_Latn': 1000}})
+    out({'done': True, 'tokens': 1234, 'seconds': 1, 'languages': {'eng_Latn': 1000}})
     sys.exit(0)
 q = queue.Queue()
 cancelled = set()
@@ -116,7 +116,7 @@ while True:
             if m['id'] in cancelled: out({'id': m['id'], 'cancelled': True}); continue
         if 'block' in text: time.sleep(2.6)
         if 'broken' in text: out({'id': m['id'], 'error': 'no'}); continue
-        out({'id': m['id'], 'word': 'ing', 'next': ' the', 'conf': 0.7, 'conf_next': 0.6, 'theta': 0.4, 'show': True, 'show_next': True, 'plan': 'slm', 'lang': 'eng_Latn', 'ms': {'total': 12, 'llm': 0, 'slm': 12}})
+        out({'id': m['id'], 'word': 'ing', 'next': ' the', 'conf': 0.7, 'conf_next': 0.6, 'theta': 0.4, 'show': True, 'show_next': True, 'plan': 'slm', 'lang': 'eng_Latn', 'model': 'base', 'ms': {'total': 12, 'llm': 0, 'slm': 12}})
     else: out({'id': m['id'], 'error': 'unknown op'})
 `,
 );
@@ -349,7 +349,7 @@ test('routes: not ready is 204 and starts the worker; then a suggestion comes ba
     const x = await ask({ surface: 'chat', text: 'Hello wor', client: 'tab-a', reply: 'The previous reply', prev: 'before' });
     return x.statusCode === 200 ? x : null;
   });
-  assert.deepEqual(r.json(), { word: 'ing', next: ' the', conf: 0.7, confNext: 0.6, show: true, showNext: true, plan: 'slm', lang: 'eng_Latn', ms: 12 });
+  assert.deepEqual(r.json(), { word: 'ing', next: ' the', conf: 0.7, confNext: 0.6, show: true, showNext: true, plan: 'slm', lang: 'eng_Latn', model: 'base', ms: 12 });
   const load = logLines().find((l) => l.op === 'load');
   assert.equal(load.model_dir, release);
   assert.equal(load.personal_dir, null);
@@ -607,6 +607,13 @@ test('the texts: the person’s typed words with the reply they answered, agents
   const file = path.join(tmp, 'texts.jsonl');
   const n = await writeTexts(db, file, { since: 0, sources: all });
   assert.deepEqual(n, { user: 3, agent: 2, doc: 3 });
+  // With a time to tell what is new from: how much of what the person wrote is newer than it (all of it is read either way).
+  const fresh = await writeTexts(db, file, { since: 0, sources: all, freshSince: T0 + 5 });
+  assert.deepEqual([fresh.user, fresh.agent, fresh.doc], [3, 2, 3]);
+  assert.equal(fresh.fresh, 4, 'the last message, the note and the two pages since then; the replies are not what the person wrote');
+  assert.equal((await writeTexts(db, file, { since: 0, sources: all, freshSince: Date.now() + 1e6 })).fresh, 0, 'nothing after the end of time');
+  assert.equal((await writeTexts(db, file, { since: 0, sources: { messages: false, replies: true, notes: false, docs: false }, freshSince: 0 })).fresh, 2, 'replies alone: they are all there is');
+  assert.equal((await writeTexts(db, file, { since: 0, sources: all })).fresh, undefined, 'without a time it is not counted');
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   const parsed = fs.readFileSync(file, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(parsed.length, 8);
@@ -635,6 +642,8 @@ test('personalising: now, at the lowest priority; the new model takes the old on
     return x.status.training.state === 'idle' && x.status.model.kind === 'personal' ? x : null;
   });
   assert.equal(s.status.model.tokens, 1234);
+  assert.ok(!('devNll' in (personalState() ?? {})), 'nothing was held out: no dev loss is kept, and the page and the API do without');
+  assert.equal(JSON.stringify(s.status).includes('devNll'), false);
   assert.deepEqual(s.status.model.languages, { eng_Latn: 1000 });
   assert.ok(s.status.model.trainedAt! > Date.now() - 60_000);
   assert.ok(s.status.training.lastAt);
@@ -651,6 +660,10 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   assert.equal(opt('--w-user'), '6');
   assert.equal(opt('--base'), release);
   assert.equal(opt('--init'), release, 'the first run starts from the small model');
+  assert.equal(opt('--replay-ratio'), '0.5', 'half a token of public text per token of the person’s');
+  assert.equal(opt('--holdout'), '0', 'no hold-out: every message is learned from');
+  assert.equal(opt('--max-tokens'), String(MAX_OWN_TOKENS), 'the person’s own text is bounded to its newest part');
+  assert.equal(MAX_OWN_TOKENS, 4_000_000);
   assert.equal(opt('--replay'), path.join(release, 'replay'));
   assert.equal(opt('--out'), path.join(personal, 'train', 'out'));
   assert.ok(a.includes('--resume') && a.includes('-I'));
@@ -666,7 +679,8 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   await ask({ surface: 'chat', text: 'wake the worker' });
   await until('the worker to load the personal model', async () => logLines().filter((l) => l.op === 'load').pop()?.personal_dir === personal);
   await until('the model it says it uses', async () => ((await get()).status.model.kind === 'personal' ? true : null));
-  // The second run reads from the personal model, and only what is new (nothing new: nothing to do).
+  // Nothing written since the last run's cut-off: nothing to do. A run after something new starts from the published model again
+  // (never the personal one) and reads all the writing, not only what is new.
   const before = logLines().filter((l) => l.train).length;
   await app.inject({ method: 'POST', url: '/api/suggest/train' });
   await until('the second run to finish', async () => (await get()).status.training.state !== 'running' && !svcActive());
@@ -678,8 +692,10 @@ test('personalising: now, at the lowest priority; the new model takes the old on
   await until('the second run', async () => logLines().filter((l) => l.train).length === before + 1);
   await until('it is over', async () => !svcActive());
   const t2 = logLines().filter((l) => l.train).pop();
-  assert.equal(t2.args[t2.args.indexOf('--init') + 1], personal, 'later runs start from the personal model');
-  assert.equal(t2.texts, 1, 'and read only the new text');
+  assert.equal(t2.args[t2.args.indexOf('--init') + 1], release, 'later runs start from the published model, not the personal one');
+  assert.equal(t2.args[t2.args.indexOf('--base') + 1], release);
+  for (const k of ['--replay-ratio', '--holdout', '--max-tokens', '--lr'] as const) assert.equal(t2.args[t2.args.indexOf(k) + 1], a[a.indexOf(k) + 1], `${k} is the same every run`);
+  assert.equal(t2.texts, t.texts + 1, 'and read all the writing: what the first run read, and the new text');
   // Forget it.
   const f = await app.inject({ method: 'DELETE', url: '/api/suggest/personal' });
   assert.equal(f.json().status.model.kind, 'base');
@@ -967,7 +983,8 @@ test('6, 7 and the exit codes: a stopped run goes on with the same texts, no tex
   const third = trains().length;
   await app.inject({ method: 'POST', url: '/api/suggest/train' });
   await until('the next run', async () => trains().length === third + 1);
-  assert.equal(trains()[third].texts, 1, 'only the one written since');
+  assert.equal(trains()[third].texts, first.texts + 1, 'all the writing again, with the one written since');
+  assert.equal(trains()[third].args[trains()[third].args.indexOf('--init') + 1], release, 'from the published model');
   await until('it to finish', async () => !svc.trainer.active);
   // A failure leaves no texts; 3 is nothing to learn from (not a failure), 2 is a failure (a wrong command line).
   for (const [name, state, detail] of [

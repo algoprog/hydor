@@ -132,6 +132,7 @@ function Status({ settings, status }: { settings: Settings; status: SuggestStatu
           {status.model.kind === 'personal' ? (
             <>
               <span>The small model is the one made on this computer from what you write.</span>
+              <span className="block">It suggests in the languages you write in; in other languages the one that came with the app does.</span>
               {status.model.trainedAt ? <span className="block">{`Last learned ${ago(status.model.trainedAt)}.`}</span> : null}
               {status.model.tokens ? <span className="block">{`${status.model.tokens.toLocaleString(LOCALE)} tokens of yours.`}</span> : null}
             </>
@@ -344,7 +345,7 @@ export function SuggestSettings() {
       <Group title="Learning">
         <Row
           label="Learn from what I write"
-          hint="Trains the small model on this computer from your writing, so it suggests your words. It never leaves this computer"
+          hint="Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer"
           control={<Switch on={settings.personalise} label="Learn from what I write" onChange={(personalise) => set({ personalise })} />}
         />
         <Row
@@ -389,7 +390,7 @@ export function SuggestSettings() {
         </Row>
         <Row
           label="Retrain now"
-          hint="Learns from your writing again now; the first time can take hours on a computer without a graphics card"
+          hint="Learns from all your writing again now, starting from the small model that came with the app; it can take hours on a computer without a graphics card"
           disabled={learning || off}
           control={
             <Button
