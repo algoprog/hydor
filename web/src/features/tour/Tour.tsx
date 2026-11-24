@@ -11,10 +11,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, X } from 'lucide-react';
 import type { AccountAgent, AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
-import { go } from '../../lib/nav';
+import { go, goApp } from '../../lib/nav';
 import { saveStart, startSettings } from '../../lib/start';
 import { desktopSystem, enablePush, pushState, systemNotices, systemNoticesState, testSystemNotice, turnOnSystemNotices, whenBack, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
@@ -218,7 +218,7 @@ function pickAgent(uses: Use[]) {
 }
 
 /** Puts words in the message box, as a link to the start page does, and leaves them for you to send or change. */
-function tryWords(text: string) {
+export function tryWords(text: string) {
   go(`/?prompt=${encodeURIComponent(text)}`);
   setTimeout(() => {
     if (!window.matchMedia('(pointer: coarse)').matches) document.querySelector<HTMLTextAreaElement>('[data-tour="composer"] textarea')?.focus({ preventScroll: true });
@@ -537,7 +537,7 @@ function BringInStep() {
   const found = useTour((s) => s.found);
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap gap-2">
+      <div className={cx('flex flex-wrap gap-2', !found.length && 'hidden')}>
         {found.map((n) => (
           <span key={n} className="rounded-full border border-line bg-bg-1 px-3 py-1 text-[13px] text-fg-2" translate="no">
             {n}
@@ -565,13 +565,15 @@ function BrowsersStep() {
 }
 
 const FIRST_TASKS = ['Plan a 3-day trip to Lisbon in May', 'Sum up a PDF I drop in', 'Make a budget spreadsheet for a small café'];
+/** Requests that one of the ready-made apps answers. */
+const APP_TASKS = ['Plan 4 days in Lisbon in May', 'Compare the three best e-bikes under $2,000', 'What will the weather be like in Rome this weekend?'];
 
-function TryThese({ finish }: { finish?: boolean }) {
+function TryThese({ finish, tasks = FIRST_TASKS }: { finish?: boolean; tasks?: string[] }) {
   return (
     <div>
       <div className="mb-2 text-[12px] font-medium text-fg-3">{finish ? 'Start with one of these:' : 'Try it: put one in the box'}</div>
       <div className="flex flex-wrap gap-1.5">
-        {FIRST_TASKS.map((t) => (
+        {tasks.map((t) => (
           <button
             key={t}
             type="button"
@@ -702,19 +704,21 @@ function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean):
       scene: (u) => <SourcesMap on={u} focus="agents" />,
       Extra: AgentsSetup,
     });
-  // Another assistant's folder is here: one step offers its memory and skills, before the tour moves into the app.
-  if (found.length)
-    list.push({
-      id: 'bring-in',
-      title: 'Coming from another agent?',
-      body: 'Hydor found these on this computer. Bring over what they know about you, and the skills you made, in one step. You see everything first, and nothing is added until you pick.',
-      scene: () => (
-        <div className="flex w-full justify-center">
-          <TideMark size={84} />
-        </div>
-      ),
-      Extra: BringInStep,
-    });
+  // For everyone: what ChatGPT and Claude know comes from the export they email, and what another agent's folder on
+  // this computer holds (memory and skills) from the folder; the step says which it found, and Bring in opens over it.
+  list.push({
+    id: 'bring-in',
+    title: found.length ? 'Coming from another agent?' : 'Coming from ChatGPT or Claude?',
+    body: found.length
+      ? 'Hydor found these on this computer. Bring over what they know about you, and the skills you made, in one step. From ChatGPT or Claude, use the export they email you (a .zip file): in ChatGPT, Settings → Data controls → Export data; in Claude, Settings → Privacy → Export data. You see everything first, and nothing is added until you pick.'
+      : 'Bring over what they know about you. Both email you an export (a .zip file): in ChatGPT, Settings → Data controls → Export data; in Claude, Settings → Privacy → Export data. Hydor reads it into notes, and you pick which to keep. Nothing is added until you do.',
+    scene: () => (
+      <div className="flex w-full justify-center">
+        <TideMark size={84} />
+      </div>
+    ),
+    Extra: BringInStep,
+  });
   // In a desktop app, its own browser can take in what the other browsers here know: bookmarks and history.
   if (browsers)
     list.push({
@@ -737,7 +741,7 @@ function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean):
       route: '/',
       icon: <MessageSquareText size={16} />,
       title: 'Ask for anything',
-      body: 'Write what you want done and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session.',
+      body: 'Write what you want done and press Enter: an agent gets to work. Drop in files and pictures too. Each conversation is called a session. As you type, grey words guess how you will go on: Tab takes them.',
       Extra: () => <TryThese />,
     },
     {
@@ -775,7 +779,16 @@ function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean):
       sidebar: true,
       icon: <LayoutGrid size={16} />,
       title: 'Everything else',
-      body: 'Projects keep each piece of work together, Apps are the tasks you run again and again, Inbox is everything waiting on you, Search finds anything in the app, Usage shows what your plans have left, System holds this computer’s files, and Help is the guide to every part of the app.',
+      body: 'Projects keep each piece of work together, Apps are the tasks you run again and again, Inbox is everything waiting on you, Search finds anything in the app, Usage shows what your plans have left, System holds this computer’s files and its Experiments, runs that wait for a free GPU, and Help is the guide to every part of the app.',
+    },
+    {
+      id: 'apps',
+      target: 'nav-apps',
+      sidebar: true,
+      icon: <LayoutGrid size={16} />,
+      title: 'Apps for the jobs you repeat',
+      body: 'An app is a job you do again and again: a trip plan, a product comparison, a news digest. Each asks a few questions and answers in a view of its own. Agents run them for you in any chat, and you can make your own by describing it.',
+      Extra: () => <TryThese tasks={APP_TASKS} />,
     },
     {
       id: 'notify',
@@ -807,7 +820,23 @@ function steps(uses: Use[], fresh: boolean, found: string[], browsers: boolean):
       body: 'Agents are ready to help. Help explains every part of the app, and short tips will show you the rest as you go.',
       width: 420,
       next: 'Get started',
-      Extra: () => <TryThese finish />,
+      Extra: () => (
+        <div className="grid gap-4">
+          <TryThese finish />
+          <div>
+            <Button
+              variant="secondary"
+              icon={<Sparkles size={15} />}
+              onClick={() => {
+                endTour(true);
+                goApp('/guide#what-hydor-can-do');
+              }}
+            >
+              See what Hydor can do
+            </Button>
+          </div>
+        </div>
+      ),
     },
   );
   return list;

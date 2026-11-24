@@ -1593,7 +1593,7 @@ html[data-motion='full'] .anim-modal-soft {
 :root[data-tour-build~='sidebar'] [data-shell] [data-tour='sidebar'],
 :root[data-tour-build~='sessions'] [data-shell] [data-tour='sessions'],
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'],
-:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system']) {
+:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system'], [data-tour='nav-apps']) {
   visibility: visible;
   opacity: 1;
   transition: none;
@@ -1603,7 +1603,7 @@ html[data-motion='full'] .anim-modal-soft {
 :root[data-tour-build~='tools'] [data-shell] [data-tour='tools'] {
   animation: overlay-in 240ms 100ms ease-out backwards;
 }
-:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system']) {
+:root[data-tour-build~='tools'] [data-shell] :is([data-tour='nav-settings'], [data-tour='nav-system'], [data-tour='nav-apps']) {
   animation-delay: calc(160ms + (var(--tour-c, 0) + var(--tour-r, 0)) * 35ms);
 }
 @keyframes tour-part-in {

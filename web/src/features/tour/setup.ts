@@ -29,4 +29,4 @@ export const DESKTOP_APP = /\b(?:HydorMac|HydorWindows|HydorLinux|NagetAgentMac)
 export const PHONE_STEP = DESKTOP_APP;
 
 /** Steps of a new install's tour before anything is picked, the password included (Tour.tsx checks it against its steps). */
-export const TOUR_SETUP_STEPS = PHONE_STEP ? 10 : 9;
+export const TOUR_SETUP_STEPS = PHONE_STEP ? 12 : 11;

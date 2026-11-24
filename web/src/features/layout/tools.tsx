@@ -87,7 +87,7 @@ export function useTools(nav: (path: string) => void, searching: () => void, com
   const [loc] = useLocation();
   const updates = useApp((s) => (s.boot?.update?.behind ?? 0) > 0);
   return [
-    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
+    ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path), tour: n.id === 'apps' ? 'nav-apps' : undefined }))),
     // What the agents' plans have used and have left, with a thin bar for it at a glance.
     { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint compact={compact} /> },
     // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
