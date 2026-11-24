@@ -19,7 +19,7 @@ export interface CatalogItem {
   where?: string;
   /** What opening it does: a page, an action, a Settings section (and the words to point at there), a theme. */
   path?: string;
-  act?: 'tour' | 'ask' | 'theme' | 'sidebar' | 'groups' | 'panel' | 'releases' | 'handsfree';
+  act?: 'tour' | 'features' | 'ask' | 'theme' | 'sidebar' | 'groups' | 'panel' | 'releases' | 'handsfree';
   section?: string;
   find?: string;
   theme?: string;
@@ -424,6 +424,7 @@ const PAGES: [string, string, string, string, string][] = [
 
 const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
   ['tour', 'Take the tour', 'help tour guide welcome onboarding how', 'A short walk through the app'],
+  ['features', 'What Hydor can do', 'features highlights what can it do getting started things to try ideas examples capabilities overview discover', 'Help’s list of what the app does, each with a request to try or the place to open it'],
   ['ask', 'Ask an agent about the app', 'help question how do i where is what does explain ask agent support', 'An agent answers from the guide, and can change a setting or set something up for you'],
   ['handsfree', 'Talk hands-free', 'voice speak talk hands free walking listen read aloud conversation microphone', 'Start, steer and check sessions by voice, and hear the results'],
   ['releases', 'Release notes', 'what is new whats new changelog changes version history updates', 'What changed in each version of the app'],

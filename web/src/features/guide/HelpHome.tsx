@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { GuideTopic } from '@shared/guide';
 import { cx, useIsMobile } from '../../components/ui';
 import { AskBox, TopicIcon } from './AskBox';
+import { Highlights } from './Highlights';
 import { GROUPS, lookOf, POPULAR, rankOf } from './topics';
 
 function TopicCard({ t, onOpen }: { t: GuideTopic; onOpen: (t: string) => void }) {
@@ -52,6 +53,9 @@ export function HelpHome({ topics, onOpen, column, listed }: { topics: GuideTopi
           </div>
         )}
       </section>
+
+      {/* Not while something is typed in the box: its results come then, as the questions go. */}
+      <Highlights className={cx('mt-9', q.trim() && 'hidden')} />
 
       {!listed &&
         groups
