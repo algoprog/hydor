@@ -38,7 +38,7 @@ export function AppRunNote({ note }: { note: SessionNote; sessionKey: string }) 
   return (
     // data-app-card: the conversation shows a tall answer from its top, with the agent's words about it (Timeline.tsx).
     <div className="my-3 space-y-2" data-app-card={data.run}>
-      <div className="flex min-w-0 items-center gap-2.5 px-1">
+      <div data-tip="app-run" className="flex min-w-0 items-center gap-2.5 px-1">
         <AppIcon icon={data.icon} color={data.color} size={24} />
         <button type="button" onClick={() => go(appPath(data.app))} className="min-w-0 shrink truncate text-[13.5px] font-semibold transition-colors hover:text-accent" title="Open the app" translate={ready ? undefined : 'no'}>
           {data.name}

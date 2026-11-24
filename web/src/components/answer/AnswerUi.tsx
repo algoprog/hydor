@@ -185,7 +185,7 @@ export function AnswerBlock({ name, code, done, demo, session, board, noPin, web
   const look = () => setPictures(!raw && picturable(card.current));
   return (
     <AuiCtx.Provider value={info}>
-      <div ref={card} className="aui group/aui relative my-3" data-ui={spec?.id ?? asked} translate="no" onPointerEnter={done ? look : undefined} onFocus={done ? look : undefined}>
+      <div ref={card} className="aui group/aui relative my-3" data-ui={spec?.id ?? asked} data-tip={done && !demo && !board && !noPin && md.sessionKey && spec ? 'answer-card' : undefined} translate="no" onPointerEnter={done ? look : undefined} onFocus={done ? look : undefined}>
         {raw ? <CodeBlock code={pretty} lang="json" /> : drawn}
         {ref && fed.got && !raw && <FromLine card={fed.got} loading={fed.loading} again={fed.again} />}
         {!done && <span className="aui-live breathe" aria-hidden />}

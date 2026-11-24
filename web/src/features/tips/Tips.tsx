@@ -57,7 +57,9 @@ function onScreen(el: HTMLElement): DOMRect | null {
   const r = el.getBoundingClientRect();
   if (r.width < 4 || r.height < 4 || r.bottom < EDGE || r.right < EDGE || r.top > innerHeight - EDGE || r.left > innerWidth - EDGE) return null;
   const hit = document.elementFromPoint(Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1), Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1));
-  return hit && (el === hit || el.contains(hit) || hit.closest('[data-tip-card]')) ? r : null;
+  // A part that lets the pointer through (data-tip-through: the grey words laid over a text box) counts as uncovered when what is under it is that box.
+  const through = el.hasAttribute('data-tip-through') && !!hit && hit.tagName === 'TEXTAREA' && !!el.parentElement?.parentElement?.contains(hit);
+  return hit && (el === hit || el.contains(hit) || through || hit.closest('[data-tip-card]')) ? r : null;
 }
 
 /** Where the card goes: right of a part in the sidebar, else below the part, above it, or beside it. */
@@ -108,7 +110,11 @@ export function Tips() {
   useEffect(() => loadTips(), []);
 
   useEffect(() => {
-    const key = (e: KeyboardEvent) => !e.repeat && (typed.current = Date.now());
+    const key = (e: KeyboardEvent) => {
+      if (!e.repeat) typed.current = Date.now();
+      // Taking the grey word is using the part the tip is about, as pressing a button is.
+      if (e.key === 'Tab' && shownRef.current?.id === 'suggest') close(true);
+    };
     const down = (e: PointerEvent) => {
       pressing.current = true;
       // Using the part the tip is about: it has done its job.

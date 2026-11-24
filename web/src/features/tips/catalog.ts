@@ -45,6 +45,18 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     title: 'A page from the agent',
     body: 'Agents can answer with a page: a report, a chart, a small tool. Keep saves it in the project’s files (or with the conversation), where you can change it and open it on your phone.',
   },
+  beside: {
+    title: 'The page, beside the conversation',
+    body: 'Pages and documents open here as an agent writes them. Edit it right here, open it full screen, or close it; the card in the conversation opens it again.',
+  },
+  'answer-card': {
+    title: 'A card, not a wall of text',
+    body: 'Agents answer with cards when that is clearer: tables, charts, maps, quizzes and small tools. Point at one for its buttons: open it full screen, save it as a picture, or pin it to a board, where an agent can keep it current.',
+  },
+  'app-run': {
+    title: 'An app ran for you',
+    body: 'An agent ran one of your apps for this request. Ask for a change in your next message, such as “shorter” or “add a column”, and the card updates. Open shows it on the app’s own page.',
+  },
   browser: {
     title: 'The agent’s browser',
     body: 'Watch it work, live. Take over to sign in, solve a check or pay yourself; the agent carries on after.',
@@ -85,6 +97,10 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     title: 'Dictate',
     body: 'Speak your message instead of typing it.',
   },
+  suggest: {
+    title: 'The grey words are a guess',
+    body: 'A guess at how you will go on, made on this computer. Tab takes the word, → takes both, and typing on ignores it.',
+  },
   handsfree: {
     title: 'Hands-free',
     body: 'Talk to the app and hear what it did: start a session, ask how your sessions are doing, approve or stop the work, out loud.',
@@ -109,6 +125,10 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     title: 'Preview',
     body: 'Look at the web apps running on this computer from any device, your phone too.',
   },
+  experiments: {
+    title: 'Experiments',
+    body: 'Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables. Agents can start and watch them for you.',
+  },
   review: {
     title: 'Review a branch',
     body: 'Everything the session’s branch changed since it left its base. Tick Viewed on each file as you go.',
@@ -120,6 +140,10 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   apps: {
     title: 'Apps',
     body: 'Small tools that find things out and show them clearly. Open one here, or just ask for what it does in any chat.',
+  },
+  'make-app': {
+    title: 'Make your own app',
+    body: 'Describe a job you do often, and an agent builds the app: a form, the work and a view for its answer. Then run it, schedule it or share it.',
   },
   spaces: {
     title: 'Projects',

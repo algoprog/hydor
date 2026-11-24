@@ -288,7 +288,7 @@ function FullButton({ layout, onClick }: { layout: 'panel' | 'sheet' | 'page'; o
   const wide = useMediaQuery(CANVAS_MEDIA);
   if (layout === 'sheet' || (layout === 'page' && !wide)) return null;
   return (
-    <IconButton label={layout === 'panel' ? 'Full screen' : 'Show beside the conversation'} size="sm" onClick={onClick}>
+    <IconButton label={layout === 'panel' ? 'Full screen' : 'Show beside the conversation'} size="sm" onClick={onClick} data-tip={layout === 'panel' ? 'beside' : undefined}>
       {layout === 'panel' ? <Maximize2 size={14} /> : <PanelRight size={15} />}
     </IconButton>
   );

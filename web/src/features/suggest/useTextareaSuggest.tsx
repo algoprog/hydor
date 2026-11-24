@@ -95,8 +95,11 @@ export function GreyMirror({ ta, before, grey }: { ta: HTMLTextAreaElement | nul
   return (
     <div ref={box} aria-hidden="true" translate="no" className="pointer-events-none absolute box-border overflow-hidden break-words" style={{ borderWidth: 0 }}>
       <span className="invisible">{before}</span>
-      <span className="text-fg-3">{grey.word}</span>
-      {grey.next && <span className="text-fg-3/50">{grey.next}</span>}
+      {/* The tip about these words (features/tips) points at them: the box lets the pointer through, so its hit test looks at the text box under it. */}
+      <span data-tip="suggest" data-tip-through>
+        <span className="text-fg-3">{grey.word}</span>
+        {grey.next && <span className="text-fg-3/50">{grey.next}</span>}
+      </span>
     </div>
   );
 }

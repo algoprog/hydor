@@ -198,6 +198,7 @@ function NewTile({ row }: { row?: boolean }) {
     <button
       type="button"
       onClick={() => go('/apps/new')}
+      data-tip="make-app"
       className={cx(
         'group flex w-full gap-3 rounded-2xl border border-line text-left transition-colors hover:border-line-2 hover:bg-bg-1',
         row ? 'items-center px-4 py-3 sm:gap-4 sm:px-5 sm:py-4' : 'min-h-[128px] items-start p-4 max-sm:hidden',

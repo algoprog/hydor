@@ -47,7 +47,7 @@ const TABS: { id: SystemTab; label: string; icon: ReactNode; tip?: TipId }[] = [
   // Dev-server previews open on this server's own preview port: its own machine only.
   ...(machineId ? [] : [{ id: 'preview' as const, label: 'Preview', icon: <MonitorSmartphone size={14} />, tip: 'preview' as const }]),
   { id: 'monitor', label: 'Monitor', icon: <Activity size={14} /> },
-  { id: 'experiments', label: 'Experiments', icon: <FlaskConical size={14} /> },
+  { id: 'experiments', label: 'Experiments', icon: <FlaskConical size={14} />, tip: 'experiments' },
 ];
 
 /**
