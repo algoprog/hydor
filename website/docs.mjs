@@ -118,6 +118,25 @@ function linkFor(href, file, hrefOfFile, pre) {
   return { href: `${REPO}/${isDir ? 'tree' : 'blob'}/main/${rel.replace(/\/$/, '')}${hash ? `#${hash}` : ''}`, out: true };
 }
 
+/** A table of four columns or more (the comparisons) cannot fit a phone: it is marked `stack`, and each body cell gets
+ * its column's name (data-label), so a narrow screen shows every row as a card with each cell under its column's name
+ * (style.css, `.table-wrap.stack`). Wide screens show the table as it is. */
+function stackWide() {
+  const text = (n) => (n.type === 'text' ? n.value : (n.children ?? []).map(text).join(''));
+  const kids = (n, tag) => (n?.children ?? []).filter((c) => c.type === 'element' && c.tagName === tag);
+  const walk = (n) => {
+    if (n.type === 'element' && n.tagName === 'table') {
+      const names = kids(kids(kids(n, 'thead')[0], 'tr')[0], 'th').map((th) => text(th).trim());
+      if (names.length >= 4) {
+        n.properties = { ...n.properties, className: [...(n.properties?.className ?? []), 'stack'] };
+        for (const body of kids(n, 'tbody')) for (const tr of kids(body, 'tr')) kids(tr, 'td').forEach((td, i) => (td.properties = { ...td.properties, dataLabel: names[i] ?? '' }));
+      }
+    }
+    for (const c of n.children ?? []) walk(c);
+  };
+  return (tree) => walk(tree);
+}
+
 /** A document's Markdown as the page's HTML: headings with the app's ids, its pictures as figures, links resolved. */
 function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
   let at = 0;
@@ -163,7 +182,7 @@ function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
       const url = image(src, file);
       return url ? h('img', { src: url, alt: alt ?? '', loading: 'lazy' }) : null;
     },
-    table: ({ node, ...rest }) => h('div', { className: 'table-wrap' }, h('table', rest)),
+    table: ({ node, ...rest }) => h('div', { className: /\bstack\b/.test(rest.className ?? '') ? 'table-wrap stack' : 'table-wrap' }, h('table', rest)),
     pre: ({ node, children, ...rest }) => {
       const lang = /language-([\w-]+)/.exec(node.children?.[0]?.properties?.className?.join(' ') ?? '')?.[1];
       return h(
@@ -179,7 +198,7 @@ function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
       );
     },
   };
-  return renderToStaticMarkup(h(Markdown, { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeRaw], components }, md));
+  return renderToStaticMarkup(h(Markdown, { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeRaw, stackWide], components }, md));
 }
 
 /** The parts every page shares, taken from the built home page of the language so they are written once: the icons,

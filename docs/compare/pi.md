@@ -12,7 +12,7 @@ People switch from pi to Hydor for the official Claude Code and Codex on their o
 | **On your phone**: installs as an app with notifications, and you approve or deny from the notification | ✓ | Partial: a terminal program; its Slack bot is a separate package [1] |
 | **Desktop apps** for Mac (Apple silicon and Intel), Windows and Linux | ✓ | — Terminal only [2] |
 | **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | — No built-in permission system; run it in a container [1][4] |
-| **A Library** of documents, slides, spreadsheets, LaTeX and diagrams that you edit in the app | ✓ | Partial: `/export` and `/share` make a page of a session [2] |
+| **Documents, slides, spreadsheets, LaTeX and diagrams** that you edit in the app | ✓ | Partial: `/export` and `/share` make a page of a session [2] |
 | **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models through llama.cpp [3] |
 | **No telemetry** | ✓ | — Install and update reports on by default; off with a setting [6] |
 | **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [5] | — No sub-agents by design [2] |
@@ -23,7 +23,7 @@ People switch from pi to Hydor for the official Claude Code and Codex on their o
 - **The official Claude Code and Codex on your plans.** Hydor runs the `claude` and `codex` programs themselves, signed in with what you pay for, and shows the sessions you started in VS Code or a terminal. pi is its own agent [2].
 - **One memory for every agent.** pi leaves memory to extensions [2]. Hydor keeps notes found by meaning, checks them each day against your conversations, and shares them with every agent you run. After a hard task an agent can propose a skill, and it is kept only when you approve it.
 - **A phone and a screen.** A web app that installs on your phone, with notifications and diffs, and desktop apps for Mac, Windows and Linux. pi is a terminal program, and its chat automation for Slack is a separate package [1].
-- **More than code.** A Library of documents, slides, spreadsheets, LaTeX and diagrams, apps with views of their own, research with sources, scheduled tasks and watchers.
+- **More than code.** Documents, slides, spreadsheets, LaTeX and diagrams you edit in the app, apps with views of their own, research with sources, scheduled tasks and watchers.
 - **A strong model leading cheaper helpers, and no telemetry.** pi skips sub-agents by design [2]. In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [5]. pi's settings say anonymous install and update reporting is on by default, off with a setting or `PI_TELEMETRY=0` [6]; Hydor has no analytics libraries.
 
 ## Switch in a few minutes

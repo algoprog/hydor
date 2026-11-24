@@ -1,6 +1,6 @@
 # Hydor vs other agents
 
-Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and a Library. Your memory and the skills you made in other agents come over when you switch. Checked 10 November 2026.
+Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and documents, slides and spreadsheets you edit in the app. Your memory and the skills you made in other agents come over when you switch. Checked 10 November 2026.
 
 Coming from the ChatGPT or Claude app? See [Hydor vs the ChatGPT and Claude apps](chatgpt-and-claude.md). The table below compares agent apps.
 
@@ -20,7 +20,7 @@ Hydor does every row. The others do the parts their own pages describe, and each
 | **No telemetry** | ✓ | ✓ None by default, says its own page | — Install and update reports on by default | — Anonymous usage analytics on by default | ✓ A daily version check; statistics are opt-in |
 | **A strong model leading cheaper helpers** | ✓ 9% less than Best alone and 67% less than everything on Max, in Hydor's own benchmark | Partial: subagents on a model you choose | — No sub-agents by design | Partial: Fusion, a planner with workers | Partial: sub-agents |
 
-On top of this, Hydor has a **Library** of documents, slides, spreadsheets, LaTeX and diagrams that you edit in the app, **apps** with views of their own, more than 100 ready-made views for replies (charts, maps, tables), and a setup tour and a full guide inside the app that its agents read to answer your questions and change settings for you.
+On top of this, Hydor has **documents, slides, spreadsheets, LaTeX and diagrams** that you edit in the app, **apps** with views of their own, more than 100 ready-made views for replies (charts, maps, tables), and a setup tour and a full guide inside the app that its agents read to answer your questions and change settings for you.
 
 ## Switching to Hydor
 
@@ -35,7 +35,7 @@ On top of this, Hydor has a **Library** of documents, slides, spreadsheets, LaTe
 - **[Hydor vs Hermes Agent](hermes-agent.md)**: the official Claude Code on your plan, one memory for every agent and a phone app.
 - **[Hydor vs pi](pi.md)**: approvals, a phone app and a memory built in.
 - **[Hydor vs Atomic Agent](atomic-agent.md)**: your memory and skills come over, and local models work in Hydor too.
-- **[Hydor vs OpenClaw](openclaw.md)**: a coding-first app with one memory and a Library.
+- **[Hydor vs OpenClaw](openclaw.md)**: a coding-first app with one memory and documents you edit in the app.
 
 ## How we compared
 

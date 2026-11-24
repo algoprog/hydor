@@ -459,5 +459,8 @@
   "Draft a reply to Maria about the budget review and keep it short": "予算レビューについてMariaへの返信を、短めに下書きして",
   "Summarize the last three meetings and list what is still open": "直近3回の会議を要約して、未解決のことを一覧にして",
   "A sketch first, to change before anything is made": "何かを作る前に、まずスケッチで確認",
-  "A board of pinned answer cards: the week’s key numbers, a sales chart and a weather forecast, each with when it was last updated.": "ピン留めした回答カードのボード。今週の主な数字、売上グラフ、天気予報が並び、それぞれに最終更新の時刻が表示されます。"
+  "A board of pinned answer cards: the week’s key numbers, a sales chart and a weather forecast, each with when it was last updated.": "ピン留めした回答カードのボード。今週の主な数字、売上グラフ、天気予報が並び、それぞれに最終更新の時刻が表示されます。",
+  "Pages, slides, documents, spreadsheets and LaTeX, edited right in the app. Pictures, videos, music and voice-overs too, all kept in the files of their project.": "ページ、スライド、ドキュメント、スプレッドシート、LaTeXを、アプリの中でそのまま編集できます。画像、動画、音楽、ナレーションも、すべてプロジェクトのファイルに保存されます。",
+  "Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and documents, slides and spreadsheets you edit in the app. What your other agents know, and the skills you made in them, come over, and you pick what to keep. <0>See the comparisons</0>, with their sources.": "Hydorは公式のClaude CodeとCodexをご自身のプランで動かし、すべてのエージェントに1つのメモリ、承認ができるスマートフォンアプリ、アプリ内で編集できるドキュメント、スライド、スプレッドシートを提供します。ほかのエージェントが知っていることや、そこで作ったスキルも引き継げて、残すものは選べます。<0>比較を見る</0>（出典つき）。",
+  "Slides for a four-day Lisbon trip open in the app's slide editor, with an illustrated tram on the slide being edited.": "リスボン4日間の旅行のスライドが、アプリのスライドエディタで開かれています。編集中のスライドには、路面電車のイラストが入っています。"
 }

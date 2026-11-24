@@ -1,6 +1,6 @@
 # Hydor vs Atomic Agent
 
-Hydor runs your local models too, and adds what Atomic Agent does not have: the official Claude Code and Codex with the sessions you started in VS Code or a terminal, many more agents beside its own, one memory for all of them, a phone app and a Library. Your memory and the skills you made in Atomic Agent come over with Bring in, and your local models work in Hydor. Checked 10 November 2026.
+Hydor runs your local models too, and adds what Atomic Agent does not have: the official Claude Code and Codex with the sessions you started in VS Code or a terminal, many more agents beside its own, one memory for all of them, a phone app, and documents you edit in the app. Your memory and the skills you made in Atomic Agent come over with Bring in, and your local models work in Hydor. Checked 10 November 2026.
 
 ## At a glance
 
@@ -21,7 +21,7 @@ Hydor runs your local models too, and adds what Atomic Agent does not have: the 
 - **The official Claude Code and Codex, and more agents.** Atomic Agent can drive your Claude Code and Codex sign-ins through their own CLIs, and pick up a session they stopped with a handoff command [1]. Hydor runs the official programs themselves on your plans and shows the sessions you started in VS Code or a terminal, so there is nothing to hand off. Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and more run inside Hydor beside its own agent.
 - **One memory for every agent.** Atomic Agent keeps notes, lessons and procedures for itself [1]. Hydor keeps one set of notes for every agent you use, found by meaning and checked each day against your conversations. After a hard task an agent can propose a skill, and it is kept only when you approve it.
 - **Every screen.** A web app that installs on your phone, with notifications and **Approve** and **Deny** on the notification. Desktop apps for Mac (Apple silicon and Intel), Windows and Linux, the `hydor` command, and Telegram, Discord and Slack. On a Mac, Atomic Agent's builds are for Apple silicon; Intel Macs are not supported yet [1].
-- **A Library and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit in the app, and small apps with views of their own.
+- **Documents and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit in the app, and small apps with views of their own.
 - **No telemetry.** Atomic Agent's README says "Anonymous usage analytics is on by default", with crash reports to Sentry on the same switch; you turn them off with a setting [1]. Hydor has no analytics libraries to switch off.
 - **A strong model leading cheaper helpers.** Atomic Agent's Fusion has one model plan and a pool of workers do the clear parts [1]. Hydor's tiers and team work in a similar way, with a number behind it: in its own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [2].
 
