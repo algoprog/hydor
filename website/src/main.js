@@ -788,6 +788,97 @@ void main() {
     }
   }
 
+  /* ---------- Words as you type: the rest of the word in grey, the next one dimmer, and Tab takes them ---------- */
+
+  function suggest() {
+    const box = $('[data-sug]');
+    if (!box) return;
+    const typed = $('[data-sg-typed]', box);
+    const g1 = $('[data-sg-g1]', box);
+    const g2 = $('[data-sg-g2]', box);
+    const tab = $('[data-sg-tab]', box);
+    const lines = [T('Draft a reply to Maria about the budget review and keep it short'), T('Summarize the last three meetings and list what is still open')];
+    // Where the grey words show in a line: after the first letters of a word, with the rest of it and the next word.
+    const stops = (s) => {
+      const out = [];
+      let end = 0;
+      if (/\s/.test(s)) {
+        const words = Array.from(s.matchAll(/\S+/g));
+        for (const f of [0.3, 0.65]) {
+          const i = words.findIndex((w, j) => j >= Math.round(words.length * f) && w[0].length >= 4 && j < words.length - 1);
+          if (i < 0) continue;
+          const [w, next] = [words[i], words[i + 1]];
+          const at = w.index + Math.ceil(w[0].length / 2);
+          if (at <= end) continue;
+          out.push({ at, g1: s.slice(at, w.index + w[0].length), g2: s.slice(w.index + w[0].length, next.index + next[0].length) });
+          end = next.index + next[0].length;
+        }
+      } else {
+        for (const f of [0.25, 0.6]) {
+          const at = Math.floor(s.length * f);
+          if (at <= end) continue;
+          out.push({ at, g1: s.slice(at, at + 2), g2: s.slice(at + 2, at + 4) });
+          end = at + 4;
+        }
+      }
+      return out;
+    };
+    if (still()) {
+      const s = lines[0];
+      const [st] = stops(s);
+      typed.textContent = s.slice(0, st.at);
+      g1.textContent = st.g1;
+      g2.textContent = st.g2;
+      return;
+    }
+    let on = false;
+    watch(box, (v) => (on = v));
+    const press = async () => {
+      tab.classList.add('on');
+      await sleep(220);
+      tab.classList.remove('on');
+    };
+    (async () => {
+      for (let k = 0; ; k++) {
+        const s = lines[k % lines.length];
+        typed.textContent = '';
+        g1.textContent = g2.textContent = '';
+        let pos = 0;
+        const typeTo = async (to) => {
+          for (; pos < to; pos++) {
+            while (!on || document.hidden) await sleep(400);
+            typed.textContent = s.slice(0, pos + 1);
+            await sleep(42 + Math.random() * 50);
+          }
+        };
+        for (const st of stops(s)) {
+          await typeTo(st.at);
+          g1.textContent = st.g1;
+          g2.textContent = st.g2;
+          await sleep(1300);
+          await press();
+          pos = st.at + st.g1.length;
+          typed.textContent = s.slice(0, pos);
+          g1.textContent = st.g2;
+          g2.textContent = '';
+          await sleep(1000);
+          await press();
+          pos += st.g2.length;
+          typed.textContent = s.slice(0, pos);
+          g1.textContent = '';
+          await sleep(500);
+        }
+        await typeTo(s.length);
+        await sleep(2600);
+        for (let i = s.length; i >= 0; i -= 3) {
+          typed.textContent = s.slice(0, i);
+          await sleep(12);
+        }
+        await sleep(500);
+      }
+    })();
+  }
+
   /* ---------- The phone: a notification comes in, you answer it or open the session ---------- */
 
   function phone() {
@@ -925,6 +1016,7 @@ void main() {
   stage();
   demo();
   memory();
+  suggest();
   phone();
   copies();
   tour();

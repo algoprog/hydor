@@ -466,11 +466,14 @@ ${groups
       const t = p.topic;
       const md = fs.readFileSync(path.join(root, p.file), 'utf8');
       const html = renderDoc(md.replace(/^\s*# .*\n/, ''), { file: p.file, anchors: t.anchors, hrefOfFile, image, pre, T: Q });
+      // A page whose table has four columns or more (the overview, ChatGPT and Claude) gets the whole width; the date is the one the page says.
+      const wide = p.href === '/compare/' || /^\|(?:[^|\n]*\|){4,}\s*$/m.test(md);
+      const checked = /\bChecked (\d{1,2} [A-Z][a-z]+ \d{4})/.exec(md)?.[1] ?? '10 November 2026';
       const prev = compare[i - 1];
       const next = compare[i + 1];
       const label = (q) => esc(q.href === '/compare/' ? 'All compared' : q.topic.title);
       const toc = t.sections.length > 1 ? `<nav class="doc-toc" aria-label="On this page"><p>On this page</p><ul>${t.sections.map((s) => `<li><a href="#${s.id}">${esc(s.title)}</a></li>`).join('')}</ul></nav>` : '';
-      const body = `  <div class="docs-shell compare-shell${p.href === '/compare/' ? ' compare-wide' : ''}">
+      const body = `  <div class="docs-shell compare-shell${wide ? ' compare-wide' : ''}">
     <aside class="docs-side" aria-label="The comparisons">
       ${searchButton('side-search', Q)}
       <nav>${compareSide(compare, p.href)}</nav>
@@ -483,7 +486,7 @@ ${groups
 ${html}
         </div>
         <nav class="doc-pager" aria-label="Other comparisons">${prev ? `<a class="prev" href="${prev.href}"><span>Previous</span>${label(prev)}</a>` : '<span></span>'}${next ? `<a class="next" href="${next.href}"><span>Next</span>${label(next)}</a>` : ''}</nav>
-        <p class="doc-edit"><a href="${REPO}/edit/main/${p.file}" rel="noopener">Change this page on GitHub</a> · checked 10 November 2026</p>
+        <p class="doc-edit"><a href="${REPO}/edit/main/${p.file}" rel="noopener">Change this page on GitHub</a> · checked ${checked}</p>
       </article>
       ${toc}
     </main>

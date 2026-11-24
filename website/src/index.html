@@ -83,6 +83,12 @@
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9.5 3.5h5M10.5 3.5v6L5 19a1.6 1.6 0 0 0 1.4 2.3h11.2A1.6 1.6 0 0 0 19 19l-5.5-9.5v-6"/><path d="M8 15h8"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2.2"/><path d="M9.2 4v16M14.8 4v16M6.3 8h.01M12 8h.01M17.7 8h.01"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12h.01"/></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><rect x="5" y="7.5" width="14" height="11" rx="3"/><path d="M12 4v3.5M9 13h.01M15 13h.01M3.5 12v3M20.5 12v3"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 15V3.5m0 0L7.5 8M12 3.5 16.5 8M4 15.5v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 3.5 3 3-2.5 4.5 4"/></symbol>
     <symbol id="i-omega" viewBox="0 0 100 100"><path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92" stroke-width="10"/></symbol>
   </svg>
 
@@ -309,6 +315,53 @@
       </div>
     </section>
 
+    <!-- Coming from ChatGPT or Claude -->
+    <section class="section" id="switch">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow">Coming from ChatGPT or Claude?</p>
+          <h2>Keep your plan. <span class="water-text">Bring what it knows.</span></h2>
+          <p>Three steps, and you don’t start from nothing.</p>
+        </header>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step-n" aria-hidden="true">1</span>
+            <h3>Keep the plan you pay for</h3>
+            <p>Sign in with your Claude plan (Pro, Max or Team) or your ChatGPT plan (Plus, Pro, Business or Enterprise). Hydor runs Claude Code and Codex on it, so there is nothing more to pay. Or use any model: pay as you go through OpenRouter, or free and private on your own computer.</p>
+          </li>
+          <li class="step reveal" style="--d: 90ms">
+            <span class="step-n" aria-hidden="true">2</span>
+            <h3>Bring what it knows about you</h3>
+            <p><b>Settings → Memory → Bring in</b> reads the export ChatGPT or Claude emails you. Your custom instructions or memory, and what you wrote in your chats, become proposed notes, and you pick what to keep. <a href="/docs/memory#bring-in-from-other-assistants">How it works</a></p>
+          </li>
+          <li class="step reveal" style="--d: 180ms">
+            <span class="step-n" aria-hidden="true">3</span>
+            <h3>Get everything else</h3>
+            <p>Apps you make yourself, answers as cards, documents you edit, tasks that run by themselves, words as you type and your phone, all on your own computer, with your own files.</p>
+          </li>
+        </ol>
+        <div class="vs-wrap reveal">
+          <table class="vs">
+            <thead><tr><th scope="col"><span class="sr-only">What</span></th><th scope="col">Hydor</th><th scope="col">ChatGPT</th><th scope="col">Claude</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Your Claude and ChatGPT plans, in one app</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>Claude Code and Codex, on the plans you pay for</span></td><td data-label="ChatGPT"><span class="no">— Your ChatGPT plan only</span></td><td data-label="Claude"><span class="no">— Your Claude plan only</span></td></tr>
+              <tr><th scope="row">Any model, local ones too</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>OpenRouter, Ollama, vLLM, llama.cpp</span></td><td data-label="ChatGPT"><span class="part">Partial</span>OpenAI’s models; the Codex program takes other providers</td><td data-label="Claude"><span class="no">— Anthropic’s models only</span></td></tr>
+              <tr><th scope="row">One memory you read, edit and bring theirs into</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>Every agent and model, one set of notes</span></td><td data-label="ChatGPT"><span class="part">Partial</span>Memory you can edit; Codex keeps its own</td><td data-label="Claude"><span class="part">Partial</span>Memory you can edit; Claude Code keeps its own</td></tr>
+              <tr><th scope="row">Apps you make, and answers as cards on boards</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>45 ready-made apps and your own; 150 kinds of card</span></td><td data-label="ChatGPT"><span class="part">Partial</span>Plugins and the Apps SDK; interactive replies</td><td data-label="Claude"><span class="part">Partial</span>Artifacts you share; visuals in beta</td></tr>
+              <tr><th scope="row">Goals with checks the app runs</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>The app runs the checks itself</span></td><td data-label="ChatGPT"><span class="part">Partial</span>Codex’s /goal checks its own progress</td><td data-label="Claude"><span class="part">Partial</span>Claude Code’s /goal, judged from the conversation</td></tr>
+              <tr><th scope="row">Word suggestions as you type</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>Made on your computer</span></td><td data-label="ChatGPT"><span class="part">Partial</span>A whole next message in Codex, Pro only</td><td data-label="Claude"><span class="no">—</span></td></tr>
+              <tr><th scope="row">Experiments for ML research</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>A GPU queue, sweeps, results tables</span></td><td data-label="ChatGPT"><span class="no">—</span></td><td data-label="Claude"><span class="part">Partial</span>Claude Science (beta)</td></tr>
+              <tr><th scope="row">Open source, your computer, no telemetry</th><td data-label="Hydor"><span class="yes"><svg class="ic"><use href="#i-check" /></svg>AGPL-3.0, no analytics or account</span></td><td data-label="ChatGPT"><span class="part">Partial</span>Only the Codex program is open source</td><td data-label="Claude"><span class="no">—</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="vs-foot reveal">
+          <p>Checked on 24 November 2026, from OpenAI’s and Anthropic’s own pages. They do things Hydor doesn’t, such as work that goes on in their cloud with your computer off.</p>
+          <a class="btn btn-ghost" href="/compare/chatgpt-and-claude">See the full comparison, with sources<svg class="ic"><use href="#i-arrow" /></svg></a>
+        </div>
+      </div>
+    </section>
+
     <!-- Features -->
     <section class="section" id="features">
       <div class="wrap">
@@ -393,6 +446,22 @@
 
           <article class="row reveal">
             <div class="row-copy">
+              <h3>Make your own apps</h3>
+              <p>Describe a job you do often, and an agent builds an app for it: a form, the work, and a view for its answer. Run it when you need it, put it on a schedule, or share it.</p>
+              <ul class="checks">
+                <li><svg class="ic"><use href="#i-check" /></svg>Starts from the ready-made app closest to your idea</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Try it on examples before you rely on it</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Any agent can run it for you in a chat</li>
+              </ul>
+            </div>
+            <figure class="window row-shot">
+              <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Hydor</span></div>
+              <img src="img/app-apps-make.webp" width="1600" height="1000" loading="lazy" alt="The app builder: a described job turning into an app, with its form, its steps and the view its answer opens in." />
+            </figure>
+          </article>
+
+          <article class="row flip reveal">
+            <div class="row-copy">
               <h3>Keep what it makes</h3>
               <p>Pages, slides, documents, spreadsheets and LaTeX, edited right in the app. Pictures, videos, music and voice-overs too, all waiting in your Library, by project.</p>
               <ul class="checks">
@@ -407,7 +476,48 @@
             </figure>
           </article>
 
+          <article class="row reveal">
+            <div class="row-copy">
+              <h3>Answers as cards, pinned to boards</h3>
+              <p>Answers come as cards when that is clearer: charts, maps, tables, quizzes and small tools, nearly 150 kinds. Pin the ones you want to keep to a board, and an agent can keep each one current on a schedule.</p>
+              <ul class="checks">
+                <li><svg class="ic"><use href="#i-check" /></svg>Open a card full screen, or save it as a picture</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Pin it to a board next to the others</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>A card can read a spreadsheet and stay current</li>
+              </ul>
+            </div>
+            <figure class="window row-shot">
+              <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Hydor</span></div>
+              <img src="img/app-boards.webp" width="1600" height="1000" loading="lazy" alt="A board of pinned answer cards: key figures, a chart, a map and a table, each with when it was last updated." />
+            </figure>
+          </article>
+
           <article class="row flip reveal">
+            <div class="row-copy">
+              <h3>Words as you type</h3>
+              <p>While you write, the rest of the word shows in grey after the cursor, and the next word dimmer still. Tab takes it. It works in the message box, in documents and in notes, in whatever language you write.</p>
+              <ul class="checks">
+                <li><svg class="ic"><use href="#i-check" /></svg>Made on your computer by a small model that learns how you write</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Nothing you type leaves your computer</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>On from the start, and one switch to turn it off</li>
+              </ul>
+            </div>
+            <figure class="window row-shot" aria-hidden="true">
+              <div class="window-bar"><i></i><i></i><i></i><span>Hydor</span></div>
+              <div class="sg" data-sug>
+                <div class="sg-box">
+                  <p class="sg-text"><span data-sg-typed></span><i class="caret"></i><span class="sg-ghost" data-sg-g1></span><span class="sg-ghost sg-ghost-2" data-sg-g2></span></p>
+                  <div class="sg-row">
+                    <span class="demo-chip">Coder · Opus 5.5 · High</span>
+                    <span class="demo-send"><svg class="ic"><use href="#i-arrow" /></svg></span>
+                  </div>
+                </div>
+                <div class="sg-keys"><kbd data-sg-tab>Tab</kbd><span>takes the grey word, again takes the next one</span></div>
+              </div>
+            </figure>
+          </article>
+
+          <article class="row reveal">
             <div class="row-copy">
               <h3>Work that runs by itself</h3>
               <p>Turn a request into a scheduled task, watch a page or a price, or give an agent a goal it keeps working on until it holds. A notification tells you what it found.</p>
@@ -420,6 +530,22 @@
             <figure class="window row-shot">
               <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Hydor</span></div>
               <img src="img/app-tasks.webp" width="1600" height="1000" loading="lazy" alt="Settings, Scheduled tasks: a morning brief, a price watch, a weekly report and a reminder, each with when it runs next, and examples to start from." />
+            </figure>
+          </article>
+
+          <article class="row flip reveal">
+            <div class="row-copy">
+              <h3>Experiments, for researchers</h3>
+              <p>Training and evaluation runs that wait for a free GPU, then run on their own and are kept: their code, settings, log and metrics. See live charts, run a sweep, and turn finished runs into a results table for your paper.</p>
+              <ul class="checks">
+                <li><svg class="ic"><use href="#i-check" /></svg>Agents start and watch runs for you</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Compare runs on shared charts</li>
+                <li><svg class="ic"><use href="#i-check" /></svg>Tables with significance tests, as LaTeX too</li>
+              </ul>
+            </div>
+            <figure class="window row-shot">
+              <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Hydor</span></div>
+              <img src="img/app-experiments.webp" width="1600" height="1000" loading="lazy" alt="System, Experiments: a sweep's six runs on shared charts, each in its own colour, with the queue and the GPUs at the left." />
             </figure>
           </article>
         </div>
@@ -484,10 +610,18 @@
           <li><svg class="ic"><use href="#i-folder" /></svg><b>Files</b><span>Browse, preview and edit, on any device.</span></li>
           <li><svg class="ic"><use href="#i-branch" /></svg><b>Git</b><span>One Sync button, the history, pull requests.</span></li>
           <li><svg class="ic"><use href="#i-apps" /></svg><b>Projects</b><span>Sessions, files and memory, together.</span></li>
-          <li><svg class="ic"><use href="#i-spark" /></svg><b>Skills and plugins</b><span>More than sixty built in, and your own.</span></li>
+          <li><svg class="ic"><use href="#i-spark" /></svg><b>Skills and plugins</b><span>More than seventy built in, and your own.</span></li>
           <li><svg class="ic"><use href="#i-plug" /></svg><b>Connected apps</b><span>Notion, Linear, GitHub and more, signed in once.</span></li>
           <li><svg class="ic"><use href="#i-gauge" /></svg><b>Usage and limits</b><span>What each plan has left, and when it resets.</span></li>
           <li><svg class="ic"><use href="#i-search" /></svg><b>One search</b><span>Ctrl+K finds settings, sessions and files.</span></li>
+          <li><svg class="ic"><use href="#i-flask" /></svg><b>Experiments</b><span>Runs that wait for a free GPU, with live charts and results tables.</span></li>
+          <li><svg class="ic"><use href="#i-board" /></svg><b>Boards</b><span>Pin answer cards, and keep each one current on a schedule.</span></li>
+          <li><svg class="ic"><use href="#i-globe" /></svg><b>A browser of its own</b><span>In the desktop apps: tabs, an ad blocker, and agents that work in it while you watch.</span></li>
+          <li><svg class="ic"><use href="#i-target" /></svg><b>Goals</b><span>Agree what “done” means, and the app runs the checks.</span></li>
+          <li><svg class="ic"><use href="#i-bot" /></svg><b>Agents of your own</b><span>Describe one, with its schedule, its budget and what it may do.</span></li>
+          <li><svg class="ic"><use href="#i-import" /></svg><b>Bring in</b><span>What ChatGPT, Claude and other agents know about you.</span></li>
+          <li><svg class="ic"><use href="#i-image" /></svg><b>Pictures, video and music</b><span>Made with AI, and edits to your own.</span></li>
+          <li><svg class="ic"><use href="#i-book" /></svg><b>Deep research</b><span>Rounds of searching and reading, ending in a report with its sources.</span></li>
         </ul>
       </div>
     </section>
@@ -565,6 +699,18 @@
           <details>
             <summary>How is it different from other AI agents?<svg class="ic"><use href="#i-chev" /></svg></summary>
             <div class="faq-a"><p>Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and a Library. What your other agents know, and the skills you made in them, come over, and you pick what to keep. <a href="/compare/">See the comparisons</a>, with their sources.</p></div>
+          </details>
+          <details>
+            <summary>Do I pay again if I have ChatGPT Plus or Claude Pro?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>No. Sign in to Claude Code with your Claude plan and to Codex with your ChatGPT plan, and Hydor runs them on those plans, so there is nothing more to pay. Hydor itself is free. If you use other models, you pay for them as you go through OpenRouter, or run free ones on your own computer.</p></div>
+          </details>
+          <details>
+            <summary>Can I bring my ChatGPT or Claude history?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>What they know about you, yes. Ask ChatGPT or Claude for your data export, then add the .zip under Settings → Memory → Bring in. Hydor reads your custom instructions or memory and what you wrote in your chats (not the replies or the files you attached), and proposes notes. You pick what to keep. The conversations themselves stay in the apps. <a href="/docs/memory#bring-in-from-other-assistants">How it works</a>.</p></div>
+          </details>
+          <details>
+            <summary>What does Hydor do that ChatGPT and Claude don’t?<svg class="ic"><use href="#i-chev" /></svg></summary>
+            <div class="faq-a"><p>It runs on your own computer, with your Claude and ChatGPT plans and any model in one app, and one memory that you can read and edit. It also makes apps from a description, pins answers to boards, checks goals itself, suggests words as you type from a model on your computer, and queues experiments for a free GPU. The apps do some of these in part, or not at all. They do things Hydor doesn’t, too. <a href="/compare/chatgpt-and-claude">The comparison</a> has each one, with sources.</p></div>
           </details>
           <details>
             <summary>Is it made by Anthropic or OpenAI?<svg class="ic"><use href="#i-chev" /></svg></summary>
@@ -691,6 +837,7 @@ docker logs hydor | grep setup</code></pre>
           <a href="#download">Download</a>
           <a href="/docs/release-notes">Release notes</a>
           <a href="/docs/features">Everything it does</a>
+          <a href="/compare/chatgpt-and-claude">Compared with ChatGPT and Claude</a>
           <a href="/compare/">Compared with other agents</a>
         </div>
         <div>
