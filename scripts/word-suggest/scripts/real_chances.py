@@ -60,7 +60,7 @@ import torch  # noqa: E402
 
 from ws import mix  # noqa: E402
 from ws.evaluate import DEFAULT_LLM, EvalConfig, Evaluator, Scorers, parse_variant, setup_env  # noqa: E402
-from ws.textdata import add_data_args, load_examples  # noqa: E402
+from ws.textdata import add_data_args, add_reply_args, load_examples, parse_pair, reply_kwargs  # noqa: E402
 
 WS_END = (b" ", b"\n", b"\t", b"\r")
 NEG = float("-inf")
@@ -114,6 +114,8 @@ class Stepper:
             elif v.mode != "linear":
                 raise SystemExit(f"real decoding supports llm, slm, llm+slm:gate, :langswitch and :linear, not {v.spec!r}")
         self.plan = "slm" if self.alone else ("llm" if self.slm is None else "mix")
+        self.cfit = sc.cache_fit(v.cache) if v.cache else None     # the session cache (ws/cache.py) mixed on top of every row
+        self.cst, self.cadded, self.cnow = None, 0, 0
         self.steps = 0
         self.seconds_llm = self.seconds_slm = 0.0
 
@@ -132,8 +134,42 @@ class Stepper:
             lg[self.llm._pad_mask] = NEG
         return torch.log_softmax(lg, -1)
 
+    def begin_example(self, ex):
+        """With a session cache: its counts for the example, before any of the target's tokens (sync_cache adds them)."""
+        self.cst, self.cadded, self.cnow = None, 0, 0
+        if self.cfit is not None:
+            from ws.cache import CacheState
+            self.cst = CacheState(len(self.tb), self.sc.session_cache().context(ex))
+
+    def sync_cache(self, gold, a):
+        """The cache holds the context and the gold tokens before position a (the words come in order): as the teacher-forced rows
+        of ExampleCache have it. The tokens a decoded path adds are not put in the cache."""
+        if self.cst is None:
+            return
+        while self.cadded < a:
+            h = gold[self.cadded - 1] if self.cadded else self.cst.bos
+            self.cst.add(h, gold[self.cadded])
+            self.cadded += 1
+        self.cnow = a
+
+    def with_cache(self, out, tids):
+        """out (the variant's row after the target tokens tids = the gold ones before the word and the path) mixed with the cache."""
+        st = self.cst
+        if st is None or st.N <= 0:
+            return out
+        h = tids[-1] if tids else st.bos
+        seen = st.seen(h, int(len(tids) == self.cnow and self.cnow > 0))
+        mu = float(self.cfit.mu([st.N], [seen])[0])
+        import numpy as np
+        with np.errstate(divide="ignore"):
+            lc = torch.from_numpy(np.log(st.row(h))).float().to(out.device)
+        return torch.logaddexp(out + math.log1p(-mu), lc + math.log(max(mu, 1e-30)))
+
     def mixed(self, ex, tids, llm_lp):
         """log P of the variant after the target tokens `tids` given the LLM's row (1-D)."""
+        return self.with_cache(self._mixed(ex, tids, llm_lp), tids)
+
+    def _mixed(self, ex, tids, llm_lp):
         if self.plan == "llm":
             return llm_lp
         t0 = time.perf_counter()
@@ -342,6 +378,7 @@ def suggestion_letters(produced: bytes, k: int) -> int:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_data_args(ap)
+    add_reply_args(ap)
     ap.set_defaults(limit=120)
     ap.add_argument("--fmt", default="plain", choices=["plain", "roles"])
     ap.add_argument("--llm", default=DEFAULT_LLM)
@@ -389,14 +426,13 @@ def main(argv=None):
     tb = token_bytes(tok, V)
     ev = Evaluator(tb, end_token_ids(tok, V), EvalConfig(), keep_details=True, device=str(device))
     v = parse_variant(a.variant)
-    if v.cache:
-        raise SystemExit("--variant without |cache:")
     if v.parts[0] != "llm" and a.llm.lower() != "none":
         print("# --variant slm: the LLM is not needed, not loading it", file=sys.stderr)
         a.llm = "none"
     sc = Scorers(a.llm, a.slm, "none", a.dtype, a.threads, a.fmt, data_dir=a.data, tok=tok, device=str(device))
     sc.check([v])
-    exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words)
+    sc.cache_reply_cut = parse_pair(a.cache_reply_cut, "--cache-reply-cut") if a.cache_reply_cut else (0, 0)
+    exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words, **reply_kwargs(a))
     if not exs:
         raise SystemExit("no examples")
     if a.only_lang:
@@ -437,6 +473,7 @@ def main(argv=None):
             skipped += 1
             continue
         plan = st.set_example(ex)
+        st.begin_example(ex)
         rows = sc.rows(ex, [v], alone=True)
         lp, lam = sc.mixed_lam(v, rows, tb, ex, {})
         extra = (dict(llm=rows["llm"], slm=rows.get("alone:" + v.parts[1]), lam=lam) if len(v.parts) == 2 else None)
@@ -462,6 +499,7 @@ def main(argv=None):
             if w["a"] > pos and plan != "slm":
                 logits, cache = advance(sc.llm.model, gold[pos:w["a"]], cache)
             pos = w["a"]
+            st.sync_cache(gold, pos)
             wb = w["word"].encode("utf-8")
             K = min(len(w["correct"]), a.max_k + 1)
             first = tf[(j, 0)]

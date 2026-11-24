@@ -55,6 +55,43 @@ def last_words(text: str, n: int, lang: str = "") -> str:
     return text[sp[max(0, len(sp) - n)][0]:sp[-1][1]]
 
 
+REPLY_JOIN = " … "
+
+
+def cut_ends(text: str, head: int, tail: int, sep: str = REPLY_JOIN) -> str:
+    """What the page sends of a long text: its last `tail` characters (head = 0, today's rule with 2000), or its first `head` and
+    last `tail` characters joined with `sep`. A text of at most head + tail characters, or head = tail = 0, is whole."""
+    if (head <= 0 and tail <= 0) or len(text) <= head + tail:
+        return text
+    if head <= 0:
+        return text[len(text) - tail:]
+    return text[:head] + sep + (text[len(text) - tail:] if tail > 0 else "")
+
+
+def window_words(text: str, first: int, last: int, lang: str = "", sep: str = REPLY_JOIN) -> str:
+    """The reply as the models read it: its last `last` words (first = 0: last_words), or its first `first` words, `sep` and its last
+    `last` words. A text of at most first + last words is given from its first word to its last."""
+    if first <= 0:
+        return last_words(text, last, lang)
+    sp = word_spans(text, lang)
+    if len(sp) <= first + last:
+        return text[sp[0][0]:sp[-1][1]] if sp else ""
+    return text[sp[0][0]:sp[first - 1][1]] + sep + (last_words(text, last, lang) if last > 0 else "")
+
+
+def parse_pair(s: str, name: str = "option") -> tuple[int, int]:
+    """'first:last' -> (first, last); '' -> (0, 0)."""
+    if not s:
+        return (0, 0)
+    try:
+        a, b = (int(x) for x in s.split(":"))
+    except ValueError:
+        raise SystemExit(f"{name} is first:last, e.g. 30:70, not {s!r}")
+    if a < 0 or b < 0:
+        raise SystemExit(f"{name} needs numbers of at least 0")
+    return (a, b)
+
+
 def segments(text: str, lang: str = "", size: int = SEG_WORDS) -> list[tuple[int, int]]:
     """Character ranges (start of the first word to the end of the last word) of chunks of at most `size` words."""
     sp = word_spans(text, lang)
@@ -79,7 +116,11 @@ def _norm(s: str) -> str:
 
 # ---- candidates: cheap records (no tokenization), sampled before the tokenizer runs -------------------------------------
 
-def chat_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None) -> Iterator[dict]:
+def chat_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None, agent_words: tuple = (0, A_WORDS),
+                    reply_cut: tuple = (0, 0)) -> Iterator[dict]:
+    """agent_words = (first, last): the reply's context is its first `first` and last `last` words (first = 0: the last ones, as
+    always); reply_cut = (head, tail) characters: what the page sends of the reply (see cut_ends), cut before the words are
+    chosen; (0, 0) sends it whole."""
     for r in read_jsonl(path):
         if split != "all" and r.get("split") != split:
             continue
@@ -91,7 +132,8 @@ def chat_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None)
             continue
         prev_agent = _norm(r.get("prev_agent") or "")
         prev_user = [_norm(u) for u in (r.get("prev_user") or [])]
-        agent_all = last_words(prev_agent, A_WORDS, rl) if ctx in ("agent", "agent+user") else ""
+        agent_all = (window_words(cut_ends(prev_agent, *reply_cut), *agent_words, rl)
+                     if ctx in ("agent", "agent+user") else "")
         for si, (a, b) in enumerate(segments(text, rl)):
             seg = text[a:b]
             if si == 0:
@@ -149,9 +191,10 @@ def doc_candidates(path: str, split: str, ctx: str, min_words: int, lang: Option
                                          dict(source=r.get("source"), author=r.get("author")))
 
 
-def messages_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None) -> Iterator[dict]:
+def messages_candidates(path: str, split: str, ctx: str, lang: Optional[str] = None, agent_words: tuple = (0, A_WORDS),
+                        reply_cut: tuple = (0, 0)) -> Iterator[dict]:
     """The public messages test (data/messages_oasst2.jsonl, FLORES language codes): chat examples of the surface 'messages'."""
-    for c in chat_candidates(path, split, ctx, lang):
+    for c in chat_candidates(path, split, ctx, lang, agent_words, reply_cut):
         yield dict(c, surface="messages")
 
 
@@ -258,12 +301,15 @@ def build_example(c: dict, tok) -> Example:
 
 def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "agent+user", limit: int = 0,
                   seed: int = 0, lang: Optional[str] = None, data_dir: str = DATA_DIR, min_words: int = 4,
-                  max_target_tokens: int = 0, plain_split: str = "all") -> list[Example]:
+                  max_target_tokens: int = 0, plain_split: str = "all", agent_words: tuple = (0, A_WORDS),
+                  reply_cut: tuple = (0, 0)) -> list[Example]:
     """Examples for one or several surfaces ('chat', 'doc', 'plain', 'all' or a comma list).
 
     limit: at most this many examples per surface (per language for 'plain' and 'flores'), chosen with random.Random(seed) after
     sorting by id, so the same arguments always give the same examples. 0 = all.
-    plain_split: for 'plain' only, 'dev' = paragraphs with an even `idx`, 'test' = odd ones, 'all' = every one."""
+    plain_split: for 'plain' only, 'dev' = paragraphs with an even `idx`, 'test' = odd ones, 'all' = every one.
+    agent_words, reply_cut: the agent context of chat and messages examples (chat_candidates); the defaults are the last 100 words
+    of the whole reply."""
     surfaces = ["chat", "doc", "plain"] if surface == "all" else surface.split(",")      # messages and email only by name
     rng = random.Random(seed)
     out: list[Example] = []
@@ -277,11 +323,11 @@ def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "a
     for s in surfaces:
         if s == "chat":
             p = os.path.join(data_dir, "user_msgs.jsonl")
-            cands = list(chat_candidates(p, split, ctx, lang)) if os.path.exists(p) else []
+            cands = list(chat_candidates(p, split, ctx, lang, agent_words, reply_cut)) if os.path.exists(p) else []
             groups = [cands]
         elif s == "messages":
             p = os.path.join(data_dir, "messages_oasst2.jsonl")
-            cands = list(messages_candidates(p, split, ctx, lang)) if os.path.exists(p) else []
+            cands = list(messages_candidates(p, split, ctx, lang, agent_words, reply_cut)) if os.path.exists(p) else []
             groups = [cands]
         elif s == "email":
             p = os.path.join(data_dir, "email_enron.jsonl")
@@ -326,3 +372,18 @@ def add_data_args(ap, plain_split: bool = False) -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--data", default=DATA_DIR)
     ap.add_argument("--min-words", type=int, default=4, help="shortest paragraph used as a doc/plain target")
+
+
+def add_reply_args(ap) -> None:
+    """The options of a script that varies what the agent's reply gives the models (real_chances.py)."""
+    ap.add_argument("--reply-cut", default="0:0", help="head:tail characters the page sends of the reply (0:2000 = today's last 2000, "
+                    "1000:1000 = the first and last 1000 joined with ' … '); 0:0 = the whole reply")
+    ap.add_argument("--agent-words", default="0:100", help="first:last words of the sent reply the models read as the agent context "
+                    "(0:100 = the last 100, today; 30:70 = the first 30, ' … ', the last 70)")
+    ap.add_argument("--cache-reply-cut", default=None, help="head:tail characters of every earlier reply of the session that the "
+                    "session cache keeps (default: the whole reply; the app sends 0:2000)")
+
+
+def reply_kwargs(a) -> dict:
+    """load_examples' agent_words and reply_cut from the options add_reply_args made."""
+    return dict(agent_words=parse_pair(a.agent_words, "--agent-words"), reply_cut=parse_pair(a.reply_cut, "--reply-cut"))

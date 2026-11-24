@@ -615,17 +615,26 @@ class Scorers:
             lp = self._cache_mix(v, lp, ex)
         return lp, lam
 
-    def _cache_mix(self, v: Variant, lp: torch.Tensor, ex: Example) -> torch.Tensor:
-        from .cache import CacheFit, SessionCache
+    def session_cache(self):
+        """The SessionCache (ws/cache.py) of this run; cache_reply_cut = (head, tail) characters of each earlier reply it keeps."""
+        from .cache import SessionCache
         src = getattr(self, "_cache_src", None)
         if src is None:
             tok = getattr(self, "tok", None) or self.llm.tok
-            src = self._cache_src = SessionCache(tok, getattr(self, "data_dir", None))
+            src = self._cache_src = SessionCache(tok, getattr(self, "data_dir", None), getattr(self, "cache_reply_cut", (0, 0)))
             self._cache_fits = {}
-        fit = self._cache_fits.get(v.cache)
+        return src
+
+    def cache_fit(self, path: str):
+        from .cache import CacheFit
+        self.session_cache()
+        fit = self._cache_fits.get(path)
         if fit is None:
-            fit = self._cache_fits[v.cache] = CacheFit.load(v.cache)
-        return fit.apply(lp, src.for_example(ex, lp.shape[1]))
+            fit = self._cache_fits[path] = CacheFit.load(path)
+        return fit
+
+    def _cache_mix(self, v: Variant, lp: torch.Tensor, ex: Example) -> torch.Tensor:
+        return self.cache_fit(v.cache).apply(lp, self.session_cache().for_example(ex, lp.shape[1]))
 
     def speed(self) -> dict:
         return self.llm.speed() if self.llm is not None else {}

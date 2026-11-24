@@ -32,7 +32,7 @@ from typing import Optional, Sequence
 import numpy as np
 import torch
 
-from .textdata import DATA_DIR, read_jsonl, segments
+from .textdata import DATA_DIR, cut_ends, read_jsonl, segments
 
 _PARA_RE = re.compile(r"\n\s*\n")           # the paragraph rule of ws/textdata.py
 
@@ -176,8 +176,10 @@ class ExampleCache:
 class SessionCache:
     """Builds the ExampleCache of an Example from data/*.jsonl, tokenizing with the LLM's tokenizer."""
 
-    def __init__(self, tok, data_dir: Optional[str] = None):
-        self.tok, self.data_dir = tok, data_dir or DATA_DIR
+    def __init__(self, tok, data_dir: Optional[str] = None, reply_cut: tuple = (0, 0)):
+        """reply_cut = (head, tail): of each earlier agent reply the cache keeps the first `head` and last `tail` characters
+        (textdata.cut_ends); (0, 0) keeps the whole reply."""
+        self.tok, self.data_dir, self.reply_cut = tok, data_dir or DATA_DIR, tuple(reply_cut)
         self._agent: Optional[dict] = None
         self._agent_tok: dict = {}
         self._user: Optional[dict] = None
@@ -205,7 +207,7 @@ class SessionCache:
         hit = self._agent_tok.get(session)
         if hit is None:
             items = sorted(self._agent.get(session, ()), key=lambda x: x[0])
-            texts = [_nfc(t) for _, t in items]
+            texts = [cut_ends(_nfc(t), *self.reply_cut) for _, t in items]
             ids = self.tok(texts, add_special_tokens=False)["input_ids"] if texts else []
             hit = ([t for t, _ in items], [np.asarray(x, dtype=np.int64) for x in ids])
             self._agent_tok[session] = hit
