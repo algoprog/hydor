@@ -5,7 +5,7 @@
 # minutes; the same command after a preemption or the time limit goes on from resume.pt (INIT is then ignored).
 set -eu
 WS=${WS:?set WS to the workspace on the cluster (its code/ holds this folder, data/ and runs/ go beside it)}
-cd $WS/code
+cd ${CODE:-$WS/code}        # CODE: another checkout of this folder (a branch's), default $WS/code
 : "${NAME:?}" "${SIZE:?}" "${TOKENS:?}" "${LR:?}"
 OUT=$WS/runs/$NAME
 mkdir -p "$OUT"
@@ -16,6 +16,6 @@ CMD=(torchrun --standalone --nproc_per_node ${NGPU:-8} scripts/pretrain_slm.py -
   --pretrain "${DATA:-$WS/data/pretrain50b}" --vocab full --emb-rank 128 --size "$SIZE" $INIT_ARG $MIX_ARG --tokens "$TOKENS" \
   --bf16 --compile --compile-head --micro-tokens "${MICRO:-65536}" --accum "${ACCUM:-1}" --lr "$LR" --warmup "${WARMUP:-300}" \
   --min-lr-frac "${MIN_LR_FRAC:-0.1}" --eval-every "${EVAL_EVERY:-1000}" --ckpt-minutes "${CKPT_MIN:-30}" --keep 2 --auto-resume \
-  --mem-gb 76 --workers ${WORKERS:-6} --block-shuffle ${BLOCK:-16} --pdev-total 4000)
+  --mem-gb 76 --workers ${WORKERS:-6} --block-shuffle ${BLOCK:-16} --pdev-total 4000 ${EXTRA:-})
 [ -n "${DRYRUN:-}" ] && { echo "${CMD[@]}"; exit 0; }
 exec "${CMD[@]}"
