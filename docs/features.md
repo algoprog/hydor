@@ -2124,19 +2124,23 @@ programs shows each program's version and what is out, with Check now, Update no
   music, voices and videos, or a model suggested for this computer installed with one click. Beside each page,
   streams flow from what you picked into a pool around the Ω; small dots show the steps, over a sea whose waves
   drift gently. Then it shows you around as the app builds itself up, a ring of water lighting each part as it is
-  explained, with first tasks to put in the message box. When the folder of Claude Code, Codex or another agent
-  is on this computer, one more page, "Coming from another agent?", names what it found and opens
-  Bring in over the tour. In the desktop apps, when other browsers are on this computer, "Bring in your bookmarks and
+  explained, with first tasks to put in the message box; the message box's step mentions the grey word
+  suggestions, the tools' step Experiments, and a step of its own lights Apps (what an app is, with requests to try).
+  Everyone gets one page about what other assistants know about you: "Coming from ChatGPT or Claude?" says how to ask
+  for the export they email you and opens Bring in over the tour; when the folder of Claude Code, Codex or another
+  agent is on this computer, it is "Coming from another agent?" and names what it found too. The last page's
+  "See what Hydor can do" ends the tour at Help's "What Hydor can do". In the desktop apps, when other browsers are on this computer, "Bring in your bookmarks and
   history?" lists them, each with how many bookmarks and pages of history it has, and **Import** beside one brings in
   what is switched on (Bookmarks, History), or **Open System Settings** on a Mac while macOS keeps Hydor from reading
   Safari (the tour comes back to this page if Hydor has to reopen); Next goes on without. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
-  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git and Apps
-  pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
+  inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Experiments
+  and Apps pages, Make an app, an answer card, an app's card in a conversation, the panel beside the conversation,
+  the grey word suggestions, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
   guide. One at a time and a while apart, never while you type or a menu is open; each shows once, on every
   device. Skip tips, or skipping the tour, stops them; Settings → General → Tips turns them on again.
 - Help (on the rail): a guide to every part of the app, its topics grouped on one page as cards (in a wide window, in a
-  column of the same kind as the sessions' instead, with Hide sidebar beside the logo, the first page keeping its box and a few questions), each with a picture of
+  column of the same kind as the sessions' instead, with Hide sidebar beside the logo, the first page keeping its box, a few questions and "What Hydor can do": a card each for bringing in from ChatGPT or Claude, apps, making your own, answer cards, word suggestions, documents, deep research, work that runs by itself, goals, experiments, the phone and, in the desktop apps, the browser, each with a request to try or a place to open and a link to the guide), each with a picture of
   that part of the app and its sections to open one at a time. One box finds sections as you type, or asks an
   agent on Enter: the answer, from the guide with links that open the place they name, shows in a panel beside
   it, and the agent can set things up for you there too. Its sections show in the search box as well. The same
