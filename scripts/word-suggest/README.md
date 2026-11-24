@@ -58,6 +58,12 @@ The pipeline steps in `scripts/`:
 - `eval.py`: scores models and mixes on a test set and writes the metrics.
 - `real_chances.py`: decodes every suggestion for real, as the app does, and records whether it was right and how
   sure the model was. This is the trustworthy measure of keystrokes saved.
+  `--variant ...|cache:<fit.json>` decodes with the session cache mixed into every row, as the app does. `--reply-cut head:tail` (the
+  characters of the agent's reply the page sends), `--agent-words first:last` (the words of that the models read) and
+  `--cache-reply-cut head:tail` (what the cache keeps of each earlier reply) change what the reply gives; the defaults are the whole
+  reply, its last 100 words, and the whole of each earlier reply. Measured on the chat test (673 messages): the first words of the
+  reply, instead of some of its last ones or added to them, did not save more keystrokes, and neither did the first and last
+  1,000 characters for the cache instead of the last 2,000.
 - `merge_eval.py`, `merge_real.py`: join the shards of an evaluation or a decoding that ran on several GPUs.
 - `show_filter.py`: the keystroke simulation. It also finds the confidence thresholds for a given share of right
   suggestions (`--compare-real`).
