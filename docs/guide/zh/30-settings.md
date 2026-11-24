@@ -227,7 +227,7 @@
 - [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
 - [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
 - [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
-- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**浏览器设置**](/settings?s=browser&find=Browser%20settings)：主页、搜索引擎、搜索快捷方式、页面缩放、拼写检查、翻译、深色网页、带过滤列表的广告拦截器、语言和允许显示广告的网站、历史记录，以及清除浏览器保留的数据。
 
 ### 电脑操控
 
@@ -323,7 +323,7 @@
 - [**按语言选择**](/settings?s=suggest&find=Choose%20by%20language)：根据你写作的语言，选择表现最好的模型。
 - [**从对话中学习**](/settings?s=suggest&find=Learn%20from%20the%20conversation)：输入消息时，使用对话中之前出现过的词。
 - [**Threads**](/settings?s=suggest&find=Threads)：用于建议的处理器线程数（默认自动）。
-- [**从我写的内容中学习**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小模型会在这台电脑上于后台从你的写作中学习。
+- [**从我写的内容中学习**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小模型会在这台电脑上于后台从你的写作中学习；每次都从应用自带的模型重新开始。
 - [**学习时间**](/settings?s=suggest&find=When%20it%20learns)：每晚、每周，或仅在你点击“立即重新训练”时；会等到你已有十分钟没有输入。
 - [**来自我的消息**](/settings?s=suggest&find=From%20my%20messages)：从你发给智能体的消息中学习。
 - [**来自智能体的回复**](/settings?s=suggest&find=From%20agents'%20replies)：从智能体给你的回复中学习。
@@ -332,7 +332,7 @@
 - [**我自己输入的词的权重**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：你输入的词比它学习的其余内容重要多少。
 - [**用于学习的线程数**](/settings?s=suggest&find=Threads%20for%20learning)：用于学习的处理器线程数（默认自动）。
 - [**在显卡上学习**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card)：有空闲的 NVIDIA 显卡或搭载 Apple 芯片的 Mac 时，会在其上学习，比在处理器上快很多倍。
-- [**立即重新训练**](/settings?s=suggest&find=Retrain%20now)：现在在后台学习你自上次以来写的内容。
+- [**立即重新训练**](/settings?s=suggest&find=Retrain%20now)：从应用自带的小模型开始，在后台立即学习你写过的全部内容。
 - [**忘记已学内容**](/settings?s=suggest&find=Forget%20what%20it%20learned)：删除从你的写作中学习的模型；改回使用应用自带的模型。
 
 ### 你的智能体

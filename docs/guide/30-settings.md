@@ -323,7 +323,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Choose by language**](/settings?s=suggest&find=Choose%20by%20language): Picks the model that does best for the language of what you write.
 - [**Learn from the conversation**](/settings?s=suggest&find=Learn%20from%20the%20conversation): Uses the words used earlier in the conversation, as you type a message.
 - [**Threads**](/settings?s=suggest&find=Threads): Processor threads for suggestions (automatic by default).
-- [**Learn from what I write**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): The small model learns from what you write, on this computer, in the background.
+- [**Learn from what I write**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): The small model learns from what you write, on this computer, in the background; every run starts again from the one that came with the app.
 - [**When it learns**](/settings?s=suggest&find=When%20it%20learns): Every night, every week, or only when you press Retrain now; it waits until you have not typed for ten minutes.
 - [**From my messages**](/settings?s=suggest&find=From%20my%20messages): Learn from the messages you wrote to agents.
 - [**From agents' replies**](/settings?s=suggest&find=From%20agents'%20replies): Learn from what agents replied to you.
@@ -332,7 +332,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Weight of my own words**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): How much more the words you typed count than the rest it learns from.
 - [**Threads for learning**](/settings?s=suggest&find=Threads%20for%20learning): Processor threads for learning (automatic by default).
 - [**Learn on the graphics card**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): Learning runs on an NVIDIA graphics card or a Mac with Apple silicon when there is one free, many times faster than on the processor.
-- [**Retrain now**](/settings?s=suggest&find=Retrain%20now): Learns from what you wrote since the last time, now, in the background.
+- [**Retrain now**](/settings?s=suggest&find=Retrain%20now): Learns from all you have written, starting from the small model that came with the app, now, in the background.
 - [**Forget what it learned**](/settings?s=suggest&find=Forget%20what%20it%20learned): Deletes the model that learned from you; the one that came with the app is used again.
 
 ### Your agents

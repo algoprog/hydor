@@ -227,7 +227,7 @@
 - [**ログイン済みのサイトでの送信前に確認**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：ログイン済みのサイトで、エージェントが送信、投稿、削除、送金を行う前。
 - [**ブックマーク**](/settings?s=browser&find=Bookmarks)：自分のものと、このコンピューターの他のブラウザのものを統合。
 - [**拡張機能**](/settings?s=browser&find=Extensions)：Chrome拡張機能（デスクトップアプリ）。
-- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept。
+- [**ブラウザの設定**](/settings?s=browser&find=Browser%20settings)：ホームページ、検索エンジン、検索ショートカット、ページのズーム、スペルチェック、翻訳、ダークページ、フィルタリスト・言語・広告を許可するサイトを含む広告ブロック、履歴と保存されたデータの消去。
 
 ### コンピューターの操作
 
@@ -323,7 +323,7 @@
 - [**言語で選ぶ**](/settings?s=suggest&find=Choose%20by%20language)：書いている言語に最も合うモデルを選びます。
 - [**会話から学習**](/settings?s=suggest&find=Learn%20from%20the%20conversation)：メッセージの入力中に、会話の前半で使われた単語を利用します。
 - [**Threads**](/settings?s=suggest&find=Threads)：候補に使うプロセッサスレッド数（デフォルトは自動）。
-- [**入力内容から学習**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小型モデルが、このコンピューター上でバックグラウンドで入力内容から学習します。
+- [**入力内容から学習**](/settings?s=suggest&find=Learn%20from%20what%20I%20write)：小型モデルが、このコンピューター上でバックグラウンドで入力内容から学習します。毎回、アプリに付属のモデルからやり直します。
 - [**学習するタイミング**](/settings?s=suggest&find=When%20it%20learns)：毎晩、毎週、または「今すぐ再学習」を押したときだけ。10分間入力がないときに実行されます。
 - [**自分のメッセージから**](/settings?s=suggest&find=From%20my%20messages)：エージェントに書いたメッセージから学習します。
 - [**エージェントの返信から**](/settings?s=suggest&find=From%20agents'%20replies)：エージェントが返した内容から学習します。
@@ -332,7 +332,7 @@
 - [**自分の言葉の重み**](/settings?s=suggest&find=Weight%20of%20my%20own%20words)：学習の対象のうち、入力した単語を他のテキストよりどのくらい重視するか。
 - [**学習用スレッド数**](/settings?s=suggest&find=Threads%20for%20learning)：学習に使うプロセッサスレッド数（デフォルトは自動）。
 - [**グラフィックスカードで学習**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card)：空いているNVIDIAのグラフィックスカードやApple siliconのMacがあれば、そこで学習します。プロセッサより何倍も高速です。
-- [**今すぐ再学習**](/settings?s=suggest&find=Retrain%20now)：前回以降に書いた内容を、バックグラウンドで今すぐ学習します。
+- [**今すぐ再学習**](/settings?s=suggest&find=Retrain%20now)：アプリに付属の小型モデルから始めて、これまでに書いた内容すべてを、バックグラウンドで今すぐ学習します。
 - [**学習内容を消去**](/settings?s=suggest&find=Forget%20what%20it%20learned)：入力内容から学習したモデルを削除し、アプリに付属のモデルに戻します。
 
 ### 自分のエージェント

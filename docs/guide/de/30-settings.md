@@ -227,7 +227,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Vor dem Senden auf angemeldeten Websites fragen**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist.
 - [**Lesezeichen**](/settings?s=browser&find=Bookmarks): Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer.
 - [**Erweiterungen**](/settings?s=browser&find=Extensions): Chrome-Erweiterungen in der Desktop-App.
-- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Browser-Einstellungen**](/settings?s=browser&find=Browser%20settings): Startseite, Suchmaschine, Suchkürzel, Seitenzoom, Rechtschreibprüfung, Übersetzung, dunkle Seiten, Werbeblocker mit seinen Filterlisten, Sprachen und Seiten, auf denen Werbung erlaubt ist, Verlauf und das Löschen gespeicherter Daten.
 
 ### Computer Use
 
@@ -323,7 +323,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Nach Sprache wählen**](/settings?s=suggest&find=Choose%20by%20language): Wählt das Modell, das für die Sprache deines Textes am besten funktioniert.
 - [**Aus der Unterhaltung lernen**](/settings?s=suggest&find=Learn%20from%20the%20conversation): Nutzt die Wörter, die früher in der Unterhaltung vorkamen, während du eine Nachricht tippst.
 - [**Threads**](/settings?s=suggest&find=Threads): Prozessor-Threads für Vorschläge (standardmäßig automatisch).
-- [**Aus meinem Geschriebenen lernen**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): Das kleine Modell lernt im Hintergrund auf diesem Computer aus dem, was du schreibst.
+- [**Aus meinem Geschriebenen lernen**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): Das kleine Modell lernt im Hintergrund auf diesem Computer aus dem, was du schreibst; jeder Durchlauf beginnt neu bei dem Modell, das mit der App geliefert wurde.
 - [**Wann gelernt wird**](/settings?s=suggest&find=When%20it%20learns): Jede Nacht, jede Woche oder nur, wenn du auf „Jetzt neu trainieren“ drückst; es wartet, bis du zehn Minuten nicht getippt hast.
 - [**Aus meinen Nachrichten**](/settings?s=suggest&find=From%20my%20messages): Aus den Nachrichten lernen, die du an Agenten geschrieben hast.
 - [**Aus Antworten von Agenten**](/settings?s=suggest&find=From%20agents'%20replies): Aus den Antworten lernen, die Agenten dir gegeben haben.
@@ -332,7 +332,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Gewicht meiner eigenen Wörter**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Wie viel stärker deine getippten Wörter zählen als der Rest, aus dem gelernt wird.
 - [**Threads für das Lernen**](/settings?s=suggest&find=Threads%20for%20learning): Prozessor-Threads für das Lernen (standardmäßig automatisch).
 - [**Auf der Grafikkarte lernen**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): Das Lernen läuft auf einer NVIDIA-Grafikkarte oder einem Mac mit Apple Silicon, wenn eine frei ist, um ein Vielfaches schneller als auf dem Prozessor.
-- [**Jetzt neu trainieren**](/settings?s=suggest&find=Retrain%20now): Lernt jetzt im Hintergrund aus dem, was du seit dem letzten Mal geschrieben hast.
+- [**Jetzt neu trainieren**](/settings?s=suggest&find=Retrain%20now): Lernt jetzt im Hintergrund aus allem, was du geschrieben hast, und beginnt dabei beim kleinen Modell, das mit der App geliefert wurde.
 - [**Gelerntes vergessen**](/settings?s=suggest&find=Forget%20what%20it%20learned): Löscht das Modell, das von dir gelernt hat; das mit der App gelieferte wird wieder verwendet.
 
 ### Deine Agenten

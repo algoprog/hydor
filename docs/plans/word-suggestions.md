@@ -136,7 +136,7 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
      (`PERSONAL_LANG_TOKENS`, from `meta.json`'s `languages`), and where no language was guessed: the plan is `mix`
      (personalisation is what helps there, and the switch would turn it off: it gives English, Greek and every major
      language to the LLM). Every other language keeps the published model (personalising costs the languages the person
-     does not write in: in the simulation of 96 nights, one personalised run lost on FLORES): with `switch` on the
+     does not write in: in the simulation of 96 nights the loss on public text rose to 6.26 even after one run): with `switch` on the
      switch's choice (`llm`, Qwen3.5 alone, or `mix` with the published model), else `mix`. A document keeps `llm`
      (or `slm` without the LLM, then with the personal model when there is one).
    - Both small models are loaded when there is a personal one (`Slot` in `engine.py`: the model, its own incremental

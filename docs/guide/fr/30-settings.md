@@ -227,7 +227,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Demander avant d’envoyer sur les sites connectés**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) : Avant qu’un agent n’envoie, ne publie, ne supprime ou ne transfère quoi que ce soit sur un site où il est connecté.
 - [**Favoris**](/settings?s=browser&find=Bookmarks) : Les vôtres, avec ceux des autres navigateurs de cet ordinateur.
 - [**Extensions**](/settings?s=browser&find=Extensions) : Extensions Chrome, dans l’app de bureau.
-- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Paramètres du navigateur**](/settings?s=browser&find=Browser%20settings) : Page d’accueil, moteur de recherche, raccourcis de recherche, zoom des pages, correction orthographique, traduction, pages sombres, bloqueur de publicités avec ses listes de filtres, langues et sites où les publicités sont autorisées, historique et effacement de ce qu’il a gardé.
 
 ### Utilisation de l’ordinateur
 
@@ -323,7 +323,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Choisir selon la langue**](/settings?s=suggest&find=Choose%20by%20language) : Choisit le modèle le plus performant pour la langue de ce que vous écrivez.
 - [**Apprendre de la conversation**](/settings?s=suggest&find=Learn%20from%20the%20conversation) : Utilise les mots employés plus tôt dans la conversation pendant que vous écrivez un message.
 - [**Threads**](/settings?s=suggest&find=Threads) : Threads de processeur pour les suggestions (automatique par défaut).
-- [**Apprendre de ce que j’écris**](/settings?s=suggest&find=Learn%20from%20what%20I%20write) : Le petit modèle apprend de ce que vous écrivez, sur cet ordinateur, en arrière-plan.
+- [**Apprendre de ce que j’écris**](/settings?s=suggest&find=Learn%20from%20what%20I%20write) : Le petit modèle apprend de ce que vous écrivez, sur cet ordinateur, en arrière-plan ; chaque passage repart de celui fourni avec l’app.
 - [**Quand il apprend**](/settings?s=suggest&find=When%20it%20learns) : Chaque nuit, chaque semaine, ou seulement quand vous appuyez sur « Réentraîner maintenant » ; il attend que vous n’ayez rien tapé depuis dix minutes.
 - [**De mes messages**](/settings?s=suggest&find=From%20my%20messages) : Apprendre à partir des messages que vous avez écrits aux agents.
 - [**Des réponses des agents**](/settings?s=suggest&find=From%20agents'%20replies) : Apprendre à partir de ce que les agents vous ont répondu.
@@ -332,7 +332,7 @@ Inutile de savoir où se trouve une option : tapez ce que vous voulez dans le c
 - [**Poids de mes propres mots**](/settings?s=suggest&find=Weight%20of%20my%20own%20words) : Combien les mots que vous avez saisis comptent de plus que le reste de ce qu’il apprend.
 - [**Threads pour l’apprentissage**](/settings?s=suggest&find=Threads%20for%20learning) : Threads de processeur pour l’apprentissage (automatique par défaut).
 - [**Apprendre sur la carte graphique**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card) : L’apprentissage se fait sur une carte graphique NVIDIA ou un Mac avec puce Apple quand il y en a une de libre, bien plus vite que sur le processeur.
-- [**Réentraîner maintenant**](/settings?s=suggest&find=Retrain%20now) : Apprend maintenant, en arrière-plan, de ce que vous avez écrit depuis la dernière fois.
+- [**Réentraîner maintenant**](/settings?s=suggest&find=Retrain%20now) : Apprend maintenant, en arrière-plan, de tout ce que vous avez écrit, en partant du petit modèle fourni avec l’app.
 - [**Oublier ce qu’il a appris**](/settings?s=suggest&find=Forget%20what%20it%20learned) : Supprime le modèle qui a appris de vous ; celui fourni avec l’app est de nouveau utilisé.
 
 ### Vos agents

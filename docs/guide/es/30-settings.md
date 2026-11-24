@@ -227,7 +227,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Preguntar antes de enviar en sitios con sesión iniciada**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Antes de que un agente envíe, publique, elimine o transfiera algo en un sitio donde ha iniciado sesión.
 - [**Marcadores**](/settings?s=browser&find=Bookmarks): Los tuyos, junto con los de los otros navegadores de esta computadora.
 - [**Extensiones**](/settings?s=browser&find=Extensions): Extensiones de Chrome, en la app de escritorio.
-- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Home page, search engine, search shortcuts, page zoom, spell checking, translation, dark pages, ad blocker with its filter lists, languages and sites where ads are allowed, history and clearing what it kept.
+- [**Configuración del navegador**](/settings?s=browser&find=Browser%20settings): Página de inicio, motor de búsqueda, atajos de búsqueda, zoom de página, revisión ortográfica, traducción, páginas oscuras, bloqueador de anuncios con sus listas de filtros, idiomas y sitios donde se permiten anuncios, historial y borrado de lo que guardó.
 
 ### Uso de la computadora
 
@@ -323,7 +323,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Elegir según el idioma**](/settings?s=suggest&find=Choose%20by%20language): Elige el modelo que funciona mejor para el idioma en el que escribes.
 - [**Aprender de la conversación**](/settings?s=suggest&find=Learn%20from%20the%20conversation): Usa las palabras empleadas antes en la conversación mientras escribes un mensaje.
 - [**Threads**](/settings?s=suggest&find=Threads): Hilos del procesador para las sugerencias (automático por defecto).
-- [**Aprender de lo que escribo**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): El modelo pequeño aprende de lo que escribes, en esta computadora y en segundo plano.
+- [**Aprender de lo que escribo**](/settings?s=suggest&find=Learn%20from%20what%20I%20write): El modelo pequeño aprende de lo que escribes, en esta computadora y en segundo plano; cada vez empieza de nuevo desde el que venía con la app.
 - [**Cuándo aprende**](/settings?s=suggest&find=When%20it%20learns): Cada noche, cada semana o solo cuando pulses Volver a entrenar ahora; espera a que lleves diez minutos sin escribir.
 - [**De mis mensajes**](/settings?s=suggest&find=From%20my%20messages): Aprender de los mensajes que escribiste a los agentes.
 - [**De las respuestas de los agentes**](/settings?s=suggest&find=From%20agents'%20replies): Aprender de lo que los agentes te respondieron.
@@ -332,7 +332,7 @@ No hace falta saber dónde está una opción: escribe lo que buscas en el cuadro
 - [**Peso de mis propias palabras**](/settings?s=suggest&find=Weight%20of%20my%20own%20words): Cuánto más pesan las palabras que escribiste frente al resto de lo que aprende.
 - [**Hilos para el aprendizaje**](/settings?s=suggest&find=Threads%20for%20learning): Hilos del procesador para el aprendizaje (automático por defecto).
 - [**Aprender con la tarjeta gráfica**](/settings?s=suggest&find=Learn%20on%20the%20graphics%20card): El aprendizaje se hace en una tarjeta gráfica NVIDIA o en un Mac con Apple silicon cuando hay una libre, muchas veces más rápido que en el procesador.
-- [**Volver a entrenar ahora**](/settings?s=suggest&find=Retrain%20now): Aprende ahora, en segundo plano, de lo que escribiste desde la última vez.
+- [**Volver a entrenar ahora**](/settings?s=suggest&find=Retrain%20now): Aprende ahora, en segundo plano, de todo lo que has escrito, partiendo del modelo pequeño que venía con la app.
 - [**Olvidar lo aprendido**](/settings?s=suggest&find=Forget%20what%20it%20learned): Elimina el modelo que aprendió de ti; se vuelve a usar el que venía con la app.
 
 ### Tus agentes
