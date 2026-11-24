@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 140-second tour of Hydor: any agent and any model, word suggestions as you type, goals the app checks, research with its sources, Bring in from ChatGPT, sessions followed on your phone, apps with views of their own and apps you make, pictures, video and music made with AI, answers pinned to a board, experiments on your GPUs, and documents and slides you write in" /></a>
+  <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 70-second tour of Hydor at twice its speed (the film it opens plays at normal speed): any agent and any model, word suggestions as you type, goals the app checks, research with its sources, Bring in from ChatGPT, sessions followed on your phone, apps with views of their own and apps you make, pictures, video and music made with AI, answers pinned to a board, experiments on your GPUs, and documents and slides you write in" /></a>
 </p>
 
 <p align="center">
