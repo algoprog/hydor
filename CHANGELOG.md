@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.111.1 · 24 November 2026
+
+Word suggestions learn on the graphics card even when every card has a program that runs models on it.
+
+- **Learning beside a model server**: on a computer whose graphics cards each run a program that serves models (vLLM,
+  Ollama and the like), learning used to stay on the processor, because a card another program used was always left
+  alone; a run then took many minutes with most of the processor busy. A card no other program uses still comes first.
+  When every card has such a program, a run now shares a card whose program is idle (under 20% busy, looked at three
+  times a second apart) and leaves 2 GB more free beside it. While those programs are at work, it learns on the
+  processor, and the setting says why.
+
 ## 0.111.0 · 24 November 2026
 
 A better small model for word suggestions, one that has read what people type, and model updates that download only
