@@ -35,6 +35,9 @@ The package `ws/`:
   keystrokes a suggestion saves at a given share of right suggestions.
 - `train.py`: training data, batches, the training loop and the dev measures. This is also how the model learns from
   one person's text, with public text replayed beside it.
+- `lora.py`: LoRA for that personalisation (`train_slm.py --lora-rank R`): adapters on the attention, MLP and convolution
+  projections, the rest frozen, the embedding projection and table trained in full only when asked
+  (`--train-proj`, `--train-embed`); the checkpoint it writes has the adapters merged into the weights.
 - `pretrain_data.py`: the pretraining shards as sequences, the replay of public text, and the mix of tokens per
   language.
 - `online.py`, `dayroute.py`: experiments in keeping the small model current day by day.
@@ -45,6 +48,8 @@ The pipeline steps in `scripts/`:
 - `pretrain_slm.py`: pretrains the small model on the public corpus (one GPU, several under `torchrun`, or the CPU).
 - `train_slm.py`: trains or continues the small model on a person's own messages, with `--replay-pretrain` against
   forgetting.
+- `flores_forgetting.py`: per-language NLL and acc@1 on FLORES of personalised checkpoints against the base, with paired bootstrap
+  intervals.
 - `build_vocab.py`: a smaller vocabulary (48,000 ids) from the most used tokens; the early experiments used it. The
   release has the full one.
 - `build_lid.py`: the language guess (`lid.json`, `lid.bin`) from token counts per language.
