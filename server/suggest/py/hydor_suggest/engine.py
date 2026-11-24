@@ -1,8 +1,9 @@
 """The engine: loads a release folder (and the personal model beside it) and answers suggest requests.
 
-A request is cut into the context and R (the word being typed with the whitespace before it); both models read the context; the plan
-(mix, llm or slm) decides which distribution the word is decoded from; the decoded word and its confidence are compared with the
-threshold for the asked precision.
+A request is cut into the context and R (the word being typed with the whitespace before it); the language model and one of the
+small models read the context (the published one, or the personal one: both are loaded, see Engine.pick_slot); the plan (mix, llm or
+slm) decides which distribution the word is decoded from; the decoded word and its confidence are compared with the threshold for
+the asked precision.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from . import vocab as V
 from .decode import decode, next_word_text, text_after
 from .lid import Lid, mostly_letters
 from .llm import LlamaClient, LlmError, LlmUnavailable, dense_from_top
-from .config import config_from_dict
+from .config import config_from_dict, config_to_dict
 from .ort_slm import GraphError, OrtSlm, State, last_logits, log_softmax
 from .tokbytes import PrefixIndex, end_token_ids, token_bytes
 
@@ -95,6 +96,18 @@ class SlmRunner:
         return hit[0]
 
 
+class Slot:
+    """One small model with its own incremental state (the published one, or the personal one), the gate that mixes it with the
+    language model, and (the personal one) the languages the person wrote in, with their tokens."""
+
+    def __init__(self, kind: str, model: OrtSlm, key, gate, languages: Optional[dict] = None):
+        self.kind = kind                       # 'base' (the published model) | 'personal'
+        self.model, self.key, self.gate = model, key, gate
+        self.languages = languages or {}
+        self.runner = SlmRunner(model)
+        self.runner.prepare([V.BOS, V.DOC])    # warms the threads and gives the first request a state
+
+
 @dataclass
 class Prepared:
     surface: str
@@ -153,12 +166,8 @@ class Release:
 class Engine:
     def __init__(self):
         self.release: Optional[Release] = None
-        self.model: Optional[OrtSlm] = None
-        self.model_key = None
-        self.runner: Optional[SlmRunner] = None
-        self.gate: Optional[mix_mod.Gate] = None
-        self.kind = 'base'
-        self.languages: dict = {}
+        self.base: Optional[Slot] = None               # the published small model: always loaded
+        self.personal: Optional[Slot] = None           # the personal one, when there is one: loaded beside it
         self.client: Optional[LlamaClient] = None
         self.opts = dict(DEFAULTS)
         self.caches: Optional[cache_mod.SessionCaches] = None
@@ -171,68 +180,112 @@ class Engine:
         self.requests = 0
         self.durations: list = []
 
+    # ---- the models in use ------------------------------------------------------------------------------------------------
+    @property
+    def primary(self) -> Optional[Slot]:
+        """The small model that answers where nothing says otherwise: the personal one when there is one, else the published one."""
+        return self.personal or self.base
+
+    @property
+    def model(self) -> Optional[OrtSlm]:
+        return self.primary.model if self.primary else None
+
+    @property
+    def runner(self) -> Optional[SlmRunner]:
+        return self.primary.runner if self.primary else None
+
+    @property
+    def gate(self) -> Optional[mix_mod.Gate]:
+        return self.primary.gate if self.primary else None
+
+    @property
+    def kind(self) -> str:
+        return 'personal' if self.personal else 'base'
+
+    @property
+    def languages(self) -> dict:
+        return self.personal.languages if self.personal else {}
+
     # ---- loading ----------------------------------------------------------------------------------------------------------
     def load(self, model_dir: str, personal_dir: Optional[str] = None, llm_url: Optional[str] = None, threads: int = 0,
              options: Optional[dict] = None) -> dict:
-        """Load a release and the personal model, and connect the language model. Everything is built before anything is swapped in: a
-        load that fails leaves the engine as it was."""
+        """Load a release and the personal model beside it (both stay loaded: the graph is the same, the weights are two sets), and
+        connect the language model. Everything is built before anything is swapped in: a load that fails leaves the engine as it was."""
         threads = max(0, int(threads or 0))
         opts = dict(DEFAULTS)
         opts.update({k: v for k, v in (options or {}).items() if v is not None})
         same = self.release is not None and os.path.abspath(self.release.folder) == os.path.abspath(model_dir)
         rel = self.release if same else Release(model_dir)
-        model, kind, languages, gate = None, 'base', {}, rel.gate
-        key = None
-        personal_error = None
+        old = [x for x in (self.base, self.personal) if x is not None]
+        base_model, base_key = self._slm(rel.slm_config, rel.weights, [rel.folder], threads, old)
+        built = [base_model] if all(x.model is not base_model for x in old) else []     # the models made here (closed if the load fails)
+        personal_model = personal_key = None
+        languages, gate, personal_error = {}, rel.gate, None
         pw = os.path.join(personal_dir, 'model.safetensors') if personal_dir else None
         if pw and os.path.isfile(pw):
             try:
                 cfg = config_from_dict(_read_json(os.path.join(personal_dir, 'config.json')).get('slm') or rel.config['slm'])
                 if cfg.vocab != rel.slm_config.vocab:
                     raise ValueError('the personal model has another vocabulary')
-                model, key = self._slm(cfg, pw, [personal_dir, rel.folder], threads)
+                # the same graph as the published model's when it is the same architecture: one graph, two weight sets
+                graph = base_model.graph if config_to_dict(cfg) == config_to_dict(rel.slm_config) else None
+                personal_model, personal_key = self._slm(cfg, pw, [personal_dir, rel.folder], threads, old, graph)
+                if all(x.model is not personal_model for x in old):
+                    built.append(personal_model)
                 mp = os.path.join(personal_dir, 'meta.json')
                 if os.path.isfile(mp):
                     languages = {str(k): int(v) for k, v in (_read_json(mp).get('languages') or {}).items()}
                 gp = os.path.join(personal_dir, 'gate.json')
                 if os.path.isfile(gp):
                     gate = mix_mod.Gate.load(gp)
-                kind = 'personal'
-            except Exception as e:                    # a broken personal model never stops the base one
-                model, key, kind, languages, gate = None, None, 'base', {}, rel.gate
+            except Exception as e:                    # a broken personal model never stops the published one
+                if personal_model is not None and all(x.model is not personal_model for x in old):
+                    personal_model.close()
+                    built = [m for m in built if m is not personal_model]
+                personal_model, personal_key, languages, gate = None, None, {}, rel.gate
                 personal_error = str(e)
-        if model is None:
-            model, key = self._slm(rel.slm_config, rel.weights, [rel.folder], threads)
-        runner = SlmRunner(model)
-        runner.prepare([V.BOS, V.DOC])                 # warms the threads and gives the first request a state
-        client = LlamaClient(llm_url, int(opts['k'])) if llm_url else None
+        try:
+            kept = {id(x.model): x for x in old}
+            base = kept.get(id(base_model)) or Slot('base', base_model, base_key, rel.gate)
+            personal = None
+            if personal_model is not None:
+                personal = kept.get(id(personal_model)) or Slot('personal', personal_model, personal_key, gate, languages)
+                personal.gate, personal.languages = gate, languages
+            client = LlamaClient(llm_url, int(opts['k'])) if llm_url else None
+        except Exception:
+            for m in built:
+                m.close()
+            raise
+        base.gate = rel.gate
         # nothing failed: swap it all in
         if self.client is not None:
             self.client.close()
         if not same:
             self._enc.clear()
             self._enc_chars = 0
-        if self.model is not None and self.model is not model:
-            self.model.close()
-        self.opts, self.release, self.model, self.kind, self.languages, self.gate = opts, rel, model, kind, languages, gate
-        self.model_key = key
-        self.runner, self.client, self.llm_error, self.llm_down_until = runner, client, None, 0.0
+        now = {id(base.model), id(personal.model) if personal else None}
+        for x in old:
+            if id(x.model) not in now:
+                x.model.close()
+        self.opts, self.release, self.base, self.personal = opts, rel, base, personal
+        self.client, self.llm_error, self.llm_down_until = client, None, 0.0
         self.caches = cache_mod.SessionCaches(rel.V, int(opts['sessions']))
         for session, texts in list(self._session_texts.items()):
             self._set_session_cache(session, texts)
-        out = {'model': kind, 'languages': dict(languages)}
+        out = {'model': self.kind, 'languages': dict(self.languages)}
         if personal_error:
             out['personal_error'] = personal_error
         return out
 
-    def _slm(self, cfg, weights: str, folders: list, threads: int) -> tuple:
+    def _slm(self, cfg, weights: str, folders: list, threads: int, loaded: list, graph: Optional[str] = None) -> tuple:
         """The small model for these weights: the one already loaded when it is the same file (the same size and time) at the same
         threads, else a new one (its graph is the release's own, else the one that comes with the app)."""
         st = os.stat(weights)
         key = (os.path.abspath(weights), st.st_mtime_ns, st.st_size, threads, json.dumps(asdict(cfg), sort_keys=True))
-        if self.model is not None and self.model_key == key:
-            return self.model, key
-        return OrtSlm(cfg, weights, threads=threads, folders=folders), key
+        for x in loaded:
+            if x.key == key:
+                return x.model, key
+        return OrtSlm(cfg, weights, graph=graph, threads=threads, folders=folders), key
 
     # ---- the language model's health -------------------------------------------------------------------------------------
     def llm(self) -> Optional[LlamaClient]:
@@ -283,26 +336,42 @@ class Engine:
         self.caches.set(session, [self.encode(t) for t in texts])
 
     # ---- the plan ---------------------------------------------------------------------------------------------------------
+    def lang_of(self, surface: str, typed_ids: np.ndarray, ctx_ids: np.ndarray, typed_text: str = '', ctx_text: str = '') -> Optional[str]:
+        """The language guessed on the typed text (with the context's when fewer than 8 tokens were typed), and only when that text is
+        mostly letters (None otherwise, and in documents)."""
+        rel = self.release
+        if rel.lid is None or surface == 'doc':
+            return None
+        short = len(typed_ids) < 8
+        ids = np.concatenate([ctx_ids, typed_ids]) if short else typed_ids
+        if mostly_letters(f'{ctx_text} {typed_text}' if short else typed_text):
+            return rel.lid.guess(ids)[0]
+        return None
+
+    def pick_slot(self, surface: str, lang: Optional[str]) -> Slot:
+        """Which small model answers. The personal one (when there is one) in a language the person writes in (at least
+        PERSONAL_LANG_TOKENS of their tokens in it), where no language could be guessed, and in documents; the published one in every
+        other language: personalising costs the languages the person does not write in, so they keep the model that came with the app."""
+        if self.personal is None or surface == 'doc' or lang is None:
+            return self.personal or self.base
+        return self.personal if self.personal.languages.get(lang, 0) >= PERSONAL_LANG_TOKENS else self.base
+
     def choose_plan(self, surface: str, typed_ids: np.ndarray, ctx_ids: np.ndarray, use_switch: bool, typed_text: str = '',
                     ctx_text: str = '') -> tuple:
-        """(plan, language guessed or None). The language is guessed on the typed text (with the context's when fewer than 8 tokens were
-        typed), and only when that text is mostly letters."""
+        """(plan, language guessed or None, the small model's slot). The plan of a request with the published small model is the
+        language's switch (Qwen3.5 alone or the mix with it); with the personal one it is the mix."""
+        lang = self.lang_of(surface, typed_ids, ctx_ids, typed_text, ctx_text)
+        slot = self.pick_slot(surface, lang)
         rel = self.release
-        lang = None
-        if rel.lid is not None and surface != 'doc':
-            short = len(typed_ids) < 8
-            ids = np.concatenate([ctx_ids, typed_ids]) if short else typed_ids
-            if mostly_letters(f'{ctx_text} {typed_text}' if short else typed_text):
-                lang, _, _ = rel.lid.guess(ids)
         if surface == 'doc':
-            return ('llm' if self.llm() else 'slm'), lang
+            return ('llm' if self.llm() else 'slm'), lang, slot
         if not self.llm():
-            return 'slm', lang
-        if lang is not None and self.languages.get(lang, 0) >= PERSONAL_LANG_TOKENS:
-            return 'mix', lang
+            return 'slm', lang, slot
+        if slot.kind == 'personal':
+            return 'mix', lang, slot
         if use_switch and lang is not None:
-            return ('llm' if rel.switch.choice(lang) == 'llm' else 'mix'), lang
-        return 'mix', lang
+            return ('llm' if rel.switch.choice(lang) == 'llm' else 'mix'), lang, slot
+        return 'mix', lang, slot
 
     # ---- suggest ----------------------------------------------------------------------------------------------------------
     def prepare(self, req: dict) -> 'Prepared':
@@ -339,7 +408,7 @@ class Engine:
         surface, R, target_ids, llm_prompt, slm_ids = pr.surface, pr.R, pr.target_ids, pr.llm_prompt, pr.slm_ids
         if len(R) > MAX_TYPED_BYTES:
             return self._empty(t0, req)
-        plan, lang = self.choose_plan(surface, target_ids, np.concatenate([pr.agent_ids, pr.doc_ids]), bool(req.get('switch', True)),
+        plan, lang, slot = self.choose_plan(surface, target_ids, np.concatenate([pr.agent_ids, pr.doc_ids]), bool(req.get('switch', True)),
                                       pr.target_text, pr.agent_ctx or pr.doc_ctx)
         want_cache = bool(req.get('cache', True)) and surface == 'chat' and self.caches is not None
         extras, extra_key = [], None
@@ -355,7 +424,7 @@ class Engine:
         want_next = bool(req.get('next', True))
         used = plan
         stats = {'llm': 0.0, 'slm': 0.0}
-        args = (slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache, precision, want_next, cancelled)
+        args = (slot, slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache, precision, want_next, cancelled)
         try:
             result = self._decode(plan, *args, stats)
         except LlmError as e:                       # the language model stopped answering: this suggestion comes from the small model
@@ -379,6 +448,8 @@ class Engine:
                'ms': {'total': round(total, 1), 'llm': round(t_llm, 1), 'slm': round(t_slm, 1)}}
         if lang:
             out['lang'] = lang
+        if used != 'llm':                           # Qwen3.5 alone does not use the small model
+            out['model'] = slot.kind
         return out
 
     def _empty(self, t0: float, req: dict) -> dict:
@@ -386,11 +457,11 @@ class Engine:
         return {'word': '', 'next': '', 'conf': 0.0, 'conf_next': 0.0, 'theta': 1.0, 'show': False, 'show_next': False,
                 'plan': 'slm', 'ms': {'total': round(total, 1), 'llm': 0.0, 'slm': 0.0}}
 
-    def _decode(self, plan, slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache, precision, want_next,
+    def _decode(self, plan, slot, slm_ids, llm_prompt, target_ids, R, req, extras, extra_key, want_cache, precision, want_next,
                 cancelled, stats) -> tuple:
         rel = self.release
         n_target = len(target_ids)
-        runner = self.runner
+        runner = slot.runner
         t = time.perf_counter()
         runner.prepare(slm_ids)
         stats['slm'] += (time.perf_counter() - t) * 1000
@@ -423,7 +494,7 @@ class Engine:
                 p = dense_from_top(ids, lps, rel.V, p_slm if plan == 'mix' else None)
                 if plan == 'mix':
                     t1 = time.perf_counter()
-                    gate = self.gate
+                    gate = slot.gate
                     if gate is None:
                         lam = 0.5
                     else:

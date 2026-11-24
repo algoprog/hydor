@@ -92,7 +92,7 @@ class EngineTests(unittest.TestCase):
         out = e.suggest({'surface': 'chat', 'text': 'we are writing a message to the as', 'reply': 'Hello, how can I help you today?',
                          'precision': 0.4})
         self.assertEqual(out['plan'], 'slm')
-        self.assertEqual(set(out) - {'lang'}, {'word', 'next', 'conf', 'conf_next', 'theta', 'show', 'show_next', 'plan', 'ms'})
+        self.assertEqual(set(out) - {'lang'}, {'word', 'next', 'conf', 'conf_next', 'theta', 'show', 'show_next', 'plan', 'ms', 'model'})
         self.assertAlmostEqual(out['theta'], 0.15)
         self.assertEqual(out['show'], out['conf'] >= 0.15)
         self.assertEqual(set(out['ms']), {'total', 'llm', 'slm'})
@@ -433,6 +433,107 @@ class EngineTests(unittest.TestCase):
             a = e.suggest({'surface': 'text', 'text': 'the quick br'})
             b = base.suggest({'surface': 'text', 'text': 'the quick br'})
             self.assertNotEqual((a['word'], a['conf']), (b['word'], b['conf']))
+
+    EN = 'the quick brown fox jumps over the lazy dog and we are writing a message'
+    EL = 'ευχαριστώ πολύ για τη βοήθεια σας καλημέρα σας τι κάνετε σήμερα'
+
+    def test_both_small_models_are_loaded_and_share_the_graph(self):
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'eng_Latn': 3000})
+            e = self.engine(personal_dir=pd)
+            self.assertIsNotNone(e.base)
+            self.assertIsNotNone(e.personal)
+            self.assertIsNot(e.base.model, e.personal.model)
+            self.assertEqual(e.base.model.graph, e.personal.model.graph)          # one graph, two weight sets
+            self.assertFalse(np.array_equal(e.base.model.table, e.personal.model.table))
+            self.assertIsNot(e.base.runner, e.personal.runner)                     # a state of its own each
+            self.assertEqual((e.kind, e.languages), ('personal', {'eng_Latn': 3000}))
+            alone = self.engine()
+            self.assertIsNone(alone.personal)
+            self.assertEqual((alone.kind, alone.languages), ('base', {}))
+
+    def test_a_language_the_person_writes_in_uses_the_personal_model_and_others_the_published_one(self):
+        fake = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake.stop)
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'eng_Latn': 2500, 'ell_Grek': 100})          # Greek: too few of their tokens to count
+            e = self.engine(fake.url, personal_dir=pd)
+            out = e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': ''})
+            self.assertEqual((out['lang'], out['plan'], out['model']), ('eng_Latn', 'mix', 'personal'))
+            out = e.suggest({'surface': 'chat', 'text': self.EL + ' κα', 'reply': ''})
+            self.assertEqual((out['lang'], out['plan'], out['model']), ('ell_Grek', 'mix', 'base'))     # the switch keeps its say
+            out = e.suggest({'surface': 'chat', 'text': 'the qu', 'reply': ''})
+            self.assertNotIn('lang', out)
+            self.assertEqual((out['plan'], out['model']), ('mix', 'personal'))              # no confident guess: the personal one
+            out = e.suggest({'surface': 'text', 'text': 'the quick br'})
+            self.assertEqual(out['model'], 'personal')
+            # a document keeps its plan (Qwen3.5 alone), which uses no small model
+            out = e.suggest({'surface': 'doc', 'text': self.EN + ' th'})
+            self.assertEqual(out['plan'], 'llm')
+            self.assertNotIn('model', out)
+
+    def test_a_language_not_written_in_follows_the_switch_with_the_published_model(self):
+        fake = helpers.FakeLlama(self.Vq)
+        self.addCleanup(fake.stop)
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'ell_Grek': 3000})
+            e = self.engine(fake.url, personal_dir=pd)
+            out = e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': ''})
+            self.assertEqual((out['lang'], out['plan']), ('eng_Latn', 'llm'))                # the switch gives English to Qwen3.5 alone
+            self.assertNotIn('model', out)
+            out = e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': '', 'switch': False})
+            self.assertEqual((out['plan'], out['model']), ('mix', 'base'))                   # mixed with the published model
+            out = e.suggest({'surface': 'chat', 'text': self.EL + ' κα', 'reply': ''})
+            self.assertEqual((out['plan'], out['model']), ('mix', 'personal'))
+            # without the language model the small model answers alone: the published one outside the person's languages
+            e.client.close()
+            e.client = None
+            out = e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': ''})
+            self.assertEqual((out['plan'], out['model']), ('slm', 'base'))
+            out = e.suggest({'surface': 'chat', 'text': self.EL + ' κα', 'reply': ''})
+            self.assertEqual((out['plan'], out['model']), ('slm', 'personal'))
+
+    def test_the_published_model_answers_as_it_does_alone_and_the_personal_one_differently(self):
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'ell_Grek': 3000})
+            both = self.engine(personal_dir=pd)
+            alone = self.engine()
+            req = {'surface': 'chat', 'text': self.EN + ' th', 'reply': ''}
+            a, b = both.suggest(dict(req)), alone.suggest(dict(req))
+            self.assertEqual((a['model'], b['model']), ('base', 'base'))
+            self.assertEqual((a['word'], a['conf'], a['conf_next']), (b['word'], b['conf'], b['conf_next']))
+            c = both.suggest({'surface': 'chat', 'text': self.EL + ' κα', 'reply': ''})
+            self.assertEqual(c['model'], 'personal')
+
+    def test_each_small_model_keeps_its_own_state(self):
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'ell_Grek': 3000})
+            e = self.engine(personal_dir=pd)
+            e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': ''})                  # the published model
+            base_ids = list(e.base.runner.ids)
+            personal_ids = list(e.personal.runner.ids)
+            self.assertEqual(personal_ids, [V.BOS, V.DOC])                                      # untouched by it
+            e.suggest({'surface': 'chat', 'text': self.EL + ' κα', 'reply': ''})                  # the personal one
+            self.assertEqual(list(e.base.runner.ids), base_ids)                                 # and it did not touch the published one's
+            self.assertGreater(len(e.personal.runner.ids), 2)
+            fed = e.base.runner.fed
+            e.suggest({'surface': 'chat', 'text': self.EN + ' th', 'reply': ''})                  # the same context again: no new tokens fed
+            self.assertLess(e.base.runner.fed - fed, len(base_ids))
+
+    def test_a_reload_keeps_the_models_that_did_not_change_and_drops_a_removed_personal_one(self):
+        with helpers.tmpdir() as pd:
+            self.write_personal(pd, {'ell_Grek': 3000})
+            e = self.engine(personal_dir=pd)
+            base, personal = e.base.model, e.personal.model
+            e.load(self.release, pd, None, 2)
+            self.assertIs(e.base.model, base)
+            self.assertIs(e.personal.model, personal)
+            res = e.load(self.release, None, None, 2)
+            self.assertEqual(res, {'model': 'base', 'languages': {}})
+            self.assertIsNone(e.personal)
+            self.assertIs(e.base.model, base)
+            self.assertIsNone(personal.pool)                                                    # let go of
+            self.assertEqual(e.suggest({'surface': 'text', 'text': 'the quick br'})['model'], 'base')
 
     def test_a_broken_personal_model_leaves_the_base_one_running(self):
         with helpers.tmpdir() as pd:

@@ -9,7 +9,9 @@ It reads requests as JSON lines on stdin and answers each with one JSON line on 
         "next": true, "cache": true, "switch": true, "typed_words": 100, "context_words": 100}
         (typed_words: how many words of the typed text before the caret are read; context_words: how many of the reply (chat) or the
         document (doc); 0 reads none of the context; both default to the load options', else 100)
-        -> {"id", "word", "next", "conf", "conf_next", "theta", "show", "show_next", "plan", "lang"?, "ms": {...}}
+        -> {"id", "word", "next", "conf", "conf_next", "theta", "show", "show_next", "plan", "lang"?, "model"?, "ms": {...}}
+        (model: "base" | "personal", the small model that answered; both are loaded, the personal one answers in the languages the
+        person writes in and where no language was guessed; absent when Qwen3.5 alone answered)
   {"id", "op": "session", "session", "texts": [str]}                 -> {"id", "ok": true}
   {"id", "op": "cancel", "target": <id>}   drops a suggest that waits or stops it between decoding steps: that suggest's answer is
         then {"id": <target>, "cancelled": true}; the cancel itself is answered {"id", "ok": true}
