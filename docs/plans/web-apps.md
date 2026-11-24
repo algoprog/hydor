@@ -11,10 +11,14 @@ is built: agent apps stay as that plan made them.*
 - **One kit, two places to run.** The same code runs inside Hydor (which keeps it running, signs you in and lends it
   its models, agents and embedding model) or standalone (a server, a one-click platform, serverless), with accounts
   and keys of its own. What differs sits behind eight seams, set by configuration and never by changing the app.
-- **Hydor Kit** (MIT, a public repository of its own) is a small core package, **blocks** copied into the app as
-  source (accounts, teams, billing, search, admin, landing sections, blog, store, booking…), **starters** (one per
-  app type), **designs**, and **checks** that travel with each block. Every block says in a manifest what it needs,
-  what it offers and which choices to put to the maker.
+- **Hydor Kit** (MIT, a public repository of its own) is versioned packages for what should be the same in every
+  app (the core, each block's engine, the interface parts), thin source copied into the app for what makes it this
+  app, **blocks** that bring both (accounts, teams, billing, search, admin, landing sections, blog, store,
+  booking…), **starters** (one per app type), **designs**, and **checks** that travel with each block. Every block
+  says in a manifest what it needs, what it offers and which choices to put to the maker.
+- **Updates reach apps.** A fix or an improvement in the kit arrives as a new version of a package: `kit upgrade`
+  takes it, runs its migrations and the checks, and nothing is merged. Only the thin copied source is joined three
+  ways, and a part a maker wants to change is taken into the app (`kit eject`) and joined from then on.
 - **The stack**: TypeScript, React, TanStack Start on Vite, Tailwind and shadcn/ui, Drizzle on SQLite first, Better
   Auth, Stripe, and Hydor's own hybrid search (words and 4-bit vectors, joined by rank), with a small embedding
   model on the app's own server by default.
@@ -33,6 +37,7 @@ is built: agent apps stay as that plan made them.*
 | How apps inside Hydor and standalone apps relate | One kit, two places to run; agent apps stay and plug in | Sections 2 and 3 |
 | The base stack | React and Vite on one plain Node server | TanStack Start, with a fallback (section 4) |
 | How prebuilt material reaches an app | Source blocks on a small tested core package | Section 4 |
+| Updates (added the same day) | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
@@ -163,8 +168,10 @@ configuration.
 hydor-kit/                 public, MIT
   packages/core/           the plumbing an app depends on: configuration, the seams and their drivers, migrations,
                            access rules, security defaults, health, logs
-  packages/cli/            new, add, remove, update, check, doctor, dev, build, deploy, data, mcp
-  registry/blocks/<name>/  block.json, src/, tests/, AGENTS.md, pictures for the pickers, changes
+  packages/ui/             the interface parts (buttons, forms, tables, shells, landing sections), themed by the app
+  packages/blocks/<name>/  a block's engine: the logic no app has a reason to change
+  packages/cli/            new, add, remove, update, upgrade, eject, check, doctor, dev, build, deploy, data, mcp
+  registry/blocks/<name>/  block.json, the thin source it copies in, tests/, AGENTS.md, pictures, changes
   registry/starters/<type>/  the blocks and options of an app type, its data model, pages and sample data
   registry/designs/<name>/   colours, type, spacing, shells and page variants
   examples/                one reference app per starter, built from the registry by the tests
@@ -172,14 +179,48 @@ hydor-kit/                 public, MIT
   docs/                    for people and, version by version, for agents
 ```
 
-- **The core is small and tested, and it is the only part an app depends on.** It holds what must be the same in
-  every app and must be fixable for all of them at once: the seams, the access rules, the security defaults.
-- **Blocks are source.** `kit add` copies one into the app, the agent adapts it, and the maker owns it. A block
-  holds everything a feature needs: pages, components, server functions, tables, emails, jobs, tests and notes.
+- **The core is small and tested.** It holds what must be the same in every app and must be fixable for all of
+  them at once: the seams, the access rules, the security defaults.
+- **A block is an engine and a surface.** Its engine is a package the app depends on: the logic no app has a reason
+  to change (checking a payment webhook, who may use what, how search ranks). Its surface is thin source that
+  `kit add` copies into the app, the agent adapts and the maker owns: the pages, their wording, the app's own
+  fields. The surface calls the engine.
+- **Interface parts are a package too**, themed by the app's own colours, type and spacing and filled through
+  their properties and slots, so a better table or a fixed form reaches every app. They use shadcn's names for
+  theme values, so parts copied from any shadcn registry sit beside them.
 - **Starters are thin.** An app type is a list of blocks with their options, a data model, pages and sample data.
   New types come from new blocks far more than from new starters.
-- **Interface parts travel in shadcn's registry format**, so the parts of other shadcn registries fit an app
-  without anything of ours.
+
+### How an app stays current
+
+The rule for where a thing lives: if a fix to it should reach every app, it is in a package; if it is what makes
+this app this app, it is source in the app.
+
+| Part of an app | Where it lives | How the app changes it | How a kit fix reaches it |
+|---|---|---|---|
+| The seams, access rules, security defaults | The core package | Configuration | A new version |
+| A block's engine (payments, sign-in wiring, search, jobs) | The block's package | Settings, events it can listen to, functions it can pass in | A new version, with its migrations |
+| Interface parts and landing sections | The interface package | The theme, properties, slots | A new version |
+| Pages, wording, emails' text, the app's own fields | Source in the app | Edited freely | A three-way join, rarely needed because it is thin |
+| A packaged part the maker wants to differ | Taken into the app with `kit eject` | Edited freely | A three-way join from then on; everything else still updates by version |
+
+- **`kit upgrade`** is the one command: it lists what is new (`kit outdated` only lists), takes the new versions of
+  the packages, joins any copied source that changed, runs the database migrations the versions bring and a small
+  rewrite program where a version changed how something is called, then runs the app's checks. It works on a
+  branch, so the app that is live is untouched until the maker says so.
+- **Every release says what it is**, in words for the maker and marked as a fix, a security fix, an improvement or
+  a change that needs attention. Security fixes can be taken alone (`kit upgrade --security`).
+- **A change that breaks apps is rare and never silent**: it comes with the rewrite program, a major version, and a
+  note in the update card. The previous major version keeps getting security fixes for a stated time.
+- **The database goes along.** A block's version brings its own migrations; an upgrade backs the database up, runs
+  them, and can go back.
+- **Customising should not mean leaving the update path.** Before a part is taken into the app, the agent looks
+  for a setting, a property, a slot or an event that does the job, and the block's notes list them. What makers
+  eject most is a signal to add such a point to the package.
+- **In Hydor**, the Run stage shows updates as a card ("3 updates, 1 for security"), tries them on a branch with
+  the checks, shows before and after pictures of the pages that changed, and launches when the maker says so. A
+  weekly check can run as a scheduled task, and security fixes can be set to apply by themselves when the checks
+  pass.
 
 ### The stack
 
@@ -188,7 +229,7 @@ Versions and licences were read from the npm registry on 24 November 2026.
 | Layer | Choice | Checked | Licence | Why, and the risk |
 |---|---|---|---|---|
 | Framework | [TanStack Start](https://tanstack.com/blog/tanstack-start-1-0) on Vite, as a Node server | 1.169.7; 1.0 on 13 October 2026 | MIT | Typed routes and server functions turn an agent's mistakes into compile errors. One code base reaches Node, Cloudflare and Vercel. Lovable (May 2026) and Base44 moved to it. It is young: React Router 8.5 is the fallback |
-| Interface | React 19, Tailwind 4, [shadcn/ui](https://ui.shadcn.com/docs/changelog) | Tailwind 4.3.5 | MIT | What models know best, and the widest stock of ready parts |
+| Interface | React 19, Tailwind 4, [shadcn/ui](https://ui.shadcn.com/docs/changelog) | Tailwind 4.3.5 | MIT | What models know best, and the widest stock of ready parts. The kit's own parts ship as a package on shadcn's theme names |
 | Data | [Drizzle](https://github.com/drizzle-team/drizzle-orm/releases) on SQLite | 0.45.4; 1.0.0-rc.6 | Apache-2.0 | One driver per place (a file, D1, Postgres later). 1.0 is not final: the kit pins a version and takes the upgrade once for everyone |
 | Accounts | [Better Auth](https://www.better-auth.com/docs/plugins/organization): teams, admin, two-factor, passkeys | 1.7.27 | MIT | Kept up by its own team, which now also keeps Auth.js. Less sign-in code of ours to get wrong |
 | Payments | Stripe: Checkout, Billing, the customer portal, [Managed Payments](https://docs.stripe.com/payments/managed-payments) as an option | 23.2.0 | MIT | A hosted checkout keeps card data out of the app |
@@ -220,7 +261,9 @@ A sketch; the exact shapes are settled in Phase 0.
   "summary": "People pay you: plans, trials, one-off purchases, and a page to manage their plan.",
   "when": "The app sells access or things. Not for a store's cart (use store), which builds on this.",
   "needs": { "blocks": ["accounts"], "seams": ["db", "jobs", "mail"],
+             "packages": { "@hydor/kit-billing": "1.1.0" },
              "keys": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] },
+  "changes": [{ "version": "1.1.0", "kind": "security", "what": "Refunds are now checked against the order's owner." }],
   "offers": { "pages": ["/pricing", "/settings/billing"], "tables": ["subscriptions", "purchases"],
               "admin": ["Subscriptions"], "events": ["subscription.started", "subscription.ended"] },
   "options": [
@@ -270,8 +313,15 @@ how much of an app came from blocks.
   scaffold takes seconds and costs nothing; the agent's work starts where judgement does.
 - `kit add resource <name>` is the workhorse: from a table's description it writes the list, the detail page, the
   form, the filters, the server functions, the access rule and the tests.
-- `kit update <block>` joins three things: the block as it was copied, the block as it is now, and the app's own
-  version. What does not join cleanly goes to the agent, which then runs the block's checks.
+- `kit update <block>` joins three things: the block's source as it was copied (kept untouched in the app under
+  `.kit/base`, so an update needs no network and no history), the source as it is now, and the app's own version.
+  What does not join cleanly goes to the agent, which then runs the block's checks.
+- `kit upgrade` does the whole of "How an app stays current" for the core and every block at once; `kit outdated`
+  lists what it would do.
+- `kit eject <part>` takes a packaged part into the app as source, records it like any copied file, and points the
+  app's imports at the copy.
+- A block's options reach its code through one generated file, not through placeholders inside its files, so the
+  copied source stays ordinary code that joins cleanly.
 - `kit check` runs the type check, the tests, the access tests and the security list; `kit doctor` says what is
   missing in an environment (a key, a driver, a migration).
 - `kit mcp` offers find, add and check to any coding agent, so the kit is usable from Claude Code, Codex or an
@@ -287,6 +337,11 @@ how much of an app came from blocks.
 6. Pictures for the pickers: light and dark, computer and phone.
 7. Words ready to translate, and an accessibility check that passes.
 8. No dependency under a licence the kit keeps out.
+9. Its engine is in a package with a typed, documented surface, and what an app may change about it is a setting,
+   a property, a slot or an event; its copied source is thin.
+10. Each release says what changed in words for the maker, marks security fixes, brings its migrations and, for a
+    change in how something is called, a rewrite program; and the upgrade is tried on the reference apps, adapted
+    ones included, before it is released.
 
 A block short of this is marked experimental, and the guide does not offer it.
 
@@ -310,14 +365,16 @@ access rule was written, checks that confirm someone is signed in but not that t
 in the browser's code. The kit's answer is to take those decisions away from generated code.
 
 1. **Access rules live in the data layer.** Every table says who owns its rows (a person, a team, or anyone may
-   read). Route code gets a database handle already narrowed to whoever is signed in. The handle that sees
-   everything is for the admin block and for jobs, and `kit check` lists every use of it.
+   read). Route code gets a database handle already narrowed to whoever is signed in, with a handful of calls
+   (list, get, add, change, remove) and not the whole query builder, because a narrow handle is one that can be
+   made airtight: a row that is not yours behaves as if it did not exist. The handle that sees everything is for
+   the admin block and for jobs, each use says why, and `kit check` lists them. (Built and tested in Phase 0.)
 
    ```ts
-   export const projects = table('projects', { id: id(), teamId: ref(teams), name: text() }, { owner: 'team' });
+   export const projects = table('projects', { id: id(), name: text() }, { owner: 'team' });
 
    export const listProjects = serverFn({ input: z.object({}) }, async (_, ctx) =>
-     ctx.db.select().from(projects));          // only the signed-in team's rows can come back
+     ctx.db.list(projects));                   // only the signed-in team's rows can come back
    ```
 
 2. **The browser never talks to the database.** Everything goes through server functions that check their input
@@ -540,10 +597,11 @@ that can run side by side in sessions of their own; the numbers are the order I 
 | 0.11 | Measure embeddings: Hydor's model under ONNX Runtime in Node on a 1 GB server (memory, speed), against two smaller models on a retrieval set | Lead session | 0.3 | small |
 | 0.12 | Can a cheaper agent build on it: a Standard helper with only the kit's notes adds a resource to the skeleton, five times (success, time, cost) | Lead session | 0.9 | small |
 | 0.13 | Decide: the framework stays or falls back; the SQLite driver; the embedding model; the ways in | You | all | small |
+| 0.14 | Prove an update end to end: the waitlist as an engine package and thin source, in an app that adapted the source and ejected one part; a new kit version with a fix in the engine, a migration and a change to the source reaches it through `kit upgrade` with the checks green | Lead session | 0.10 | medium |
 
 **Done when** the skeleton runs inside Hydor and on a server from the same code with only configuration between
-them, a Standard helper adds a resource from the notes alone at least four times in five, and the formats have
-tests.
+them, a Standard helper adds a resource from the notes alone at least four times in five, the formats have tests,
+and an adapted app takes a new version of the kit through `kit upgrade` with nothing merged by hand.
 
 ### Phase 1: the core, the first blocks, web apps in Hydor
 
@@ -660,7 +718,8 @@ paying sellers, which Phase 6 needs and which can take a while.
 | Money and the law: tax, privacy, what makers promise their users | A hosted checkout only; Managed Payments explained; legal pages as drafts; what stays the maker's said at Launch |
 | A generated server running on your computer | Its own process, keys and folder, bubblewrap where it exists, an origin apart from Hydor's, stopped when idle, a card for what it uses |
 | It works in Hydor and not outside | The check lists what an app takes from Hydor and its stand-in; **Only inside Hydor** is said when a feature is added, not at Launch |
-| Apps drift from their blocks, and updates stop joining | A small core for fixes that must reach everyone; the three-way join with the agent behind it; a block's tests travel with it |
+| Apps drift from their blocks, and updates stop joining | Engines and interface parts are packages, updated by version with nothing to join; copied source is thin; an ejected part is the exception, counted, and a reason to add a setting or a slot; every release is tried on adapted reference apps first |
+| Packages that are hard to bend push agents to eject everything | Settings, properties, slots and events listed in each block's notes; what gets ejected is measured on the benchmark |
 | Fifty blocks to keep up | Upstream plugins before code of our own (Better Auth's, Stripe's); nightly builds; experimental blocks stay out of the guide |
 | AGPL code reaching the MIT kit | Ports are a step of their own, listed, and only of what is yours to give; the licence check on every change |
 | A build costs too much in model use | Scaffolding is a program; helpers on cheaper tiers; cost per build is a number the benchmark reports |
@@ -677,7 +736,10 @@ the share of the app's lines that came from blocks. Targets to argue with:
 - At least eight in ten briefs of a type green before that type counts as done.
 - At least seven in ten of a new app's lines from blocks and the starter, unchanged or lightly adapted.
 - No access test failing and no server key in browser code in any app that passes Launch.
-- A block's update joins by itself in eight apps of ten, and with the agent in nineteen of twenty.
+- A new version of the kit reaches a benchmark app through `kit upgrade`, checks green, with no hand and no agent
+  in nine apps of ten, and with the agent in ninety-nine of a hundred. The benchmark keeps each app as it was built
+  on the previous version to measure this.
+- At least two thirds of the code a block brings stays in its package, measured per block.
 - Every benchmark app passes its checks inside Hydor and on a server from the same code, and on Cloudflare where
   its blocks say they run there.
 - From pressing Launch to a live address with HTTPS on a fresh server in under fifteen minutes.
