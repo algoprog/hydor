@@ -55,8 +55,10 @@ def get_args(argv=None):
     p.add_argument('--flores-n', type=int, default=30)
     p.add_argument('--flores-final-n', type=int, default=100)
     p.add_argument('--early', type=int, default=200, help='the person\'s earliest messages (segments) kept as a measure')
+    p.add_argument('--first-day', type=int, default=None, help='the feature is turned on at this day: the first run reads everything written so far, no run before it')
     p.add_argument('--max-nights', type=int, default=0, help='stop after this many nights (a test)')
     p.add_argument('--lr', type=float, default=5e-4, help='the app\'s 5e-4')
+    p.add_argument('--fresh-lr', type=float, default=None, help='the lr of a fresh start (a first run, a D reset, R); default --lr')
     p.add_argument('--fixed-warmup', action='store_true', help='warm-up always --warmup steps (the app: at most a tenth of the run, so 1 to 3 steps in a short night)')
     p.add_argument('--warmup', type=int, default=50)
     p.add_argument('--micro-tokens', type=int, default=4096)
@@ -91,6 +93,8 @@ def main(argv=None):
     recs = N.load_records(a.data)
     seqs = N.AllSeqs(recs, os.path.join(a.release, 'tokenizer.json'), cache=os.path.join(os.path.dirname(a.out.rstrip('/')), '_cache', 'seqs.pkl'))
     nights = N.nights_of(recs, anchor, test_from, a.step_days)
+    if a.first_day is not None:
+        nights = [n for n in nights if n[0] >= a.first_day]
     if a.arm == 'R':
         nights = [(nights[-1][0], [ri for _, rs in nights for ri in rs])]
     replay = N.load_replay(a.release)
@@ -177,7 +181,7 @@ def main(argv=None):
                 backup = {k: v.detach().clone() for k, v in model.state_dict().items()}
             rec['fresh'] = bool(fresh)
             rec['new_tokens'] = int(sum(len(s.ids) - 1 for s in train_seqs))
-            r = N.train_run(model, train_seqs, replay, seed=seed, device=device, st=stt, micro_tokens=a.micro_tokens, fixed_warmup=a.fixed_warmup)
+            r = N.train_run(model, train_seqs, replay, seed=seed, device=device, st=(T.Settings(bf16=bf16, lr=a.fresh_lr, warmup=a.warmup) if (fresh and a.fresh_lr) else stt), micro_tokens=a.micro_tokens, fixed_warmup=a.fixed_warmup and not fresh)
             rec.update({k: r[k] for k in ('steps', 'tokens', 'seconds', 'skipped', 'loss_first', 'loss_last')})
         t1 = time.time()
         new_pub = pub()
