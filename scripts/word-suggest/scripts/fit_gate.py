@@ -58,14 +58,19 @@ def switch_pass(a, g, tok, tb, sc, var, exs, other):
             h[name][1] += c.get("acc_n@1", 0)
         if (i + 1) % 20 == 0:
             print(f"# switch pass {i + 1}/{len(exs)} {time.time() - t0:.0f}s", file=sys.stderr, flush=True)
-    choice, rows = {}, []
+    base = mix.Gate.load(a.switch_base) if a.switch_base else None
+    choice, rows, evidence = (dict(base.switch) if base else {}), [], {}
     for lang, h in sorted(hits.items()):
         n = max(h["llm"][1], 1)
         al, am = h["llm"][0] / n, h["mix"][0] / n
-        choice[lang] = "mix" if am > al else "llm"
+        if h["llm"][1] >= a.switch_min_words:
+            choice[lang] = "mix" if am > al else "llm"
         rows.append((lang, al, am))
-    g.switch, g.switch_default = choice, "mix"
-    g.meta = dict(g.meta, lang_switch=True, switch_criterion="acc@1 on the fitting examples, a tie goes to the LLM")
+        evidence[lang] = [h["llm"][1], round(al, 4), round(am, 4), choice.get(lang, "default") if h["llm"][1] >= a.switch_min_words else "kept"]
+    g.switch, g.switch_default = choice, (base.switch_default if base else "mix")
+    g.meta = dict(g.meta, lang_switch=True, switch_criterion="acc@1 on the fitting examples, a tie goes to the LLM",
+                  switch_base=os.path.basename(a.switch_base) if a.switch_base else None, switch_min_words=a.switch_min_words,
+                  switch_evidence=evidence)
     os.makedirs(os.path.dirname(os.path.abspath(a.out_switch)), exist_ok=True)
     g.save(a.out_switch)
     tot = sum(h["llm"][1] for h in hits.values())
@@ -90,6 +95,10 @@ def main(argv=None):
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--device", default="cpu", help="cpu | cuda | cuda:N (cuda: .venv-gpu; WS_GPU_MEM_GB caps the memory)")
     ap.add_argument("--l2", type=float, default=1e-3)
+    ap.add_argument("--dump-features", default=None, metavar="FILE", help="save the positions' features and gold log-probs (torch file) after collecting them")
+    ap.add_argument("--features-in", default=None, metavar="FILE", help="fit from a --dump-features file instead of running the models (no --lang-switch)")
+    ap.add_argument("--sources", default=None, help="with --features-in: only the positions of these sources (a comma list of surface or record source, e.g. wildchat:dev)")
+    ap.add_argument("--langs", default=None, help="with --features-in: only the positions of these languages (comma list of codes)")
     ap.add_argument("--lambdas", default="0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9")
     ap.add_argument("--out", required=True, help="gate JSON to write (with --per-lang: with the language biases)")
     ap.add_argument("--per-lang", action="store_true", help="add a bias per language to the gate")
@@ -97,44 +106,76 @@ def main(argv=None):
     ap.add_argument("--out-global", default=None, help="also write the shared gate (no language biases) here")
     ap.add_argument("--lang-switch", action="store_true", help="per language: the LLM alone or the mix, by acc@1 on these examples")
     ap.add_argument("--out-switch", default=None, help="JSON of the language switch (needs --lang-switch)")
+    ap.add_argument("--switch-base", default=None, metavar="JSON", help="a switch to start from: only the languages with at least --switch-min-words "
+                    "scored words here are decided again, every other language keeps its choice there (and its default)")
+    ap.add_argument("--switch-min-words", type=int, default=0, help="a language with fewer scored words than this is not decided (it keeps --switch-base's "
+                    "choice, or the default 'mix')")
     a = ap.parse_args(argv)
-    setup_env(a.threads)
-    from ws.gpu import setup_device
-    device = setup_device(a.device)
-
-    from transformers import AutoTokenizer
-    from ws.scorers import llm_vocab_size
-    from ws.tokbytes import token_bytes, word_start_flags
-    tok = AutoTokenizer.from_pretrained(a.llm)
-    tb = token_bytes(tok, llm_vocab_size(a.llm))
-    other = "slm" if a.slm.lower() != "none" else "ngram"
-    sc = Scorers(a.llm, a.slm, a.ngram, a.dtype, a.threads, a.fmt, device=str(device))
-    var = parse_variant(f"llm+{other}:linear:0.5")
-    sc.check([var])
-    exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words, plain_split=a.plain_split)
-    if not exs:
-        raise SystemExit("no examples")
-
+    if a.features_in and a.lang_switch:
+        raise SystemExit("--lang-switch needs the models: run it without --features-in")
     if a.lang_switch and not a.out_switch:
         raise SystemExit("--lang-switch needs --out-switch")
-    F, GL, GS, EX, NBYTES, LANG = [], [], [], [], [], []
-    t0 = time.time()
-    for i, ex in enumerate(exs):
-        r = sc.rows(ex, [var])
-        llm_lp, slm_lp, unk = r["llm"], r[other + "+"], r.get("unk:" + other)
-        feats = mix.gate_features(llm_lp, slm_lp, unk, word_start_flags(tb, ex.target_ids))[:-1]
-        n = len(ex.target_ids)
-        idx = torch.arange(n, device=llm_lp.device)
-        gold = torch.tensor(ex.target_ids, device=llm_lp.device)
-        F.append(feats.cpu())
-        GL.append(llm_lp[idx, gold].cpu())
-        GS.append(slm_lp[idx, gold].cpu())
-        EX.append(torch.full((n,), i))
-        LANG.extend([ex.lang] * n)
-        NBYTES.append(len(ex.target.encode("utf-8")))
-        if (i + 1) % 20 == 0:
-            print(f"# {i + 1}/{len(exs)} {time.time() - t0:.0f}s", file=sys.stderr, flush=True)
-    F, GL, GS, EX = torch.cat(F), torch.cat(GL), torch.cat(GS), torch.cat(EX)
+    if a.features_in:
+        d = torch.load(a.features_in)
+        if "ids" in d:                      # the email surfaces share a name: tell Enron and Sinabis by the record id
+            d["SRC"] = [x if x != "email" else ("sinabis" if "sinabis" in d["ids"][e] else "enron") for x, e in zip(d["SRC"], d["EX"].tolist())]
+        keep = torch.ones(len(d["F"]), dtype=torch.bool)
+        if a.sources:
+            keep &= torch.tensor([s in a.sources.split(",") for s in d["SRC"]])
+        if a.langs:
+            keep &= torch.tensor([l in a.langs.split(",") for l in d["LANG"]])
+        idx = keep.nonzero().squeeze(1).tolist()
+        F, GL, GS, EX = d["F"][keep], d["GL"][keep], d["GS"][keep], d["EX"][keep]
+        LANG = [d["LANG"][i] for i in idx]
+        SRC = [d["SRC"][i] for i in idx]
+        kept_ex = sorted(set(EX.tolist()))
+        remap = {e: i for i, e in enumerate(kept_ex)}
+        EX = torch.tensor([remap[e] for e in EX.tolist()])
+        NBYTES = [d["NBYTES"][e] for e in kept_ex]
+        other = "slm"
+        exs = [None] * len(kept_ex)
+        a.slm = a.slm if a.slm.lower() != "none" else d.get("slm", "none")
+    else:
+        setup_env(a.threads)
+        from ws.gpu import setup_device
+        device = setup_device(a.device)
+
+        from transformers import AutoTokenizer
+        from ws.scorers import llm_vocab_size
+        from ws.tokbytes import token_bytes, word_start_flags
+        tok = AutoTokenizer.from_pretrained(a.llm)
+        tb = token_bytes(tok, llm_vocab_size(a.llm))
+        other = "slm" if a.slm.lower() != "none" else "ngram"
+        sc = Scorers(a.llm, a.slm, a.ngram, a.dtype, a.threads, a.fmt, device=str(device))
+        var = parse_variant(f"llm+{other}:linear:0.5")
+        sc.check([var])
+        exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words, plain_split=a.plain_split)
+        if not exs:
+            raise SystemExit("no examples")
+
+        F, GL, GS, EX, NBYTES, LANG, SRC = [], [], [], [], [], [], []
+        t0 = time.time()
+        for i, ex in enumerate(exs):
+            r = sc.rows(ex, [var])
+            llm_lp, slm_lp, unk = r["llm"], r[other + "+"], r.get("unk:" + other)
+            feats = mix.gate_features(llm_lp, slm_lp, unk, word_start_flags(tb, ex.target_ids))[:-1]
+            n = len(ex.target_ids)
+            idx = torch.arange(n, device=llm_lp.device)
+            gold = torch.tensor(ex.target_ids, device=llm_lp.device)
+            F.append(feats.cpu())
+            GL.append(llm_lp[idx, gold].cpu())
+            GS.append(slm_lp[idx, gold].cpu())
+            EX.append(torch.full((n,), i))
+            LANG.extend([ex.lang] * n)
+            SRC.extend([(ex.meta or {}).get("source") or ex.surface] * n)
+            NBYTES.append(len(ex.target.encode("utf-8")))
+            if (i + 1) % 20 == 0:
+                print(f"# {i + 1}/{len(exs)} {time.time() - t0:.0f}s", file=sys.stderr, flush=True)
+        F, GL, GS, EX = torch.cat(F), torch.cat(GL), torch.cat(GS), torch.cat(EX)
+        if a.dump_features:
+            os.makedirs(os.path.dirname(os.path.abspath(a.dump_features)), exist_ok=True)
+            torch.save(dict(F=F, GL=GL, GS=GS, EX=EX, LANG=LANG, SRC=SRC, NBYTES=NBYTES, slm=a.slm, llm=a.llm,
+                            ids=[e.id for e in exs]), a.dump_features)
     N = len(F)
     nb = torch.tensor(NBYTES, dtype=torch.double)
 
@@ -157,12 +198,24 @@ def main(argv=None):
     g = mix.fit_gate(F, GL, GS, a.l2)
     g.meta = dict(llm=a.llm, other=a.slm if other == "slm" else a.ngram, split=a.split, surface=a.surface, ctx=a.ctx,
                   fmt=a.fmt, positions=N, examples=len(exs), l2=a.l2, best_fixed_lambda=best[0])
+    if a.features_in:
+        g.meta.update(features_in=os.path.basename(a.features_in), sources=a.sources, langs=a.langs)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     if a.out_global:
         os.makedirs(os.path.dirname(os.path.abspath(a.out_global)), exist_ok=True)
         g.save(a.out_global)
     gl = torch.logaddexp(GL + torch.log(g.lam(F).double().float()), GS.clamp_min(-60) + torch.log1p(-g.lam(F)))
     stats("gate_fit_on_all (optimistic)", gl)
+    groups: dict = {}
+    for i, key in enumerate(zip(SRC, LANG)):
+        groups.setdefault(key, []).append(i)
+    for key, ix in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        if len(ix) < 3000:
+            break
+        ix = torch.tensor(ix)
+        print(json.dumps(dict(group=list(key), positions=len(ix), llm=float(GL[ix].mean()), slm=float(GS[ix].clamp_min(-60).mean()),
+                              gate=float(gl[ix].double().mean()),
+                              fixed_0_5=float(torch.logaddexp(GL[ix] + math.log(0.5), GS[ix].clamp_min(-60) + math.log(0.5)).mean()))), flush=True)
     gp = None
     if a.per_lang:
         gp = mix.fit_gate(F, GL, GS, a.l2, langs=LANG, lang_l2=a.lang_l2)

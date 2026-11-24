@@ -10,6 +10,12 @@ messages : data/messages_oasst2.jsonl  public: human messages to an assistant (O
 email    : data/email_enron.jsonl  public: the body an Enron employee wrote (corbt/enron-emails), cleaned; one example per email, read as
                                   text (no context, like the app's text boxes); built by data/enron_email.py. A fixed sample: --limit 0.
 
+typed_conv, typed_enron, typed_sinabis : the typed text the gate and the language switch are fitted on (split dev), made by data/typed_dev.py from the
+                                  dev parts of the typed shards of data/typed.py, which no pretraining and no test holds: data/typed_dev_conv.jsonl (what
+                                  people typed to an assistant, WildChat, in the layout of messages: surface 'messages'), typed_dev_enron.jsonl (Enron email
+                                  of writers who are not in the public email test: surface 'email') and typed_dev_sinabis.jsonl (synthetic email in four
+                                  languages: surface 'email'). --limit counts per language for typed_conv and typed_sinabis, for all of typed_enron.
+
 --ctx none|agent|agent+user: none clears every context; agent keeps agent_ctx (chat) and doc_ctx (doc, plain: the
 document's own context); agent+user keeps agent_ctx, user_ctx and doc_ctx.
 """
@@ -213,6 +219,9 @@ def email_candidates(path: str, split: str, ctx: str, min_words: int, lang: Opti
                                              dict(writer=r.get("writer")), paras=[text])
 
 
+# the typed text the gate and the language switch are fitted on (data/typed_dev.py): surface -> file in data/
+TYPED_SURFACES = {"typed_conv": "typed_dev_conv.jsonl", "typed_enron": "typed_dev_enron.jsonl", "typed_sinabis": "typed_dev_sinabis.jsonl"}
+
 PLAIN_SPLITS = ("all", "dev", "test")
 
 
@@ -310,7 +319,7 @@ def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "a
     plain_split: for 'plain' only, 'dev' = paragraphs with an even `idx`, 'test' = odd ones, 'all' = every one.
     agent_words, reply_cut: the agent context of chat and messages examples (chat_candidates); the defaults are the last 100 words
     of the whole reply."""
-    surfaces = ["chat", "doc", "plain"] if surface == "all" else surface.split(",")      # messages and email only by name
+    surfaces = ["chat", "doc", "plain"] if surface == "all" else surface.split(",")      # messages, email and typed_* only by name
     rng = random.Random(seed)
     out: list[Example] = []
 
@@ -333,6 +342,18 @@ def load_examples(tok, split: str = "test", surface: str = "chat", ctx: str = "a
             p = os.path.join(data_dir, "email_enron.jsonl")
             cands = list(email_candidates(p, split, ctx, min_words, lang)) if os.path.exists(p) else []
             groups = [cands]
+        elif s in TYPED_SURFACES:
+            p = os.path.join(data_dir, TYPED_SURFACES[s])
+            if not os.path.exists(p):
+                cands = []
+            elif s == "typed_conv":
+                cands = list(messages_candidates(p, split, ctx, lang, agent_words, reply_cut))
+            else:
+                cands = list(email_candidates(p, split, ctx, min_words, lang))
+            by_lang = {}
+            for c in cands:
+                by_lang.setdefault(c["lang"], []).append(c)
+            groups = [by_lang[k] for k in sorted(by_lang)] if s != "typed_enron" else [cands]
         elif s == "doc":
             p = os.path.join(data_dir, "other_texts.jsonl")
             cands = list(doc_candidates(p, split, ctx, min_words, lang)) if os.path.exists(p) else []
@@ -365,7 +386,7 @@ def add_data_args(ap, plain_split: bool = False) -> None:
         ap.add_argument("--plain-split", default="all", choices=list(PLAIN_SPLITS),
                         help="plain surface only: dev = paragraphs with an even idx, test = odd idx, all = every paragraph")
     ap.add_argument("--split", default="test", help="train|dev|test|all (plain: its whole files unless --plain-split is dev or test; flores: dev = FLORES dev, test = devtest)")
-    ap.add_argument("--surface", default="chat", help="chat|doc|plain|flores|messages|email|all or a comma list (all = chat, doc, plain; messages and email are the public tests: --limit 0)")
+    ap.add_argument("--surface", default="chat", help="chat|doc|plain|flores|messages|email|typed_conv|typed_enron|typed_sinabis|all or a comma list (all = chat, doc, plain; messages and email are the public tests: --limit 0; typed_* are the dev sets of typed text, --split dev)")
     ap.add_argument("--lang", default=None, help="only these languages (comma list)")
     ap.add_argument("--ctx", default="agent+user", choices=["none", "agent", "agent+user"])
     ap.add_argument("--limit", type=int, default=0, help="examples per surface (per language for plain and flores); 0 = all")

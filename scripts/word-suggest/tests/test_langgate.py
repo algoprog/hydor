@@ -21,6 +21,15 @@ OLD_JSON = dict(features=mix.FEATURES, w=[0.5, -0.2, 0.1, 0.3, -0.4, 0.2, 0.7], 
 
 
 class LangGate(unittest.TestCase):
+    def test_switch_reads_two_letter_codes_as_flores_codes(self):
+        g = mix.Gate(w=[0.0] * 7, b=0.0, switch={"eng_Latn": "llm", "kor_Hang": "mix", "zho_Hans": "llm"}, switch_default="mix")
+        self.assertEqual(g.choice("en"), "llm")             # a test file that says 'en' is switched as eng_Latn
+        self.assertEqual(g.choice("eng_Latn"), "llm")
+        self.assertEqual(g.choice("ko"), "mix")
+        self.assertEqual(g.choice("zh"), "llm")
+        self.assertEqual(g.choice("xx"), "mix")             # unknown: the default
+        self.assertEqual(g.choice(None), "mix")
+
     def test_old_json_loads_and_behaves_the_same(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "old.json")

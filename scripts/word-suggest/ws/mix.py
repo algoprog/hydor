@@ -8,6 +8,8 @@ from typing import Optional
 
 import torch
 
+from .langs import ISO_TO_FLORES
+
 FEATURES = ["llm_entropy", "llm_maxp", "slm_entropy", "slm_maxp", "slm_unk", "log1p_pos", "word_start"]
 
 
@@ -79,7 +81,9 @@ class Gate:
 
     def choice(self, lang: Optional[str]) -> str:
         """'llm' or 'mix' for the language switch."""
-        return self.switch.get(lang, self.switch_default)
+        if lang in self.switch or lang is None:
+            return self.switch.get(lang, self.switch_default)
+        return self.switch.get(ISO_TO_FLORES.get(lang), self.switch_default)         # 'en' as eng_Latn
 
     def save(self, path: str) -> None:
         d = dict(features=self.features, w=self.w, b=self.b, mu=self.mu, sd=self.sd, meta=self.meta)
