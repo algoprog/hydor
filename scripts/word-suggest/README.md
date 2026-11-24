@@ -366,6 +366,10 @@ email +6.5, the owner's chat +2.9, FLORES-200 (193 languages) -0.04 (no change).
 gate or switch the gain does not show beyond parity (the switch gives these languages to Qwen3.5 alone), so a gate fitted on typed
 text is the next step.
 
+The pilot became version 2 of `hydor-suggest-49m` (24 November 2026), with version 1's gate and switch and `calibration.json`
+fitted again by real decoding on FLORES-200 devtest (193 languages x 20 sentences; `mix` 0.2053, 0.3441, 0.5137 and `slm`
+0.2391, 0.3802, 0.5581 at precision 0.3, 0.4, 0.5; `llm` unchanged). Its card has the numbers.
+
 ### Fitting the gate and the switch on typed text
 
 `data/typed_dev.py` writes the held-out dev parts of the typed shards back as text (`data/typed_dev_conv.jsonl`, `typed_dev_enron.jsonl`,

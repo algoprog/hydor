@@ -19,7 +19,10 @@ chat messages, judged by decoding each suggestion as the app would and counting 
 share of right suggestions) found that the small model, pretrained on public text in 200 languages and personalised
 on the person's own writing with the public text replayed beside it, adds to Qwen3.5: through a per-language switch,
 9.0% → 10.5% of keystrokes saved over 193 languages at 40% precision; on chat, personalised and mixed through a
-learned gate, 30.5% → 31.5%. Documents are best served by Qwen3.5 alone.
+learned gate, 30.5% → 31.5%. Documents are best served by Qwen3.5 alone. Version 2 of the small model (24 November 2026)
+added a last pretraining stage on typed text (WildChat messages, Enron and Sinabis email, a third of 1 billion tokens): on
+its own it saves more on email (17.0% → 23.4%), chat (13.2% → 16.1%) and messages (23.0% → 24.0%); mixed through the
+switch on FLORES it saves 10.3% (0.2 points below version 1, at the edge of the noise), and personalised on chat 31.3%.
 
 ## The parts and where the code goes
 

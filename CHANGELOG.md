@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.111.0 · 24 November 2026
+
+A better small model for word suggestions, one that has read what people type, and model updates that download only
+what changed.
+
+- **A better word-suggestion model**: version 2 of the small model also learned from messages people typed to an
+  assistant and from email. On its own it saves more typing on email (about a third more), on chat and on messages, and
+  as much as before in other languages; mixed with the language model, it no longer costs anything on email. The model
+  that learned from your writing learns again from it at its next run, even if you have written nothing new since.
+- **Smaller model updates**: when an update brings a new version of the small model, only its changed files are
+  downloaded (about 195 MB of 314 MB), and the copy before it is removed once no copy of the app has used it for a week.
+
 ## 0.110.0 · 24 November 2026
 
 Word suggestions that keep getting better as they learn your writing, instead of slowly losing what they knew, and

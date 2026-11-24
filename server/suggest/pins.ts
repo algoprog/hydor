@@ -39,18 +39,18 @@ export const GGUF_FILES: Record<'q8' | 'q4', ModelFile> = {
  */
 export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[] } = {
   repo: 'algoprog/hydor-suggest-49m',
-  revision: 'f4408ab53c77a960df1c68d629acab56d7a0de56',
+  revision: 'db7f41395e51501c99b8896bf63c98e7e445a18b',
   files: [
     { from: 'LICENSE', name: 'LICENSE', bytes: 34_523, sha256: '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0' },
     { from: 'LICENSE.Apache-2.0', name: 'LICENSE.Apache-2.0', bytes: 11_358, sha256: 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30' },
     { from: 'NOTICE', name: 'NOTICE', bytes: 690, sha256: '97249394e99179d156041d3584a52514dd84446b1ea8d9cee94db1e2abc7ed03' },
-    { from: 'README.md', name: 'README.md', bytes: 14_927, sha256: 'f330ea42598aebc550a89ca608b99718f46cfba72ee53ec41055abb5a92b3bc0' },
-    { from: 'calibration.json', name: 'calibration.json', bytes: 313, sha256: '47b8c4fb2992cdfb561ffdb050a49c27625724e9572e4c99308db1e408dae744' },
+    { from: 'README.md', name: 'README.md', bytes: 33_519, sha256: 'f702ee4cc23a8618b8558c5d5eb4a70374d1c88c5c11b0640bfeaaff6b721991' },
+    { from: 'calibration.json', name: 'calibration.json', bytes: 318, sha256: '94c7a20c49b1d41c95fc0a3cc6f454175afaf4a3c81440343f20950a204e6068' },
     { from: 'config.json', name: 'config.json', bytes: 638, sha256: '52d3a69a5b7553138c1cea66fa873eb185c500de19fc1bbb4b081b7a1913934f' },
     { from: 'gate.json', name: 'gate.json', bytes: 887, sha256: '675f95ec6a477ff047c29d090a7dee26b4e8d28b6bb1a8b0662e73c75e48878c' },
     { from: 'lid.bin', name: 'lid.bin', bytes: 23_160_000, sha256: 'b0c735486d3699115dd1a9e05e86b09f58da309ade393621a8a20a63f16b1663' },
     { from: 'lid.json', name: 'lid.json', bytes: 4_482, sha256: '2d0c7fc81cbe0a2b098e7f05cbb7ba7a17b626a44a45c8e5b8132d85f760c04d' },
-    { from: 'model.safetensors', name: 'model.safetensors', bytes: 195_076_072, sha256: '2a7a65386ce7686801d90f2614d430464311d9f4cd1afb0a159abadc3708d5f0' },
+    { from: 'model.safetensors', name: 'model.safetensors', bytes: 195_076_072, sha256: '69a4ba215692171c2e18a31150e08c630f7b445f7381123c9517fae2e8f59424' },
     { from: 'replay/index.json', name: 'replay/index.json', bytes: 2_864_722, sha256: '341a125eb80438a50583294c4cae64fac4c045ff596a74776283edc9ca592c71' },
     { from: 'replay/replay.u32', name: 'replay/replay.u32', bytes: 80_000_628, sha256: 'f21beeda1c0d69f9571f77bf14e4e1817c900a1598e5315831f3736607285007' },
     { from: 'switch.json', name: 'switch.json', bytes: 4_555, sha256: '19afa0f370ffadc8c2805649abfa8fe69d120ff87b970368755c5279b2a918e9' },
