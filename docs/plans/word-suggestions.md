@@ -160,7 +160,7 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
    linear); `show = conf ≥ theta`; `show_next = show and conf_next ≥ theta`.
 
 A suggestion takes about 100–150 ms with the LLM at 4 threads; with the small model alone, median 20 ms and 90th percentile 53 ms at 4 threads
-(32 and 80 ms at 1; PyTorch took 59 and 150 ms), a worker of about 610 MB (PyTorch: 905 MB) that is ready to answer in about 2 s.
+(32 and 80 ms at 1; PyTorch took 59 and 150 ms), a worker of about 610 MB (PyTorch: 905 MB) that is ready to answer in about 2 s. With a personal model both small models stay loaded (a second set of weights, 250 MB): the worker is then about 830 MB, as against about 575 MB with one.
 
 ### Personalising (`server/suggest/py/train.py`)
 
