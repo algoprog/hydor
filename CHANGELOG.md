@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.109.0 · 24 November 2026
+
+Hydor shows you what it can do: tips for the features people miss, a page of them in Help, and a tour that brings in
+what ChatGPT or Claude know about you.
+
+- **What Hydor can do**: Help's first page now starts with the features people miss most (Bring in, apps and making
+  your own, answer cards, word suggestions, documents, deep research, work that runs by itself, goals, Experiments,
+  your phone and, in the desktop apps, the browser). Each has a line on what it does, a request to put in the message
+  box or the place to open, and **How it works**. The search box finds it as **What Hydor can do**.
+- **Coming from ChatGPT or Claude?**: the welcome tour now asks everyone, not only those with another agent on their
+  computer. It says how to ask ChatGPT or Claude for the export they email you, and opens **Bring in**, which turns it
+  into notes you pick from.
+- **Apps in the tour**: a new step shows **Apps** in the sidebar, what an app is, and three requests to try. The tour
+  also mentions the grey word suggestions and **Experiments**, and its last page has **See what Hydor can do**.
+  Start it again from Help with **Take the tour**.
+- **Six new tips**: the first time you see grey word suggestions, **Experiments**, an answer card in a reply, an app's
+  card in a conversation, **Make an app**, or the panel beside the conversation, a short tip says what it is and how
+  to use it. Taking a suggestion with Tab counts as using it.
+
 ## 0.108.0 · 23 November 2026
 
 Every document an agent makes opens beside the conversation as it is written, files included, with a button that shows it
