@@ -49,7 +49,11 @@ def switch_pass(a, g, tok, tb, sc, var, exs, other):
     hits: dict = {}
     t0 = time.time()
     for i, ex in enumerate(exs):
-        r = sc.rows(ex, [var])
+        try:
+            r = sc.rows(ex, [var])
+        except torch.OutOfMemoryError:             # a very long example on a capped GPU: free what is cached and try once more
+            torch.cuda.empty_cache()
+            r = sc.rows(ex, [var])
         lp_mix = mix.gate(r["llm"], r[other + "+"], g, r.get("unk:" + other), word_start_flags(tb, ex.target_ids))
         h = hits.setdefault(ex.lang, dict(llm=[0, 0], mix=[0, 0]))
         for name, lp in (("llm", r["llm"]), ("mix", lp_mix)):
@@ -95,6 +99,8 @@ def main(argv=None):
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--device", default="cpu", help="cpu | cuda | cuda:N (cuda: .venv-gpu; WS_GPU_MEM_GB caps the memory)")
     ap.add_argument("--l2", type=float, default=1e-3)
+    ap.add_argument("--extra", default=None, metavar="SURFACE:LIMIT[,..]", help="more examples fitted together with --surface's (same --split, --ctx, "
+                    "--seed): each SURFACE with its own --limit, e.g. flores:15 to fit on FLORES dev as well")
     ap.add_argument("--dump-features", default=None, metavar="FILE", help="save the positions' features and gold log-probs (torch file) after collecting them")
     ap.add_argument("--features-in", default=None, metavar="FILE", help="fit from a --dump-features file instead of running the models (no --lang-switch)")
     ap.add_argument("--sources", default=None, help="with --features-in: only the positions of these sources (a comma list of surface or record source, e.g. wildchat:dev)")
@@ -150,6 +156,9 @@ def main(argv=None):
         var = parse_variant(f"llm+{other}:linear:0.5")
         sc.check([var])
         exs = load_examples(tok, a.split, a.surface, a.ctx, a.limit, a.seed, a.lang, a.data, a.min_words, plain_split=a.plain_split)
+        for part in (a.extra.split(",") if a.extra else []):
+            surf, lim = part.split(":")
+            exs += load_examples(tok, a.split, surf, a.ctx, int(lim), a.seed, a.lang, a.data, a.min_words)
         if not exs:
             raise SystemExit("no examples")
 

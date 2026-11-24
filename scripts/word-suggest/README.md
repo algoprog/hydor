@@ -366,6 +366,36 @@ email +6.5, the owner's chat +2.9, FLORES-200 (193 languages) -0.04 (no change).
 gate or switch the gain does not show beyond parity (the switch gives these languages to Qwen3.5 alone), so a gate fitted on typed
 text is the next step.
 
+### Fitting the gate and the switch on typed text
+
+`data/typed_dev.py` writes the held-out dev parts of the typed shards back as text (`data/typed_dev_conv.jsonl`, `typed_dev_enron.jsonl`,
+`typed_dev_sinabis.jsonl`; surfaces `typed_conv`, `typed_enron`, `typed_sinabis`, `--split dev`): 10,680 typed WildChat turns in 58 languages
+(417k words; English 4,954 turns, Chinese 2,180, Russian 1,514, French 424, Spanish 347, Arabic 228), 129 Enron emails of writers who are
+not in the public email test (11.6k words), and 1,043 Sinabis emails (not used for the fit: the model trained on that generator's train part
+and is far too good on it). None of it is in the pilot's training, a public test or FLORES. `fit_gate.py --surface typed_conv,typed_enron
+--limit 1000 [--extra flores:15] --lang-switch --out-switch F [--switch-base FLORES_switch.json --switch-min-words 3000]` fits the gate and
+the switch on it (the languages with at least that many scored words are decided again, the others keep the base's choice);
+`--dump-features` and `--features-in` fit again from saved positions without the models, and `gate_check.py` scores gates by acc@1 and
+log-likelihood. The switch reads a two-letter language code (`en`) as its FLORES code.
+
+Real decoding, keystrokes saved at precision 0.4 (paired 95% interval of the difference from Qwen3.5 alone in brackets; the threshold is picked on
+each file's test events as in `show_filter.py --compare-real`; FLORES-200 devtest, 193 spaced languages, 20 sentences each, a quarter of the
+examples):
+
+| | messages | email | owner's chat | FLORES (per-language mean) |
+|---|---|---|---|---|
+| Qwen3.5 alone | 38.3 | 33.1 | 30.5 | 9.3 |
+| the app today (released model, FLORES gate and switch) | 38.3 (+0.0) | 33.1 (+0.0) | 30.5 (+0.0) | 10.5 (+1.15) |
+| pilot, FLORES gate and switch | 38.3 (+0.0) | 33.1 (+0.0) | 30.5 (+0.0) | 10.4 (+1.12) |
+| pilot, typed gate and switch | 39.1 (+0.8 [0.0, 1.2]) | 33.4 (+0.3 [0.05, 0.9]) | 29.2 (-1.4 [-2.0, -0.7]) | 10.0 (+0.70) |
+| pilot, FLORES + typed gate and switch | 38.8 (+0.5 [-0.3, 0.9]) | 33.4 (+0.4 [0.06, 1.0]) | 28.9 (-1.6 [-2.3, -1.1]) | 10.3 (+0.93) |
+| released model, typed gate, FLORES switch | = Qwen3.5 alone | = Qwen3.5 alone | = Qwen3.5 alone | 9.4 (+0.09) |
+
+The typed gate moves the pilot's mix a little forward on messages and email, loses on the owner's chat and takes back a third of the mix's
+gain on FLORES (-0.45 [-0.55, -0.35] against the app today); the released model's typed gate gives the small model so little weight that
+FLORES loses its whole gain. Teacher-forced next-word accuracy of the mix is that of Qwen3.5 on messages and email and 0.8 points lower on
+the owner's chat, although the log-likelihood is better everywhere: the gate improves probabilities, hardly the first guess.
+
 ## Licence
 
 AGPL-3.0-only, like the rest of the repository. The model's tokenizer is Qwen3.5's, unchanged, under Apache-2.0
