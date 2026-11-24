@@ -2,6 +2,8 @@
 
 Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and a Library. Your memory and the skills you made in other agents come over when you switch. Checked 10 November 2026.
 
+Coming from the ChatGPT or Claude app? See [Hydor vs the ChatGPT and Claude apps](chatgpt-and-claude.md). The table below compares agent apps.
+
 ## Hydor beside the others
 
 Hydor does every row. The others do the parts their own pages describe, and each page below has the sources for its column.
@@ -29,6 +31,7 @@ On top of this, Hydor has a **Library** of documents, slides, spreadsheets, LaTe
 
 ## The pages
 
+- **[Hydor vs the ChatGPT and Claude apps](chatgpt-and-claude.md)**: your Claude and ChatGPT plans in one app, any model, one memory you can bring theirs into, and everything on your own computer.
 - **[Hydor vs Hermes Agent](hermes-agent.md)**: the official Claude Code on your plan, one memory for every agent and a phone app.
 - **[Hydor vs pi](pi.md)**: approvals, a phone app and a memory built in.
 - **[Hydor vs Atomic Agent](atomic-agent.md)**: your memory and skills come over, and local models work in Hydor too.
