@@ -3,15 +3,17 @@
 // its folder. Save writes the file again in its own format (server/pages/filemodel.ts). What the editor cannot keep of
 // a file (a Word file's headers and footers, say) is said above it before anything changes, and asked about the first
 // time it is saved over; a Word or Excel file's first save puts the file as it was in the Trash. Changes made to the
-// file meanwhile (an agent, a terminal) come in while nothing is changed here, and are asked about otherwise. A LaTeX
+// file meanwhile (an agent, a terminal) come in while nothing is changed here, in the editor as it is (its place kept),
+// and are asked about otherwise; beside a session's conversation, that agent's edits of a LaTeX file show in it as they
+// are written (pages/liveEdits.ts). A LaTeX
 // file's comments, which the app keeps beside it, come in as an agent answers them, and are kept when it is saved; on
 // the Files page, Resolve with AI asks an agent about them through its Ask panel (askFileNow).
 // Its text, or its preview, is in the ⋯ menu, as the file showed before.
-import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileCode2, FolderOpen, MessageSquarePlus, RotateCcw, SquareTerminal, TriangleAlert } from 'lucide-react';
 import { editorKindOf, type FileOpened, type FileSaved } from '@shared/documents';
 import type { PagesEvent } from '@shared/pages';
-import { TEX_MAIN } from '@shared/latex';
+import { TEX_MAIN, type TexDoc } from '@shared/latex';
 import type { Workbook } from '@shared/sheets';
 import { api, ApiError, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
@@ -29,6 +31,8 @@ import { useSpaceMenu } from './SpaceMenu';
 import { askFileNow, useFileAsk, useWatchMs } from './FileAsk';
 import { useAskRun } from '../guide/ask';
 import { useCommentAi } from '../pages/common/commentAi';
+import { useAgentEdits } from '../pages/liveEdits';
+import type { LiveDraft } from '../pages/kinds';
 
 /** What of a Word file the document editor does not keep, in words (the server's keys). */
 const DOC_LOST: Record<string, string> = {
@@ -122,8 +126,12 @@ export function FileInEditor({
   const delimited = ext === 'csv' || ext === 'tsv';
   const office = ext === 'docx' || ext === 'xlsx';
   const [opened, setOpened] = useState<FileOpened | null>(null);
-  // Each time the file is read again, the editor starts again from it.
+  // Each time the file is read again, the editor takes it in where it is (its place kept); read again to leave the
+  // changes made here (Reload), it starts afresh.
   const [round, setRound] = useState(0);
+  const [epoch, setEpoch] = useState(0);
+  // When the file was last read (Date.now()): an agent's edit that has run is in what was read after it.
+  const [readAt, setReadAt] = useState(0);
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
@@ -160,7 +168,7 @@ export function FileInEditor({
   );
   useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (afresh = false) => {
     try {
       const f = await api<FileOpened>(`/api/pages/file?path=${encodeURIComponent(path)}`);
       times.current = { mtime: f.mtime, files: f.tex?.files };
@@ -168,6 +176,8 @@ export function FileInEditor({
       setIncoming(undefined);
       setOpened(f);
       setRound((n) => n + 1);
+      if (afresh) setEpoch((n) => n + 1);
+      setReadAt(Date.now());
       setDirty(false);
       setChanged(false);
     } catch (e) {
@@ -295,6 +305,9 @@ export function FileInEditor({
         return true;
       }
       times.current = { mtime: r.mtime, files: r.files ?? times.current.files };
+      // What was saved is the file now (an agent's edit that comes next is made on it); the editor keeps its own.
+      setOpened((o) => (o ? { ...o, model, mtime: r.mtime } : o));
+      setReadAt(Date.now());
       if (r.comments) {
         // Kept merged with what an agent did meanwhile: the editor takes that in once it has the save in hand.
         const merged = r.comments;
@@ -422,7 +435,7 @@ export function FileInEditor({
       {changed && (
         <Band>
           <span className="min-w-0 flex-1">The file changed on disk since you opened it.</span>
-          <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={() => void load()}>
+          <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={() => void load(true)}>
             Reload (discard mine)
           </Button>
           <Button size="sm" variant="danger" onClick={() => saveAs({ force: true })}>
@@ -463,13 +476,26 @@ export function FileInEditor({
     </>
   );
 
+  // A LaTeX file an agent is editing beside its session's conversation: its version as the edits come, in the editor's
+  // own way of showing an agent's version (read-only, its caret where the words arrive).
+  const texModel = kind === 'tex' && opened?.tex ? (opened.model as TexDoc) : null;
+  const texName = opened?.tex ? (opened.tex.open === TEX_MAIN || opened.tex.open === opened.tex.main ? TEX_MAIN : opened.tex.open) : TEX_MAIN;
+  const texText = texModel ? (texName === TEX_MAIN ? texModel.main : (texModel.files.find((f) => f.name === texName)?.text ?? null)) : null;
+  const agent = useAgentEdits(texText != null ? path : null, texText, readAt, { mtime: opened?.mtime, off: dirty });
+  const live = useMemo((): LiveDraft<TexDoc> | null => {
+    if (!texModel || !agent || agent.text === null) return null;
+    const model = texName === TEX_MAIN ? { ...texModel, main: agent.text } : { ...texModel, files: texModel.files.map((f) => (f.name === texName ? { ...f, text: agent.text! } : f)) };
+    return { model, mark: agent.writing && !agent.placing ? { kind: 'tex', file: texName, at: agent.to } : null, done: !agent.writing, n: agent.n };
+  }, [texModel, texName, agent]);
+
   const Editor = EDITORS[kind];
   return (
     <div className={cx('flex h-full min-h-0 flex-col', mobile && !embedded && 'pt-[var(--safe-top)]')}>
       {opened && Editor ? (
         <Editor
-          key={`${path}:${round}`}
+          key={`${path}:${epoch}`}
           doc={{ key: `${path}:${round}`, title: basename(path), model: opened.model }}
+          live={live}
           pageId=""
           layout={mobile ? 'sheet' : 'page'}
           readOnly={!!opened.cut}

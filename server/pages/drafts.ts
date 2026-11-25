@@ -7,8 +7,12 @@
 // deck, a spreadsheet, a LaTeX document or a diagram being saved (save_doc, save_slides, save_sheet, save_latex, save_diagram) it sends the
 // call's input itself as it grows, to the session's pages and to an editor that has that page open (subscribed to
 // page:<id>), which read it (shared/partial-json.ts) and show the version being written (shared/page-drafts.ts); once
-// the call has run, the draft says which version it saved, or that it saved nothing, and the page shows that. Agents
-// that hand over whole calls only (Codex, ACP) show the page once the call is there.
+// the call has run, the draft says which version it saved, or that it saved nothing, and the page shows that. An edit
+// of one of those files (Edit, MultiEdit: some words of it replaced) goes the same way, its input as it grows, for the
+// panel that shows the file to make the change in it as it comes (shared/file-edits.ts); once it has run, the draft
+// says so, and whether it failed. Agents that hand over whole calls only (Codex, ACP) show the page once the call is
+// there.
+import fs from 'node:fs';
 import { isStreamedDoc } from '../../shared/documents.ts';
 import type { PageDraft, PagesEvent } from '../../shared/pages.ts';
 import type { Deps } from '../features/types.ts';
@@ -22,6 +26,8 @@ export interface ToolStream {
   delta?: string;
   /** At the end: the whole input. */
   input?: Record<string, unknown>;
+  /** With the result: the answer was an error (the tool failed, or was refused). */
+  error?: boolean;
 }
 
 const PAGE_TOOL = /^mcp__(?:hydor|naget-agent|agent-console)__(show_html|save_page|save_doc|save_slides|save_sheet|save_latex|save_diagram)$/;
@@ -30,11 +36,16 @@ const HTML_FILE = /\.html?$/i;
 type Kind = PageDraft['tool'];
 /** Saves of another kind than a page of HTML: their drafts are the call's input as it comes. */
 const MODEL = new Set<Kind>(['save_doc', 'save_slides', 'save_sheet', 'save_latex', 'save_diagram']);
+/** Drafts that are the call's input itself, as it comes: those saves, and an edit of a file. */
+const RAW = new Set<Kind>([...MODEL, 'edit']);
+/** Calls that change a saved page: an editor with that page open hears of them, from whichever session. */
+const SAVES = new Set<Kind>([...MODEL, 'save_page']);
 
 /** Which calls draw a page as they come, and the fields that say what it is. */
 function kindOf(name: string): Kind | null {
   const m = PAGE_TOOL.exec(name);
   if (m) return m[1] as Kind;
+  if (name === 'Edit' || name === 'MultiEdit') return 'edit';
   return name === 'Write' ? 'file' : null;
 }
 
@@ -179,11 +190,14 @@ const drafts = new Map<string, Map<string, Draft>>();
 const SEND_MS = 140;
 /** A finished draft stays this long, for pages that ask for it late. */
 const KEEP_MS = 120_000;
+/** An edit whose call is whole stays at most this long while it has not run (waiting for the user's OK, say). */
+const EDIT_KEEP_MS = 30 * 60_000;
 
 const FIELDS: Record<Kind, Set<string>> = {
   show_html: new Set(['title', 'html']),
   save_page: new Set(['id', 'title', 'html']),
   file: new Set(['file_path', 'content']),
+  edit: new Set(['file_path']),
   save_doc: new Set(['id', 'title']),
   save_slides: new Set(['id', 'title']),
   save_sheet: new Set(['id', 'title']),
@@ -197,8 +211,8 @@ const followed = (path: string) => HTML_FILE.test(path) || isStreamedDoc(path);
 /** A file's path has come whole (it comes in pieces, like the rest of the call). */
 const named = (d: Draft) => !!d.path && (d.done || d.json.ended.has('file_path'));
 
-/** A file draft shows once its path says it is one of those. */
-const showable = (d: Draft) => d.tool !== 'file' || (named(d) && followed(d.path!));
+/** A file's draft (written whole, or edited) shows once its path says it is one of those. */
+const showable = (d: Draft) => (d.tool !== 'file' && d.tool !== 'edit') || (named(d) && followed(d.path!));
 
 const info = (d: Draft): Omit<PageDraft, 'text'> => ({
   id: d.id,
@@ -212,6 +226,8 @@ const info = (d: Draft): Omit<PageDraft, 'text'> => ({
   seq: d.seq,
   ...(d.saved ? { saved: d.saved } : {}),
   ...(d.failed ? { failed: true } : {}),
+  ...(d.ran ? { ran: true } : {}),
+  ...(d.mtime !== undefined ? { mtime: d.mtime } : {}),
 });
 
 function send(deps: Deps, d: Draft) {
@@ -220,13 +236,14 @@ function send(deps: Deps, d: Draft) {
   if (!showable(d)) return;
   const from = d.started ? d.sent : 0;
   d.seq++;
-  const data: PagesEvent = { what: 'draft', draft: info(d), from, text: d.text.slice(from) };
+  // An edit goes as an event of its own, which a page of an older version of the app (not reloaded since) leaves alone.
+  const data: PagesEvent = { what: d.tool === 'edit' ? 'edit-draft' : 'draft', draft: info(d), from, text: d.text.slice(from) };
   d.started = true;
   d.sent = d.text.length;
   const e = { t: 'feature', id: 'pages', key: d.key, data } as const;
   deps.toSubscribers(d.key, e);
   // An editor with the page open hears of a save of it too, from whichever session it comes.
-  if (MODEL.has(d.tool) && d.pageId) deps.toSubscribers(`page:${d.pageId}`, e);
+  if (SAVES.has(d.tool) && d.pageId) deps.toSubscribers(`page:${d.pageId}`, e);
 }
 
 function later(deps: Deps, d: Draft) {
@@ -242,6 +259,8 @@ function read(d: Draft) {
   } else if (d.tool === 'file') {
     d.path = f.get('file_path') ?? d.path;
     d.text = f.get('content') ?? '';
+  } else if (d.tool === 'edit') {
+    d.path = f.get('file_path') ?? d.path;
   } else {
     d.title = f.get('title') ?? d.title;
     d.pageId = f.get('id') ?? d.pageId;
@@ -268,6 +287,31 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
   }
   const d = m?.get(e.id);
   if (e.at === 'result') {
+    // An edit has run: the file has it now, or it failed (its words were not found, or it was refused).
+    if (d?.tool === 'edit') {
+      if (d.ran || d.failed) return;
+      setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+      d.done = true;
+      if (e.error) d.failed = true;
+      else {
+        d.ran = true;
+        // The file's time once it has the edit (as the file routes give it): a page that read it since has the edit.
+        try {
+          if (d.path) d.mtime = Math.floor(fs.statSync(d.path).mtimeMs);
+        } catch {}
+      }
+      send(deps, d);
+      return;
+    }
+    // A page of HTML saved again whose call failed saved nothing: the page shows as it was.
+    if (d?.tool === 'save_page' && e.error) {
+      if (d.failed) return;
+      if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+      d.done = true;
+      d.failed = true;
+      send(deps, d);
+      return;
+    }
     // Answered without saving (a save that ran has settled its draft by now): the page stays as it was.
     if (!d || !MODEL.has(d.tool) || d.saved || d.failed) return;
     if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
@@ -277,11 +321,13 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
     return;
   }
   if (!d || d.done) return;
-  if (e.at === 'delta' && MODEL.has(d.tool)) {
+  if (e.at === 'delta' && RAW.has(d.tool)) {
     if (!e.delta) return;
-    // The input itself, as it comes: the pages read it (its id and title are read here too).
+    // The input itself, as it comes: the pages read it (its id and title, or the file an edit changes, are read here too).
     d.text += e.delta;
     if (d.json.feed(e.delta).size) read(d);
+    // An edit of any other file is no document's: it is not followed further.
+    if (d.tool === 'edit' && named(d) && !followed(d.path!)) return forget(key, d.id);
     later(deps, d);
     return;
   }
@@ -306,6 +352,9 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
     if (id && /^[a-f0-9]{10}$/.test(id)) d.pageId = id;
     // What came in pieces is the input already; a driver that told nothing before the end gives it whole here.
     if (!d.text) d.text = JSON.stringify(input);
+  } else if (d.tool === 'edit') {
+    d.path = str('file_path') ?? d.path;
+    if (!d.text) d.text = JSON.stringify(input);
   } else if (d.tool === 'file') {
     d.path = str('file_path') ?? d.path;
     if (str('content') !== undefined) d.text = str('content')!;
@@ -318,7 +367,8 @@ export function feedDraft(deps: Deps, key: string, e: ToolStream) {
   if (!d.text.startsWith(streamed)) d.started = false;
   d.done = true;
   send(deps, d);
-  setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+  // An edit is kept until it has run (it may wait for the user's OK a long while), and a while after.
+  setTimeout(() => forget(key, d.id), d.tool === 'edit' ? EDIT_KEEP_MS : KEEP_MS).unref();
 }
 
 /** The turn ended or the agent stopped: drafts still open stop where they are; a save that never ran saved nothing. */
@@ -327,10 +377,12 @@ export function endDrafts(deps: Deps, key: string) {
   if (!m) return;
   for (const d of m.values()) {
     const unsaved = MODEL.has(d.tool) && !d.saved && !d.failed;
-    if (d.done && !unsaved) continue;
-    if (!d.done) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
+    // An edit that never ran changed nothing.
+    const unrun = d.tool === 'edit' && !d.ran && !d.failed;
+    if (d.done && !unsaved && !unrun) continue;
+    if (!d.done || unrun) setTimeout(() => forget(key, d.id), KEEP_MS).unref();
     d.done = true;
-    if (unsaved) d.failed = true;
+    if (unsaved || unrun) d.failed = true;
     send(deps, d);
   }
 }
@@ -365,6 +417,6 @@ export function draftsOf(key: string): PageDraft[] {
 /** The saves of a page being written now (from any session), whole: an editor that opens it mid-way. */
 export function draftsOfPage(pageId: string): PageDraft[] {
   const out: PageDraft[] = [];
-  for (const m of drafts.values()) for (const d of m.values()) if (MODEL.has(d.tool) && d.pageId === pageId) out.push(whole(d));
+  for (const m of drafts.values()) for (const d of m.values()) if (SAVES.has(d.tool) && d.pageId === pageId) out.push(whole(d));
   return out;
 }

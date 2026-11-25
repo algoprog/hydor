@@ -2,7 +2,8 @@
 // session's conversation or over everything: the file as the file window shows it (FileView: its editor or its preview,
 // which reads it again as an agent or a command changes it), under the panel's own top line. While an agent writes it
 // whole as text (a Write call coming in, server/pages/drafts.ts), its text shows as it comes: Markdown as it will look,
-// anything else as it is written. Once the call has run, the file itself takes its place.
+// anything else as it is written. Once the call has run, the file itself takes its place. While the agent edits it
+// (Edit), the file shows each change as it is written, in place (liveEdits.ts).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { kindLabel } from '@shared/documents';
 import type { PageDraft } from '@shared/pages';
@@ -15,6 +16,7 @@ import { FileIcon } from '../documents/fileTypes';
 import { FileView } from '../files/FilesPage';
 import { useDiscardGuard } from '../settings/Instructions';
 import { useOwnScroll } from './live';
+import { EditsOf, useEditing } from './liveEdits';
 import { useDrafts } from './state';
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
@@ -153,8 +155,10 @@ export function SessionFile({
     if (writing) setDirty(false);
   }, [writing, setDirty]);
 
+  // Some of its words being changed by the agent (an edit written, or about to run).
+  const editing = useEditing(key, path) && !writing;
   // What it is ("Markdown", "Word document"): where it is shows in the file's own line under this one.
-  const sub = writing ? (!draft!.done ? `Writing · ${kb(draft!.text.length)}` : status === 'waiting' ? 'Waiting for your OK' : 'Saving…') : kindLabel(path);
+  const sub = writing ? (!draft!.done ? `Writing · ${kb(draft!.text.length)}` : status === 'waiting' ? 'Waiting for your OK' : 'Saving…') : editing ? 'Changing' : kindLabel(path);
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
@@ -165,7 +169,7 @@ export function SessionFile({
               {basename(path)}
             </span>
             <span className="flex items-center gap-1.5 truncate text-[11.5px] text-fg-3">
-              {writing && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
+              {(writing || editing) && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
               <span className="truncate">{sub}</span>
             </span>
           </span>
@@ -173,7 +177,13 @@ export function SessionFile({
         {tail(guard.leave)}
       </div>
       <div className={cx('min-h-0 flex-1', layout === 'sheet' && 'pb-[var(--safe-bottom)]')}>
-        {writing ? <DraftText path={path} text={draft!.text} /> : <FileView key={`${path}:${round.current}`} path={path} embedded narrow={layout === 'panel'} onDirty={setDirty} />}
+        {writing ? (
+          <DraftText path={path} text={draft!.text} />
+        ) : (
+          <EditsOf.Provider value={key}>
+            <FileView key={`${path}:${round.current}`} path={path} embedded narrow={layout === 'panel'} onDirty={setDirty} />
+          </EditsOf.Provider>
+        )}
       </div>
       {guard.node}
     </div>

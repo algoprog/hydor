@@ -838,7 +838,7 @@ agents that speak ACP and take MCP servers.
   each file's progress (Upload files in the + of a phone's Files does the same). A page shows as the agent writes it (beside the conversation on a wide screen), and so does every other kind of
   document: slides, documents, spreadsheets, LaTeX, notebooks and diagrams the app keeps, and files (Markdown, Word,
   Excel, PowerPoint, PDF, LaTeX, CSV, notebooks), Markdown, LaTeX and CSV files as their text comes and the others
-  once they are there, each change an agent makes landing as it is made. The first page or document a turn makes or
+  once they are there, each change an agent makes landing as it is made. A page or document already open there (or full screen, or in the file window) shows the agent's changes to it as they are written: a Markdown file's edits lit in place (a change that comes all at once lit where it landed), a LaTeX file's source with the agent's caret, a page shown or saved again as it is written, and a Word or Excel file the agent changes with commands where you were reading. The first page or document a turn makes or
   changes opens there by itself, asked for or not; a turn that goes on to a second one puts the panel back as it
   was, and each opens from its card (a page with the title of one the turn made already, such as a mock-up written to
   an HTML file to check and then shown, is that page again, and the panel moves on to it). Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,

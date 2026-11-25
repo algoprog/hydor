@@ -1,11 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, ClipboardPaste, Copy, CornerDownRight, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, Keyboard, MessageSquarePlus, Replace, RotateCcw, Save, Scissors, Search, Signature, SlidersHorizontal, Sparkles, SquareTerminal, TextSelect, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle, EditorSnapshot, EditorStatus } from '../../lib/codemirror';
 import { basename, bytes, dirname } from '../../lib/format';
 import { canReveal, reveal, revealLabel } from '../../lib/reveal';
 import { toast, toastError, useUI } from '../../lib/store';
-import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuSep, Popover, useIsMobile } from '../../components/ui';
 import { VideoPlayer } from '../../components/VideoPlayer';
@@ -27,6 +26,8 @@ import { getDraft, isDirty, keepDraft, leaveFile, registerSaver, setDirty as not
 import { EDITABLE, editFile } from '../mediaedit/open';
 import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
 import { EDITABLE_SOUND, editSoundFile } from '../mediaedit/audio/open';
+import { EditsOf, useAgentEdits } from '../pages/liveEdits';
+import { MarkdownPreview } from './MarkdownPreview';
 
 // Word, Excel, PowerPoint and other documents open as a preview (features/documents).
 const OfficePreview = lazy(() => import('../documents/OfficePreview').then((m) => ({ default: m.OfficePreview })));
@@ -177,7 +178,8 @@ function PageFrame({ url, version, title }: { url: string | null; version: numbe
  * (the Files page): a menu with what else can be done with the file (a session with it, a space, its folder).
  * `saveFirst` is given a way to save unsaved changes (true when there were none, or they are saved), for an agent
  * asked about the file to work on them. Changes made to the file elsewhere (an agent, a terminal) come into the
- * editor as they land, while nothing is changed here, their lines tinted for a moment; asked about otherwise.
+ * editor as they land, while nothing is changed here, their lines tinted for a moment; asked about otherwise. Beside a
+ * session's conversation, a Markdown file's preview shows that agent's edits as they are written (pages/liveEdits.ts).
  * `narrow`: little room across (the panel beside a conversation): its path is one line that folds, as on a phone.
  */
 export function FileEditor({
@@ -205,6 +207,8 @@ export function FileEditor({
 }) {
   const mobile = useIsMobile();
   const [file, setFile] = useState<FileData | null>(null);
+  // When the file was last read (Date.now()): an agent's edit that has run is in what was read after it.
+  const [readAt, setReadAt] = useState(0);
   const [error, setError] = useState('');
   // Coming back to a file with changes not saved, it starts as changed (its tab's dot stays on).
   const [dirty, setDirty] = useState(() => !embedded && isDirty(path));
@@ -303,6 +307,7 @@ export function FileEditor({
       }
       setEolShown(eol.current);
       setFile(f);
+      setReadAt(Date.now());
       return f;
     } catch (e) {
       setError((e as Error).message);
@@ -323,6 +328,9 @@ export function FileEditor({
   // later (a change from elsewhere, a save) keeps it too.
   const editable = !!file && !file.binary && !file.tooLarge && file.content != null;
   const textual = !error && editable && !(office && ext === 'rtf') && !(media && ext === 'svg');
+  // An agent's edits of a Markdown file shown beside its session's conversation, made in its preview as they come.
+  const agent = useAgentEdits(isMd && textual && mode === 'preview' ? path : null, file ? doc.current : null, readAt, { mtime: file?.mtime, off: dirty });
+  const inSession = useContext(EditsOf) !== null;
   useEffect(() => {
     if (!textual || !host.current) return;
     let alive = true;
@@ -798,11 +806,7 @@ export function FileEditor({
             <PageFrame url={pageUrl} version={file.mtime} title={basename(path)} />
           )
         ) : mode === 'preview' ? (
-          <div className="relative z-10 h-full overflow-auto bg-bg">
-            <div className="mx-auto max-w-[860px] px-5 py-6">
-              {mdHtml ? <Markdown text={doc.current} rehypeExtra={mdHtml.MD_HTML} resolveImage={docImages} baseDir={dirname(path)} /> : <Throbber className="text-fg-3" />}
-            </div>
-          </div>
+          <MarkdownPreview text={doc.current} edit={agent} mdHtml={mdHtml} images={docImages} dir={dirname(path)} landing={inSession} />
         ) : mode === 'diff' ? (
           <div className="relative z-10 h-full overflow-auto bg-bg">{diff ? <DiffView diff={diff} /> : <Empty title="No changes">This file matches the last commit (or is not in a git repository).</Empty>}</div>
         ) : null}

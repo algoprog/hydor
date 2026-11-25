@@ -38,6 +38,16 @@ A document, slides, a spreadsheet or a LaTeX document grows the same way as an a
 
 A document the agent makes as a file opens in the panel too: a Markdown file, a Word, Excel or PowerPoint file, a PDF, a LaTeX file, a CSV or TSV table, a notebook or an e-book, whether the agent wrote it, one of its commands made it, or it handed it over. A Markdown, LaTeX, CSV or TSV file the agent writes in one go shows as its text comes (Markdown as it will look), under **Writing** and how much has come so far; any other file shows once it is there. From then on the panel shows the file as the file window does, to read, change and save ([Preview a document in the file viewer](/guide/documents-voice#preview-a-document-in-the-file-viewer)), and takes in each change the agent makes to it as it lands. A document in several forms counts as one: the `report.md` an agent wrote and the `report.pdf` it made from it, or a document the app keeps and the PDF exported from it. The panel keeps what you watched; only a file gives way, to another form of it that the agent hands over.
 
+Ask the agent to change a page or document that is open, beside the conversation or full screen, and you watch the change being made there, in that turn or any later one, whether or not documents open by themselves:
+
+- A document, slides, a spreadsheet, a LaTeX document or a diagram the app keeps shows its new version as it comes, as above.
+- A page shown or saved again shows its new version as it is written, in place of the old one.
+- In a Markdown file, each edit shows in place as the agent writes it: the part being changed is lit in the agent's colour with its **Agent** flag (first a dashed box round the words it is about to change), kept in view unless you scroll away, and the light fades once the change is in the file. The file's top line says **Changing** meanwhile. A change that comes all at once (from an agent that hands over its edits whole, or from a command) is lit for a moment where it landed, without the flag.
+- In a LaTeX file, the source shows each edit as it is written, with the agent's caret; in an HTML file, the page shows it.
+- A Word or Excel file, or a CSV table, that the agent changes with its commands shows each change once it is made, where you were reading.
+
+Changes of yours not saved yet are left as they are. A file open in the window over the conversation (**Open** on its card) shows the agent's edits the same way.
+
 The panel opens by itself for one page or document at a time: the first one a turn makes or changes, whether you asked for it or the agent made it on its own. If the agent goes on to make or change a second one in the same turn, the panel goes back to what it showed before (or closes), and nothing more opens by itself in that turn: each page and document has its card in the conversation, which opens it beside. A page with the same title as one the turn made already is that page again, not a second one: an agent that writes a mock-up to an HTML file to check it, then shows it to you, made one page, and the panel moves on to the one it shows. A panel you close stays closed for the rest of the turn, and one that holds changes of yours not saved yet is left as it is.
 
 - Drag the panel's left edge to make it wider or narrower; the app remembers the width on this device.

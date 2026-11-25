@@ -2,9 +2,12 @@
 // (shared/partial-json.ts), the version being written over the one open (shared/page-drafts.ts and its builders),
 // the small changes agents make without sending a whole document (shared/doc-edits.ts), and the server's drafts of
 // save_doc, save_slides, save_sheet and save_latex (drafts.ts): sent to the session and to the page's editor, told
-// once the save is kept or failed. Build and run with a scratch folder:
+// once the save is kept or failed; and of a file's edits (Edit, MultiEdit), told once they ran or failed. Build and run
+// with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/live-test.ts
 //   DATA_DIR=/tmp/hydor-live-test node dist/dev/live-test.js
+import fs from 'node:fs';
+import path from 'node:path';
 import { blockText, normalizeDoc, type Doc } from '../../shared/docs.ts';
 import { applyDocEdits } from '../../shared/doc-edits.ts';
 import { draftDoc, tidyEnd } from '../../shared/draft-doc.ts';
@@ -426,6 +429,66 @@ const textOf = (d: Doc) => d.blocks.map(blockText).join('\n');
   ok(draftsOf('claude:s2').find((d) => d.id === 'w1')?.done && sent.at(-1)!.data.draft.done, 'the call complete, the draft is done: the file itself shows once the step has run');
   endDrafts(deps, 'claude:s2');
   ok(draftsOf('claude:s2').every((d) => d.done), 'the turn over, none is left open');
+}
+
+// ---- an edit of a file: followed when the file is a page or a document, its input as it comes ---------------------
+{
+  const sent: { key: string; data: any }[] = [];
+  const deps = { toSubscribers: (key: string, e: { data: unknown }) => void sent.push({ key, data: e.data }) } as unknown as Deps;
+  const input = { file_path: '/home/a/trip/lisbon.md', old_string: 'Two days, "on foot".', new_string: 'Three days, "on foot",\nwith a tram.' };
+  const call = JSON.stringify(input);
+  const edit = (id: string, name: string, file_path: string) => {
+    const c = JSON.stringify({ ...input, file_path });
+    feedDraft(deps, 'claude:s3', { id, name, at: 'start' });
+    for (let i = 0; i < c.length; i += 13) feedDraft(deps, 'claude:s3', { id, name, at: 'delta', delta: c.slice(i, i + 13) });
+  };
+  const whole = (id: string) => sent.filter((x) => x.data.draft.id === id).reduce((acc, x) => (x.data.from === 0 ? x.data.text : acc.slice(0, x.data.from) + x.data.text), '');
+  edit('e1', 'Edit', '/home/a/trip/lisbon.md');
+  edit('e2', 'Edit', '/home/a/trip/plan.py');
+  edit('e3', 'MultiEdit', '/home/a/trip/paper.tex');
+  edit('e4', 'Edit', '/home/a/trip/index.html');
+  await new Promise((r) => setTimeout(r, 200));
+  const e1 = draftsOf('claude:s3').find((d) => d.id === 'e1');
+  ok(e1?.tool === 'edit' && e1.path === input.file_path && e1.text === call && !e1.done && whole('e1') === call, 'an edit of a Markdown file comes as its input, a piece at a time');
+  ok(draftsOf('claude:s3').some((d) => d.id === 'e3' && d.tool === 'edit') && whole('e4').includes('index.html'), 'so do one of a LaTeX file (MultiEdit) and of an HTML page');
+  ok(!draftsOf('claude:s3').some((d) => d.id === 'e2') && !sent.some((x) => x.data.draft.id === 'e2'), 'an edit of code is not followed');
+  ok(sent.filter((x) => x.data.draft.id === 'e1').every((x) => x.data.what === 'edit-draft'), 'an edit goes as an event of its own, which pages of an older version leave alone');
+  feedDraft(deps, 'claude:s3', { id: 'e1', name: 'Edit', at: 'end', input });
+  const done = draftsOf('claude:s3').find((d) => d.id === 'e1');
+  ok(done?.done && !done.ran && !done.failed && done.text === call, 'the call complete, the edit is not made yet');
+  feedDraft(deps, 'claude:s3', { id: 'e1', name: 'Edit', at: 'result' });
+  ok(draftsOf('claude:s3').find((d) => d.id === 'e1')?.ran && sent.at(-1)!.data.draft.ran, 'once it has run, the draft says so: the file has it');
+  feedDraft(deps, 'claude:s3', { id: 'e3', name: 'MultiEdit', at: 'end', input: { file_path: '/home/a/trip/paper.tex' } });
+  feedDraft(deps, 'claude:s3', { id: 'e3', name: 'MultiEdit', at: 'result', error: true });
+  const e3 = draftsOf('claude:s3').find((d) => d.id === 'e3');
+  ok(e3?.failed && !e3.ran, 'one that failed says so: the file is as it was');
+  // An edit of a file that is there: once it has run, the file's time says which reads of it have it.
+  const real = path.join(process.env.DATA_DIR!, 'notes.md');
+  fs.writeFileSync(real, '# Notes\n\nOne.\n');
+  feedDraft(deps, 'claude:s3', { id: 'e5', name: 'Edit', at: 'start' });
+  feedDraft(deps, 'claude:s3', { id: 'e5', name: 'Edit', at: 'delta', delta: JSON.stringify({ file_path: real, old_string: 'One.', new_string: 'Two.' }) });
+  feedDraft(deps, 'claude:s3', { id: 'e5', name: 'Edit', at: 'end', input: { file_path: real, old_string: 'One.', new_string: 'Two.' } });
+  fs.writeFileSync(real, '# Notes\n\nTwo.\n');
+  feedDraft(deps, 'claude:s3', { id: 'e5', name: 'Edit', at: 'result' });
+  const e5 = draftsOf('claude:s3').find((d) => d.id === 'e5');
+  ok(e5?.ran && e5.mtime === Math.floor(fs.statSync(real).mtimeMs), 'an edit that ran gives the file’s time once it has it');
+  endDrafts(deps, 'claude:s3');
+  const e4 = draftsOf('claude:s3').find((d) => d.id === 'e4');
+  ok(e4?.done && e4.failed && draftsOf('claude:s3').find((d) => d.id === 'e1')?.ran, 'the turn over, an edit that never ran changed nothing; the one that ran stays made');
+}
+
+// ---- a saved page of HTML changed again: an editor with it open hears of the save, from whichever session -----------
+{
+  const sent: { key: string; data: any }[] = [];
+  const deps = { toSubscribers: (key: string, e: { data: unknown }) => void sent.push({ key, data: e.data }) } as unknown as Deps;
+  feedDraft(deps, 'claude:s4', { id: 'p1', name: 'mcp__hydor__save_page', at: 'start' });
+  feedDraft(deps, 'claude:s4', { id: 'p1', name: 'mcp__hydor__save_page', at: 'delta', delta: '{"id":"0a1b2c3d4e","title":"Plan","html":"<h1>Pl' });
+  await new Promise((r) => setTimeout(r, 200));
+  ok(sent.some((x) => x.key === 'page:0a1b2c3d4e' && x.data.draft.id === 'p1') && draftsOfPage('0a1b2c3d4e')[0]?.text === '<h1>Pl', 'a save_page with an id goes to the page too');
+  feedDraft(deps, 'claude:s4', { id: 'p1', name: 'mcp__hydor__save_page', at: 'end', input: { id: '0a1b2c3d4e', title: 'Plan', html: '<h1>Plan</h1>' } });
+  feedDraft(deps, 'claude:s4', { id: 'p1', name: 'mcp__hydor__save_page', at: 'result', error: true });
+  ok(draftsOf('claude:s4').find((d) => d.id === 'p1')?.failed, 'a save_page whose call failed says so: the page shows as it was');
+  endDrafts(deps, 'claude:s4');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

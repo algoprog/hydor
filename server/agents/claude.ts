@@ -812,7 +812,7 @@ export class ClaudeLive extends LiveAdapter {
         // A foreground subagent ends with its call; one sent to the background has its result at launch instead.
         for (const t of this.tasks.values()) if (t.status === 'running' && t.toolUseId === b.tool_use_id && (t.kind ?? '').includes('agent') && !this.listed.has(t.id) && !/async_launched|Async agent launched/i.test(JSON.stringify(m.tool_use_result ?? b.content ?? ''))) t.status = 'completed';
         if (typeof b.tool_use_id === 'string') this.stepEnded(b.tool_use_id);
-        if (typeof b.tool_use_id === 'string' && this.toolNames.has(b.tool_use_id)) this.emit('toolstream', { id: b.tool_use_id, name: this.toolNames.get(b.tool_use_id), at: 'result' });
+        if (typeof b.tool_use_id === 'string' && this.toolNames.has(b.tool_use_id)) this.emit('toolstream', { id: b.tool_use_id, name: this.toolNames.get(b.tool_use_id), at: 'result', error: b.is_error === true });
       }
     }
     const isPrompt = !(Array.isArray(content) && content.some((b: Json) => b?.type === 'tool_result'));

@@ -31,7 +31,9 @@ import { exportFile } from './exportFile';
 import { EXPORTS } from './exports';
 import { EDITORS } from './editors';
 import type { ModelDoc } from './kinds';
-import { draftKind, useEmptyModel, useLiveDraft, usePageDraft } from './live';
+import { draftKind, isDraftTool, useEmptyModel, useLiveDraft, usePageDraft } from './live';
+import { useAgentEdits } from './liveEdits';
+import { useWatchMs } from '../files/FileAsk';
 import { htmlTitle, noteDoc, opened, quiet, titleName, whichDoc, type TurnDocs } from './beside-rule';
 import { SessionFile } from './BesideFile';
 import { sendToSession, useCommentAi } from './common/commentAi';
@@ -221,6 +223,60 @@ function alsoKnown(key: string): (name: string) => string[] {
   };
 }
 
+/** The names a call of the conversation (a page, a save, an HTML file written) goes by now, as far as they are known. */
+function itemNames(key: string, id: string, more: (name: string) => string[]): string[] {
+  const ov = useLive.getState().byKey[key]?.overlay;
+  const it = useTimeline.getState().byKey[key]?.items.find((x) => x.id === id) ?? ov?.items.find((x) => x.id === id);
+  const d = useDrafts.getState().byKey[key]?.[id];
+  const path = d?.tool === 'file' ? d.path : it?.kind === 'tool' && it.tool.name === 'Write' ? (it.tool.input as { file_path?: unknown } | undefined)?.file_path : undefined;
+  const names = [id, ...(typeof path === 'string' && HTML_FILE.test(path) ? [fileName(path)] : [])];
+  return uniqNames([...names, ...names.flatMap(more)]);
+}
+
+const uniqNames = (list: string[]) => [...new Set(list.filter(Boolean))];
+
+/** The names what is shown (beside the conversation, or over everything) goes by now. */
+function targetNames(key: string, t: CanvasTarget, more: (name: string) => string[]): string[] {
+  if (t.kind === 'file') return [fileName(t.id)];
+  if (t.kind === 'page') return [t.id];
+  if (t.kind !== 'item') return [];
+  const page = shownPage.get(key);
+  return uniqNames([...itemNames(key, t.id, more), ...(page ? [page] : [])]);
+}
+
+/**
+ * The document shown (beside the conversation, or over everything) written anew by another call (a page shown or saved
+ * again, an HTML file written again), in this turn or a later one: it shows that call, as it is written, whether or not
+ * documents open by themselves. Not a document this turn opened, so a second one does not put it back. A page with
+ * changes not saved stays. Whether it moved.
+ */
+function follow(key: string, doc: BesideDoc, more: (name: string) => string[], mine: CanvasTarget | undefined): boolean {
+  if (!doc.follow || dirty.has(key)) return false;
+  const names = uniqNames([...doc.names, ...doc.names.flatMap(more)]);
+  const same = (t: CanvasTarget) => !sameTarget(t, doc.target) && targetNames(key, t, more).some((n) => names.includes(n));
+  let moved = false;
+  const c = useCanvas.getState();
+  const cur = c.open[key];
+  // What opened by itself in this turn follows its document its own way (below), as this turn's.
+  if (cur && !sameTarget(cur, mine) && same(cur)) {
+    c.show(key, doc.target);
+    moved = true;
+  }
+  const over = useOver.getState().at;
+  if (over?.key === key && same(over.target)) {
+    useOver.setState({ at: { key, target: doc.target } });
+    moved = true;
+  }
+  return moved;
+}
+
+/** Whether a session shows a page now (beside the conversation, or over everything), which a page being written may be. */
+function showsPage(key: string): boolean {
+  const cur = useCanvas.getState().open[key];
+  const over = useOver.getState().at;
+  return cur?.kind === 'item' || cur?.kind === 'page' || (over?.key === key && (over.target.kind === 'item' || over.target.kind === 'page'));
+}
+
 /** Whether the panel shows this document already, however it came to (opened by hand, or by an earlier save of it). */
 function shows(key: string, cur: CanvasTarget | null, doc: BesideDoc): boolean {
   if (!cur) return false;
@@ -254,6 +310,8 @@ export function offerBeside(key: string, docs: BesideDoc[], at?: string) {
     else if (r.now.opened === r.at && !r.now.quiet) again = doc;
   }
   turns.set(key, st);
+  // The document shown already, written anew: it shows the newest call.
+  for (const doc of docs) follow(key, doc, more, st.target);
   const c = useCanvas.getState();
   const cur = c.open[key] ?? null;
   // A page open with changes not saved stays.
@@ -309,16 +367,18 @@ function another(key: string, d: PageDraft): boolean {
 }
 
 onDraftStart((key, started) => {
+  // An edit of a file opens nothing: the file shown beside (or over everything) shows it as it is made (liveEdits.ts).
+  if (started.tool === 'edit') return;
   // Which document it is shows once the call says so: the page a save of another kind changes (its id comes first,
   // mostly; a new one has none), the file a Write writes, the title of a page of HTML when its turn has another
-  // document (the HTML file it was written in first, say). Until then, a moment's wait (the title's, by this
-  // browser's clock: the server's may differ by more than it).
+  // document (the HTML file it was written in first, say) or a page is shown (it may be that page, written anew).
+  // Until then, a moment's wait (the title's, by this browser's clock: the server's may differ by more than it).
   const heard = Date.now();
   const decide = () => {
     const now = useDrafts.getState().byKey[key]?.[started.id];
     if (!now || (now.done && draftKind(now))) return;
     if (!now.done && draftKind(now) && !now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
-    if (Date.now() - heard < TITLE_MS && titleComing(now) && another(key, now)) return void setTimeout(decide, 150);
+    if (Date.now() - heard < TITLE_MS && titleComing(now) && (another(key, now) || showsPage(key))) return void setTimeout(decide, 150);
     offerBeside(key, [draftDoc(now)], now.id);
   };
   decide();
@@ -388,14 +448,21 @@ interface Loaded {
   version?: number;
 }
 
-function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined, kind: PageCall | null): { loaded: Loaded | null; error: string | null } {
+function useLoaded(
+  key: string,
+  target: CanvasTarget,
+  item: ToolItem | undefined,
+  kind: PageCall | null,
+): { loaded: Loaded | null; error: string | null; readAt: number; fileMtime?: number; holdFile: React.MutableRefObject<boolean> } {
+  // An HTML file with changes not saved here is not read again (they would be lost): set by the page.
+  const holdFile = useRef(false);
   const home = useApp((x) => x.boot?.home);
   const kept = usePagesStore((x) => (target.kind === 'item' ? x.kept[key]?.[target.id] : undefined));
   const keptMap = usePagesStore((x) => x.kept[key]);
   const pagesVersion = usePagesStore((x) => x.pages);
   const draft = useDrafts((x) => (target.kind === 'item' ? x.byKey[key]?.[target.id] : undefined));
   const [page, setPage] = useState<{ info: PageInfo; html?: string; model?: unknown } | null>(null);
-  const [file, setFile] = useState<{ content: string; mtime: number; base: string } | null>(null);
+  const [file, setFile] = useState<{ content: string; mtime: number; base: string; readAt: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!keptMap) usePagesStore.getState().loadKept(key).catch(() => {});
@@ -403,7 +470,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
 
   // The saved page it is (save_page's, a kept one, or one opened by id). A document, deck, spreadsheet or LaTeX being
   // saved shows the version it changes while its call comes in (the version being written over it: live.ts).
-  const modelSave = !!item && /__save_(?:doc|slides|sheet|latex)$/.test(item.tool.name);
+  const modelSave = !!item && isDraftTool(nagetTool(item.tool.name) ?? '');
   const pageId = target.kind === 'page' ? target.id : kind === 'save_page' ? (modelSave && item ? (savedPageOf(item.tool) ?? draft?.pageId) : savedRef(item?.tool.output)?.id) : kind === 'show_html' ? kept : undefined;
   const loadPage = () => {
     if (!pageId) return;
@@ -425,14 +492,14 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagesVersion]);
 
-  // An HTML file: read once the agent finished writing it.
+  // An HTML file: read once the agent finished writing it, and again when it changes (an agent's edit of it, say).
   const path = kind === 'file' ? String((item?.tool.input as { file_path?: unknown })?.file_path ?? draft?.path ?? '') : '';
   const fileDone = kind === 'file' && !!item && item.tool.status !== 'running' && item.tool.status !== 'pending';
   const loadFile = async () => {
     try {
       const [f, v] = await Promise.all([api<{ content: string | null; mtime: number; binary?: boolean; tooLarge?: boolean }>(`/api/fs/read?path=${enc(path)}`), post<{ url: string }>('/api/fs/view-link', { path })]);
       if (f.content == null) throw new Error(f.tooLarge ? 'The file is too large to edit here' : 'Not a text file');
-      setFile({ content: f.content, mtime: f.mtime, base: `${location.origin}${v.url.slice(0, v.url.lastIndexOf('/') + 1)}` });
+      setFile({ content: f.content, mtime: f.mtime, base: `${location.origin}${v.url.slice(0, v.url.lastIndexOf('/') + 1)}`, readAt: Date.now() });
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -443,6 +510,27 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
     if (path && fileDone) void loadFile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, fileDone]);
+  const watchMs = useWatchMs();
+  const fileNow = useRef(file);
+  fileNow.current = file;
+  useEffect(() => {
+    if (!path || !fileDone) return;
+    let busy = false;
+    const t = setInterval(async () => {
+      const f = fileNow.current;
+      if (!f || busy || document.visibilityState !== 'visible' || holdFile.current) return;
+      busy = true;
+      try {
+        const st = await api<{ exists: boolean; mtime: number }>(`/api/fs/stat?path=${enc(path)}`);
+        if (st.exists && st.mtime !== f.mtime && !holdFile.current) await loadFile();
+      } catch {
+      } finally {
+        busy = false;
+      }
+    }, watchMs);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, fileDone, watchMs]);
 
   const loaded = useMemo((): Loaded | null => {
     if (pageId) {
@@ -497,7 +585,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
         save: async (html) => {
           const r = await put<{ mtime: number }>('/api/fs/write', { path, content: html, expectedMtime: file.mtime });
           await post('/api/pages/file-edit', { sessionKey: key, path, before: file.content, after: html }).catch(() => {});
-          setFile({ ...file, content: html, mtime: r.mtime });
+          setFile({ ...file, content: html, mtime: r.mtime, readAt: Date.now() });
           toast('Saved. The agent sees your changes with your next message.', 'ok');
           return true;
         },
@@ -505,7 +593,39 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
     }
     return null;
   }, [pageId, page, kind, item, draft?.done, draft?.text, file, path, key, home]);
-  return { loaded, error };
+  return { loaded, error, readAt: file?.readAt ?? 0, fileMtime: file?.mtime, holdFile };
+}
+
+/** How long a page of HTML saved again shows as it was written, at most, while its saved version is read. */
+const HELD_MS = 3000;
+
+/**
+ * Whether a save of a page of HTML watched here as it was written still shows as it was written, once written whole:
+ * until the page read here is newer than the one shown while it was written (the version it saved), so the old version
+ * never shows again in between. One written before it was seen here shows as saved at once.
+ */
+function useHeldSave(draft: PageDraft | null, version: number | undefined): boolean {
+  const seen = useRef<{ id: string; going: boolean; version?: number; doneAt?: number } | null>(null);
+  const [, bump] = useState(0);
+  if (draft && seen.current?.id !== draft.id) seen.current = { id: draft.id, going: !draft.done, version };
+  if (draft && !draft.done && seen.current && seen.current.version === undefined) seen.current.version = version;
+  if (draft?.done && seen.current?.going && !seen.current.doneAt) seen.current.doneAt = Date.now();
+  const s = seen.current;
+  const held =
+    !!draft &&
+    draft.tool === 'save_page' &&
+    !!draft.pageId &&
+    draft.done &&
+    !draft.failed &&
+    !!s?.doneAt &&
+    Date.now() - s.doneAt < HELD_MS &&
+    (version === undefined || s.version === undefined || version <= s.version);
+  useEffect(() => {
+    if (!held) return;
+    const t = setTimeout(() => bump((n) => n + 1), HELD_MS + 50);
+    return () => clearTimeout(t);
+  }, [held]);
+  return held;
 }
 
 /**
@@ -518,12 +638,25 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   // The call's own draft; for a saved page shown here, the newest save of it being written (from any session: an agent
   // working in steps saves it again and again, each shown here as it comes).
   const own = usePageDraft(undefined, target.kind === 'item' ? { sessionKey: key, item: target.id } : {});
-  const itemPage = item && /__save_(?:doc|slides|sheet|latex)$/.test(item.tool.name) ? savedPageOf(item.tool) : undefined;
+  // A saved page (a document, a deck… or a page of HTML) the agent saves again, in this turn or a later one: each save
+  // shows here as it is written.
+  const bare = item ? nagetTool(item.tool.name) : null;
+  const itemPage = item && bare && (isDraftTool(bare) || bare === 'save_page') ? savedPageOf(item.tool) : undefined;
   const newest = usePageDraft(target.kind === 'page' ? target.id : itemPage, { watch: true });
   const draft = newest && (!own || newest.startedAt >= own.startedAt) ? newest : own;
   const callKind = draft && !draftKind(draft) ? draft.tool : null;
   const kind: PageCall | null = target.kind === 'page' ? 'save_page' : (pageCall(item?.tool) ?? (draft ? (draftKind(draft) ? 'save_page' : (callKind as PageCall)) : null));
-  const { loaded, error } = useLoaded(key, target, item, kind);
+  const { loaded, error, readAt, fileMtime, holdFile } = useLoaded(key, target, item, kind);
+  const [isDirty, setDirty] = useState(false);
+  holdFile.current = isDirty;
+  // An HTML file the agent edits (Edit): each change shows as it is written, until the file has it.
+  const fileEdit = useAgentEdits(kind === 'file' && loaded?.path ? loaded.path : null, kind === 'file' ? (loaded?.doc.html ?? null) : null, readAt, {
+    mtime: fileMtime,
+    html: true,
+    off: isDirty,
+    sessionKey: key,
+  });
+  const held = useHeldSave(draft, loaded?.version);
   // A document, deck, spreadsheet or LaTeX document being saved: the version being written, over the one it changes
   // (none for a new one, whose editor starts empty).
   const saving = draftKind(draft);
@@ -557,7 +690,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   const moreRef = useRef<HTMLButtonElement>(null);
   const pickRef = useRef<HTMLButtonElement>(null);
   const onPick = usePicks(key, false);
-  const writing = !!draft && !draft.done;
+  const writing = !!draft && (!draft.done || held);
+  const agentEditing = !writing && !!fileEdit && fileEdit.text !== null;
   const title = loaded?.doc.title ?? draft?.title ?? (draft?.path ? basename(draft.path) : undefined) ?? titleOf(item, kind);
 
   useEffect(() => {
@@ -578,7 +712,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
 
   const lead = (
     <>
-      <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', writing ? 'bg-busy/12 text-busy' : 'bg-accent-soft text-accent')}>
+      <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', writing || agentEditing ? 'bg-busy/12 text-busy' : 'bg-accent-soft text-accent')}>
         {kind === 'file' ? <FileCode2 size={16} /> : <AppWindow size={16} />}
       </span>
       <button ref={pickRef} type="button" onClick={() => picks.length > 1 && setMenu(menu === 'pick' ? null : 'pick')} className={cx('min-w-0 text-left', picks.length > 1 && 'cursor-pointer')}>
@@ -589,8 +723,8 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
           {picks.length > 1 && <ChevronDown size={13} className="shrink-0 text-fg-3" />}
         </span>
         <span className="flex items-center gap-1.5 truncate text-[11.5px] text-fg-3">
-          {writing && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
-          {writing ? `Writing · ${kb(draft!.text.length)}` : (loaded?.sub ?? (error ? error : ' '))}
+          {(writing || agentEditing) && <span className="breathe h-1.5 w-1.5 shrink-0 rounded-full bg-busy" />}
+          {writing ? `Writing · ${kb(draft!.text.length)}` : agentEditing ? 'Changing' : (loaded?.sub ?? (error ? error : ' '))}
         </span>
       </button>
     </>
@@ -662,7 +796,6 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     </>
   );
 
-  const [isDirty, setDirty] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   // A newer version saved meanwhile (the agent's, say): asked before yours goes on top of it.
   const save = async (html: string) => {
@@ -775,7 +908,13 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
     {confirmNode}
     <Studio
       doc={loaded?.doc ?? null}
-      draft={draft && !saving ? { text: draft.text, done: draft.done } : null}
+      draft={
+        fileEdit?.text != null
+          ? { text: fileEdit.text, done: false }
+          : draft && !saving
+            ? { text: draft.text, done: draft.done && !held }
+            : null
+      }
       layout={layout}
       onSave={loaded ? save : undefined}
       onPick={onPick}

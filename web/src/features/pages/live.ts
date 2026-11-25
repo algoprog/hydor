@@ -38,7 +38,8 @@ export function useEmptyModel(kind: DraftKind | null): unknown {
 
 /**
  * The save of a page being written now. With `item` (a call in a session's conversation), that call's draft; else the
- * newest save of `pageId` from any session, its news heard of while `watch` (the page's own editor).
+ * newest save of `pageId` from any session (a page of HTML's too), its news heard of while `watch` (the page's own
+ * editor, or the panel showing it).
  */
 export function usePageDraft(pageId: string | undefined, o: { sessionKey?: string; item?: string; watch?: boolean } = {}): PageDraft | null {
   const { sessionKey, item, watch } = o;
@@ -55,7 +56,7 @@ export function usePageDraft(pageId: string | undefined, o: { sessionKey?: strin
     if (sessionKey && item) return s.byKey[sessionKey]?.[item] ?? null;
     if (!pageId) return null;
     let best: PageDraft | null = null;
-    for (const m of Object.values(s.byKey)) for (const d of Object.values(m)) if (isDraftTool(d.tool) && d.pageId === pageId && (!best || d.startedAt > best.startedAt)) best = d;
+    for (const m of Object.values(s.byKey)) for (const d of Object.values(m)) if ((isDraftTool(d.tool) || d.tool === 'save_page') && d.pageId === pageId && (!best || d.startedAt > best.startedAt)) best = d;
     return best;
   });
 }

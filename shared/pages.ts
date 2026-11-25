@@ -161,7 +161,8 @@ export interface PageDataEntry {
 export interface PageDraft {
   /** The tool call's id: its item in the conversation. */
   id: string;
-  tool: 'show_html' | 'save_page' | 'file' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex' | 'save_diagram';
+  /** 'file': a file written whole (Write); 'edit': some of a file's words replaced (Edit, MultiEdit), its input as `text`. */
+  tool: 'show_html' | 'save_page' | 'file' | 'edit' | 'save_doc' | 'save_slides' | 'save_sheet' | 'save_latex' | 'save_diagram';
   title?: string;
   /** A file's path (tool 'file'): an HTML file, or a document written as text. */
   path?: string;
@@ -178,8 +179,12 @@ export interface PageDraft {
   seq?: number;
   /** A save of another kind, once its call has run: the version it saved (the page's, when it made a new one)… */
   saved?: { pageId: string; version: number };
-  /** …or that it saved nothing (the call failed, or the turn stopped first): the page stays as it was. */
+  /** …or that it saved nothing (the call failed, or the turn stopped first): the page stays as it was. An edit that failed or never ran changed nothing. */
   failed?: boolean;
+  /** An edit has run: the file has it now… */
+  ran?: boolean;
+  /** …and the file's time just after it ran (whole milliseconds, as the file routes give it): a read of the file at or after it has the edit. */
+  mtime?: number;
 }
 
 export type SiteVisibility = 'private' | 'public';
@@ -231,6 +236,8 @@ export type PagesEvent =
   | { what: 'comments'; id: string }
   /** To one session's pages (and a save's page, open in an editor): a draft grew by `text`, which goes at `from` (0 with the whole text so far starts it over). */
   | { what: 'draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string }
+  /** An agent's edit of a file as it comes (a draft of tool 'edit'), apart from the drafts that open pages. */
+  | { what: 'edit-draft'; draft: Omit<PageDraft, 'text'>; from: number; text: string }
   /** An agent answered, resolved or added comments of these files of this computer (LaTeX files opened from Files). */
   | { what: 'file-comments'; paths: string[] };
 

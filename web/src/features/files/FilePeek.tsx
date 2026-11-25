@@ -4,7 +4,8 @@
 // a file there) shows there too, as the Files page shows it: its folders and files open in place, and Back
 // returns to what the dialog showed before. Full screen in its top line (on a computer, as the panel beside the
 // conversation has) makes it fill the whole app, and the same button brings it back to its size; the next one opens
-// as the last was left (kept in this browser).
+// as the last was left (kept in this browser). The session's agent's edits of the file show in it as they are written
+// (pages/liveEdits.ts), as in the panel beside the conversation.
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
@@ -12,10 +13,12 @@ import { ChevronLeft, Folder, FolderOpen, Maximize2, Minimize2, X } from 'lucide
 import { api } from '../../lib/api';
 import { basename, inside, joinPath, pathParts } from '../../lib/format';
 import { go, showInFiles, useFilePeek, type Peeked } from '../../lib/nav';
+import { machineBase } from '../../lib/machine';
 import { Button, IconButton, Throbber, useMediaQuery } from '../../components/ui';
 import { useDiscardGuard } from '../settings/Instructions';
 import { goFolder } from './actions';
 import { FileView } from './FilesPage';
+import { EditsOf } from '../pages/liveEdits';
 import { FolderView } from './FolderView';
 import { searchUrl } from './SearchView';
 import { FileMore } from './SpaceMenu';
@@ -72,6 +75,9 @@ export function FilePeek() {
   const guard = useDiscardGuard();
   const { leave } = guard;
   const [loc] = useLocation();
+  // Opened over a session's conversation: that agent's edits of the file show in it as they are written.
+  const over = /^\/s\/([^/?#]+)/.exec(location.pathname.slice(machineBase.length))?.[1];
+  const sessionKey = over ? decodeURIComponent(over) : null;
   // Another page (the browser's Back, a link) takes the file away with the page it was opened over.
   useEffect(shut, [loc]);
   // Over the whole app instead of in its window, as the last one was left (the files and folders it goes on to keep it):
@@ -189,7 +195,9 @@ export function FilePeek() {
                     embedded
                   />
                 ) : (
-                  <FileView key={file.path} path={file.path} line={file.line} embedded onDirty={guard.setDirty} />
+                  <EditsOf.Provider value={sessionKey}>
+                    <FileView key={file.path} path={file.path} line={file.line} embedded onDirty={guard.setDirty} />
+                  </EditsOf.Provider>
                 )}
               </div>
             </div>

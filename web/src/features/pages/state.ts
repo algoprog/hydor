@@ -53,8 +53,8 @@ interface DraftsState {
   loadPage(pageId: string): Promise<void>;
 }
 
-/** A draft still to end: being written, or a save of a document, slides, a spreadsheet or LaTeX still to say how it went. */
-const going = (d: PageDraft) => !d.done || (d.tool in DRAFT_TOOLS && !d.saved && !d.failed);
+/** A draft still to end: being written, a save of a document, slides, a spreadsheet or LaTeX still to say how it went, or an edit of a file still to run. */
+const going = (d: PageDraft) => !d.done || (d.tool in DRAFT_TOOLS && !d.saved && !d.failed) || (d.tool === 'edit' && !d.ran && !d.failed);
 
 /** The drafts open here now, of a session or of a page (by id, with the last piece heard of each). */
 function goingNow(o: { key?: string; page?: string }): Map<string, number> {
@@ -68,7 +68,8 @@ function goingNow(o: { key?: string; page?: string }): Map<string, number> {
  * Drafts fetched whole, each kept by its session (a newer one already here stays). One open here when they were asked
  * for (`was`) that the server no longer has, nothing heard of it since (the server started again, or its end was sent
  * while this window was away), ends where it is: a save of a document, slides, a spreadsheet or LaTeX as one that
- * saved nothing, so its page shows as it is (and can be changed) rather than waiting for good.
+ * saved nothing, so its page shows as it is (and can be changed) rather than waiting for good; an edit of a file as one
+ * that changed nothing (the file as read has whatever it did).
  */
 function keepWhole(list: PageDraft[], key: string | undefined, was: Map<string, number>) {
   const byKey = { ...useDrafts.getState().byKey };
@@ -81,7 +82,7 @@ function keepWhole(list: PageDraft[], key: string | undefined, was: Map<string, 
   }
   const has = new Set(list.map((d) => d.id));
   for (const [k, ds] of Object.entries(byKey))
-    for (const d of Object.values(ds)) if (was.get(d.id) === (d.seq ?? 0) && !has.has(d.id) && going(d)) byKey[k] = { ...byKey[k], [d.id]: { ...d, done: true, ...(d.tool in DRAFT_TOOLS ? { failed: true } : {}) } };
+    for (const d of Object.values(ds)) if (was.get(d.id) === (d.seq ?? 0) && !has.has(d.id) && going(d)) byKey[k] = { ...byKey[k], [d.id]: { ...d, done: true, ...(d.tool in DRAFT_TOOLS || d.tool === 'edit' ? { failed: true } : {}) } };
   useDrafts.setState({ byKey });
 }
 
@@ -117,7 +118,7 @@ export function onDraftStart(fn: (key: string, d: PageDraft) => void): () => voi
   };
 }
 
-function takeDraft(key: string, e: Extract<PagesEvent, { what: 'draft' }>) {
+function takeDraft(key: string, e: Extract<PagesEvent, { what: 'draft' | 'edit-draft' }>) {
   const s = useDrafts.getState();
   const had = s.byKey[key]?.[e.draft.id];
   // Heard of already (this window watches both the session and the page it saves).
@@ -130,7 +131,8 @@ function takeDraft(key: string, e: Extract<PagesEvent, { what: 'draft' }>) {
   const text = e.from === 0 ? e.text : had!.text + e.text;
   const d: PageDraft = { ...e.draft, text };
   useDrafts.setState({ byKey: { ...s.byKey, [key]: { ...s.byKey[key], [d.id]: d } } });
-  if (!had && !d.done) for (const fn of startListeners) fn(key, d);
+  // An edit of a file opens nothing: the file shown follows it (liveEdits.ts).
+  if (!had && !d.done && d.tool !== 'edit') for (const fn of startListeners) fn(key, d);
 }
 
 // What the server says changed: whatever is loaded is loaded again.
@@ -144,7 +146,7 @@ onFeatureEvent('pages', ({ key, data }) => {
     if (s.sites) s.loadSites().catch(() => {});
   } else if (e?.what === 'request' && e.request?.id) s.setRequest(e.request);
   else if (e?.what === 'thumb' && e.id) usePagesStore.setState({ thumbs: { ...s.thumbs, [e.id]: e.thumb } });
-  else if (e?.what === 'draft' && key && e.draft?.id) takeDraft(key, e);
+  else if ((e?.what === 'draft' || e?.what === 'edit-draft') && key && e.draft?.id) takeDraft(key, e);
 });
 
 // ---- beside the conversation ---------------------------------------------------------------------------
