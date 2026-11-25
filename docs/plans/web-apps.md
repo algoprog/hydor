@@ -43,6 +43,7 @@ is built: agent apps stay as that plan made them.*
 | Agent apps on the kit | Agent apps can use the same kit when they need more: an interface of their own, not only what an agent shows in a session, behaving like proper web apps | Section 2: one kind of app with a flows half and a web half; a ninth seam, flows |
 | Updates | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
+| With the kit or without | Someone building a standalone app chooses: on the kit, or from scratch without it. The kit should make building faster and cheaper, and that is measured, not assumed | Section 7 (the choice, on the brief) and section 13 (the comparison) |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
 | Vectors in a standalone app | A small model on the app's server by default, an API as an option | Section 6 |
@@ -511,6 +512,12 @@ How it behaves:
   block's notes. Mechanical edits are Quick. The lead thinks with Best.
 - **Any session can pick it up.** The brief, `kit.json` and git say where the app stands and what was decided.
 
+**With the kit or without.** On the brief, the maker chooses how the app is built: on the kit (the default), or
+from scratch in any stack. From scratch is what Hydor already does for any coding task, with the brief known and
+Preview to look at it; it has no ready-made parts, no Features, Check, Launch and Run stages, no updates card, and
+it is not used inside Hydor by other people. The choice says so, and shows what the comparison in section 13
+measured.
+
 ## 8. Inside Hydor
 
 ### Keeping a web app running
@@ -931,6 +938,16 @@ the share of the app's lines that came from blocks. Targets to argue with:
 - Every benchmark app passes its checks inside Hydor and on a server from the same code, and on Cloudflare where
   its blocks say they run there.
 - From pressing Launch to a live address with HTTPS on a fresh server in under fifteen minutes.
+
+**With the kit or without.** Someone who builds a standalone app chooses between the kit and from scratch (section
+7), so the kit's advantage has to be a number. A paired comparison builds the same descriptions both ways with the
+same kind of agent, under the same limits, judged by one judge that knows nothing of the kit: each builder says
+where its app's routes are, and the judge tests what they do. Ten descriptions to start: six of the kind the kit is
+made for, and four that are mostly an app's own logic or interface, where the kit has no head start. For each run:
+the checks passed, the cost, the time and the lines written; then one change asked for afterwards, built and
+judged the same way, since most of an app's cost comes after the first day. The choice in Hydor shows these
+numbers with their date and says "not measured yet" until they exist. Ten pairs with one run each is a small
+sample: it can show a large difference and where the kit does not help, not a small one.
 
 ## 14. Not in this plan
 
