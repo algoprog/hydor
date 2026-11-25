@@ -10,7 +10,7 @@ import { acpControl } from './agents/acp-accounts.ts';
 import { antigravityControl } from './agents/antigravity.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
-import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
+import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds, mergeCodexSnapshot } from './agents/control.ts';
 import type { ApprovalAnswer, ImageInput, LiveAdapter, LiveConfig, ModelCall } from './agents/live.ts';
 import { HttpError } from './auth.ts';
 import { config, paths } from './config.ts';
@@ -301,6 +301,9 @@ export function subagentsLine(names: string[]): string {
     ? ` Your subagents ${list} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.`
     : ` Your subagent ${list} stopped at that limit and can go on now: send it a message (SendMessage) to continue it from where it stopped, or start it again if that fails.`;
 }
+
+/** A model family as people know it ("Fable" for fable). */
+const familyName = (family: string) => family.charAt(0).toUpperCase() + family.slice(1);
 
 /**
  * How a session whose turn its plan's usage limit stopped carries on (SessionManager.afterLimit): with another account
@@ -995,7 +998,7 @@ export class SessionManager extends EventEmitter {
       if (autoSwitchOn(this.db) && !s.external) {
         this.switching.add(s.key);
         try {
-          const to = await this.freeAccount(agent, from);
+          const to = await this.freeAccount(agent, from, this.familyOf(s.key));
           if (to) {
             // Meanwhile you stopped it, or it moved already.
             if (this.userStopped.has(s.key) || this.accountOf(s.key) !== from) return null;
@@ -1400,6 +1403,13 @@ export class SessionManager extends EventEmitter {
         this.limitReads.set(key, read);
       }
     });
+    // The account's plan does not include the session's model ("Fable 5.2 requires usage credits"): the account is passed
+    // over for that model from now on, and the turn ends as one a limit stopped, so the session moves to another account
+    // that takes the model, or waits for one. Not for a session on API credit, which no plan bills.
+    adapter.on('modelrefused', (at: number) => {
+      const family = adapter.agent === 'claude' && !this.lives.get(key)?.apiCredit ? claudeFamily(adapter.state.model ?? this.summary(key)?.model) : null;
+      if (family) this.controlFor('claude', this.lives.get(key)?.account ?? l.account).noteRefused(family, at);
+    });
     // The turn was turned away for the account's sign-in: the account is passed over from now on, and once the turn is
     // over the session moves to another one or the user is asked to sign in again (afterSignOut). A session on API
     // credit runs on a key, not the account's sign-in: its refusal says nothing of the account.
@@ -1546,7 +1556,7 @@ export class SessionManager extends EventEmitter {
     // Claude Code keeps a copy of each file it edits, per message, so "Edit from here" can put them back.
     const env: Record<string, string> = agent === 'claude' ? { ...agentBaseEnv(), ...acct, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1' } : { ...agentBaseEnv(), ...acct };
     // Every account at its limit and Use API credit on: Claude Code bills this run to the account's API key.
-    const credit = agent === 'claude' ? await this.creditKey(account) : null;
+    const credit = agent === 'claude' ? await this.creditKey(account, claudeFamily(opts.model)) : null;
     if (credit) env.ANTHROPIC_API_KEY = credit;
     const runId = crypto.randomBytes(6).toString('hex');
     if (agent === 'claude') {
@@ -1763,9 +1773,12 @@ export class SessionManager extends EventEmitter {
     const acctAgent = accountAgentOf(o.agent, o.agent === 'acp' ? acpAgent(this.db, o.acpAgent) : null);
     if (acctAgent === 'antigravity' && !o.person) throw new HttpError(400, ANTIGRAVITY_PERSON_ONLY);
     if (acctAgent && autoSwitchOn(this.db)) {
+      // Only a limit that holds back the session's model counts (not one of another model alone), and a plan that turned
+      // that model away.
+      const family = acctAgent === 'claude' ? claudeFamily(o.model) : null;
       const lim = this.lastUsageOf(acctAgent, account)?.limited;
-      if (lim?.resetsAt && lim.resetsAt > Date.now()) {
-        const free = await this.freeAccount(acctAgent, account);
+      if ((lim?.resetsAt && lim.resetsAt > Date.now() && limitHolds(lim.model, family)) || this.refusesModel(acctAgent, account, family)) {
+        const free = await this.freeAccount(acctAgent, account, family);
         if (free) account = free.id;
       }
     }
@@ -2061,11 +2074,10 @@ export class SessionManager extends EventEmitter {
   limitLiftsAt(key: string): number | null | undefined {
     const agent = this.accountAgentOf(key);
     if (!agent) return undefined;
-    const lifts = (account?: string) => {
-      const u = this.lastUsageOf(agent, account);
-      if (!u?.ok) return undefined;
-      return u.limited ? (u.limited.resetsAt ?? undefined) : null;
-    };
+    // For the session's model: a limit of another model alone does not hold it back, and an account whose plan turned
+    // that model away has no reset to wait for.
+    const family = this.familyOf(key);
+    const lifts = (account?: string) => (this.refusesModel(agent, account, family) ? undefined : SessionManager.liftsAt(this.lastUsageOf(agent, account), family));
     const own = lifts(this.accountOf(key));
     if (!autoSwitchOn(this.db)) return own;
     // Switching accounts at a limit: the first of them to have usage again.
@@ -2111,16 +2123,48 @@ export class SessionManager extends EventEmitter {
     return (isAcpAccountAgent(agent) ? acpControl(this.db, agent, account) : this.controlFor(agent, account)).lastUsage;
   }
 
-  private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
+  /**
+   * Whether an account's usage leaves nothing for a session on that model family: a limit of another model alone does not
+   * count (Weekly · Fable only holds back only Fable). With no family, every limit counts.
+   */
+  private static usedUp = (u: AgentUsage | null | undefined, family: string | null = null) =>
+    !u?.ok || (!!u.limited && limitHolds(u.limited.model, family)) || u.windows.some((w) => (w.usedPercent ?? 0) >= 100 && limitHolds(w.model, family));
 
-  /** Another signed-in account of the agent with usage left, the least used first (one found signed out lately is passed over); null when there is none. */
-  private async freeAccount(agent: AccountAgent, except: string | undefined): Promise<{ id: string | undefined } | null> {
+  /**
+   * When an account's usage has room again for a session on that model family, as it last said: null when it has now;
+   * undefined when that is not known (not read, or a limit with no reset time).
+   */
+  private static liftsAt(u: AgentUsage | null | undefined, family: string | null): number | null | undefined {
+    if (!u?.ok) return undefined;
+    if (!SessionManager.usedUp(u, family)) return null;
+    const times = [...(u.limited && limitHolds(u.limited.model, family) ? [u.limited.resetsAt] : []), ...u.windows.filter((w) => (w.usedPercent ?? 0) >= 100 && limitHolds(w.model, family)).map((w) => w.resetsAt)];
+    return times.length && times.every((t): t is number => typeof t === 'number') ? Math.max(...times) : undefined;
+  }
+
+  /** The model family a Claude Code session runs ("fable", "opus"…), for limits of one model alone; null when it is not known. */
+  private familyOf(key: string): string | null {
+    if (agentOfKey(key) !== 'claude') return null;
+    return claudeFamily(this.lives.get(key)?.adapter.state.model ?? this.summary(key)?.model);
+  }
+
+  /** Whether the account's plan turned that model family away lately ("… requires usage credits"): Claude Code's accounts only. */
+  private refusesModel(agent: AccountAgent, account: string | undefined, family: string | null): boolean {
+    return agent === 'claude' && !!family && this.controlFor('claude', account).refuses(family);
+  }
+
+  /**
+   * Another signed-in account of the agent with usage left for a session on that model family, the least used first; null
+   * when there is none. One found signed out lately is passed over, and one whose plan turned that model away. A limit of
+   * another model alone does not count, unless `anyLimit` (for subagents whose model is not known).
+   */
+  private async freeAccount(agent: AccountAgent, except: string | undefined, family: string | null = null, anyLimit = false): Promise<{ id: string | undefined } | null> {
     let best: { id: string | undefined; used: number } | null = null;
+    const counts = anyLimit ? null : family;
     for (const id of accountPool(this.db, agent)) {
-      if (id === except || isSignedOut(agent, id)) continue;
+      if (id === except || isSignedOut(agent, id) || (family && this.refusesModel(agent, id, family))) continue;
       const u = await this.usageOf(agent, id);
-      if (SessionManager.usedUp(u)) continue;
-      const used = Math.max(0, ...u!.windows.map((w) => w.usedPercent ?? 0));
+      if (SessionManager.usedUp(u, counts)) continue;
+      const used = Math.max(0, ...u!.windows.filter((w) => limitHolds(w.model, counts)).map((w) => w.usedPercent ?? 0));
       if (!best || used < best.used) best = { id, used };
     }
     return best;
@@ -2156,7 +2200,8 @@ export class SessionManager extends EventEmitter {
         if (this.lives.get(key)?.adapter.limitStopped === false) return { goes: 'on' };
       }
       const stopped = this.subagentsToContinue(key);
-      const to = await this.freeAccount(agent, from);
+      const family = this.familyOf(key);
+      const to = await this.freeAccount(agent, from, family);
       if (!to) {
         if (agent === 'claude' && (await this.toCredit(key))) {
           await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.${subagentsLine(stopped)}`);
@@ -2165,7 +2210,15 @@ export class SessionManager extends EventEmitter {
         if (kvGet(this.db, 'auto_resume') === '1') return await this.resumeAfterLimit(key, resetsAt);
         return null;
       }
-      if (!(await this.carryOver(key, from, to.id))) await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`);
+      // Its plan does not include the session's model, rather than a limit.
+      const refused = this.refusesModel(agent, from, family) ? family : null;
+      if (!(await this.carryOver(key, from, to.id, refused ? 'model' : 'limit')))
+        await this.deliverOrQueue(
+          key,
+          refused
+            ? `${this.accountName(agent, from)}'s plan does not include ${familyName(refused)}, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`
+            : `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`,
+        );
       return { goes: 'account', to: this.accountName(agent, to.id) };
     } finally {
       this.switching.delete(key);
@@ -2187,7 +2240,8 @@ export class SessionManager extends EventEmitter {
       // A usage that could not be read never moves a session that is getting on with its work.
       const own = await this.usageOf(agent, from, 60_000);
       if (!own?.ok || !SessionManager.usedUp(own)) return;
-      const to = await this.freeAccount(agent, from);
+      // Which model the subagents run is not known, so every limit counts; the session's own model must run there too.
+      const to = await this.freeAccount(agent, from, this.familyOf(key), true);
       const stopped = this.subagentsToContinue(key);
       if (!to || !stopped.length || this.lives.get(key)?.adapter.state.status !== 'idle') return;
       if (await this.carryOver(key, from, to.id)) return;
@@ -2257,8 +2311,8 @@ export class SessionManager extends EventEmitter {
     if (!agent) return null;
     if (!resetsAt) {
       const u = await this.usageOf(agent, this.accountOf(key), 0);
-      const r = u?.limited?.resetsAt ?? Math.max(0, ...(u?.windows ?? []).filter((w) => (w.usedPercent ?? 0) >= 100).map((w) => w.resetsAt ?? 0));
-      if (r > Date.now()) resetsAt = r;
+      const r = SessionManager.liftsAt(u, this.familyOf(key));
+      if (typeof r === 'number' && r > Date.now()) resetsAt = r;
     }
     const lifts = this.limitLiftsAt(key);
     const at = typeof lifts === 'number' ? lifts : resetsAt;
@@ -2282,7 +2336,10 @@ export class SessionManager extends EventEmitter {
     if (st === 'working' || st === 'waiting' || st === 'starting') return;
     const from = this.accountOf(key);
     const out = isSignedOut(agent, from);
-    if (!out && !this.lastUsageOf(agent, from)?.limited) return;
+    // At a limit that holds back the session's model, or on a plan that turned that model away.
+    const family = this.familyOf(key);
+    const lim = this.lastUsageOf(agent, from)?.limited;
+    if (!out && !(lim && limitHolds(lim.model, family)) && !this.refusesModel(agent, from, family)) return;
     this.switching.add(key);
     try {
       if (out) await this.leaveSignedOut(key, agent, from);
@@ -2298,7 +2355,7 @@ export class SessionManager extends EventEmitter {
    * to its own account (a sign-in made outside the app may be noticed then).
    */
   private async leaveSignedOut(key: string, agent: AccountAgent, from: string | undefined) {
-    const to = await this.freeAccount(agent, from);
+    const to = await this.freeAccount(agent, from, this.familyOf(key));
     if (!to) return;
     await this.carryOver(key, from, to.id, 'signedout');
     // Its next message says so: the agent may be waiting for the old account's sign-in.
@@ -2314,13 +2371,21 @@ export class SessionManager extends EventEmitter {
     const agent = this.accountAgentOf(key);
     if (!agent || !autoSwitchOn(this.db)) return false;
     const from = this.accountOf(key);
-    if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
-    const to = await this.freeAccount(agent, from);
+    // Its own account goes on unless it is at a limit that holds back the session's model, or its plan turned that model away.
+    const family = this.familyOf(key);
+    const refused = this.refusesModel(agent, from, family) ? family : null;
+    if (!refused && !SessionManager.usedUp(await this.usageOf(agent, from, 60_000), family)) return false;
+    const to = await this.freeAccount(agent, from, family);
     if (to) {
       const stopped = this.subagentsToContinue(key);
-      const goes = await this.carryOver(key, from, to.id);
+      const goes = await this.carryOver(key, from, to.id, refused ? 'model' : 'limit');
       // Its next message says so: the agent may be waiting for the old account's reset, for itself or its subagents.
-      this.moveNotes.set(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`);
+      this.moveNotes.set(
+        key,
+        refused
+          ? `${this.accountName(agent, from)}'s plan does not include ${familyName(refused)}, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`
+          : `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`,
+      );
       return goes;
     }
     if (agent === 'claude') await this.toCredit(key);
@@ -2343,14 +2408,15 @@ export class SessionManager extends EventEmitter {
    * limit and no other has usage left (Switch accounts at a limit on), its own key, else another account's. Null
    * otherwise: a usage that could not be read never moves work onto API billing.
    */
-  private async creditKey(account: string | undefined): Promise<string | null> {
+  private async creditKey(account: string | undefined, family: string | null = null): Promise<string | null> {
     if (!apiCreditOn(this.db)) return null;
     const pool = autoSwitchOn(this.db) ? accountPool(this.db, 'claude') : [undefined];
     const keys = [account, ...pool.filter((id) => id !== account)].map((id) => apiKeyOf(this.db, id));
     if (!keys.some(Boolean)) return null;
+    // For the model it runs: a limit of another model alone leaves the plan, and a plan that turned that model away does not.
     const own = await this.usageOf('claude', account);
-    if (!own?.ok || !SessionManager.usedUp(own)) return null;
-    if (autoSwitchOn(this.db) && (await this.freeAccount('claude', account))) return null;
+    if (!own?.ok || (!SessionManager.usedUp(own, family) && !this.refusesModel('claude', account, family))) return null;
+    if (autoSwitchOn(this.db) && (await this.freeAccount('claude', account, family))) return null;
     return keys.find(Boolean) ?? null;
   }
 
@@ -2361,7 +2427,7 @@ export class SessionManager extends EventEmitter {
   private async toCredit(key: string): Promise<boolean> {
     // Already on it: a limit now is the API's own (credit used up), and nothing changes.
     if (this.external.get(key) || this.lives.get(key)?.apiCredit) return false;
-    if (!(await this.creditKey(this.accountOf(key)))) return false;
+    if (!(await this.creditKey(this.accountOf(key), this.familyOf(key)))) return false;
     await this.stopAndWait(key);
     const s = this.summary(key);
     this.emit('toast', { level: 'info', text: `${s?.title ?? 'A session'}: every Claude account is at its usage limit, so it continues on API credit` });
@@ -2378,24 +2444,30 @@ export class SessionManager extends EventEmitter {
     this.switching.add(key);
     try {
       const from = this.accountOf(key);
+      const family = this.familyOf(key);
       const own = await this.usageOf('claude', from, 600_000);
-      if (own?.ok && !SessionManager.usedUp(own)) {
+      if (own?.ok && !SessionManager.usedUp(own, family) && !this.refusesModel('claude', from, family)) {
         if (this.lives.get(key) === l && l.adapter.state.status === 'idle') await this.stopAndWait(key);
         return;
       }
       if (!autoSwitchOn(this.db)) return;
-      const to = await this.freeAccount('claude', from);
+      const to = await this.freeAccount('claude', from, family);
       if (to && this.lives.get(key) === l && l.adapter.state.status === 'idle') await this.carryOver(key, from, to.id);
     } finally {
       this.switching.delete(key);
     }
   }
 
-  /** Moves the session to the account, says so (`why` it moves), and brings a Codex goal along. True when that goal continues it by itself. */
-  private async carryOver(key: string, from: string | undefined, to: string | undefined, why: 'limit' | 'signedout' = 'limit'): Promise<boolean> {
+  /**
+   * Moves the session to the account, says so (`why` it moves: a limit, a sign-out, or a plan without the session's model),
+   * and brings a Codex goal along. True when that goal continues it by itself.
+   */
+  private async carryOver(key: string, from: string | undefined, to: string | undefined, why: 'limit' | 'signedout' | 'model' = 'limit'): Promise<boolean> {
     const agent = this.accountAgentOf(key);
     if (!agent) return false;
     const s = this.summary(key);
+    // Which model the plan left out, read while its agent still runs.
+    const family = why === 'model' ? this.familyOf(key) : null;
     // Codex keeps a thread's goal in its account's own folder: it is set again on the new one. (A goal the app's loop drives is the app's.)
     const goal = agent === 'codex' && !s?.goal?.app ? s?.goal : undefined;
     await this.moveToAccount(key, to);
@@ -2403,7 +2475,15 @@ export class SessionManager extends EventEmitter {
     const title = s?.title ?? 'A session';
     const was = this.accountName(agent, from);
     const now = this.accountName(agent, to);
-    this.emit('toast', { level: 'info', text: why === 'signedout' ? `${title}: ${was} is signed out, so it continues on ${now}` : `${title}: ${was} is at its usage limit, so it continues on ${now}` });
+    this.emit('toast', {
+      level: 'info',
+      text:
+        why === 'signedout'
+          ? `${title}: ${was} is signed out, so it continues on ${now}`
+          : family
+            ? `${title}: ${was}'s plan does not include ${familyName(family)}, so it continues on ${now}`
+            : `${title}: ${was} is at its usage limit, so it continues on ${now}`,
+    });
     if (!goal) return false;
     await this.programGoal(key, 'set', goal.objective);
     if (goal.status === 'active' || goal.status === 'limited') return true;

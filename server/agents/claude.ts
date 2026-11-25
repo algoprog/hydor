@@ -417,6 +417,9 @@ export class ClaudeLive extends LiveAdapter {
         // "You've hit your session limit": the plan's usage ran out mid-turn.
         if (!m.parent_tool_use_id && m.error === 'rate_limit') {
           this.limitStopped = true;
+          // "Fable 5.2 requires usage credits": the account's plan does not include the session's model, so the account is
+          // passed over for it. Read again after a restart too, at the time it was said.
+          if (m.api_error === 'model_requires_usage_credits' || m.api_error_code === 'credits_required') this.emit('modelrefused', Date.parse(m.timestamp) || Date.now());
           if (!replay) this.emit('limithit');
         }
         if (!replay) this.callFrom(m);

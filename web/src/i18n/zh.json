@@ -27708,5 +27708,8 @@
   "Learns from all you have written, starting from the small model that came with the app, now, in the background": "从应用自带的小模型开始，在后台立即学习你写过的全部内容",
   "Learns from all your writing again now, starting from the small model that came with the app; it can take hours on a computer without a graphics card": "从应用自带的小模型开始，立即重新学习你写过的全部内容；在没有显卡的电脑上可能需要几个小时",
   "The small model learns from what you write, on this computer, in the background; every run starts again from the one that came with the app": "小模型会在这台电脑上于后台从你的写作中学习；每次都从应用自带的模型重新开始",
-  "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "在这台电脑上根据你的写作训练小模型，让它建议你常用的词。每次都从应用自带的模型开始，并从你写过的全部内容（取最新的部分）中学习，因此不会跑偏。内容绝不会离开这台电脑"
+  "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "在这台电脑上根据你的写作训练小模型，让它建议你常用的词。每次都从应用自带的模型开始，并从你写过的全部内容（取最新的部分）中学习，因此不会跑偏。内容绝不会离开这台电脑",
+  "{0}'s plan does not include {1}, so this session now runs on {2}, which has usage left.{3}": "{0} 的套餐不包含 {1}，因此此会话现在改用 {2} 运行，该账户还有剩余用量。{3}",
+  "{0}'s plan does not include {1}, so this session now runs on {2}. Continue where you left off.{3}": "{0} 的套餐不包含 {1}，因此此会话现在改用 {2} 运行。请从中断的地方继续。{3}",
+  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1} 的套餐不包含 {2}，因此改用 {3} 继续"
 }

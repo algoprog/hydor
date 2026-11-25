@@ -150,7 +150,9 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage (for Grok, its weekly limit, credit limit or pay-as-you-go cap, not a short rate limit) moves, with its history, to another account with usage left and carries on (a Claude Code
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
-  rather than an error), and the app's own quick
+  rather than an error). Usage counts for the model the session runs: a limit of one model alone (a weekly Fable
+  limit) holds back only sessions on that model, and an account whose plan doesn't include the model ("requires usage
+  credits", as Fable on a Pro plan) is passed over for it. The app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
   An account that has been signed out (its sign-in ended or was revoked) is worked around the same way: a session
   whose turn it turned away moves to another signed-in account with usage left and carries on (with the setting off,

@@ -772,6 +772,8 @@ export interface UsageWindow {
   severity?: string;
   active?: boolean;
   detail?: string;
+  /** The model family a limit of one model alone holds back ("fable" for Weekly · Fable only); none for one of the whole account. */
+  model?: string;
 }
 
 export interface AgentUsage {
@@ -786,8 +788,8 @@ export interface AgentUsage {
   credits?: { balance?: string; unlimited?: boolean; hasCredits?: boolean } | null;
   /** Limit resets the account holds: Codex reset credits, Claude reset grants. */
   resetCredits?: { available: number; items: LimitReset[]; nextAvailableAt?: number; cooldownUntil?: number } | null;
-  /** Set while the usage is used up: which limit, and when it lifts. */
-  limited?: { label: string; resetsAt?: number | null } | null;
+  /** Set while the usage is used up: which limit, and when it lifts; `model` when it is a limit of that model family alone. */
+  limited?: { label: string; resetsAt?: number | null; model?: string } | null;
   extra?: {
     enabled: boolean;
     monthlyLimit?: number | null;

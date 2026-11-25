@@ -25852,5 +25852,8 @@
   "Learns from all you have written, starting from the small model that came with the app, now, in the background": "アプリに付属の小型モデルから始めて、これまでに書いた内容すべてを、バックグラウンドで今すぐ学習します",
   "Learns from all your writing again now, starting from the small model that came with the app; it can take hours on a computer without a graphics card": "アプリに付属の小型モデルから始めて、これまでに書いた内容すべてを今すぐもう一度学習します。グラフィックカードのないコンピューターでは数時間かかることがあります",
   "The small model learns from what you write, on this computer, in the background; every run starts again from the one that came with the app": "小型モデルが、このコンピューター上でバックグラウンドで入力内容から学習します。毎回、アプリに付属のモデルからやり直します",
-  "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "入力内容から、このコンピューター上で小型モデルを学習させ、自分の言葉を候補に出せるようにします。毎回アプリに付属のモデルから始めて、書いた内容すべて（新しい部分を優先）から学習するので、ずれていくことはありません。外部には送信されません"
+  "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "入力内容から、このコンピューター上で小型モデルを学習させ、自分の言葉を候補に出せるようにします。毎回アプリに付属のモデルから始めて、書いた内容すべて（新しい部分を優先）から学習するので、ずれていくことはありません。外部には送信されません",
+  "{0}'s plan does not include {1}, so this session now runs on {2}, which has usage left.{3}": "{0}のプランには{1}が含まれていないため、このセッションは使用量に余裕のある{2}で実行されます。{3}",
+  "{0}'s plan does not include {1}, so this session now runs on {2}. Continue where you left off.{3}": "{0}のプランには{1}が含まれていないため、このセッションは{2}で実行されます。中断したところから続けてください。{3}",
+  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1}のプランには{2}が含まれていないため、{3}で続行します"
 }

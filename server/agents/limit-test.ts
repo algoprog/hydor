@@ -254,6 +254,62 @@ const tests: [string, () => void][] = [
       assert.deepEqual([...a.limitTasks], [['t1', 'Check the logs']]);
     },
   ],
+  [
+    'a refusal for a model the plan does not include says so at the line’s time, live and replayed, and is still a limit hit only live',
+    () => {
+      const at = '2026-11-25T20:32:52.848Z';
+      const refusal = {
+        type: 'assistant',
+        message: { model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'Fable 5.2 requires usage credits. Turn on extra usage or pick another model.' }] },
+        parent_tool_use_id: null,
+        timestamp: at,
+        error: 'rate_limit',
+        is_api_error_message: true,
+        api_error_status: 429,
+        api_error: 'model_requires_usage_credits',
+        api_error_code: 'credits_required',
+      };
+      const run = (text: string, replay: boolean) => {
+        const runner = new EventEmitter() as any;
+        runner.writeLine = () => {};
+        const a = new ClaudeLive(runner, { sessionId: 's' } as any);
+        const refused: number[] = [];
+        let hits = 0;
+        a.on('modelrefused', (when: number) => refused.push(when));
+        a.on('limithit', () => hits++);
+        runner.emit('line', text, replay);
+        return { a, refused, hits };
+      };
+      const live = run(JSON.stringify(refusal), false);
+      assert.deepEqual(live.refused, [Date.parse(at)]);
+      assert.equal(live.a.limitStopped, true);
+      assert.equal(live.hits, 1);
+      const replayed = run(JSON.stringify(refusal), true);
+      assert.deepEqual(replayed.refused, [Date.parse(at)], 'read again after a restart, at the time it was said');
+      assert.equal(replayed.a.limitStopped, true);
+      assert.equal(replayed.hits, 0);
+      // Either marker is enough, and a line with no time is now.
+      const { api_error: _a, timestamp: _t, ...codeOnly } = refusal;
+      const before = Date.now();
+      const bare = run(JSON.stringify(codeOnly), false);
+      assert.equal(bare.refused.length, 1);
+      assert.ok(bare.refused[0] >= before && bare.refused[0] <= Date.now());
+    },
+  ],
+  [
+    'a plain rate limit line, or one from a subagent, says nothing of a model the plan does not include',
+    () => {
+      const runner = new EventEmitter() as any;
+      runner.writeLine = () => {};
+      const a = new ClaudeLive(runner, { sessionId: 's' } as any);
+      let refused = 0;
+      a.on('modelrefused', () => refused++);
+      runner.emit('line', JSON.stringify({ ...limitError, timestamp: '2026-11-25T20:32:52.848Z', api_error_status: 429 }), false);
+      assert.equal(a.limitStopped, true);
+      runner.emit('line', JSON.stringify({ ...limitError, api_error: 'model_requires_usage_credits', parent_tool_use_id: 'tu_1' }), false);
+      assert.equal(refused, 0);
+    },
+  ],
 ];
 
 let passed = 0;

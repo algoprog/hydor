@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { keychainService, resetReads } from './claudeResets.ts';
-import { ClaudeControl, claudeUsage, CodexControl } from './control.ts';
+import { ClaudeControl, claudeFamily, claudeUsage, CodexControl, limitHolds } from './control.ts';
 
 const raw = { subscription_type: 'max', rate_limits: { five_hour: { utilization: 21 } } };
 const init = { account: { email: 'work@example.com', subscriptionType: 'Claude Ultra' } };
@@ -243,4 +243,140 @@ try {
     globalThis.fetch = originalFetch;
     fs.rmSync(dir3, { recursive: true, force: true });
   }
+}
+
+// A limit of one model alone (Weekly · Fable only) names its model, and holds back only the sessions on it.
+{
+  const T1 = Date.parse('2026-12-01T00:00:00Z');
+  const T2 = Date.parse('2026-12-03T00:00:00Z');
+  const limit = (kind: string, percent: number, resets: number, model?: string) => ({
+    kind,
+    group: kind === 'session' ? 'session' : 'weekly',
+    percent,
+    resets_at: new Date(resets).toISOString(),
+    ...(model ? { scope: { model: { display_name: model } } } : {}),
+  });
+  const read = (...limits: object[]) => claudeUsage({ rate_limits: { limits } }, init);
+
+  let u = read(limit('weekly_all', 40, T1), limit('weekly_scoped', 100, T2, 'Fable'));
+  const fable = u.windows.find((w) => w.id === 'weekly_fable');
+  assert.equal(fable?.model, 'fable', 'a window of one model names its family');
+  assert.equal(fable?.label, 'Weekly · Fable only');
+  assert.equal(u.windows.find((w) => w.id === 'weekly_all')?.model, undefined, 'a window of the whole account names none');
+  assert.deepEqual(u.limited, { label: 'Weekly · Fable only', resetsAt: T2, model: 'fable' }, 'only the model’s window is full: its limit says which model');
+
+  u = read(limit('weekly_all', 100, T1), limit('weekly_scoped', 100, T2, 'Fable'));
+  assert.deepEqual(u.limited, { label: 'Weekly · all models', resetsAt: T1 }, 'both full: the whole account’s limit, with no model, even when the model’s lifts later');
+
+  u = read(limit('weekly_all', 30, T1), limit('weekly_scoped', 50, T2, 'Fable'));
+  assert.equal(u.limited, null);
+
+  // The older form of the report.
+  u = claudeUsage({ rate_limits: { seven_day: { utilization: 10 }, seven_day_opus: { utilization: 100, resets_at: new Date(T1).toISOString() }, seven_day_sonnet: { utilization: 5 } } }, init);
+  assert.equal(u.windows.find((w) => w.id === 'weekly_opus')?.model, 'opus');
+  assert.equal(u.windows.find((w) => w.id === 'weekly_sonnet')?.model, 'sonnet');
+  assert.equal(u.windows.find((w) => w.id === 'weekly_all')?.model, undefined);
+  assert.deepEqual(u.limited, { label: 'Weekly · Opus only', resetsAt: T1, model: 'opus' });
+
+  for (const [model, family] of [
+    ['claude-fable-5-2', 'fable'],
+    ['fable', 'fable'],
+    ['fable[1m]', 'fable'],
+    ['Fable 5.2', 'fable'],
+    ['claude-3-5-sonnet-20241022', 'sonnet'],
+    ['claude-opus-4-1', 'opus'],
+    ['opusplan', null], // Opus to plan, Sonnet otherwise: not one model
+    ['default', null],
+    ['', null],
+    [null, null],
+    [undefined, null],
+  ] as const) {
+    assert.equal(claudeFamily(model), family, `family of ${JSON.stringify(model)}`);
+  }
+
+  assert.equal(limitHolds(undefined, 'fable'), true, 'a limit of the whole account holds every model');
+  assert.equal(limitHolds('', 'fable'), true);
+  assert.equal(limitHolds(null, null), true);
+  assert.equal(limitHolds('fable', null), true, 'a session whose model is not known is held by every limit');
+  assert.equal(limitHolds('fable', 'fable'), true);
+  assert.equal(limitHolds('opus', 'opus'), true);
+  assert.equal(limitHolds('opus', 'opusplan'), true, 'opusplan runs Opus');
+  assert.equal(limitHolds('fable', 'sonnet'), false, 'a limit of another model alone does not');
+  console.log('Limits of one model alone passed');
+}
+
+// A live rejection: a model the plan does not include is no limit; a weekly limit of one model names it.
+{
+  const dirs: string[] = [];
+  const scratch = (name: string) => (dirs.push(fs.mkdtempSync(path.join(os.tmpdir(), name))), dirs[dirs.length - 1]);
+  const control = new ClaudeControl({ CLAUDE_CONFIG_DIR: scratch('hydor-usage-model-') });
+  const c = control as any;
+  const cached = () => claudeUsage({ rate_limits: { five_hour: { utilization: 20 }, seven_day: { utilization: 30 } } }, init);
+  c.usageCache = cached();
+  const before = c.usageCache;
+  const same = control.applyRateLimit({ status: 'rejected', errorCode: 'credits_required', rateLimitType: 'seven_day' });
+  assert.equal(same, before, 'the cached report comes back unchanged');
+  assert.ok(!same?.limited, 'a model the plan does not include is no limit of the account');
+
+  const at = Math.floor(Date.now() / 1000) + 3600;
+  const opus = control.applyRateLimit({ status: 'rejected', rateLimitType: 'seven_day_opus', resetsAt: at });
+  assert.equal(opus?.limited?.model, 'opus');
+  assert.equal(opus?.limited?.resetsAt, at * 1000);
+  const whole = control.applyRateLimit({ status: 'rejected', rateLimitType: 'seven_day', resetsAt: at });
+  assert.equal(whole?.limited?.model, undefined, 'a limit of the whole account names no model');
+
+  // Refused models: remembered for a day, until the plan or extra usage changes, and not across a sign-out.
+  const refuse = (usage: object | null) => {
+    const k = new ClaudeControl({ CLAUDE_CONFIG_DIR: scratch('hydor-usage-refused-') });
+    (k as any).usageCache = usage;
+    return k;
+  };
+  const withPlan = (plan: string, extra = false) => ({ ...cached(), account: { plan }, extra: { enabled: extra } });
+  const day = 24 * 60 * 60_000;
+
+  let k = refuse(withPlan('Pro'));
+  assert.equal(k.refuses('fable'), false, 'nothing refused yet');
+  k.noteRefused('fable');
+  assert.equal(k.refuses('fable'), true);
+  assert.equal(k.refuses('sonnet'), false, 'only the family it turned away');
+  assert.equal(k.refuses(null), false);
+  assert.equal(k.refuses(undefined), false);
+
+  k.noteRefused('opus', Date.now() - day - 60_000);
+  assert.equal(k.refuses('opus'), false, 'a refusal older than a day is not kept');
+
+  k = refuse(withPlan('Pro'));
+  k.noteRefused('fable', Date.now() - 1000);
+  k.noteRefused('fable', Date.now() - 5000);
+  assert.equal((k as any).refused.get('fable').at >= Date.now() - 1500, true, 'an older one does not replace the one kept');
+
+  k = refuse(withPlan('Pro'));
+  k.noteRefused('fable', Date.now() - day + 60_000);
+  assert.equal(k.refuses('fable'), true, 'still within the day');
+  (k as any).refused.get('fable').at = Date.now() - day - 1;
+  assert.equal(k.refuses('fable'), false, 'after a day it is forgotten');
+  assert.equal((k as any).refused.has('fable'), false);
+
+  k = refuse(withPlan('Pro'));
+  k.noteRefused('fable');
+  (k as any).usageCache = withPlan('Max');
+  assert.equal(k.refuses('fable'), false, 'a plan that changed since may include it now');
+  (k as any).usageCache = withPlan('Pro');
+  assert.equal(k.refuses('fable'), false, 'and it stays forgotten');
+
+  k = refuse(withPlan('Pro', false));
+  k.noteRefused('fable');
+  (k as any).usageCache = withPlan('Pro', true);
+  assert.equal(k.refuses('fable'), false, 'extra usage turned on since: it may take the model now');
+
+  k = refuse(withPlan('Pro', true));
+  k.noteRefused('fable');
+  (k as any).usageCache = withPlan('Pro', true);
+  assert.equal(k.refuses('fable'), true, 'extra usage that was on already changes nothing');
+
+  k = refuse(null);
+  k.noteRefused('fable');
+  assert.equal(k.refuses('fable'), true, 'with no usage read, the refusal stands');
+  for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+  console.log('Models the plan does not include passed');
 }

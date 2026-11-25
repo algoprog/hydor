@@ -4,7 +4,9 @@
 // counts; the move waits for subagents still at work; a session that is idle with subagents stopped at the limit moves
 // too; and what it tells the agent names them. Also what happens when that move fails (the error toast, and the
 // continue at the reset with Resume after usage limits on), and moveToAccount over a stale copy of the history the
-// other account already holds (cleared before the agent stops, or refused with the agent left running).
+// other account already holds (cleared before the agent stops, or refused with the agent left running). The model
+// counts too: a limit of another model alone (Weekly · Fable only) does not hold a Sonnet session back, and an account
+// whose plan turned the session's model away is passed over for it.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sessions-limit-test.ts
 //   DATA_DIR=/tmp/hydor-test-limit CLAUDE_CONFIG_DIR=/tmp/hydor-test-limit/claude CODEX_HOME=/tmp/hydor-test-limit/codex GROK_HOME=/tmp/hydor-test-limit/grok node dist/dev/sessions-limit-test.js
@@ -103,8 +105,11 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     },
     toCredit: async () => false,
     resumeAfterLimit: async () => {},
+    summary: () => null,
   };
   m.accountAgentOf = proto.accountAgentOf.bind(m);
+  m.familyOf = proto.familyOf.bind(m);
+  m.refusesModel = proto.refusesModel.bind(m);
   m.acpAccountAgentOf = proto.acpAccountAgentOf.bind(m);
   m.lastUsageOf = proto.lastUsageOf.bind(m);
   m.afterTurn = proto.afterTurn.bind(m);
@@ -314,7 +319,7 @@ test('switchAtLimit waits for a subagent still at work, then moves and names the
   const started = Date.now();
   await t.switchAtLimit(KEY, undefined);
   assert.ok(Date.now() - started >= 90, 'it waited');
-  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
   assert.equal(t.calls.delivered.length, 1);
   const msg = t.calls.delivered[0];
   assert.ok(msg.includes('reached its usage limit, so this session now runs on Account b'), msg);
@@ -379,7 +384,7 @@ test('switchAtLimit with nothing to wait for moves at once, whatever limitStoppe
   t.adapter.limitStopped = false;
   t.m.userStopped.add(KEY);
   await t.switchAtLimit(KEY, undefined);
-  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
   assert.ok(!t.calls.delivered[0].includes('subagent'), 'no subagent line without subagents');
 });
 
@@ -684,7 +689,7 @@ test('beforeResume moves to the account with usage left and leaves a note, taken
   t.adapter.limitTasks.set('t1', 'Check the logs');
   t.adapter.limitTasks.set('t2', 'Read the docs');
   assert.equal(await t.beforeResume(KEY), false);
-  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
   assert.equal(t.takeMoveNote(KEY, '/compact'), '', 'a command leaves it');
   assert.equal(t.takeMoveNote(KEY, '  /compact'), '', 'also after spaces');
   const note = t.takeMoveNote(KEY, 'carry on');
@@ -761,7 +766,7 @@ test('a Grok session the limit stopped moves to another account, told in the sam
   const after = t.m.limitAfter.get(GROK_KEY);
   assert.ok(after, 'the turn is followed');
   assert.deepEqual(await after.after, { goes: 'account', to: 'Account b' });
-  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b', 'limit']]);
   assert.deepEqual(t.calls.delivered, ['Account a reached its usage limit, so this session now runs on Account b. Continue where you left off.']);
 });
 
@@ -804,7 +809,7 @@ test('beforeResume for a Grok session moves it to the account with usage left, w
   const t = grokManager({ free: { id: 'b' }, usage: grokUsage(true) });
   t.m.beforeResume = proto.beforeResume.bind(t.m);
   assert.equal(await t.m.beforeResume(GROK_KEY), false);
-  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b', 'limit']]);
   assert.deepEqual(t.calls.usageOf, [['grok', 'a', 60_000]]);
   assert.equal(t.takeMoveNote(GROK_KEY, 'hi'), 'Account a reached its usage limit, so this session now runs on Account b, which has usage left.');
 });
@@ -1187,6 +1192,184 @@ test('moveToAccount that cannot be made says so and leaves the agent running', a
     assert.ok(fs.existsSync(t.inA.file), 'its history stays');
   } finally {
     t.done();
+  }
+});
+
+// ---- the session's model: limits of one model alone, and a plan that does not include it ----------------------
+
+const HOUR = 3600_000;
+/** Claude Code usage: its windows (`model` on one of a model alone), and the limit it shows when one is full. */
+const claudeUsageOf = (windows: [id: string, used: number, model?: string][], limited: { label: string; resetsAt: number; model?: string } | null = null) => ({
+  agent: 'claude',
+  ok: true,
+  fetchedAt: Date.now(),
+  windows: windows.map(([id, used, model]) => ({ id, label: model ? `Weekly · ${model} only` : id, usedPercent: used, resetsAt: Date.now() + 5 * HOUR, ...(model ? { model } : {}) })),
+  limited,
+});
+const fableOnly = (resetsAt = Date.now() + 5 * HOUR) => ({ label: 'Weekly · Fable only', resetsAt, model: 'fable' });
+/** A manager that knows which accounts turn which model families away (for their plans), by account. */
+const refusing = (refuses: (id: string | undefined, family: string) => boolean) => ({ refuses }) as const;
+
+signedOutTest('freeAccount for a Sonnet session takes an account whose only full window is a Fable-only one, and passes it over for a Fable session', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  try {
+    const usage = claudeUsageOf([['weekly_all', 40], ['weekly_fable', 100, 'fable']], fableOnly());
+    const m: any = { db, usageOf: async (_agent: string, id: string | undefined) => (id === a.id ? usage : undefined), controlFor: () => ({ refuses: () => false }) };
+    m.refusesModel = proto.refusesModel.bind(m);
+    const free = (family: string | null) => proto.freeAccount.call(m, 'claude', undefined, family) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free('sonnet'))?.id, a.id, 'a limit of Fable alone leaves Sonnet its usage');
+    assert.equal(await free('fable'), null, 'it holds a Fable session back');
+    assert.equal(await free(null), null, 'and one whose model is not known: every limit counts');
+    // With anyLimit (subagents of unknown models) every limit counts, as for an unknown model.
+    assert.equal(await proto.freeAccount.call(m, 'claude', undefined, 'sonnet', true), null);
+    // A limit of the whole account holds every model back.
+    usage.windows[0].usedPercent = 100;
+    assert.equal(await free('sonnet'), null);
+  } finally {
+    removeAccount(db, a.id, true);
+  }
+});
+
+signedOutTest('freeAccount passes over an account whose plan turned the family away, for that family only', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const reads = new Map<string | undefined, ReturnType<typeof claudeUsageOf>>([
+      [a.id, claudeUsageOf([['weekly_all', 10]])],
+      [b.id, claudeUsageOf([['weekly_all', 50]])],
+    ]);
+    const asked: (string | undefined)[] = [];
+    const m: any = {
+      db,
+      usageOf: async (_agent: string, id: string | undefined) => (asked.push(id), reads.get(id)),
+      controlFor: (_agent: string, id: string | undefined) => refusing((f) => f === 'fable' && id === a.id),
+    };
+    m.refusesModel = proto.refusesModel.bind(m);
+    const free = (family: string | null) => proto.freeAccount.call(m, 'claude', undefined, family) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free('sonnet'))?.id, a.id, 'Work takes a Sonnet session: the least used');
+    assert.equal((await free(null))?.id, a.id);
+    asked.length = 0;
+    assert.equal((await free('fable'))?.id, b.id, 'Work\'s plan does not include Fable: Personal takes it');
+    assert.ok(!asked.includes(a.id), 'the usage of an account that refuses is not even read');
+    // Claude Code's refusals are its own: another agent's accounts are not asked.
+    assert.equal(m.refusesModel('codex', a.id, 'fable'), false);
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+signedOutTest('freeAccount picks the least used by the windows that hold the model back', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const reads = new Map<string | undefined, ReturnType<typeof claudeUsageOf>>([
+      [a.id, claudeUsageOf([['weekly_all', 90], ['weekly_fable', 10, 'fable']])],
+      [b.id, claudeUsageOf([['weekly_all', 50], ['weekly_fable', 99, 'fable']])],
+    ]);
+    const m: any = { db, usageOf: async (_agent: string, id: string | undefined) => reads.get(id), controlFor: () => ({ refuses: () => false }) };
+    m.refusesModel = proto.refusesModel.bind(m);
+    const free = (family: string | null, anyLimit = false) => proto.freeAccount.call(m, 'claude', undefined, family, anyLimit) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free('sonnet'))?.id, b.id, 'for Sonnet the Fable window counts for nothing: 50 beats 90');
+    assert.equal((await free('fable'))?.id, a.id, 'for Fable both count: 90 beats 99');
+    assert.equal((await free(null))?.id, a.id, 'with no model known all count');
+    assert.equal((await free('sonnet', true))?.id, a.id, 'and with anyLimit');
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
+  }
+});
+
+/** A manager for a Claude Code session on that model, whose accounts turn away the families `refuses` says. */
+function modelManager(model: string, opts: Parameters<typeof manager>[0] = {}, refuses: (f: string) => boolean = () => false) {
+  const t = manager(opts);
+  (t.adapter.state as any).model = model;
+  t.m.controlFor = () => ({ lastUsage: { limited: null }, refuses });
+  return t;
+}
+
+test('beforeResume moves a Fable session whose own account has usage but whose plan does not include Fable, with a note that says so', async () => {
+  const t = modelManager('claude-fable-5-2', { usage: claudeUsageOf([['weekly_all', 10]]) }, (f) => f === 'fable');
+  assert.equal(await t.beforeResume(KEY), false);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'model']]);
+  assert.equal(t.takeMoveNote(KEY, 'carry on'), "Account a's plan does not include Fable, so this session now runs on Account b, which has usage left.");
+  // A Sonnet session on the same account has no reason to leave it.
+  const s = modelManager('claude-sonnet-5', { usage: claudeUsageOf([['weekly_all', 10]]) }, (f) => f === 'fable');
+  assert.equal(await s.beforeResume(KEY), false);
+  assert.equal(s.calls.carryOver.length, 0);
+  assert.equal(s.takeMoveNote(KEY, 'carry on'), '');
+});
+
+test('beforeResume does not move a Sonnet session whose account is only at a Fable-only limit, and moves a Fable one for the limit', async () => {
+  const usage = claudeUsageOf([['weekly_all', 40], ['weekly_fable', 100, 'fable']], fableOnly());
+  const sonnet = modelManager('claude-sonnet-5', { usage });
+  assert.equal(await sonnet.beforeResume(KEY), false);
+  assert.equal(sonnet.calls.carryOver.length, 0);
+  assert.equal(sonnet.takeMoveNote(KEY, 'hi'), '');
+  // Its model is not in the session's state: the summary's one counts.
+  const viaSummary = modelManager('', { usage });
+  (viaSummary.adapter.state as any).model = undefined;
+  viaSummary.m.summary = () => ({ model: 'sonnet' });
+  await viaSummary.beforeResume(KEY);
+  assert.equal(viaSummary.calls.carryOver.length, 0);
+  const fable = modelManager('fable', { usage });
+  await fable.beforeResume(KEY);
+  assert.deepEqual(fable.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
+  assert.equal(fable.takeMoveNote(KEY, 'hi'), 'Account a reached its usage limit, so this session now runs on Account b, which has usage left.');
+});
+
+test('switchAtLimit after a refusal says the plan does not include the model, and moves for that reason', async () => {
+  const t = modelManager('claude-fable-5-2', {}, (f) => f === 'fable');
+  await t.switchAtLimit(KEY, undefined);
+  assert.deepEqual(t.calls.carryOver, [[KEY, 'a', 'b', 'model']]);
+  assert.deepEqual(t.calls.delivered, ["Account a's plan does not include Fable, so this session now runs on Account b. Continue where you left off."]);
+  // The same refusal for another model than the session's changes nothing: a plain limit.
+  const s = modelManager('claude-sonnet-5', {}, (f) => f === 'fable');
+  await s.switchAtLimit(KEY, undefined);
+  assert.deepEqual(s.calls.carryOver, [[KEY, 'a', 'b', 'limit']]);
+  assert.deepEqual(s.calls.delivered, ['Account a reached its usage limit, so this session now runs on Account b. Continue where you left off.']);
+});
+
+signedOutTest('limitLiftsAt leaves out an account that turned the model away, and counts only the limits that hold the model back', async () => {
+  const a = addAccount(db, 'claude', 'Work');
+  const b = addAccount(db, 'claude', 'Personal');
+  try {
+    const now = Date.now();
+    const later = now + 9 * HOUR;
+    const sooner = now + 3 * HOUR;
+    const reads = new Map<string | undefined, ReturnType<typeof claudeUsageOf>>();
+    let family: string | null = 'fable';
+    let refused = true;
+    const m: any = {
+      db,
+      accountAgentOf: () => 'claude',
+      familyOf: () => family,
+      accountOf: () => undefined,
+      lastUsageOf: (_agent: string, id: string | undefined) => reads.get(id),
+      controlFor: (_agent: string, id: string | undefined) => refusing((f) => refused && f === 'fable' && id === a.id),
+    };
+    m.refusesModel = proto.refusesModel.bind(m);
+    const lifts = () => proto.limitLiftsAt.call(m, KEY) as number | null | undefined;
+    // The session's own account (the main one) and Personal are at the Fable-only limit; Work has usage but turns Fable away.
+    const fableLimitUntil = (resetsAt: number) => {
+      const u = claudeUsageOf([['weekly_all', 20], ['weekly_fable', 100, 'fable']], fableOnly(resetsAt));
+      u.windows[1].resetsAt = resetsAt;
+      return u;
+    };
+    reads.set(undefined, fableLimitUntil(later));
+    reads.set(a.id, claudeUsageOf([['weekly_all', 10]]));
+    reads.set(b.id, fableLimitUntil(sooner));
+    assert.equal(lifts(), sooner, 'Work is left out for Fable: the earliest Fable reset among the others');
+    refused = false;
+    assert.equal(lifts(), null, 'where Work takes Fable, a session can go on there now');
+    refused = true;
+    family = 'sonnet';
+    assert.equal(lifts(), null, 'a Sonnet session is not held back by a limit of Fable alone: usage now');
+    // With no model known, every limit counts: Work (which turns nothing away for it) has usage, the others do not.
+    family = null;
+    assert.equal(lifts(), null);
+    reads.set(a.id, fableLimitUntil(later + HOUR));
+    assert.equal(lifts(), sooner, 'and with Work at the limit too, the earliest reset of them all');
+  } finally {
+    for (const x of [a, b]) removeAccount(db, x.id, true);
   }
 });
 

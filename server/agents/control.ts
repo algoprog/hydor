@@ -50,9 +50,30 @@ const toMs = (v: unknown): number | null => {
 function usedUp(windows: UsageWindow[]): AgentUsage['limited'] {
   const full = windows.filter((w) => (w.usedPercent ?? 0) >= 100);
   if (!full.length) return null;
-  const w = full.reduce((a, b) => ((b.resetsAt ?? 0) > (a.resetsAt ?? 0) ? b : a));
-  return { label: w.label, resetsAt: w.resetsAt ?? null };
+  // A limit of the whole account says more than one of a model alone, which holds back only sessions on that model.
+  const whole = full.filter((w) => !w.model);
+  const w = (whole.length ? whole : full).reduce((a, b) => ((b.resetsAt ?? 0) > (a.resetsAt ?? 0) ? b : a));
+  return { label: w.label, resetsAt: w.resetsAt ?? null, ...(w.model ? { model: w.model } : {}) };
 }
+
+/**
+ * The family of a Claude model, as a limit of one model alone names it: "fable" for claude-fable-5-2, fable, fable[1m]
+ * or Fable 5.2. Null when it is not known which model runs: the default one (whichever the plan gives), or opusplan
+ * (Opus to plan, Sonnet otherwise).
+ */
+export function claudeFamily(model: string | null | undefined): string | null {
+  const word = String(model ?? '')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .find((w) => w && w !== 'claude');
+  return !word || word === 'default' || word === 'opusplan' ? null : word;
+}
+
+/** Whether a limit of `scope` (a model family; none: the whole account) holds back a session on `family` (null: not known, so every limit does). */
+export const limitHolds = (scope: string | null | undefined, family: string | null | undefined): boolean => !scope || !family || family.startsWith(scope);
+
+/** How long an account that turned a model away for its plan is passed over for that model, unless its plan or extra usage changes first. */
+const REFUSED_MS = 24 * 60 * 60_000;
 
 export interface ResetOutcome {
   outcome: string;
@@ -513,10 +534,38 @@ export class ClaudeControl extends EventEmitter {
     return this.usageCache;
   }
 
+  /**
+   * Model families this account turned away because its plan does not include them (Claude Code's "Fable 5.2 requires
+   * usage credits"), with when, its plan then and whether extra usage was on. Sessions on such a model pass the account
+   * over (SessionManager.freeAccount) until its plan changes, extra usage is turned on, or a day has gone by.
+   */
+  private refused = new Map<string, { at: number; plan?: string; extra: boolean }>();
+
+  /** The account turned a model family away for its plan at `at`. */
+  noteRefused(family: string, at = Date.now()) {
+    if ((this.refused.get(family)?.at ?? -1) >= at || Date.now() - at > REFUSED_MS) return;
+    this.refused.set(family, { at, plan: this.usageCache?.account?.plan, extra: !!this.usageCache?.extra?.enabled });
+  }
+
+  /** Whether the account turned that model family away for its plan lately (noteRefused), with nothing since saying it would take it now. */
+  refuses(family: string | null | undefined): boolean {
+    const r = family ? this.refused.get(family) : undefined;
+    if (!family || !r) return false;
+    const u = this.usageCache;
+    if (Date.now() - r.at > REFUSED_MS || (r.plan && u?.account?.plan && u.account.plan !== r.plan) || (!r.extra && u?.extra?.enabled)) {
+      this.refused.delete(family);
+      return false;
+    }
+    return true;
+  }
+
   /** Applies a live `rate_limit_event` to the cached report. */
   applyRateLimit(info: Json): AgentUsage | null {
     const u = this.usageCache;
     if (!u || !info) return null;
+    // A model the plan does not include ("Fable 5.2 requires usage credits"): no limit of the account, whose other models
+    // still run. The session manager passes the account over for that model (noteRefused).
+    if (info.status === 'rejected' && info.errorCode === 'credits_required') return u;
     const win = info.unifiedWindows ?? {};
     const windows = u.windows.map((w) => {
       const src = w.id === 'session' ? win.five_hour : w.id === 'weekly_all' ? win.seven_day : undefined;
@@ -524,9 +573,11 @@ export class ClaudeControl extends EventEmitter {
       return { ...w, usedPercent: Math.round(src.utilization * 1000) / 10, resetsAt: toMs(src.resetsAt) ?? w.resetsAt };
     });
     // Rejected: that limit is used up until it resets. Allowed again: usage is back.
+    // A weekly limit of one model alone (seven_day_opus) holds back only the sessions on that model.
+    const model = /^seven_day_([a-z]+)$/.exec(String(info.rateLimitType ?? ''))?.[1];
     const limited =
       info.status === 'rejected'
-        ? { label: RATE_LIMIT_LABELS[info.rateLimitType] ?? 'Usage limit', resetsAt: toMs(info.resetsAt) }
+        ? { label: RATE_LIMIT_LABELS[info.rateLimitType] ?? windows.find((w) => model && w.model === model)?.label ?? 'Usage limit', resetsAt: toMs(info.resetsAt), ...(model ? { model } : {}) }
         : info.status === 'allowed' || info.status === 'allowed_warning'
           ? usedUp(windows)
           : u.limited;
@@ -607,6 +658,7 @@ export class ClaudeControl extends EventEmitter {
       else flow.error = flow.error ?? (flow.buf ?? '').replace(ANSI, '').trim().split('\n').slice(-3).join(' ').slice(0, 300);
       this.initCache = null;
       this.usageCache = null;
+      this.refused.clear();
       this.emit('flow', flow);
       this.emit('account');
     });
@@ -640,6 +692,7 @@ export class ClaudeControl extends EventEmitter {
     await execJson(config.claudeBin, ['auth', 'logout'], this.env());
     this.initCache = null;
     this.usageCache = null;
+    this.refused.clear();
     this.emit('account');
   }
 }
@@ -667,6 +720,8 @@ export function claudeUsage(raw: Json, init: Json | null): AgentUsage {
   if (Array.isArray(rl.limits) && rl.limits.length) {
     for (const l of rl.limits as Json[]) {
       const scope = l.scope?.model?.display_name ?? l.scope?.surface?.display_name;
+      // A limit of one model alone (Weekly · Fable only) holds back only the sessions on that model.
+      const model = l.kind === 'weekly_scoped' && l.scope?.model?.display_name ? claudeFamily(String(l.scope.model.display_name)) : null;
       windows.push({
         id: l.kind === 'weekly_scoped' ? `weekly_${String(scope ?? 'scoped').toLowerCase()}` : String(l.kind),
         label: LIMIT_LABELS[l.kind] ?? (l.kind === 'weekly_scoped' ? `Weekly · ${scope ?? 'model'} only` : String(l.kind).replace(/_/g, ' ')),
@@ -675,16 +730,17 @@ export function claudeUsage(raw: Json, init: Json | null): AgentUsage {
         severity: l.severity,
         active: !!l.is_active,
         windowMinutes: l.group === 'session' ? 300 : l.group === 'weekly' ? 10080 : null,
+        ...(model ? { model } : {}),
       });
     }
   } else {
-    const add = (id: string, label: string, w: Json | null | undefined, mins: number) => {
-      if (w && typeof w.utilization === 'number') windows.push({ id, label, usedPercent: w.utilization, resetsAt: toMs(w.resets_at), windowMinutes: mins });
+    const add = (id: string, label: string, w: Json | null | undefined, mins: number, model?: string) => {
+      if (w && typeof w.utilization === 'number') windows.push({ id, label, usedPercent: w.utilization, resetsAt: toMs(w.resets_at), windowMinutes: mins, ...(model ? { model } : {}) });
     };
     add('session', LIMIT_LABELS.session, rl.five_hour, 300);
     add('weekly_all', LIMIT_LABELS.weekly_all, rl.seven_day, 10080);
-    add('weekly_opus', 'Weekly · Opus only', rl.seven_day_opus, 10080);
-    add('weekly_sonnet', 'Weekly · Sonnet only', rl.seven_day_sonnet, 10080);
+    add('weekly_opus', 'Weekly · Opus only', rl.seven_day_opus, 10080, 'opus');
+    add('weekly_sonnet', 'Weekly · Sonnet only', rl.seven_day_sonnet, 10080, 'sonnet');
   }
   const ex: Json | null = rl.extra_usage ?? null;
   const acct = init?.account ?? {};
