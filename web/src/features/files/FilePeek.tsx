@@ -3,8 +3,9 @@
 // a session with the file or adds it to a space. A folder (a link to one in a reply, or one in the path above
 // a file there) shows there too, as the Files page shows it: its folders and files open in place, and Back
 // returns to what the dialog showed before. Full screen in its top line (on a computer, as the panel beside the
-// conversation has) makes it fill the whole app, and the same button brings it back to its size.
-import { useCallback, useEffect, useState } from 'react';
+// conversation has) makes it fill the whole app, and the same button brings it back to its size; the next one opens
+// as the last was left (kept in this browser).
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { ChevronLeft, Folder, FolderOpen, Maximize2, Minimize2, X } from 'lucide-react';
@@ -20,6 +21,22 @@ import { searchUrl } from './SearchView';
 import { FileMore } from './SpaceMenu';
 
 const shut = () => useFilePeek.setState({ file: null, show: undefined });
+
+/** Whether the last file window was left full screen: the next one opens so too (kept in this browser). */
+const FULL_KEY = 'wa.peek.full';
+const wasFull = (): boolean => {
+  try {
+    return localStorage.getItem(FULL_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+const keepFull = (on: boolean) => {
+  try {
+    if (on) localStorage.setItem(FULL_KEY, '1');
+    else localStorage.removeItem(FULL_KEY);
+  } catch {}
+};
 
 /** The item right in folder `dir` on the way to `p` (`p` itself when it is in it); none when `p` is not below `dir`. */
 function toward(dir: string, p: string): string | undefined {
@@ -57,14 +74,19 @@ export function FilePeek() {
   const [loc] = useLocation();
   // Another page (the browser's Back, a link) takes the file away with the page it was opened over.
   useEffect(shut, [loc]);
-  // Over the whole app instead of in its window: only where the window does not fill the screen already (a phone's comes
-  // up from the bottom, as wide as it), and for this opening only (the files and folders it goes on to keep it).
-  const [full, setFull] = useState(false);
+  // Over the whole app instead of in its window, as the last one was left (the files and folders it goes on to keep it):
+  // only where the window does not fill the screen already (a phone's comes up from the bottom, as wide as it).
+  const [full, setFull] = useState(wasFull);
   const roomy = useMediaQuery('(min-width: 640px)');
   const big = full && roomy;
-  useEffect(() => {
-    if (!open) setFull(false);
+  // Each opening as the last one was left, here or in another of this browser's tabs (before it shows: no jump in size).
+  useLayoutEffect(() => {
+    if (open) setFull(wasFull());
   }, [open]);
+  const toggleFull = () => {
+    setFull(!big);
+    keepFull(!big);
+  };
 
   /** True once it is closed: nothing unsaved, or the changes were discarded. */
   const close = useCallback(async () => {
@@ -143,7 +165,7 @@ export function FilePeek() {
                   <span className="max-sm:hidden">Open in Files</span>
                 </Button>
                 {roomy && (
-                  <IconButton label={big ? 'Close full screen' : 'Full screen'} onClick={() => setFull(!big)}>
+                  <IconButton label={big ? 'Close full screen' : 'Full screen'} onClick={toggleFull}>
                     {big ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                   </IconButton>
                 )}
