@@ -10,7 +10,7 @@
 <p align="center">
   <b>Claude Code, Codex and any model in one app, on the plans you already pay for.</b><br />
   They share one memory, answer with charts, maps and apps, carry on with your other account when one hits its limit,
-  and ask for your OK on your phone. Free and open source, on your own computer.
+  and ask for your OK on your phone.
 </p>
 
 <p align="center">
