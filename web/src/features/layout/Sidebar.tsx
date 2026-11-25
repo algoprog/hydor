@@ -59,7 +59,7 @@ function NavItem({ t, drag, floating, onMenu, tight }: { t: Tool; drag?: DragBit
       )}
     >
       <span className={cx('shrink-0', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
-      <span className={cx('max-w-full truncate leading-none', tight ? 'px-0.5 text-[11px]' : 'px-1')}>{t.label}</span>
+      <span className={cx('max-w-full truncate leading-[1.35]', tight ? 'px-0.5 text-[11px]' : 'px-1')}>{t.label}</span>
       {t.extra}
     </button>
   );

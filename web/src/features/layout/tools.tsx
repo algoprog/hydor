@@ -50,7 +50,7 @@ export function UsageHint({ compact }: { compact?: boolean } = {}) {
     ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : u.agent === 'antigravity' ? 'Antigravity' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
   ].join('\n');
   return (
-    <span className={cx('absolute left-1/2 h-[3px] -translate-x-1/2 overflow-hidden rounded-full bg-fg/10', compact ? 'bottom-[3px] w-5' : 'bottom-[7px] w-8')} title={title}>
+    <span className={cx('absolute left-1/2 h-[3px] -translate-x-1/2 overflow-hidden rounded-full bg-fg/10', compact ? 'bottom-[3px] w-5' : 'bottom-[4px] w-8')} title={title}>
       <span className="block h-full rounded-full" style={{ width: `${left}%`, background: left <= 0 ? 'var(--err)' : severityColor(100 - left) }} />
     </span>
   );
