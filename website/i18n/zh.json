@@ -462,5 +462,6 @@
   "A board of pinned answer cards: the week’s key numbers, a sales chart and a weather forecast, each with when it was last updated.": "一块置顶回答卡片的看板：本周关键数字、销售图表和天气预报，每张都标明上次更新的时间。",
   "Pages, slides, documents, spreadsheets and LaTeX, edited right in the app. Pictures, videos, music and voice-overs too, all kept in the files of their project.": "页面、幻灯片、文档、电子表格和 LaTeX，直接在应用里编辑。图片、视频、音乐和配音也一样，全都保存在各自项目的文件中。",
   "Hydor runs the official Claude Code and Codex on your own plans, and gives every agent one memory, a phone app with approvals, and documents, slides and spreadsheets you edit in the app. What your other agents know, and the skills you made in them, come over, and you pick what to keep. <0>See the comparisons</0>, with their sources.": "Hydor 运行官方的 Claude Code 和 Codex，使用你自己的订阅方案，并为每个智能体提供同一份记忆、一个可以批准操作的手机应用，以及可在应用内编辑的文档、幻灯片和电子表格。你的其他智能体所了解的内容，以及你在它们那里创建的技能，都会一并迁移过来，保留哪些由你来选。<0>查看对比</0>，并附有来源。",
-  "Slides for a four-day Lisbon trip open in the app's slide editor, with an illustrated tram on the slide being edited.": "一场为期四天的里斯本之旅的幻灯片在应用的幻灯片编辑器中打开，正在编辑的那张幻灯片上有一辆带插画的电车。"
+  "Slides for a four-day Lisbon trip open in the app's slide editor, with an illustrated tram on the slide being edited.": "一场为期四天的里斯本之旅的幻灯片在应用的幻灯片编辑器中打开，正在编辑的那张幻灯片上有一辆带插画的电车。",
+  "Blog": "博客"
 }

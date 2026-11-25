@@ -8,6 +8,16 @@
 //   node website/build.mjs --extract     write website/i18n/strings.json: every English text the site shows, to translate
 //   node website/build.mjs --deploy      build, then publish it on Cloudflare Pages (project "hydor", hydor.app);
 //                                        needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+//
+// The blog (/blog, website/blog.mjs) is made from website/blog/posts/*.md; for looking at it while it is written:
+//
+//   HYDOR_SITE_OUT=<folder>  build (and serve, and check with i18n-test.mjs) in that folder instead of dist/website, so
+//                            several people can build at once without overwriting each other
+//   --langs en,de            only those languages (a quick look; the sitemap and the language checks are then partial)
+//   --posts a,b              only those posts of the blog
+//   --drafts                 also the blog's drafts (posts whose file names start with _)
+//
+// --langs, --posts and --drafts are refused together with --deploy: what is published is the whole site.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -15,17 +25,36 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildBlog } from './blog.mjs';
 import { bundleSearch, buildDocs, loadDocs } from './docs.mjs';
 import { SITE, TAGS, dataBlock, detectScript, find, formatDate, headLinks, loadDict, localHref, makeTranslator, parseHtml, pathIn, relocate, scanCalls, serializeHtml, switcher, translateTree, wordCount } from './i18n.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'website/src');
 const I18N = path.join(ROOT, 'website/i18n');
-const DIST = path.join(ROOT, 'dist/website');
+const DIST = process.env.HYDOR_SITE_OUT ? path.resolve(process.env.HYDOR_SITE_OUT) : path.join(ROOT, 'dist/website');
 let OUT = DIST;
 const TOUR = path.join(ROOT, 'docs/media/hydor-intro.mp4');
 const PROJECT = 'hydor';
 const args = process.argv.slice(2);
+/** The value of a flag: `--langs en,de` as ['en', 'de'], or null when it is not given. */
+const listOf = (flag) => {
+  const i = args.indexOf(flag);
+  if (i < 0) return null;
+  const v = args[i + 1];
+  if (!v || v.startsWith('--')) throw new Error(`${flag} wants a list, like ${flag} a,b`);
+  return v.split(',').map((x) => x.trim()).filter(Boolean);
+};
+const ONLY_LANGS = listOf('--langs');
+const ONLY_POSTS = listOf('--posts');
+const DRAFTS = args.includes('--drafts');
+if (args.includes('--deploy') && (ONLY_LANGS || ONLY_POSTS || DRAFTS)) throw new Error('--langs, --posts and --drafts are for looking at the site: --deploy publishes all of it');
+// What a build deletes first must be a folder of its own.
+if (process.env.HYDOR_SITE_OUT) {
+  const bad = [path.parse(DIST).root, ROOT, os.homedir(), path.dirname(ROOT)];
+  if (bad.includes(DIST) || ROOT.startsWith(DIST + path.sep) || fs.existsSync(path.join(DIST, '.git')) || fs.existsSync(path.join(DIST, 'package.json')))
+    throw new Error(`HYDOR_SITE_OUT=${DIST}: this folder is not one to build into (it would be emptied first): use a new folder, like /tmp/site-mine`);
+}
 
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -101,14 +130,20 @@ async function build({ extract = false } = {}) {
   for (const f of ['index.html', '404.html']) fs.rmSync(path.join(OUT, f));
   const version = extract ? JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version : await latestVersion();
   const { date, summary } = notes(version);
-  const langs = await loadLangs();
+  let langs = await loadLangs();
+  if (ONLY_LANGS) {
+    for (const l of ONLY_LANGS) if (!langs.some((x) => x.id === l)) throw new Error(`--langs ${l}: the languages are ${langs.map((x) => x.id).join(', ')}`);
+  }
   const docs = await loadDocs(ROOT);
   const texts = codeTexts();
   const record = new Set();
   const entries = new Map(); // English address → whether it has pages in the other languages
   const stats = [];
+  let blogPages = 0;
 
-  for (const { id: lang } of langs) {
+  // The language menu and the alternates always name every language; --langs only chooses which are built.
+  const built = ONLY_LANGS ? langs.filter((l) => ONLY_LANGS.includes(l.id)) : langs;
+  for (const { id: lang } of built) {
     if (extract && lang !== 'en') continue;
     const tr = makeTranslator(loadDict(I18N, lang), lang === 'en' ? record : null);
     const pre = lang === 'en' ? '' : `/${lang}`;
@@ -133,7 +168,15 @@ async function build({ extract = false } = {}) {
     const made = await buildDocs(docs, { out: OUT, lang, langs, tr, shellHtml: finish(home.shell), commonKeys: texts.common });
     if (lang === 'en') for (const k of texts.all) tr.get(k); // the texts in main.js and the search's code come last
     for (const m of made) entries.set(m.path, Boolean(m.alternates));
-    stats.push({ lang, tr, pages: made.length + 2 });
+    // The blog is English only, like /compare: the other languages' pages link to it.
+    if (lang === 'en' && !extract) {
+      const blog = await buildBlog({ root: ROOT, out: OUT, langs, shellHtml: finish(home.shell), drafts: DRAFTS, only: ONLY_POSTS });
+      for (const m of blog.made) entries.set(m.path, false);
+      for (const w of blog.warnings) console.log(`  blog: ${w}`);
+      if (blog.warnings.length && args.includes('--deploy')) throw new Error('the blog has pictures that are not made yet (above): not publishing');
+      blogPages = blog.made.length;
+    }
+    stats.push({ lang, tr, pages: made.length + 2 + (lang === 'en' ? blogPages : 0) });
   }
 
   await bundleSearch(ROOT, OUT);
@@ -168,17 +211,19 @@ async function build({ extract = false } = {}) {
   const headers = path.join(OUT, '_headers');
   fs.writeFileSync(headers, fs.readFileSync(headers, 'utf8').replace('%SCRIPT_HASHES%', [...hashes].join(' ')));
   const pageCount = stats.reduce((a, s) => a + s.pages, 0);
-  console.log(`built ${path.relative(ROOT, OUT)} for Hydor ${version}${date ? ` (${date})` : ''}: ${pageCount} pages in ${langs.length} languages, and ${n} pictures and films asked for by their hash`);
+  const where = path.relative(ROOT, OUT).startsWith('..') ? OUT : path.relative(ROOT, OUT);
+  console.log(`built ${where} for Hydor ${version}${date ? ` (${date})` : ''}: ${pageCount} pages in ${built.length === langs.length ? `${langs.length} languages` : `${built.map((l) => l.id).join(', ')}`}${blogPages ? ` (the blog: ${blogPages} pages and its feed)` : ''}, and ${n} pictures and films asked for by their hash`);
   for (const { lang, tr } of stats) {
     if (lang === 'en') continue;
-    const done = [...record].filter((k) => tr.has(k) && !tr.refused.has(k)).length;
-    console.log(`  ${lang}: ${done} of ${record.size} texts translated${tr.refused.size ? `, ${tr.refused.size} refused (placeholders differ from the English)` : ''}`);
+    const total = record.size || tr.asked.size;
+    const done = [...(record.size ? record : tr.asked)].filter((k) => tr.has(k) && !tr.refused.has(k)).length;
+    console.log(`  ${lang}: ${done} of ${total} texts translated${tr.refused.size ? `, ${tr.refused.size} refused (placeholders differ from the English)` : ''}`);
     for (const k of tr.refused) console.log(`    refused: ${k.slice(0, 90)}`);
   }
   // Where strings.json is no longer what the site shows, the translators would work from a stale list.
   const file = path.join(I18N, 'strings.json');
   const listed = fs.existsSync(file) ? Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))) : [];
-  if (listed.length !== record.size || listed.some((k) => !record.has(k))) console.log('  website/i18n/strings.json is out of date: run  node website/build.mjs --extract');
+  if (record.size && (listed.length !== record.size || listed.some((k) => !record.has(k)))) console.log('  website/i18n/strings.json is out of date: run  node website/build.mjs --extract');
 }
 
 /** Every page asks for the pictures and the film with ?v= and a hash of what they hold. Cloudflare and browsers keep
@@ -191,8 +236,8 @@ function versionFiles() {
     return hashes.get(file);
   };
   // In an attribute, a string or url(…): img/x.webp beside the page, or /img/x.webp and https://hydor.app/img/x.webp
-  // from the site's root; one with a query already is left as it is.
-  const ref = /(?<=["'(])(https:\/\/hydor\.app\/|\/)?((?:img|media|docs\/images)\/[\w.-]+\.(?:webp|jpe?g|png|gif|svg|avif|mp4|webm))(?![\w.?-])/g;
+  // from the site's root, in a sub-folder too (img/blog/meet-hydor/cover.webp); one with a query already is left as it is.
+  const ref = /(?<=["'(])(https:\/\/hydor\.app\/|\/)?((?:img|media|docs\/images)\/(?:[\w.-]+\/)*[\w.-]+\.(?:webp|jpe?g|png|gif|svg|avif|mp4|webm))(?![\w.?-])/g;
   const pages = fs.readdirSync(OUT, { recursive: true }).filter((f) => /\.(html|css|js)$/.test(f));
   for (const page of pages.map((f) => path.join(OUT, f))) {
     const text = fs.readFileSync(page, 'utf8');

@@ -2,6 +2,7 @@
 // Checks the website's languages (website/i18n.mjs and the pages build.mjs makes of them):
 //   node website/i18n-test.mjs            builds the site if dist/website is not there, then checks it
 //   node website/i18n-test.mjs --build    builds it first
+// HYDOR_SITE_OUT=<folder> checks (and builds) that folder instead of dist/website, as build.mjs does.
 //
 // 1. A translation's placeholders: the words in another order, the elements and attributes put back, a translation
 //    with a placeholder missing refused.
@@ -18,7 +19,7 @@ import { parse } from 'parse5';
 import { detectScript, makeTranslator, parseHtml, serializeHtml, translateTree } from './i18n.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist/website');
+const OUT = process.env.HYDOR_SITE_OUT ? path.resolve(process.env.HYDOR_SITE_OUT) : path.join(ROOT, 'dist/website');
 let failures = 0;
 const ok = (cond, what) => {
   if (!cond) {

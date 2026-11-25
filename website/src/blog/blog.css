@@ -1,0 +1,984 @@
+/* hydor.app's blog (/blog): the first page, a post, and the pieces every post's figures share (.fig, .chip, .callout,
+   .stats…). Loaded after style.css, on blog pages only. Dark, in the site's tokens. website/README.md says how posts work. */
+
+/* The header's Blog link, on the blog's pages */
+
+.nav-links a[aria-current='page'] {
+  color: var(--fg);
+}
+
+.nav-sheet a[aria-current='page'] {
+  color: var(--fg);
+}
+
+.nav-links a[aria-current='page']::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin: 3px 4px -5px;
+  border-radius: 2px;
+  background: var(--water);
+}
+
+/* ---------- Pieces every post's figures share ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A figure in the text column; .wide lets it break out to about 1080 px. */
+.fig {
+  --fig-w: 1080px;
+  margin: 2.4em 0;
+  color: var(--fg-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.fig.wide {
+  width: min(var(--fig-w), 100vw - 40px);
+  margin-left: calc(50% - min(var(--fig-w) / 2, 50vw - 20px));
+}
+
+.fig-stage {
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 42%), var(--panel);
+}
+
+.fig figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+
+.fig figcaption b {
+  color: var(--fg-2);
+  font-weight: 600;
+}
+
+.fig-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.fig-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+
+.fig-btn:hover {
+  color: var(--fg);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.fig-btn[aria-pressed='true'] {
+  color: var(--w2);
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.fig-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--fg-3);
+}
+
+.fig-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fig-legend i {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--c, var(--w2));
+}
+
+.chip {
+  --c: var(--fg-3);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, var(--c) 38%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  color: var(--c);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.callout {
+  margin: 2em 0;
+  padding: 15px 20px;
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.09), rgba(94, 234, 212, 0.03));
+  color: var(--fg);
+  font-size: 0.94em;
+  line-height: 1.65;
+}
+
+.callout > :first-child {
+  margin-top: 0;
+}
+
+.callout > :last-child {
+  margin-bottom: 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 2.2em 0;
+}
+
+.stat {
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+}
+
+.stat b {
+  display: block;
+  background: var(--water);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: clamp(2rem, 4.4vw, 2.7rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat span {
+  display: block;
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fg-3);
+}
+
+/* ---------- The blog's first page ---------- */
+
+.blog-main {
+  padding-bottom: clamp(80px, 11vw, 140px);
+}
+
+.blog-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  padding: calc(var(--nav-h) + clamp(48px, 9vh, 104px)) 0 clamp(44px, 6vw, 72px);
+}
+
+.blog-hero .water.on {
+  opacity: 0.5;
+}
+
+.blog-hero::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: auto 0 0;
+  height: 40%;
+  background: linear-gradient(transparent, var(--bg));
+  pointer-events: none;
+}
+
+.blog-hero-in {
+  max-width: 1160px;
+}
+
+.blog-hero h1 {
+  font-size: clamp(2.7rem, 7vw, 5rem);
+  font-weight: 680;
+  line-height: 1;
+  letter-spacing: -0.048em;
+}
+
+.blog-lede {
+  max-width: 640px;
+  margin: 22px 0 0;
+  font-size: clamp(1.06rem, 1.6vw, 1.25rem);
+  line-height: 1.6;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.blog-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+  padding: 6px 14px 6px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--fg-2);
+  font-size: 13.5px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: color 0.3s var(--ease), border-color 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+
+.blog-feed .ic {
+  width: 16px;
+  height: 16px;
+  color: var(--w2);
+}
+
+.blog-feed:hover {
+  color: var(--fg);
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.07);
+}
+
+.blog-list {
+  display: grid;
+  gap: 22px;
+}
+
+.blog-empty {
+  color: var(--fg-3);
+}
+
+.post-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+@media (min-width: 760px) {
+  .post-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A card: the cover, its tags, title, description and when. */
+
+.post-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  transition: transform 0.5s var(--ease), background-color 0.4s;
+}
+
+/* The border that lights in the water's colours. */
+.post-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--water);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+  pointer-events: none;
+}
+
+.post-card:hover::before,
+.post-card:focus-within::before {
+  opacity: 0.9;
+}
+
+.post-card-link {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px 10px 4px;
+  border-radius: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.post-card-link:focus-visible {
+  outline-offset: 4px;
+}
+
+.post-card-cover {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.post-card-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.post-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 14px 18px;
+}
+
+.post-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.post-card-title {
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  transition: color 0.4s var(--ease);
+}
+
+.post-card-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.post-card:hover .post-card-title,
+.post-card:focus-within .post-card-title {
+  color: var(--w2);
+}
+
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+}
+
+.post-card .post-meta {
+  padding-top: 8px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .post-card-cover img {
+    transition: transform 0.6s var(--ease);
+  }
+
+  .post-card:hover .post-card-cover img,
+  .post-card:focus-within .post-card-cover img {
+    transform: scale(1.03);
+  }
+}
+
+/* The newest post: a wide card, the cover on the left. */
+
+.post-card.featured {
+  border-radius: 28px;
+}
+
+.post-card.featured .post-card-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(8px, 3vw, 40px);
+  padding: 12px;
+}
+
+.post-card.featured .post-card-cover {
+  border-radius: 18px;
+}
+
+.post-card.featured .post-card-body {
+  gap: 14px;
+  padding: 12px clamp(8px, 2vw, 28px) 12px 4px;
+}
+
+.post-card.featured .post-card-title {
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.038em;
+}
+
+.post-card.featured .post-card-text {
+  -webkit-line-clamp: 5;
+  font-size: clamp(1rem, 1.3vw, 1.1rem);
+}
+
+@media (max-width: 860px) {
+  .post-card.featured .post-card-link {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 10px 10px 4px;
+  }
+
+  .post-card.featured .post-card-body {
+    padding: 18px 14px;
+  }
+}
+
+/* ---------- A post ---------- */
+
+.read-progress {
+  position: fixed;
+  z-index: 49;
+  inset: var(--nav-h) 0 auto;
+  height: 2px;
+  pointer-events: none;
+}
+
+.read-progress i {
+  display: block;
+  height: 100%;
+  background: var(--water);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+.post-main {
+  padding: calc(var(--nav-h) + clamp(36px, 7vh, 80px)) 0 clamp(72px, 10vw, 128px);
+}
+
+.post-article {
+  width: min(100% - 40px, 1180px);
+  margin-inline: auto;
+}
+
+.post-head {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.post-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+}
+
+.post-crumbs a {
+  color: var(--fg-2);
+  text-decoration: none;
+}
+
+.post-crumbs a:hover {
+  color: var(--w2);
+}
+
+.post-head h1 {
+  font-size: clamp(2.3rem, 5.4vw, 3.7rem);
+  font-weight: 680;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.post-dek {
+  margin: 22px 0 0;
+  font-size: clamp(1.1rem, 1.9vw, 1.3rem);
+  line-height: 1.55;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.post-head .post-meta {
+  margin-top: 26px;
+  padding: 0;
+  gap: 6px 10px;
+}
+
+.post-head .post-tags {
+  margin-left: 6px;
+}
+
+/* The cover, wide, over a soft glow of the water. */
+
+.post-cover {
+  position: relative;
+  isolation: isolate;
+  max-width: 1180px;
+  margin: clamp(34px, 5vw, 56px) auto clamp(40px, 6vw, 72px);
+}
+
+.post-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line-2);
+  border-radius: 18px;
+  background: var(--panel);
+}
+
+.post-cover-glow {
+  position: absolute;
+  z-index: -1;
+  inset: 8% 4% -6%;
+  border-radius: 40px;
+  background: radial-gradient(60% 70% at 30% 40%, rgba(56, 189, 248, 0.5), transparent 70%), radial-gradient(50% 60% at 75% 60%, rgba(94, 234, 212, 0.35), transparent 70%);
+  filter: blur(48px);
+  opacity: 0.4;
+}
+
+/* The text column, and the list of its parts beside it. */
+
+.post-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+}
+
+@media (min-width: 1200px) {
+  .post-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr);
+  }
+
+  .post-body {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .post-toc {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+.post-toc {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .post-toc {
+    display: block;
+    align-self: start;
+    position: sticky;
+    top: calc(var(--nav-h) + 32px);
+    max-height: calc(100vh - var(--nav-h) - 64px);
+    margin-left: clamp(20px, 3vw, 44px);
+    padding-right: 4px;
+    overflow-y: auto;
+    transition: opacity 0.4s var(--ease);
+  }
+
+  .post-toc.is-aside {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.post-toc p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.post-toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 1px solid var(--line-2);
+}
+
+.post-toc a {
+  position: relative;
+  display: block;
+  padding: 6px 0 6px 16px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fg-3);
+  text-decoration: none;
+  transition: color 0.3s var(--ease);
+}
+
+.post-toc a::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--water);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.post-toc a:hover {
+  color: var(--fg);
+}
+
+.post-toc a.is-current {
+  color: var(--fg);
+}
+
+.post-toc a.is-current::before {
+  opacity: 1;
+}
+
+/* The words. The prose rules (margins, sizes, lists, quotes, tables) stop at figures (.fig and its parts), so a figure
+   needs no reset of its own; :where() keeps their specificity as it was. Inline looks (links, strong, code, kbd, code
+   blocks) are the same everywhere. */
+
+.post-body {
+  min-width: 0;
+  font-size: 18px;
+  line-height: 1.75;
+  color: var(--fg-2);
+}
+
+.post-body > :first-child {
+  margin-top: 0;
+}
+
+.post-body p:where(:not(.fig *)),
+.post-body ul:where(:not(.fig *)),
+.post-body ol:where(:not(.fig *)) {
+  margin: 0 0 1.35em;
+  text-wrap: pretty;
+}
+
+.post-body strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.post-body h2:where(:not(.fig *)),
+.post-body h3:where(:not(.fig *)),
+.post-body h4:where(:not(.fig *)) {
+  color: var(--fg);
+  text-wrap: balance;
+  scroll-margin-top: calc(var(--nav-h) + 24px);
+}
+
+.post-body h2:where(:not(.fig *)) {
+  margin: 2.5em 0 0.7em;
+  font-size: clamp(1.6rem, 3.1vw, 2.05rem);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.post-body h3:where(:not(.fig *)) {
+  margin: 2em 0 0.55em;
+  font-size: clamp(1.25rem, 2.2vw, 1.45rem);
+  font-weight: 640;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.post-body h4:where(:not(.fig *)) {
+  margin: 1.8em 0 0.5em;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.post-body :is(h2, h3, h4) .anchor {
+  color: var(--fg-3);
+  font-weight: 400;
+}
+
+.post-body :is(h2, h3, h4):hover .anchor,
+.post-body .anchor:focus-visible {
+  opacity: 1;
+}
+
+.post-body ul:where(:not(.fig *)),
+.post-body ol:where(:not(.fig *)) {
+  padding-left: 1.5em;
+}
+
+.post-body li:where(:not(.fig *)) {
+  padding-left: 0.2em;
+}
+
+.post-body li + li:where(:not(.fig *)) {
+  margin-top: 0.5em;
+}
+
+.post-body li > ul:where(:not(.fig *)),
+.post-body li > ol:where(:not(.fig *)) {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+}
+
+.post-body li:where(:not(.fig *))::marker {
+  color: var(--fg-3);
+}
+
+.post-body a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: rgba(56, 189, 248, 0.7);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+  transition: color 0.2s, text-decoration-color 0.2s;
+}
+
+.post-body a:hover {
+  color: var(--w1);
+  text-decoration-color: var(--w1);
+}
+
+.post-body a.anchor {
+  text-decoration: none;
+}
+
+.post-body blockquote:where(:not(.fig *)) {
+  position: relative;
+  margin: 2em 0;
+  padding: 2px 0 2px 24px;
+  color: var(--fg);
+  font-size: 1.06em;
+}
+
+.post-body blockquote:where(:not(.fig *))::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--w1), var(--w2) 55%, var(--w3));
+}
+
+.post-body blockquote p:last-child:where(:not(.fig *)) {
+  margin-bottom: 0;
+}
+
+.post-body hr:where(:not(.fig *)) {
+  margin: 3em 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.post-body :not(pre) > code {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #12161d;
+  color: #d5dbe6;
+  font-family: var(--mono);
+  font-size: 0.82em;
+  overflow-wrap: anywhere;
+}
+
+.post-body kbd {
+  font-size: 0.78em;
+}
+
+.post-body .code {
+  margin: 1.8em 0;
+  padding-top: 0;
+}
+
+.post-body .code pre {
+  font-size: 13.5px;
+  white-space: pre;
+}
+
+/* The browser gives <code> its own monospace font; the site's own one is used in a block. */
+.post-body .code pre code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.post-body .table-wrap:where(:not(.fig *)) {
+  margin: 2em 0;
+}
+
+.post-body table:where(:not(.fig *)) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.post-body th:where(:not(.fig *)),
+.post-body td:where(:not(.fig *)) {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.post-body th:where(:not(.fig *)) {
+  background: #0d1015;
+  color: var(--fg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.post-body tr:last-child td:where(:not(.fig *)) {
+  border-bottom: 0;
+}
+
+.post-body td code:where(:not(.fig *)) {
+  white-space: nowrap;
+}
+
+/* A picture on its own line. */
+
+.post-figure {
+  margin: 2.4em 0;
+}
+
+.post-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.post-figure figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+
+/* The end of a post: a way in, and two more to read. */
+
+.post-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 24px;
+  width: min(100%, 880px);
+  margin: clamp(64px, 9vw, 104px) auto 0;
+  padding: clamp(26px, 4vw, 40px);
+  border: 1px solid var(--line-2);
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
+
+.post-cta::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -40% -10% auto auto;
+  width: 70%;
+  height: 120%;
+  background: radial-gradient(closest-side, rgba(56, 189, 248, 0.22), rgba(94, 234, 212, 0.07) 55%, transparent 80%);
+  pointer-events: none;
+}
+
+.post-cta h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.post-cta p {
+  max-width: 560px;
+  margin: 10px 0 0;
+  font-size: 1.04rem;
+  line-height: 1.6;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.post-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.post-more {
+  margin-top: clamp(64px, 9vw, 104px);
+}
+
+.post-more > h2 {
+  margin-bottom: 22px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+@media (max-width: 720px) {
+  .post-body {
+    font-size: 17px;
+    line-height: 1.7;
+  }
+
+  .fig-stage {
+    padding: 16px;
+  }
+
+  .post-cta-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .post-cover img {
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .read-progress i {
+    transition: none;
+  }
+}

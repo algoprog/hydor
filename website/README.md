@@ -22,6 +22,7 @@ CSS and JavaScript with no framework, dark like the app's own dark theme, and no
   to places in the app show as their names; links to other topics stay on the site. Nothing of the docs is kept
   here: change the Markdown and build again. A guide topic is shown in the language of the visitor from
   `docs/guide/<lang>/`, where that translation is in step with the English topic.
+- `blog.mjs` makes the blog (`/blog`) from `blog/posts/*.md` (below).
 - `search.ts` is the docs' search (the header's Search, Ctrl+K or "/" on any page): Help's own search
   (`web/src/features/guide/search.ts`) over every section, bundled into `docs/search.js` when the site is built.
 - `og/og.html` is the picture shown where a link to the site is shared (`src/img/og.jpg`, 1200×630).
@@ -33,13 +34,92 @@ CSS and JavaScript with no framework, dark like the app's own dark theme, and no
 node website/build.mjs --serve 4321   # then open http://localhost:4321
 ```
 
+To build somewhere else, so several people can build at once without overwriting each other (`i18n-test.mjs` reads it
+too), and to build only part of the site for a quick look:
+
+```bash
+HYDOR_SITE_OUT=/tmp/site-mine node website/build.mjs --langs en --posts meet-hydor --drafts --serve 4410
+```
+
+`HYDOR_SITE_OUT=<folder>` replaces `dist/website` (it is emptied first, so it refuses folders that are not a build's
+own: the repository, your home, `/tmp` itself); `--langs en,de` builds only those languages (the sitemap and the
+language checks are then partial); `--posts a,b` only those blog posts; `--drafts` also the blog's drafts. The three
+flags are refused with `--deploy`: what is published is all of the site.
+
 The page offers the download that suits the visitor: the Mac app for their Mac's chip, the Windows installer, and on
 Linux the .deb (where the browser names Ubuntu or Debian) or else the AppImage, for their processor; Docker, the Linux
 server's installer and the cloud services follow. Reduced motion in the system's settings turns its animations off.
 
+## Blog
+
+`/blog/` is the blog: notes on how Hydor works. It is English only, like `/compare`: the other languages' pages link to
+it, its pages have no alternates and no language script, and its language menu goes to each language's home page. A post
+is `/blog/<slug>`, and `/blog/feed.xml` is an Atom feed (every post with its date, title and description; drafts are
+not in it, nor in `sitemap.xml`).
+
+| What | Where |
+|---|---|
+| The post: front matter, then Markdown | `blog/posts/<slug>.md` |
+| A figure: an HTML fragment | `blog/figures/<slug>/<name>.html` |
+| The post's own figure styles and code, linked from its page when they exist | `src/blog/<slug>.css`, `src/blog/<slug>.js` |
+| The post's pictures (`cover.webp` 1600×900, `og.jpg` 1200×630, anything else it shows) | `src/img/blog/<slug>/` |
+| The pages' look, and the pieces every figure shares | `src/blog/blog.css` |
+| The figures' runtime, the reading progress, the "On this page" list, the counters | `src/blog/blog.js` |
+
+**Front matter**, between two lines of `---`, one `key: value` a line: `title`, `description` (the line under the title,
+the page's description, the card's text and the feed's summary), `date` (`YYYY-MM-DD`), `tags` (comma separated; the
+first is in the breadcrumb), `cover` and `coverAlt`, `og` (the social card, else `/img/og.jpg`), and `order` (the
+tie-break between posts of one date: lower first). Posts are newest first; the first is the wide one on `/blog/`. A file
+name starting with `_` is a draft: built only with `--drafts` (marked noindex, with its own files in `src/blog/` left
+out of the build otherwise). `_style-guide.md` is one: every element a post can use, and a small figure. Build it and
+look.
+
+**Markdown** is the docs' (GitHub-flavoured, rendered like the guide). Do not write an `#` title: the page has it. `##`
+and `###` headings get an address from their words (lower case, letters, digits and hyphens, made unique), and the `##`
+ones are the "On this page" list. A picture alone on a line, `![alt](/img/blog/<slug>/x.webp "Caption")`, becomes a
+figure with its caption and its size read from the file (WebP, PNG, JPEG or SVG; a missing file stops the build).
+Tables scroll on a phone, code blocks have a copy button, and links to other sites open with `rel="noopener"`. Small
+inline HTML (`<kbd>`, `<span class="chip">`, `<aside class="callout"><p>…</p></aside>`) is fine. The reading time is the
+words outside code, tags and figures over 230 a minute.
+
+**Figures**: a line `<!-- figure: name -->` on its own (blank lines around it) is replaced by
+`blog/figures/<slug>/<name>.html`, as it is: never read as Markdown. A figure is `<figure class="fig"
+data-fig="<slug>-<name>">…<figcaption>…</figcaption></figure>`. The Content-Security-Policy allows no inline script and no
+outside file, so a figure's code goes in the post's `src/blog/<slug>.js` and its styles in `<slug>.css` (every rule
+under `[data-fig^="<slug>-"]`). The shared classes are `.fig` (and `.fig.wide`, up to about 1080 px), `.fig-stage`,
+`.fig-controls` with `.fig-btn[aria-pressed]`, `.fig-legend`, `.chip` (`--c` is its colour), `.callout`, `.stats` with
+`.stat` (`<b data-count-to="10.5" data-suffix="%">10.5%</b>` counts up when first seen), `.sr-only` and `<kbd>`.
+
+**The runtime** (`blog.js`) is `window.HydorBlog`, loaded before the post's script:
+
+```js
+HydorBlog.figure('<slug>-<name>', (el, fig) => {
+  /* runs once for each [data-fig="<slug>-<name>"], when it is first within 300 px of the screen */
+});
+```
+
+- `fig.reduced`: the reader asked for reduced motion. Draw the final state, with no motion and no auto-play (buttons
+  still work).
+- `fig.visible`, `fig.on('show' | 'hide', fn)`: whether it is on screen.
+- `fig.wait(ms)`: a Promise that resolves after `ms` of on-screen time; its clock stops while the figure is off screen
+  or the tab is hidden.
+- `fig.loop((dt, t) => …)`: called on each animation frame while it is on screen (`dt` and `t` in milliseconds);
+  returns a function that stops it.
+- Every `.fig` gets `is-in` the first time it is on screen and `is-visible` while it is, for CSS entrances. A CSS loop
+  pauses with `.fig:not(.is-visible) .x { animation-play-state: paused }`, and stops under
+  `@media (prefers-reduced-motion: reduce)`.
+
+Nothing runs or loops off screen, and under reduced motion nothing moves (counters show their value). A post with no
+figures needs none of this. Look at a post, on a phone (390 px) and a desktop, with the flags above; a missing figure or
+picture stops the build and names the post and the file.
+
+**Pictures** go through the same `?v=` hashes as the rest of the site, in sub-folders too (`img/blog/<slug>/cover.webp`,
+in an attribute, in CSS and as `https://hydor.app/…` in `og:image`), so a picture taken again under the same name shows
+at once.
+
 ## Languages
 
-The site is in the app's eight languages (`LANGS` in `shared/i18n.ts`). English is at `/` and `/docs/…`, the others
+The site is in the app's eight languages (`LANGS` in `shared/i18n.ts`). English is at `/`, `/docs/…` and `/blog/…`, the others
 under their id: `/de/`, `/es/`, `/fr/`, `/pt/` (Brazilian Portuguese), `/el/`, `/ja/`, `/zh/` (Simplified Chinese),
 each with the home page, a 404 page (Cloudflare Pages shows the nearest `404.html`, so `/de/nothing` shows
 `/de/404.html`) and the docs (`/de/docs/…`). The pages are static: nothing runs on the server.
@@ -68,8 +148,8 @@ subset (it says how many texts each language has, and when `strings.json` is out
   texts it asks for are recorded in the English build, which is what `--extract` uses.
 - A guide topic's words come from `docs/guide/<lang>/<topic>.md` when that file is in step with the English one
   (`translatedTopic` in `shared/guide.ts`), else from the English topic, in an element with `lang="en"`. Section
-  addresses are the English ones in every language. The other documents (Install, release notes…) and `/compare`
-  are English only: the pages of other languages link to them. Each language's docs have their own search index
+  addresses are the English ones in every language. The other documents (Install, release notes…), `/compare` and
+  `/blog` are English only: the pages of other languages link to them. Each language's docs have their own search index
   (`/de/docs/search.json`). The release summary written from `CHANGELOG.md` stays English (`lang="en"`) and its date
   is written for the page's language.
 
@@ -89,6 +169,11 @@ alternates and `x-default` (English), its own canonical address and `og:locale`,
 **Fonts.** Inter's Latin and Greek subsets load by `unicode-range`, so Greek pages use the Greek one. Japanese and
 Chinese pages name system fonts for their characters (`html:lang(ja)`: Hiragino Sans, Noto Sans JP, Yu Gothic, Meiryo;
 `html:lang(zh)`: PingFang SC, Noto Sans SC, Microsoft YaHei) and drop the tight letter-spacing the Latin type uses.
+
+**The header** has more or less room by language: the links (Demo … Docs, Blog) are 419 px wide in Chinese and 741 in
+Portuguese. `style.css` ("The header in every language") gives each language two widths: below the first the search box
+and GitHub shrink to their icons, below the second the links give way to the menu button. They are measured (the widths of
+`.nav-links` and `.nav-end` at 1700 px, plus a little room): when a link is added or a long word comes in, measure again.
 
 **Adding a language** means adding it to `LANGS` in `shared/i18n.ts` (and its tags to `TAGS` and `OG_LOCALES` in
 `i18n.mjs`), then translating.

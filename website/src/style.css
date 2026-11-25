@@ -3927,8 +3927,11 @@ html:lang(zh) :is(.eyebrow, .side-group p, .doc-toc p, .footer-cols h4) {
   text-transform: none;
 }
 
-/* Longer words in the header: in the other languages the links give way to the menu sooner, and the search and
-   GitHub buttons shrink to their icons before that. */
+/* The header in every language. Its links, the language menu, the search box, GitHub and Download need more room the
+   longer the words are (Portuguese's links are 741 px wide, English's 519), so each language has its own two widths:
+   below the first the search box and GitHub shrink to their icons (-110 to -190 px), below the second the links give
+   way to the menu button. The numbers are the measured widths of each language's header (with Inter loaded) plus a
+   little room; when a link or a label is added, measure them again (the widths of .nav-links and .nav-end at 1700 px). */
 html:not(:lang(en)) .nav-in {
   grid-template-columns: auto 1fr auto;
 }
@@ -3937,34 +3940,242 @@ html:not(:lang(en)) .nav-links {
   justify-self: center;
 }
 
-@media (max-width: 1360px) {
-  html:not(:lang(en)) .nav-gh-label,
-  html:not(:lang(en)) .nav-search span,
-  html:not(:lang(en)) .nav-search kbd {
+@media (max-width: 1199px) {
+  html:lang(en) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
     display: none;
   }
 
-  html:not(:lang(en)) .nav-search {
+  html:lang(en) .nav-search {
     width: 36px;
     padding: 0;
     justify-content: center;
   }
 }
 
-@media (max-width: 1160px) {
-  html:not(:lang(en)) .nav-in {
+@media (max-width: 1029px) {
+  html:lang(en) .nav-in {
     display: flex;
   }
 
-  html:not(:lang(en)) .nav-links {
+  html:lang(en) .nav-links {
     display: none;
   }
 
-  html:not(:lang(en)) .nav-end {
+  html:lang(en) .nav-end {
     margin-left: auto;
   }
 
-  html:not(:lang(en)) .nav-menu {
+  html:lang(en) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1074px) {
+  html:lang(zh) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(zh) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 929px) {
+  html:lang(zh) .nav-in {
+    display: flex;
+  }
+
+  html:lang(zh) .nav-links {
+    display: none;
+  }
+
+  html:lang(zh) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(zh) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1239px) {
+  html:lang(ja) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(ja) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1089px) {
+  html:lang(ja) .nav-in {
+    display: flex;
+  }
+
+  html:lang(ja) .nav-links {
+    display: none;
+  }
+
+  html:lang(ja) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(ja) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1319px) {
+  html:lang(es) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(es) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1144px) {
+  html:lang(es) .nav-in {
+    display: flex;
+  }
+
+  html:lang(es) .nav-links {
+    display: none;
+  }
+
+  html:lang(es) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(es) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1419px) {
+  html:lang(de) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(de) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1189px) {
+  html:lang(de) .nav-in {
+    display: flex;
+  }
+
+  html:lang(de) .nav-links {
+    display: none;
+  }
+
+  html:lang(de) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(de) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1449px) {
+  html:lang(el) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(el) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1179px) {
+  html:lang(el) .nav-in {
+    display: flex;
+  }
+
+  html:lang(el) .nav-links {
+    display: none;
+  }
+
+  html:lang(el) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(el) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1549px) {
+  html:lang(fr) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(fr) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1229px) {
+  html:lang(fr) .nav-in {
+    display: flex;
+  }
+
+  html:lang(fr) .nav-links {
+    display: none;
+  }
+
+  html:lang(fr) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(fr) .nav-menu {
+    display: grid;
+  }
+}
+
+@media (max-width: 1629px) {
+  html:lang(pt) :is(.nav-gh-label, .nav-search span, .nav-search kbd) {
+    display: none;
+  }
+
+  html:lang(pt) .nav-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1299px) {
+  html:lang(pt) .nav-in {
+    display: flex;
+  }
+
+  html:lang(pt) .nav-links {
+    display: none;
+  }
+
+  html:lang(pt) .nav-end {
+    margin-left: auto;
+  }
+
+  html:lang(pt) .nav-menu {
     display: grid;
   }
 }

@@ -137,6 +137,24 @@ function stackWide() {
   return (tree) => walk(tree);
 }
 
+/** A fenced code block as the site shows it: its language (or "Code") and a copy button over the code (main.js). */
+export const codeBlock =
+  (T) =>
+  ({ node, children, ...rest }) => {
+    const lang = /language-([\w-]+)/.exec(node.children?.[0]?.properties?.className?.join(' ') ?? '')?.[1];
+    return h(
+      'div',
+      { className: 'code', 'data-copy-wrap': '' },
+      h(
+        'div',
+        { className: 'code-bar' },
+        h('span', null, lang && lang !== 'text' ? lang : T('Code')),
+        h('button', { className: 'copy', type: 'button', 'data-copy': '', 'aria-label': T('Copy') }, h('svg', { className: 'ic' }, h('use', { href: '#i-copy' })), h('span', null, T('Copy'))),
+      ),
+      h('pre', rest, children),
+    );
+  };
+
 /** A document's Markdown as the page's HTML: headings with the app's ids, its pictures as figures, links resolved. */
 function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
   let at = 0;
@@ -183,20 +201,7 @@ function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
       return url ? h('img', { src: url, alt: alt ?? '', loading: 'lazy' }) : null;
     },
     table: ({ node, ...rest }) => h('div', { className: /\bstack\b/.test(rest.className ?? '') ? 'table-wrap stack' : 'table-wrap' }, h('table', rest)),
-    pre: ({ node, children, ...rest }) => {
-      const lang = /language-([\w-]+)/.exec(node.children?.[0]?.properties?.className?.join(' ') ?? '')?.[1];
-      return h(
-        'div',
-        { className: 'code', 'data-copy-wrap': '' },
-        h(
-          'div',
-          { className: 'code-bar' },
-          h('span', null, lang && lang !== 'text' ? lang : T('Code')),
-          h('button', { className: 'copy', type: 'button', 'data-copy': '', 'aria-label': T('Copy') }, h('svg', { className: 'ic' }, h('use', { href: '#i-copy' })), h('span', null, T('Copy'))),
-        ),
-        h('pre', rest, children),
-      );
-    },
+    pre: codeBlock(T),
   };
   return renderToStaticMarkup(h(Markdown, { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeRaw, stackWide], components }, md));
 }
@@ -204,7 +209,7 @@ function renderDoc(md, { file, anchors, hrefOfFile, image, pre, T }) {
 /** The parts every page shares, taken from the built home page of the language so they are written once: the icons,
  * the header and the footer, their links to the home page's parts made absolute (under the language's prefix). The
  * header's <!--LANG_SWITCH--> is for each page to fill in. */
-function shellOf(indexHtml, pre) {
+export function shellOf(indexHtml, pre) {
   const pick = (re) => {
     const m = re.exec(indexHtml);
     if (!m) throw new Error(`website/src/index.html: no ${re}`);
@@ -248,7 +253,7 @@ function head({ lang, langs, title, description, enPath, alternates, data }) {
 ${data ? `  ${data}\n` : ''}`;
 }
 
-const svg = (Icon, size = 20) => (Icon ? renderToStaticMarkup(h(Icon, { size, strokeWidth: 1.8, 'aria-hidden': 'true' })) : '');
+export const svg = (Icon, size = 20) => (Icon ? renderToStaticMarkup(h(Icon, { size, strokeWidth: 1.8, 'aria-hidden': 'true' })) : '');
 
 /** One page of the docs as the language shows it: the title and the words it carries (a guide topic in the language
  * where there is a translation in step with the English one, else English, marked as such). */
