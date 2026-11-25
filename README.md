@@ -8,9 +8,9 @@
 <h3 align="center">The everything app for AI agents</h3>
 
 <p align="center">
-  Claude Code and Codex on the plans you already pay for, or any model (your Claude and ChatGPT plans' models, local ones too), with unified memory. They
-  code, research, write and run your routine work on your own computer, answer with dynamic UIs and apps, and check
-  with you on your phone.
+  <b>Claude Code, Codex and any model in one app, on the plans you already pay for.</b><br />
+  They share one memory, answer with charts, maps and apps, carry on with your other account when one hits its limit,
+  and ask for your OK on your phone. Free and open source, on your own computer.
 </p>
 
 <p align="center">
@@ -41,52 +41,33 @@
   <b>150</b> answer UIs · <b>45</b> ready-made apps · <b>70+</b> skills · <b>8</b> languages · <b>zero</b> telemetry
 </p>
 
-> [!TIP]
-> **A team that costs less.** A strong model leads and hands the clear parts to cheaper subagents. In our benchmark the
-> team passed every check at 9% less than the best tier alone, and 67% less than running everything on the strongest
-> model ([the numbers](docs/plans/tiers-and-the-team.md)).
-
-## Coming from ChatGPT or Claude?
-
-You keep your plan, and you don't start from nothing.
-
-1. **Keep the plan you pay for.** Sign in with your Claude plan (Pro, Max or Team) or your ChatGPT plan (Plus, Pro,
-   Business or Enterprise): Hydor runs Claude Code and Codex on it, so there is nothing more to pay. Or use any model:
-   pay as you go through OpenRouter, or free and private on your own computer
-   ([agents and models](docs/guide/16-agents-models.md)).
-2. **Bring what it knows about you.** [**Settings → Memory → Bring in**](docs/guide/06-memory.md#bring-in-from-other-assistants)
-   reads the export ChatGPT or Claude emails you (in ChatGPT, Settings → Data controls → Export data; in Claude,
-   Settings → Privacy → Export data). Your custom instructions or memory, and what you wrote in your chats, become
-   proposed notes, and you pick what to keep.
-3. **Get everything else**: apps you make yourself, answers as cards, documents, slides and spreadsheets you edit,
-   tasks that run by themselves, word suggestions as you type, and your phone, all with your own files on your own
-   computer. [How it compares](#how-it-compares) has the details.
-
-## What you can hand it
-
-- **"Fix the failing checkout tests"**, then approve `npm test` from your phone's notification.
-- **"Plan 4 days in Lisbon in May"**: a day-by-day plan on a map, what to book and the budget, then slides of it.
-- **"Find the best e-bike under $2,000 for a hilly commute"**: a cited answer with a comparison table, and a
-  spreadsheet to open.
-- **"Every Monday at 8, sum up last week's sales"**: an agent of your own does it on schedule and tells you.
-- **"Remember that I'm vegetarian"**: every agent knows it from then on, in every project.
-- **"Turn my paper into a talk, a poster and a thread"**: one of 45 ready-made apps.
-- **"Make me an app that sums up a job offer and what to ask before signing"**: an agent builds it, with a form and a
-  view for its answer, and you run it whenever you like.
-- **"Train this on a free GPU and tell me when it's done"**: the run waits for a GPU, then you get live charts and, for
-  a sweep, a results table for your paper.
-- **"Bring in what ChatGPT knows about me"**: add the export it emails you under Settings → Memory → Bring in, and pick
-  the notes to keep.
-- **From Telegram, Discord or Slack**: a photo of a receipt, a file or a voice message to one of your agents.
-
 ## Why Hydor
+
+Six reasons to move your work here:
+
+1. **[Every agent, on the plans you already pay for.](docs/guide/16-agents-models.md)** Claude Code on your Claude plan
+   and Codex on your ChatGPT plan: the official programs, with nothing more to pay. Gemini CLI, OpenCode, Grok Build
+   and more run beside them, and Hydor's own agent takes any model, local ones too.
+2. **[A usage limit doesn't stop the work.](docs/guide/16-agents-models.md#use-all-your-accounts-switch-at-a-limit)**
+   Sign in more than one Claude, ChatGPT or Grok account, a work and a personal one say. When one hits its limit, the
+   session moves to another by itself, with its history, and carries on.
+3. **[One memory for all of them.](docs/guide/06-memory.md)** Tell one agent once and every agent knows, on every
+   model. Read, edit or undo any note, and bring in what ChatGPT and Claude already know about you.
+4. **[Answers you can use.](docs/guide/10-apps.md)** Charts, maps, tables and quizzes instead of walls of text, 45
+   ready-made apps, and apps of your own that an agent builds from a description. Documents, slides and spreadsheets
+   you edit in place.
+5. **[Work that gets finished.](docs/guide/29-goals.md)** Agree what "done" means and the agent keeps at it round after
+   round, while the app runs the checks itself. Agents of your own work on schedules, and what needs your OK reaches
+   your phone.
+6. **[It is yours.](docs/privacy.md)** Free and open source, on your own computer, with no telemetry and no account
+   with us. Agents use your keys without seeing them, and Confidential sessions use only models on your machine.
 
 <table>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
       <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
-      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model: your Claude or ChatGPT plan's, on-device or in the cloud.</p>
+      Whichever agent or model does the work, you follow it the same way: each step in plain words, every edit with its diff, and a command that waits for your OK.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />
@@ -108,14 +89,14 @@ You keep your plan, and you don't start from nothing.
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <img src="docs/media/readme-goals.webp" alt="A goal in a session: what done means, its checks, and the rounds the agent has worked" />
+      <p><b><a href="docs/guide/29-goals.md">Goals the app checks</a></b><br />
+      Agree what "done" means (tests that pass, a number to reach) and the agent keeps at it round after round. The app runs the checks itself.</p>
+    </td>
+    <td width="50%" valign="top">
       <img src="docs/media/readme-automation.webp" alt="Scheduled tasks: a morning brief, a price watch and a weekly report" />
       <p><b><a href="docs/guide/12-tasks.md">Work that runs by itself</a></b><br />
       Agents of your own on schedules, watchers and webhooks, or keeping at a goal, each within a monthly budget.</p>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/media/readme-library.webp" alt="Slides an agent made, open in the app's editor" />
-      <p><b><a href="docs/guide/11-library.md">Documents they write in</a></b><br />
-      Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf, kept in the files of their project.</p>
     </td>
   </tr>
   <tr>
@@ -125,16 +106,23 @@ You keep your plan, and you don't start from nothing.
       Describe a job you do often, and an agent builds an app for it: a form, the work, and a view for its answer. Run it, schedule it or share it.</p>
     </td>
     <td width="50%" valign="top">
+      <img src="docs/media/readme-library.webp" alt="Slides an agent made, open in the app's editor" />
+      <p><b><a href="docs/guide/11-library.md">Documents they write in</a></b><br />
+      Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf, kept in the files of their project.</p>
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary>More to see: word suggestions, boards, experiments and a browser of its own</summary>
+<br />
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
       <img src="docs/media/readme-suggest.webp" alt="A message box with the rest of the word in grey after the cursor, and the next word dimmer" />
       <p><b><a href="docs/guide/09-documents-voice.md#word-suggestions-as-you-type">Word suggestions</a></b><br />
       The rest of the word you are typing in grey, and the next one: Tab takes it. Made on your computer by a small model that learns how you write.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/media/readme-experiments.webp" alt="Experiments: a sweep's runs on shared charts, with the queue and the GPUs at the left" />
-      <p><b><a href="docs/guide/24-experiments.md">Experiments</a></b><br />
-      Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables for your paper. Agents start and watch them.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-boards.webp" alt="A board of pinned answer cards: the week's key numbers, a sales chart and the weather forecast" />
@@ -144,9 +132,9 @@ You keep your plan, and you don't start from nothing.
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/media/readme-goals.webp" alt="A goal in a session: what done means, its checks, and the rounds the agent has worked" />
-      <p><b><a href="docs/guide/29-goals.md">Goals</a></b><br />
-      Agree what "done" means (tests that pass, a number to reach) and the agent keeps at it round after round. The app runs the checks itself.</p>
+      <img src="docs/media/readme-experiments.webp" alt="Experiments: a sweep's runs on shared charts, with the queue and the GPUs at the left" />
+      <p><b><a href="docs/guide/24-experiments.md">Experiments</a></b><br />
+      Training and evaluation runs that wait for a free GPU, with live charts, sweeps and results tables for your paper. Agents start and watch them.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-browser.webp" alt="The desktop app's own browser: tabs grouped in a column, and a review article open" />
@@ -155,6 +143,43 @@ You keep your plan, and you don't start from nothing.
     </td>
   </tr>
 </table>
+
+</details>
+
+> [!TIP]
+> **A team that costs less.** A strong model leads and hands the clear parts to cheaper subagents. On our benchmark of
+> 58 coding tasks the team solved the most (96.6%), for 18% less than its lead model doing all the work alone
+> ([the numbers](docs/plans/tiers-and-the-team.md)).
+
+## Switch in a few minutes
+
+You keep your plan, and you don't start from nothing.
+
+1. **Keep the plan you pay for.** Sign in with your Claude plan or your ChatGPT plan, and Hydor runs Claude Code and
+   Codex on it. Or use any model: pay as you go through OpenRouter, or free and private on your own computer
+   ([agents and models](docs/guide/16-agents-models.md)).
+2. **Bring what it knows about you.** [**Settings → Memory → Bring in**](docs/guide/06-memory.md#bring-in-from-other-assistants)
+   reads the export ChatGPT or Claude emails you, and the memory and skills you made in Claude Code, Codex and other
+   agents. You see it all first, and nothing comes over until you pick it.
+3. **Find your work already there.** The folders you work in with Claude Code and Codex become projects by themselves,
+   with their sessions ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
+
+## What you can hand it
+
+- **"Fix the failing checkout tests"**, then approve `npm test` from your phone's notification.
+- **"Get test coverage to 90%"**, as a goal: the agent works round after round, and the app runs the checks and says
+  when it is reached.
+- **"Plan 4 days in Lisbon in May"**: a day-by-day plan on a map, what to book and the budget, then slides of it.
+- **"Find the best e-bike under $2,000 for a hilly commute"**: a cited answer with a comparison table, and a
+  spreadsheet to open.
+- **"Every Monday at 8, sum up last week's sales"**: an agent of your own does it on schedule and tells you.
+- **"Remember that I'm vegetarian"**: every agent knows it from then on, in every project.
+- **"Turn my paper into a talk, a poster and a thread"**: one of 45 ready-made apps.
+- **"Make me an app that sums up a job offer and what to ask before signing"**: an agent builds it, with a form and a
+  view for its answer, and you run it whenever you like.
+- **"Train this on a free GPU and tell me when it's done"**: the run waits for a GPU, then you get live charts and, for
+  a sweep, a results table for your paper.
+- **From Telegram, Discord or Slack**: a photo of a receipt, a file or a voice message to one of your agents.
 
 ## How it compares
 
@@ -240,28 +265,27 @@ hydor completion install                           # Tab completion in your shel
 
 On a Mac, the app puts the command on your PATH by itself.
 
-
 ## Everything else it does
 
 <details>
-<summary>Coming from another agent, memory, privacy, automation, research, devices and the terminal</summary>
+<summary>Agents and accounts, memory, privacy, automation, research, devices and the terminal</summary>
 
-**Coming from another agent**
+**Agents and accounts**
 
-- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build and Antigravity CLI run as agents of
-  Hydor, beside Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
-  ([agents and models](docs/guide/16-agents-models.md)). Antigravity CLI is Google's agent for a Google AI Pro, Ultra
-  or Plus plan (Gemini CLI now serves a Gemini API key or a Gemini Code Assist Standard or Enterprise licence); it
-  has one sign-in and runs only in sessions you start yourself, as Google's terms ask
-  ([Antigravity CLI](docs/guide/16-agents-models.md#antigravity-cli)). Sign in to Claude Code, Codex and Grok Build with your
-  subscriptions, and add more than one account of each, a work and a personal one say
-  ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)). When one hits its limit or
-  is signed out, the work carries on with another, and you're asked to sign in again only when nothing else can do it
-  ([signed out](docs/guide/16-agents-models.md#when-an-account-is-signed-out)).
-- **Bring in what it knows**: **Settings → Memory → Bring in** takes the memory and skills you made in other agents,
-  and what ChatGPT, Claude, Claude Code and Codex know about you. You pick what comes over ([memory](docs/guide/06-memory.md)).
-- **Your projects come along**: the folders you work in with Claude Code and Codex become Hydor projects, with their
-  sessions ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
+- **Other agents run inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build and
+  Antigravity CLI run as agents of Hydor, beside Claude Code, Codex and its own agent, and sessions you start in
+  VS Code or a terminal show up too ([agents and models](docs/guide/16-agents-models.md)). Antigravity CLI is Google's
+  agent for a Google AI Pro, Ultra or Plus plan (Gemini CLI now serves a Gemini API key or a Gemini Code Assist
+  Standard or Enterprise licence); it has one sign-in and runs only in sessions you start yourself, as Google's terms
+  ask ([Antigravity CLI](docs/guide/16-agents-models.md#antigravity-cli)).
+- **Several accounts of each**: sign in to Claude Code, Codex and Grok Build with your subscriptions, and add more than
+  one account of each, a work and a personal one say
+  ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)). When one hits its limit, the
+  session moves to another that has usage left, with its history, and a new session starts on one that has. When every
+  account is used up, a session can continue by itself once a limit resets, or, for Claude Code, on an API key of
+  yours if you turn that on ([switch at a limit](docs/guide/16-agents-models.md#use-all-your-accounts-switch-at-a-limit)).
+- **A signed-out account is passed over** the same way, and you're asked to sign in again only when nothing else can
+  do the work ([signed out](docs/guide/16-agents-models.md#when-an-account-is-signed-out)).
 
 **Memory that learns, with your OK**
 
@@ -298,15 +322,11 @@ On a Mac, the app puts the command on your PATH by itself.
 
 - Research with cited sources, deep research reports, and a browser you can watch and take over
   ([research](docs/guide/08-research.md)). In the desktop apps that browser runs inside the app, with nothing to install.
-- **A browser of your own** in the desktop app: tabs, a smart address bar (open tabs, bookmarks and history ranked as
-  you use them, also by what a page is about with search by meaning on, completing in place, search suggestions, shortcuts that search one site (`yt lofi`), and
-  asking an agent), a home page and a search engine of your choice, history (and downloads, which the search box finds
-  too), an ad and tracker blocker that hides cookie banners, private tabs that forget their sign-ins and pages when you
-  close them, a page translated into your language (by the helper model), reader view for articles, dark pages,
-  screenshots and Save as PDF, a right-click menu (with video and sound controls), highlights you make on pages that are
-  marked again when you come back (and listed in the Browser's Highlights panel), zoom (and a page zoom of your choice), spell checking, print, bookmarks (searchable, and sorted into folders by topic with AI) and history (bring them in from your other
-  browsers), a Read later list, pictures saved to a project's files or asked about from the right-click menu, Chrome extensions, and a page you can hand to an agent, to ask about or to work on in your sign-in, with a
-  stop before it sends or deletes anything ([the browser](docs/guide/07-web.md)).
+- **A browser of your own** in the desktop app: tabs, an address bar that finds your tabs, bookmarks and history by
+  what a page is about, an ad and tracker blocker that hides cookie banners, private tabs, pages translated into your
+  language, reader view, highlights that are still there when you come back, bookmarks and history brought in from
+  your other browsers, Chrome extensions, and a page you can hand to an agent, to ask about or to work on in your
+  sign-in, with a stop before it sends or deletes anything ([the browser](docs/guide/07-web.md)).
 - Answer UIs open full screen and save as pictures, tables and charts can read a kept spreadsheet or a data file
   and stay current, and a conversation exports as Markdown or a document.
 - **Boards** keep the cards you pin from replies together, each brought up to date by an agent on a schedule if you

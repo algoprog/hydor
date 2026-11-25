@@ -14,7 +14,7 @@ People switch from OpenClaw to Hydor for what it is built around: the official C
 | **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | Partial: sender pairing, a sandbox you set up, approvals in chat apps [1][2] |
 | **Documents, slides, spreadsheets, LaTeX and diagrams** that you edit in the app | ✓ | Partial: a Canvas in its companion apps [1] |
 | **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models [1] |
-| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [3] | Partial: sub-agents [2] |
+| **A strong model leading cheaper helpers** | ✓ Most tasks solved, for 18% less than Best alone [3] | Partial: sub-agents [2] |
 
 ## Why people switch to Hydor
 
@@ -22,7 +22,7 @@ People switch from OpenClaw to Hydor for what it is built around: the official C
 - **More agents, one memory.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and more run inside Hydor beside Claude Code, Codex and its own agent, and they all share one set of notes, found by meaning and checked each day against your conversations. After a hard task an agent can propose a skill, and it is kept only when you approve it.
 - **Approvals on your phone, a sandbox and a vault.** OpenClaw's README says tools run on the host for the main session unless you configure sandboxing [1]. Hydor asks before risky steps and shows them on your phone with **Approve** and **Deny**, can sandbox commands, and keeps your keys in a vault that agents use without seeing them.
 - **Documents and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit as in Word, PowerPoint, Excel and Overleaf, and small apps with views of their own.
-- **A strong model leading cheaper helpers.** In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [3]. We have not compared this with OpenClaw.
+- **A strong model leading cheaper helpers.** In Hydor's own benchmark of November 2026 (58 coding tasks, run by us) the team solved the most tasks, 96.6%, for **18% less than the Best tier alone** [3]. We have not compared this with OpenClaw.
 - **Private by choice.** Confidential sessions use only models on your computer, with every tool that reaches the internet turned off.
 
 ## Switch in a few minutes

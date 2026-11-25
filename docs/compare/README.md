@@ -18,7 +18,7 @@ Hydor does every row. The others do the parts their own pages describe, and each
 | **Approvals, sandbox and key vault** | ✓ | Partial: command approval and container isolation | — No built-in permission system; run it in a container | Partial: approvals, and keys kept out of the commands it runs | Partial: sender pairing, a sandbox you set up, approvals in chat apps |
 | **Confidential sessions** on local models | ✓ | Partial: local models | Partial: local models | Partial: local models, which it is built for | Partial: local models |
 | **No telemetry** | ✓ | ✓ None by default, says its own page | — Install and update reports on by default | — Anonymous usage analytics on by default | ✓ A daily version check; statistics are opt-in |
-| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone and 67% less than everything on Max, in Hydor's own benchmark | Partial: subagents on a model you choose | — No sub-agents by design | Partial: Fusion, a planner with workers | Partial: sub-agents |
+| **A strong model leading cheaper helpers** | ✓ Most tasks solved, for 18% less than Best alone, in Hydor's own benchmark | Partial: subagents on a model you choose | — No sub-agents by design | Partial: Fusion, a planner with workers | Partial: sub-agents |
 
 On top of this, Hydor has **documents, slides, spreadsheets, LaTeX and diagrams** that you edit in the app, **apps** with views of their own, more than 100 ready-made views for replies (charts, maps, tables), and a setup tour and a full guide inside the app that its agents read to answer your questions and change settings for you.
 
@@ -40,6 +40,6 @@ On top of this, Hydor has **documents, slides, spreadsheets, LaTeX and diagrams*
 ## How we compared
 
 - Every claim about another project comes from its own README, documentation, site or GitHub page, listed on its page, and was checked on 10 November 2026. Where we could not check something, the table says what the project's own pages say, or leaves the row out.
-- Numbers come with their source. The one number that is Hydor's own, the cost of a team of agents, is from our benchmark of seven coding tasks that we ran ourselves ([Tiers and the team](../plans/tiers-and-the-team.md)); it says nothing about the other projects. The 67% is over the six tasks that Max alone was run on.
+- Numbers come with their source. The one number that is Hydor's own, the cost of a team of agents, is from our benchmark of 58 coding tasks that we ran ourselves ([Tiers and the team](../plans/tiers-and-the-team.md)); it says nothing about the other projects.
 - Projects change fast. If something here is out of date, [open an issue](https://github.com/algoprog/hydor/issues) and it will be corrected.
 - Hydor is not affiliated with Anthropic, OpenAI, Nous Research, Earendil, AtomicBot or the OpenClaw Foundation.

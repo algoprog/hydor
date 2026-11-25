@@ -13,7 +13,7 @@ People switch from Hermes Agent to Hydor for the official Claude Code and Codex 
 | **Desktop apps** for Mac (Apple silicon and Intel), Windows and Linux | ✓ | Partial: apps for macOS and Windows [2] |
 | **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | Partial: command approval and container isolation [1] |
 | **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models [3] |
-| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [4] | Partial: subagents on a model you choose [1] |
+| **A strong model leading cheaper helpers** | ✓ Most tasks solved, for 18% less than Best alone [4] | Partial: subagents on a model you choose [1] |
 
 ## Why people switch to Hydor
 
@@ -21,7 +21,7 @@ People switch from Hermes Agent to Hydor for the official Claude Code and Codex 
 - **One memory, for every agent.** Hydor keeps notes found by meaning and checks them each day against your conversations, whichever agent you used. Hermes keeps two small files per profile by default, MEMORY.md (2,200 characters) and USER.md (1,375), and searches past sessions [1]. In Hydor you can read, edit and delete every note, and a skill is kept only when you approve it.
 - **Your phone, with approvals and diffs.** A web app that installs on your phone, with notifications; an approval comes with **Approve** and **Deny** right on the notification. Every change is a diff you can read. There are desktop apps for Mac (Apple silicon and Intel), Windows and Linux.
 - **More than chat.** Pages, documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit as in Word, PowerPoint, Excel and Overleaf. Apps with views of their own. More than 100 ready-made views for replies: charts, maps, tables.
-- **A strong model leading cheaper helpers.** In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [4]. Hermes can run subagents on a model of your choice [1]; we have not compared the two.
+- **A strong model leading cheaper helpers.** In Hydor's own benchmark of November 2026 (58 coding tasks, run by us) the team solved the most tasks, 96.6%, for **18% less than the Best tier alone** [4]. Hermes can run subagents on a model of your choice [1]; we have not compared the two.
 - **Private by choice.** Confidential sessions use only models on your computer, with every tool that reaches the internet turned off. A vault holds your keys, and agents use them without seeing them.
 
 ## Switch in a few minutes

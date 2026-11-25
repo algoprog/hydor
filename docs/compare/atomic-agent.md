@@ -14,7 +14,7 @@ Hydor runs your local models too, and adds what Atomic Agent does not have: the 
 | **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | Partial: approvals, and keys kept out of the commands it runs [1] |
 | **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models, which it is built for [1] |
 | **No telemetry** | ✓ | — Anonymous usage analytics on by default [1] |
-| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [2] | Partial: Fusion, a planner with workers [1] |
+| **A strong model leading cheaper helpers** | ✓ Most tasks solved, for 18% less than Best alone [2] | Partial: Fusion, a planner with workers [1] |
 
 ## Why people switch to Hydor
 
@@ -23,7 +23,7 @@ Hydor runs your local models too, and adds what Atomic Agent does not have: the 
 - **Every screen.** A web app that installs on your phone, with notifications and **Approve** and **Deny** on the notification. Desktop apps for Mac (Apple silicon and Intel), Windows and Linux, the `hydor` command, and Telegram, Discord and Slack. On a Mac, Atomic Agent's builds are for Apple silicon; Intel Macs are not supported yet [1].
 - **Documents and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit in the app, and small apps with views of their own.
 - **No telemetry.** Atomic Agent's README says "Anonymous usage analytics is on by default", with crash reports to Sentry on the same switch; you turn them off with a setting [1]. Hydor has no analytics libraries to switch off.
-- **A strong model leading cheaper helpers.** Atomic Agent's Fusion has one model plan and a pool of workers do the clear parts [1]. Hydor's tiers and team work in a similar way, with a number behind it: in its own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [2].
+- **A strong model leading cheaper helpers.** Atomic Agent's Fusion has one model plan and a pool of workers do the clear parts [1]. Hydor's tiers and team work in a similar way, with a number behind it: in its own benchmark of November 2026 (58 coding tasks, run by us) the team solved the most tasks, 96.6%, for **18% less than the Best tier alone** [2].
 
 ## Your memory and your local models come with you
 

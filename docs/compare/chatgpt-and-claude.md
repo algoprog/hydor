@@ -45,7 +45,7 @@ Hydor is not better at everything. These are real strengths, from their own page
 - **One memory that is yours.** Tell one agent and every agent knows. Notes are found by meaning, you can read, edit and undo each one, and they stay on your computer. **Bring in** reads the export either app emails you, so you don't start again.
 - **Your computer, your files, your data.** Hydor runs on your Mac, Windows or Linux computer, or a server you own, with your folders, and your sessions, notes and keys stay there. It is open source, has no telemetry and no account with us.
 - **A lot in one place.** Apps you make by describing them, answers as cards pinned to boards, documents beside the conversation, tasks and goals the app checks, word suggestions as you type, experiments for researchers, a browser of its own, and your phone. Several of these have a partial answer in the apps, in the table, and the combination, working on any agent and any model, is Hydor's.
-- **A strong model leading cheaper helpers.** In Hydor's own benchmark the team passed every check at 9% less than the best tier alone, and 67% less than running everything on the strongest model [63]. This one is our own number; it says nothing about the other apps.
+- **A strong model leading cheaper helpers.** In Hydor's own benchmark of 58 coding tasks the team solved the most, 96.6%, for 18% less than the best tier alone [63]. This one is our own number; it says nothing about the other apps.
 
 ## What you give up
 
@@ -131,7 +131,7 @@ Hydor is not better at everything. These are real strengths, from their own page
 
 - Every claim about ChatGPT or Claude comes from OpenAI's or Anthropic's own pages (help centres, product pages, documentation and release notes), listed above, and was checked on 24 November 2026. "—" means those pages describe nothing of the kind, which is not proof that it does not exist.
 - Both products change every few weeks, and some features differ by plan, country or beta. Where they disagree, the pages' dated entries are the ones we followed. If something here is out of date, [open an issue](https://github.com/algoprog/hydor/issues) and it will be corrected.
-- The one number that is Hydor's own, the cost of a team of agents, is from our benchmark of seven coding tasks, run by us. The 67% is over the six tasks that Max alone was run on.
+- The one number that is Hydor's own, the cost of a team of agents, is from our benchmark of 58 coding tasks, run by us.
 - Hydor is not affiliated with Anthropic or OpenAI.
 
 [Back to all comparisons](README.md)
