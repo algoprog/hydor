@@ -286,7 +286,7 @@
   "Free and open source · It runs on a computer, and you use it from your phone": "Gratis y de código abierto · Se ejecuta en una computadora y lo usas desde tu teléfono",
   "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>": "Gratis y de código abierto · macOS 12 o posterior, Intel · <0>Apple silicon</0> · <1>Windows y Linux</1>",
   "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.": "ARM. Para x64: <0>.deb</0> · <1>AppImage</1>. Un sistema de 2022 o posterior: Ubuntu 22.04, Debian 12, Fedora 36.",
-  "The checkout tests fail since yesterday's discount change. Find out why and fix it.": "Las pruebas del pago fallan desde el cambio de descuento de ayer. Averigua por qué y arréglalo.",
+  "The checkout tests fail since yesterday's change. Find out why and fix it.": "Las pruebas del pago fallan desde el cambio de ayer. Averigua por qué y arréglalo.",
   "I'll run the checkout tests first to see what fails.": "Primero ejecutaré las pruebas del pago para ver qué falla.",
   "Ran 1 command, read 1 file": "Ejecutó 1 comando, leyó 1 archivo",
   "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.": "Dos problemas en <0>total()</0>: el impuesto se suma a cada línea antes del descuento y cada línea se redondea por separado. Aplicaré primero el descuento y redondearé una sola vez, al final.",

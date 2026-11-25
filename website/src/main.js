@@ -381,7 +381,7 @@ void main() {
       meta: '~/code/shop-api · main · Opus 5.5',
       chip: T('Coder · Opus 5.5 · High'),
       steps: [
-        ['user', T("The checkout tests fail since yesterday's discount change. Find out why and fix it.")],
+        ['user', T("The checkout tests fail since yesterday's change. Find out why and fix it.")],
         ['say', TH("I'll run the checkout tests first to see what fails.")],
         ['tool', 'terminal', TH('Ran 1 command, read 1 file'), '2.4 s', 1300],
         ['say', TH("Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.", ['<code>'])],

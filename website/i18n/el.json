@@ -286,7 +286,7 @@
   "Free and open source · It runs on a computer, and you use it from your phone": "Δωρεάν και ανοιχτού κώδικα · Τρέχει σε έναν υπολογιστή και το χρησιμοποιείτε από το κινητό σας",
   "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>": "Δωρεάν και ανοιχτού κώδικα · macOS 12 ή νεότερο, Intel · <0>Apple silicon</0> · <1>Windows και Linux</1>",
   "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.": "ARM. Για x64: <0>.deb</0> · <1>AppImage</1>. Σύστημα του 2022 ή νεότερο: Ubuntu 22.04, Debian 12, Fedora 36.",
-  "The checkout tests fail since yesterday's discount change. Find out why and fix it.": "Τα τεστ του checkout αποτυγχάνουν από την χθεσινή αλλαγή στην έκπτωση. Βρείτε γιατί και διορθώστε το.",
+  "The checkout tests fail since yesterday's change. Find out why and fix it.": "Τα τεστ του checkout αποτυγχάνουν από τη χθεσινή αλλαγή. Βρείτε γιατί και διορθώστε το.",
   "I'll run the checkout tests first to see what fails.": "Θα εκτελέσω πρώτα τα τεστ του checkout για να δω τι αποτυγχάνει.",
   "Ran 1 command, read 1 file": "Εκτελέστηκε 1 εντολή, διαβάστηκε 1 αρχείο",
   "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.": "Δύο προβλήματα στο <0>total()</0>: ο φόρος προστίθεται σε κάθε γραμμή πριν από την έκπτωση και κάθε γραμμή στρογγυλοποιείται χωριστά. Θα εφαρμόσω πρώτα την έκπτωση και θα στρογγυλοποιήσω μία φορά, στο τέλος.",

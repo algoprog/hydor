@@ -286,7 +286,7 @@
   "Free and open source · It runs on a computer, and you use it from your phone": "免费开源 · 它在一台电脑上运行，你用手机来使用",
   "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>": "免费开源 · macOS 12 或更新版本，Intel · <0>Apple 芯片</0> · <1>Windows 和 Linux</1>",
   "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.": "ARM。x64 版本：<0>.deb</0> · <1>AppImage</1>。需要 2022 年或之后的系统：Ubuntu 22.04、Debian 12、Fedora 36。",
-  "The checkout tests fail since yesterday's discount change. Find out why and fix it.": "自从昨天的折扣改动以来，结账测试一直失败。找出原因并修复。",
+  "The checkout tests fail since yesterday's change. Find out why and fix it.": "自从昨天的改动以来，结账测试一直失败。找出原因并修复。",
   "I'll run the checkout tests first to see what fails.": "我先运行结账测试，看看哪里失败。",
   "Ran 1 command, read 1 file": "运行了 1 条命令，读取了 1 个文件",
   "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.": "<0>total()</0> 里有两个问题：税是在折扣之前加到每一行上的，而且每一行都单独四舍五入。我会先应用折扣，最后只四舍五入一次。",

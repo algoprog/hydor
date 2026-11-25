@@ -286,7 +286,7 @@
   "Free and open source · It runs on a computer, and you use it from your phone": "無料・オープンソース · コンピューターで動かし、スマートフォンから使えます",
   "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>": "無料・オープンソース · macOS 12以降、Intel · <0>Apple silicon</0> · <1>WindowsとLinux</1>",
   "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.": "ARM。x64の場合：<0>.deb</0> · <1>AppImage</1>。2022年以降のシステムが対象：Ubuntu 22.04、Debian 12、Fedora 36。",
-  "The checkout tests fail since yesterday's discount change. Find out why and fix it.": "昨日の割引の変更以降、チェックアウトのテストが失敗しています。原因を調べて直してください。",
+  "The checkout tests fail since yesterday's change. Find out why and fix it.": "昨日の変更以降、チェックアウトのテストが失敗しています。原因を調べて直してください。",
   "I'll run the checkout tests first to see what fails.": "まずチェックアウトのテストを実行して、何が失敗しているか確認します。",
   "Ran 1 command, read 1 file": "コマンドを1件実行、ファイルを1件読み取り",
   "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.": "<0>total()</0>に2つの問題があります。割引の前に各行へ税が加算されていること、そして各行がそれぞれ丸められていることです。先に割引を適用し、最後に1回だけ丸めます。",

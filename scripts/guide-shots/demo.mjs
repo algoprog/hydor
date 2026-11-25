@@ -355,7 +355,7 @@ export function makeSessions(home, projects, now, { shop, blog }) {
   // Fixing the checkout tests: steps, an edit, and the agent waiting to run the test suite.
   {
     const t = new Transcript({ cwd: shop, at: now - 4 * MIN, branch: 'main' });
-    t.user("The checkout tests fail since yesterday's discount change. Find out why and fix it.");
+    t.user("The checkout tests fail since yesterday's change. Find out why and fix it.");
     t.tool('Bash', { command: 'npm test -- checkout', description: 'Run the checkout tests' }, {
       say: "I'll run the checkout tests first to see what fails.",
       text: ' FAIL  src/checkout/total.test.ts\n  × applies the discount before tax\n    expected 2700, received 2730\n  × rounds once\n    expected 1199, received 1200\n\n Tests  2 failed (2)',

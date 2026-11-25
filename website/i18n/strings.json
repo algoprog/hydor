@@ -378,7 +378,7 @@
   "Free and open source · It runs on a computer, and you use it from your phone": "Free and open source · It runs on a computer, and you use it from your phone",
   "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>": "Free and open source · macOS 12 or newer, Intel · <0>Apple silicon</0> · <1>Windows and Linux</1>",
   "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.": "ARM. For x64: <0>.deb</0> · <1>AppImage</1>. A system from 2022 or later: Ubuntu 22.04, Debian 12, Fedora 36.",
-  "The checkout tests fail since yesterday's discount change. Find out why and fix it.": "The checkout tests fail since yesterday's discount change. Find out why and fix it.",
+  "The checkout tests fail since yesterday's change. Find out why and fix it.": "The checkout tests fail since yesterday's change. Find out why and fix it.",
   "I'll run the checkout tests first to see what fails.": "I'll run the checkout tests first to see what fails.",
   "Ran 1 command, read 1 file": "Ran 1 command, read 1 file",
   "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.": "Two problems in <0>total()</0>: tax is added to each line before the discount, and every line is rounded on its own. I'll apply the discount first and round once, at the end.",
