@@ -53,7 +53,7 @@ Six reasons to move your work here:
    session moves to another by itself, with its history, and carries on.
 3. **[One memory for all of them.](docs/guide/06-memory.md)** Tell one agent once and every agent knows, on every
    model. Read, edit or undo any note, and bring in what ChatGPT and Claude already know about you.
-4. **[Answers you can use.](docs/guide/10-apps.md)** Charts, maps, tables and quizzes instead of walls of text, 45
+4. **[Answers you can use.](docs/guide/10-apps.md)** Charts, maps, tables and UIs instead of walls of text, 45
    ready-made apps, and apps of your own that an agent builds from a description. Documents, slides and spreadsheets
    you edit in place.
 5. **[Work that gets finished.](docs/guide/29-goals.md)** Agree what "done" means and the agent keeps at it round after
