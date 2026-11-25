@@ -1,0 +1,23 @@
+<figure class="fig wide" data-fig="how-hydor-remembers-hybrid">
+<div class="fig-stage">
+<div class="hr-hy-top">
+<span class="chip">An example</span>
+<div class="fig-controls" role="group" aria-label="Request to search for">
+<button type="button" class="fig-btn" data-req="0" aria-pressed="true">keep it brief</button>
+<button type="button" class="fig-btn" data-req="1" aria-pressed="false">Is Stripe in sandbox mode?</button>
+<button type="button" class="fig-btn" data-req="2" aria-pressed="false">the retry in server/queue/worker.ts is flaky</button>
+</div>
+</div>
+<div class="hr-hy-cols">
+<div class="hr-hy-col"><h4>By words<small>BM25 · weight 0.1</small></h4><div class="hr-hy-list" data-list="words"></div></div>
+<div class="hr-hy-col"><h4>By meaning<small>cosine · weight 1</small></h4><div class="hr-hy-list" data-list="meaning"></div></div>
+<div class="hr-hy-col"><h4>By exact name<small>at most 3 · weight 1</small></h4><div class="hr-hy-list" data-list="exact"></div></div>
+<div class="hr-hy-col hr-hy-fused"><h4>Fused<small>Σ weight ÷ (60 + rank)</small></h4><div class="hr-hy-rows" aria-live="polite"></div></div>
+</div>
+<div class="hr-hy-foot">
+<button type="button" class="fig-btn" data-boost aria-pressed="false">Recency and look-ups: off</button>
+<span class="hr-grow">Off, the order is the fused score alone. On, each score is multiplied by 1 + 0.3 × e<sup>−age / 90 days</sup> + 0.2 × min(1, log<sub>2</sub>(1 + look-ups) ÷ 6). The ranks, similarities, ages and look-up counts are made up for the example; the formula and the weights are the app's.</span>
+</div>
+</div>
+<figcaption>Pick a request. Each list ranks eight example notes its own way, and every fused score is worked out from the rank formula as you watch. "keep it brief" shares no word with the note it finds; the Stripe question is nudged up by a rare word; the file name pulls its note up whatever meaning says.</figcaption>
+</figure>

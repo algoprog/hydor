@@ -1,0 +1,12 @@
+<figure class="fig" data-fig="how-hydor-remembers-budgets">
+<div class="fig-stage">
+<div class="hr-bd" role="img" aria-label="Memory's share of a Custom model's window: 13.1% of 8,192 tokens, 11.6% of 32,768 tokens and 3.2% of 200,000 tokens.">
+<div class="hr-bd-row" data-row="0"><div class="hr-bd-name"><b>8k tokens</b><span>8,192 · tiny</span></div><div class="hr-bd-track"><i class="hr-bd-seg block"></i><i class="hr-bd-seg chk"></i></div><div class="hr-bd-total"><b>13.1%</b><span class="hr-mono">block 5.1% · checkpoint 8.0%</span></div></div>
+<div class="hr-bd-row" data-row="1"><div class="hr-bd-name"><b>32k tokens</b><span>32,768 · lean</span></div><div class="hr-bd-track"><i class="hr-bd-seg block"></i><i class="hr-bd-seg add"></i><i class="hr-bd-seg chk"></i></div><div class="hr-bd-total"><b>11.6%</b><span class="hr-mono">block 2.9% · additions 0.7% · checkpoint 8.0%</span></div></div>
+<div class="hr-bd-row" data-row="2"><div class="hr-bd-name"><b>200k tokens</b><span>200,000 · full</span></div><div class="hr-bd-track"><i class="hr-bd-seg block"></i><i class="hr-bd-seg add"></i><i class="hr-bd-seg chk"></i></div><div class="hr-bd-total"><b>3.2%</b><span class="hr-mono">block 0.9% · additions 0.3% · checkpoint 2.0%</span></div></div>
+<div class="hr-bd-axis"><div class="hr-bd-ticks" aria-hidden="true"><span style="left:0">0%</span><span style="left:25%">4%</span><span style="left:50%">8%</span><span style="left:75%">12%</span><span style="left:100%">16%</span></div></div>
+</div>
+<div class="fig-legend"><span><i style="--c: #5b9dff"></i>The memory block, as measured</span><span><i style="--c: #4fc995"></i>With a message and on a file touch, at most</span><span><i style="--c: #e8a93d"></i>The session checkpoint, at most</span></div>
+</div>
+<figcaption>Memory's share of a Custom model's window, counting 4 characters to a token. The block is what a test measured with a project of 150 notes; the other two are the most the app allows. A window under 12,000 tokens gets no additions and no index.</figcaption>
+</figure>

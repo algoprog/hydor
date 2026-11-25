@@ -1,0 +1,48 @@
+<figure class="fig wide" data-fig="on-device-word-suggestions-learning">
+  <div class="fig-stage">
+    <p class="sr-only">How Hydor learns how you write, in four steps. One: your writing, from the sources you leave on. Two: a quiet moment, when you have not typed for ten minutes, at the lowest priority, on the graphics card if one is free. Three: a fresh start from the model that came with the app, learning from all your writing with public text replayed beside it. Four: your copy, used for the languages you write in, while the model that came with the app serves every other language. Below, an illustration of the idea, not a measurement: a model that builds each run on the last slowly gets worse over weeks, while one that starts again each time stays level.</p>
+    <div class="le-flow" aria-hidden="true">
+      <div class="le-node" data-n="0">
+        <h4><i>1</i>Your writing</h4>
+        <p>Messages to agents, your notes, your documents. Only the sources you leave on.</p>
+        <div class="le-lines"><span></span><span></span><span></span></div>
+      </div>
+      <div class="le-arrow"><b></b></div>
+      <div class="le-node" data-n="1">
+        <h4><i>2</i>A quiet moment</h4>
+        <p>Ten minutes without typing. Lowest priority. The graphics card if one is free.</p>
+        <div class="le-moon"></div>
+      </div>
+      <div class="le-arrow"><b></b></div>
+      <div class="le-node" data-n="2">
+        <h4><i>3</i>A fresh start</h4>
+        <p>The model that came with the app learns from all your writing, with public text replayed beside it.</p>
+        <div class="le-mix"><span class="le-you">your writing</span><span class="le-pub">public text</span></div>
+      </div>
+      <div class="le-arrow"><b></b></div>
+      <div class="le-node" data-n="3">
+        <h4><i>4</i>Your copy</h4>
+        <div class="le-split">
+          <p><span class="chip" style="--c: var(--w1)">Languages you write in</span>use your copy</p>
+          <p><span class="chip">Every other language</span>use the model that came with the app</p>
+        </div>
+      </div>
+    </div>
+    <div class="le-chart" aria-hidden="true">
+      <div class="le-ctitle"><b>Why every run starts again</b><span class="chip" style="--c: var(--amber)">An illustration, not measured</span></div>
+      <div class="le-plot">
+        <svg viewBox="0 0 640 180" preserveAspectRatio="none">
+          <g class="le-grid"><path d="M0 30H640M0 90H640M0 150H640"/></g>
+          <path class="le-line le-level" d="M0 40C80 38 160 44 240 38S400 42 480 37 600 40 640 38"/>
+          <path class="le-line le-drift" d="M0 42C80 50 160 62 240 78S400 108 480 126 600 146 640 154"/>
+        </svg>
+        <div class="le-axis"><span>first night</span><span>weeks later</span></div>
+      </div>
+      <div class="fig-legend">
+        <span><i style="--c: var(--w1)"></i>Start again from the shipped model each time</span>
+        <span><i style="--c: var(--err)"></i>Build each run on the last</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>Each run starts from the model that came with the app and reads all your writing, so what it learned never drifts. The curves are an illustration of what the 0.110.0 release notes describe, not measured data: building every night on the last run got worse over weeks, at other languages and in the end at your own writing.</figcaption>
+</figure>

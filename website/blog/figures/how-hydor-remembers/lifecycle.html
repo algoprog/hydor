@@ -1,0 +1,31 @@
+<figure class="fig wide" data-fig="how-hydor-remembers-lifecycle">
+<div class="fig-stage">
+<div class="hr-lc" role="group" aria-label="A note's life. Pick a step to read about it.">
+<div class="hr-lc-row"><i>Its life</i>
+<div class="hr-lc-flow">
+<button type="button" class="hr-lc-n" data-id="saved">Saved</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n" data-id="anchored">Anchored to its files</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n" data-id="given">Given</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n" data-id="used">Used</button>
+</div></div>
+<div class="hr-lc-row"><i>When its files change</i>
+<div class="hr-lc-flow">
+<button type="button" class="hr-lc-n warn" data-id="changed">Its files change</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n warn" data-id="flagged">Flagged</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n" data-id="rechecked">Re-checked by the helper</button><s aria-hidden="true">→</s>
+<button type="button" class="hr-lc-n ok" data-id="kept">Kept</button><span class="alt">or</span>
+<button type="button" class="hr-lc-n ok" data-id="fixed">Fixed</button><span class="alt">or</span>
+<button type="button" class="hr-lc-n bad" data-id="deleted">Deleted</button>
+</div></div>
+<div class="hr-lc-row"><i>Over time</i>
+<div class="hr-lc-flow">
+<button type="button" class="hr-lc-n" data-id="merged">Merged into a topic</button><span class="alt">or</span>
+<button type="button" class="hr-lc-n" data-id="moved">Moved to its project</button><span class="alt">or</span>
+<button type="button" class="hr-lc-n" data-id="pointer">Replaced by a pointer into the wiki</button><span class="alt">or</span>
+<button type="button" class="hr-lc-n warn" data-id="expired">Expires</button>
+</div></div>
+<p class="hr-lc-cap" aria-live="polite"></p>
+</div>
+</div>
+<figcaption>A highlight walks a note's life: written, tied to its files, given, used; checked again when the code moves on; and, over time, merged, moved, turned into a wiki pointer or expired. Press any step to stop and read it. Every change is in the note's history and can be undone.</figcaption>
+</figure>

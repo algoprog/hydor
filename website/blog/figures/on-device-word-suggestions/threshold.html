@@ -1,0 +1,17 @@
+<figure class="fig" data-fig="on-device-word-suggestions-threshold">
+  <div class="fig-stage">
+    <div class="fig-controls" role="group" aria-label="How sure before showing">
+      <button class="fig-btn" type="button" data-k="0" aria-pressed="false">More</button>
+      <button class="fig-btn" type="button" data-k="1" aria-pressed="true">Balanced</button>
+      <button class="fig-btn" type="button" data-k="2" aria-pressed="false">Surer</button>
+    </div>
+    <div class="t-blocks"></div>
+    <div class="fig-legend">
+      <span><i style="--c: #8f99ab"></i>Qwen3.5 alone</span>
+      <span><i style="--c: #38bdf8"></i>Mixed with the small model</span>
+      <span><i style="--c: #5eead4"></i>Small model alone</span>
+    </div>
+    <p class="t-read" aria-live="polite"></p>
+  </div>
+  <figcaption>FLORES-200 devtest, 193 languages that use spaces, 20 sentences each, as the card gives them. Every system is set to be right about 30%, 40% or 50% of the time it suggests, so the typing saved can be compared fairly. A surer setting suggests less often and saves less typing.</figcaption>
+</figure>

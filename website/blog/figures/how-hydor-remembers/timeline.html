@@ -1,0 +1,62 @@
+<figure class="fig wide" data-fig="how-hydor-remembers-timeline">
+<div class="fig-stage hr-tl">
+<div class="hr-tl-track" aria-hidden="true">
+<div class="hr-tl-n is-on"><i>1</i><span>Start</span></div>
+<div class="hr-tl-n"><i>2</i><span>A message</span></div>
+<div class="hr-tl-n"><i>3</i><span>A file opened</span></div>
+<div class="hr-tl-n"><i>4</i><span>Condensed</span></div>
+<div class="hr-tl-n"><i>5</i><span>Resumed</span></div>
+<div class="hr-tl-head" data-n="1"></div>
+</div>
+<div class="fig-controls" role="group" aria-label="Moment in a session">
+<button type="button" class="fig-btn" data-step="0" aria-pressed="true">At the start</button>
+<button type="button" class="fig-btn" data-step="1" aria-pressed="false">With a message</button>
+<button type="button" class="fig-btn" data-step="2" aria-pressed="false">A file is opened</button>
+<button type="button" class="fig-btn" data-step="3" aria-pressed="false">After condensing</button>
+<button type="button" class="fig-btn" data-step="4" aria-pressed="false">Resuming</button>
+</div>
+<div class="hr-tl-panel" aria-live="polite">
+<div class="hr-tl-step" data-step="0">
+<p class="hr-tl-lead">Claude Code and Codex get most of this in their instructions, which stay the same from one session to the next. The notes that stand out for your first message come with it.</p>
+<div class="hr-tl-cards">
+<div class="hr-card"><b>Your profile</b><p>Who you are and how you like to work. The one thing every agent always knows.</p><span class="hr-lim">always</span></div>
+<div class="hr-card"><b>The project's profile</b><p>Standing rules first: how to commit, build, test and ship.</p><span class="hr-lim">once it has enough notes</span></div>
+<div class="hr-card"><b>Notes that stand out</b><p>For your first message. Nothing is given to fill the room: no match, no notes. A place with only a few notes is given whole.</p><span class="hr-lim">up to 10 (5, 10, 20 or 40)</span></div>
+<div class="hr-card"><b>An index</b><p>A short title for each note and topic not given, the most used first, so the agent knows what it can look up.</p><span class="hr-lim amber">2,400 characters a place</span></div>
+<div class="hr-card"><b>Lines from the wiki</b><p>Title, summary and where to read it, marked "may be out of date" when its files changed.</p><span class="hr-lim">up to 3 lines</span></div>
+<div class="hr-card"><b>Active plans</b><p>The project's plans, with their open items.</p><span class="hr-lim">up to 3</span></div>
+</div>
+</div>
+<div class="hr-tl-step" data-step="1" hidden>
+<p class="hr-tl-lead">Your new message is searched with a stricter bar than the first one, and only notes the session was not given before count. Most of the time there is nothing to add, and nothing is said.</p>
+<div class="hr-tl-cards">
+<div class="hr-card"><b>What newly bears on it</b><p>Under "From memory, newly relevant to this message".</p><span class="hr-lim">up to 3 notes, 1,500 characters</span></div>
+<div class="hr-card"><b>A wiki line</b><p>At most one article line that bears on the message.</p><span class="hr-lim">at most 1</span></div>
+<div class="hr-card"><b>Often nothing</b><p>A message starting with a slash gets nothing, nor does one of fewer than three words.</p><span class="hr-lim amber">z at least 3.0</span></div>
+</div>
+</div>
+<div class="hr-tl-step" data-step="2" hidden>
+<p class="hr-tl-lead">When an agent reads or edits a file, notes anchored to it come too: to the file, then its folder, then the folder above, never the whole project.</p>
+<div class="hr-tl-cards">
+<div class="hr-card"><b>Notes about that area</b><p>Once for each folder in a session. Plain SQL, no embeddings, so it answers at once.</p><span class="hr-lim">up to 2 notes, 800 characters</span></div>
+<div class="hr-card"><b>How it arrives</b><p>Claude Code: right after the tool finishes, through a hook. Custom: in the tool's own output. Codex and other ACP agents: with your next message.</p></div>
+</div>
+</div>
+<div class="hr-tl-step" data-step="3" hidden>
+<p class="hr-tl-lead">When a long conversation is condensed, an agent can lose what it was given. Hydor forgets that it gave it, so what bears on your next message can be given again.</p>
+<div class="hr-tl-cards">
+<div class="hr-card"><b>Custom reads memory again</b><p>A new block for your latest message, with the checkpoint Hydor kept of the session so far.</p><span class="hr-lim">checkpoint: 8% of the window, at most 16,000 characters</span></div>
+<div class="hr-card"><b>The checkpoint</b><p>A short summary kept in the shared wiki folder, one for each session, written over each time.</p></div>
+</div>
+</div>
+<div class="hr-tl-step" data-step="4" hidden>
+<p class="hr-tl-lead">A session you resume still has in its conversation what it was given, so it is not given it again.</p>
+<div class="hr-tl-cards">
+<div class="hr-card"><b>Not given again</b><p>The notes and lines it already has are left out of what comes with its first message.</p></div>
+<div class="hr-card"><b>If it was condensed since</b><p>A resumed Claude Code or Codex session gets the checkpoint once, with its first message: its path and a summary.</p><span class="hr-lim">summary up to 3,000 characters</span></div>
+</div>
+</div>
+</div>
+</div>
+<figcaption>A session's memory timeline. The playhead walks the five moments by itself; press a button to stop it and read one. The limits are the app's defaults.</figcaption>
+</figure>

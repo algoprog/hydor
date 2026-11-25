@@ -1,0 +1,53 @@
+<figure class="fig" data-fig="how-hydor-remembers-parts">
+<div class="fig-stage">
+<div class="hr-p" role="group" aria-label="Memory has three parts: notes, wiki memory and documents. The helper model reads documents, finished conversations and commit messages and writes notes and wiki articles. Every agent is given notes unasked, a few wiki lines, and searches documents when it asks.">
+<div class="hr-p-bar helper">
+<b>Helper model</b>
+<span class="hr-p-txt">The small model you pick for jobs beside your sessions. It reads, and keeps what is worth keeping.</span>
+<span class="hr-p-srcs"><span class="chip">New documents</span><span class="chip">Finished conversations</span><span class="chip">Commit messages</span></span>
+</div>
+<div class="hr-p-cols">
+<div class="hr-p-col">
+<div class="hr-p-wire feed"><i></i></div>
+<div class="hr-p-card">
+<h4>Memory notes</h4>
+<p>Short facts, a sentence or two each: about you, a project or one session.</p>
+<div class="hr-p-row"><i>Written by</i><span>Agents, you and the helper</span></div>
+<div class="hr-p-row"><i>Reaches the agent</i><span class="hr-p-give">Given, unasked</span></div>
+</div>
+<div class="hr-p-wire out"><i></i></div>
+</div>
+<div class="hr-p-col">
+<div class="hr-p-wire feed"><i></i></div>
+<div class="hr-p-card">
+<h4>Wiki memory</h4>
+<p>Linked articles for each project, with the sources they came from.</p>
+<div class="hr-p-row"><i>Written by</i><span>The helper</span></div>
+<div class="hr-p-row"><i>Reaches the agent</i><span class="hr-p-give">A few lines</span></div>
+</div>
+<div class="hr-p-wire out"><i></i></div>
+</div>
+<div class="hr-p-col">
+<div class="hr-p-wire feed up"><i></i></div>
+<div class="hr-p-card">
+<h4>Documents</h4>
+<p>The files themselves, in a project's knowledge or the shared knowledge.</p>
+<div class="hr-p-row"><i>Added by</i><span>You</span></div>
+<div class="hr-p-row"><i>Reaches the agent</i><span class="hr-p-give">Searched when it asks</span></div>
+</div>
+<div class="hr-p-wire out"><i></i></div>
+</div>
+</div>
+<div class="hr-p-bar agent">
+<b>Every agent</b>
+<span class="hr-p-agents">
+<span class="chip" style="--ac: #f0a07f">Claude Code</span>
+<span class="chip" style="--ac: #b9a9ff">Codex</span>
+<span class="chip" style="--ac: #38bdf8">Custom</span>
+<span class="chip" style="--ac: #8ab4f8">ACP agents</span>
+</span>
+</div>
+</div>
+</div>
+<figcaption>Three parts, one memory. Things flow along the arrows: the helper reads documents, conversations and commits into notes and articles, and each part reaches an agent in its own way. The arrow on the right runs up because the helper reads documents too.</figcaption>
+</figure>

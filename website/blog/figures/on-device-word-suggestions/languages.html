@@ -1,0 +1,22 @@
+<figure class="fig wide" data-fig="on-device-word-suggestions-languages">
+  <div class="fig-stage">
+    <div class="l-cols">
+      <section>
+        <h4>Where mixing helps most</h4>
+        <p class="l-sub">Typing saved at Balanced, 20 sentences per language (noisy)</p>
+        <div class="l-rows" data-set="gain"></div>
+      </section>
+      <section>
+        <h4>How often the top guess is right</h4>
+        <p class="l-sub">acc@1 for the next token, 204 languages × 40 sentences</p>
+        <div class="l-rows" data-set="acc"></div>
+      </section>
+    </div>
+    <div class="fig-legend">
+      <span><i style="--c: #8f99ab"></i>Qwen3.5 alone</span>
+      <span><i style="--c: #38bdf8"></i>Mixed with the small model</span>
+      <span><i style="--c: #5eead4"></i>Small model alone</span>
+    </div>
+  </div>
+  <figcaption>Four of the biggest gains the card lists, in languages Qwen3.5 handles poorly: mixing in the small model saves far more typing. On the top-guess measure the small model alone already beats Qwen3.5 in the 57 weakest languages, and the mix is best in both rows.</figcaption>
+</figure>

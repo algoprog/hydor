@@ -1,0 +1,19 @@
+<figure class="fig" data-fig="how-hydor-remembers-codebook">
+<div class="fig-stage">
+<div class="hr-cb-top">
+<div class="fig-controls" role="group" aria-label="How the numbers are stored">
+<button type="button" class="fig-btn" data-state="0" aria-pressed="true">Full precision</button>
+<button type="button" class="fig-btn" data-state="1" aria-pressed="false">4 bits each</button>
+</div>
+<div class="hr-cb-count" aria-live="polite"><b data-bytes>3,072 bytes</b><span data-bytes-note>768 numbers × 4 bytes</span></div>
+</div>
+<div class="hr-cb-chart" role="img" aria-label="A few dozen of a note's 768 numbers drawn as bars. In full precision they have any height. Stored in 4 bits, each snaps to the nearest of 16 levels, which lie closer together near zero, and is written as one hex digit from 0 to F."></div>
+<div class="hr-cb-score">
+<div><b>A request</b>stays in full precision</div>
+<div><b>A table</b>made once per request</div>
+<div><b>A sum over 384 bytes</b>one look-up for each byte of a note</div>
+<div><b>A score</b>each stored vector read once</div>
+</div>
+</div>
+<figcaption>A few dozen of a note's 768 numbers. Press 4 bits each, or wait: they snap to the nearest of 16 levels and the note shrinks from 3,072 bytes to 384. The levels here are an illustration of the idea; the real ones are fitted for each dimension.</figcaption>
+</figure>

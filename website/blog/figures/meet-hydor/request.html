@@ -1,0 +1,61 @@
+<figure class="fig" data-fig="meet-hydor-request">
+  <div class="fig-stage mhr">
+    <div class="fig-controls mhr-steps" role="group" aria-label="Steps of a request">
+      <button class="fig-btn" type="button" data-step="1" aria-pressed="true">1 Ask</button>
+      <button class="fig-btn" type="button" data-step="2" aria-pressed="false">2 Remember</button>
+      <button class="fig-btn" type="button" data-step="3" aria-pressed="false">3 Work</button>
+      <button class="fig-btn" type="button" data-step="4" aria-pressed="false">4 Answer</button>
+      <button class="fig-btn" type="button" data-step="5" aria-pressed="false">5 Keep</button>
+    </div>
+    <p class="mhr-say" aria-live="polite" data-say>You ask in plain words.</p>
+    <div class="mhr-win" data-step="1">
+      <div class="mhr-head">
+        <span class="mhr-title">Fix the checkout tests</span>
+        <span class="mhr-status" data-status data-state="ready">Ready</span>
+        <span class="mhr-path">~/code/shop-api · main · Opus 5.5</span>
+      </div>
+      <div class="mhr-body">
+        <div class="mhr-item mhr-user" data-s="1">
+          <p>The checkout tests fail since yesterday’s discount change. Find out why and fix it.</p>
+        </div>
+        <div class="mhr-item mhr-mem" data-s="2">
+          <p class="mhr-k">From memory, before it starts</p>
+          <ul>
+            <li><span class="chip" style="--c: var(--accent)">Shop website</span>Tests run with <code>npm test</code></li>
+            <li><span class="chip" style="--c: var(--w1)">You</span>Likes short answers with a clear pick</li>
+          </ul>
+        </div>
+        <div class="mhr-item mhr-work" data-s="3">
+          <ul class="mhr-steps-list">
+            <li><i class="ok"></i>Ran the tests, read <code>total.ts</code><span>2.4 s</span></li>
+            <li><i class="ok"></i>Edited <code>src/checkout/total.ts</code><span class="mhr-diff"><b>+2</b> <em>−3</em></span></li>
+          </ul>
+          <div class="mhr-ask" data-ask>
+            <p class="mhr-k">Run a command</p>
+            <p class="mhr-cmd">Run the whole test suite: <code>npm test</code></p>
+            <div class="mhr-btns"><span class="mhr-allow">Allow</span><span>Always allow</span><span>Deny</span></div>
+            <p class="mhr-done"><i class="ok"></i>Allowed · 48 passed</p>
+          </div>
+        </div>
+        <div class="mhr-item mhr-answer" data-s="4">
+          <p><b>Fixed.</b> The discount now comes off before tax, and the total is rounded once.</p>
+          <div class="mhr-card">
+            <p class="mhr-k">Checkout tests <span>An example</span></p>
+            <div class="mhr-bar"><span>Before</span><div><i class="p" style="--w: 46"></i><i class="f" style="--w: 2"></i></div><em>2 failed</em></div>
+            <div class="mhr-bar"><span>After</span><div><i class="p" style="--w: 48"></i></div><em>0 failed</em></div>
+          </div>
+        </div>
+        <div class="mhr-item mhr-kept" data-s="5">
+          <p><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Kept in the project <b>shop-api</b>: the session, its diff and what was learned.</span></p>
+          <div class="mhr-note">
+            <svg viewBox="-6 -6 112 112" fill="none" stroke="currentColor" stroke-width="10"><path d="M4 95H24C24 80.6 3 65.3 3 47.3C3 23 23.2 5 48 5C72.8 5 93 23 93 47.3C93 65.3 72 80.6 72 95H92"/></svg>
+            <div><span>On your phone · now</span><b>Fix the checkout tests</b><p>Finished · both checkout tests pass</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="mhr-input" aria-hidden="true"><span>Describe a task or ask a question</span><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg></i></div>
+    </div>
+    <button class="fig-btn mhr-replay" type="button" data-replay hidden>Play again</button>
+  </div>
+  <figcaption>A request from start to finish, as an example: pick a step, or let it play. Each step builds on the one before.</figcaption>
+</figure>

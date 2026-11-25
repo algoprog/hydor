@@ -1,0 +1,54 @@
+<figure class="fig wide" data-fig="on-device-word-suggestions-pipeline">
+  <div class="fig-stage">
+    <p class="sr-only">A walk through one suggestion, in six steps. One: the text before the cursor, "Buenos días, quería preguntarte si podrías enviarme el docu", is cut into word pieces. Two: the engine guesses the language, Spanish, and looks up the per-language switch, which chooses between mixing both models and using Qwen3.5 alone. Three: both models list their best guesses for the next piece, "mento" first. Four: the gate mixes them, one minus lambda times Qwen3.5 plus lambda times the small model. Five: guesses that do not fit the letters already typed are dropped. Six: the confidence, 0.77 for "mento", is compared with the bar, 0.24; it is higher, so "mento" is shown. For "Thank you for your " the model is only 0.06 sure of "help.", below the bar, so nothing is shown. Only 0.77, 0.06 and 0.24 are the card's numbers; the other numbers in the figure are an illustration.</p>
+    <div class="fig-controls" role="group" aria-label="Steps">
+      <button class="fig-btn" type="button" data-go="1" aria-pressed="true">1 · Text</button>
+      <button class="fig-btn" type="button" data-go="2" aria-pressed="false">2 · Language</button>
+      <button class="fig-btn" type="button" data-go="3" aria-pressed="false">3 · Two models</button>
+      <button class="fig-btn" type="button" data-go="4" aria-pressed="false">4 · Mix</button>
+      <button class="fig-btn" type="button" data-go="5" aria-pressed="false">5 · Fit</button>
+      <button class="fig-btn" type="button" data-go="6" aria-pressed="false">6 · Show or stay quiet</button>
+    </div>
+    <div class="p-grid" aria-hidden="true">
+      <section class="p-col" data-at="1">
+        <h4><i>1</i>The text before the cursor</h4>
+        <p class="p-text">Buenos días, quería preguntarte si podrías enviarme el <b>docu</b><span class="p-caret"></span></p>
+        <div class="p-toks"><span>…</span><span>env</span><span>iar</span><span>me</span><span>el</span><span>doc</span><span>u</span></div>
+        <p class="p-hint">cut into word pieces (an example cut)</p>
+        <div class="p-lang" data-at="2">
+          <h4><i>2</i>Which language?</h4>
+          <span class="chip" style="--c: var(--w1)">Spanish · spa_Latn</span>
+          <div class="p-sw"><span class="p-opt p-opt-on">mix both models</span><span class="p-opt">Qwen3.5 alone</span></div>
+          <p class="p-hint">the switch for this language. In the shipped switch Spanish is set to Qwen3.5 alone until the model has learned your Spanish; we follow the mixing path.</p>
+        </div>
+      </section>
+      <section class="p-col" data-at="3">
+        <h4><i>3</i>Two models, each with its guesses</h4>
+        <div class="p-bars" data-m="q"><h5>Qwen3.5-0.8B</h5></div>
+        <div class="p-bars" data-m="s"><h5>The small model</h5></div>
+      </section>
+      <section class="p-col" data-at="4">
+        <h4><i>4</i>The gate mixes them</h4>
+        <p class="p-formula">(1 − λ) · Qwen3.5<br>+ λ · small<br><span>λ = 0.4 here; the gate sets it at every step</span></p>
+        <div class="p-bars" data-m="x"><h5>Mixed</h5></div>
+        <p class="p-fit" data-at="5"><i>5</i>Pieces that do not fit the letters already typed are dropped, and the rest are scaled to add up to 1.</p>
+      </section>
+      <section class="p-col" data-at="6">
+        <h4><i>6</i>Sure enough to show?</h4>
+        <div class="p-gauge" data-conf="0.77" data-need="0.24">
+          <p class="p-case">Buenos días, … el docu</p>
+          <div class="p-track"><span class="p-fill"></span><span class="p-mark"></span></div>
+          <div class="p-scale"><span>confidence <b>0.77</b></span><span>the bar <b>0.24</b></span></div>
+          <p class="p-verdict p-yes">Shown: <b>mento</b></p>
+        </div>
+        <div class="p-gauge" data-conf="0.06" data-need="0.24">
+          <p class="p-case">Thank you for your␣</p>
+          <div class="p-track"><span class="p-fill"></span><span class="p-mark"></span></div>
+          <div class="p-scale"><span>confidence <b>0.06</b></span><span>the bar <b>0.24</b></span></div>
+          <p class="p-verdict p-no">Quiet: it is only 6% sure of “help.”</p>
+        </div>
+      </section>
+    </div>
+  </div>
+  <figcaption>One suggestion, step by step. The confidences 0.77 and 0.06 and the bar 0.24 are what the card's script prints (small model alone, at More; the mix and each model have a bar of their own). The bars in steps 3 to 5, the cut into pieces and λ are an illustration, made to end at the same 0.77.</figcaption>
+</figure>

@@ -1,0 +1,253 @@
+/* How Hydor remembers: the figures. Every rule is scoped to this post's figures. (Made from a source where [data-fig^="how-hydor-remembers-"] stands for the scope.) */
+
+[data-fig^="how-hydor-remembers-"] {
+  --hr-glow: drop-shadow(0 0 10px rgb(56 189 248 / 0.35));
+  --hr-claude: #f0a07f;
+  --hr-codex: #b9a9ff;
+  --hr-gemini: #8ab4f8;
+}
+[data-fig^="how-hydor-remembers-"] .fig-stage { font-size: 14px; color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-mono { font-family: var(--mono); }
+[data-fig^="how-hydor-remembers-"] button { font-family: inherit; }
+[data-fig^="how-hydor-remembers-"] h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--fg); letter-spacing: 0; }
+[data-fig^="how-hydor-remembers-"] h4 small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 400; color: var(--fg-3); font-family: var(--mono); }
+[data-fig^="how-hydor-remembers-"] .hr-note-tag { font-size: 12px; color: var(--fg-3); }
+
+/* ---------- parts ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-p { display: grid; gap: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-p-bar {
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding: 14px 16px; border: 1px solid var(--line-2); border-radius: 12px; background: rgb(255 255 255 / 0.02);
+  transition: border-color 0.6s var(--ease), box-shadow 0.6s var(--ease), background-color 0.6s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-p-bar > b { color: var(--fg); font-size: 14px; font-weight: 600; }
+[data-fig^="how-hydor-remembers-"] .hr-p-bar > span.hr-p-txt { flex: 1 1 220px; color: var(--fg-3); font-size: 13px; line-height: 1.45; }
+[data-fig^="how-hydor-remembers-"] .hr-p-srcs { display: flex; flex-wrap: wrap; gap: 6px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-col { display: grid; grid-template-rows: 44px auto 44px; justify-items: center; min-width: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-p-card {
+  width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 16px;
+  border: 1px solid var(--line-2); border-radius: 12px; background: rgb(255 255 255 / 0.02);
+  transition: border-color 0.6s var(--ease), box-shadow 0.6s var(--ease), background-color 0.6s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-p-card h4 { font-size: 15px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-p-row { display: flex; flex-direction: column; gap: 3px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-row > i { font-style: normal; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-p-row > span { font-size: 13px; color: var(--fg-2); line-height: 1.45; }
+[data-fig^="how-hydor-remembers-"] .hr-p-give { align-self: flex-start; padding: 3px 10px; border: 1px solid rgb(94 234 212 / 0.4); border-radius: 999px; color: var(--w1); font-size: 12.5px; background: rgb(94 234 212 / 0.06); }
+[data-fig^="how-hydor-remembers-"] .hr-p-wire { position: relative; width: 2px; height: 100%; background: linear-gradient(var(--line-2), var(--line-2)); border-radius: 1px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-wire::after {
+  content: ''; position: absolute; left: 50%; bottom: -1px; width: 8px; height: 8px; margin-left: -4px;
+  border-right: 2px solid var(--line-2); border-bottom: 2px solid var(--line-2); transform: rotate(45deg) translate(-1px, -1px); transform-origin: center;
+}
+[data-fig^="how-hydor-remembers-"] .hr-p-wire.up::after { bottom: auto; top: -1px; transform: rotate(-135deg) translate(-1px, -1px); }
+[data-fig^="how-hydor-remembers-"] .hr-p-wire i {
+  position: absolute; left: 50%; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%;
+  background: var(--w1); box-shadow: 0 0 10px var(--w2); opacity: 0;
+}
+[data-fig^="how-hydor-remembers-"] .hr-p-wire.up i { top: auto; bottom: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-p-agents { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+[data-fig^="how-hydor-remembers-"] .hr-p-agents .chip { --c: var(--ac, var(--fg-3)); border-color: color-mix(in srgb, var(--ac, var(--fg-3)) 45%, transparent); color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-p-agents .chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ac); margin-right: 6px; display: inline-block; }
+[data-fig^="how-hydor-remembers-"] .hr-p-wirerow { display: none; }
+
+[data-fig^="how-hydor-remembers-"] .hr-p.is-lit-helper .hr-p-bar.helper,
+[data-fig^="how-hydor-remembers-"] .hr-p.is-lit-cards .hr-p-card,
+[data-fig^="how-hydor-remembers-"] .hr-p.is-lit-agent .hr-p-bar.agent {
+  border-color: rgb(56 189 248 / 0.55); box-shadow: 0 0 24px rgb(56 189 248 / 0.12); background: rgb(56 189 248 / 0.05);
+}
+[data-fig^="how-hydor-remembers-"] .hr-p.is-lit-helper .hr-p-bar.helper b,
+[data-fig^="how-hydor-remembers-"] .hr-p.is-lit-agent .hr-p-bar.agent b { color: var(--w1); }
+[data-fig^="how-hydor-remembers-"] .hr-p.flow-in .hr-p-wire.feed i { animation: hr-down 2.2s var(--ease) infinite; }
+[data-fig^="how-hydor-remembers-"] .hr-p.flow-in .hr-p-wire.feed.up i { animation: hr-up 2.2s var(--ease) infinite; }
+[data-fig^="how-hydor-remembers-"] .hr-p.flow-out .hr-p-wire.out i { animation: hr-down 2.2s var(--ease) infinite; }
+@keyframes hr-down { 0% { top: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { top: calc(100% - 6px); opacity: 0; } }
+@keyframes hr-up { 0% { bottom: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { bottom: calc(100% - 6px); opacity: 0; } }
+[data-fig^="how-hydor-remembers-"].is-in .hr-p-bar, [data-fig^="how-hydor-remembers-"].is-in .hr-p-card { animation: hr-rise 0.9s var(--ease) both; }
+[data-fig^="how-hydor-remembers-"].is-in .hr-p-col:nth-child(2) .hr-p-card { animation-delay: 0.12s; }
+[data-fig^="how-hydor-remembers-"].is-in .hr-p-col:nth-child(3) .hr-p-card { animation-delay: 0.24s; }
+[data-fig^="how-hydor-remembers-"].is-in .hr-p-bar.agent { animation-delay: 0.36s; }
+@keyframes hr-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+[data-fig^="how-hydor-remembers-"]:not(.is-visible) .hr-p-wire i { animation-play-state: paused !important; }
+
+@media (max-width: 720px) {
+  [data-fig^="how-hydor-remembers-"] .hr-p { gap: 12px; }
+  [data-fig^="how-hydor-remembers-"] .hr-p-cols { grid-template-columns: 1fr; gap: 12px; }
+  [data-fig^="how-hydor-remembers-"] .hr-p-col { grid-template-rows: auto; }
+  [data-fig^="how-hydor-remembers-"] .hr-p-wire { display: none; }
+}
+
+/* ---------- timeline ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-tl-track { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); margin: 6px 0 4px; padding-top: 4px; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-track::before { content: ''; position: absolute; left: 10%; right: 10%; top: 17px; height: 2px; background: var(--line-2); border-radius: 1px; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-n { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-n i {
+  position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: #0b0e13; border: 1.5px solid var(--line-2); font-style: normal; font-size: 12px; color: var(--fg-3);
+  transition: border-color 0.5s var(--ease), color 0.5s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-tl-n span { font-size: 12.5px; color: var(--fg-3); transition: color 0.5s var(--ease); line-height: 1.3; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-n.is-on i { border-color: var(--w2); color: var(--w1); }
+[data-fig^="how-hydor-remembers-"] .hr-tl-n.is-on span { color: var(--fg); }
+[data-fig^="how-hydor-remembers-"] .hr-tl-head {
+  position: absolute; top: 4px; left: 0; width: 26px; height: 26px; margin-left: -13px; z-index: 2; pointer-events: none;
+  border-radius: 50%; background: var(--water); box-shadow: 0 0 18px rgb(56 189 248 / 0.55);
+  transition: left 0.9s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-tl-head::after { content: attr(data-n); position: absolute; inset: 0; display: grid; place-items: center; color: #04121a; font-size: 12px; font-weight: 700; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-panel { margin-top: 12px; display: grid; gap: 12px; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-step[hidden] { display: none; }
+[data-fig^="how-hydor-remembers-"] .hr-tl-step { animation: hr-fade 0.6s var(--ease) both; }
+@keyframes hr-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+[data-fig^="how-hydor-remembers-"] .hr-tl-lead { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-tl-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+[data-fig^="how-hydor-remembers-"] .hr-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 10px; background: rgb(255 255 255 / 0.02); min-width: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-card b { font-size: 13.5px; font-weight: 600; color: var(--fg); }
+[data-fig^="how-hydor-remembers-"] .hr-card p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-lim { align-self: flex-start; max-width: 100%; padding: 2px 8px; border-radius: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--w1); background: rgb(94 234 212 / 0.08); border: 1px solid rgb(94 234 212 / 0.28); }
+[data-fig^="how-hydor-remembers-"] .hr-lim.amber { color: var(--amber); background: rgb(242 180 104 / 0.08); border-color: rgb(242 180 104 / 0.3); }
+[data-fig^="how-hydor-remembers-"] .hr-tl .fig-controls { margin-top: 14px; }
+@media (max-width: 640px) {
+  [data-fig^="how-hydor-remembers-"] .hr-tl-n span { display: none; }
+  [data-fig^="how-hydor-remembers-"] .hr-tl-track::before { top: 17px; }
+}
+
+/* ---------- hybrid ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-hy-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-top .fig-controls { margin: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.7fr); gap: 14px; align-items: start; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-col { display: grid; gap: 8px; min-width: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-list { display: grid; gap: 6px; min-height: 40px; align-content: start; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-item {
+  display: flex; gap: 8px; align-items: baseline; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: rgb(255 255 255 / 0.02); font-size: 12.5px; line-height: 1.35; color: var(--fg-2); animation: hr-fade 0.5s var(--ease) both;
+}
+[data-fig^="how-hydor-remembers-"] .hr-hy-item em { flex: none; font-style: normal; font-family: var(--mono); font-size: 11.5px; color: var(--w2); min-width: 1.4em; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-item small { display: block; margin-top: 2px; font-family: var(--mono); font-size: 11px; color: var(--fg-3); overflow-wrap: anywhere; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-empty { padding: 8px 4px; font-size: 12.5px; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-fused { position: relative; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-rows { position: relative; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--hr-row, 62px); box-sizing: border-box; padding: 7px 10px;
+  border: 1px solid var(--line-2); border-radius: 10px; background: #0d1117; overflow: hidden;
+  transition: transform 0.8s var(--ease), opacity 0.5s var(--ease), border-color 0.5s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-hy-row.is-gone { opacity: 0; pointer-events: none; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row.is-top { border-color: rgb(94 234 212 / 0.55); box-shadow: 0 0 16px rgb(56 189 248 / 0.14); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row b { display: flex; gap: 8px; font-size: 13px; font-weight: 500; color: var(--fg); line-height: 1.3; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row b em { flex: none; font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--w1); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row small { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; line-height: 1.4; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-row small span { display: block; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-rows.has-boost .hr-hy-row { --hr-row: 76px; }
+[data-fig^="how-hydor-remembers-"] .hr-hy-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-foot code { font-size: 12px; color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-hy-foot .hr-grow { flex: 1 1 260px; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; }
+@media (max-width: 860px) {
+  [data-fig^="how-hydor-remembers-"] .hr-hy-cols { grid-template-columns: 1fr 1fr; }
+  [data-fig^="how-hydor-remembers-"] .hr-hy-fused { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  [data-fig^="how-hydor-remembers-"] .hr-hy-cols { grid-template-columns: 1fr; }
+  [data-fig^="how-hydor-remembers-"] .hr-hy-row { --hr-row: 68px; }
+  [data-fig^="how-hydor-remembers-"] .hr-hy-rows.has-boost .hr-hy-row { --hr-row: 100px; }
+}
+
+/* ---------- stands-out ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-so-ctl { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: 8px; }
+[data-fig^="how-hydor-remembers-"] .hr-so-ctl .fig-controls { margin: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-so-chart { position: relative; width: 100%; }
+[data-fig^="how-hydor-remembers-"] .hr-so-chart svg { display: block; width: 100%; overflow: visible; }
+[data-fig^="how-hydor-remembers-"] .hr-so-dot { fill: #7d8799; opacity: 0.6; transition: transform 0.9s var(--ease), fill 0.5s var(--ease), opacity 0.5s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-so-dot.is-pass { fill: var(--w1); opacity: 1; filter: drop-shadow(0 0 5px rgb(94 234 212 / 0.7)); }
+[data-fig^="how-hydor-remembers-"] .hr-so-dot.is-out { stroke: var(--fg-3); stroke-dasharray: 2 2; fill: none; stroke-width: 1.2; }
+[data-fig^="how-hydor-remembers-"] .hr-so-ax { stroke: var(--line-2); stroke-width: 1.5; }
+[data-fig^="how-hydor-remembers-"] .hr-so-tick { fill: var(--fg-3); font-size: 11.5px; font-family: var(--mono); }
+[data-fig^="how-hydor-remembers-"] .hr-so-lbl { fill: var(--fg-2); font-size: 12px; font-family: var(--font); }
+[data-fig^="how-hydor-remembers-"] .hr-so-line { stroke-width: 1.5; fill: none; transition: opacity 0.5s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-so-band { fill: rgb(138 168 255 / 0.1); transition: opacity 0.5s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-so-read { margin: 10px 0 0; min-height: 3.2em; font-size: 13.5px; line-height: 1.55; color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-so-read b { color: var(--fg); font-weight: 600; }
+[data-fig^="how-hydor-remembers-"] .hr-so-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-so-key span { display: inline-flex; align-items: center; gap: 6px; }
+[data-fig^="how-hydor-remembers-"] .hr-so-key i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; }
+[data-fig^="how-hydor-remembers-"] .hr-so-key i.ring { background: none; border: 1.2px dashed var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-so-keyring { transition: opacity 0.5s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-so-keyring.is-off { opacity: 0.25; }
+[data-fig^="how-hydor-remembers-"] .stats { margin: 14px 0 4px; }
+[data-fig^="how-hydor-remembers-"] .hr-so-evalnote { margin: 4px 0 0; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; }
+
+/* ---------- codebook ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-cb-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 10px; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-top .fig-controls { margin: 0; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-count { display: flex; align-items: baseline; gap: 10px; font-family: var(--mono); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-count b { font-size: 22px; font-weight: 600; color: var(--fg); transition: color 0.6s var(--ease); font-variant-numeric: tabular-nums; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-count.is-small b { color: var(--w1); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-count span { font-size: 12px; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-chart { width: 100%; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-chart svg { display: block; width: 100%; overflow: visible; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-lvl { stroke: rgb(255 255 255 / 0.22); stroke-width: 1; stroke-dasharray: 2 4; transition: opacity 0.7s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-zero { stroke: var(--fg-3); stroke-width: 1; opacity: 0.5; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-bar { fill: #7d8799; opacity: 0.75; transition: height 0.9s var(--ease), y 0.9s var(--ease), fill 0.6s var(--ease), opacity 0.6s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-bar.is-snap { fill: var(--w2); opacity: 1; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-code { fill: var(--w1); font-family: var(--mono); font-size: 11.5px; text-anchor: middle; transition: opacity 0.6s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-note { fill: var(--fg-3); font-size: 11.5px; font-family: var(--font); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-score { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-score > div { position: relative; padding: 9px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: rgb(255 255 255 / 0.02); font-size: 12.5px; line-height: 1.45; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-cb-score > div b { display: block; color: var(--fg); font-size: 13px; font-weight: 600; }
+[data-fig^="how-hydor-remembers-"] .hr-cb-score > div:not(:last-child)::after { content: '→'; position: absolute; right: -11px; top: 50%; transform: translateY(-50%); color: var(--fg-3); font-size: 13px; background: #0b0e13; line-height: 1; }
+@media (max-width: 640px) {
+  [data-fig^="how-hydor-remembers-"] .hr-cb-score { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-fig^="how-hydor-remembers-"] .hr-cb-score > div:not(:last-child)::after { display: none; }
+}
+
+/* ---------- lifecycle ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-lc { display: grid; gap: 14px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-row { display: grid; gap: 6px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-row > i { font-style: normal; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-flow > s { text-decoration: none; color: var(--fg-3); font-size: 15px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-flow .alt { color: var(--fg-3); font-size: 12px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n {
+  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; min-height: 36px; padding: 6px 12px;
+  border: 1px solid var(--line-2); border-radius: 10px; background: rgb(255 255 255 / 0.02); color: var(--fg-2); font-size: 13px;
+  transition: border-color 0.5s var(--ease), background-color 0.5s var(--ease), color 0.5s var(--ease), box-shadow 0.5s var(--ease);
+}
+[data-fig^="how-hydor-remembers-"] .hr-lc-n:hover { border-color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n:focus-visible { outline: 2px solid var(--w2); outline-offset: 2px; }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n.is-on { border-color: rgb(94 234 212 / 0.7); background: rgb(94 234 212 / 0.08); color: var(--fg); box-shadow: 0 0 18px rgb(56 189 248 / 0.2); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n.ok.is-on { border-color: rgb(111 211 154 / 0.7); background: rgb(111 211 154 / 0.08); box-shadow: 0 0 18px rgb(111 211 154 / 0.18); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n.warn.is-on { border-color: rgb(242 180 104 / 0.7); background: rgb(242 180 104 / 0.08); box-shadow: 0 0 18px rgb(242 180 104 / 0.16); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-n.bad.is-on { border-color: rgb(242 139 139 / 0.7); background: rgb(242 139 139 / 0.08); box-shadow: 0 0 18px rgb(242 139 139 / 0.16); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-cap { margin: 4px 0 0; min-height: 4.6em; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: rgb(255 255 255 / 0.02); font-size: 13.5px; line-height: 1.55; color: var(--fg-2); }
+[data-fig^="how-hydor-remembers-"] .hr-lc-cap b { color: var(--fg); }
+
+/* ---------- budgets ---------- */
+[data-fig^="how-hydor-remembers-"] .hr-bd { display: grid; gap: 22px; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 16px; align-items: center; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-name b { display: block; font-size: 15px; color: var(--fg); font-weight: 600; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-name span { font-size: 12px; color: var(--fg-3); font-family: var(--mono); }
+[data-fig^="how-hydor-remembers-"] .hr-bd-track { position: relative; height: 34px; border-radius: 8px; background: rgb(255 255 255 / 0.03); overflow: hidden; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-seg { position: absolute; top: 0; bottom: 0; width: 0; transition: width 1.1s var(--ease), left 1.1s var(--ease); }
+[data-fig^="how-hydor-remembers-"] .hr-bd-seg.block { background: #5b9dff; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-seg.add { background: #4fc995; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-seg.chk { background: #e8a93d; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-total { grid-column: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 12.5px; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-bd-total b { font-size: 20px; color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-total span.hr-mono { font-size: 12px; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-axis { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-ticks { position: relative; height: 16px; grid-column: 2; font-family: var(--mono); font-size: 11px; color: var(--fg-3); }
+[data-fig^="how-hydor-remembers-"] .hr-bd-ticks span { position: absolute; top: 0; transform: translateX(-50%); }
+[data-fig^="how-hydor-remembers-"] .hr-bd-ticks span:first-child { transform: none; }
+[data-fig^="how-hydor-remembers-"] .hr-bd-ticks span:last-child { transform: translateX(-100%); }
+@media (max-width: 560px) {
+  [data-fig^="how-hydor-remembers-"] .hr-bd-row { grid-template-columns: 1fr; }
+  [data-fig^="how-hydor-remembers-"] .hr-bd-total { grid-column: 1; }
+  [data-fig^="how-hydor-remembers-"] .hr-bd-axis { grid-template-columns: 1fr; }
+  [data-fig^="how-hydor-remembers-"] .hr-bd-ticks { grid-column: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fig^="how-hydor-remembers-"] *, [data-fig^="how-hydor-remembers-"] *::before, [data-fig^="how-hydor-remembers-"] *::after { animation: none !important; }
+  [data-fig^="how-hydor-remembers-"] .hr-tl-head, [data-fig^="how-hydor-remembers-"] .hr-hy-row, [data-fig^="how-hydor-remembers-"] .hr-so-dot, [data-fig^="how-hydor-remembers-"] .hr-cb-bar, [data-fig^="how-hydor-remembers-"] .hr-bd-seg { transition: none !important; }
+}
