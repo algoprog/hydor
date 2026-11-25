@@ -144,7 +144,7 @@ export function Row({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {text}
-          {control && <div className="flex shrink-0 flex-wrap items-center gap-2">{control}</div>}
+          {control && <div className="flex max-w-full min-w-0 shrink-0 flex-wrap items-center gap-2">{control}</div>}
         </div>
         {children && <div className="mt-2.5">{children}</div>}
       </div>

@@ -673,13 +673,13 @@ export function useConfirm() {
 export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
   // The chosen option's pill glides to the next one (placed at once the first time).
   const box = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState<{ x: number; w: number; glide: boolean } | null>(null);
+  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number; glide: boolean } | null>(null);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
     const place = () => {
       const b = [...el.querySelectorAll<HTMLElement>('[data-seg]')].find((x) => x.dataset.seg === value);
-      if (b) setPill((p) => ({ x: b.offsetLeft, w: b.offsetWidth, glide: !!p }));
+      if (b) setPill((p) => ({ x: b.offsetLeft, y: b.offsetTop, w: b.offsetWidth, h: b.offsetHeight, glide: !!p }));
       else setPill(null);
     };
     place();
@@ -688,12 +688,13 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
     return () => ro.disconnect();
   }, [value, options.length]);
   return (
-    <div ref={box} className="relative inline-flex rounded-[10px] bg-bg-2 p-0.5">
+    // Too wide for its row (a phone, a long translation), the options go on to a second line rather than off the card.
+    <div ref={box} className="relative inline-flex max-w-full flex-wrap rounded-[10px] bg-bg-2 p-0.5">
       {pill && (
         <span
           aria-hidden
-          className={cx('absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-panel shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-line', pill.glide && 'transition-[translate,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]')}
-          style={{ translate: `${pill.x}px 0`, width: pill.w }}
+          className={cx('absolute top-0 left-0 rounded-lg bg-panel shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-line', pill.glide && 'transition-[translate,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]')}
+          style={{ translate: `${pill.x}px ${pill.y}px`, width: pill.w, height: pill.h }}
         />
       )}
       {options.map((o) => (
@@ -703,7 +704,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
           type="button"
           onClick={() => onChange(o.value)}
           className={cx(
-            'relative inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors duration-200',
+            'relative inline-flex items-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-colors duration-200',
             size === 'sm' ? 'h-7 px-2.5 text-[12.5px]' : 'h-8 px-3 text-[13px]',
             value === o.value ? 'text-fg' : 'text-fg-3 hover:text-fg',
           )}
