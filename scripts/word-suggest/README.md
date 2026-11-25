@@ -238,8 +238,8 @@ python scripts/fit_gate.py --split dev --surface flores --limit 15 --llm Qwen/Qw
 `gate.json` of the release holds the `features`, `w`, `b`, `mu` and `sd` of the first file. `switch.json` holds the
 `switch` map and `switch_default` (stored there as `default`) of the second one.
 
-`calibration.json` has, for each way of running the model (`mix`, `llm`, `slm`), the confidence at which 30, 40 and
-50 out of 100 shown suggestions are right. They come from real decoding on FLORES-200 devtest, in the languages that
+`calibration.json` has, for each way of running the model (`mix`, `llm`, `slm`), the confidence at which 20, 25, 30, 40
+and 50 out of 100 shown suggestions are right (20 is the app's More, its default). They come from real decoding on FLORES-200 devtest, in the languages that
 use spaces, 20 sentences each:
 
 ```bash
@@ -251,12 +251,15 @@ python scripts/real_chances.py --split test --surface flores --limit 20 --words-
 python scripts/real_chances.py --split test --surface flores --limit 20 --words-per-example 16 --llm none \
   --slm $CKPT --variant slm --device cuda --events-out runs/real/slm.jsonl --out runs/real/slm
 python scripts/show_filter.py --compare-real runs/real/mix.jsonl runs/real/llm.jsonl runs/real/slm.jsonl \
-  --labels mix,llm,slm --out runs/real/calibration
+  --labels mix,llm,slm --precisions 0.2,0.25,0.3,0.4,0.5 --out runs/real/calibration
 ```
 
-The rows with `"tag": "compare_real"` give `theta` for each precision (0.3, 0.4, 0.5). No script writes
+The rows with `"tag": "compare_real"` give `theta` for each precision (0.2 to 0.5). No script writes
 `calibration.json`: the release's holds the pooled rows, rounded to four decimals (`mix` is the switch's row), in the
-same layout.
+same layout. Version 2's lists only 0.3, 0.4 and 0.5, so the app's pin of it (`SMALL_MODEL.calibration` in
+`server/suggest/pins.ts`) carries its 0.2 and 0.25 rows, measured this way on the same events; the worker adds them to
+the release's table, never over a precision the release lists. A release whose table has them needs none: drop the
+pin's when you pin it.
 
 ### 5. Export and publish
 

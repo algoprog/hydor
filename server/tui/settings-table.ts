@@ -764,13 +764,13 @@ row('suggest', 'Language model size', 'choice', {
 });
 row('suggest', 'How sure before showing', 'choice', {
   choices: [
-    { value: '0.3', label: '30%: more suggestions' },
+    { value: '0.2', label: '20%: more suggestions' },
     { value: '0.4', label: '40%: balanced' },
     { value: '0.5', label: '50%: surer ones' },
     { value: '0.6', label: '60%: only the surest' },
   ],
   free: true,
-  check: (v) => (Number(v) >= 0.3 && Number(v) <= 0.6 ? null : 'Pick a share from 0.3 (more suggestions) to 0.6 (only the surest)'),
+  check: (v) => (Number(v) >= 0.2 && Number(v) <= 0.6 ? null : 'Pick a share from 0.2 (more suggestions) to 0.6 (only the surest)'),
   read: { endpoint: '/api/suggest', pick: (d) => (d.settings?.precision == null ? undefined : String(d.settings.precision)) },
   write: put('/api/suggest', (v) => ({ precision: Number(v) })),
   note: 'The share of the suggestions shown that is meant to be right.',

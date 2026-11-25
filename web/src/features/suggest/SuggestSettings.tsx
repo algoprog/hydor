@@ -19,7 +19,7 @@ const automatic = (n: number) => (n === 0 ? 'Automatic' : String(n));
 
 /** The three answers to "how sure before showing", and the share of right suggestions each aims at. */
 const SURE = [
-  { id: 'more', value: 0.3, label: 'More' },
+  { id: 'more', value: 0.2, label: 'More' },
   { id: 'balanced', value: 0.4, label: 'Balanced' },
   { id: 'surer', value: 0.5, label: 'Surer' },
 ] as const;

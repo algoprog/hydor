@@ -70,7 +70,9 @@ Environment overrides (for development and tests; documented in docs/configurati
 - `lid.json` + `lid.bin`: the language guess: per language (FLORES codes, as `switch.json`), log-probabilities of the
   tokens it uses most (from the pretraining text), and a floor; naive Bayes over the context's token ids.
 - `calibration.json`: for each plan (`mix`, `llm`, `slm`), the confidence threshold θ that gives 30%, 40% and 50% of
-  shown suggestions right in the research's real decoding (FLORES-200).
+  shown suggestions right in the research's real decoding (FLORES-200). The app's pin of the release
+  (`SMALL_MODEL.calibration` in `server/suggest/pins.ts`) adds the thresholds for 20% (Settings' More) and 25%, measured
+  the same way on the same events; the release's own points come first, so a release that lists them needs none.
 - `replay/`: public pretraining text (FineWeb-2 and the OpenAssistant / Aya chats only), already tokenised
   (`replay.u32` little-endian token ids, `index.json` with the sequences' offsets, kinds and languages): personalising
   replays it 1:1 beside the person's text, or the other languages are forgotten.
@@ -105,10 +107,10 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
 `{"ready": true, "rss": <MB>}`. Every request has an `id`; every answer carries it back.
 
 - `{"id", "op": "load", "model_dir", "personal_dir": str|null, "llm_url": str|null, "threads": int,
-  "options": {"k": 1000}}` → `{"id", "ok": true, "model": "base"|"personal", "languages": {…user token counts…}}`.
+  "options": {"k": 1000}, "calibration"?: {plan: {precision: θ}}}` (the pin's thresholds; none for a folder of one's own) → `{"id", "ok": true, "model": "base"|"personal", "languages": {…user token counts…}}`.
   Sent first and again after training or when the LLM starts or stops (a `null` llm_url: the small model alone).
 - `{"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?,
-  "precision": 0.3, "next": true, "cache": true, "switch": true}` → `{"id", "word", "next", "conf", "conf_next",
+  "precision": 0.2, "next": true, "cache": true, "switch": true}` → `{"id", "word", "next", "conf", "conf_next",
   "theta", "show", "show_next", "plan", "lang", "model", "ms": {"total", "llm", "slm"}}` (`model`: `"base"` or
   `"personal"`, the small model that answered; absent when Qwen3.5 alone did).
 - `{"id", "op": "session", "session", "texts": [str]}`: the session's earlier text for its cache (Node sends it once
@@ -159,8 +161,8 @@ Started as `python -I <dist>/server/suggest/py/worker.py`; prints `{"status": "l
    the mass of the word-ending tokens at the end. `word` = what it decoded past `R`'s typed letters. With `next` on and
    the word ended, the following word is decoded the same way with nothing typed: `next` (with its leading space) and
    `conf_next`. Session cache (with `cache` on, chat): `P = (1 − μ)·P_plan + μ·P_cache` as the research's E9.
-6. **Showing**: `theta` = calibration.json's θ for the plan at the asked precision (between the listed precisions:
-   linear); `show = conf ≥ theta`; `show_next = show and conf_next ≥ theta`.
+6. **Showing**: `theta` = calibration.json's θ for the plan at the asked precision, with the pin's points added (between the
+   listed precisions: linear); `show = conf ≥ theta`; `show_next = show and conf_next ≥ theta`.
 
 A suggestion takes about 100–150 ms with the LLM at 4 threads; with the small model alone, median 20 ms and 90th percentile 53 ms at 4 threads
 (32 and 80 ms at 1; PyTorch took 59 and 150 ms), a worker of about 610 MB (PyTorch: 905 MB) that is ready to answer in about 2 s. With a personal model both small models stay loaded (a second set of weights, 250 MB): the worker is then about 830 MB, as against about 575 MB with one.
@@ -226,7 +228,7 @@ Qwen3.5 alone (29.7% against 30.5%); one run from the published model on everyth
 ## Settings (`shared/suggest.ts`)
 
 Kept on the server (`kv`, key `suggest.settings`): on/off; the language model (`auto` / `on` / `off`) and its size
-(8-bit / 4-bit); how sure (`precision`: 0.3 more suggestions, the default … 0.5 surer ones); the next word; where (message boxes,
+(8-bit / 4-bit); how sure (`precision`: 0.2 more suggestions, the default; 0.4 balanced; 0.5 surer ones; up to 0.6); the next word; where (message boxes,
 documents, notes, other text boxes); words read (typed: 100; the reply or the document: 100); per-language switch;
 session cache; threads; personalise (on/off, schedule, sources, the weight of the person's own words, training
 threads). Kept by each browser (`shared/device.ts`): show word suggestions in this browser. Every option has its row in

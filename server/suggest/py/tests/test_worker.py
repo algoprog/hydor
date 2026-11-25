@@ -112,6 +112,25 @@ class WorkerTests(unittest.TestCase):
         w.send(id=8, op='load', model_dir=os.path.join(self.dir.name, 'missing'))
         self.assertIn('error', w.answer(8))
 
+    def test_the_calibration_of_a_load_reaches_the_engine(self):
+        w = self.start()
+        w.send(id=1, op='load', model_dir=self.release, threads=2)
+        w.answer(1)
+        w.send(id=2, op='suggest', surface='text', text='hello wor', precision=0.2)
+        self.assertAlmostEqual(w.answer(2)['theta'], 0.1)                  # the release's own: 0.2 clamps to its 0.3 threshold
+        w.send(id=3, op='load', model_dir=self.release, threads=2, calibration={'mix': {'0.2': 0.05}, 'slm': {'0.2': 0.04}})
+        self.assertTrue(w.answer(3)['ok'])
+        w.send(id=4, op='suggest', surface='text', text='hello wor', precision=0.2)
+        self.assertAlmostEqual(w.answer(4)['theta'], 0.04)
+        w.send(id=5, op='suggest', surface='text', text='hello wor')        # no precision: the default, 0.2
+        self.assertAlmostEqual(w.answer(5)['theta'], 0.04)
+        w.send(id=6, op='suggest', surface='text', text='hello wor', precision=0.4)
+        self.assertAlmostEqual(w.answer(6)['theta'], 0.15)                 # the release's own points are as they were
+        w.send(id=7, op='load', model_dir=self.release, threads=2, calibration=None)
+        self.assertTrue(w.answer(7)['ok'])
+        w.send(id=8, op='suggest', surface='text', text='hello wor', precision=0.2)
+        self.assertAlmostEqual(w.answer(8)['theta'], 0.1)
+
     def test_non_ascii_text_goes_through(self):
         w = self.start()
         w.send(id=1, op='load', model_dir=self.release, threads=2)

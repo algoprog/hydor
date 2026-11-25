@@ -114,6 +114,9 @@ export function releaseDir(): string | null {
   return path.join(modelsRoot(), `hydor-suggest-49m-${SMALL_MODEL.revision.slice(0, 12)}`);
 }
 
+/** Thresholds the worker adds to the release's own (pins.ts): none for a folder of one's own (HYDOR_SUGGEST_MODEL_DIR), which they were not measured for. */
+export const releaseCalibration = () => (process.env.HYDOR_SUGGEST_MODEL_DIR ? undefined : SMALL_MODEL.calibration);
+
 /**
  * What the personal model is learnt from: the published release's revision, or `dir:<path>` for a folder of one's own
  * (HYDOR_SUGGEST_MODEL_DIR). A model made from another base is learnt again from this one.

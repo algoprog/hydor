@@ -37,9 +37,19 @@ export const GGUF_FILES: Record<'q8' | 'q4', ModelFile> = {
  * its repository, a pinned revision and its files, each checked by its SHA-256 as it downloads. HYDOR_SUGGEST_MODEL_DIR
  * (a folder holding these files) still runs another copy instead.
  */
-export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[] } = {
+export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[]; calibration?: Record<'mix' | 'llm' | 'slm', Record<string, number>> } = {
   repo: 'algoprog/hydor-suggest-49m',
   revision: 'db7f41395e51501c99b8896bf63c98e7e445a18b',
+  /**
+   * Thresholds for this revision at precisions its calibration.json does not list (it has 0.3, 0.4 and 0.5): 0.2 is Settings' More,
+   * 0.25 lies between. Measured as its own were (show_filter.py --compare-real on the same real-decoded FLORES-200 devtest events, 193
+   * spaced languages x 20 sentences). The worker adds them to the release's table; a release that lists these precisions itself needs none.
+   */
+  calibration: {
+    mix: { '0.2': 0.0825, '0.25': 0.1416 },
+    llm: { '0.2': 0.101, '0.25': 0.1641 },
+    slm: { '0.2': 0.1154, '0.25': 0.1757 },
+  },
   files: [
     { from: 'LICENSE', name: 'LICENSE', bytes: 34_523, sha256: '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0' },
     { from: 'LICENSE.Apache-2.0', name: 'LICENSE.Apache-2.0', bytes: 11_358, sha256: 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30' },

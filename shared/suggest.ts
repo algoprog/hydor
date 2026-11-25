@@ -60,7 +60,7 @@ export interface SuggestSettings {
   llm: SuggestLlmMode;
   /** The language model's size: 8-bit (better) or 4-bit (smaller, a little worse). */
   quant: 'q8' | 'q4';
-  /** How sure a suggestion must be to show: the share of shown suggestions meant to be right (0.3 more of them … 0.5 surer ones). */
+  /** How sure a suggestion must be to show: the share of shown suggestions meant to be right (0.2 more of them … 0.5 surer ones; at most 0.6). */
   precision: number;
   /** Show the next word too, dimmer. */
   nextWord: boolean;
@@ -93,7 +93,7 @@ export const SUGGEST_DEFAULTS: SuggestSettings = {
   enabled: true,
   llm: 'auto',
   quant: 'q8',
-  precision: 0.3,
+  precision: 0.2,
   nextWord: true,
   where: { chat: true, docs: true, notes: true, other: true },
   typedWords: 100,
@@ -111,7 +111,7 @@ export const SUGGEST_DEFAULTS: SuggestSettings = {
 
 /** The limits of the numeric settings (inclusive). */
 export const SUGGEST_LIMITS = {
-  precision: [0.3, 0.6],
+  precision: [0.2, 0.6],
   typedWords: [20, 200],
   contextWords: [0, 200],
   threads: [0, 32],

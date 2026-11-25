@@ -3,9 +3,11 @@
 It reads requests as JSON lines on stdin and answers each with one JSON line on stdout, carrying the request's id back. First it prints
 {"status": "loading"} and, once its libraries are loaded, {"ready": true, "rss": <MB>}.
 
-  {"id", "op": "load", "model_dir", "personal_dir": str|null, "llm_url": str|null, "threads": int, "options": {"k": 1000}}
+  {"id", "op": "load", "model_dir", "personal_dir": str|null, "llm_url": str|null, "threads": int, "options": {"k": 1000},
+        "calibration"?: {plan: {precision: theta}}}
         -> {"id", "ok": true, "model": "base"|"personal", "languages": {lang: the person's tokens}}
-  {"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?, "precision": 0.3,
+        (calibration: thresholds measured for the release at precisions its calibration.json does not list; its own come first)
+  {"id", "op": "suggest", "surface": "chat"|"doc"|"text", "text", "reply"?, "prev"?, "doc"?, "session"?, "precision": 0.2,
         "next": true, "cache": true, "switch": true, "typed_words": 100, "context_words": 100}
         (typed_words: how many words of the typed text before the caret are read; context_words: how many of the reply (chat) or the
         document (doc); 0 reads none of the context; both default to the load options', else 100)
@@ -136,7 +138,7 @@ class Worker:
                     from .engine import Engine
                     self.engine = Engine()
                 res = self.engine.load(req['model_dir'], req.get('personal_dir'), req.get('llm_url'), int(req.get('threads') or 0),
-                                       req.get('options') or {})
+                                       req.get('options') or {}, req.get('calibration'))
                 self.say({'id': rid, 'ok': True, **res})
             elif op == 'suggest':
                 if self.is_cancelled(rid):

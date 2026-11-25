@@ -54,6 +54,22 @@ def theta_for(calibration: dict, plan: str, precision: float) -> float:
     return pts[-1][1]
 
 
+def with_points(calibration: dict, extra: Optional[dict]) -> dict:
+    """A release's calibration with the thresholds `extra` adds: points measured for that release the same way, at precisions its own
+    table does not list (the app's pin of the release, pins.ts SMALL_MODEL.calibration). They go only into a plan the release has a
+    table for, and never in place of a precision it lists."""
+    out = {plan: (dict(t) if isinstance(t, dict) else t) for plan, t in (calibration or {}).items()}
+    for plan, pts in (extra or {}).items():
+        table = out.get(plan)
+        if not isinstance(table, dict) or not isinstance(pts, dict):
+            continue
+        listed = {float(k) for k in table}
+        for k, v in pts.items():
+            if float(k) not in listed:
+                table[str(k)] = float(v)
+    return out
+
+
 class SlmRunner:
     """The small model with an incremental state: the state after the last context is kept and extended when the next one only adds
     tokens; decoding steps run on copies of it (a State is never changed in place)."""
@@ -152,7 +168,8 @@ class Release:
         self.switch = mix_mod.Switch.load(sw) if os.path.isfile(sw) else mix_mod.Switch()
         self.lid = Lid.load(folder)
         cal = os.path.join(folder, 'calibration.json')
-        self.calibration = _read_json(cal) if os.path.isfile(cal) else {}
+        self.own_calibration = _read_json(cal) if os.path.isfile(cal) else {}
+        self.calibration = self.own_calibration          # with the points the app adds (Engine.load)
         cf = os.path.join(folder, 'cache.json')
         self.cache_fits = dict(cache_mod.DEFAULT_FITS)
         if os.path.isfile(cf):
@@ -208,14 +225,16 @@ class Engine:
 
     # ---- loading ----------------------------------------------------------------------------------------------------------
     def load(self, model_dir: str, personal_dir: Optional[str] = None, llm_url: Optional[str] = None, threads: int = 0,
-             options: Optional[dict] = None) -> dict:
+             options: Optional[dict] = None, calibration: Optional[dict] = None) -> dict:
         """Load a release and the personal model beside it (both stay loaded: the graph is the same, the weights are two sets), and
-        connect the language model. Everything is built before anything is swapped in: a load that fails leaves the engine as it was."""
+        connect the language model. `calibration`: thresholds the app adds to the release's own (with_points). Everything is built
+        before anything is swapped in: a load that fails leaves the engine as it was."""
         threads = max(0, int(threads or 0))
         opts = dict(DEFAULTS)
         opts.update({k: v for k, v in (options or {}).items() if v is not None})
         same = self.release is not None and os.path.abspath(self.release.folder) == os.path.abspath(model_dir)
         rel = self.release if same else Release(model_dir)
+        thresholds = with_points(rel.own_calibration, calibration)
         old = [x for x in (self.base, self.personal) if x is not None]
         base_model, base_key = self._slm(rel.slm_config, rel.weights, [rel.folder], threads, old)
         built = [base_model] if all(x.model is not base_model for x in old) else []     # the models made here (closed if the load fails)
@@ -267,6 +286,7 @@ class Engine:
         for x in old:
             if id(x.model) not in now:
                 x.model.close()
+        rel.calibration = thresholds
         self.opts, self.release, self.base, self.personal = opts, rel, base, personal
         self.client, self.llm_error, self.llm_down_until = client, None, 0.0
         self.caches = cache_mod.SessionCaches(rel.V, int(opts['sessions']))
@@ -420,7 +440,7 @@ class Engine:
             texts = [t for t in (V.nfc(req.get('reply') or ''), V.nfc(req.get('prev') or '')) if t and hash(t) not in known]
             extras = [self.encode(t) for t in texts]
             extra_key = tuple(hash(t) for t in texts)
-        precision = float(req.get('precision') or 0.3)
+        precision = float(req.get('precision') or 0.2)
         want_next = bool(req.get('next', True))
         used = plan
         stats = {'llm': 0.0, 'slm': 0.0}

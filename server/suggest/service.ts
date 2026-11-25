@@ -11,7 +11,7 @@ import { childEnv, PyWorker, type Reply } from './engine.ts';
 import { LlamaServer } from './llm.ts';
 import { llmThreads, merge, readSettings, workerThreads, writeSettings } from './settings.ts';
 import { leftoverTraining, reapLeftovers } from './procs.ts';
-import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, tidyReleases, unsupportedSystem, workerScript } from './setup.ts';
+import { ggufPath, llamaBinary, llamaSupported, packagesReady, pythonPath, releaseCalibration, releaseDir, releaseProblem, setupGguf, setupLlama, setupPython, setupRelease, suggestDisabled, tidyReleases, unsupportedSystem, workerScript } from './setup.ts';
 import { forgetPersonal, gpuHold, hasPersonal, lastDevice, personalDir, personalState, recoverPersonal, Trainer } from './train.ts';
 import { lastTyped } from './texts.ts';
 import { addUsage, readUsage, resetUsage } from './usage.ts';
@@ -612,7 +612,7 @@ export class SuggestService {
     const release = releaseDir();
     if (!release) return false;
     try {
-      const r = await w.request({ op: 'load', model_dir: release, personal_dir: personal ? personalDir() : null, llm_url: url, threads: workerThreads(s), options: { k: 1000 } }, LOAD_MS).done;
+      const r = await w.request({ op: 'load', model_dir: release, personal_dir: personal ? personalDir() : null, llm_url: url, threads: workerThreads(s), options: { k: 1000 }, calibration: releaseCalibration() }, LOAD_MS).done;
       w.loadedKey = key;
       this.loadInfo = { kind: r.model === 'personal' ? 'personal' : 'base', languages: r.languages && typeof r.languages === 'object' ? r.languages : undefined };
       return true;

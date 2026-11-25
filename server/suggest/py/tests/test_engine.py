@@ -8,7 +8,7 @@ import numpy as np
 from hydor_suggest import vocab as V
 from hydor_suggest.cache import CacheFit
 from hydor_suggest.decode import Cancelled
-from hydor_suggest.engine import Engine, theta_for
+from hydor_suggest.engine import Engine, theta_for, with_points
 
 
 def llm_script(tok, Vq, text, base_len):
@@ -65,6 +65,41 @@ class TextCutTests(unittest.TestCase):
         self.assertAlmostEqual(theta_for(cal, 'llm', 0.5), 0.35)
         self.assertAlmostEqual(theta_for(cal, 'slm', 0.4), 0.3)          # no table of its own: the mix's
         self.assertAlmostEqual(theta_for({}, 'slm', 0.4), 0.4)
+
+    def test_with_points_adds_thresholds_the_release_does_not_list(self):
+        cal = {'mix': {'0.3': 0.2, '0.4': 0.3, '0.5': 0.5}, 'llm': {'0.3': 0.25, '0.4': 0.35}, 'source': 'flores'}
+        before = json.loads(json.dumps(cal))
+        extra = {'mix': {'0.2': 0.08, '0.25': 0.14}, 'llm': {'0.2': 0.1}, 'slm': {'0.2': 0.11}}
+        out = with_points(cal, extra)
+        self.assertEqual(out['mix'], {'0.3': 0.2, '0.4': 0.3, '0.5': 0.5, '0.2': 0.08, '0.25': 0.14})
+        self.assertEqual(out['llm'], {'0.3': 0.25, '0.4': 0.35, '0.2': 0.1})
+        self.assertNotIn('slm', out)                                     # the release has no table for it: it keeps using the mix's
+        self.assertEqual(out['source'], 'flores')                        # entries that are not tables stay
+        self.assertEqual(cal, before)                                    # the input is not changed
+        self.assertIsNot(out['mix'], cal['mix'])
+        # A precision the release lists is never replaced, however it is written.
+        out = with_points({'mix': {'0.30': 0.2, '0.4': 0.3}}, {'mix': {'0.3': 0.99, '0.4': 0.99, '0.2': 0.05}})
+        self.assertEqual(out['mix'], {'0.30': 0.2, '0.4': 0.3, '0.2': 0.05})
+        out = with_points({'mix': {'0.3': 0.2}}, {'mix': {'0.30': 0.99}})
+        self.assertEqual(out['mix'], {'0.3': 0.2})
+        # Nothing to add, or nothing to add to.
+        self.assertEqual(with_points(cal, None), cal)
+        self.assertEqual(with_points(cal, {}), cal)
+        self.assertEqual(with_points({}, extra), {})
+        self.assertEqual(with_points(None, extra), {})
+        self.assertEqual(with_points({'mix': 'odd'}, {'mix': {'0.2': 0.1}}), {'mix': 'odd'})
+        # The merged table interpolates between the new point and the release's first, and 0.2 no longer clamps to the 0.3 threshold.
+        merged = with_points(cal, extra)
+        self.assertAlmostEqual(theta_for(cal, 'mix', 0.2), 0.2)           # as the release alone: clamped to the 0.3 threshold
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.2), 0.08)
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.25), 0.14)
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.275), 0.17)     # between 0.25 (0.14) and 0.3 (0.2)
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.3), 0.2)
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.35), 0.25)      # the release's own points are as they were
+        self.assertAlmostEqual(theta_for(merged, 'mix', 0.1), 0.08)
+        self.assertAlmostEqual(theta_for(merged, 'llm', 0.2), 0.1)
+        self.assertAlmostEqual(theta_for(merged, 'llm', 0.25), 0.175)     # between 0.2 (0.1) and 0.3 (0.25)
+        self.assertAlmostEqual(theta_for(merged, 'slm', 0.2), 0.08)       # no table of its own: the mix's, with its new points
 
 
 class EngineTests(unittest.TestCase):
@@ -342,6 +377,46 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(pr.target_text, '')
         pr = e.prepare({'surface': 'chat', 'text': 'one two three wor'})
         self.assertEqual(pr.target_text, 'one two three')
+
+    def test_calibration_of_the_app_adds_thresholds_to_the_releases_own(self):
+        own = json.loads(json.dumps(self.calibration_file()))
+        extra = {'mix': {'0.2': 0.05}, 'llm': {'0.2': 0.07}, 'slm': {'0.2': 0.04}}
+        e = self.engine()
+        ask = {'surface': 'text', 'text': 'we are writing a message to the as', 'precision': 0.2}
+        out = e.suggest(ask)
+        self.assertEqual(out['plan'], 'slm')                                       # no language model: the small model's table
+        self.assertAlmostEqual(out['theta'], 0.1)                                  # the release's own: 0.2 clamps to its 0.3 threshold
+        e.load(self.release, None, None, 2, None, extra)
+        self.assertEqual(e.release.own_calibration, own)
+        self.assertEqual(e.release.calibration['slm'], {**own['slm'], '0.2': 0.04})
+        out = e.suggest(ask)
+        self.assertEqual(out['plan'], 'slm')
+        self.assertAlmostEqual(out['theta'], 0.04)
+        self.assertAlmostEqual(e.suggest({**ask, 'precision': 0.25})['theta'], 0.07)  # halfway between 0.04 and the release's 0.1
+        self.assertAlmostEqual(e.suggest({**ask, 'precision': 0.4})['theta'], 0.15)   # the release's own points are as they were
+        self.assertAlmostEqual(e.suggest({'surface': 'text', 'text': ask['text']})['theta'], 0.04)   # the default precision is 0.2
+        # Loaded again without them, it is the release's own table again.
+        e.load(self.release, None, None, 2)
+        self.assertEqual(e.release.calibration, own)
+        self.assertEqual(e.release.own_calibration, own)
+        self.assertAlmostEqual(e.suggest(ask)['theta'], 0.1)
+        # And again with them: the release's file was not changed by the first time.
+        e.load(self.release, None, None, 2, None, extra)
+        self.assertAlmostEqual(e.suggest(ask)['theta'], 0.04)
+        self.assertEqual(e.release.own_calibration, own)
+
+    def test_a_load_that_fails_does_not_keep_the_added_thresholds(self):
+        e = self.engine()
+        before = e.release.calibration
+        with self.assertRaises(Exception):
+            e.load(self.release, None, 'ftp://nowhere', 2, None, {'slm': {'0.2': 0.01}})
+        self.assertIs(e.release.calibration, before)
+        self.assertNotIn('0.2', e.release.calibration['slm'])
+        self.assertAlmostEqual(e.suggest({'surface': 'text', 'text': 'the quick br', 'precision': 0.2})['theta'], 0.1)
+
+    def calibration_file(self):
+        with open(os.path.join(self.release, 'calibration.json'), encoding='utf-8') as f:
+            return json.load(f)
 
     def test_a_load_that_fails_changes_nothing(self):
         e = self.engine()

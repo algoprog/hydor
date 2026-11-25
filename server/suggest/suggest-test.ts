@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import Fastify from 'fastify';
-import { SUGGEST_DEFAULTS, type SuggestState } from '../../shared/suggest.ts';
+import { SUGGEST_DEFAULTS, SUGGEST_LIMITS, type SuggestState } from '../../shared/suggest.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -22,12 +22,12 @@ import { suggest, suggestService, cleanRequest } from './index.ts';
 import { LlamaServer } from './llm.ts';
 import { killAll, leftoverTraining, reapLeftovers, track } from './procs.ts';
 import { retryAfter, SuggestService } from './service.ts';
-import { baseId, run as runCommand, setupRelease, tidyReleases, unsupportedSystem, withStall } from './setup.ts';
+import { baseId, releaseCalibration, run as runCommand, setupRelease, tidyReleases, unsupportedSystem, withStall } from './setup.ts';
 import { chooseDevice, bestGpu, othersByCard, parseCuda, parseGpus, tagSuits, visibleCards, wheelTag, worstOf, GPU_SHARED_BUSY_MAX, GPU_SHARED_LOOKS, GPU_SPARE_MB, type DevicePick } from './gpu.ts';
 import { GRACE, MAX_OWN_TOKENS, gpuHold, personalDir, personalState, recoverPersonal, runSeed } from './train.ts';
 import { merge, readSettings, trainThreads, writeSettings } from './settings.ts';
 import { cleanUser, extractTexts, htmlText, texText, writeTexts } from './texts.ts';
-import { SMALL_MODEL_NEEDS } from './pins.ts';
+import { SMALL_MODEL, SMALL_MODEL_NEEDS } from './pins.ts';
 import { addUsage, cleanUsage, dayBefore, dayKey, readUsage, resetUsage, USAGE_KEY } from './usage.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
@@ -264,7 +264,7 @@ test('settings: a wrong value is a 400 that names the field; limits are inclusiv
   bad({ llm: 'maybe' }, 'llm');
   bad({ quant: 'q5' }, 'quant');
   bad({ schedule: 'daily' }, 'schedule');
-  bad({ precision: 0.29 }, 'precision');
+  bad({ precision: 0.19 }, 'precision');
   bad({ precision: 0.61 }, 'precision');
   bad({ typedWords: 19 }, 'typedWords');
   bad({ typedWords: 100.5 }, 'typedWords');
@@ -279,8 +279,8 @@ test('settings: a wrong value is a 400 that names the field; limits are inclusiv
   bad({ sources: 'all' }, 'sources');
   bad({ nonsense: 1 }, 'nonsense');
   bad([], 'Send');
-  const edge = merge(SUGGEST_DEFAULTS, { precision: 0.3, typedWords: 200, contextWords: 0, threads: 32, userWeight: 16, trainThreads: 64 }, true);
-  assert.deepEqual([edge.precision, edge.typedWords, edge.contextWords, edge.threads, edge.userWeight, edge.trainThreads], [0.3, 200, 0, 32, 16, 64]);
+  const edge = merge(SUGGEST_DEFAULTS, { precision: 0.2, typedWords: 200, contextWords: 0, threads: 32, userWeight: 16, trainThreads: 64 }, true);
+  assert.deepEqual([edge.precision, edge.typedWords, edge.contextWords, edge.threads, edge.userWeight, edge.trainThreads], [0.2, 200, 0, 32, 16, 64]);
   // Threads for learning: the person's number wins; else half the logical cores, at most 16.
   assert.equal(trainThreads({ ...SUGGEST_DEFAULTS, trainThreads: 3 }), 3);
   assert.equal(trainThreads(SUGGEST_DEFAULTS), Math.max(1, Math.min(16, Math.floor(os.cpus().length / 2))));
@@ -357,10 +357,11 @@ test('routes: not ready is 204 and starts the worker; then a suggestion comes ba
   assert.equal(load.llm_url, null, 'the language model is off');
   assert.equal(load.threads, 2);
   assert.deepEqual(load.options, { k: 1000 });
+  assert.equal(load.calibration, undefined, 'a folder of one\'s own (HYDOR_SUGGEST_MODEL_DIR) gets no pinned thresholds');
   const sug = logLines().filter((l) => l.op === 'suggest').pop();
   assert.deepEqual(
     { ...sug, id: undefined },
-    { id: undefined, op: 'suggest', surface: 'chat', text: 'Hello wor', reply: 'The previous reply', prev: 'before', precision: 0.3, next: true, cache: false, switch: true, typed_words: 100, context_words: 100 },
+    { id: undefined, op: 'suggest', surface: 'chat', text: 'Hello wor', reply: 'The previous reply', prev: 'before', precision: 0.2, next: true, cache: false, switch: true, typed_words: 100, context_words: 100 },
   );
   // The settings go with each request: the next word off hides it.
   await app.inject({ method: 'PUT', url: '/api/suggest', payload: { nextWord: false, precision: 0.5, typedWords: 50, contextWords: 20 } });
@@ -729,6 +730,32 @@ test('personalising: the schedule waits for the gap and for a quiet ten minutes'
   await app.inject({ method: 'PUT', url: '/api/suggest', payload: { schedule: 'manual' } });
   assert.equal(svc.trainDue(quiet + 400 * 3600_000), false, 'manual never starts by itself');
   assert.equal((await get()).status.training.next, undefined);
+});
+
+test('the thresholds pinned for the published release go to the worker, but not for a folder of one\'s own', () => {
+  const saved = process.env.HYDOR_SUGGEST_MODEL_DIR;
+  try {
+    delete process.env.HYDOR_SUGGEST_MODEL_DIR;
+    assert.deepEqual(releaseCalibration(), SMALL_MODEL.calibration);
+    process.env.HYDOR_SUGGEST_MODEL_DIR = path.join(tmp, 'own-release');
+    assert.equal(releaseCalibration(), undefined, 'the pins were measured for the published release only');
+  } finally {
+    saved === undefined ? delete process.env.HYDOR_SUGGEST_MODEL_DIR : (process.env.HYDOR_SUGGEST_MODEL_DIR = saved);
+  }
+  // The pin itself: a table for each plan, thresholds that rise with the precision, at precisions Settings allows.
+  const cal = SMALL_MODEL.calibration!;
+  assert.deepEqual(Object.keys(cal).sort(), ['llm', 'mix', 'slm']);
+  const [lo, hi] = SUGGEST_LIMITS.precision;
+  for (const [plan, table] of Object.entries(cal)) {
+    const points = Object.entries(table).map(([p, theta]) => [Number(p), theta] as const).sort((a, b) => a[0] - b[0]);
+    assert.ok(points.length > 0, `${plan} has points`);
+    for (const [p, theta] of points) {
+      assert.ok(Number.isFinite(p) && p >= lo && p <= hi, `${plan}: precision ${p} is one Settings allows`);
+      assert.ok(theta > 0 && theta < 1, `${plan}: threshold ${theta} is between 0 and 1`);
+    }
+    for (let i = 1; i < points.length; i++) assert.ok(points[i][1] > points[i - 1][1], `${plan}: the threshold rises with the precision (${points[i - 1]} then ${points[i]})`);
+  }
+  assert.notEqual(cal.mix[String(SUGGEST_DEFAULTS.precision)], undefined, 'the default precision has a measured threshold');
 });
 
 test('with no local copy given, setup downloads the published release, and says why when it cannot', async () => {
