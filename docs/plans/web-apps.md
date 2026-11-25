@@ -43,6 +43,7 @@ is built: agent apps stay as that plan made them.*
 | Agent apps on the kit | Agent apps can use the same kit when they need more: an interface of their own, not only what an agent shows in a session, behaving like proper web apps | Section 2: one kind of app with a flows half and a web half; a ninth seam, flows |
 | Updates | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
+| Credentials | When an app needs a key (payments, a model, a mail service, a sign-in app), the agent shows how to get it and asks for it on a card that saves it in the vault; several at once as tabs, each with its own short steps | Section 7: one card for any session, fed for kit apps by what each block says about its keys |
 | With the kit or without | Someone building a standalone app chooses: on the kit, or from scratch without it. The kit should make building faster and cheaper, and that is measured, not assumed | Section 7 (the choice, on the brief) and section 13 (the comparison) |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
@@ -511,6 +512,15 @@ How it behaves:
 - **The cheapest worker for each part.** Scaffolding is a program. Adapting a block is a Standard helper with the
   block's notes. Mechanical edits are Quick. The lead thinks with Best.
 - **Any session can pick it up.** The brief, `kit.json` and git say where the app stands and what was decided.
+
+**Keys.** When a feature needs a credential, the agent asks for it as soon as the feature is chosen, not when
+something fails: one card, a tab for each provider, and in each tab what the key is for, three to six plain steps
+for getting it with a link to the provider's page, the boxes to paste into, and a quiet warning when a paste is
+plainly the wrong thing (a live key where a test key belongs). Values go to the vault; the agent learns only which
+were saved or skipped. For an app on the kit the steps come from the blocks, which say for every key who gives it
+and how; the host's own keys and the ones a launch makes are never asked for. Launch asks the same way for whatever
+the place still lacks. An app built from scratch gets the same card, with steps the agent writes after reading the
+provider's page.
 
 **With the kit or without.** On the brief, the maker chooses how the app is built: on the kit (the default), or
 from scratch in any stack. From scratch is what Hydor already does for any coding task, with the brief known and
