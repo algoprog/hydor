@@ -756,6 +756,8 @@ test('the thresholds pinned for the published release go to the worker, but not 
     for (let i = 1; i < points.length; i++) assert.ok(points[i][1] > points[i - 1][1], `${plan}: the threshold rises with the precision (${points[i - 1]} then ${points[i]})`);
   }
   assert.notEqual(cal.mix[String(SUGGEST_DEFAULTS.precision)], undefined, 'the default precision has a measured threshold');
+  // The most an agent can set has a threshold of its own in every plan, or it would get the release's last one (0.5's).
+  for (const [plan, table] of Object.entries(cal)) assert.notEqual(table[String(hi)], undefined, `${plan} has a threshold for ${hi}, the highest precision Settings allows`);
 });
 
 test('with no local copy given, setup downloads the published release, and says why when it cannot', async () => {

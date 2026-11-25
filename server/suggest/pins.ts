@@ -42,13 +42,16 @@ export const SMALL_MODEL: { repo: string; revision: string; files: ModelFile[]; 
   revision: 'db7f41395e51501c99b8896bf63c98e7e445a18b',
   /**
    * Thresholds for this revision at precisions its calibration.json does not list (it has 0.3, 0.4 and 0.5): 0.2 is Settings' More,
-   * 0.25 lies between. Measured as its own were (show_filter.py --compare-real on the same real-decoded FLORES-200 devtest events, 193
-   * spaced languages x 20 sentences). The worker adds them to the release's table; a release that lists these precisions itself needs none.
+   * 0.25 lies between; 0.55 and 0.6 reach the most an agent can set (above the last point a precision gets that point's threshold).
+   * Measured as its own were (show_filter.py --compare-real on the same real-decoded FLORES-200 devtest events, 193 spaced languages x
+   * 20 sentences). The small model alone never reaches 60% there: its share right levels off at about 56% for thresholds 0.72 to 0.79
+   * and falls above them (its surest guesses are often wrong), so its 0.6 is the lowest threshold of that peak. The worker adds these
+   * to the release's table; a release that lists these precisions itself needs none.
    */
   calibration: {
-    mix: { '0.2': 0.0825, '0.25': 0.1416 },
-    llm: { '0.2': 0.101, '0.25': 0.1641 },
-    slm: { '0.2': 0.1154, '0.25': 0.1757 },
+    mix: { '0.2': 0.0825, '0.25': 0.1416, '0.55': 0.6309, '0.6': 0.7633 },
+    llm: { '0.2': 0.101, '0.25': 0.1641, '0.55': 0.6983, '0.6': 0.8071 },
+    slm: { '0.2': 0.1154, '0.25': 0.1757, '0.55': 0.6755, '0.6': 0.72 },
   },
   files: [
     { from: 'LICENSE', name: 'LICENSE', bytes: 34_523, sha256: '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0' },

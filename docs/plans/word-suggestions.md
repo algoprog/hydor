@@ -71,8 +71,9 @@ Environment overrides (for development and tests; documented in docs/configurati
   tokens it uses most (from the pretraining text), and a floor; naive Bayes over the context's token ids.
 - `calibration.json`: for each plan (`mix`, `llm`, `slm`), the confidence threshold θ that gives 30%, 40% and 50% of
   shown suggestions right in the research's real decoding (FLORES-200). The app's pin of the release
-  (`SMALL_MODEL.calibration` in `server/suggest/pins.ts`) adds the thresholds for 20% (Settings' More) and 25%, measured
-  the same way on the same events; the release's own points come first, so a release that lists them needs none.
+  (`SMALL_MODEL.calibration` in `server/suggest/pins.ts`) adds the thresholds for 20% (Settings' More), 25%, 55% and 60%
+  (the most an agent can set), measured the same way on the same events (the small model alone never reaches 60%: its
+  60% is the lowest threshold where it is surest, about 56% right); the release's own points come first, so a release that lists them needs none.
 - `replay/`: public pretraining text (FineWeb-2 and the OpenAssistant / Aya chats only), already tokenised
   (`replay.u32` little-endian token ids, `index.json` with the sequences' offsets, kinds and languages): personalising
   replays it 1:1 beside the person's text, or the other languages are forgotten.
