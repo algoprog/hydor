@@ -2,15 +2,16 @@
 // dialog over the conversation, which stays where it was. The Files page is a click away, and its ⋯ starts
 // a session with the file or adds it to a space. A folder (a link to one in a reply, or one in the path above
 // a file there) shows there too, as the Files page shows it: its folders and files open in place, and Back
-// returns to what the dialog showed before.
+// returns to what the dialog showed before. Full screen in its top line (on a computer, as the panel beside the
+// conversation has) makes it fill the whole app, and the same button brings it back to its size.
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
-import { ChevronLeft, Folder, FolderOpen, X } from 'lucide-react';
+import { ChevronLeft, Folder, FolderOpen, Maximize2, Minimize2, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { basename, inside, joinPath, pathParts } from '../../lib/format';
 import { go, showInFiles, useFilePeek, type Peeked } from '../../lib/nav';
-import { Button, IconButton, Throbber } from '../../components/ui';
+import { Button, IconButton, Throbber, useMediaQuery } from '../../components/ui';
 import { useDiscardGuard } from '../settings/Instructions';
 import { goFolder } from './actions';
 import { FileView } from './FilesPage';
@@ -56,6 +57,14 @@ export function FilePeek() {
   const [loc] = useLocation();
   // Another page (the browser's Back, a link) takes the file away with the page it was opened over.
   useEffect(shut, [loc]);
+  // Over the whole app instead of in its window: only where the window does not fill the screen already (a phone's comes
+  // up from the bottom, as wide as it), and for this opening only (the files and folders it goes on to keep it).
+  const [full, setFull] = useState(false);
+  const roomy = useMediaQuery('(min-width: 640px)');
+  const big = full && roomy;
+  useEffect(() => {
+    if (!open) setFull(false);
+  }, [open]);
 
   /** True once it is closed: nothing unsaved, or the changes were discarded. */
   const close = useCallback(async () => {
@@ -109,12 +118,16 @@ export function FilePeek() {
     <>
       {file &&
         createPortal(
-          <div className="scrim holds fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+          <div className={big ? 'scrim holds fixed inset-0 z-50 flex' : 'scrim holds fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4'} onPointerDown={(e) => e.target === e.currentTarget && close()}>
             <div
               role="dialog"
               aria-modal
               aria-label={basename(file.path) || file.path}
-              className="anim-modal flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]"
+              className={
+                big
+                  ? 'anim-modal flex h-full w-full flex-col overflow-hidden bg-elevated pt-[var(--safe-top)]'
+                  : 'anim-modal flex h-[92dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-t-[20px] border border-line bg-elevated shadow-lg sm:h-[min(88dvh,960px)] sm:rounded-[20px]'
+              }
             >
               <div className={file.back ? 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-2' : 'flex shrink-0 items-center gap-1 py-2 pr-2.5 pl-5'}>
                 {file.back && (
@@ -129,12 +142,17 @@ export function FilePeek() {
                 <Button size="sm" variant="ghost" icon={<FolderOpen size={14} />} onClick={() => void inFiles()}>
                   <span className="max-sm:hidden">Open in Files</span>
                 </Button>
+                {roomy && (
+                  <IconButton label={big ? 'Close full screen' : 'Full screen'} onClick={() => setFull(!big)}>
+                    {big ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  </IconButton>
+                )}
                 <FileMore path={file.path} dir={!!folder} inFiles={false} />
                 <IconButton label="Close" onClick={close}>
                   <X size={17} />
                 </IconButton>
               </div>
-              <div className="min-h-0 flex-1 border-t border-line bg-bg pb-[var(--safe-bottom)] sm:pb-0">
+              <div className={big ? 'min-h-0 flex-1 border-t border-line bg-bg pb-[var(--safe-bottom)]' : 'min-h-0 flex-1 border-t border-line bg-bg pb-[var(--safe-bottom)] sm:pb-0'}>
                 {folder === null ? (
                   <div className="flex h-full items-center justify-center text-fg-3">
                     <Throbber size={34} />

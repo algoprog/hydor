@@ -687,7 +687,7 @@ agents that speak ACP and take MCP servers.
   Under every reply the documents the agent made or changed in the turn (PDF, Word, Excel, PowerPoint, OpenDocument,
   CSV and TSV, LaTeX, notebooks, EPUB, Markdown) show as cards marked New or Updated, handed over or not (the finished
   ones before their sources, four first), and file names and paths in the reply are links that open the file in the
-  window over the conversation; agents are told to hand over what they made or changed and to name each file as a link.
+  window over the conversation (Full screen in its top line makes it fill the whole app, and back); agents are told to hand over what they made or changed and to name each file as a link.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the session's project with save_notebook, or handed over as a file
   whose card opens it in the notebook page. A file card can keep a copy of a notebook, a document, a
