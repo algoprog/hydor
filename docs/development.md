@@ -21,7 +21,15 @@ The app's capabilities (search, the browser, memory, the guide…) each live in 
 scratch data folder. `npm test` runs every one that needs nothing beyond a checkout, a few at a time (pull requests run
 it on GitHub too); `npm test -- memory guide/` runs those whose path has those words, and `npm test -- --all` those
 that need a display, another system or the network as well (email's `server/mail/live-test.ts` needs a throwaway test
-mail server, GreenMail in Docker: its first lines say how to start one). One by hand:
+mail server, GreenMail in Docker: its first lines say how to start one). `npm run check` (`scripts/check.mjs`) runs the type
+check and just the tests that belong to what changed: those beside a changed file (in its folder, else the nearest folder
+above that has any) and the ones named in its table of rules at the top (the guide's, the search box's, the release
+notes', the dictionaries'). It prints one line when all passes and otherwise only the errors and each failed test's
+message, with the full output in a log under the temporary folder (`hydor-check/`); `-- --base main` takes what changed
+since the branch left `main`, `-- --plan` says what would run and why, `-- pages` names tests as `npm test` does, and
+`node scripts/check.mjs --selftest` (also run by `server/check-test.ts`) checks the script itself. It runs tsc and the
+tests under `systemd-run --user --scope` with a memory cap (`CHECK_MEMORY_MAX`, 6G unless set) and `nice` where it can.
+One by hand:
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js

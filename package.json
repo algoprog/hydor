@@ -47,6 +47,7 @@
     "build": "npm run build:server && npm run build:web",
     "i18n:translate": "node scripts/i18n-translate.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "node scripts/check.mjs",
     "test": "node scripts/test.mjs",
     "i18n:extract": "node scripts/i18n-extract.mjs",
     "i18n:audit": "node scripts/i18n-audit.mjs",

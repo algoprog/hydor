@@ -9,9 +9,17 @@ with where to start.
 ```bash
 npm ci                    # Node.js 22.12+, git; tmux on Linux and macOS
 npm run build             # the server and the web app into dist/
+npm run check             # the type check and the tests that belong to what you changed; prints only failures
 npm run typecheck
 npm test                  # every test that needs nothing beyond a checkout; npm test -- memory guide/ runs some
 ```
+
+Run `npm run check` after every change, instead of `tsc` and single tests by hand (or piped through `tail`, which hides
+the exit code): it runs the type check and the tests beside what git says changed, plus those the rules in this file bring
+in (the guide's, the search box's, the release notes'), under a memory cap. One line when all is well, else only the errors
+and the failed tests' messages, and exit code 1. `-- --base main` takes what changed since the branch left `main`,
+`-- --plan` says what would run and why, `-- pages server/pages/x.ts` names tests or files. `npm test` and
+`npm run typecheck` stay for full runs.
 
 Each test is a script beside the code it checks (`*-test.ts`, `tests.ts`), run with a scratch `DATA_DIR`
 (docs/development.md). Nothing here may use a GPU: keep `CUDA_VISIBLE_DEVICES` empty. A scratch copy of the app gets
