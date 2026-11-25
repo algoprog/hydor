@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.112.0 · 25 November 2026
+
+Word suggestions show up more often at More, and a document's window can fill the whole app.
+
+- **More suggestions at More**: at **More** (the default), a suggestion now shows when it has about a 2 in 10 chance of
+  being right, instead of 3 in 10. That bar was measured on formal articles in 193 languages, and on what people
+  actually type it held back many good guesses: on one person's chat, 4 in 10 of the suggestions shown were right where
+  3 were meant. There a suggestion now shows at about 7 in 10 of the moments where one could, instead of under half, and
+  a little more typing is saved (34% instead of 31%); on the articles, at 4 in 10 instead of 1 in 4. **Balanced** and
+  **Surer** are as they were.
+- **Full screen for a document's window**: the window a session opens a document in has **Full screen** in its top line
+  (the arrows icon, left of ⋯), as the panel beside the conversation has. It keeps the file as it is, and the next file
+  opens the way you left the last one, in this browser. A phone's window is already as wide as the screen.
+
 ## 0.111.1 · 24 November 2026
 
 Word suggestions learn on the graphics card even when every card has a program that runs models on it.
