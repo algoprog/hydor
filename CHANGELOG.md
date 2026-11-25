@@ -3,6 +3,34 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.113.0 · 26 November 2026
+
+A conversation zooms by itself, tables and code open full screen, and an open document shows the agent's edits live.
+
+- **Zoom in a conversation**: a session's conversation has a zoom of its own, from 67% to 200%, kept on each device.
+  **Ctrl** (**⌘** on a Mac) with **+**, **−** and **0**, **Ctrl** and the wheel, or a pinch on the trackpad change it;
+  while it is not 100%, **− 125% +** shows in the session's header, and the session's ⋯ menu has a **Zoom** row. Text,
+  code, cards and pictures grow and the lines wrap again, while the sidebar, the header and the message box stay as they
+  are. In the desktop apps these keys now work every time (Ctrl with = often did nothing), and **View** has **Zoom In**,
+  **Zoom Out** and **Actual Size**.
+- **Tables and code full screen**: a table has a small button at its top right corner, and a block of code one beside
+  **Copy**. There, and in a diagram's full screen, **− 100% +**, the same keys, the wheel or a pinch zoom what you see,
+  and a drag moves you about. **Esc** closes the full screen view without also closing a dialog under it.
+- **Watch a document change**: a page or document open beside the conversation, full screen or in its own window shows
+  each change the agent makes to it as it is made, in that turn or a later one. In a Markdown file the part being
+  changed is lit in the agent's colour and kept in view unless you scrolled away; a LaTeX file shows each edit with the
+  agent's caret; an HTML file is read again whenever it changes. Word, Excel, CSV and LaTeX files that change on disk
+  are taken in where you were reading, instead of starting again from the top.
+- **A document you close stays closed**: closing the document beside the conversation now holds until the agent writes
+  or edits it again. Before, it came back when the turn ended, or in a later turn.
+- **Accounts at a usage limit, by model**: a limit on one model alone no longer holds back sessions that run on other
+  models, and an account whose plan does not include a session's model is passed over for that session instead of
+  being marked as at its limit.
+- **Word suggestions at 60%**: at 60% right, the most an agent can set, only the surest suggestions show. Before, it
+  showed what 50% shows.
+- **On a phone**: a row of choices in Settings wraps to a second line instead of running off its card, and the names
+  under the drawer's icons are no longer cut off at the bottom.
+
 ## 0.112.0 · 25 November 2026
 
 Word suggestions show up more often at More, and a document's window can fill the whole app.
