@@ -44,6 +44,7 @@ is built: agent apps stay as that plan made them.*
 | Updates | An app must stay easy to update as the kit gets fixes and improvements; some parts are reused and updated in place | Section 4, "How an app stays current": more lives in packages, less is copied |
 | Licence of the kit and what it puts in apps | MIT | Section 4. Hydor itself stays AGPL-3.0 |
 | Credentials | When an app needs a key (payments, a model, a mail service, a sign-in app), the agent shows how to get it and asks for it on a card that saves it in the vault; several at once as tabs, each with its own short steps | Section 7: one card for any session, fed for kit apps by what each block says about its keys |
+| Outside services | For each need (a database, mail, a place to run, web search, storage, a model, payments and so on) the kit supports the popular services that are affordable and easy; people pick by preference, at most three side by side with one recommended; where one is better overall, only that one is offered | Section 7: the services catalog and its choice card |
 | With the kit or without | Someone building a standalone app chooses: on the kit, or from scratch without it. The kit should make building faster and cheaper, and that is measured, not assumed | Section 7 (the choice, on the brief) and section 13 (the comparison) |
 | Where the kit lives | A public repository of its own, a copy inside each Hydor release | Section 4 |
 | Database and search | SQLite first, Postgres as a switch | Sections 3, 4 and 9 |
@@ -521,6 +522,13 @@ were saved or skipped. For an app on the kit the steps come from the blocks, whi
 and how; the host's own keys and the ones a launch makes are never asked for. Launch asks the same way for whatever
 the place still lacks. An app built from scratch gets the same card, with steps the agent writes after reading the
 provider's page.
+
+**Services.** An app's outside services come from a catalog the kit ships: for each need, the services it has a
+driver for, what each costs a small app (with the date the price was read), what it takes to get going, where it
+does not fit, and how to get its key. Where the catalog names one service for a need, the guide uses it and says
+so in a line; where it names two or three, the guide shows them side by side with the one sentence each is chosen
+by and a default marked, never more than three. The choice writes the driver into the app's settings and brings up
+the keys card for that service. The catalog is revisited each release, since prices and free allowances change.
 
 **With the kit or without.** On the brief, the maker chooses how the app is built: on the kit (the default), or
 from scratch in any stack. From scratch is what Hydor already does for any coding task, with the brief known and
