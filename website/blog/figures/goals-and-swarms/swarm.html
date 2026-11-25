@@ -1,0 +1,42 @@
+<figure class="fig wide" data-fig="goals-and-swarms-swarm">
+<div class="fig-stage gs-sw">
+<div class="gs-sw-top">
+<span class="gs-eg">An example: a stubborn bug, with a goal</span>
+<span class="gs-sw-round" data-round>Round 1 of 30</span>
+</div>
+<div class="gs-sw-grid">
+<div class="gs-sw-lead" data-lead>
+<span class="gs-sw-cap">Lead</span>
+<b>Sets members on what does not hold yet</b>
+<p data-lead-text>Choosing angles</p>
+</div>
+<ul class="gs-sw-members" aria-label="Members, one angle each">
+<li data-m="0"><span class="gs-sw-angle">Reproduce it under load</span><em>idle</em></li>
+<li data-m="1"><span class="gs-sw-angle">Read the retry code</span><em>idle</em></li>
+<li data-m="2"><span class="gs-sw-angle">Bisect the last 40 commits</span><em>idle</em></li>
+<li data-m="3"><span class="gs-sw-angle">Check the storage client</span><em>idle</em></li>
+</ul>
+<div class="gs-sw-side">
+<div class="gs-sw-board"><span class="gs-sw-cap">Board</span><p data-board>No posts yet</p></div>
+<div class="gs-sw-folder"><span class="gs-sw-cap">The lead's folder</span><ul data-folder><li class="gs-sw-empty">no changes yet</li></ul></div>
+</div>
+</div>
+<div class="gs-sw-judge">
+<span class="gs-sw-cap">The app's checks, on the folder</span>
+<ul class="gs-sw-checks" aria-label="Checks">
+<li data-k="0"><i></i><span><code>npm test</code> passes</span></li>
+<li data-k="1"><i></i><span>A 2 GB upload takes at most 60 s</span></li>
+<li data-k="2"><i></i><span>A reviewer finds the retry logic sound</span></li>
+</ul>
+<p class="gs-sw-verdict" data-verdict>Waiting for the round to end</p>
+</div>
+<ol class="gs-sw-log" aria-hidden="true" data-log></ol>
+<p class="sr-only" aria-live="polite" data-sr></p>
+</div>
+<div class="fig-controls" role="group" aria-label="Playback">
+<button class="fig-btn" type="button" data-act="pause" aria-pressed="false">Pause</button>
+<button class="fig-btn" type="button" data-act="step">Next step</button>
+<button class="fig-btn" type="button" data-act="restart">Start again</button>
+</div>
+<figcaption>An example of one goal for a swarm. A round is the whole team's work: the lead sets members on what does not hold, and the app runs the checks only when everyone has finished. Round 2 breaks a check that held, so it is undone, members' changes included. Round 3 brings in a new angle and every check holds.</figcaption>
+</figure>

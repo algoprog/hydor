@@ -1,0 +1,206 @@
+/* Goals and swarms: the figures. Every rule is scoped to this post's figures. (Made from a source where [data-fig^="goals-and-swarms-"] stands for [data-fig^="goals-and-swarms-"].) */
+
+[data-fig^="goals-and-swarms-"] {
+  --gs-glow: drop-shadow(0 0 10px rgb(56 189 248 / 0.35));
+  --gs-ok: rgb(94 234 212 / 0.55);
+}
+[data-fig^="goals-and-swarms-"] .fig-stage { font-size: 14px; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] code { font-family: var(--mono); font-size: 0.88em; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] button { font-family: inherit; }
+[data-fig^="goals-and-swarms-"] [hidden] { display: none !important; }
+[data-fig^="goals-and-swarms-"] .gs-eg {
+  display: inline-block; padding: 2px 10px; border: 1px dashed var(--line-2); border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--fg-3); white-space: nowrap;
+}
+
+@keyframes gs-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes gs-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes gs-shake-free { 0%, 100% { box-shadow: 0 0 0 rgb(242 139 139 / 0); } 50% { box-shadow: 0 0 18px rgb(242 139 139 / 0.35); } }
+
+/* ---------- goal ---------- */
+[data-fig^="goals-and-swarms-"] .gs-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; }
+[data-fig^="goals-and-swarms-"] .gs-head b { color: var(--fg); font-size: 15px; font-weight: 600; }
+[data-fig^="goals-and-swarms-"] .gs-checks { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+[data-fig^="goals-and-swarms-"] .gs-check {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 4px 12px;
+  padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: rgb(255 255 255 / 0.02);
+  transition: border-color 0.6s var(--ease), background-color 0.6s var(--ease), box-shadow 0.6s var(--ease);
+}
+[data-fig^="goals-and-swarms-"] .gs-kind { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-label { color: var(--fg-2); font-size: 14px; line-height: 1.4; }
+[data-fig^="goals-and-swarms-"] .gs-meter { display: block; height: 4px; margin-top: 7px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+[data-fig^="goals-and-swarms-"] .gs-meter i { display: block; height: 100%; width: calc(var(--p, 0) * 100%); border-radius: 2px; background: var(--water); transition: width 0.9s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-state { display: inline-flex; align-items: center; gap: 8px; justify-self: end; }
+[data-fig^="goals-and-swarms-"] .gs-state i { width: 14px; height: 14px; border: 1.5px solid var(--fg-3); border-radius: 50%; transition: background-color 0.5s var(--ease), border-color 0.5s var(--ease), box-shadow 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-state em { min-width: 92px; font-style: normal; font-family: var(--mono); font-size: 12px; text-align: right; color: var(--fg-3); transition: color 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-check.is-hold { border-color: var(--gs-ok); background: rgb(94 234 212 / 0.05); }
+[data-fig^="goals-and-swarms-"] .gs-check.is-hold .gs-state i { background: var(--w1); border-color: var(--w1); box-shadow: 0 0 10px rgb(94 234 212 / 0.5); }
+[data-fig^="goals-and-swarms-"] .gs-check.is-hold .gs-state em { color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-safe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 14px 0 0; color: var(--fg-3); font-size: 12.5px; }
+[data-fig^="goals-and-swarms-"] .gs-safe svg { flex: none; }
+[data-fig^="goals-and-swarms-"] .gs-safe span { font-weight: 600; }
+[data-fig^="goals-and-swarms-"] .gs-safe code { padding: 1px 8px; border: 1px solid var(--line-2); border-radius: 6px; transition: border-color 0.5s var(--ease), color 0.5s var(--ease), box-shadow 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-safe code.is-hit { border-color: var(--err); color: var(--err); animation: gs-shake-free 2.4s var(--ease) infinite; }
+[data-fig^="goals-and-swarms-"] .gs-talk { display: grid; gap: 6px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+[data-fig^="goals-and-swarms-"] .gs-talk p { display: flex; gap: 12px; margin: 0; min-height: 22px; align-items: baseline; }
+[data-fig^="goals-and-swarms-"] .gs-talk span { flex: none; width: 62px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-talk q { quotes: none; font-size: 14px; line-height: 1.45; color: var(--fg); }
+[data-fig^="goals-and-swarms-"] .gs-app { min-height: 46px; }
+[data-fig^="goals-and-swarms-"] .gs-app q { color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-app.is-bad q { color: var(--err); }
+[data-fig^="goals-and-swarms-"] .gs-app.is-good q { color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-agent:not(.is-on) q { visibility: hidden; }
+[data-fig^="goals-and-swarms-"] .gs-say q { animation: gs-in 0.6s var(--ease) both; }
+[data-fig^="goals-and-swarms-"] .gs-app.gs-say q { animation-delay: 0.9s; }
+[data-fig^="goals-and-swarms-"] .gs-gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+[data-fig^="goals-and-swarms-"] .gs-gauge { display: grid; gap: 4px; }
+[data-fig^="goals-and-swarms-"] .gs-gauge span { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-gauge b { font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-gauge s { display: block; height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; text-decoration: none; }
+[data-fig^="goals-and-swarms-"] .gs-gauge i { display: block; height: 100%; width: calc(var(--v, 0) * 100%); border-radius: 2px; background: var(--water); transition: width 0.9s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-rounds { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; min-height: 26px; }
+[data-fig^="goals-and-swarms-"] .gs-rounds li { padding: 2px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12.5px; font-weight: 600; animation: gs-in 0.6s var(--ease) both; }
+[data-fig^="goals-and-swarms-"] .gs-rounds .is-kept { color: var(--ok); border-color: rgb(111 211 154 / 0.4); background: rgb(111 211 154 / 0.07); }
+[data-fig^="goals-and-swarms-"] .gs-rounds .is-undone { color: var(--err); border-color: rgb(242 139 139 / 0.4); background: rgb(242 139 139 / 0.07); }
+[data-fig^="goals-and-swarms-"] .gs-readout { margin: 14px 0 0; min-height: 4.6em; font-size: 14px; line-height: 1.55; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-goal.is-done, [data-fig^="goals-and-swarms-"] .is-done .gs-goal { box-shadow: inset 0 0 0 1px rgb(94 234 212 / 0.3); }
+
+/* ---------- swarm ---------- */
+[data-fig^="goals-and-swarms-"] .gs-sw-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 14px; margin-bottom: 16px; }
+[data-fig^="goals-and-swarms-"] .gs-sw-round { font-family: var(--mono); font-size: 13px; color: var(--w2); }
+[data-fig^="goals-and-swarms-"] .gs-sw-cap { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-sw-grid { display: grid; grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.7fr) minmax(200px, 1fr); gap: 16px; align-items: stretch; }
+[data-fig^="goals-and-swarms-"] .gs-sw-lead, [data-fig^="goals-and-swarms-"] .gs-sw-board, [data-fig^="goals-and-swarms-"] .gs-sw-folder, [data-fig^="goals-and-swarms-"] .gs-sw-judge {
+  padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: rgb(255 255 255 / 0.02);
+  transition: border-color 0.6s var(--ease), box-shadow 0.6s var(--ease), background-color 0.6s var(--ease);
+}
+[data-fig^="goals-and-swarms-"] .gs-sw-lead { display: flex; flex-direction: column; gap: 6px; }
+[data-fig^="goals-and-swarms-"] .gs-sw-lead b { color: var(--fg); font-size: 14px; font-weight: 600; line-height: 1.4; }
+[data-fig^="goals-and-swarms-"] .gs-sw-lead p { margin: auto 0 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; color: var(--fg-3); transition: color 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-sw-lead.is-on { border-color: rgb(56 189 248 / 0.55); box-shadow: 0 0 24px rgb(56 189 248 / 0.12); background: rgb(56 189 248 / 0.05); }
+[data-fig^="goals-and-swarms-"] .gs-sw-lead.is-on p { color: var(--w2); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+[data-fig^="goals-and-swarms-"] .gs-sw-members li {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: rgb(255 255 255 / 0.02);
+  transition: border-color 0.6s var(--ease), box-shadow 0.6s var(--ease), background-color 0.6s var(--ease), opacity 0.6s var(--ease);
+}
+[data-fig^="goals-and-swarms-"] .gs-sw-angle { color: var(--fg); font-size: 13.5px; line-height: 1.35; }
+[data-fig^="goals-and-swarms-"] .gs-sw-members em { display: inline-flex; align-items: center; gap: 7px; font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-wk { border-color: rgb(56 189 248 / 0.55); box-shadow: 0 0 20px rgb(56 189 248 / 0.1); background: rgb(56 189 248 / 0.05); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-wk em { color: var(--w2); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-wk em::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--w2); animation: gs-pulse 1.4s ease-in-out infinite; }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-fin { border-color: rgb(94 234 212 / 0.4); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-fin em { color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-stop { opacity: 0.55; }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-new { border-color: rgb(138 168 255 / 0.6); background: rgb(138 168 255 / 0.06); }
+[data-fig^="goals-and-swarms-"] .gs-sw-members .is-new em { color: var(--accent); }
+[data-fig^="goals-and-swarms-"] .gs-sw-side { display: grid; gap: 12px; grid-template-rows: auto 1fr; }
+[data-fig^="goals-and-swarms-"] .gs-sw-board p { min-height: 2.9em; margin: 0; font-size: 13px; line-height: 1.45; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-sw-folder ul { min-height: 4.9em; align-content: start; margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+[data-fig^="goals-and-swarms-"] .gs-sw-folder li { font-family: var(--mono); font-size: 12.5px; color: var(--fg-2); transition: opacity 0.6s var(--ease), color 0.6s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-sw-folder li.is-new { color: var(--w1); animation: gs-in 0.6s var(--ease) both; }
+[data-fig^="goals-and-swarms-"] .gs-sw-folder li.is-dim { color: var(--err); text-decoration: line-through; opacity: 0.7; }
+[data-fig^="goals-and-swarms-"] .gs-sw-folder .gs-sw-empty { color: var(--fg-3); font-family: inherit; }
+[data-fig^="goals-and-swarms-"] .gs-sw-judge { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 10px 20px; margin-top: 16px; }
+[data-fig^="goals-and-swarms-"] .gs-sw-judge .gs-sw-cap { grid-column: 1 / -1; margin: 0; }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks li { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 13px; color: var(--fg-2); transition: border-color 0.5s var(--ease), background-color 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks i { flex: none; width: 10px; height: 10px; border: 1.5px solid var(--fg-3); border-radius: 50%; transition: background-color 0.5s var(--ease), border-color 0.5s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks .is-run i { border-color: var(--w2); animation: gs-pulse 1s ease-in-out infinite; }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks .is-hold { border-color: var(--gs-ok); background: rgb(94 234 212 / 0.05); }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks .is-hold i { background: var(--w1); border-color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks .is-fail { border-color: rgb(242 139 139 / 0.55); background: rgb(242 139 139 / 0.06); }
+[data-fig^="goals-and-swarms-"] .gs-sw-checks .is-fail i { background: var(--err); border-color: var(--err); }
+[data-fig^="goals-and-swarms-"] .gs-sw-verdict { margin: 0; font-size: 14px; line-height: 1.45; color: var(--fg-2); min-height: 2.9em; display: flex; align-items: center; }
+[data-fig^="goals-and-swarms-"] .gs-sw-verdict.is-kept { color: var(--ok); }
+[data-fig^="goals-and-swarms-"] .gs-sw-verdict.is-undone { color: var(--err); }
+[data-fig^="goals-and-swarms-"] .gs-sw-verdict.is-done { color: var(--w1); font-weight: 600; filter: var(--gs-glow); }
+[data-fig^="goals-and-swarms-"] .gs-sw-log { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; min-height: 26px; }
+[data-fig^="goals-and-swarms-"] .gs-sw-log li { padding: 2px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+[data-fig^="goals-and-swarms-"] .gs-sw-log .is-kept { color: var(--ok); border-color: rgb(111 211 154 / 0.4); background: rgb(111 211 154 / 0.07); }
+[data-fig^="goals-and-swarms-"] .gs-sw-log .is-undone { color: var(--err); border-color: rgb(242 139 139 / 0.4); background: rgb(242 139 139 / 0.07); }
+[data-fig^="goals-and-swarms-"] .gs-sw-board p.gs-say, [data-fig^="goals-and-swarms-"] .gs-sw-verdict.gs-say { animation: gs-in 0.6s var(--ease) both; }
+
+/* ---------- year ---------- */
+[data-fig^="goals-and-swarms-"] .gs-yr { padding: 20px; }
+[data-fig^="goals-and-swarms-"] .gs-yr-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+[data-fig^="goals-and-swarms-"] .gs-yc {
+  --kc: var(--fg-3); display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 13px;
+  border: 1px solid var(--line-2); border-top: 3px solid var(--kc); border-radius: 12px; background: rgb(255 255 255 / 0.02);
+}
+[data-fig^="goals-and-swarms-"] .gs-yc[data-kind='math'] { --kc: var(--w2); }
+[data-fig^="goals-and-swarms-"] .gs-yc[data-kind='sec'] { --kc: var(--accent); }
+[data-fig^="goals-and-swarms-"] .gs-yc[data-kind='bad'] { --kc: var(--err); }
+[data-fig^="goals-and-swarms-"] .gs-yc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+[data-fig^="goals-and-swarms-"] .gs-yc time { font-family: var(--mono); font-size: 12.5px; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-yc p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--fg); }
+[data-fig^="goals-and-swarms-"] .gs-yc p.gs-yc-j { font-size: 13px; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-yc-j i { margin-right: 6px; font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+[data-fig^="goals-and-swarms-"] .gs-yc a { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--w2); text-decoration: underline; text-decoration-color: rgb(56 189 248 / 0.4); text-underline-offset: 3px; }
+[data-fig^="goals-and-swarms-"] .gs-yc a:hover { text-decoration-color: currentColor; }
+[data-fig^="goals-and-swarms-"] .gs-rise { animation: gs-in 0.6s var(--ease) both; }
+
+/* ---------- judge ---------- */
+[data-fig^="goals-and-swarms-"] .gs-ju-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 14px; }
+[data-fig^="goals-and-swarms-"] .gs-ju-clock { font-family: var(--mono); font-size: 12.5px; color: var(--w2); }
+[data-fig^="goals-and-swarms-"] .gs-ju-wall { display: grid; grid-template-columns: repeat(auto-fill, 20px); gap: 5px; margin: 16px 0; padding: 0; list-style: none; }
+[data-fig^="goals-and-swarms-"] .gs-ju-wall li { width: 20px; height: 20px; border: 1.5px solid var(--line-2); border-radius: 5px; transition: background-color 0.5s var(--ease), border-color 0.5s var(--ease), box-shadow 0.5s var(--ease), outline-color 0.5s var(--ease); outline: 1.5px solid transparent; outline-offset: 1.5px; }
+[data-fig^="goals-and-swarms-"] .gs-ju-wall li.on { background: rgb(94 234 212 / 0.85); border-color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-ju-wall li.is-x.on { outline-color: var(--amber); }
+[data-fig^="goals-and-swarms-"] .gs-ju[data-mode='checks'] .gs-ju-wall li.is-x.on { background: transparent; border-color: rgb(242 180 104 / 0.55); outline-color: transparent; }
+[data-fig^="goals-and-swarms-"] .gs-ju-counts { display: flex; flex-wrap: wrap; gap: 8px 36px; }
+[data-fig^="goals-and-swarms-"] .gs-ju-counts div { display: grid; gap: 2px; }
+[data-fig^="goals-and-swarms-"] .gs-ju-counts b { font-size: 26px; font-weight: 600; line-height: 1.1; color: var(--fg); font-variant-numeric: tabular-nums; }
+[data-fig^="goals-and-swarms-"] .gs-ju-counts div + div b { color: var(--w1); }
+[data-fig^="goals-and-swarms-"] .gs-ju-counts span { font-size: 13px; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-ju-note { margin: 12px 0 0; min-height: 4.6em; font-size: 14px; line-height: 1.55; color: var(--fg-2); }
+[data-fig^="goals-and-swarms-"] .gs-ju-does { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+[data-fig^="goals-and-swarms-"] .gs-ju-does div { display: grid; gap: 4px; align-content: start; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; opacity: 0.4; transition: opacity 0.6s var(--ease), border-color 0.6s var(--ease), background-color 0.6s var(--ease); }
+[data-fig^="goals-and-swarms-"] .gs-ju-does b { font-size: 13.5px; color: var(--fg); }
+[data-fig^="goals-and-swarms-"] .gs-ju-does span { font-size: 13px; line-height: 1.45; color: var(--fg-3); }
+[data-fig^="goals-and-swarms-"] .gs-ju[data-mode='checks'] .gs-ju-does div { opacity: 1; border-color: var(--gs-ok); background: rgb(94 234 212 / 0.04); }
+
+/* ---------- loops pause off screen; entrance ---------- */
+[data-fig^="goals-and-swarms-"]:not(.is-visible) .gs-sw-members .is-wk em::before,
+[data-fig^="goals-and-swarms-"]:not(.is-visible) .gs-sw-checks .is-run i,
+[data-fig^="goals-and-swarms-"]:not(.is-visible) .gs-safe code.is-hit { animation-play-state: paused; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-fig^="goals-and-swarms-"] .gs-yc, [data-fig^="goals-and-swarms-"] .gs-sw-lead, [data-fig^="goals-and-swarms-"] .gs-sw-members li { opacity: 0; transform: translateY(8px); }
+  [data-fig^="goals-and-swarms-"].is-in .gs-yc, [data-fig^="goals-and-swarms-"].is-in .gs-sw-lead, [data-fig^="goals-and-swarms-"].is-in .gs-sw-members li { opacity: 1; transform: none; transition: opacity 0.9s var(--ease), transform 0.9s var(--ease), border-color 0.6s var(--ease), box-shadow 0.6s var(--ease), background-color 0.6s var(--ease); }
+  [data-fig^="goals-and-swarms-"].is-in .gs-yc:nth-child(2n) { transition-delay: 0.1s; }
+  [data-fig^="goals-and-swarms-"].is-in .gs-yc:nth-child(3n) { transition-delay: 0.2s; }
+  [data-fig^="goals-and-swarms-"].is-in .gs-sw-members li:nth-child(2) { transition-delay: 0.1s; }
+  [data-fig^="goals-and-swarms-"].is-in .gs-sw-members li:nth-child(3) { transition-delay: 0.2s; }
+  [data-fig^="goals-and-swarms-"].is-in .gs-sw-members li:nth-child(4) { transition-delay: 0.3s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fig^="goals-and-swarms-"] *, [data-fig^="goals-and-swarms-"] *::before, [data-fig^="goals-and-swarms-"] *::after { animation: none !important; transition: none !important; }
+  [data-fig^="goals-and-swarms-"] .gs-say q { opacity: 1; }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 860px) {
+  [data-fig^="goals-and-swarms-"] .gs-sw-grid { grid-template-columns: 1fr; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-side { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+}
+@media (max-width: 640px) {
+  [data-fig^="goals-and-swarms-"] .gs-check { grid-template-columns: minmax(0, 1fr) auto; }
+  [data-fig^="goals-and-swarms-"] .gs-kind { grid-column: 1 / -1; }
+  [data-fig^="goals-and-swarms-"] .gs-state em { min-width: 0; }
+  [data-fig^="goals-and-swarms-"] .gs-gauges { gap: 8px; }
+  [data-fig^="goals-and-swarms-"] .gs-gauge b { font-size: 12px; }
+  [data-fig^="goals-and-swarms-"] .gs-talk p { flex-direction: column; gap: 2px; }
+  [data-fig^="goals-and-swarms-"] .gs-talk span { width: auto; }
+  [data-fig^="goals-and-swarms-"] .gs-readout { min-height: 8.2em; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-members { gap: 8px; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-members li { padding: 10px 12px; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-side { gap: 8px; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-board, [data-fig^="goals-and-swarms-"] .gs-sw-folder { padding: 10px 12px; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-lead p { margin-top: 0; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-board p { min-height: 5.8em; }
+  [data-fig^="goals-and-swarms-"] .gs-sw-judge { grid-template-columns: 1fr; }
+  [data-fig^="goals-and-swarms-"] .gs-yr-list { grid-template-columns: 1fr; }
+  [data-fig^="goals-and-swarms-"] .gs-yr { padding: 14px; }
+  [data-fig^="goals-and-swarms-"] .gs-ju-does { grid-template-columns: 1fr; }
+  [data-fig^="goals-and-swarms-"] .gs-ju-note { min-height: 7.4em; }
+}

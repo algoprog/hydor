@@ -1,0 +1,31 @@
+<figure class="fig" data-fig="goals-and-swarms-goal">
+<div class="fig-stage gs-goal">
+<div class="gs-head"><span class="gs-eg">An example goal</span><b>npm test passes and uploads of 2 GB work</b></div>
+<ul class="gs-checks" aria-label="The checks">
+<li class="gs-check is-open" data-c="cmd"><span class="gs-kind">Command</span><span class="gs-label"><code>npm test</code> passes</span><span class="gs-state"><i></i><em>not yet</em></span></li>
+<li class="gs-check is-open" data-c="num"><span class="gs-kind">Measured</span><span class="gs-label">A 2 GB upload takes at most 60 s<span class="gs-meter"><i></i></span></span><span class="gs-state"><i></i><em>140 s</em></span></li>
+<li class="gs-check is-open" data-c="rev"><span class="gs-kind">Reviewer</span><span class="gs-label">The upload page shows progress and errors</span><span class="gs-state"><i></i><em>not yet</em></span></li>
+<li class="gs-check is-open" data-c="you"><span class="gs-kind">You</span><span class="gs-label">You confirm the wording of the error messages</span><span class="gs-state"><i></i><em>waits for you</em></span></li>
+</ul>
+<div class="gs-safe"><svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Kept safe</span><code data-p="tests">tests/</code><code>fixtures/</code><code>scripts/check.sh</code></div>
+<div class="gs-talk">
+<p class="gs-agent" aria-hidden="true"><span>Agent</span><q></q></p>
+<p class="gs-app" aria-hidden="true"><span>The app</span><q></q></p>
+</div>
+<div class="gs-gauges" aria-hidden="true">
+<div class="gs-gauge" data-g="rounds"><span>Rounds</span><b>0 of 30</b><s><i></i></s></div>
+<div class="gs-gauge" data-g="money"><span>Money</span><b>$0.00 of $5.00</b><s><i></i></s></div>
+<div class="gs-gauge" data-g="time"><span>Time</span><b>0 of 60 min</b><s><i></i></s></div>
+</div>
+<ol class="gs-rounds" aria-hidden="true"></ol>
+<p class="gs-readout" aria-live="polite"></p>
+</div>
+<div class="fig-controls" role="group" aria-label="Moment in the goal">
+<button class="fig-btn" type="button" data-step="0" aria-pressed="true">Agree the checks</button>
+<button class="fig-btn" type="button" data-step="1" aria-pressed="false">Round 1</button>
+<button class="fig-btn" type="button" data-step="2" aria-pressed="false">Round 2</button>
+<button class="fig-btn" type="button" data-step="3" aria-pressed="false">Round 3</button>
+<button class="fig-btn" type="button" data-step="4" aria-pressed="false">Round 4</button>
+</div>
+<figcaption>An example, not a real run: the app runs the four checks after every round. In round 2 the agent says it is done, the checks say otherwise and the goal goes on. In round 3 it touches a path kept safe and the round is undone. Press a button to stop the sequence and look at one moment.</figcaption>
+</figure>

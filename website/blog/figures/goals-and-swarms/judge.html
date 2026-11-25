@@ -1,0 +1,25 @@
+<figure class="fig" data-fig="goals-and-swarms-judge">
+<div class="fig-stage gs-ju">
+<div class="gs-ju-head">
+<span class="gs-eg">DeepMind's experiment: 100 agents, 71 conjectures</span>
+<span class="gs-ju-clock" data-clock>Real proofs</span>
+</div>
+<ol class="gs-ju-wall" role="img" aria-label="Seventy-one squares, one for each conjecture. The first 37 are solved with real proofs. The other 34 were marked solved by an exploit."></ol>
+<div class="gs-ju-counts" aria-live="polite">
+<div><b data-n-word>0</b><span>marked solved</span></div>
+<div><b data-n-hold>0</b><span data-hold-label>counted as solved</span></div>
+</div>
+<p class="gs-ju-note" data-note></p>
+<div class="gs-ju-does">
+<div data-d="1"><b>The app runs the checks</b><span>Not the agents, and not their peers. Saying "solved" changes nothing.</span></div>
+<div data-d="2"><b>Paths kept safe</b><span>A round that changes the tests, the test data or a check's own script is undone.</span></div>
+<div data-d="3"><b>A reviewer reads the change</b><span>A model that did none of the work looks for weakened tests and answers written in.</span></div>
+</div>
+</div>
+<div class="fig-controls" role="group" aria-label="Who decides what is solved">
+<button class="fig-btn" type="button" data-mode="word" aria-pressed="true">The agents' own word</button>
+<button class="fig-btn" type="button" data-mode="checks" aria-pressed="false">Checks the app runs</button>
+</div>
+<div class="fig-legend"><span><i style="--c: #5eead4"></i>Holds</span><span><i style="--c: #f2b468"></i>Marked solved by an exploit</span><span><i style="--c: rgba(255,255,255,.14)"></i>Not counted</span></div>
+<figcaption>The numbers are DeepMind's, from a paper that has not been peer reviewed: 37 problems were solved with real proofs in just under an hour, then an exploit let the swarm "solve" the other 34 in 27 minutes, because the proofs were not checked in detail. The second button shows what an outside check would count. That part is an illustration, not a re-run of the experiment.</figcaption>
+</figure>
