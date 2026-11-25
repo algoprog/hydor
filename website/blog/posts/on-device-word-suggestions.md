@@ -67,9 +67,9 @@ p = (1 − λ) · p(Qwen3.5) + λ · p(small model)
 
 ## Knowing when to stay quiet
 
-A wrong suggestion is worse than none: it gets in your way. So every guess comes with a confidence, and Hydor shows it only when the confidence is high enough. **How sure before showing** sets the bar, and the three choices are targets for how often a shown suggestion is right: **More** (the default) aims at 30%, **Balanced** at 40% and **Surer** at 50%.
+A wrong suggestion is worse than none: it gets in your way. So every guess comes with a confidence, and Hydor shows it only when the confidence is high enough. **How sure before showing** sets the bar, and the three choices are targets for how often a shown suggestion is right: **More** (the default) aims at 20%, **Balanced** at 40% and **Surer** at 50%.
 
-**Under the hood.** A confidence of 0.8 means little until you know how the model's confidence relates to being right. The card's `calibration.json` holds, for each mode (the mix, Qwen3.5 alone, the small model alone), the confidence needed to get 30%, 40% or 50% of the shown suggestions right, measured on FLORES-200. The cost of that choice: on other kinds of text the same bar gives a different share of right suggestions.
+**Under the hood.** A confidence of 0.8 means little until you know how the model's confidence relates to being right. The card's `calibration.json` holds, for each mode (the mix, Qwen3.5 alone, the small model alone), the confidence needed to get 30%, 40% or 50% of the shown suggestions right, measured on FLORES-200, and Hydor adds the one for 20%, measured the same way. The cost of that choice: on other kinds of text the same bar gives a different share of right suggestions. On one person's chat, the bar for 30% was right 41% of the time, which is why **More** aims at 20%: there it is right 29% of the time, and a suggestion shows at 71% of the moments where one could, instead of 46%.
 
 How good a setup is gets measured in **typing saved**: out of all the keys you would press without help, the share that suggestions press for you. Taking a suggestion costs one <kbd>Tab</kbd>, so a suggestion that adds 6 letters saves 5 keys.
 
@@ -144,7 +144,7 @@ for text in texts:
     print(f"   word={r['word']!r}  confidence={r['conf']:.2f}  needed={r['theta']:.2f}  show={r['show']}")
 ```
 
-On the card, the first prints `word='mento'` with confidence 0.77 against a needed 0.24 (`show=True`); the second prints `word='help.'` with 0.06 (`show=False`): the model is only 6% sure, so it stays quiet. `precision` is the setting: `0.3` is **More**, `0.4` is **Balanced** and `0.5` is **Surer**.
+On the card, the first prints `word='mento'` with confidence 0.77 against a needed 0.24 (`show=True`); the second prints `word='help.'` with 0.06 (`show=False`): the model is only 6% sure, so it stays quiet. `precision` is the share of shown suggestions meant to be right: **More** is `0.2`, **Balanced** `0.4` and **Surer** `0.5`. The card's table starts at `0.3` (a lower one gets its bar), and Hydor adds the bar for `0.2`, measured the same way.
 
 ## What it cannot do
 

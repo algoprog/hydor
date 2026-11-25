@@ -15,7 +15,7 @@
   /** Sets bar widths on the next frame, so they animate from where they are. */
   const later = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
   const SETTINGS = ['More', 'Balanced', 'Surer'];
-  const AIM = [30, 40, 50];
+  const AIM = [20, 40, 50];
 
   /* ---------- typing ---------- */
 
@@ -199,16 +199,17 @@
   /* ---------- threshold ---------- */
 
   const FLORES = {
-    // [Qwen3.5 alone, mixed, small model alone] at More, Balanced, Surer: the card's three tables.
-    suggests: [[20.7, 23.6, 16.8], [12.4, 14.5, 10.0], [6.8, 8.4, 5.4]],
-    saved: [[11.5, 12.9, 7.6], [9.0, 10.3, 5.7], [6.1, 7.3, 3.6]],
-    right: [[30.3, 30.4, 30.2], [40.3, 40.5, 40.1], [50.3, 50.3, 50.0]],
+    // [Qwen3.5 alone, mixed, small model alone] at More (20%), Balanced (40%), Surer (50%): the card's tables for Balanced and
+    // Surer, and More's measured the same way, on the same events (show_filter.py --compare-real --precisions 0.2).
+    suggests: [[36.0, 41.0, 29.4], [12.4, 14.5, 10.0], [6.8, 8.4, 5.4]],
+    saved: [[13.8, 15.3, 9.4], [9.0, 10.3, 5.7], [6.1, 7.3, 3.6]],
+    right: [[20.3, 20.1, 20.2], [40.3, 40.5, 40.1], [50.3, 50.3, 50.0]],
   };
 
   HydorBlog.figure('on-device-word-suggestions-threshold', (el, fig) => {
     const metrics = [
-      { key: 'suggests', title: 'How often it suggests', sub: 'of the moments where a suggestion could appear', max: 25 },
-      { key: 'saved', title: 'Typing saved', sub: 'of the keys you would press', max: 14 },
+      { key: 'suggests', title: 'How often it suggests', sub: 'of the moments where a suggestion could appear', max: 45 },
+      { key: 'saved', title: 'Typing saved', sub: 'of the keys you would press', max: 17 },
       { key: 'right', title: 'How often a shown suggestion is right', sub: 'what each setting aims at', max: 55 },
     ];
     const names = ['Qwen3.5 alone', 'Mixed', 'Small model alone'];
@@ -416,9 +417,10 @@
   /* ---------- personal ---------- */
 
   HydorBlog.figure('on-device-word-suggestions-personal', (el, fig) => {
-    // Typing saved on 673 messages of one person's chat: [Qwen3.5 alone, mixed before, mixed after, small before, small after].
+    // Typing saved on 673 messages of one person's chat: [Qwen3.5 alone, mixed before, mixed after, small before, small after],
+    // each set to be right 20% (More), 40% (Balanced) or 50% (Surer) of the time on this chat (the card's chat events).
     const V = [
-      [32.8, 30.7, 33.6, 17.7, 23.7],
+      [34.3, 32.7, 34.9, 19.0, 25.2],
       [30.5, 28.4, 31.3, 16.1, 21.8],
       [27.2, 25.6, 28.4, 14.1, 19.3],
     ];
