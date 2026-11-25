@@ -1584,3 +1584,154 @@ h2{font-size:22px;margin:28px 0 8px;color:#fff}
 <div class="row"><div><b>Commuter Pro 3</b><br><span>50 Nm hub motor · 500 Wh · belt drive</span></div><em>$1,599</em></div>
 <p>Hub-drive bikes such as the Commuter Pro 3 slowed to 11 km/h on the steepest section, against 17–18 km/h for the Ridge E5.</p>
 </main></body></html>`;
+
+// ---- the blog post on dynamic UIs (website/blog/shots/dynamic-uis.mjs) ----------------------------------------------
+
+const FENCE = '```';
+
+/** The same question as CARDS.ask, answered in plain Markdown alone: a table and sentences, no cards. */
+const PLAIN_REPLY = [
+  '**The Roomi S5 at $429 is the best buy for a flat with a cat**: it empties itself, so the cat hair is never your job, and it is the quietest of the three. Here is how they compare.',
+  [
+    '| | Roomi S5 | Tidyr Mini | Orbit Pro |',
+    '|---|---|---|---|',
+    '| Kind | Self-emptying | Compact | Vacuum and mop |',
+    '| Price | $429 | $349 | $499 |',
+    '| Suction | 5,000 Pa | 3,200 Pa | 6,000 Pa |',
+    '| Battery | 180 min | 120 min | 150 min |',
+    '| Noise | 58 dB | 62 dB | 65 dB |',
+    '| Empties itself | Yes | No | Yes |',
+  ].join('\n'),
+  'The Roomi S5 in four numbers: it costs $429, which is 13% under its launch price; its battery lasts 180 minutes, 50% more than the Tidyr Mini’s; it runs at 58 dB, about as loud as a quiet conversation; and 2,300 owners rate it 4.6 out of 5.',
+  'Over three years the Roomi costs the least to run, because its bags are cheap and it needs fewer filters. Bags and filters come to $60 for the Roomi S5, $95 for the Tidyr Mini and $110 for the Orbit Pro, at the makers’ prices. Electricity, at 16 cents a kWh, adds $18, $15 and $24. With the price, that makes $507 for the Roomi S5, $459 for the Tidyr Mini and $633 for the Orbit Pro.',
+].join('\n\n');
+
+/** BM25 explained with a formula, a Mermaid diagram and a figure that runs in place (a ```html live block). */
+const BM25_REPLY = [
+  'BM25 scores a document by adding up, for each word of the query, how rare the word is and how often the document uses it. Two corrections keep it honest: each repeat of a word counts for less than the one before, and long documents get no head start.',
+  // On lines of its own: the app shows maths between $$ lines as a display formula (on one line with text it is set small, as a word's).
+  '$$\n' + String.raw`\text{score}(D, Q) = \sum_{t \in Q} \text{IDF}(t)\cdot\frac{f(t, D)\,(k_1 + 1)}{f(t, D) + k_1\left(1 - b + b\,\frac{|D|}{\text{avgdl}}\right)}` + '\n$$',
+  String.raw`Here $f(t, D)$ is how often the word $t$ appears in $D$, $|D|$ is the document's length and $\text{avgdl}$ the average length. $k_1$ (usually 1.2) sets how fast repeats stop counting, and $b$ (usually 0.75) how much length is corrected for.`,
+  'In your pipeline it is the fast first stage, before the slower model that re-ranks:',
+  [
+    `${FENCE}mermaid`,
+    'flowchart LR',
+    '  Q[Query] --> T[Tokenize]',
+    '  T --> B[BM25 over the index]',
+    '  B --> K[Top 100]',
+    '  K --> R[Re-ranker]',
+    '  R --> A[Top 10 for the answer]',
+    FENCE,
+  ].join('\n'),
+  String.raw`Move $k_1$ to see how fast a word's repeats stop adding to the score:`,
+  [
+    `${FENCE}html live`,
+    '<title>How repeats stop counting</title>',
+    '<div style="display:grid;gap:10px">',
+    '<label style="display:flex;gap:10px;align-items:center;color:var(--n-muted);font-size:13px">k₁ <input id="k" type="range" min="0.2" max="3" step="0.1" value="1.2" style="flex:1"><b id="kv" style="color:var(--n-fg)">1.2</b></label>',
+    '<svg id="c" viewBox="0 0 920 230" style="width:100%;height:auto"></svg>',
+    '</div>',
+    '<script>',
+    "const k=document.getElementById('k'),kv=document.getElementById('kv'),c=document.getElementById('c');",
+    "function draw(){const k1=+k.value;kv.textContent=k1.toFixed(1);let d='';for(let f=0;f<=20;f+=0.25){const y=f*(k1+1)/(f+k1);const X=50+f*42.5,Y=200-y*44;d+=(f?'L':'M')+X.toFixed(1)+' '+Y.toFixed(1);}",
+    `const cy=200-(k1+1)*44;c.innerHTML='<line x1="50" y1="200" x2="905" y2="200" stroke="var(--n-line)"/><line x1="50" y1="14" x2="50" y2="200" stroke="var(--n-line)"/><line x1="50" y1="'+cy+'" x2="905" y2="'+cy+'" stroke="var(--n-muted)" stroke-dasharray="3 6" opacity=".6"/><text x="899" y="'+(cy-7)+'" text-anchor="end" font-size="12" fill="var(--n-muted)">it never passes k\u2081 + 1</text><path d="'+d+'" fill="none" stroke="var(--n-accent)" stroke-width="2.5"/><text x="478" y="222" text-anchor="middle" font-size="12" fill="var(--n-muted)">times the word appears in the document</text><text x="58" y="26" font-size="12" fill="var(--n-muted)">what the word adds to the score</text>';}`,
+    "k.addEventListener('input',draw);draw();",
+    '</script>',
+    FENCE,
+  ].join('\n'),
+].join('\n\n');
+
+/** The brief the `doc` session's agent wrote (about 25 lines), from what the e-bike session found. */
+const BRIEF = `# E-bike brief: Velora Ridge E5 or Urbana Climb 2
+
+**For Sam, 25 November.** Both bikes handle a 9 km commute with two steep hills. The Velora Ridge E5 climbs better and goes further between charges; the Urbana Climb 2 costs $140 less and is a close second.
+
+## The two bikes
+
+| | Velora Ridge E5 | Urbana Climb 2 |
+|---|---|---|
+| Price | $1,890 | $1,749 |
+| Motor | 85 Nm | 75 Nm |
+| Battery | 625 Wh | 540 Wh |
+| 12% climb | 17–18 km/h | 15 km/h |
+| Charge every | 4 days | 3 days |
+| Extras | Lights, rack | Hydraulic brakes |
+
+## Recommendation
+
+Buy the **Velora Ridge E5**. A mid-drive uses the bike's gears, so it keeps its pull on the steepest hill, and the bigger battery means a charge only every four days on your 18 km a day.
+
+If the budget is tight, pick the Urbana Climb 2: it costs $140 less, at a price that holds until the end of November.
+
+## Next steps
+
+1. Sam confirms the budget (up to $1,900).
+2. Book a test ride of the Ridge E5 this week.
+3. Order by 30 November, whichever bike it is.
+`;
+
+/**
+ * What the blog post on dynamic UIs shows besides the showcase sessions: the robot-vacuum question answered in plain
+ * Markdown (`plain`), BM25 explained with a formula, a diagram and a live figure (`bm25`, in the thesis folder), and a
+ * session whose turn wrote one Markdown document (`doc`: ebike-brief.md, also written to its folder). Written as
+ * Claude Code transcripts once the app is running, like showcaseSessions. Returns { plain, bm25, doc }: key, folder, time.
+ */
+export async function blogSessions(ctx) {
+  const { home, db, api, sessions } = ctx;
+  const projects = path.join(home, '.claude/projects');
+  const now = Date.now();
+  const tasks = path.join(home, 'Hydor/Tasks');
+  const out = {};
+  {
+    const cwd = path.join(tasks, '2026-11-23-robot-vacuums');
+    fs.mkdirSync(cwd, { recursive: true });
+    // Asked at the very time the cards session was (its transcript's end, less what the transcript adds), so both show the same clock.
+    const t = new Transcript({ cwd, at: ctx.cards ? ctx.cards.at - 51_500 : now - 40 * MIN });
+    t.user(CARDS.ask);
+    t.wait(45_000).say([PLAIN_REPLY], { out: 700 });
+    t.title('Robot vacuums under $500').save(projects);
+    out.plain = { key: t.key, cwd, at: t.t, assistant: 'researcher' };
+  }
+  {
+    const cwd = sessions?.thesis?.cwd ?? path.join(tasks, '2026-11-24-bm25');
+    fs.mkdirSync(cwd, { recursive: true });
+    const t = new Transcript({ cwd, at: now - 12 * MIN });
+    t.user('Explain how BM25 scores a document, with the formula, and draw where it sits in my search pipeline.');
+    t.wait(40_000).say([BM25_REPLY], { out: 900 });
+    t.title('How BM25 scores a document').save(projects);
+    out.bm25 = { key: t.key, cwd, at: t.t, assistant: 'tutor' };
+  }
+  {
+    const cwd = path.join(tasks, '2026-11-24-ebike-brief');
+    fs.mkdirSync(cwd, { recursive: true });
+    const file = path.join(cwd, 'ebike-brief.md');
+    const t = new Transcript({ cwd, at: now - 20 * MIN });
+    t.user('Write up the e-bike comparison as a one-page brief I can send to Sam.');
+    t.tool('Write', { file_path: file, content: BRIEF }, {
+      say: 'I’ll write it as a one-page brief: the two bikes side by side, then my recommendation and what to do next.',
+      text: `File created successfully at: ${file}`,
+      result: { type: 'create', filePath: file, content: BRIEF, structuredPatch: [], originalFile: null },
+      ms: 5000,
+    });
+    t.say(['The brief is in `ebike-brief.md`: a two-line summary, the Velora Ridge E5 and the Urbana Climb 2 side by side, my recommendation and three next steps. It is ready to send to Sam.'], { out: 120 });
+    // The file is made at the time of the turn, as a real one would be.
+    write(file, BRIEF);
+    const when = new Date(t.t - 10_000);
+    fs.utimesSync(file, when, when);
+    t.title('A one-page brief on the e-bikes').save(projects);
+    out.doc = { key: t.key, cwd, at: t.t, file, assistant: 'writer' };
+  }
+  const own_ = db.prepare(
+    `insert into app_sessions (key, agent, created_by_app, created_at, updated_at) values (?, 'claude', 1, ?, ?)
+     on conflict(key) do update set created_by_app = 1, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+  );
+  for (const x of Object.values(out)) own_.run(x.key, x.at - 60_000, x.at);
+  for (let i = 0; i < 60; i++) {
+    const list = await api('GET', '/api/sessions?limit=300');
+    const have = new Set((list.sessions ?? list).map((s) => s.key));
+    if (Object.values(out).every((x) => have.has(x.key))) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  for (const x of Object.values(out)) await api('PATCH', `/api/sessions/${encodeURIComponent(x.key)}/extra`, { assistant: x.assistant }).catch(() => {});
+  return out;
+}

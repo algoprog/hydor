@@ -62,7 +62,8 @@ not in it, nor in `sitemap.xml`).
 | The post: front matter, then Markdown | `blog/posts/<slug>.md` |
 | A figure: an HTML fragment | `blog/figures/<slug>/<name>.html` |
 | The post's own figure styles and code, linked from its page when they exist | `src/blog/<slug>.css`, `src/blog/<slug>.js` |
-| The post's pictures (`cover.webp` 1600×900, `og.jpg` 1200×630, anything else it shows) | `src/img/blog/<slug>/` |
+| The post's pictures (`cover.webp` 1600×900, `og.jpg` 1200×630, anything else it shows, short `.mp4` clips too) | `src/img/blog/<slug>/` |
+| Where a post shows the app itself: its lists of shots, and of clips, for the guide's screenshot tool (`scripts/guide-shots`; their headers say how to take them) | `blog/shots/<slug>.mjs`, `blog/shots/<slug>-clips.mjs` |
 | The pages' look, and the pieces every figure shares | `src/blog/blog.css` |
 | The figures' runtime, the reading progress, the "On this page" list, the counters | `src/blog/blog.js` |
 

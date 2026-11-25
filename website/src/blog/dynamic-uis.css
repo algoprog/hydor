@@ -1,0 +1,236 @@
+/* Dynamic UIs: the figures. Every rule is under [data-fig^="dynamic-uis-"]. */
+
+/* The post's text styles reach into the figures: put lists and paragraphs back to plain. */
+[data-fig^="dynamic-uis-"] :is(ul, ol) { margin: 0; padding: 0; list-style: none; }
+[data-fig^="dynamic-uis-"] li, [data-fig^="dynamic-uis-"] li + li { padding-left: 0; margin-top: 0; }
+[data-fig^="dynamic-uis-"] li::marker { content: none; }
+[data-fig^="dynamic-uis-"] p { margin: 0; text-wrap: initial; }
+[data-fig^="dynamic-uis-"] img, [data-fig^="dynamic-uis-"] video { display: block; }
+[data-fig^="dynamic-uis-"] :is(button, [role="slider"]):focus-visible, [data-fig^="dynamic-uis-"] [tabindex="0"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The progress bar of a tab that moves on by itself (kinds, more), as the tour's */
+[data-fig^="dynamic-uis-"] :is(.duk-bar, .dum-bar) { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--water); transform: scaleX(0); transform-origin: left; }
+[data-fig^="dynamic-uis-"] :is(.duk-bar, .dum-bar).run { animation: du-fill var(--dur, 6s) linear forwards; }
+[data-fig^="dynamic-uis-"] .paused :is(.duk-bar, .dum-bar).run { animation-play-state: paused; }
+[data-fig^="dynamic-uis-"]:not(.is-visible) :is(.duk-bar, .dum-bar).run { animation-play-state: paused; }
+@keyframes du-fill { to { transform: scaleX(1); } }
+
+/* ---------- versus: a bar wipes between the plain text and the answer UIs ---------- */
+[data-fig="dynamic-uis-versus"] .duv { padding: clamp(12px, 2.4vw, 24px); }
+[data-fig="dynamic-uis-versus"] .duv-frame {
+  --p: 50; position: relative; width: 100%; max-width: 900px; margin: 0 auto; aspect-ratio: 1600 / 1041; overflow: hidden;
+  border: 1px solid var(--line-2); border-radius: 12px; background: #05080c; box-shadow: 0 20px 50px rgb(0 0 0 / .45);
+  touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none;
+}
+[data-fig="dynamic-uis-versus"] .duv-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+/* The plain text is the top image; what is right of the bar is cut away, and the answer UIs show there. */
+[data-fig="dynamic-uis-versus"] .duv-text { clip-path: inset(0 calc(100% - var(--p) * 1%) 0 0); }
+[data-fig="dynamic-uis-versus"] .duv-tag {
+  position: absolute; top: 10px; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.6; pointer-events: none;
+  color: var(--fg); background: rgb(5 8 12 / .82); border: 1px solid var(--line-2); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+[data-fig="dynamic-uis-versus"] .duv-tag-text { left: 10px; opacity: clamp(0, calc((var(--p) - 6) / 12), 1); }
+[data-fig="dynamic-uis-versus"] .duv-tag-cards { right: 10px; color: var(--w1); border-color: rgb(94 234 212 / .4); opacity: clamp(0, calc((94 - var(--p)) / 12), 1); }
+[data-fig="dynamic-uis-versus"] .duv-bar { position: absolute; top: 0; bottom: 0; left: calc(var(--p) * 1%); width: 0; z-index: 2; cursor: ew-resize; touch-action: pan-y; }
+[data-fig="dynamic-uis-versus"] .duv-bar::before { content: ''; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--fg); box-shadow: 0 0 0 1px rgb(0 0 0 / .35), 0 0 16px rgb(56 189 248 / .55); }
+[data-fig="dynamic-uis-versus"] .duv-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -22px; width: 44px; } /* a wider place to grab */
+[data-fig="dynamic-uis-versus"] .duv-knob {
+  position: absolute; top: 50%; left: 0; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--fg); color: #05080c; box-shadow: 0 4px 18px rgb(0 0 0 / .55), 0 0 0 4px rgb(255 255 255 / .12);
+  transition: box-shadow .25s var(--ease), transform .25s var(--ease);
+}
+[data-fig="dynamic-uis-versus"] .duv-knob::before { content: ''; width: 18px; height: 18px; background: currentColor; -webkit-mask: var(--arrows) center / contain no-repeat; mask: var(--arrows) center / contain no-repeat;
+  --arrows: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M6 3.5 1 9l5 5.5V3.5Zm6 0v11L17 9l-5-5.5Z'/%3E%3C/svg%3E"); }
+[data-fig="dynamic-uis-versus"] .duv-frame.drag .duv-knob { transform: scale(1.1); box-shadow: 0 4px 18px rgb(0 0 0 / .55), 0 0 0 6px rgb(56 189 248 / .3); }
+[data-fig="dynamic-uis-versus"] .duv-bar:focus-visible { outline: none; }
+[data-fig="dynamic-uis-versus"] .duv-bar:focus-visible .duv-knob { box-shadow: 0 4px 18px rgb(0 0 0 / .55), 0 0 0 3px #05080c, 0 0 0 5px var(--accent); }
+[data-fig="dynamic-uis-versus"] .fig-controls { justify-content: center; }
+
+/* ---------- stream: the block as it is written, the card as it is drawn ---------- */
+[data-fig="dynamic-uis-stream"] .dus { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px clamp(14px, 2.4vw, 24px); padding: clamp(14px, 2.4vw, 24px); }
+[data-fig="dynamic-uis-stream"] .dus-pane { display: flex; flex-direction: column; min-width: 0; }
+/* The text pane adds nothing to the row's height (the video sets it) and fills it. */
+[data-fig="dynamic-uis-stream"] .dus-write { contain: size; }
+[data-fig="dynamic-uis-stream"] .dus-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; min-height: 26px; font-size: 13.5px; font-weight: 600; color: var(--fg); }
+[data-fig="dynamic-uis-stream"] .dus-pre {
+  flex: 1 1 0; min-height: 0; margin: 0; padding: 10px 12px; overflow: hidden; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .22) transparent; border: 1px solid var(--line-2); border-radius: 10px; background: #05080c;
+  font: 11px / 1.45 var(--mono); color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+}
+/* Once the whole block is there, a pane that is too short for it scrolls. */
+[data-fig="dynamic-uis-stream"] .dus.done .dus-pre { overflow-y: auto; }
+[data-fig="dynamic-uis-stream"] .dus-pre code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
+[data-fig="dynamic-uis-stream"] .dus-fence { color: var(--fg-3); }
+[data-fig="dynamic-uis-stream"] .dus-k { color: var(--w2); }
+[data-fig="dynamic-uis-stream"] .dus-s { color: var(--w1); }
+[data-fig="dynamic-uis-stream"] .dus-caret { display: none; width: .55em; height: 1.1em; margin-left: 1px; vertical-align: text-bottom; background: var(--w1); }
+[data-fig="dynamic-uis-stream"] .dus.grows .dus-caret { display: inline-block; animation: dus-blink 1s steps(2, jump-none) infinite; }
+[data-fig="dynamic-uis-stream"]:not(.is-visible) .dus-caret { animation-play-state: paused; }
+@keyframes dus-blink { 0% { opacity: 1; } 100% { opacity: 0; } }
+[data-fig="dynamic-uis-stream"] .dus-video { width: 100%; height: auto; aspect-ratio: 1280 / 956; border: 1px solid var(--line-2); border-radius: 10px; background: #05080c; object-fit: contain; }
+[data-fig="dynamic-uis-stream"] .fig-controls { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 720px) {
+  [data-fig="dynamic-uis-stream"] .dus { grid-template-columns: minmax(0, 1fr); }
+  [data-fig="dynamic-uis-stream"] .dus-write { contain: none; }
+  [data-fig="dynamic-uis-stream"] .dus-pre { flex: none; height: 150px; }
+  /* Large enough to read: the card scrolls sideways in its frame. */
+  [data-fig="dynamic-uis-stream"] .dus-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .22) transparent; }
+  [data-fig="dynamic-uis-stream"] .dus-video { width: 540px; max-width: none; }
+}
+
+/* ---------- kinds: five requests, five cards ---------- */
+[data-fig="dynamic-uis-kinds"] .duk { display: grid; grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); gap: 20px; }
+[data-fig="dynamic-uis-kinds"] .duk-tabs { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+[data-fig="dynamic-uis-kinds"] .duk-tab {
+  position: relative; overflow: hidden; display: block; width: 100%; padding: 10px 14px 13px; text-align: left; font: inherit; cursor: pointer;
+  background: transparent; border: 1px solid var(--line-2); border-radius: 12px; color: var(--fg-3);
+  transition: color .3s var(--ease), border-color .3s var(--ease), background .3s var(--ease);
+}
+[data-fig="dynamic-uis-kinds"] .duk-tab b { display: block; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--fg-2); transition: color .3s var(--ease); }
+[data-fig="dynamic-uis-kinds"] .duk-tab span { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.4; color: var(--fg-3); }
+[data-fig="dynamic-uis-kinds"] .duk-tab:hover b { color: var(--fg); }
+[data-fig="dynamic-uis-kinds"] .duk-tab[aria-selected="true"] { border-color: rgb(94 234 212 / .5); background: rgb(94 234 212 / .06); }
+[data-fig="dynamic-uis-kinds"] .duk-tab[aria-selected="true"] b { color: var(--w1); }
+[data-fig="dynamic-uis-kinds"] .duk-panel { min-width: 0; }
+[data-fig="dynamic-uis-kinds"] .duk-req { display: none; }
+[data-fig="dynamic-uis-kinds"] .duk-shots {
+  height: 540px; overflow: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg);
+  scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .22) transparent;
+}
+[data-fig="dynamic-uis-kinds"] .duk-img { display: none; width: 100%; max-width: 770px; height: auto; margin: 0 auto; }
+[data-fig="dynamic-uis-kinds"] .duk-img.on { display: block; animation: du-in .5s var(--ease); }
+@keyframes du-in { from { opacity: 0; } }
+[data-fig="dynamic-uis-kinds"] .duk-note { margin: 12px 0 0; min-height: 4.7em; font-size: 14px; color: var(--fg-2); }
+@media (max-width: 720px) {
+  [data-fig="dynamic-uis-kinds"] .duk { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  [data-fig="dynamic-uis-kinds"] .duk-tabs { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .22) transparent; }
+  [data-fig="dynamic-uis-kinds"] .duk-tab { flex: none; width: auto; padding: 7px 14px 9px; border-radius: 999px; white-space: nowrap; }
+  [data-fig="dynamic-uis-kinds"] .duk-tab b { font-size: 13px; }
+  [data-fig="dynamic-uis-kinds"] .duk-tab span { display: none; }
+  [data-fig="dynamic-uis-kinds"] .duk-req { display: block; margin: 0 0 10px; min-height: 2.9em; font-size: 13.5px; color: var(--fg-2); }
+  [data-fig="dynamic-uis-kinds"] .duk-shots { height: 420px; padding: 8px; }
+  /* Large enough to read: the frame scrolls both ways. */
+  [data-fig="dynamic-uis-kinds"] .duk-img { width: 540px; max-width: none; }
+  [data-fig="dynamic-uis-kinds"] .duk-note { min-height: 7.4em; font-size: 13.5px; }
+}
+
+/* ---------- use: four clips, one at a time ---------- */
+[data-fig="dynamic-uis-use"] .duu-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+[data-fig="dynamic-uis-use"] .duu-tab {
+  font: inherit; font-size: 13.5px; color: var(--fg-3); cursor: pointer; background: transparent; border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 15px;
+  transition: color .3s var(--ease), border-color .3s var(--ease), background .3s var(--ease);
+}
+[data-fig="dynamic-uis-use"] .duu-tab:hover { color: var(--fg); }
+[data-fig="dynamic-uis-use"] .duu-tab[aria-selected="true"] { color: var(--w1); border-color: rgb(94 234 212 / .5); background: rgb(94 234 212 / .06); }
+/* The clips sit in one cell of a grid, so the stage is as high as the tallest at this width. */
+[data-fig="dynamic-uis-use"] .duu-clips { display: grid; justify-items: center; align-items: start; }
+[data-fig="dynamic-uis-use"] .duu-clip {
+  grid-area: 1 / 1; width: auto; height: auto; max-width: min(100%, 760px); max-height: max(420px, 80vh); border: 1px solid var(--line-2); border-radius: 10px; background: #05080c;
+  box-shadow: 0 20px 50px rgb(0 0 0 / .45); visibility: hidden; opacity: 0; transition: opacity .45s var(--ease), visibility 0s .45s;
+}
+[data-fig="dynamic-uis-use"] .duu-clip.on { visibility: visible; opacity: 1; transition: opacity .45s var(--ease), visibility 0s; }
+[data-fig="dynamic-uis-use"] .duu-note { margin: 14px 0 0; min-height: 4.7em; font-size: 14px; color: var(--fg-2); }
+@media (max-width: 560px) {
+  /* Large enough to read: the clip scrolls sideways in its frame. */
+  [data-fig="dynamic-uis-use"] .duu-clips { justify-items: start; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .22) transparent; }
+  [data-fig="dynamic-uis-use"] .duu-clip { width: 540px; max-width: none; max-height: none; box-shadow: none; }
+  [data-fig="dynamic-uis-use"] .duu-tab { padding: 6px 12px; font-size: 13px; }
+  [data-fig="dynamic-uis-use"] .duu-note { min-height: 8.8em; font-size: 13.5px; }
+}
+
+/* ---------- phone: the same reply on a phone ---------- */
+[data-fig="dynamic-uis-phone"] .dup { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(20px, 5vw, 48px); align-items: center; padding: clamp(18px, 3vw, 30px); }
+[data-fig="dynamic-uis-phone"] .dup-phone {
+  width: 270px; aspect-ratio: 780 / 1688; padding: 8px; border-radius: 38px;
+  background: #1a1f28; border: 1px solid var(--line-2); box-shadow: 0 20px 60px rgb(0 0 0 / .5), 0 0 60px rgb(56 189 248 / .08);
+}
+[data-fig="dynamic-uis-phone"] .dup-screen { position: relative; height: 100%; border-radius: 31px; overflow: hidden; background: #000; }
+[data-fig="dynamic-uis-phone"] .dup-screen img { width: 100%; height: 100%; object-fit: cover; }
+[data-fig="dynamic-uis-phone"] .dup-island { position: absolute; top: 8px; left: 50%; width: 30%; height: 16px; margin-left: -15%; border-radius: 99px; background: #000; }
+[data-fig="dynamic-uis-phone"] .dup-list { display: grid; gap: 18px; }
+[data-fig="dynamic-uis-phone"] .dup-list li { padding-left: 14px; border-left: 2px solid rgb(56 189 248 / .4); }
+[data-fig="dynamic-uis-phone"] .dup-list b { display: block; font-size: 15px; color: var(--fg); font-weight: 600; }
+[data-fig="dynamic-uis-phone"] .dup-list span { display: block; margin-top: 2px; font-size: 13.5px; color: var(--fg-3); line-height: 1.45; }
+@media (max-width: 560px) {
+  [data-fig="dynamic-uis-phone"] .dup { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  [data-fig="dynamic-uis-phone"] .dup-phone { width: 230px; }
+  [data-fig="dynamic-uis-phone"] .dup-list { justify-self: stretch; }
+}
+
+/* ---------- session: eight parts of one screen ---------- */
+[data-fig="dynamic-uis-session"] .dua { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; overflow: clip; }
+[data-fig="dynamic-uis-session"] .dua-shot { --d: 24px; position: relative; align-self: start; border-radius: 10px; }
+[data-fig="dynamic-uis-session"] .dua-shot img { width: 100%; height: auto; border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 20px 50px rgb(0 0 0 / .45); }
+[data-fig="dynamic-uis-session"] .dua-box {
+  position: absolute; left: var(--x, 0); top: var(--y, 0); width: var(--w, 0); height: var(--h, 0); box-sizing: border-box; border: 2px solid var(--accent); border-radius: 6px; pointer-events: none;
+  background: rgb(138 168 255 / .1); box-shadow: 0 0 0 1px rgb(0 0 0 / .4), 0 0 22px rgb(138 168 255 / .55); opacity: 0;
+  transition: left .45s var(--ease), top .45s var(--ease), width .45s var(--ease), height .45s var(--ease), opacity .3s;
+}
+[data-fig="dynamic-uis-session"] .dua-box.on { opacity: 1; }
+/* A number sits on the top left corner of the part it explains, half outside it, and never outside the picture. */
+[data-fig="dynamic-uis-session"] .dua-dot {
+  --nx: 0px; position: absolute; left: max(calc(var(--d) / 2), var(--x)); top: max(calc(var(--d) / 2), var(--y)); width: var(--d); height: var(--d); padding: 0; margin: 0;
+  transform: translate(calc(-50% + var(--nx)), -50%); display: grid; place-items: center; border-radius: 50%; cursor: pointer;
+  font: 700 12px / 1 var(--font); color: var(--fg); background: rgb(11 14 19 / .92); border: 1.5px solid rgb(255 255 255 / .55); box-shadow: 0 2px 8px rgb(0 0 0 / .6);
+  transition: background .25s var(--ease), color .25s var(--ease), border-color .25s var(--ease), transform .25s var(--ease);
+}
+/* Four numbers sit one above the other: they step to the left by turns, so none covers another. */
+[data-fig="dynamic-uis-session"] .dua-dot[data-i="3"], [data-fig="dynamic-uis-session"] .dua-dot[data-i="5"] { --nx: -24px; }
+[data-fig="dynamic-uis-session"] .dua-dot[data-i="4"], [data-fig="dynamic-uis-session"] .dua-dot[data-i="6"] { --nx: -2px; }
+[data-fig="dynamic-uis-session"] .dua-dot:hover { border-color: var(--fg); transform: translate(calc(-50% + var(--nx)), -50%) scale(1.12); }
+[data-fig="dynamic-uis-session"] .dua-dot.is-active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); box-shadow: 0 0 0 4px rgb(138 168 255 / .3), 0 2px 8px rgb(0 0 0 / .6); z-index: 1; }
+[data-fig="dynamic-uis-session"] .dua-notes { display: grid; gap: 4px; counter-reset: dua; min-width: 0; }
+[data-fig="dynamic-uis-session"] .dua-notes li { counter-increment: dua; }
+[data-fig="dynamic-uis-session"] .dua-note {
+  position: relative; display: block; width: 100%; padding: 8px 12px 8px 40px; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: 10px; transition: background .25s var(--ease), border-color .25s var(--ease);
+}
+[data-fig="dynamic-uis-session"] .dua-note::before {
+  content: counter(dua); position: absolute; left: 10px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+  font: 700 11px / 1 var(--font); color: var(--fg-3); border: 1.5px solid var(--line-2); transition: background .25s var(--ease), color .25s var(--ease), border-color .25s var(--ease);
+}
+[data-fig="dynamic-uis-session"] .dua-note b { display: block; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--fg); }
+[data-fig="dynamic-uis-session"] .dua-note span { display: block; margin-top: 1px; font-size: 13px; line-height: 1.45; color: var(--fg-3); }
+[data-fig="dynamic-uis-session"] .dua-note:hover { background: rgb(255 255 255 / .03); }
+[data-fig="dynamic-uis-session"] .dua-note.is-active { background: rgb(138 168 255 / .09); border-color: rgb(138 168 255 / .45); }
+[data-fig="dynamic-uis-session"] .dua-note.is-active::before { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+[data-fig="dynamic-uis-session"] .dua-note.is-active span { color: var(--fg-2); }
+/* The notes sit under the picture, which keeps the figure's whole width so its words can be read: in two columns, then four. */
+@media (min-width: 620px) {
+  [data-fig="dynamic-uis-session"] .dua-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+  [data-fig="dynamic-uis-session"] .dua-note { height: 100%; }
+}
+@media (min-width: 900px) {
+  [data-fig="dynamic-uis-session"] .dua-notes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  [data-fig="dynamic-uis-session"] .dua-dot { --nx: 0px !important; }
+  [data-fig="dynamic-uis-session"] .dua-note b { font-size: 13.5px; }
+  [data-fig="dynamic-uis-session"] .dua-note span { font-size: 12.5px; line-height: 1.4; }
+}
+
+/* ---------- more: three ways to read what an agent made ---------- */
+[data-fig="dynamic-uis-more"] .dum { display: grid; gap: 14px; }
+[data-fig="dynamic-uis-more"] .dum-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+[data-fig="dynamic-uis-more"] .dum-tab {
+  position: relative; overflow: hidden; font: inherit; font-size: 13.5px; color: var(--fg-3); cursor: pointer;
+  background: transparent; border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 15px;
+  transition: color .3s var(--ease), border-color .3s var(--ease), background .3s var(--ease);
+}
+[data-fig="dynamic-uis-more"] .dum-tab:hover { color: var(--fg); }
+[data-fig="dynamic-uis-more"] .dum-tab[aria-selected="true"] { color: var(--w1); border-color: rgb(94 234 212 / .5); background: rgb(94 234 212 / .06); }
+[data-fig="dynamic-uis-more"] .dum-window { width: 100%; max-width: 900px; margin: 0 auto; border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: #05080c; box-shadow: 0 20px 50px rgb(0 0 0 / .45); }
+[data-fig="dynamic-uis-more"] .dum-wbar { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px; background: #0b0e13; border-bottom: 1px solid var(--line); }
+[data-fig="dynamic-uis-more"] .dum-wbar i { width: 9px; height: 9px; border-radius: 50%; background: rgb(255 255 255 / .14); }
+[data-fig="dynamic-uis-more"] .dum-wbar span { margin: 0 auto; font-size: 11px; color: var(--fg-3); transform: translateX(-24px); }
+[data-fig="dynamic-uis-more"] .dum-shots { position: relative; aspect-ratio: 1600 / 1125; }
+[data-fig="dynamic-uis-more"] .dum-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .8s var(--ease); }
+[data-fig="dynamic-uis-more"] .dum-img.on { opacity: 1; }
+[data-fig="dynamic-uis-more"] .dum-line { margin: 12px 0 0; min-height: 3em; font-size: 14px; color: var(--fg-2); }
+@media (max-width: 560px) {
+  [data-fig="dynamic-uis-more"] .dum-tab { padding: 6px 12px; font-size: 13px; }
+  [data-fig="dynamic-uis-more"] .dum-line { min-height: 9em; font-size: 13.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fig^="dynamic-uis-"] *, [data-fig^="dynamic-uis-"] *::before, [data-fig^="dynamic-uis-"] *::after { transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; }
+  [data-fig^="dynamic-uis-"] :is(.duk-bar, .dum-bar) { display: none; }
+  [data-fig="dynamic-uis-stream"] .dus-caret { display: none !important; }
+}

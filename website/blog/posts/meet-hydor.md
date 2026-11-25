@@ -53,7 +53,7 @@ If you do code, Hydor has what that needs: a terminal beside the agent, files, G
 
 A few things worth knowing about:
 
-- **Answers as cards.** When a card is clearer than a paragraph, you get one: charts, maps, tables, quizzes and small tools, nearly 150 kinds. Pin the ones you want to keep to a **board**, and an agent can keep each one current on a schedule.
+- **Answers as cards.** When a card is clearer than a paragraph, you get one: charts, maps, tables, quizzes and small tools, 150 kinds. Pin the ones you want to keep to a **board**, and an agent can keep each one current on a schedule. [Dynamic UIs](/blog/dynamic-uis) shows them at work.
 - **Apps.** For a job you do again and again, such as a trip plan, a product comparison or a quiz, an app asks a few questions and opens its answer in a view of its own, with maps, charts and pictures. 45 ready-made apps come with Hydor. You can also describe a job, and an agent builds an app for it: a sketch first, which you can change before anything is made.
 - **Documents you keep.** Pages, slides, documents, spreadsheets and LaTeX, edited right in the app and exported to PDF, Word, PowerPoint or Excel. Pictures, video, music and voice-overs made with AI are kept in the project too.
 - **Deep research.** Rounds of searching and reading that end in a report with its sources.

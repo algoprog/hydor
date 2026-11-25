@@ -1,0 +1,21 @@
+<figure class="fig wide" data-fig="dynamic-uis-stream">
+  <div class="fig-stage dus">
+    <div class="dus-pane dus-write">
+      <p class="dus-head"><span class="chip">1</span> What the agent writes</p>
+      <pre class="dus-pre" aria-hidden="true"><code data-out></code><span class="dus-caret"></span></pre>
+      <pre hidden data-src>```ui weather
+{"location":"Amherst, Massachusetts","unit":"C","now":{"temp":9,"feels":6,"condition":"Partly cloudy","icon":"partly","humidity":62,"wind":"14 km/h NW","uv":2},"hourly":[{"time":"14:00","temp":9,"icon":"partly","rain":5},{"time":"15:00","temp":10,"icon":"partly","rain":5},{"time":"16:00","temp":9,"icon":"cloud","rain":10},{"time":"17:00","temp":7,"icon":"cloud","rain":20},{"time":"18:00","temp":6,"icon":"showers","rain":45},{"time":"19:00","temp":5,"icon":"rain","rain":70},{"time":"20:00","temp":4,"icon":"rain","rain":65},{"time":"21:00","temp":4,"icon":"cloud","rain":30}],"daily":[{"date":"2026-11-07","high":10,"low":3,"icon":"showers","condition":"Showers this evening","rain":70},{"date":"2026-11-08","high":8,"low":-1,"icon":"sun","condition":"Sunny and crisp","rain":0},{"date":"2026-11-09","high":7,"low":-3,"icon":"sun","condition":"Clear, frost at night","rain":0},{"date":"2026-11-10","high":11,"low":2,"icon":"partly","condition":"Milder","rain":10},{"date":"2026-11-11","high":12,"low":6,"icon":"rain","condition":"Steady rain","rain":90},{"date":"2026-11-12","high":9,"low":1,"icon":"cloud","condition":"Cloudy, breezy","rain":20},{"date":"2026-11-13","high":6,"low":-2,"icon":"snow","condition":"Flurries possible","rain":35}],"alerts":[{"title":"Frost advisory, Sunday night","text":"Lows near −3 °C: cover tender plants.","tone":"warn"}]}
+```</pre>
+    </div>
+    <div class="dus-pane dus-see">
+      <p class="dus-head"><span class="chip" style="--c: var(--w2)">2</span> What you see</p>
+      <div class="dus-scroll"><video class="dus-video" muted playsinline preload="none" width="1280" height="956" poster="/img/blog/dynamic-uis/stream-weather.webp" data-start="0" data-end="4.28" aria-label="A weather card filling in as its data arrives: first the place and the temperature now, then the coming hours one by one, then the seven days, and last a frost advisory.">
+        <source src="/img/blog/dynamic-uis/stream-weather.mp4" type="video/mp4" />
+      </video></div>
+    </div>
+    <div class="fig-controls">
+      <button class="fig-btn" type="button" data-replay>Play it again</button>
+    </div>
+  </div>
+  <figcaption>A weather card from the app’s gallery, played as a reply would bring it: at the left the block as the agent writes it, at the right the card filling in. Recorded in the app.</figcaption>
+</figure>

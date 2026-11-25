@@ -1,0 +1,20 @@
+<figure class="fig wide" data-fig="dynamic-uis-use">
+  <div class="fig-stage duu">
+    <div class="duu-tabs" role="tablist" aria-label="Cards in use">
+      <button class="duu-tab" role="tab" type="button" id="duu-tab-0" aria-controls="duu-panel" aria-selected="true" tabindex="0" data-i="0">Scale a recipe</button>
+      <button class="duu-tab" role="tab" type="button" id="duu-tab-1" aria-controls="duu-panel" aria-selected="false" tabindex="-1" data-i="1">Weigh a decision</button>
+      <button class="duu-tab" role="tab" type="button" id="duu-tab-2" aria-controls="duu-panel" aria-selected="false" tabindex="-1" data-i="2">Practise</button>
+      <button class="duu-tab" role="tab" type="button" id="duu-tab-3" aria-controls="duu-panel" aria-selected="false" tabindex="-1" data-i="3">Fit a curve</button>
+    </div>
+    <div class="duu-panel" id="duu-panel" role="tabpanel" aria-labelledby="duu-tab-0">
+      <div class="duu-clips">
+        <video class="duu-clip on" muted playsinline preload="none" width="1280" height="1230" poster="/img/blog/dynamic-uis/use-recipe.webp" data-i="0" aria-label="A shakshuka recipe card: the servings go from 4 to 5 to 6 and every amount changes with them, then the timer of the first step is started and counts down from 8 minutes." data-note="Two more servings, and every amount follows: 3 tbsp of olive oil becomes 4½, one onion becomes 1½. Then a step’s timer starts, right where the recipe says how long."><source src="/img/blog/dynamic-uis/use-recipe.mp4" type="video/mp4" /></video>
+        <video class="duu-clip" muted playsinline preload="none" width="1280" height="1140" poster="/img/blog/dynamic-uis/use-decision.webp" data-i="1" aria-hidden="true" aria-label="A decision card ranking three cities to work from: as the weight of one criterion is dragged to zero and another is turned down, the scores change and the cities change places." data-note="Every criterion has a weight you can drag. Mexico City leads at first; take the overlap with New York hours out and Chiang Mai goes to the top; care less about the cost of living and Lisbon passes it."><source src="/img/blog/dynamic-uis/use-decision.mp4" type="video/mp4" /></video>
+        <video class="duu-clip" muted playsinline preload="none" width="1280" height="784" poster="/img/blog/dynamic-uis/use-practice.webp" data-i="2" aria-hidden="true" aria-label="A card of practice problems: 60 is typed for a train's average speed and marked right, then a wrong answer to another problem is marked not quite, and a hint is shown." data-note="A right answer is marked at once and counted. A wrong one gets “Not quite”, and a hint when you ask for one. The score can go back to the agent with one button."><source src="/img/blog/dynamic-uis/use-practice.mp4" type="video/mp4" /></video>
+        <video class="duu-clip" muted playsinline preload="none" width="1280" height="1108" poster="/img/blog/dynamic-uis/use-graph.webp" data-i="3" aria-hidden="true" aria-label="A plot of a sunflower's height over time with measured points: three sliders are dragged in turn and the growth curve moves until it passes through the points." data-note="Three sliders and one curve. Move them until the growth curve passes through the measured points: no new question, and no waiting for a reply."><source src="/img/blog/dynamic-uis/use-graph.mp4" type="video/mp4" /></video>
+      </div>
+      <p class="duu-note" data-note aria-live="polite">Two more servings, and every amount follows: 3 tbsp of olive oil becomes 4½, one onion becomes 1½. Then a step’s timer starts, right where the recipe says how long.</p>
+    </div>
+  </div>
+  <figcaption>Four cards in use, recorded in the app. Nothing you see here was sent to a model.</figcaption>
+</figure>
