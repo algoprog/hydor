@@ -797,6 +797,36 @@ not the guide's cards.
   purchase in Stripe's test mode works end to end (sign up, subscribe, change the plan, cancel), it comes back from
   its backup, and it takes a block's update through the card.
 
+### What Phase 3 found (25 November 2026)
+
+Phase 3 is built and its test passes against stand-ins, not yet for real: there was no server, no domain and no
+Stripe account to try it on. The Hydor side is still a branch.
+
+| Part of the test | Result |
+|---|---|
+| A SaaS with teams and subscriptions, from a brief | The SaaS starter makes it in one command; a proof then uses it as a visitor would, in a browser and over HTTP (176 checks). It was not led through the guide's stages by an agent |
+| To its own domain on a small server | To a stand-in: a container that is a small Ubuntu server with its own Docker, reached over SSH, answering over HTTPS at a local name with a certificate from the web server's own authority. A real name with a public certificate is untried |
+| A purchase in Stripe's test mode, end to end | Sign up, subscribe with a trial, change the plan up and down, cancel, a failed payment and its grace, seats that follow a team's members: all against Stripe's own mock server, with events signed as Stripe signs them. Hosted checkout, a declined card and tax were never exercised |
+| It comes back from its backup | Yes, on the stand-in: a backup, a change, the backup put back, the change gone and the subscription there. Every backup is restored into a scratch folder and read back before it counts |
+| It takes a block's update through the card | A newer block is taken in the app and launched again with the data intact, by the kit's commands; Hydor's **Updates** card runs the same commands and is tested with them, not by a person |
+
+| Built | What it is now |
+|---|---|
+| Blocks | Teams (several per person, roles, invitations, a read-only guest the data layer holds to), onboarding, API keys (shown once, hashed, a scope, a rate), usage meters, billing (plans in one file, subscriptions, one-off purchases, credits, the portal, the pricing section read from the same file) |
+| The SaaS starter | Those blocks with a landing page and a list limited by plan, on a server, inside Hydor and on Cloudflare's runtime locally |
+| Launching | `kit host` (a server's key is shown and accepted before anything is sent), `kit launch` in fifteen named steps with the image built on the server, a failed launch putting the version before back by itself with its data, `--rollback`, backups daily and on request with a copy to S3-compatible storage, `kit status`, `kit logs`, `kit upgrade` on a branch; the files for Render, Railway and Fly.io |
+| At run time | A readiness address, one line per request and per error with no personal data beyond an id, a polite stop that finishes what it is answering |
+| In Hydor | A places card; launching inside this Hydor, where an app then has two sides, the launched version with data of its own and the one being changed; a server of your own with a key Hydor makes and never your own SSH folder; keys from the vault given to the command's environment only; launch history and the way back; a **Run** tab with status, logs, backups, updates and a weekly check |
+
+**What the work showed.** Each block named the interface package at one exact version, so releasing a new one made
+adding any block fail: a shared package is now "at least this version" and an app gets the newest. Seat changes
+within one minute could be lost, leaving a team paying for the wrong number of seats: fixed. A list had no place for
+a rule of the app's own (a limit by plan), so the starter wrote it twice: the next round gives a list one place for
+such rules. Three kit agents in one folder cost more in failed runs than they saved: each now works in a copy.
+
+**Still to do for real.** One evening with a rented server, a domain and a Stripe test key, following the steps the
+proofs wrote down for exactly that; and the three platforms, whose files were checked for shape only.
+
 ### Phase 4: content, search and AI
 
 - Blocks: search (with the embedding drivers), blog, docs, changelog, newsletter, forms, the AI blocks with caps
