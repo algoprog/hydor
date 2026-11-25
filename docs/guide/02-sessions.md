@@ -159,6 +159,7 @@ At the top of a session:
 - the folder (click it to browse it in Files), a pull request badge, the account when it runs as an added one, and on wider screens the git branch and the model;
 - one button for what you can do now: **Stop** while a turn runs, **Resume** when the agent is not running (after **Stopped** or **Failed**; quieter after **Done**, since a message in the box continues the session anyway), or **Continue here** for a Claude Code session open in VS Code or a terminal;
 - **Details** (showing the lines added and removed once files changed), which opens [the details panel](#the-details-panel-changes-commands-and-info);
+- while the conversation is [zoomed](#zoom-in-and-full-screen), **− 125% +** with the level it is at;
 - the session's menu (⋯): see [Everything in the session's menu](#everything-in-the-sessions-menu).
 
 ### Turns, steps and replies
@@ -226,6 +227,28 @@ When part of an answer is something to look at, compare, choose from, follow, tr
 - **See them all**: [Answer UIs](/answers) shows every one with an example, by group: summaries, comparisons, shopping, places and travel, food, plans, work and business, numbers and charts, money, learning, science, media, people and sports, writing, and code. **Play as it streams** shows one coming in as a reply would bring it.
 
 Ask for one in plain words too: "compare them in a table", "put them on a map", "quiz me on it", "give me practice problems on this", "mark up my essay with what to fix". Your [Agent Guidelines](/guide/guidelines) ("Answer in plain text, without cards or charts") or your message can ask for plain text instead.
+
+### Zoom in and full screen
+
+A conversation can be shown bigger or smaller by itself, while the sidebar, the header and the message box stay as they are. Everything in it grows or shrinks (text, code, cards and pictures) and the lines wrap again to fit. The levels are 67, 80, 90, 100, 110, 125, 150, 175 and 200%; each device keeps its own, for all its sessions.
+
+- **Keys**: **Ctrl** (**⌘** on a Mac) with **+** or **=** zooms in, with **−** zooms out, and with **0** goes back to 100%. In the desktop app these are also **View → Zoom In**, **Zoom Out** and **Actual Size**; away from a session they zoom the whole window. With the conversation already at 100%, **0** resets the browser's or the window's own zoom.
+- **Mouse and trackpad**: hold **Ctrl** and scroll, or pinch on the trackpad. In Safari, a pinch works too.
+- **The header**: while the level is not 100%, **− 125% +** shows beside **Details**; click the percentage to go back to 100%.
+- **The menu**: the session's ⋯ menu always has a **Zoom** row, on a phone too.
+
+What you were reading at the top of the screen stays there as the level changes. A terminal or a code editor keeps these keys to itself.
+
+Zoom is not the same as [Settings → App → General → Appearance → Text size](/settings?s=general&find=Text%20size). **Text size** makes the reading text bigger throughout the app (messages, the Help pages and the box you type in) and leaves cards and pictures as they are; zoom enlarges the whole of a session's conversation, and nothing outside it.
+
+**Tables, code and diagrams full screen**: a table has a small button at its top right corner, a block of code has one beside **Copy**, and a diagram has **Full screen** in its bar. Each opens over the page, where:
+
+- **− 100% +** at the top zooms what it shows, and clicking the percentage goes back to 100%;
+- **Ctrl** or **⌘** with **+**, **−** and **0** do the same, and **Ctrl** and scroll, or a pinch, zoom around the pointer;
+- once zoomed, drag with the mouse to move about (scrolling works too);
+- **Esc**, **Close** or a click beside it brings you back.
+
+Pictures already open large when you click them.
 
 ### Open a step to see its output
 
@@ -484,6 +507,7 @@ How many Hydor subagents one session runs at once is set in [Settings → Capabi
 The ⋯ button at the top right of a session opens its menu. Some items show only when they apply; a [confidential session](#keep-a-session-confidential)'s has no **Share a read-only link**, **Open a pull request**, **Open a browser**, **Connected accounts**, **Make this an automation** or **Save as an app**, and its memory stays off.
 
 - **Rename**: edit the title in place.
+- **Zoom**: **−**, the level and **+**, for [the conversation](#zoom-in-and-full-screen) on this device; click the level to go back to 100%.
 - **Pin to the top** / **Unpin**.
 - **Snooze** (a submenu of times), or **Unsnooze (back at …)** while it is snoozed.
 - **Settle: done for now**: stops the agent and marks the session read (not while a turn runs).
@@ -522,6 +546,8 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Start a Claude Code session in ~/code/blog in a new worktree that adds an RSS feed, with a $5 spending cap."
 - "Which sessions finished since this morning? Settle the ones that are done and archive the ones from last week."
 - "Why does this session say Failed, and what should I send to try again?"
+- "Zoom the conversation to 125% on this device."
+- "The text in my sessions is small on my laptop: make the conversation bigger."
 - "What did the last turn of this session cost, and how much of it was the cache?"
 - "Snooze the session about the tax forms until Monday at 9."
 - "Put the sales chart and the key figures you just showed me on my Shop board."

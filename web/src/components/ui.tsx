@@ -146,6 +146,12 @@ function useStacked(node: RefObject<HTMLElement | null>, open: boolean) {
 /** Whether nothing was opened over this layer since it opened. */
 const onTop = (el: HTMLElement | null) => !el || popoverStack[popoverStack.length - 1] === el;
 
+/** For a layer drawn by hand over the page (a page full screen): one of the stack too. Says whether it is the topmost, for Escape. */
+export function useLayer(node: RefObject<HTMLElement | null>): () => boolean {
+  useStacked(node, true);
+  return useCallback(() => onTop(node.current), [node]);
+}
+
 /** Closes a popover on a click outside it, its anchor, and any popover or dialog opened on top of it; Escape closes only the topmost. */
 function usePopoverDismiss(node: RefObject<HTMLElement | null>, anchor: RefObject<HTMLElement | null>, onClose: () => void, open: boolean) {
   useStacked(node, open);

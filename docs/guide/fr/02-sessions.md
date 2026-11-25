@@ -159,6 +159,7 @@ En haut d’une session :
 - le dossier (cliquez dessus pour le parcourir dans Fichiers), un badge de pull request, le compte quand la session s’exécute avec un compte ajouté, et, sur les écrans plus larges, la branche Git et le modèle ;
 - un seul bouton pour ce que vous pouvez faire maintenant : **Arrêter** pendant qu’un tour s’exécute, **Reprendre** quand l’agent ne tourne pas (après **Arrêtées** ou **Échec** ; plus discret après **Terminé**, puisqu’un message dans la zone de saisie poursuit la session de toute façon), ou **Continuer ici** pour une session Claude Code ouverte dans VS Code ou dans un terminal ;
 - **Détails** (qui affiche les lignes ajoutées et supprimées dès que des fichiers ont changé), qui ouvre [le panneau des détails](#the-details-panel-changes-commands-and-info) ;
+- quand la conversation est [agrandie ou réduite](#zoom-in-and-full-screen), **− 125% +** avec le niveau de zoom actuel ;
 - le menu de la session (⋯) : voir [Tout ce que contient le menu de la session](#everything-in-the-sessions-menu).
 
 ### Tours, étapes et réponses
@@ -226,6 +227,28 @@ Quand une partie d’une réponse est faite pour être regardée, comparée, cho
 - **Les voir toutes** : [UI de réponse](/answers) les présente toutes avec un exemple, par groupe : synthèses, comparaisons, achats, lieux et voyages, cuisine, plans, travail et affaires, chiffres et graphiques, argent, apprentissage, sciences, médias, personnes et sport, écriture, et code. **Lire pendant la diffusion** montre l’une d’elles arrivant comme le ferait une réponse.
 
 Demandez-en une aussi avec des mots simples : « compare-les dans un tableau », « place-les sur une carte », « fais-moi un quiz là-dessus », « donne-moi des exercices d’entraînement sur ce sujet », « annote ma dissertation avec ce qu’il faut corriger ». Vos [Consignes des agents](/guide/guidelines) (« Réponds en texte brut, sans cartes ni graphiques ») ou votre message peuvent demander du texte brut à la place.
+
+### Zoom et plein écran
+
+Une conversation peut être affichée en plus grand ou en plus petit à elle seule, tandis que la barre latérale, l’en-tête et la zone de message restent tels quels. Tout ce qu’elle contient grandit ou rétrécit (texte, code, cartes et images) et les lignes se réorganisent pour tenir dans l’espace. Les niveaux sont 67, 80, 90, 100, 110, 125, 150, 175 et 200 % ; chaque appareil garde le sien, pour toutes ses sessions.
+
+- **Touches** : **Ctrl** (**⌘** sur un Mac) avec **+** ou **=** agrandit, avec **−** réduit, et avec **0** revient à 100 %. Dans l’app de bureau, ce sont aussi **View → Zoom In**, **Zoom Out** et **Actual Size** ; en dehors d’une session, elles zooment sur toute la fenêtre. Quand la conversation est déjà à 100 %, **0** réinitialise le zoom propre au navigateur ou à la fenêtre.
+- **Souris et pavé tactile** : maintenez **Ctrl** et faites défiler, ou pincez sur le pavé tactile. Dans Safari, le pincement fonctionne aussi.
+- **L’en-tête** : tant que le niveau n’est pas à 100 %, **− 125% +** apparaît à côté de **Détails** ; cliquez sur le pourcentage pour revenir à 100 %.
+- **Le menu** : le menu ⋯ de la session a toujours une ligne **Zoom**, sur un téléphone aussi.
+
+Ce que vous lisiez en haut de l’écran y reste quand le niveau change. Un terminal ou un éditeur de code garde ces touches pour lui.
+
+Le zoom n’est pas la même chose que [Paramètres → App → Général → Apparence → Taille du texte](/settings?s=general&find=Text%20size). **Taille du texte** agrandit le texte à lire dans toute l’app (les messages, les pages d’Aide et la zone où vous tapez) et laisse les cartes et les images telles quelles ; le zoom agrandit l’ensemble de la conversation d’une session, et rien en dehors.
+
+**Tableaux, code et diagrammes en plein écran** : un tableau a un petit bouton dans son coin supérieur droit, un bloc de code en a un à côté de **Copier**, et un diagramme a **Plein écran** dans sa barre. Chacun s’ouvre par-dessus la page, où :
+
+- **− 100% +** en haut zoome sur ce qui est affiché, et un clic sur le pourcentage revient à 100 % ;
+- **Ctrl** ou **⌘** avec **+**, **−** et **0** font de même, et **Ctrl** avec le défilement, ou un pincement, zooment autour du pointeur ;
+- une fois le zoom appliqué, faites glisser avec la souris pour vous déplacer (le défilement fonctionne aussi) ;
+- **Esc**, **Fermer** ou un clic à côté vous ramène.
+
+Les images s’ouvrent déjà en grand quand vous cliquez dessus.
 
 ### Ouvrir une étape pour voir sa sortie
 
@@ -484,6 +507,7 @@ Le nombre de sous-agents Hydor qu’une session exécute en même temps se règl
 Le bouton ⋯ en haut à droite d’une session ouvre son menu. Certains éléments ne s’affichent que s’ils s’appliquent ; le menu d’une [session confidentielle](#keep-a-session-confidential) n’a ni **Partager un lien en lecture seule**, ni **Ouvrir une pull request**, ni **Ouvrir un navigateur**, ni **Comptes connectés**, ni **En faire une automatisation**, ni **Enregistrer comme app**, et sa mémoire reste désactivée.
 
 - **Renommer** : modifier le titre directement.
+- **Zoom** : **−**, le niveau et **+**, pour [la conversation](#zoom-in-and-full-screen) sur cet appareil ; cliquez sur le niveau pour revenir à 100 %.
 - **Épingler en haut** / **Désépingler**.
 - **Reporter** (un sous-menu d’horaires), ou **Annuler le report (de retour à …)** tant qu’elle est reportée.
 - **Clore : terminé pour le moment** : arrête l’agent et marque la session comme lue (pas pendant un tour en cours).
@@ -522,6 +546,8 @@ Le bouton ⋯ en haut à droite d’une session ouvre son menu. Certains éléme
 - « Démarre une session Claude Code dans ~/code/blog dans un nouveau worktree qui ajoute un flux RSS, avec un plafond de dépenses de 5 $. »
 - « Quelles sessions se sont terminées depuis ce matin ? Règle celles qui sont terminées et archive celles de la semaine dernière. »
 - « Pourquoi cette session indique-t-elle Échec, et que dois-je envoyer pour réessayer ? »
+- « Zoome la conversation à 125 % sur cet appareil. »
+- « Le texte de mes sessions est petit sur mon ordinateur portable : agrandis la conversation. »
 - « Combien a coûté le dernier tour de cette session, et quelle part vient du cache ? »
 - « Mets en pause la session sur les formulaires d’impôts jusqu’à lundi 9 h. »
 - « Place sur mon tableau de bord Boutique le graphique des ventes et les chiffres clés que tu viens de me montrer. »

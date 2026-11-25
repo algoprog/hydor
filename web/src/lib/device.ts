@@ -1,7 +1,8 @@
-// The settings this browser keeps (theme, language, the chime, what Enter does, the sidebar, voice), told to the server
+// The settings this browser keeps (theme, language, the chime, what Enter does, the sidebar, the conversation's zoom, voice), told to the server
 // of the machine this page shows when the page connects and whenever one changes: agents read them (app_api's GET
 // /device, GET /api/settings) as they change them (features/guide applies a change). shared/device.ts says what each is.
 import type { DeviceNotices, DeviceReport, DeviceSettings } from '@shared/device';
+import { validZoom } from '@shared/zoom';
 import { speechLang, useVoicePrefs } from '../features/voice/prefs';
 import { currentLang } from '../i18n';
 import { desktopSystem, inDesktopApp, notifyPrefs, pushState } from './notify';
@@ -49,6 +50,7 @@ async function report(): Promise<DeviceReport> {
     lightTheme: findTheme(ui.lightTheme)?.name ?? ui.lightTheme,
     motion: ui.motion,
     textSize: ui.textSize,
+    zoom: Math.round(validZoom(ui.convZoom) * 100),
     language: currentLang(),
     sound: notifyPrefs().sound,
     enter,
@@ -78,7 +80,7 @@ export function deviceChanged() {
   }, 400);
 }
 
-const WATCHED = ['theme', 'darkTheme', 'lightTheme', 'motion', 'textSize', 'termSuggest', 'wordSuggestions', 'sideOpen', 'groupByFolder'] as const;
+const WATCHED = ['theme', 'darkTheme', 'lightTheme', 'motion', 'textSize', 'convZoom', 'termSuggest', 'wordSuggestions', 'sideOpen', 'groupByFolder'] as const;
 
 /** Starts telling: now, and whenever one of these settings changes. */
 export function startDeviceReports() {

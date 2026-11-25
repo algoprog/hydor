@@ -57,6 +57,7 @@ function DrawPad({ kind, color, setColor, onChange, take }: { kind: SignatureKin
     for (const s of strokes.current) drawStroke(ctx, s, k);
   };
 
+  const refit = useRef(() => {});
   // The canvas as large as its box, sharp on any screen; what is drawn stays where it was across the pad.
   useLayoutEffect(() => {
     const el = host.current;
@@ -71,6 +72,7 @@ function DrawPad({ kind, color, setColor, onChange, take }: { kind: SignatureKin
       redraw();
     };
     fit();
+    refit.current = fit;
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
@@ -126,6 +128,8 @@ function DrawPad({ kind, color, setColor, onChange, take }: { kind: SignatureKin
     if (live.current || (e.pointerType === 'mouse' && e.button !== 0)) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
+    // The conversation's zoom changes how large it is on screen without changing its box, which the observer watches.
+    if (Math.abs(e.currentTarget.getBoundingClientRect().width - size.current.w) > 0.5) refit.current();
     const stroke: Stroke = { color, pts: [] };
     // The line's width in screen pixels: a little fuller on a tall pad.
     live.current = { id: e.pointerId, stroke, nib: new Nib(Math.min(3.6, Math.max(2.4, size.current.h / 62))), last: at(e) };

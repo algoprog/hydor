@@ -19,7 +19,7 @@ export interface CatalogItem {
   where?: string;
   /** What opening it does: a page, an action, a Settings section (and the words to point at there), a theme. */
   path?: string;
-  act?: 'tour' | 'features' | 'ask' | 'theme' | 'sidebar' | 'groups' | 'panel' | 'releases' | 'handsfree';
+  act?: 'tour' | 'features' | 'ask' | 'theme' | 'sidebar' | 'groups' | 'panel' | 'releases' | 'handsfree' | 'zoom-in' | 'zoom-out' | 'zoom-reset';
   section?: string;
   find?: string;
   theme?: string;
@@ -432,6 +432,9 @@ const ACTIONS: [CatalogItem['act'] & string, string, string, string][] = [
   ['sidebar', 'Show or hide the sidebar', 'sidebar toggle hide show', 'Ctrl+B'],
   ['groups', 'Group sessions by folder or project', 'sidebar session list group by folder project space organize sort by date day', 'In the sidebar: a group for each project and each folder you work in, or every session by day'],
   ['panel', 'Show or hide the terminal panel', 'terminal panel toggle bottom', 'Ctrl+`'],
+  ['zoom-in', 'Zoom in on the conversation', 'zoom in bigger larger magnify enlarge session messages text code pictures pinch', 'Shows a session’s conversation larger on this device'],
+  ['zoom-out', 'Zoom out of the conversation', 'zoom out smaller shrink session messages text fit more', 'Shows a session’s conversation smaller on this device'],
+  ['zoom-reset', 'Reset the conversation zoom', 'zoom reset actual size normal 100 percent session messages', 'The conversation back to 100% on this device'],
 ];
 
 /** Everything above, as items: pages, actions, sections, options, themes. */

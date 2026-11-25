@@ -1,6 +1,6 @@
 // A session's menu (the … in its header). What you do most is on its main list; the rest is in submenus that open
 // in its place: Export, Folder and code, Session settings and More. Features add their items through the registry,
-// each saying which part they go in.
+// each saying which part they go in. The conversation's Zoom has a row of its own (ZoomControls.tsx).
 import { useState, type ReactNode, type RefObject } from 'react';
 import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FileDown, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
@@ -24,6 +24,7 @@ import { canSetGoal } from '../goal/can';
 import { SetGoal } from '../goal/SetGoal';
 import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
+import { ZoomRow } from './ZoomControls';
 
 type Submenu = 'snooze' | 'export' | 'code' | 'settings' | 'more';
 type Shown = 'worktree' | 'goal' | 'share';
@@ -246,6 +247,8 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
         <MenuItem icon={<CircleEllipsis size={15} />} submenu onClick={() => enter('more')}>
           More
         </MenuItem>
+        <MenuSep />
+        <ZoomRow />
         <MenuSep />
         <MenuItem icon={<Archive size={15} />} onClick={() => (close(), setFlags(s, { archived: !s.archived }))}>
           {s.archived ? 'Unarchive' : 'Archive'}

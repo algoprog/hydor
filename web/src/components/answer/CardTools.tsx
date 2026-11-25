@@ -14,6 +14,7 @@ import { PageOverlay } from '../../features/pages/overlay';
 import { BarButton } from '../Markdown';
 import { MenuItem, MenuSep, Popover } from '../ui';
 import { PinPane, type PinCard } from './PinToBoard';
+import { zoomOf } from '../../lib/convZoom';
 
 /** Whether a card can be drawn as a picture: nothing in it is a frame (a map, a figure, a player), whose content the page cannot read. */
 export const picturable = (el: HTMLElement | null) => !!el && !el.querySelector('iframe,embed,object');
@@ -44,8 +45,10 @@ const MAX_PIXELS = 16_000_000;
 export async function cardPicture(el: HTMLElement): Promise<Blob> {
   const { domToBlob } = await import('modern-screenshot');
   const r = el.getBoundingClientRect();
-  const width = Math.ceil(r.width) + 2 * PAD;
-  const height = Math.ceil(r.height) + 2 * PAD;
+  // At its own size: the conversation's zoom is not part of the picture.
+  const k = zoomOf(el);
+  const width = Math.ceil(r.width / k) + 2 * PAD;
+  const height = Math.ceil(r.height / k) + 2 * PAD;
   const scale = Math.max(1, Math.min(2, Math.sqrt(MAX_PIXELS / (width * height))));
   const blob = await domToBlob(el, {
     scale,

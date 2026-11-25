@@ -25855,5 +25855,15 @@
   "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "入力内容から、このコンピューター上で小型モデルを学習させ、自分の言葉を候補に出せるようにします。毎回アプリに付属のモデルから始めて、書いた内容すべて（新しい部分を優先）から学習するので、ずれていくことはありません。外部には送信されません",
   "{0}'s plan does not include {1}, so this session now runs on {2}, which has usage left.{3}": "{0}のプランには{1}が含まれていないため、このセッションは使用量に余裕のある{2}で実行されます。{3}",
   "{0}'s plan does not include {1}, so this session now runs on {2}. Continue where you left off.{3}": "{0}のプランには{1}が含まれていないため、このセッションは{2}で実行されます。中断したところから続けてください。{3}",
-  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1}のプランには{2}が含まれていないため、{3}で続行します"
+  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1}のプランには{2}が含まれていないため、{3}で続行します",
+  "Reset the conversation zoom": "会話のズームをリセット",
+  "Shows a session’s conversation larger on this device": "このデバイスでセッションの会話を大きく表示します",
+  "Shows a session’s conversation smaller on this device": "このデバイスでセッションの会話を小さく表示します",
+  "The conversation back to 100% on this device": "このデバイスで会話を100%に戻します",
+  "Zoom in on the conversation": "会話を拡大",
+  "Zoom out of the conversation": "会話を縮小",
+  "theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), zoom (the conversation's zoom in percent, 67 to 200; 100 is normal), language ({0}), sound, terminalSuggestions, wordSuggestions, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as \"de-DE\", or \"\" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or \"\" for the browser's pick), readingSpeed (0.5 to 2)": "theme（dark、light、system）、themeName（テーマの名前。テーマのベースに応じてダークモードかライトモードで表示されます）、motion（full、calm、off）、textSize（default、large、larger）、zoom（会話の拡大率（パーセント）、67～200。100が標準）、language（{0}）、sound、terminalSuggestions、wordSuggestions、sidebar、groupSessions（trueまたはfalse）、enter（join、queue）、voiceLanguage（音声入力で話す言語。\"de-DE\"などのタグ、またはブラウザの言語を使う場合は\"\"）、dictation（browser、server）、readingVoice（GET /deviceで取得する音声の名前、またはブラウザに任せる場合は\"\"）、readingSpeed（0.5～2）",
+  "zoom in bigger larger magnify enlarge session messages text code pictures pinch": "ズームイン 拡大 大きく 大きくする セッション メッセージ 文字 テキスト コード 画像 ピンチ zoom",
+  "zoom out smaller shrink session messages text fit more": "ズームアウト 縮小 小さく 小さくする セッション メッセージ 文字 テキスト もっと表示 zoom",
+  "zoom reset actual size normal 100 percent session messages": "ズーム リセット 実際のサイズ 標準 等倍 100パーセント セッション メッセージ zoom"
 }

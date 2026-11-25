@@ -7,6 +7,7 @@ import { cx } from '../../ui';
 import { useWidth } from '../charts';
 import { dotsAndCorners, placeLabels, quadrantOf, wrapName } from '../quadrant-layout';
 import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, NameLink, num, Pic, Ring, Section, Seg, SentNote, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Composed, type Data, type Tone } from '../kit';
+import { localPoint } from '../../../lib/convZoom';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -1714,8 +1715,8 @@ function Venn({ data, done }: { data: Data; done: boolean }) {
   const focus = hover ?? (done ? pin : null);
   const lit = hover ?? listHover ?? (done ? pin : null);
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const b = e.currentTarget.getBoundingClientRect();
-    const m = maskAt(circles, e.clientX - b.left, e.clientY - b.top);
+    const at = localPoint(e, e.currentTarget);
+    const m = maskAt(circles, at.x, at.y);
     setHover(m || null);
   };
   const nameSpots = circles.map((c, i) => (n === 3 && i === 2 ? { x: c.x, y: c.y + c.r + 18 } : { x: n === 1 ? c.x : c.x + (i === 0 ? -0.32 : 0.32) * c.r, y: top - 9 }));
@@ -1729,8 +1730,8 @@ function Venn({ data, done }: { data: Data; done: boolean }) {
           {width > 0 && n > 0 && (
             <svg width={W} height={h} className="mx-auto block touch-manipulation overflow-visible" role="img" aria-label={sets.map((s) => s.name).join(', ')} onPointerMove={onMove} onPointerLeave={() => setHover(null)} onClick={(e) => {
               if (!done) return;
-              const b = e.currentTarget.getBoundingClientRect();
-              const m = maskAt(circles, e.clientX - b.left, e.clientY - b.top);
+              const at = localPoint(e, e.currentTarget);
+              const m = maskAt(circles, at.x, at.y);
               setPin((p) => (!m || p === m ? null : m));
             }}>
               <defs>

@@ -1,8 +1,9 @@
-// Settings kept on each device, in its browser: the look, the language, the chime, what Enter does, the sidebar, and
-// voice. Every open page tells the server its own (web/src/lib/device.ts) when it opens and whenever one changes, so
+// Settings kept on each device, in its browser: the look, the language, the chime, what Enter does, the sidebar, the
+// conversation's zoom, and voice. Every open page tells the server its own (web/src/lib/device.ts) when it opens and whenever one changes, so
 // an agent reads them (app_api's GET /device, and GET /api/settings) as it changes them (PUT /device: the pages showing
 // its session switch at once). One set per browser, so each page reports the browser it runs in.
 import { isLang, LANGS, type Lang } from './i18n.ts';
+import { CONV_ZOOMS } from './zoom.ts';
 
 export interface DeviceSettings {
   theme: 'dark' | 'light' | 'system';
@@ -11,6 +12,8 @@ export interface DeviceSettings {
   lightTheme: string;
   motion: 'full' | 'calm' | 'off';
   textSize: 'default' | 'large' | 'larger';
+  /** The conversation's zoom in percent, 67 to 200 (Ctrl or ⌘ with + − 0 in a session; shared/zoom.ts). */
+  zoom: number;
   language: Lang;
   /** A chime with each notice while the app is open. */
   sound: boolean;
@@ -56,6 +59,7 @@ const oneOf =
 const yesNo = (v: unknown) => (typeof v === 'boolean' ? v : undefined);
 const name = (max: number) => (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, max) : undefined);
 const speechTag = (v: unknown) => (typeof v === 'string' && (v === '' || /^[a-z]{2,3}(-[a-z0-9]{2,8}){0,3}$/i.test(v)) ? v : undefined);
+const percent = (v: unknown) => (typeof v === 'number' && v >= CONV_ZOOMS[0] * 100 && v <= CONV_ZOOMS[CONV_ZOOMS.length - 1] * 100 ? Math.round(v) : undefined);
 const speed = (v: unknown) => (typeof v === 'number' && v >= 0.5 && v <= 2 ? Math.round(v * 10) / 10 : undefined);
 
 /** Each setting's values, as a page reports it and as an agent sets it. */
@@ -65,6 +69,7 @@ const SETTING: { [K in keyof DeviceSettings]: (v: unknown) => DeviceSettings[K] 
   lightTheme: name(60),
   motion: oneOf('full', 'calm', 'off'),
   textSize: oneOf('default', 'large', 'larger'),
+  zoom: percent,
   language: (v) => (isLang(v) ? v : undefined),
   sound: yesNo,
   enter: oneOf('join', 'queue'),
@@ -82,7 +87,7 @@ const SETTING: { [K in keyof DeviceSettings]: (v: unknown) => DeviceSettings[K] 
 export const DEVICE_KEYS = [...Object.keys(SETTING).filter((k) => k !== 'darkTheme' && k !== 'lightTheme'), 'themeName'];
 
 /** The values each takes, in words: for the agent told it got one wrong, and for the guide. */
-export const DEVICE_VALUES = `theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), language (${LANGS.map((l) => l.id).join(', ')}), sound, terminalSuggestions, wordSuggestions, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as "de-DE", or "" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or "" for the browser's pick), readingSpeed (0.5 to 2)`;
+export const DEVICE_VALUES = `theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), zoom (the conversation's zoom in percent, 67 to 200; 100 is normal), language (${LANGS.map((l) => l.id).join(', ')}), sound, terminalSuggestions, wordSuggestions, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as "de-DE", or "" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or "" for the browser's pick), readingSpeed (0.5 to 2)`;
 
 /** An agent's change, checked: the settings to send, and the names it got wrong. */
 export function deviceChange(body: Record<string, unknown>): { set: Record<string, unknown>; bad: string[] } {

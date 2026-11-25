@@ -1717,6 +1717,17 @@ programs shows each program's version and what is out, with Check now, Update no
   place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
   sites never see your browser) or from this computer, opened large on a click. The user's guidelines can ask for
   plain text instead.
+- Zoom in a conversation, apart from the rest of the app: Ctrl or ⌘ with + − 0 (the number pad too), Ctrl and the
+  wheel or a trackpad pinch (Safari's pinch too), the − 125% + pill in the session's header (shown while it is not
+  100%; the percentage resets) and a Zoom row in the session's ⋯ menu, in steps of 67, 80, 90, 100, 110, 125, 150, 175
+  and 200%, kept per device. Text, code, cards and pictures all grow and the column reflows, what is at the top of the
+  screen staying there, while the sidebar, header and message box stay as they are; terminals and code editors keep
+  their own keys; Ctrl+0 with the conversation already at 100% is left to the browser or the window. In the desktop apps these are View → Zoom In, Zoom Out and Actual Size, which zoom the window on
+  other pages. Agents read and set it (`zoom` in `GET`/`PUT /device`), and the search box (Ctrl+K) has Zoom in on the
+  conversation, Zoom out of it and Reset the conversation zoom.
+- Tables, code blocks and Mermaid diagrams open full screen (a small button at a table's corner, beside Copy on code,
+  in a diagram's bar), where − 100% +, Ctrl or ⌘ with + − 0, Ctrl and the wheel or a pinch (about the pointer) zoom
+  them, a drag moves about once zoomed and scrolling works too.
 - Answer UIs: when part of an answer is something to look at, compare, choose from, follow, try or practise, the agent
   shows it in one of more than 140 ready-made UIs drawn in the app's look as the reply streams, by writing a
   ```` ```ui <name> ```` block of JSON. Agents are told to use one for every such part, which is most of an answer of more

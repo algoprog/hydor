@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, Boxes, Compass, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, Clock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, Bookmark, Boxes, Compass, FileDown, MonitorCog, BookOpen, Bot, Cable, CalendarClock, Clock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, LayoutGrid, Library, MonitorSmartphone, Moon, Palette, PanelLeft, Pin, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp, User, ZoomIn, ZoomOut } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -16,7 +16,8 @@ import type { SkillLibrary } from '@shared/skillpack';
 import type { PluginList } from '@shared/plugins';
 import { isGroup, type SpaceView } from '@shared/spaces';
 import { api } from '../../lib/api';
-import { bytes, timeAgo } from '../../lib/format';
+import { zoomConversation } from '../../lib/convZoom';
+import { bytes, MOD, timeAgo } from '../../lib/format';
 import { go, goApp } from '../../lib/nav';
 import { useUI } from '../../lib/store';
 import { allThemes, pickTheme, switchTheme } from '../../lib/theme';
@@ -126,6 +127,9 @@ const ACTS: Record<NonNullable<CatalogItem['act']>, { icon: ReactNode; run: () =
   sidebar: { icon: <PanelLeft size={15} />, run: () => useUI.getState().set({ sideOpen: !useUI.getState().sideOpen }), hint: 'Ctrl+B' },
   groups: { icon: <Folders size={15} />, run: () => useUI.getState().set({ groupByFolder: !useUI.getState().groupByFolder }) },
   panel: { icon: <SquareTerminal size={15} />, run: () => useUI.getState().set({ panelOpen: !useUI.getState().panelOpen }), hint: 'Ctrl+`' },
+  'zoom-in': { icon: <ZoomIn size={15} />, run: () => zoomConversation('in', true), hint: `${MOD}+` },
+  'zoom-out': { icon: <ZoomOut size={15} />, run: () => zoomConversation('out', true), hint: `${MOD}−` },
+  'zoom-reset': { icon: <ZoomIn size={15} />, run: () => zoomConversation('reset', true), hint: `${MOD}0` },
 };
 
 /** What ships with the app (shared/find-catalog.ts), with icons and where each goes; and your own themes. */

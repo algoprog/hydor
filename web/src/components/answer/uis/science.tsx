@@ -7,6 +7,7 @@ import { cx } from '../../ui';
 import { arr, Card, Chip, Copy, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, isObj, Md, num, obj, Section, seriesColor, str, textOf, useKept, yes, type AnswerUiView, type Data } from '../kit';
 import { niceTicks } from '../charts';
 import { calcFormula, HoverTip, niceStep, NumBox, parseFormula, SliderRow, useBoxWidth } from './data';
+import { localPoint } from '../../../lib/convZoom';
 
 // ---- the night sky ----------------------------------------------------------------------------------------------------
 
@@ -904,8 +905,7 @@ function Graph({ data, done }: { data: Data; done: boolean }) {
               height={plotH}
               fill="transparent"
               onPointerMove={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                setHover(axisW + Math.max(0, Math.min(plotW, e.clientX - r.left)));
+                setHover(axisW + Math.max(0, Math.min(plotW, localPoint(e, e.currentTarget).x)));
               }}
               onPointerLeave={() => setHover(null)}
             />

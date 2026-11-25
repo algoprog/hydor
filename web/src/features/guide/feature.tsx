@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { DeviceSettings } from '@shared/device';
+import { validZoom } from '@shared/zoom';
 import { isLang } from '@shared/i18n';
 import type { ToolInfo, ToolItem } from '@shared/types';
 import { cx } from '../../components/ui';
@@ -76,6 +77,7 @@ onFeatureEvent('guide', (e) => {
   if (d.theme || d.themeName) applyTheme();
   if (d.motion) ui.set({ motion: d.motion });
   if (d.textSize) ui.set({ textSize: d.textSize });
+  if (d.zoom !== undefined) ui.set({ convZoom: validZoom(d.zoom / 100) });
   if (d.sound !== undefined) setNotifyPrefs({ sound: d.sound });
   if (d.enter) {
     try {

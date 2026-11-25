@@ -49,6 +49,7 @@ import {
   type Data,
   type Tone,
 } from '../kit';
+import { localPoint, zoomOf } from '../../../lib/convZoom';
 
 /** A chart's source line: "Source: NOAA" with its link. */
 export function SourceLine({ source }: { source: unknown }) {
@@ -1519,8 +1520,7 @@ function Sankey({ data }: { data: Data }) {
   const xOf = (layer: number) => (cols.length > 1 ? (layer * (width - nodeW)) / (cols.length - 1) : (width - nodeW) / 2);
   const v = (n: number) => numText(n, unit, prefix);
   const at = (e: React.PointerEvent) => {
-    const r = ref.current?.getBoundingClientRect();
-    return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
+    return localPoint(e, ref.current);
   };
   const lit = (k: SkLink) => !hover || hover.link === k || hover.node === k.from || hover.node === k.to;
   return (
@@ -2508,8 +2508,7 @@ function Treemap({ data, done }: { data: Data; done: boolean }) {
     setHover(null);
   };
   const point = (e: React.PointerEvent) => {
-    const r = ref.current?.getBoundingClientRect();
-    return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
+    return localPoint(e, ref.current);
   };
   const keyed = (name: string) => (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -2799,12 +2798,14 @@ function Activity({ data }: { data: Data }) {
   }
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const col = Math.floor((e.clientX - r.left - labelW) / pitch);
-    const row = Math.floor((e.clientY - r.top - topH) / pitch);
+    const at = localPoint(e, e.currentTarget);
+    const col = Math.floor((at.x - labelW) / pitch);
+    const row = Math.floor((at.y - topH) / pitch);
     const i = col * 7 + row;
     if (col < 0 || row < 0 || row > 6 || col >= weeks || i < lead || i >= nDays) return setHover(null);
     const b = box.current?.getBoundingClientRect();
-    setHover({ i, x: r.left - (b?.left ?? 0) + labelW + col * pitch + cell / 2, y: r.top - (b?.top ?? 0) + topH + row * pitch });
+    const k = zoomOf(box.current);
+    setHover({ i, x: (r.left - (b?.left ?? 0)) / k + labelW + col * pitch + cell / 2, y: (r.top - (b?.top ?? 0)) / k + topH + row * pitch });
   };
   const hd = hover ? dayAfter(gridStart, hover.i) : null;
   const hv = hd ? valueAt(hd) : 0;

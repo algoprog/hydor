@@ -479,6 +479,8 @@ interface UIState {
   motion: Motion;
   /** How big messages, Help pages and the message box are on this device (lib/textSize.ts). */
   textSize: TextSize;
+  /** The conversation's zoom on this device, 1 being 100 % (shared/zoom.ts, lib/convZoom.ts). */
+  convZoom: number;
   /** The theme shown in each mode (lib/theme.ts). */
   darkTheme: string;
   lightTheme: string;
@@ -548,6 +550,7 @@ export const useUI = create<UIState>((set, get) => ({
   theme: 'dark',
   motion: 'full',
   textSize: 'default',
+  convZoom: 1,
   darkTheme: 'naget-dark',
   lightTheme: 'naget-light',
   termSuggest: true,

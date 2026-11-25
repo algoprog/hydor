@@ -23,6 +23,7 @@ import { go } from '../../lib/nav';
 import { tr } from '../../i18n/runtime';
 import { cx, Throbber } from '../../components/ui';
 import { openVideo } from '../../components/Lightbox';
+import { ConvZoomCtx } from '../../lib/convZoom';
 
 // ---- how tall a page stands in the conversation ---------------------------------------------------------
 
@@ -63,8 +64,8 @@ const previewMax = (() => {
   };
 })();
 
-/** The most a page shows of itself in the conversation, in pixels (previewMax). */
-export const usePreviewMax = () => useSyncExternalStore(previewMax.subscribe, previewMax.get);
+/** The most a page shows of itself in the conversation, in pixels (previewMax): of the screen, so less of them where the conversation is zoomed in. */
+export const usePreviewMax = () => Math.round(useSyncExternalStore(previewMax.subscribe, previewMax.get) / useContext(ConvZoomCtx));
 
 /** A template's screen: what the frame tells it of its template. */
 export interface AppBridge {

@@ -159,6 +159,7 @@ En la parte superior de una sesión:
 - la carpeta (haz clic en ella para explorarla en Archivos), una insignia de pull request, la cuenta cuando se ejecuta con una cuenta añadida y, en pantallas más anchas, la rama de git y el modelo;
 - un botón para lo que puedes hacer ahora: **Detener** mientras se ejecuta un turno, **Reanudar** cuando el agente no se está ejecutando (después de **Detenidas** o **Fallido**; más discreto después de **Hecho**, ya que un mensaje en el cuadro continúa la sesión de todos modos), o **Continuar aquí** para una sesión de Claude Code abierta en VS Code o en una terminal;
 - **Detalles** (que muestra las líneas añadidas y eliminadas cuando hay archivos modificados), que abre [el panel de detalles](#the-details-panel-changes-commands-and-info);
+- mientras la conversación está [ampliada](#zoom-in-and-full-screen), **− 125% +** con el nivel en el que está;
 - el menú de la sesión (⋯): consulta [Todo lo que hay en el menú de la sesión](#everything-in-the-sessions-menu).
 
 ### Turnos, pasos y respuestas
@@ -226,6 +227,28 @@ Cuando una parte de una respuesta es algo para mirar, comparar, elegir, seguir, 
 - **Verlas todas**: [UI de respuesta](/answers) muestra cada una con un ejemplo, por grupos: resúmenes, comparaciones, compras, lugares y viajes, comida, planes, trabajo y negocios, números y gráficos, dinero, aprendizaje, ciencia, medios, personas y deportes, escritura, y código. **Reproducir mientras llega** muestra una llegando como lo haría en una respuesta.
 
 También puedes pedir una con palabras sencillas: “compáralos en una tabla”, “ponlos en un mapa”, “hazme un cuestionario sobre eso”, “dame problemas de práctica sobre esto”, “marca en mi ensayo lo que hay que corregir”. Tus [Pautas de los agentes](/guide/guidelines) (“Responde en texto sin formato, sin tarjetas ni gráficos”) o tu mensaje pueden pedir texto sin formato.
+
+### Zoom y pantalla completa
+
+Una conversación se puede mostrar más grande o más pequeña por sí sola, mientras la barra lateral, el encabezado y el cuadro de mensaje se quedan como están. Todo lo que contiene crece o se reduce (texto, código, tarjetas e imágenes) y las líneas se vuelven a ajustar para caber. Los niveles son 67, 80, 90, 100, 110, 125, 150, 175 y 200%; cada dispositivo guarda el suyo, para todas sus sesiones.
+
+- **Teclas**: **Ctrl** (**⌘** en una Mac) con **+** o **=** acerca, con **−** aleja y con **0** vuelve al 100%. En la app de escritorio también están en **View → Zoom In**, **Zoom Out** y **Actual Size**; fuera de una sesión, aplican el zoom a toda la ventana. Con la conversación ya en 100%, **0** restablece el zoom propio del navegador o de la ventana.
+- **Mouse y panel táctil**: mantén **Ctrl** y desplázate, o pellizca en el panel táctil. En Safari, el pellizco también funciona.
+- **El encabezado**: mientras el nivel no sea 100%, aparece **− 125% +** junto a **Detalles**; haz clic en el porcentaje para volver al 100%.
+- **El menú**: el menú ⋯ de la sesión siempre tiene una fila **Zoom**, también en el teléfono.
+
+Lo que estabas leyendo en la parte de arriba de la pantalla se queda ahí cuando cambia el nivel. Una terminal o un editor de código se reservan estas teclas.
+
+El zoom no es lo mismo que [Configuración → App → General → Apariencia → Tamaño del texto](/settings?s=general&find=Text%20size). **Tamaño del texto** agranda el texto de lectura en toda la app (los mensajes, las páginas de Ayuda y el cuadro donde escribes) y deja las tarjetas y las imágenes como están; el zoom amplía toda la conversación de una sesión, y nada fuera de ella.
+
+**Tablas, código y diagramas a pantalla completa**: una tabla tiene un pequeño botón en su esquina superior derecha, un bloque de código tiene uno junto a **Copiar** y un diagrama tiene **Pantalla completa** en su barra. Cada uno se abre sobre la página, donde:
+
+- **− 100% +** arriba aplica el zoom a lo que se muestra, y hacer clic en el porcentaje vuelve al 100%;
+- **Ctrl** o **⌘** con **+**, **−** y **0** hacen lo mismo, y **Ctrl** con desplazamiento, o un pellizco, hacen zoom alrededor del puntero;
+- una vez ampliado, arrastra con el mouse para moverte (desplazarte también funciona);
+- **Esc**, **Cerrar** o un clic fuera de él te devuelven.
+
+Las imágenes ya se abren en grande cuando haces clic en ellas.
 
 ### Abrir un paso para ver su salida
 
@@ -484,6 +507,7 @@ Cuántos subagentes de Hydor ejecuta una sesión a la vez se define en [Configur
 El botón ⋯ de la parte superior derecha de una sesión abre su menú. Algunos elementos solo aparecen cuando corresponden; el de una [sesión confidencial](#keep-a-session-confidential) no tiene **Compartir un enlace de solo lectura**, **Abrir un pull request**, **Abrir un navegador**, **Cuentas conectadas**, **Convertir esto en una automatización** ni **Guardar como app**, y su memoria permanece desactivada.
 
 - **Cambiar nombre**: edita el título directamente.
+- **Zoom**: **−**, el nivel y **+**, para [la conversación](#zoom-in-and-full-screen) en este dispositivo; haz clic en el nivel para volver al 100%.
 - **Fijar arriba** / **Dejar de fijar**.
 - **Posponer** (un submenú de horas), o **Dejar de posponer (de vuelta a las …)** mientras está pospuesta.
 - **Dar por terminada: lista por ahora**: detiene el agente y marca la sesión como leída (no mientras se ejecuta un turno).
@@ -522,6 +546,8 @@ El botón ⋯ de la parte superior derecha de una sesión abre su menú. Algunos
 - “Empieza una sesión de Claude Code en ~/code/blog en un nuevo worktree que añada un feed RSS, con un límite de gasto de 5 $.”
 - “¿Qué sesiones terminaron desde esta mañana? Cierra las que ya están hechas y archiva las de la semana pasada.”
 - “¿Por qué esta sesión dice Fallida y qué debo enviar para intentarlo de nuevo?”
+- “Pon el zoom de la conversación al 125% en este dispositivo.”
+- “El texto de mis sesiones se ve pequeño en mi laptop: haz más grande la conversación.”
 - “¿Cuánto costó el último turno de esta sesión y cuánto de eso fue la caché?”
 - “Pospón la sesión de los formularios de impuestos hasta el lunes a las 9.”
 - “Pon el gráfico de ventas y las cifras clave que acabas de mostrarme en mi tablero Shop.”

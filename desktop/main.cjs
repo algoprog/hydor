@@ -43,7 +43,7 @@
 // says so ({ type: 'awake', on }, Settings → General → Keep the computer awake) and the app keeps the computer from
 // going to sleep by itself (awake.cjs); it lets go when the server says, when the server exits, and when it quits.
 'use strict';
-const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerSaveBlocker, session, shell, systemPreferences } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerSaveBlocker, session, shell, systemPreferences, webContents } = require('electron');
 const glow = require('./glow.cjs');
 const { createNotices } = require('./notices.cjs');
 const { badgeBitmap } = require('./badge.cjs');
@@ -1278,6 +1278,42 @@ function rebuildTray() {
   );
 }
 
+/**
+ * View → Actual Size, Zoom In and Zoom Out, for what has the keys. In the app's window the page zooms the conversation
+ * of the session it shows (or a table, code or a diagram full screen) and says so (window.__hydorZoom, true); on its
+ * other pages the window zooms. Anything else with the keys (a browser tab you clicked into, the developer tools) zooms
+ * itself, as with Electron's own zoom items. Keys typed in a page are the page's first: the menu hears only those the
+ * page did not take (the app's page takes them in a session, and a browser tab zooms its page itself, browser.cjs).
+ */
+async function zoomView(op) {
+  const own = win && !win.isDestroyed() ? win.webContents : null;
+  const wc = webContents.getFocusedWebContents() || own;
+  if (!wc || wc.isDestroyed()) return;
+  if (wc === own) {
+    try {
+      if ((await wc.executeJavaScript(`window.__hydorZoom?.('${op}')`)) === true) return;
+    } catch {}
+  }
+  if (!wc.isDestroyed()) wc.setZoomLevel(op === 'reset' ? 0 : wc.getZoomLevel() + (op === 'in' ? 0.5 : -0.5));
+}
+
+/**
+ * The View menu's zoom items. Zoom In is on Ctrl or ⌘ with = (the key with + on it, no Shift needed: Electron's own item
+ * wants Shift); items that do not show take it with Shift too, and the number pad's keys.
+ */
+function zoomItems() {
+  const item = (label, accelerator, op, hidden) => ({ label, accelerator, click: () => void zoomView(op), ...(hidden ? { visible: false, acceleratorWorksWhenHidden: true } : {}) });
+  return [
+    item('Actual Size', 'CmdOrCtrl+0', 'reset'),
+    item('Zoom In', 'CmdOrCtrl+=', 'in'),
+    item('Zoom In', 'CmdOrCtrl+Plus', 'in', true),
+    item('Zoom In', 'CmdOrCtrl+numadd', 'in', true),
+    item('Zoom Out', 'CmdOrCtrl+-', 'out'),
+    item('Zoom Out', 'CmdOrCtrl+numsub', 'out', true),
+    item('Actual Size', 'CmdOrCtrl+num0', 'reset', true),
+  ];
+}
+
 function appMenu() {
   const update = updateReady ? { label: `Restart to Update to ${updateReady}`, click: updateNow } : { label: 'Check for Updates…', click: () => go('/settings?s=general&find=Check%20now') };
   const help = {
@@ -1310,7 +1346,7 @@ function appMenu() {
         { role: 'editMenu' },
         {
           label: 'View',
-          submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }],
+          submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, ...zoomItems(), { type: 'separator' }, { role: 'togglefullscreen' }],
         },
         { role: 'windowMenu' },
         help,
@@ -1338,9 +1374,7 @@ function appMenu() {
           { label: 'Reload', accelerator: 'F5', click: () => win?.webContents.reload() },
           { role: 'toggleDevTools' },
           { type: 'separator' },
-          { role: 'resetZoom' },
-          { role: 'zoomIn' },
-          { role: 'zoomOut' },
+          ...zoomItems(),
           { type: 'separator' },
           { role: 'togglefullscreen' },
         ],

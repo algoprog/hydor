@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { tr } from '../../i18n/runtime';
 import { cx } from '../ui';
 import { compact, fmtNum, seriesColor, str } from './kit';
+import { localPoint } from '../../lib/convZoom';
 
 /**
  * An element's width, again whenever it changes (a chart, a chart-like layout). The element may come later than the
@@ -288,8 +289,7 @@ export function XYChart({
   };
 
   const onMove = (e: React.PointerEvent<SVGRectElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const mx = e.clientX - r.left;
+    const mx = localPoint(e, e.currentTarget).x;
     const i = bars ? Math.floor(mx / band) : Math.round((mx / plotW) * (n - 1));
     setHover(Math.max(0, Math.min(n - 1, i)));
   };
@@ -436,9 +436,9 @@ export function ScatterChart({ series, height = 260, unit, prefix, xLabel, yLabe
   const sy = (v: number) => 10 + plotH - ((v - ys[0]) / (ys[ys.length - 1] - ys[0] || 1)) * plotH;
   const radius = (p: ScatterPoint) => (maxSize && typeof p.size === 'number' ? 4 + Math.sqrt(Math.max(0, p.size) / maxSize) * 14 : 4.5);
   const onMove = (e: React.PointerEvent<SVGRectElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const mx = e.clientX - r.left + axisW;
-    const my = e.clientY - r.top + 10;
+    const at = localPoint(e, e.currentTarget);
+    const mx = at.x + axisW;
+    const my = at.y + 10;
     let best: { s: number; i: number; d: number } | null = null;
     series.forEach((s, si) =>
       s.points.forEach((p, i) => {

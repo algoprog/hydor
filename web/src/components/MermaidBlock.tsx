@@ -8,10 +8,10 @@
 import { memo, useEffect, useState } from 'react';
 import { CodeXml, Download, Expand, Shapes } from 'lucide-react';
 import type { MermaidConfig } from 'mermaid';
-import { PageOverlay } from '../features/pages/overlay';
 import { tr } from '../i18n/runtime';
 import { BarButton as Bar, CodeBlock, CopyButton } from './Markdown';
 import { cx } from './ui';
+import { ZoomOverlay } from './ZoomPan';
 
 type Mermaid = (typeof import('mermaid'))['default'];
 let loaded: Promise<Mermaid> | null = null;
@@ -263,9 +263,9 @@ export default memo(function MermaidBlock({ code, done }: { code: string; done: 
         </>
       )}
       {full && svg && (
-        <PageOverlay title={tr('Diagram')} onClose={() => setFull(false)}>
+        <ZoomOverlay title={tr('Diagram')} onClose={() => setFull(false)} fill>
           <div className="mermaid-full" dangerouslySetInnerHTML={{ __html: svg }} />
-        </PageOverlay>
+        </ZoomOverlay>
       )}
     </div>
   );

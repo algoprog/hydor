@@ -159,6 +159,7 @@ Oben in einer Sitzung stehen:
 - der Ordner (klicke darauf, um ihn in Dateien zu durchsuchen), ein Pull-Request-Badge, das Konto, wenn die Sitzung mit einem hinzugefügten Konto läuft, und auf breiteren Bildschirmen der Git-Branch und das Modell;
 - eine Schaltfläche für das, was du gerade tun kannst: **Stoppen**, solange eine Runde läuft, **Fortsetzen**, wenn der Agent nicht läuft (nach **Angehalten** oder **Fehlgeschlagen**; dezenter nach **Fertig**, da eine Nachricht im Eingabefeld die Sitzung ohnehin fortsetzt), oder **Hier fortsetzen** für eine Claude-Code-Sitzung, die in VS Code oder einem Terminal geöffnet ist;
 - **Details** (mit den hinzugefügten und entfernten Zeilen, sobald Dateien geändert wurden), das [das Detailfenster](#the-details-panel-changes-commands-and-info) öffnet;
+- während die Unterhaltung [vergrößert oder verkleinert](#zoom-in-and-full-screen) ist, **− 125% +** mit der aktuellen Stufe;
 - das Menü der Sitzung (⋯): siehe [Alles im Menü der Sitzung](#everything-in-the-sessions-menu).
 
 ### Runden, Schritte und Antworten
@@ -226,6 +227,28 @@ Wenn ein Teil einer Antwort etwas ist, das man ansehen, vergleichen, auswählen,
 - **Alle ansehen**: [Antwort-UIs](/answers) zeigt jede mit einem Beispiel, nach Gruppen: Zusammenfassungen, Vergleiche, Einkaufen, Orte und Reisen, Essen, Pläne, Arbeit und Business, Zahlen und Diagramme, Geld, Lernen, Wissenschaft, Medien, Menschen und Sport, Schreiben und Code. **Schon während des Streamings abspielen** zeigt eine, wie sie in einer Antwort ankäme.
 
 Du kannst auch mit einfachen Worten nach einer fragen: „vergleiche sie in einer Tabelle“, „zeig sie auf einer Karte“, „frag mich dazu ab“, „gib mir Übungsaufgaben dazu“, „markiere in meinem Aufsatz, was zu verbessern ist“. Deine [Agentenrichtlinien](/guide/guidelines) („Antworte in reinem Text, ohne Karten oder Diagramme“) oder deine Nachricht können stattdessen reinen Text anfordern.
+
+### Zoom und Vollbild
+
+Eine Unterhaltung lässt sich für sich allein größer oder kleiner anzeigen, während Seitenleiste, Kopfzeile und Nachrichtenfeld bleiben, wie sie sind. Alles darin wird größer oder kleiner (Text, Code, Karten und Bilder), und die Zeilen werden neu umbrochen, damit alles passt. Die Stufen sind 67, 80, 90, 100, 110, 125, 150, 175 und 200 %; jedes Gerät merkt sich seine eigene, für alle seine Sitzungen.
+
+- **Tasten**: **Strg** (**⌘** auf dem Mac) mit **+** oder **=** vergrößert, mit **−** verkleinert, und mit **0** geht es zurück auf 100 %. In der Desktop-App findest du das auch unter **View → Zoom In**, **Zoom Out** und **Actual Size**; außerhalb einer Sitzung zoomen sie das ganze Fenster. Ist die Unterhaltung schon bei 100 %, setzt **0** den eigenen Zoom des Browsers oder des Fensters zurück.
+- **Maus und Trackpad**: Halte **Strg** gedrückt und scrolle, oder ziehe auf dem Trackpad zwei Finger auseinander oder zusammen. In Safari funktioniert diese Geste ebenfalls.
+- **Die Kopfzeile**: Solange die Stufe nicht 100 % ist, steht **− 125% +** neben **Details**; klicke auf die Prozentzahl, um zu 100 % zurückzukehren.
+- **Das Menü**: Das ⋯-Menü der Sitzung hat immer eine Zeile **Zoom**, auch auf dem Handy.
+
+Was du oben auf dem Bildschirm gelesen hast, bleibt dort, wenn sich die Stufe ändert. Ein Terminal oder ein Code-Editor behält diese Tasten für sich.
+
+Zoom ist nicht dasselbe wie [Einstellungen → App → Allgemein → Darstellung → Textgröße](/settings?s=general&find=Text%20size). **Textgröße** macht den Lesetext in der ganzen App größer (Nachrichten, die Hilfeseiten und das Feld, in das du tippst) und lässt Karten und Bilder, wie sie sind; Zoom vergrößert die gesamte Unterhaltung einer Sitzung und nichts außerhalb davon.
+
+**Tabellen, Code und Diagramme im Vollbild**: Eine Tabelle hat oben rechts einen kleinen Button, ein Codeblock hat einen neben **Kopieren**, und ein Diagramm hat **Vollbild** in seiner Leiste. Jedes öffnet sich über der Seite, wo:
+
+- **− 100% +** oben das Angezeigte zoomt und ein Klick auf die Prozentzahl zu 100 % zurückführt;
+- **Strg** oder **⌘** mit **+**, **−** und **0** dasselbe bewirken und **Strg** mit Scrollen oder die Zweifingergeste um den Mauszeiger herum zoomt;
+- du nach dem Zoomen mit der Maus ziehen kannst, um dich darin zu bewegen (Scrollen funktioniert auch);
+- **Esc**, **Schließen** oder ein Klick daneben dich zurückbringt.
+
+Bilder öffnen sich bereits groß, wenn du sie anklickst.
 
 ### Einen Schritt öffnen, um seine Ausgabe zu sehen
 
@@ -484,6 +507,7 @@ Wie viele Hydor-Subagents eine Sitzung gleichzeitig ausführt, stellst du unter 
 Die Schaltfläche ⋯ oben rechts in einer Sitzung öffnet ihr Menü. Manche Einträge erscheinen nur, wenn sie zutreffen; das Menü einer [vertraulichen Sitzung](#keep-a-session-confidential) hat kein **Schreibgeschützten Link teilen**, kein **Pull-Request öffnen**, kein **Browser öffnen**, keine **Verbundene Konten**, kein **In Automatisierung umwandeln** und kein **Als App speichern**, und ihr Memory bleibt aus.
 
 - **Umbenennen**: den Titel direkt bearbeiten.
+- **Zoom**: **−**, die Stufe und **+**, für [die Unterhaltung](#zoom-in-and-full-screen) auf diesem Gerät; klicke auf die Stufe, um zu 100 % zurückzukehren.
 - **Oben anheften** / **Lösen**.
 - **Zurückstellen** (ein Untermenü mit Zeiten) oder **Zurückstellung aufheben (zurück um …)**, solange sie zurückgestellt ist.
 - **Abschließen: vorerst erledigt**: stoppt den Agent und markiert die Sitzung als gelesen (nicht, während ein Durchgang läuft).
@@ -522,6 +546,8 @@ Die Schaltfläche ⋯ oben rechts in einer Sitzung öffnet ihr Menü. Manche Ein
 - „Starte eine Claude-Code-Sitzung in ~/code/blog in einem neuen Worktree, die einen RSS-Feed hinzufügt, mit einem Ausgabenlimit von 5 $."
 - „Welche Sitzungen sind seit heute Morgen fertig geworden? Erledige die abgeschlossenen und archiviere die von letzter Woche."
 - „Warum steht bei dieser Sitzung „Fehlgeschlagen“, und was sollte ich senden, um es erneut zu versuchen?"
+- „Zoome die Unterhaltung auf diesem Gerät auf 125 %.“
+- „Der Text in meinen Sitzungen ist auf meinem Laptop zu klein: Mach die Unterhaltung größer.“
 - „Was hat der letzte Zug dieser Sitzung gekostet, und wie viel davon entfiel auf den Cache?"
 - „Verschiebe die Sitzung zu den Steuerformularen auf Montag um 9 Uhr."
 - „Setze das Umsatzdiagramm und die Kennzahlen, die du mir gerade gezeigt hast, auf mein Board „Shop“."

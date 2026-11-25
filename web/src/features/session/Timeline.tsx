@@ -13,6 +13,7 @@ import { Button, cx, Throbber } from '../../components/ui';
 import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
+import { ConvZoomCtx, zoomOf } from '../../lib/convZoom';
 import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UNFOLD, UserBubble, WorkTime } from './items';
 import { noteLike, noteTitle, partsOf, plainText, runsOf, type Part, type Run } from './outline';
 import { toolView } from '../registry';
@@ -723,11 +724,46 @@ function newestText(segs: Segment[]): TimelineItem | undefined {
   return said[said.length - 1] ?? s?.prompt;
 }
 
-/** Where an element starts in the scroller's content: its place in the layout (an item rising in does not move it). */
+/**
+ * Where an element starts in the scroller's content: its place in the layout (an item rising in does not move it), in
+ * the scroller's pixels (offsets inside the zoomed conversation are before its zoom).
+ */
 function topIn(el: HTMLElement, sc: HTMLElement): number {
   let y = 0;
   for (let e: HTMLElement | null = el; e && e !== sc; e = e.offsetParent as HTMLElement | null) y += e.offsetTop;
-  return y;
+  return y * zoomOf(el);
+}
+
+/** How tall an element is in the scroller's pixels. */
+const tallIn = (el: HTMLElement) => el.offsetHeight * zoomOf(el);
+
+/**
+ * What is at the top of the view, as finely as the page is built (a turn, then a paragraph or a line of it), and where
+ * in it the view starts: what a change of the conversation's zoom keeps there.
+ */
+function atTop(sc: HTMLElement, content: HTMLElement) {
+  const top = sc.getBoundingClientRect().top;
+  let el: Element = content;
+  for (let depth = 0; depth < 12; depth++) {
+    const next: Element | undefined = Array.prototype.find.call(el.children, (c: Element) => {
+      const r = c.getBoundingClientRect();
+      return r.height > 0 && r.bottom > top + 1 && getComputedStyle(c).position !== 'absolute';
+    });
+    if (!next) break;
+    el = next;
+  }
+  const r = el.getBoundingClientRect();
+  // Its start above the view: the same fraction of it stays above. Else it keeps its distance from the top.
+  const above = r.top < top;
+  return { el, above, at: above ? (top - r.top) / (r.height || 1) : r.top - top };
+}
+
+/** How far the scroller moves so that what `atTop` found is where it was. */
+function backToTop(sc: HTMLElement, was: ReturnType<typeof atTop>): number {
+  if (!was.el.isConnected) return 0;
+  const top = sc.getBoundingClientRect().top;
+  const r = was.el.getBoundingClientRect();
+  return was.above ? r.top - top + was.at * r.height : r.top - top - was.at;
 }
 
 /** How far below the top of the view a text it holds sits: clear of the fade under the header. */
@@ -981,6 +1017,7 @@ export function Timeline({
   live,
   overlay,
   external,
+  zoom = 1,
 }: {
   sessionKey: string;
   agent: Agent;
@@ -988,6 +1025,8 @@ export function Timeline({
   overlay?: LiveOverlay;
   /** Set when the session runs in VS Code or a terminal instead of here. */
   external?: ExternalState | null;
+  /** How large the messages show, 1 being 100 % (a session's page gives it; the side panels keep 100 %). */
+  zoom?: number;
 }) {
   const tl = useTimeline((s) => s.byKey[sessionKey]);
   const worked = useSessions((s) => s.byKey[sessionKey]?.stats?.workMs);
@@ -1055,21 +1094,21 @@ export function Timeline({
     let hi = blocks.length - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (blocks[mid].offsetTop + blocks[mid].offsetHeight > sc.scrollTop) hi = mid;
+      if (topIn(blocks[mid], sc) + tallIn(blocks[mid]) > sc.scrollTop) hi = mid;
       else lo = mid + 1;
     }
     // A first block that starts mid-turn joins the turn before it once that loads: hold on to the next one.
     let el: HTMLElement | undefined = blocks[lo];
     while (el && el.dataset.partial) el = blocks[++lo];
     // No block to hold on to (one long turn fills the view): keep the distance from the end instead.
-    anchor.current = el ? { id: el.dataset.seg!, offset: el.offsetTop - sc.scrollTop, fromBottom } : { id: null, offset: 0, fromBottom };
+    anchor.current = el ? { id: el.dataset.seg!, offset: topIn(el, sc) - sc.scrollTop, fromBottom } : { id: null, offset: 0, fromBottom };
   };
   const restore = () => {
     const sc = scroller.current;
     const a = anchor.current;
     if (!sc || !a) return;
     const el = a.id ? content.current?.querySelector<HTMLElement>(`:scope > [data-seg="${CSS.escape(a.id)}"]`) : null;
-    const want = el ? el.offsetTop - a.offset : sc.scrollHeight - a.fromBottom;
+    const want = el ? topIn(el, sc) - a.offset : sc.scrollHeight - a.fromBottom;
     if (Math.abs(sc.scrollTop - want) > 0.5) setTop(want);
   };
   // The texts looked up while following, by id: looking through every turn for each, twice an update, was the biggest
@@ -1143,7 +1182,7 @@ export function Timeline({
       lead.current = el ? { id: el.dataset.text!, offset: lead.current.offset } : null;
     }
     let top = el && lead.current ? topIn(el, sc) - lead.current.offset : sc.scrollTop;
-    const reading = () => !!el && topIn(el, sc) + el.offsetHeight - top > view;
+    const reading = () => !!el && topIn(el, sc) + tallIn(el) - top > view;
     const f = came && came !== lead.current?.id ? textEl(came) : null;
     const y = f ? topIn(f, sc) - top : -1;
     if (f && y >= 0 && !reading()) {
@@ -1156,7 +1195,7 @@ export function Timeline({
       // While the agent works, what came after a text read to its end (steps, a card to answer) may run past the
       // screen: then the end is what to follow.
       const last = content.current?.lastElementChild as HTMLElement | null;
-      const end = last ? last.offsetTop + last.offsetHeight : h;
+      const end = last ? topIn(last, sc) + tallIn(last) : h;
       if (!(turn.current.busy && end - top > view && (!reading() || turn.current.asks))) {
         // Short of a screen below it, the end decides: the text sits where the conversation puts it.
         held.current = false;
@@ -1349,6 +1388,32 @@ export function Timeline({
   // The same function from one render to the next, so a turn that did not change is not drawn again for it.
   const fresh = useCallback((id: string) => !!known.current && !known.current.has(id), []);
 
+  // The conversation's zoom: CSS zoom on the column of turns, so text, code, cards and pictures all grow and it reflows.
+  // Set here rather than as the element is drawn, to see what is at the top of the view before it changes: that stays
+  // there (while following, the end or the text held does). Before the follow below, which measures with it.
+  const shown = !!tl && !(tl.loading && !tl.items.length && !overlay?.items.length);
+  const zoomed = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = content.current;
+    const sc = scroller.current;
+    if (!el || !sc) return;
+    // A column just made has no place to keep yet.
+    const was = zoomed.current === el && !stick.current ? atTop(sc, el) : null;
+    const had = zoomed.current === el;
+    zoomed.current = el;
+    el.style.zoom = zoom === 1 ? '' : String(zoom);
+    el.style.setProperty('--conv-zoom', String(zoom));
+    if (zoom === 1) delete el.dataset.convZoom;
+    else el.dataset.convZoom = String(zoom);
+    if (!had) return;
+    if (stick.current) follow();
+    else if (was) {
+      setTop(sc.scrollTop + backToTop(sc, was));
+      capture();
+    }
+    fadeBelow();
+  }, [zoom, shown]);
+
   // Follow new output while the reader is following; anywhere else, keep their place (before the paint).
   const landed = useRef<string | null>(null);
   useLayoutEffect(() => {
@@ -1402,7 +1467,6 @@ export function Timeline({
   // Code and maths highlight late, so content keeps growing after a render; while following,
   // keep up with it. (The content is there once the first page is: watch from then. A session just started
   // shows your message from the live copy while its transcript loads, so it never blinks to a loading mark.)
-  const shown = !!tl && !(tl.loading && !tl.items.length && !overlay?.items.length);
   useEffect(() => {
     const el = content.current;
     if (!el) return;
@@ -1496,6 +1560,8 @@ export function Timeline({
         ref={scroller}
         onScroll={onScroll}
         onWheel={(e) => {
+          // Ctrl and the wheel zoom: they scroll nothing.
+          if (e.ctrlKey) return;
           // A pause between wheel events starts a new gesture (a trackpad's momentum is one run).
           if (e.timeStamp - lastWheel.current > 300) gesture.current++;
           lastWheel.current = e.timeStamp;
@@ -1537,6 +1603,8 @@ export function Timeline({
           }
         }}
         onKeyDown={(e) => {
+          // Keys in a window over the page (a table full screen) come here too, through React: they are not the reader scrolling.
+          if (!e.currentTarget.contains(e.target as Node)) return;
           gesture.current++;
           if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') unstick();
           else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') down();
@@ -1544,6 +1612,7 @@ export function Timeline({
         className="absolute inset-x-0 top-px bottom-px overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]"
       >
         <QuoteSelection />
+        <ConvZoomCtx.Provider value={zoom}>
         <FollowCtx.Provider value={following}>
           {/* As wide as the message box under it (800px at most, 12px in from the sides on a phone, 24px on wider
               screens), so the two line up. A scrollbar that takes room gets it on both sides, to keep them centred alike. */}
@@ -1614,6 +1683,7 @@ export function Timeline({
             )}
           </div>
         </FollowCtx.Provider>
+        </ConvZoomCtx.Provider>
       </div>
       <div
         aria-hidden

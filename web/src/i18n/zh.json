@@ -27711,5 +27711,15 @@
   "Trains the small model on this computer from your writing, so it suggests your words. Every run starts from the one that came with the app and learns from all your writing, its newest part, so it never drifts. It never leaves this computer": "在这台电脑上根据你的写作训练小模型，让它建议你常用的词。每次都从应用自带的模型开始，并从你写过的全部内容（取最新的部分）中学习，因此不会跑偏。内容绝不会离开这台电脑",
   "{0}'s plan does not include {1}, so this session now runs on {2}, which has usage left.{3}": "{0} 的套餐不包含 {1}，因此此会话现在改用 {2} 运行，该账户还有剩余用量。{3}",
   "{0}'s plan does not include {1}, so this session now runs on {2}. Continue where you left off.{3}": "{0} 的套餐不包含 {1}，因此此会话现在改用 {2} 运行。请从中断的地方继续。{3}",
-  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1} 的套餐不包含 {2}，因此改用 {3} 继续"
+  "{0}: {1}'s plan does not include {2}, so it continues on {3}": "{0}：{1} 的套餐不包含 {2}，因此改用 {3} 继续",
+  "Reset the conversation zoom": "重置对话缩放",
+  "Shows a session’s conversation larger on this device": "在此设备上放大显示会话中的对话",
+  "Shows a session’s conversation smaller on this device": "在此设备上缩小显示会话中的对话",
+  "The conversation back to 100% on this device": "在此设备上将对话恢复到 100%",
+  "Zoom in on the conversation": "放大对话",
+  "Zoom out of the conversation": "缩小对话",
+  "theme (dark, light, system), themeName (a theme's name: it shows in dark or light mode, as the theme's base is), motion (full, calm, off), textSize (default, large, larger), zoom (the conversation's zoom in percent, 67 to 200; 100 is normal), language ({0}), sound, terminalSuggestions, wordSuggestions, sidebar, groupSessions (true or false), enter (join, queue), voiceLanguage (the language spoken, for dictation: a tag such as \"de-DE\", or \"\" for the browser's), dictation (browser, server), readingVoice (a voice's name from GET /device, or \"\" for the browser's pick), readingSpeed (0.5 to 2)": "theme（dark、light、system），themeName（主题名称：按该主题的基础以深色或浅色模式显示），motion（full、calm、off），textSize（default、large、larger），zoom（对话的缩放百分比，67 到 200；100 为正常大小），language（{0}），sound，terminalSuggestions，wordSuggestions，sidebar，groupSessions（true 或 false），enter（join、queue），voiceLanguage（听写时所说的语言：如 \"de-DE\" 这样的标记，或用 \"\" 表示沿用浏览器的语言），dictation（browser、server），readingVoice（来自 GET /device 的语音名称，或用 \"\" 表示由浏览器选择），readingSpeed（0.5 到 2）",
+  "zoom in bigger larger magnify enlarge session messages text code pictures pinch": "放大 变大 更大 缩放 zoom 会话 消息 文字 代码 图片 双指缩放 捏合",
+  "zoom out smaller shrink session messages text fit more": "缩小 变小 更小 缩放 zoom 会话 消息 文字 显示更多",
+  "zoom reset actual size normal 100 percent session messages": "缩放 重置 恢复 实际大小 正常大小 100 百分比 zoom 会话 消息"
 }

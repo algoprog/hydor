@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
-import { FileText } from 'lucide-react';
+import { FileText, Maximize2 } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { appPageLink, isAppPage } from '@shared/app-pages';
 import type { CardSource } from '@shared/boards';
@@ -14,6 +14,7 @@ import { codexCitations, FILE_CITATION } from '@shared/file-citations';
 import { CiteChip, SourcesRow } from './Citations';
 import { openLightbox } from './Lightbox';
 import { cx } from './ui';
+import { ZoomOverlay } from './ZoomPan';
 import { goApp, openFile } from '../lib/nav';
 import { joinPath } from '../lib/format';
 import { useApp } from '../lib/store';
@@ -95,6 +96,7 @@ export const CodeBlock = memo(function CodeBlock({
   className,
   bare,
   arriving,
+  whole,
 }: {
   code: string;
   lang?: string | null;
@@ -102,12 +104,15 @@ export const CodeBlock = memo(function CodeBlock({
   className?: string;
   bare?: boolean;
   arriving?: boolean;
+  /** Every line shown, none folded away (its full screen view). */
+  whole?: boolean;
 }) {
   const text = code.replace(/\n$/, '');
   const key = `${lang ?? ''}\n${text}`;
   const [shown, setShown] = useState<{ key: string; html: string } | null>(null);
   const html = arriving ? null : (highlighted.get(key) ?? (shown?.key === key ? shown.html : null));
   const [expanded, setExpanded] = useState(false);
+  const [full, setFull] = useState(false);
   useEffect(() => {
     if (arriving || highlighted.has(key)) return;
     let alive = true;
@@ -124,13 +129,18 @@ export const CodeBlock = memo(function CodeBlock({
     };
   }, [key, arriving]);
   const lines = useMemo(() => text.split('\n').length, [text]);
-  const tall = lines > 28;
+  const tall = !whole && lines > 28;
+  const name = resolveLang(lang) ?? lang ?? 'text';
   return (
     <div className={cx(bare ? 'code-body group relative' : 'code-block group relative my-2', className)}>
       {!bare && (
         <div className="flex h-7 items-center gap-2 border-b border-line px-3 text-[11px] text-fg-3">
-          <span className="font-mono">{resolveLang(lang) ?? lang ?? 'text'}</span>
+          <span className="font-mono">{name}</span>
           <span className="flex-1" />
+          {/* Through tr: inside a reply (.md) the page's own translation of text passes it by. */}
+          <BarButton label={tr('Full screen')} onClick={() => setFull(true)}>
+            <Maximize2 size={12} />
+          </BarButton>
           <CopyButton text={text} />
         </div>
       )}
@@ -146,9 +156,43 @@ export const CodeBlock = memo(function CodeBlock({
           {expanded ? tr('Show less') : tr('Show all {0} lines').replace('{0}', String(lines))}
         </button>
       )}
+      {full && (
+        <ZoomOverlay title={<span translate="no" className="font-mono text-[13px]">{name}</span>} onClose={() => setFull(false)} actions={<CopyButton text={text} />}>
+          <div className="md zoom-code">
+            <CodeBlock code={text} lang={lang} arriving={arriving} bare whole className="code-block" />
+          </div>
+        </ZoomOverlay>
+      )}
     </div>
   );
 });
+
+/** A Markdown table, scrolling sideways when it does not fit, with a small button that shows it full screen. */
+function MdTable({ children }: { children?: ReactNode }) {
+  const [full, setFull] = useState(false);
+  const info = useContext(MdCtx);
+  return (
+    <div className="md-tablewrap">
+      <div className="md-table">
+        <table>{children}</table>
+      </div>
+      <button type="button" className="md-table-full" title={tr('Full screen')} aria-label={tr('Full screen')} onClick={() => setFull(true)}>
+        <Maximize2 size={11} />
+      </button>
+      {full && (
+        <ZoomOverlay title={tr('Table')} onClose={() => setFull(false)}>
+          <MdCtx.Provider value={info}>
+            <div className="md zoom-table">
+              <div className="md-table">
+                <table>{children}</table>
+              </div>
+            </div>
+          </MdCtx.Provider>
+        </ZoomOverlay>
+      )}
+    </div>
+  );
+}
 
 /** `a/./b/../c` → `a/c`. */
 function normalizePath(p: string): string {
@@ -492,13 +536,7 @@ const components: Components = {
   pre: Pre as Components['pre'],
   // Tables keep natural column widths and scroll sideways when they do not fit; long cells
   // wrap at a readable width instead of squeezing their neighbours.
-  table({ children }) {
-    return (
-      <div className="md-table">
-        <table>{children}</table>
-      </div>
-    );
-  },
+  table: MdTable as Components['table'],
   th({ children, style }) {
     return (
       <th style={style}>

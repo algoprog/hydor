@@ -735,7 +735,7 @@ function HandoffCard({ h }: { h: HandoffInfo }) {
         <button onClick={() => setOpen((o) => !o)} className="mt-1 text-[12px] text-fg-3 transition-colors hover:text-fg">
           {open ? 'Hide' : 'Show'} the {h.messages} message{h.messages === 1 ? '' : 's'} carried over{h.omitted ? ` (${h.omitted} older left out)` : ''}
         </button>
-        {open && <pre className="mt-2 max-h-[50vh] overflow-auto rounded-lg bg-bg px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-2">{h.context}</pre>}
+        {open && <pre className="mt-2 max-h-[calc(50vh/var(--conv-zoom,1))] overflow-auto rounded-lg bg-bg px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-fg-2">{h.context}</pre>}
       </div>
     </div>
   );

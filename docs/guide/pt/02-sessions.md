@@ -159,6 +159,7 @@ No topo de uma sessão:
 - a pasta (clique nela para explorá-la em Arquivos), um selo de pull request, a conta quando a sessão roda como uma conta adicionada e, em telas mais largas, o branch do git e o modelo;
 - um botão para o que você pode fazer agora: **Parar** enquanto um turno está em execução, **Retomar** quando o agente não está em execução (depois de **Interrompida** ou **Falhou**; mais discreto depois de **Concluído**, já que uma mensagem na caixa continua a sessão de qualquer forma), ou **Continuar aqui** para uma sessão do Claude Code aberta no VS Code ou em um terminal;
 - **Detalhes** (mostrando as linhas adicionadas e removidas quando há arquivos alterados), que abre [o painel de detalhes](#the-details-panel-changes-commands-and-info);
+- enquanto a conversa está [com zoom](#zoom-in-and-full-screen), **− 125% +** com o nível atual;
 - o menu da sessão (⋯): veja [Tudo o que há no menu da sessão](#everything-in-the-sessions-menu).
 
 ### Turnos, passos e respostas
@@ -226,6 +227,28 @@ Quando parte de uma resposta é algo para olhar, comparar, escolher, acompanhar,
 - **Veja todas**: [UIs de resposta](/answers) mostra cada uma com um exemplo, por grupo: resumos, comparações, compras, lugares e viagens, comida, planos, trabalho e negócios, números e gráficos, dinheiro, aprendizado, ciência, mídia, pessoas e esportes, escrita e código. **Reproduzir durante o streaming** mostra uma chegando como chegaria em uma resposta.
 
 Peça uma com palavras simples também: “compare em uma tabela”, “coloque em um mapa”, “me faça um quiz sobre isso”, “me dê problemas de prática sobre isto”, “marque no meu texto o que corrigir”. As suas [Diretrizes dos agentes](/guide/guidelines) (“Responda em texto simples, sem cartões nem gráficos”) ou a sua mensagem podem pedir texto simples.
+
+### Zoom e tela cheia
+
+Uma conversa pode ser mostrada maior ou menor sozinha, enquanto a barra lateral, o cabeçalho e a caixa de mensagem continuam como estão. Tudo nela aumenta ou diminui (texto, código, cartões e imagens), e as linhas se ajustam de novo para caber. Os níveis são 67, 80, 90, 100, 110, 125, 150, 175 e 200%; cada dispositivo guarda o seu, para todas as sessões dele.
+
+- **Teclas**: **Ctrl** (**⌘** no Mac) com **+** ou **=** aumenta o zoom, com **−** diminui e com **0** volta para 100%. No app para computador, esses comandos também estão em **View → Zoom In**, **Zoom Out** e **Actual Size**; fora de uma sessão, eles aplicam zoom à janela inteira. Com a conversa já em 100%, **0** redefine o zoom do próprio navegador ou da janela.
+- **Mouse e trackpad**: segure **Ctrl** e role, ou faça o gesto de pinça no trackpad. No Safari, a pinça também funciona.
+- **O cabeçalho**: enquanto o nível não for 100%, **− 125% +** aparece ao lado de **Detalhes**; clique na porcentagem para voltar a 100%.
+- **O menu**: o menu ⋯ da sessão sempre tem uma linha **Zoom**, também no celular.
+
+O que você estava lendo no topo da tela continua lá quando o nível muda. Um terminal ou um editor de código fica com essas teclas para si.
+
+O zoom não é a mesma coisa que [Configurações → App → Geral → Aparência → Tamanho do texto](/settings?s=general&find=Text%20size). **Tamanho do texto** aumenta o texto de leitura em todo o app (mensagens, as páginas de Ajuda e a caixa em que você digita) e deixa cartões e imagens como estão; o zoom amplia toda a conversa de uma sessão, e nada fora dela.
+
+**Tabelas, código e diagramas em tela cheia**: uma tabela tem um pequeno botão no canto superior direito, um bloco de código tem um ao lado de **Copiar**, e um diagrama tem **Tela cheia** na barra dele. Cada um abre sobre a página, onde:
+
+- **− 100% +** no topo aplica zoom ao que é mostrado, e clicar na porcentagem volta para 100%;
+- **Ctrl** ou **⌘** com **+**, **−** e **0** fazem o mesmo, e **Ctrl** com rolagem, ou o gesto de pinça, aplicam zoom em torno do ponteiro;
+- com o zoom aplicado, arraste com o mouse para se movimentar (a rolagem também funciona);
+- **Esc**, **Fechar** ou um clique ao lado traz você de volta.
+
+As imagens já abrem grandes quando você clica nelas.
 
 ### Abra um passo para ver sua saída
 
@@ -484,6 +507,7 @@ Quantos subagentes do Hydor uma sessão executa ao mesmo tempo é definido em [C
 O botão ⋯ no canto superior direito de uma sessão abre o menu dela. Alguns itens só aparecem quando se aplicam; o menu de uma [sessão confidencial](#keep-a-session-confidential) não tem **Compartilhar um link somente leitura**, **Abrir um pull request**, **Abrir um navegador**, **Contas conectadas**, **Transformar em automação** nem **Salvar como app**, e a memória dela fica desativada.
 
 - **Renomear**: edite o título no próprio lugar.
+- **Zoom**: **−**, o nível e **+**, para [a conversa](#zoom-in-and-full-screen) neste dispositivo; clique no nível para voltar a 100%.
 - **Fixar no topo** / **Desafixar**.
 - **Adiar** (um submenu de horários), ou **Cancelar o adiamento (volta às …)** enquanto ela está adiada.
 - **Encerrar: por enquanto, concluída**: para o agente e marca a sessão como lida (não enquanto uma rodada está em andamento).
@@ -522,6 +546,8 @@ O botão ⋯ no canto superior direito de uma sessão abre o menu dela. Alguns i
 - "Comece uma sessão do Claude Code em ~/code/blog em um novo worktree que adicione um feed RSS, com um limite de gastos de US$ 5."
 - "Quais sessões terminaram desde esta manhã? Conclua as que estão prontas e arquive as da semana passada."
 - "Por que esta sessão diz Falhou, e o que devo enviar para tentar de novo?"
+- “Ajuste o zoom da conversa para 125% neste dispositivo.”
+- “O texto das minhas sessões fica pequeno no meu notebook: aumente a conversa.”
 - "Quanto custou a última vez que esta sessão respondeu, e quanto disso foi o cache?"
 - "Adie a sessão sobre os formulários de imposto até segunda-feira às 9h."
 - "Coloque no meu painel Loja o gráfico de vendas e os números principais que você acabou de me mostrar."

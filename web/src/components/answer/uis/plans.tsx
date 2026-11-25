@@ -9,6 +9,7 @@ import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
 import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, hostOf, isObj, LinkOut, Md, Meter, NameLink, num, parseDate, Pic, Ring, Seg, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, useAui, useKept, useNow, WithPic, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { localPoint } from '../../../lib/convZoom';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
 
@@ -1392,8 +1393,7 @@ function Gantt({ data, done }: { data: Data; done: boolean }) {
     if (todayX !== null && nameW + chartW > el.clientWidth) el.scrollLeft = Math.max(0, todayX - (el.clientWidth - nameW) * 0.35);
   }, [done, width, chartW, nameW, todayX, tasks.length]);
   const point = (i: number) => (e: React.PointerEvent) => {
-    const r = ref.current?.getBoundingClientRect();
-    setHover({ i, x: r ? e.clientX - r.left : 0 });
+    setHover({ i, x: ref.current ? localPoint(e, ref.current).x : 0 });
   };
   const shown = hover ? tasks.find((t) => t.i === hover.i) : undefined;
   const after = shown ? shown.depends.map((d) => byId(d)?.name).filter(Boolean) : [];

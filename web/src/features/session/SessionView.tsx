@@ -24,6 +24,8 @@ import { TaskItem } from './WorkRow';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
+import { useConvZoomInput, ZoomPill } from './ZoomControls';
+import { useConvZoom } from '../../lib/convZoom';
 import { ProgramDock, ProgramStop } from '../children/program';
 import { FindBar, showSeq } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
@@ -83,7 +85,7 @@ function StatusPill({ s, end }: { s: SessionSummary; end: SessionEnd | null | un
   );
 }
 
-function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; detailsOpen: boolean; onDetails: () => void; onFork: () => void }) {
+function Header({ s, detailsOpen, onDetails, onFork, conversation }: { s: SessionSummary; detailsOpen: boolean; onDetails: () => void; onFork: () => void; conversation: boolean }) {
   const end = useSessionEnd(s);
   const home = useApp((x) => x.boot?.home);
   const cat = useCatalog(s.agent);
@@ -194,6 +196,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
             )}
           </div>
         </div>
+        {conversation && <ZoomPill />}
         {action}
         <Button
           size="sm"
@@ -635,6 +638,11 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
 
   const [forking, setForking] = useState<{ at?: string } | null>(null);
 
+  // The conversation's zoom (this device's): its keys, the wheel and pinches, while the conversation is what shows.
+  const zoom = useConvZoom();
+  const [column, setColumn] = useState<HTMLDivElement | null>(null);
+  useConvZoomInput(column, !!summary && (!sessionPaneOf(summary) || chosen === 'conversation'));
+
   // Ctrl+F finds in this session's messages (editors and terminals keep their own); the search box opens a
   // session with `find=<words>` to show where they are.
   const [finding, setFinding] = useState(false);
@@ -716,9 +724,10 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
   const view = (
     <SessionCtx.Provider value={sessionCtx}>
       <div className="flex h-full min-h-0">
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div ref={setColumn} className="flex min-w-0 flex-1 flex-col">
           <Header
             s={summary}
+            conversation={show === 'conversation'}
             detailsOpen={detailsOpen && !side}
             onDetails={() => {
               if (side) {
@@ -735,7 +744,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
             {pane && show === 'pane' ? (
               <pane.Body s={summary} />
             ) : (
-              <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} />
+              <Timeline sessionKey={sessionKey} agent={summary.agent} live={summary.live ?? null} overlay={lv?.overlay} external={summary.external} zoom={zoom} />
             )}
           </div>
           <MovedOn s={summary} />
