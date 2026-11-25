@@ -242,8 +242,22 @@
 }
 
 /* ---------- film ---------- */
-[data-fig="meet-hydor-film"] .mhf { padding: clamp(8px, 1.4vw, 14px); }
-[data-fig="meet-hydor-film"] video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; }
+[data-fig="meet-hydor-film"] .mhf { position: relative; padding: clamp(8px, 1.4vw, 14px); }
+[data-fig="meet-hydor-film"] video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; cursor: pointer; }
+/* A large play button in the middle while the film is not playing: the home page's .play-dot, larger */
+[data-fig="meet-hydor-film"] .mhf-play {
+  position: absolute; left: 50%; top: 50%; width: clamp(48px, 9%, 88px); aspect-ratio: 1; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--fg); color: #000; cursor: pointer;
+  box-shadow: 0 0 0 clamp(6px, .9vw, 10px) rgb(255 255 255 / .1), 0 12px 40px rgb(0 0 0 / .55);
+  transform: translate(-50%, -50%); transition: transform .3s var(--ease), opacity .2s, visibility 0s;
+}
+[data-fig="meet-hydor-film"] .mhf-play svg { width: 40%; height: 40%; margin-left: 6%; fill: currentColor; }
+[data-fig="meet-hydor-film"] .mhf-play:hover { transform: translate(-50%, -50%) scale(1.08); }
+[data-fig="meet-hydor-film"] .mhf-play:focus-visible { outline: 2px solid var(--accent); outline-offset: 14px; }
+[data-fig="meet-hydor-film"] .mhf.is-playing .mhf-play { opacity: 0; visibility: hidden; transform: translate(-50%, -50%) scale(.85); transition: transform .2s, opacity .2s, visibility 0s .2s; }
+@media (prefers-reduced-motion: reduce) {
+  [data-fig="meet-hydor-film"] .mhf-play, [data-fig="meet-hydor-film"] .mhf.is-playing .mhf-play { transition: none; }
+}
 
 /* ---------- plans ---------- */
 [data-fig="meet-hydor-plans"] .mhq { display: grid; gap: 16px; }

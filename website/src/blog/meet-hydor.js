@@ -285,4 +285,36 @@
     btns.forEach((b) => b.addEventListener('click', () => pick(b.dataset.p, true)));
     pick('claude', false);
   });
+
+  /* ---------- film: a large play button in the middle, and a click anywhere on the picture plays or pauses ---------- */
+  B.figure('meet-hydor-film', (el) => {
+    const stage = el.querySelector('.mhf');
+    const vid = stage?.querySelector('video');
+    if (!vid) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mhf-play';
+    btn.setAttribute('aria-label', 'Play the tour');
+    const icon = mk('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+    icon.append(mk('path', { d: 'M8.5 5.8v12.4a.8.8 0 0 0 1.2.7l10-6.2a.8.8 0 0 0 0-1.4l-10-6.2a.8.8 0 0 0-1.2.7z' }));
+    btn.append(icon);
+    stage.append(btn);
+    const sync = () => stage.classList.toggle('is-playing', !vid.paused);
+    ['play', 'pause', 'ended'].forEach((t) => vid.addEventListener(t, sync));
+    sync();
+    btn.addEventListener('click', () => {
+      vid.play().catch(() => {});
+      // The button hides as it plays: the film takes the focus, so Space pauses it.
+      vid.focus({ preventScroll: true });
+    });
+    // Firefox and Safari play or pause on a click on the picture themselves, and so does Chrome once the film has
+    // loaded; before that, Chrome does nothing. So a click on a film that has loaded nothing yet starts it, if the
+    // browser has not by the time the click is over (Safari starts it between this listener and the next).
+    vid.addEventListener('click', () => {
+      if (vid.readyState > 0 || !vid.paused) return;
+      setTimeout(() => {
+        if (vid.paused) vid.play().catch(() => {});
+      }, 0);
+    }, true);
+  });
 })();
