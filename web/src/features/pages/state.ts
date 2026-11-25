@@ -131,8 +131,8 @@ function takeDraft(key: string, e: Extract<PagesEvent, { what: 'draft' | 'edit-d
   const text = e.from === 0 ? e.text : had!.text + e.text;
   const d: PageDraft = { ...e.draft, text };
   useDrafts.setState({ byKey: { ...s.byKey, [key]: { ...s.byKey[key], [d.id]: d } } });
-  // An edit of a file opens nothing: the file shown follows it (liveEdits.ts).
-  if (!had && !d.done && d.tool !== 'edit') for (const fn of startListeners) fn(key, d);
+  // Listeners hear of edits too (one opens nothing, but a file closed by hand that the agent edits opens again: Canvas.tsx).
+  if (!had && !d.done) for (const fn of startListeners) fn(key, d);
 }
 
 // What the server says changed: whatever is loaded is loaded again.

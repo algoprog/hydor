@@ -843,7 +843,7 @@ agents that speak ACP and take MCP servers.
   once they are there, each change an agent makes landing as it is made. A page or document already open there (or full screen, or in the file window) shows the agent's changes to it as they are written: a Markdown file's edits lit in place (a change that comes all at once lit where it landed), a LaTeX file's source with the agent's caret, a page shown or saved again as it is written, and a Word or Excel file the agent changes with commands where you were reading. The first page or document a turn makes or
   changes opens there by itself, asked for or not; a turn that goes on to a second one puts the panel back as it
   was, and each opens from its card (a page with the title of one the turn made already, such as a mock-up written to
-  an HTML file to check and then shown, is that page again, and the panel moves on to it). Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,
+  an HTML file to check and then shown, is that page again, and the panel moves on to it); one you close does not open by itself again until the agent writes or edits it once more. Full screen in the panel's top line shows it over the whole app, and back. A page fills the width it gets,
   looks like part of the app (its theme, light or dark as the app is, your colours and the app's font, unless you
   ask for another look), and you can change it in a visual editor that works on a phone too, written in as in Notion:
   Enter makes the next block, "/" adds headings, lists, to-dos, toggles, callouts, quotes, code, tables, pictures,

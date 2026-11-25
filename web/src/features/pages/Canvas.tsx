@@ -119,6 +119,11 @@ export interface BesideDoc {
 
 /** By session: its turn's documents so far, what opened by itself for it, and what the panel showed before that. */
 const turns = new Map<string, { docs: TurnDocs; target?: CanvasTarget; before?: CanvasTarget | null }>();
+/**
+ * By session: the names of what was closed by hand beside its conversation. It does not open there by itself again (at
+ * the end of its turn, or in a later one) until the agent writes or edits it once more.
+ */
+const dismissed = new Map<string, Set<string>>();
 
 const sameTarget = (a: CanvasTarget | null | undefined, b: CanvasTarget | null | undefined) => !!a && !!b && a.kind === b.kind && a.id === b.id;
 
@@ -293,12 +298,26 @@ function shows(key: string, cur: CanvasTarget | null, doc: BesideDoc): boolean {
  * off; a second one puts the panel back as it was before, and nothing more opens by itself in that turn (each has
  * its card in the conversation). A page open with changes not saved is left alone, and so is one opened by hand.
  */
-export function offerBeside(key: string, docs: BesideDoc[], at?: string) {
+export function offerBeside(key: string, docs: BesideDoc[], at?: string, writing?: 'write' | 'edit') {
   if (!docs.length) return;
   const turn = turnOf(key, at);
   const had = turns.get(key);
   let st = had && had.docs.turn === turn ? had : { docs: { turn, docs: [] } as TurnDocs };
   const more = alsoKnown(key);
+  // Closed by hand: it stays closed, unless the agent is writing or editing it now, which opens it again.
+  const gone = dismissed.get(key);
+  if (gone?.size) {
+    const isGone = (d: BesideDoc) => uniqNames([...d.names, ...d.names.flatMap(more)]).some((n) => gone.has(n));
+    const back = writing ? docs.find(isGone) : undefined;
+    if (back) {
+      for (const n of uniqNames([...back.names, ...back.names.flatMap(more)])) gone.delete(n);
+      reopen(key, back, st.docs, turn, more);
+      return;
+    }
+    docs = docs.filter((d) => !isGone(d));
+  }
+  // An edit opens only a file closed by hand (above): any other file shown follows it as it is (liveEdits.ts).
+  if (!docs.length || writing === 'edit') return;
   let first: { doc: BesideDoc; at: number } | null = null;
   let back = false;
   let again: BesideDoc | null = null;
@@ -343,10 +362,35 @@ export function offerBeside(key: string, docs: BesideDoc[], at?: string) {
   }
 }
 
-/** The panel was closed by hand: nothing more opens there by itself in the turn going on. */
+/**
+ * A document closed by hand, that the agent writes or edits again: it opens beside the conversation once more (where a
+ * turn's document would open by itself), as what this turn opened.
+ */
+function reopen(key: string, doc: BesideDoc, docs: TurnDocs, turn: string, more: (name: string) => string[]) {
+  const c = useCanvas.getState();
+  const cur = c.open[key] ?? null;
+  if (cur && dirty.has(key)) return;
+  if (!c.auto || !matchMedia(CANVAS_MEDIA).matches || !onScreen(key) || useOver.getState().at?.key === key) return;
+  const r = noteDoc({ ...docs, quiet: undefined }, turn, doc.names, more);
+  if (!shows(key, cur, doc)) c.show(key, doc.target);
+  turns.set(key, { docs: opened(r.now, r.at), target: doc.target, before: shows(key, cur, doc) ? undefined : cur });
+}
+
+/**
+ * The panel was closed by hand: nothing more opens there by itself in the turn going on, and what it showed does not
+ * open by itself again until the agent writes or edits it.
+ */
 function closedByHand(key: string) {
   const st = turns.get(key);
-  if (st) turns.set(key, { docs: quiet(st.docs) });
+  const turn = turnOf(key);
+  turns.set(key, { docs: quiet(st && st.docs.turn === turn ? st.docs : { turn, docs: [] }) });
+  const cur = useCanvas.getState().open[key];
+  if (!cur) return;
+  const names = targetNames(key, cur, alsoKnown(key));
+  if (!names.length) return;
+  const gone = dismissed.get(key) ?? new Set<string>();
+  for (const n of names) gone.add(n);
+  dismissed.set(key, gone);
 }
 
 /** How long a page's draft waits for its title, at most, to see whether it is a document its turn has already. */
@@ -367,8 +411,9 @@ function another(key: string, d: PageDraft): boolean {
 }
 
 onDraftStart((key, started) => {
-  // An edit of a file opens nothing: the file shown beside (or over everything) shows it as it is made (liveEdits.ts).
-  if (started.tool === 'edit') return;
+  // An edit of a file opens nothing (the file shown beside, or over everything, shows it as it is made: liveEdits.ts),
+  // unless it is a file closed by hand there, which the agent now changes.
+  if (started.tool === 'edit') return void (started.path && offerBeside(key, [fileDoc(started.path)], started.id, 'edit'));
   // Which document it is shows once the call says so: the page a save of another kind changes (its id comes first,
   // mostly; a new one has none), the file a Write writes, the title of a page of HTML when its turn has another
   // document (the HTML file it was written in first, say) or a page is shown (it may be that page, written anew).
@@ -379,7 +424,7 @@ onDraftStart((key, started) => {
     if (!now || (now.done && draftKind(now))) return;
     if (!now.done && draftKind(now) && !now.pageId && Date.now() - now.startedAt < 600) return void setTimeout(decide, 150);
     if (Date.now() - heard < TITLE_MS && titleComing(now) && (another(key, now) || showsPage(key))) return void setTimeout(decide, 150);
-    offerBeside(key, [draftDoc(now)], now.id);
+    offerBeside(key, [draftDoc(now)], now.id, 'write');
   };
   decide();
 });

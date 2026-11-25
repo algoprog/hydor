@@ -55,7 +55,7 @@ export function useOpensBeside(sessionKey: string | undefined, item: ToolItem) {
   useEffect(() => {
     if (!sessionKey || !item.ts || Date.now() - item.ts > 20_000) return;
     if (useDrafts.getState().byKey[sessionKey]?.[item.id]) return;
-    offerBeside(sessionKey, [callDoc(item)], item.id);
+    offerBeside(sessionKey, [callDoc(item)], item.id, 'write');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 }
