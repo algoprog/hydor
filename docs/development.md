@@ -35,6 +35,13 @@ One by hand:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
+`scripts/agent-tools/` holds three small command-line tools for coding agents: `waitfor` (wait for a job in one call),
+`edits` (several exact search-and-replace edits in one call) and `sym` (a definition with its whole body, found by a
+parser). They are developer tools kept here: the app does not give them to agents. Put them on your `PATH` and tell your
+agents about them as its README says; their tests (`server/agent-tools-test.ts`) run with `npm test`, and with
+`npm run check` when something in that folder changes. They need nothing installed beyond Node.js; the parser and
+grammars `sym` uses are copied into the folder, with their licences in `NOTICE`.
+
 A scratch copy of the app (its own `DATA_DIR` and `PORT`, to try a change in a browser) shares your computer with the
 app you use. Give it a `HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` of its own under `/tmp` too: its agents keep their
 sign-ins and sessions there, so they never carry on with yours, and nothing it starts shows up in the app you use.

@@ -31,5 +31,9 @@
     "shared",
     "web/src",
     "scripts"
+  ],
+  "exclude": [
+    "scripts/agent-tools/fixtures",
+    "scripts/agent-tools/lib/sym/vendor"
   ]
 }

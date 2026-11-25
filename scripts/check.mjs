@@ -34,11 +34,13 @@ const RULES = [
   { name: 'skills', from: 'docs/development.md "Testing"', tests: ['server/skillpack/tests.ts'], paths: [/^skills\//] },
   { name: 'plugins', from: 'docs/development.md "Testing"', tests: ['server/plugins/plugins-test.ts'], paths: [/^plugins\//] },
   { name: 'check', from: 'scripts/check.mjs and scripts/test.mjs', tests: ['server/check-test.ts'], paths: [/^scripts\/(check|test)\.mjs$/] },
+  { name: 'agent-tools', from: 'scripts/agent-tools/README.md', tests: ['server/agent-tools-test.ts'], paths: [/^scripts\/agent-tools\//] },
 ];
 
 const ROOTS = ['server', 'shared', 'web/src']; // where source files and their tests live (as scripts/test.mjs walks)
 const BIG_DIR = 8; // a directory with more tests than this is narrowed to the tests named like the changed file, when there are any
 const TYPE_DIRS = /^(server|shared|web\/src|scripts)\//; // tsconfig.json's "include"
+const NOT_TYPED = /^scripts\/agent-tools\/(fixtures|lib\/sym\/vendor)\//; // and its "exclude": sample files for sym's tests, vendored code
 const MAX_CHARS = 6000; // the most printed without --verbose
 const KEEP_LOGS = 10;
 const DEFAULT_CAP = '6G'; // tsc peaks at about 3.1 GB; six tests at once at about 2.2 GB (measured: see the report in the commit)
@@ -54,7 +56,7 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** Does the type check cover anything in these files? (TypeScript, or JSON in what tsconfig.json includes.) */
 export function typesRelevant(files) {
-  const hit = files.filter((f) => f === 'tsconfig.json' || isTs(f) || (f.endsWith('.json') && TYPE_DIRS.test(f)));
+  const hit = files.filter((f) => !NOT_TYPED.test(f) && (f === 'tsconfig.json' || isTs(f) || (f.endsWith('.json') && TYPE_DIRS.test(f))));
   return hit;
 }
 
@@ -271,7 +273,7 @@ async function selftest() {
     ...many('server/pages', ['pages', 'sheet-editor', 'sheet-functions', 'slides-editor', 'slides-web', 'doc-editing', 'doc-files', 'boards', 'live', 'reader']),
     'server/accounts-test.ts', 'server/auth-test.ts', 'server/files-test.ts', 'server/git-test.ts', 'server/starts-test.ts', 'server/stats-test.ts', 'server/titles-test.ts', 'server/view-test.ts', 'server/platform-test.ts', 'server/env-test.ts',
     'server/guide/guide-test.ts', 'server/find/find-test.ts', 'server/releases/releases-test.ts', 'server/tui/settings-test.ts', 'server/language/language-test.ts', 'server/goals/i18n-test.ts',
-    'web/src/features/wiki/wiki-i18n-test.ts', 'server/skillpack/tests.ts', 'server/plugins/plugins-test.ts', 'server/check-test.ts',
+    'web/src/features/wiki/wiki-i18n-test.ts', 'server/skillpack/tests.ts', 'server/plugins/plugins-test.ts', 'server/check-test.ts', 'server/agent-tools-test.ts',
     'server/wiki/session/codex-live-test.ts', 'server/browser/selftest.ts', 'server/browser/bookmarks-test.ts',
     'server/wiki/digest/a-test.ts', 'server/mail/mail-test.ts',
     ...many('shared', ['sheet-diff', 'snap', 'zoom', 'translate-names', 'translate-values', 'file-edits', 'latex-nav', 'app-pages', 'app-estimate', 'update-progress', 'mediaedit-video-captions']),
@@ -334,7 +336,7 @@ async function selftest() {
     assert.equal(coverageNotes({ unmapped: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'] })[0], 'no test maps to a.ts, b.ts, c.ts, +2 more');
     assert.deepEqual(coverageNotes({ narrowed: [], unmapped: [] }), []);
   });
-  test('rules: the guide, settings, search, releases, dictionaries', () => {
+  test('rules: the guide, settings, search, releases, dictionaries, the developer tools', () => {
     assert.deepEqual(names(['docs/guide/12-tasks.md']), ['server/guide/guide-test.ts']);
     assert.deepEqual(names(['docs/guide/de/12-tasks.md']), ['server/guide/guide-test.ts']);
     assert.deepEqual(names(['shared/find-catalog.ts']), ['server/find/find-test.ts', 'server/guide/guide-test.ts', 'server/tui/settings-test.ts']);
@@ -345,6 +347,8 @@ async function selftest() {
     assert.deepEqual(names(['CHANGELOG.md']), ['server/releases/releases-test.ts']);
     assert.deepEqual(names(['web/src/i18n/de.json']), ['server/goals/i18n-test.ts', 'server/language/language-test.ts', 'web/src/features/wiki/wiki-i18n-test.ts']);
     assert.deepEqual(names(['scripts/check.mjs']), ['server/check-test.ts']);
+    assert.deepEqual(names(['scripts/agent-tools/bin/sym']), ['server/agent-tools-test.ts']);
+    assert.deepEqual(names(['scripts/agent-tools/lib/sym/vendor/web-tree-sitter/tree-sitter.js', 'scripts/agent-tools/README.md']), ['server/agent-tools-test.ts']);
     assert.deepEqual(names(['README.md', 'docs/features.md']), []);
   });
   test('a server file that defines /api/ routes brings the guide test', () => {
@@ -366,6 +370,7 @@ async function selftest() {
     assert.equal(typesRelevant(['web/src/i18n/de.json']).length, 1);
     assert.equal(typesRelevant(['scripts/x.mts']).length, 1);
     assert.equal(typesRelevant(['catalog/connections/a.json']).length, 0);
+    assert.equal(typesRelevant(['scripts/agent-tools/fixtures/sym/ts/forms.ts', 'scripts/agent-tools/lib/sym/vendor/web-tree-sitter/tree-sitter.js']).length, 0);
   });
   test('tsc output is grouped by file, and cut at 6 a file and 20 in all', () => {
     const line = (f, n) => `${f}(${n},3): error TS2322: Type 'string' is not assignable to type 'number'.\n  Types of property are incompatible.`;

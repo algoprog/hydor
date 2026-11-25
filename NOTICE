@@ -34,3 +34,12 @@ its own LICENSE.txt.
 The reader copy of a web page saved from the Browser is made with Mozilla's Readability
 (server/browser/readability/), Copyright (c) 2010 Arc90 Inc, unchanged, under the Apache License 2.0,
 which it keeps beside it.
+
+The developer tool sym (scripts/agent-tools/lib/sym/) reads code with web-tree-sitter 0.25.10, Copyright (c) 2018-2024
+Max Brunsfeld, unchanged, under the MIT License, which it keeps beside it (lib/sym/vendor/web-tree-sitter/). The
+grammars it loads (scripts/agent-tools/lib/sym/grammars/: typescript and tsx from tree-sitter-typescript, javascript
+from tree-sitter-javascript, python from tree-sitter-python, rust from tree-sitter-rust) are the compiled files of
+the npm package tree-sitter-wasms 0.1.13, unchanged, which is released under the Unlicense (public domain). The four
+grammar projects they were built from are each under the MIT License: tree-sitter-typescript, Copyright (c) 2017 Max
+Brunsfeld; tree-sitter-javascript, Copyright (c) 2014 Max Brunsfeld; tree-sitter-python, Copyright (c) 2016 Max
+Brunsfeld; tree-sitter-rust, Copyright (c) 2017 Maxim Sokolov.
