@@ -54,6 +54,7 @@ export function SimpleHome({ app, checks, reload }: { app: WebAppDetail; checks:
   const [undoing, setUndoing] = useState(false);
   const [pointing, setPointing] = useState(false);
   const [pointed, setPointed] = useState<Pointed | null>(null);
+  const [streamed, setStreamed] = useState(false);
   const [fixAt, setFixAt] = useState(() => readFixing(app.id));
   const box = useRef<HTMLTextAreaElement>(null);
   const closeKeys = useCallback(() => {
@@ -148,7 +149,7 @@ export function SimpleHome({ app, checks, reload }: { app: WebAppDetail; checks:
         strip={strip}
         needs={needs}
         onOpen={canShow ? () => void openWebApp(app.id, undefined, 'preview') : undefined}
-        preview={<Preview app={app} simple control={{ pointing, onPointed: setPointed }} onBuild={() => void post(`${base}/build`).then(() => reload(), toastError)} />}
+        preview={<Preview app={app} simple control={{ pointing, onPointed: setPointed, onStreamed: setStreamed }} onBuild={() => void post(`${base}/build`).then(() => reload(), toastError)} />}
         actions={{
           online: !!address,
           undo: undo ? { message: undo.message, isUndo: !!undo.back } : null,
@@ -162,7 +163,7 @@ export function SimpleHome({ app, checks, reload }: { app: WebAppDetail; checks:
           items: guide.data?.try ?? [],
           onWorks: (id) => void tryResult(id, 'works'),
           onWrong: wrong,
-          point: canShow ? { on: pointing, picked: pointed ? plainPoint(pointed) : '', toggle: () => (setPointing((p) => !p), pointing && setPointed(null)) } : undefined,
+          point: canShow && !streamed ? { on: pointing, picked: pointed ? plainPoint(pointed) : '', toggle: () => (setPointing((p) => !p), pointing && setPointed(null)) } : undefined,
         }}
         checked={{ line, fixing, onFix: fix, onAgain: app.shape.ok ? () => void checks.run() : undefined }}
       />

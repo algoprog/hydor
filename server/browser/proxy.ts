@@ -29,6 +29,8 @@ const named = (h: string) => h === 'localhost' || h.endsWith('.localhost') || h.
 
 async function lookup(host: string): Promise<string[]> {
   if (net.isIP(host)) return [host];
+  // localhost and every name under it are this machine (RFC 6761), whatever the system's resolver makes of `<name>.localhost`.
+  if (host === 'localhost' || host.endsWith('.localhost')) return ['127.0.0.1', '::1'];
   return (await dns.lookup(host, { all: true }).catch(() => [])).map((r) => r.address);
 }
 

@@ -555,8 +555,11 @@ function globalPolicy(): Policy {
 
 /** A browser of the user's own outside any session: logging a profile in from Settings… */
 export const profileKey = (id: string) => `browser-profile:${id}`;
-/** …or a dev server's page streaming to Preview, where the browser can't reach the preview port (server/preview.ts). */
-export const previewKey = (port: number) => `preview:${port}`;
+/**
+ * …or a page streaming to Preview where the browser looking at Hydor can't reach it (server/preview.ts): a dev server's (by its
+ * port), or a web app's at its own hostname on the apps' server (`<name>.localhost:<port>`).
+ */
+export const previewKey = (at: number | string) => `preview:${at}`;
 /** None of these has an agent to tell, cards in a conversation, or a session's options; nor has your own browsing. */
 export const outsideSessions = (key: string) => key === BROWSING_KEY || key.startsWith('browser-profile:') || key.startsWith('preview:');
 
@@ -568,10 +571,12 @@ export function downloadsFolder(): string {
   } catch {}
   return os.homedir();
 }
-/** A preview's page reaches its own dev server, by each name of this machine, and nothing else here. */
+/** A preview's page reaches its own dev server, by each name of this machine, or its web app's own hostname, and nothing else here. */
 const previewLocal = (key: string): string[] => {
-  const port = key.startsWith('preview:') ? Number(key.slice('preview:'.length)) : 0;
-  return Number.isInteger(port) && port > 0 ? ['localhost', '127.0.0.1', '::1'].map((h) => `${h}:${port}`) : [];
+  const at = key.startsWith('preview:') ? key.slice('preview:'.length) : '';
+  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?\.localhost:\d{1,5}$/.test(at)) return [at];
+  const port = /^\d{1,5}$/.test(at) ? Number(at) : 0;
+  return port > 0 ? ['localhost', '127.0.0.1', '::1'].map((h) => `${h}:${port}`) : [];
 };
 
 const browsers = new Map<string, SessionBrowser>();

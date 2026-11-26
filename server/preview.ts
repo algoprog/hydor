@@ -324,14 +324,30 @@ const within = (v: unknown, lo: number, hi: number, d: number) => {
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
 };
 
-// One opening at a time for each port: two at once would each start a browser for it.
-const opening = new Map<number, Promise<unknown>>();
-function oneAtATime<T>(port: number, fn: () => Promise<T>): Promise<T> {
-  const p = (opening.get(port) ?? Promise.resolve()).then(fn, fn);
+// One opening at a time for each page (a dev server's port, a web app's hostname): two at once would each start a browser for it.
+const opening = new Map<number | string, Promise<unknown>>();
+function oneAtATime<T>(at: number | string, fn: () => Promise<T>): Promise<T> {
+  const p = (opening.get(at) ?? Promise.resolve()).then(fn, fn);
   const tail = p.catch(() => {});
-  opening.set(port, tail);
-  void tail.then(() => opening.get(port) === tail && opening.delete(port));
+  opening.set(at, tail);
+  void tail.then(() => opening.get(at) === tail && opening.delete(at));
   return p;
+}
+
+type LiveLayout = { device: 'desktop' | 'tablet' | 'phone'; w: unknown; h: unknown; scale?: unknown };
+
+/** The browser for `key`, laid out at the size Preview shows it (a phone's and a tablet's as on one, touch included); `to` says where its tab goes, or nowhere. */
+async function openLive(key: string, o: LiveLayout, to: (fresh: boolean, url: string) => string | undefined): Promise<{ key: string; view: BrowserView }> {
+  const fresh = !browserOf(key);
+  const b = await ensureBrowser(key, config.defaultCwd, '');
+  const mobile = o.device !== 'desktop';
+  // Device pixels per CSS pixel: as sharp as the screen looking at it (Preview keeps frames to 1600 pixels wide).
+  const scale = Math.round(within(o.scale, 1, 3, mobile ? 2 : 1) * 100) / 100;
+  await b.layOut({ w: Math.round(within(o.w, 240, 3000, 1280)), h: Math.round(within(o.h, 240, 3000, 800)), mobile, scale });
+  const t = await b.tab();
+  const url = to(fresh, t.url);
+  if (url) await t.navigate(url);
+  return { key, view: b.view() };
 }
 
 /**
@@ -340,20 +356,20 @@ function oneAtATime<T>(port: number, fn: () => Promise<T>): Promise<T> {
  * user driving. It opens at `path` (or the start when it has no page yet); coming back to Preview finds
  * the page as it was left. Its live view streams to whoever follows its key; it reaches that port only.
  */
-export function livePreview(port: number, o: { path?: string; device: 'desktop' | 'tablet' | 'phone'; w: unknown; h: unknown; scale?: unknown }): Promise<{ key: string; view: BrowserView }> {
-  return oneAtATime(port, async () => {
-    const key = previewKey(port);
-    const fresh = !browserOf(key);
-    const b = await ensureBrowser(key, config.defaultCwd, '');
-    const mobile = o.device !== 'desktop';
-    // Device pixels per CSS pixel: as sharp as the screen looking at it (Preview keeps frames to 1600 pixels wide).
-    const scale = Math.round(within(o.scale, 1, 3, mobile ? 2 : 1) * 100) / 100;
-    await b.layOut({ w: Math.round(within(o.w, 240, 3000, 1280)), h: Math.round(within(o.h, 240, 3000, 800)), mobile, scale });
-    const t = await b.tab();
-    if (o.path !== undefined || fresh || !/^https?:/.test(t.url)) {
-      // A server that isn't answering shows the browser's own page saying so.
-      await t.navigate(`http://localhost:${port}${safePath(o.path ?? '/')}`);
-    }
-    return { key, view: b.view() };
-  });
+export function livePreview(port: number, o: LiveLayout & { path?: string }): Promise<{ key: string; view: BrowserView }> {
+  return oneAtATime(port, () =>
+    // A server that isn't answering shows the browser's own page saying so.
+    openLive(previewKey(port), o, (fresh, url) => (o.path !== undefined || fresh || !/^https?:/.test(url) ? `http://localhost:${port}${safePath(o.path ?? '/')}` : undefined)),
+  );
+}
+
+/**
+ * A web app's page in the app's own browser, for its Preview where the browser looking at Hydor can't reach the app's own address
+ * (Hydor reached through one hostname: a tunnel, a proxy). There it is at its own hostname, `at` (`<name>.localhost:<port>`), as on
+ * this computer, cookies and all, signed in by the one-time link `open(path)` makes; laid out and driven as a dev server's above. It
+ * goes to `path` when asked, to the start when it has no page yet, and else stays where it was left. It reaches that hostname only
+ * on this computer (and the web, as any preview does).
+ */
+export function liveWebApp(at: string, open: (path: string) => string, o: LiveLayout & { path?: string }): Promise<{ key: string; view: BrowserView }> {
+  return oneAtATime(at, () => openLive(previewKey(at), o, (fresh, url) => (o.path !== undefined || fresh || !/^https?:/.test(url) ? open(o.path ?? '/') : undefined)));
 }

@@ -1,26 +1,32 @@
 // A web app's Preview: the app inside the page in a frame, as a phone or as a computer, with a reload. The address comes from the same
 // route that opens it in a tab (it starts the app and signs the person in; each address works once, so a reload asks for a new one).
-// Where the page cannot show it in a frame (the path way, for a tunnel with one hostname, where the app runs in a sandbox of its own;
-// a browser that refuses the frame, or one that keeps the app's session cookie from inside a frame: Safari, Firefox with strict settings),
-// it says so and offers a tab of its own. The second is told by the app's own answer: with no cookie it is "open this from Hydor", which
-// to a frame is a small page that tells the page around it (server/webapps/proxy.ts), and nothing else is needed to know.
-import { useCallback, useEffect, useRef, useState } from 'react';
+// Where this browser cannot reach the app's own address (the path way: Hydor reached through one hostname, a tunnel), the app is shown
+// as Hydor's own browser on the server shows it, streaming, and the person drives it (stream.ts). Where it cannot be in a frame for
+// another reason (a browser that refuses the frame, or one that keeps the app's session cookie from inside a frame: Safari, Firefox
+// with strict settings), it says so and offers a tab of its own. The second is told by the app's own answer: with no cookie it is
+// "open this from Hydor", which to a frame is a small page that tells the page around it (server/webapps/proxy.ts), and nothing else
+// is needed to know.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, Monitor, MousePointerClick, RefreshCw, Send, Smartphone, X } from 'lucide-react';
 import type { WebApp, WebAppOpen } from '@shared/webapps';
 import { tr } from '../../i18n/runtime';
 import { ApiError, enc, post } from '../../lib/api';
 import { composeInsert } from '../../lib/featureEvents';
-import { Button, cx, IconButton, inputCls, Segmented, Throbber, useMediaQuery } from '../../components/ui';
-import { NO_ADDRESS, openWebApp } from './api';
+import { Button, cx, IconButton, inputCls, Segmented, Throbber, useIsMobile, useMediaQuery } from '../../components/ui';
+import { DialogCard, KeyRow } from '../browser/Dock';
+import { LiveView, type LiveViewApi } from '../browser/LiveView';
+import { browserCall } from '../browser/store';
+import { openWebApp } from './api';
 import { useAskAgent } from './ask';
 import { BuildWhere } from './BuildWhere';
 import { pointNote, readFrameMessage, type Pointed } from './point';
 import { readable, statusOf } from './status';
+import { useAppStream } from './stream';
 import { useBeingMade } from './simple/sessions';
 
 type Size = 'phone' | 'computer';
-/** `waiting`: it did not start while its agent is still making it, and is tried again. */
-type Phase = { at: 'idle' } | { at: 'loading' } | { at: 'ready'; url: string } | { at: 'path' } | { at: 'refused' } | { at: 'nocookie' } | { at: 'error'; message: string } | { at: 'waiting'; message: string };
+/** `waiting`: it did not start while its agent is still making it, and is tried again. `stream`: shown from Hydor's own browser. */
+type Phase = { at: 'idle' } | { at: 'loading' } | { at: 'ready'; url: string } | { at: 'stream' } | { at: 'refused' } | { at: 'nocookie' } | { at: 'error'; message: string } | { at: 'waiting'; message: string };
 
 /** While its agent makes it, how long after a start that failed it is tried again (Hydor spaces repeated starts out as well). */
 const AGAIN_MS = 8000;
@@ -52,7 +58,7 @@ const NEEDS_OPEN = 'hydor-webapp-needs-open';
  * own page) the pointed part shows in a small bar under the toolbar, with a box to say what should change and a button that asks the
  * agent in the app's project.
  */
-export function Preview({ app, onBuild, session, simple, control }: { app: WebApp; onBuild: () => void; session?: string; /** With Technical details off: the app fills it, with no toolbar of its own and nothing technical said. */ simple?: boolean; /** Pointing at a part, switched and read by the page around it. */ control?: { pointing: boolean; onPointed: (p: Pointed) => void } }) {
+export function Preview({ app, onBuild, session, simple, control }: { app: WebApp; onBuild: () => void; session?: string; /** With Technical details off: the app fills it, with no toolbar of its own and nothing technical said. */ simple?: boolean; /** Pointing at a part, switched and read by the page around it; told when the app is streamed, where pointing cannot be. */ control?: { pointing: boolean; onPointed: (p: Pointed) => void; onStreamed?: (streamed: boolean) => void } }) {
   const [size, setSize] = useState<Size>(() => {
     try {
       return localStorage.getItem(SIZE_KEY) === 'computer' ? 'computer' : 'phone';
@@ -88,6 +94,29 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
   // An app being made runs its development server, so nothing has to be built before it shows.
   const blocker = !readable(app) ? 'file' : app.build.state === 'building' ? 'building' : !app.build.exists && app.mode?.runsAs !== 'dev' ? 'build' : null;
 
+  // The streamed app is laid out at the size of the area it is shown in: the phone's box, or all of it (a phone when that is narrow).
+  const phoneBox = size === 'phone' && !narrow && !simple;
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [fit, setFit] = useState<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!box) return;
+    const ro = new ResizeObserver(() => {
+      const w = box.clientWidth;
+      const h = box.clientHeight;
+      if (w > 0 && h > 0) setFit((f) => (f?.w === w && f.h === h ? f : { w, h }));
+    });
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [box]);
+  const stream = useAppStream(app.id, phase.at === 'stream' && !blocker, phoneBox || (fit && fit.w < 640) ? 'phone' : 'desktop', fit);
+  const mobile = useIsMobile();
+  const livePage = useRef<LiveViewApi>(null);
+  const phaseAt = useRef(phase.at);
+  phaseAt.current = phase.at;
+  // The page around it offers pointing only where it works: not on a streamed app.
+  const streamed = phase.at === 'stream';
+  useEffect(() => given.current?.onStreamed?.(streamed), [streamed]);
+
   const load = useCallback((resume = false, quiet = false) => {
     const n = ++run.current;
     loaded.current = 0;
@@ -97,7 +126,7 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
     post<WebAppOpen>(`/api/webapps/${enc(app.id)}/open`, { frame: true, side: 'preview', ...(pointingNow.current ? { point: true } : {}), ...(resume ? { resume: true } : {}) }).then(
       (r) => {
         if (n !== run.current) return;
-        setPhase(r.way === 'hostname' ? { at: 'ready', url: r.url } : { at: 'path' });
+        setPhase(r.way === 'hostname' ? { at: 'ready', url: r.url } : { at: 'stream' });
       },
       (e: unknown) => {
         if (n !== run.current) return;
@@ -155,7 +184,8 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
     if (wanted === undefined || pointingNow.current === wanted) return;
     pointingNow.current = wanted;
     setPointing(wanted);
-    load(true);
+    // Pointing needs a frame: a streamed app stays as it is.
+    if (phaseAt.current !== 'stream') load(true);
   }, [wanted, load]);
   const togglePoint = () => {
     const on = !pointing;
@@ -186,7 +216,7 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
         {busy && <Throbber size={24} className="mx-auto mb-4 text-fg-3" />}
         <div className="text-[15px] font-medium">{title}</div>
         {body && (
-          <p translate={blocker === 'file' || phase.at === 'error' || (phase.at === 'waiting' && !simple) ? 'no' : undefined} className="mt-1.5 break-words text-[13.5px] leading-relaxed text-fg-3">
+          <p translate={blocker === 'file' || phase.at === 'error' || ((phase.at === 'waiting' || phase.at === 'stream') && !simple) ? 'no' : undefined} className="mt-1.5 break-words text-[13.5px] leading-relaxed text-fg-3">
             {body}
           </p>
         )}
@@ -200,6 +230,9 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
     </Button>
   );
 
+  /** What the app is shown in: a phone's shape where there is room for one, else all of the area. */
+  const frameBox = cx('relative mx-auto h-full bg-bg', phoneBox ? 'w-[390px] max-w-full overflow-hidden rounded-[22px] border border-line-2 shadow-sm' : 'w-full');
+
   let body: React.ReactNode;
   // Its agent is still making it: what does not run yet shows as being made (with why, in technical details), not as a fault.
   if (!blocker && phase.at === 'waiting') body = message(tr('Being made'), simple ? tr('It shows here once it can run.') : phase.message, undefined, true);
@@ -210,8 +243,8 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
     body = message(tr('Not ready to be shown yet'), tr('Put it together once to try it.'), (
       <Button size="sm" variant="primary" onClick={onBuild}>{tr('Show it')}</Button>
     ));
-  else if (simple && (phase.at === 'path' || phase.at === 'refused' || phase.at === 'nocookie')) body = message(tr('It cannot be shown inside this page here'), tr('It works in a tab of its own.'), openTab);
-  else if (simple && phase.at === 'error') body = message(tr('It could not be shown'), tr('Try once more. If it keeps happening, tell the agent.'), <Button size="sm" variant="secondary" onClick={() => load()}>Try again</Button>);
+  else if (simple && (phase.at === 'refused' || phase.at === 'nocookie')) body = message(tr('It cannot be shown inside this page here'), tr('It works in a tab of its own.'), openTab);
+  else if (simple && (phase.at === 'error' || (phase.at === 'stream' && !stream.key && stream.error))) body = message(tr('It could not be shown'), tr('Try once more. If it keeps happening, tell the agent.'), <Button size="sm" variant="secondary" onClick={() => load()}>Try again</Button>);
   else if (blocker === 'file') body = message(st.label, st.reason);
   else if (blocker === 'building') body = message('Building…', 'It shows here when the build is done.');
   else if (blocker === 'build')
@@ -221,14 +254,34 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
         <BuildWhere box={app.build.box} refused={app.build.refused} className="text-left" />
       </div>
     ));
-  else if (phase.at === 'path') body = message('This app can’t be shown inside this page here', NO_ADDRESS(), openTab);
   else if (phase.at === 'refused') body = message('Your browser won’t show the app inside this page', undefined, openTab);
   else if (phase.at === 'nocookie')
     body = message('This browser does not allow the preview here', 'It keeps an app’s sign-in from a page shown inside another page. The app works in a tab of its own.', openTab);
-  else if (phase.at === 'error') body = message('It could not be shown', phase.message, <Button size="sm" variant="secondary" onClick={() => load()}>Try again</Button>);
+  else if (phase.at === 'error' || (phase.at === 'stream' && !stream.key && stream.error))
+    body = message('It could not be shown', phase.at === 'error' ? phase.message : (stream.error ?? undefined), <Button size="sm" variant="secondary" onClick={() => load()}>Try again</Button>);
+  else if (phase.at === 'stream')
+    body = (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1">
+          <div ref={setBox} className={frameBox}>
+            {stream.key && stream.view ? (
+              <>
+                <LiveView ref={livePage} k={stream.key} view={stream.view} driving plain className="h-full w-full" />
+                {stream.view.dialog && <DialogCard k={stream.key} view={stream.view} />}
+              </>
+            ) : (
+              <div className="grid h-full place-items-center text-fg-3">
+                <Throbber size={24} />
+              </div>
+            )}
+          </div>
+        </div>
+        {mobile && stream.key && <KeyRow live={livePage} />}
+      </div>
+    );
   else if (phase.at === 'ready')
     body = (
-      <div className={cx('relative mx-auto h-full bg-bg', size === 'phone' && !narrow && !simple ? 'w-[390px] max-w-full overflow-hidden rounded-[22px] border border-line-2 shadow-sm' : 'w-full')}>
+      <div className={frameBox}>
         {!shown && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-bg text-fg-3">
             <Throbber size={24} />
@@ -274,11 +327,11 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
         <Button size="sm" variant={pointing ? 'primary' : 'ghost'} aria-pressed={pointing} aria-label={tr('Point at a part')} icon={<MousePointerClick size={14} />} disabled={!!blocker || phase.at !== 'ready'} onClick={togglePoint}>
           <span className={cx(session ? 'hidden' : 'max-sm:hidden')}>{pointing ? tr('Pointing') : tr('Point')}</span>
         </Button>
-        <IconButton label="Reload" size="sm" disabled={!!blocker || phase.at === 'loading'} onClick={() => load()}>
+        <IconButton label="Reload" size="sm" disabled={!!blocker || phase.at === 'loading'} onClick={() => (phase.at === 'stream' && stream.key ? void browserCall(stream.key, '/nav', { do: 'reload' }) : load())}>
           <RefreshCw size={14} className={cx(phase.at === 'loading' && 'animate-spin')} />
         </IconButton>
         {/* Where the message below offers it, once is enough. */}
-        {phase.at !== 'path' && phase.at !== 'refused' && phase.at !== 'nocookie' && (
+        {phase.at !== 'stream' && phase.at !== 'refused' && phase.at !== 'nocookie' && (
           <Button size="sm" variant="ghost" aria-label="Open in a new tab" icon={<ExternalLink size={14} />} disabled={!!blocker} onClick={() => void openWebApp(app.id, undefined, 'preview')}>
             <span className={cx(session ? 'hidden' : 'max-sm:hidden')}>Open in a new tab</span>
           </Button>
@@ -308,7 +361,7 @@ export function Preview({ app, onBuild, session, simple, control }: { app: WebAp
           </Button>
         </form>
       )}
-      <div className={cx('min-h-0 flex-1 bg-bg-1', phase.at === 'ready' && !narrow && !simple && 'p-3 sm:p-4')}>{body}</div>
+      <div className={cx('min-h-0 flex-1 bg-bg-1', (phase.at === 'ready' || phase.at === 'stream') && !narrow && !simple && 'p-3 sm:p-4')}>{body}</div>
     </div>
   );
 }

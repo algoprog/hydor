@@ -64,6 +64,11 @@ async function main() {
     assert.match(String((await destination('localhost', 65000, allowed, 65000) as any).why), /Hydor itself/);
     assert.match(String((await destination('127.0.0.1', 65000, { ...policy, blockPrivate: false }, 65000) as any).why), /Hydor itself/);
     assert.deepEqual(await destination('10.1.2.3', 80, { ...policy, blockPrivate: false }, 65000), { ips: ['10.1.2.3'] });
+    // A name under localhost is this machine whatever the resolver says (a web app's own hostname, streamed to its Preview): refused
+    // unless allowed by name and port, and then reached on loopback, IPv4 first.
+    assert.match(String((await destination('shop.localhost', port, policy, 65000) as any).why), /on this machine/);
+    assert.deepEqual(await destination('shop.localhost', port, { ...policy, local: [`shop.localhost:${port}`] }, 65000), { ips: ['127.0.0.1', '::1'] });
+    assert.match(String((await destination('shop.localhost', 65000, { ...policy, local: ['shop.localhost:65000'] }, 65000) as any).why), /Hydor itself/);
   });
 
   test('a tunnel inward is refused before anything reaches it, and the refusal is told', async () => {

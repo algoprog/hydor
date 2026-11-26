@@ -17,12 +17,13 @@ export function SideTry({ app, session, onBuild }: { app: WebApp; session: strin
   const [open, setOpen] = useState(true);
   const [pointing, setPointing] = useState(false);
   const [pointed, setPointed] = useState<Pointed | null>(null);
+  const [streamed, setStreamed] = useState(false);
   const items = guide.data?.try ?? [];
   const keep = (id: string, result: 'works' | 'wrong', note?: string) => void put(`/api/webapps/${enc(app.id)}/guide/try`, { id, result, ...(note ? { note } : {}) }).then(() => guide.reload(), toastError);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1">
-        <Preview app={app} simple control={{ pointing, onPointed: setPointed }} onBuild={onBuild} />
+        <Preview app={app} simple control={{ pointing, onPointed: setPointed, onStreamed: setStreamed }} onBuild={onBuild} />
       </div>
       {items.length > 0 && (
         <div className="flex max-h-[45%] shrink-0 flex-col border-t border-line">
@@ -42,7 +43,7 @@ export function SideTry({ app, session, onBuild }: { app: WebApp; session: strin
                   setPointed(null);
                   void post(`/api/sessions/${enc(session)}/message`, { text: `${tr(`I tried “${item?.text ?? ''}” and something is wrong.`)}\n${tr('What happened:')} ${what}${part ? `\n${part}` : ''}` }).catch(toastError);
                 }}
-                point={{ on: pointing, picked: pointed ? plainPoint(pointed) : '', toggle: () => (setPointing((p) => !p), pointing && setPointed(null)) }}
+                point={streamed ? undefined : { on: pointing, picked: pointed ? plainPoint(pointed) : '', toggle: () => (setPointing((p) => !p), pointing && setPointed(null)) }}
               />
             </div>
           )}

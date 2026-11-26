@@ -211,6 +211,13 @@ const alive = (pid: number | null) => {
   return !!i && i.cmdline !== "";
 };
 const bwrap = sandboxAvailable()?.kind === "bwrap";
+/** What the live Preview asked the browser here for (a stand-in for it: the real one streams from Chromium). */
+const livesAsked: { at: string; open: (path: string) => string; o: Parameters<NonNullable<WebappsOptions["live"]>>[2] }[] = [];
+const liveStandIn: NonNullable<WebappsOptions["live"]> = async (at, open, o) => {
+  livesAsked.push({ at, open, o });
+  if (o.w === 999) throw new Error("No Chromium is installed\nmore");
+  return { key: `preview:${at}`, view: { open: true } as never };
+};
 const open = (i: Instance, id: string, body: unknown = {}, headers: Record<string, string> = { origin: "http://localhost:8790" }) => i.call<WebAppOpen & { error: string }>("POST", `/api/webapps/${id}/open`, body, headers);
 const get = async (i: Instance, id: string) => (await i.call<{ app: WebAppDetail }>("GET", `/api/webapps/${id}`)).json.app;
 const built = (i: Instance, id: string, ms = 20_000) => until(`${id} to stop building`, async () => (await get(i, id)).build.state !== "building", ms);
@@ -264,7 +271,7 @@ try {
   });
 
   // ---- registering, building, running (fixture apps) ------------------------------------------------------------------
-  const main = await instance("main", {}, true);
+  const main = await instance("main", { live: liveStandIn }, true);
   instances.push(main);
   const dataRoot = path.join(main.dataDir, "webapps");
   assert.equal(await main.feature.ready, PORT);
@@ -533,6 +540,37 @@ try {
     // No hostname way on a host with no app, and no port way: the plain host has nothing without a token.
     assert.equal((await new Browser(PORT).request(`192.168.1.20:${PORT}`, "/whoami")).status, 403);
     assert.equal((await new Browser(PORT).request(`localhost:${PORT}`, "/whoami")).status, 403);
+  });
+
+  await step("the live Preview (Hydor reached through one hostname): the app at its own hostname in the browser here, signed in by a link that works once, at the size asked", async () => {
+    livesAsked.length = 0;
+    const live = (body: unknown) => main.call<{ key: string; error: string }>("POST", `/api/webapps/${ok.id}/live`, body);
+    const r = await live({ side: "preview", device: "phone", w: 390, h: 700, scale: 2, path: "/whoami" });
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+    assert.equal(r.json.key, `preview:club-notes.localhost:${PORT}`);
+    assert.equal(livesAsked.length, 1);
+    const [c] = livesAsked;
+    assert.equal(c.at, `club-notes.localhost:${PORT}`);
+    assert.deepEqual({ ...c.o }, { path: "/whoami", device: "phone", w: 390, h: 700, scale: 2 });
+    // Each link the browser here is sent to signs this person in, once.
+    const url = c.open("/whoami");
+    assert.match(url, new RegExp(`^http://club-notes\\.localhost:${PORT}/__hydor/open\\?t=[^&]+&to=%2Fwhoami$`));
+    const page = await new Browser(PORT).open(url);
+    assert.equal(page.status, 200, page.text);
+    assert.equal(page.json().name, "Dana");
+    assert.equal((await new Browser(PORT).open(url)).status, 403, "a used link is no link");
+    assert.notEqual(c.open("/"), c.open("/"), "a new link each time");
+    // No path: the page is left where it was; a computer's size when no device is named.
+    assert.equal((await live({ w: 1280, h: 800 })).status, 200);
+    assert.equal(livesAsked[1].o.path, undefined);
+    assert.equal(livesAsked[1].o.device, "desktop");
+    // What cannot be is refused before anything opens; a browser that cannot open it says why, in one line.
+    for (const body of [{ path: "notes" }, { device: "tablet" }, { side: "elsewhere" }]) assert.equal((await live(body)).status, 400, JSON.stringify(body));
+    assert.equal((await live({ side: "launched" })).status, 409, "not launched: there is only the one being made");
+    assert.equal(livesAsked.length, 2);
+    const no = await live({ w: 999 });
+    assert.equal(no.status, 502);
+    assert.equal(no.json.error, "It could not be opened in the browser here: No Chromium is installed");
   });
 
   await step("changing: a new name keeps the address, settings are kept and checked, a bad one is a sentence, an unknown app is 404", async () => {
