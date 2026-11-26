@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.114.0 · 26 November 2026
+
+Every agent finds three commands in its shell: wait for a long job, change several files at once, read a definition.
+
+- **Three commands every agent has**: every session the app starts, with Claude Code, Codex, Custom or another agent,
+  now finds `waitfor`, `edits` and `sym` in its shell and is told what they are for. `waitfor` waits for a long job in
+  one call (a program, a file, a line in a log, a web address, a Slurm job or a command), stops at the first line that
+  says the job crashed, and shows the end of the log. `edits` makes several exact search-and-replace changes across
+  files in one call, and writes nothing unless every change fits. `sym` prints a function, class or type with all of
+  its lines and their numbers, in TypeScript, JavaScript, Python and Rust. Agents spend fewer steps on waiting, editing
+  and reading code, so the same work uses fewer tokens.
+- **In the desktop apps, Docker and a copy from the repository**: there is nothing to install. The app tries each
+  command once when it starts and tells agents only about the ones that work on your computer. Waiting for a systemd
+  service works on Linux only; on Windows, waiting for a program by name needs PowerShell, and waiting on a command or
+  a Slurm job needs Git for Windows. On a Mac and on Windows these commands are new and less tried than on Linux.
+- **Turning it off**: start the app with `HYDOR_SHELL_TOOLS=0`. There is no switch for it in Settings.
+- **For people working on Hydor**: `npm run check` runs the type check and the tests that belong to what you changed,
+  and prints only what fails.
+
 ## 0.113.0 · 26 November 2026
 
 A conversation zooms by itself, tables and code open full screen, and an open document shows the agent's edits live.
