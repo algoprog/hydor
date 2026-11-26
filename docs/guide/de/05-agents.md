@@ -1,6 +1,6 @@
 # Agenten
 
-Ein Agent ist die Rolle, in der eine Sitzung arbeitet: seine Anweisungen, was er verwenden darf, wo und wann er arbeitet, mit welcher Modellstufe er denkt, an welche anderen Agenten er Arbeit weitergibt und was er in einem Monat ausgeben darf. Dieses Thema behandelt die Seite „Agenten“, die Agenten, die mit der App mitkommen, wie du einen eigenen erstellst, indem du sagst, was er tun soll, wie du einen änderst, wo ein Agent arbeitet, seine Zeitpläne, Leistungsstufen, Agenten, die Arbeit an andere Agenten weitergeben, ein Monatsbudget, die Versionen eines Agenten und die Beispiele, die ihn prüfen, wie du Sitzungen als Agent startest und wechselst, wie du einen Agenten als Datei teilst, wie du die Agentendateien von Claude Code importierst, die Aufgabenordner, die eine Sitzung bekommt, wenn du keinen Ordner wählst, und wie Agenten nach einer Aufgabe aufräumen.
+Ein Agent legt fest, als wer eine Sitzung arbeitet: seine Anweisungen, was er verwenden darf, wo und wann er arbeitet, mit welcher Modellstufe er denkt, an welche anderen Agenten er Arbeit abgibt und was er in einem Monat ausgeben darf. Dieses Thema behandelt die Seite „Agenten“, die mitgelieferten Agenten, das Erstellen eines eigenen Agenten durch eine Beschreibung seiner Aufgabe, das Ändern eines Agenten, seinen Arbeitsbereich, seine Zeitpläne, Leistungsstufen, Agenten, die Arbeit an andere Agenten abgeben, ein Monatsbudget, die Versionen eines Agenten und die Beispiele, die ihn prüfen, das Starten und Wechseln von Sitzungen als Agent, das Teilen eines Agenten als Datei, das Importieren der Agentendateien von Claude Code, Aufgabenordner, das Aufräumen durch Agenten nach einer Aufgabe und die drei Befehle, die jeder Agent in seiner Shell vorfindet.
 
 ![Die Seite „Agenten“: deine Agenten, jeder in einer Karte mit seinem aktuellen Status, und darunter die eingebauten](images/agents.webp)
 
@@ -511,6 +511,27 @@ Er behält, was du verlangt hast, und Arbeit, die noch jemand prüfen oder zusam
 
 Schaltest du ihn aus, lassen Agenten zurück, was sie erzeugt haben. In beiden Fällen übernehmen Agenten die Änderung ab ihrer nächsten Sitzung (Custom ab der nächsten Nachricht).
 
+## Drei Befehle, die jeder Agent hat
+
+Jede Sitzung, die die App startet, ob mit Claude Code, Codex oder Custom, findet drei kleine Befehle in ihrer Shell und erfährt, wofür sie da sind. Du musst nichts tun, um sie zu bekommen: Die App legt sie selbst dort ab, in den Desktop-Apps für Mac, Windows und Linux, in Docker und in einer Kopie, die du aus dem Repository ausführst, und sie erfordern keine Installation auf deinem Computer.
+
+- **`waitfor`** wartet in einem einzigen Aufruf darauf, dass ein langer Vorgang fertig wird, wo ein Agent sonst alle paar Sekunden erneut nachsehen würde. Der Befehl kann darauf warten, dass ein Programm beendet wird, eine Datei erscheint, eine Zeile in einem Log auftaucht, eine Webadresse antwortet, ein Slurm-Job auf einem Cluster seine Warteschlange verlässt oder ein Befehl erfolgreich ist. Er kann bei der ersten Log-Zeile anhalten, die einen Absturz des Jobs meldet, am Ende das Ende des Logs anzeigen und nach einer von dir festgelegten Zeit aufgeben. Er kann auch selbst einen Befehl starten und auf ihn warten. Ein Agent führt ihn als Hintergrundbefehl aus, wenn das Warten länger als ein paar Minuten dauern kann, sodass die Unterhaltung währenddessen weitergeht.
+- **`edits`** nimmt in einem Aufruf mehrere exakte Ersetzungen (Suchen und Ersetzen) vor, in so vielen Dateien wie nötig. Geschrieben wird nur, wenn jede Änderung ihren Text genau einmal findet, sodass eine unpassende Änderung deine Dateien unverändert lässt. Der Befehl gibt die geänderten Zeilen mit ihren Nummern aus, damit der Agent die Dateien nicht erneut lesen muss.
+- **`sym`** findet, wo etwas definiert ist (eine Funktion, eine Klasse, ein Typ), und gibt alles davon mit den genauen Zeilennummern aus, in TypeScript-, JavaScript-, Python- und Rust-Dateien. Er kann auch auflisten, wo ein Name verwendet wird und welche Deklarationen eine Datei enthält. Er liest den Code, sodass ihn eine Klammer in einer Zeichenkette oder einem Kommentar nicht verwirrt, und er braucht keinen Index. Für reinen Text und andere Sprachen verwenden Agenten weiterhin grep.
+
+Kurz gesagt: Agenten brauchen weniger Aufrufe fürs Warten, für Änderungen an mehreren Stellen und zum Lesen von Code. Jeder Befehl erklärt sich mit `--help`, und das liest ein Agent, wenn er eine Option sucht.
+
+Einige Einschränkungen:
+
+- Das Warten auf einen systemd-Dienst funktioniert nur unter Linux.
+- Unter Windows führen Agenten Befehle in der Bash von Git aus. Diese Befehle brauchen daher ein installiertes [Git for Windows](https://git-scm.com/download/win), so wie die Befehle der Agenten überhaupt, und eine Wartemethode, die einen Befehl ausführt oder einen anderen Computer erreicht, braucht das, was dieser Befehl braucht.
+- `sym` kennt Definitionen in TypeScript-, JavaScript-, Python- und Rust-Dateien und sagt es, wenn es nicht erkennen kann, wo eine endet.
+- Eine Sitzung, die in einem einzelnen Browser-Tab arbeitet, hat keine Shell und bekommt sie deshalb nicht.
+
+Die App probiert jeden Befehl beim Start einmal aus, so wie ihn die Shell eines Agenten ausführt, und nennt den Agenten nur die, die funktioniert haben. So wird nie ein Befehl angeboten, der auf deinem Computer nicht laufen kann. Eine Änderung gilt für Agenten ab ihrer nächsten Sitzung (bei Custom ab der nächsten Nachricht).
+
+Um dies auszuschalten, starte die App mit der Umgebungsvariable `HYDOR_SHELL_TOOLS=0` (in `~/.config/hydor.env` für die Desktop-Apps und den Dienst oder in `.env` für Docker). Agenten bekommen dann keine zusätzlichen Befehle und erfahren nichts davon. In den Einstellungen gibt es dafür keinen Schalter. Bereits laufende Sitzungen behalten die Befehle, mit denen sie gestartet sind.
+
 ## Wo Agenten sonst noch vorkommen
 
 - **Projekte**: Ein Projekt kann festlegen, als welcher Agent seine Sitzungen starten („Seine Sitzungen starten als“). Wenn du das Projekt auf der Startseite wählst, wählst du ihn mit. Sein Tab **Agenten** zeigt die Agenten, die darin arbeiten. Siehe [Projekte](/guide/projects).
@@ -541,3 +562,5 @@ Schaltest du ihn aus, lassen Agenten zurück, was sie erzeugt haben. In beiden F
 - „Gib meinem Agenten Wochenbericht zwei Beispiele, eines für eine ruhige und eines für eine geschäftige Woche, mit dem, was ein guter Bericht sagen muss, und probiere sie aus.“
 - „Lade meinen Agenten Buchhalter als Datei herunter und sag mir, was ich auf meinem Laptop neu einstellen muss.“
 - „Lege neue Aufgabenordner ab jetzt in ~/Documents/Tasks ab.“
+- „Welche Befehle bekommen meine Agenten in ihrer Shell, und wie schalte ich sie aus?“
+- „Führe das Trainingsskript aus und warte, bis es fertig ist, aber brich vorher ab, wenn das Log einen Fehler zeigt.“

@@ -1,6 +1,6 @@
 # Agents
 
-Un agent est celui sous l’identité duquel une session travaille : ses instructions, ce qu’il peut utiliser, où et quand il travaille, le niveau de modèle avec lequel il réfléchit, les autres agents à qui il confie du travail, et ce qu’il peut dépenser en un mois. Cette rubrique couvre la page Agents, les agents fournis avec l’app, la création des vôtres en disant ce qu’ils doivent faire, la modification d’un agent, l’endroit où un agent travaille, ses planifications, les niveaux, les agents qui confient du travail à d’autres agents, un budget mensuel, les versions d’un agent et les exemples qui le vérifient, le démarrage et le changement de session avec un agent, le partage d’un agent sous forme de fichier, l’importation des fichiers d’agent de Claude Code, les dossiers de tâche qu’une session reçoit quand vous ne choisissez aucun dossier, et le nettoyage par les agents après une tâche.
+Un agent, c’est le rôle sous lequel travaille une session : ses instructions, ce qu’il peut utiliser, où et quand il travaille, le niveau de modèle avec lequel il réfléchit, les agents auxquels il confie du travail et ce qu’il peut dépenser en un mois. Cette rubrique présente la page Agents, les agents fournis avec l’app, la création de vos propres agents en décrivant ce qu’ils doivent faire, leur modification, l’endroit où un agent travaille, ses planifications, les niveaux, les agents qui confient du travail à d’autres agents, le budget mensuel, les versions d’un agent et les exemples qui le vérifient, le démarrage d’une session avec un agent et le changement d’agent, le partage d’un agent sous forme de fichier, l’importation des fichiers d’agent de Claude Code, les dossiers de tâche, le rangement fait par les agents après une tâche, et les trois commandes que tout agent trouve dans son shell.
 
 ![La page Agents : vos agents, chacun dans une carte indiquant où il en est, et ceux qui sont intégrés en dessous](images/agents.webp)
 
@@ -511,6 +511,27 @@ Il garde ce que vous avez demandé et le travail que quelqu’un doit encore rel
 
 Si vous le désactivez, les agents laissent en place ce qu’ils ont créé. Dans les deux cas, les agents prennent en compte le changement dès leur prochaine session (Custom dès son prochain message).
 
+## Trois commandes dont dispose chaque agent
+
+Chaque session démarrée par l’app, qu’elle travaille avec Claude Code, Codex ou Custom, trouve trois petites commandes dans son shell et apprend à quoi elles servent. Vous n’avez rien à faire pour les obtenir : l’app les y place elle-même, dans les applications de bureau pour Mac, Windows et Linux, dans Docker et dans une copie que vous exécutez depuis le dépôt, et elles ne nécessitent aucune installation sur votre ordinateur.
+
+- **`waitfor`** attend la fin d’un travail long en un seul appel, là où un agent vérifierait autrement encore et encore toutes les quelques secondes. Elle peut attendre qu’un programme se termine, qu’un fichier apparaisse, qu’une ligne s’affiche dans un journal, qu’une adresse web réponde, qu’un travail Slurm sur un cluster quitte sa file d’attente ou qu’une commande réussisse. Elle peut s’arrêter à la première ligne d’un journal indiquant que le travail a planté, afficher la fin du journal une fois terminé et abandonner après un délai que vous fixez. Elle peut aussi lancer elle-même une commande et l’attendre. Un agent l’exécute comme commande en arrière-plan lorsque l’attente peut dépasser quelques minutes, afin que la conversation continue entre-temps.
+- **`edits`** effectue plusieurs modifications exactes par recherche et remplacement, dans autant de fichiers que nécessaire, en un seul appel. Rien n’est écrit à moins que chaque modification ne trouve son texte exactement une fois : une modification qui ne correspond pas laisse donc vos fichiers tels qu’ils étaient. Elle affiche les lignes modifiées avec leurs numéros, pour que l’agent n’ait pas à relire les fichiers.
+- **`sym`** trouve où quelque chose est défini (une fonction, une classe, un type) et l’affiche en entier avec ses numéros de ligne exacts, dans les fichiers TypeScript, JavaScript, Python et Rust. Elle peut aussi lister les endroits où un nom est utilisé et les déclarations d’un fichier. Elle lit le code, si bien qu’une accolade dans une chaîne ou un commentaire ne la trompe pas, et elle n’a besoin d’aucun index. Pour le texte brut et les autres langages, les agents continuent d’utiliser grep.
+
+En bref, les agents consacrent moins d’appels à attendre, à modifier plusieurs endroits et à lire du code. Chaque commande s’explique elle-même avec `--help`, ce qu’un agent lit lorsqu’il cherche une option.
+
+Quelques limites :
+
+- L’attente d’un service systemd ne fonctionne que sous Linux.
+- Sous Windows, les agents exécutent les commandes dans le bash de Git : ces commandes nécessitent donc que [Git for Windows](https://git-scm.com/download/win) soit installé, comme les commandes des agents, et un mode d’attente qui exécute une commande ou joint un autre ordinateur nécessite ce dont cette commande a besoin.
+- `sym` connaît les définitions des fichiers TypeScript, JavaScript, Python et Rust, et le signale lorsqu’elle ne peut pas déterminer où l’une d’elles se termine.
+- Une session qui travaille dans un seul onglet de navigateur n’a pas de shell, elle n’obtient donc pas ces commandes.
+
+L’app essaie chaque commande une fois à son démarrage, de la manière dont le shell d’un agent l’exécute, et ne parle aux agents que de celles qui ont fonctionné : une commande qui ne peut pas s’exécuter sur votre ordinateur n’est donc jamais proposée. Les agents appliquent un changement à partir de leur prochaine session (Custom à partir de son prochain message).
+
+Pour désactiver cela, démarrez l’app avec la variable d’environnement `HYDOR_SHELL_TOOLS=0` (dans `~/.config/hydor.env` pour les applications de bureau et le service, ou dans `.env` pour Docker). Les agents n’obtiennent alors aucune commande supplémentaire et n’en entendent pas parler. Il n’existe pas d’interrupteur pour cela dans les Paramètres. Les sessions déjà en cours conservent les commandes avec lesquelles elles ont démarré.
+
 ## Où les agents interviennent encore
 
 - **Projets** : un projet peut indiquer avec quel agent ses sessions démarrent (« Ses sessions démarrent avec ») ; choisir le projet sur la page de démarrage choisit cet agent. Son onglet **Agents** montre les agents qui y travaillent. Voir [Projets](/guide/projects).
@@ -541,3 +562,5 @@ Si vous le désactivez, les agents laissent en place ce qu’ils ont créé. Dan
 - « Donne à mon agent Rapport hebdomadaire deux exemples, un pour une semaine calme et un pour une semaine chargée, avec ce qu’un bon rapport doit dire, et essaie-les. »
 - « Télécharge mon agent Comptable comme fichier, et dis-moi ce que je devrai régler de nouveau sur mon portable. »
 - « Mets désormais les nouveaux dossiers de tâche dans ~/Documents/Tasks. »
+- « Quelles commandes mes agents ont-ils dans leur shell, et comment les désactiver ? »
+- « Exécute le script d’entraînement et attends qu’il se termine, en t’arrêtant plus tôt si le journal affiche une erreur. »

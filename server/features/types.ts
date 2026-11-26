@@ -100,6 +100,8 @@ export interface SpawnInfo {
   model?: string;
   /** Custom with a model of a small context (32k tokens or less): give only what such a model needs. */
   lean?: boolean;
+  /** The PATH the agent would get from the app without the capabilities (the login shell's, its account's and agent's own settings), when the start knows it: what a capability that puts a folder on it builds on. */
+  path?: string;
 }
 
 /** An MCP server for an agent: at an address, or a command it starts. */

@@ -1,6 +1,6 @@
 # Agentes
 
-Un agente es quien hace el trabajo en una sesión: sus instrucciones, lo que puede usar, dónde y cuándo trabaja, el nivel de modelo con el que piensa, a qué otros agentes les pasa trabajo y cuánto puede gastar en un mes. Este tema cubre la página Agentes, los agentes que vienen con la app, cómo crear los tuyos diciendo lo que deben hacer, cómo cambiar uno, dónde trabaja un agente, sus programaciones, los niveles, los agentes que pasan trabajo a otros agentes, un presupuesto mensual, las versiones de un agente y los ejemplos que lo comprueban, cómo empezar y cambiar sesiones con un agente, cómo compartir un agente como archivo, cómo importar los archivos de agentes de Claude Code, las carpetas de tareas que recibe una sesión cuando no eliges ninguna carpeta y cómo hacer que los agentes limpien después de una tarea.
+Un agente es la persona como la que trabaja una sesión: sus instrucciones, qué puede usar, dónde y cuándo trabaja, el nivel de modelo con el que piensa, a qué otros agentes les entrega trabajo y cuánto puede gastar en un mes. Este tema trata de la página Agentes, los agentes que vienen con la app, cómo crear los tuyos diciendo qué deben hacer, cómo cambiarlos, dónde trabaja un agente, sus programaciones, los niveles, los agentes que entregan trabajo a otros agentes, el presupuesto mensual, las versiones de un agente y los ejemplos que lo comprueban, cómo empezar y cambiar sesiones como un agente, cómo compartir un agente como archivo, cómo importar los archivos de agentes de Claude Code, las carpetas de tareas, cómo hacer que los agentes limpien después de una tarea y los tres comandos que todo agente encuentra en su shell.
 
 ![La página Agentes: tus agentes, cada uno en una tarjeta con su estado, y los integrados debajo](images/agents.webp)
 
@@ -511,6 +511,27 @@ Conserva lo que pediste y el trabajo que alguien todavía debe revisar o fusiona
 
 Si lo desactivas, los agentes dejan en su lugar lo que crearon. En ambos casos, los agentes siguen el cambio desde su próxima sesión (Custom desde su próximo mensaje).
 
+## Tres comandos que tiene todo agente
+
+Cada sesión que empieza la app, ya trabaje con Claude Code, Codex o Custom, encuentra tres pequeños comandos en su shell y recibe una explicación de para qué sirven. No tienes que hacer nada para tenerlos: la app misma los pone ahí, en las apps de escritorio para Mac, Windows y Linux, en Docker y en una copia que ejecutes desde el repositorio, y no requieren instalar nada en tu computadora.
+
+- **`waitfor`** espera en una sola llamada a que termine un trabajo largo, cuando de otro modo un agente comprobaría una y otra vez cada pocos segundos. Puede esperar a que un programa termine, a que aparezca un archivo, a que se muestre una línea en un registro, a que responda una dirección web, a que un trabajo de Slurm en un clúster salga de su cola o a que un comando tenga éxito. Puede detenerse en la primera línea de un registro que indique que el trabajo falló, mostrar el final del registro cuando termina y rendirse después del tiempo que definas. También puede iniciar él mismo un comando y esperarlo. Un agente lo ejecuta como comando en segundo plano cuando la espera puede durar más de unos minutos, para que la conversación continúe mientras tanto.
+- **`edits`** hace varios cambios exactos de buscar y reemplazar, en tantos archivos como haga falta, en una sola llamada. No se escribe nada a menos que cada cambio encuentre su texto exactamente una vez, así que un cambio que no encaja deja tus archivos como estaban. Imprime las líneas que cambió con sus números, para que el agente no tenga que volver a leer los archivos.
+- **`sym`** encuentra dónde se define algo (una función, una clase, un tipo) y lo imprime completo con sus números de línea exactos, en archivos de TypeScript, JavaScript, Python y Rust. También puede enumerar dónde se usa un nombre y las declaraciones de un archivo. Lee el código, así que una llave dentro de una cadena o un comentario no lo confunde, y no necesita ningún índice. Para texto sin formato y otros lenguajes, los agentes siguen usando grep.
+
+En resumen, los agentes gastan menos llamadas en esperar, en editar en varios lugares y en leer código. Cada comando se explica con `--help`, que es lo que lee un agente cuando busca una opción.
+
+Algunos límites:
+
+- Esperar a un servicio de systemd solo funciona en Linux.
+- En Windows, los agentes ejecutan comandos en el bash de Git, así que estos comandos necesitan que [Git for Windows](https://git-scm.com/download/win) esté instalado, igual que los comandos de los agentes, y una forma de esperar que ejecute un comando o llegue a otra computadora necesita lo que ese comando necesite.
+- `sym` reconoce definiciones en archivos de TypeScript, JavaScript, Python y Rust, y avisa cuando no puede saber dónde termina una.
+- Una sesión que trabaja en una pestaña del navegador no tiene shell, así que no los recibe.
+
+La app prueba cada comando una vez al arrancar, tal como lo ejecuta el shell de un agente, y solo informa a los agentes de los que funcionaron, de modo que nunca se ofrece un comando que no pueda ejecutarse en tu computadora. Los agentes siguen un cambio a partir de su próxima sesión (Custom, a partir de su próximo mensaje).
+
+Para desactivar esto, arranca la app con la variable de entorno `HYDOR_SHELL_TOOLS=0` (en `~/.config/hydor.env` para las apps de escritorio y el servicio, o en `.env` para Docker). Entonces los agentes no reciben comandos adicionales ni saben nada de ellos. No hay un interruptor para esto en Configuración. Las sesiones que ya están en marcha conservan los comandos con los que empezaron.
+
 ## Dónde más intervienen los agentes
 
 - **Proyectos**: un proyecto puede indicar con qué agente empiezan sus sesiones (“Sus sesiones empiezan como”); al elegir el proyecto en la página de inicio se elige ese agente. Su pestaña **Agentes** muestra los agentes que trabajan en él. Consulta [Proyectos](/guide/projects).
@@ -541,3 +562,5 @@ Si lo desactivas, los agentes dejan en su lugar lo que crearon. En ambos casos, 
 - “Dale a mi agente Weekly report dos ejemplos, uno para una semana tranquila y otro para una ajetreada, con lo que debe decir un buen informe, y pruébalos.”
 - “Descarga mi agente Bookkeeper como archivo y dime qué tendré que configurar de nuevo en mi laptop.”
 - “Pon las carpetas de tareas nuevas en ~/Documents/Tasks a partir de ahora.”
+- “¿Qué comandos tienen mis agentes en su shell y cómo los desactivo?”
+- “Ejecuta el script de entrenamiento y espera a que termine, deteniéndolo antes si el registro muestra un error.”

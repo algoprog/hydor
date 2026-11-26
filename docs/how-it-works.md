@@ -74,6 +74,12 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   for search. When the indexer reads a new or changed document, the helper model adds a few notes and updates the
   wiki, a little at a time (a project with more documents than its limit has the pinned, most used and newest read into the wiki; agents search all of them); about once a day it also adds what a project's recent conversations and commits settled to that
   project's wiki. Agents are given a few lines from the wiki, with the notes, when they bear on a request, and read and write the wiki only through tools that keep it inside its folder. Notes and articles that name a project's files are checked against the code as it changes. [How memory works](memory.md) says what agents are given and when and how it stays true, and [Memory internals](memory-internals.md) how it is built.
+- **Three commands in every agent's shell.** `waitfor`, `edits` and `sym` (the programs in `scripts/agent-tools/`) are
+  built in. At each start the server writes a small launcher for each into `shelltools/bin` in its data folder (the app's
+  own Node.js on the app's own copy of the tool, whatever the app's version or folder: agents' shells have no Node.js on
+  their PATH), tries each once in the way an agent's shell runs it, and from then on puts that folder first on the PATH
+  of every session it starts (Claude Code, Codex, Custom and the other ACP agents: `server/shelltools/`) and adds a
+  short text to their instructions naming the commands that worked. `HYDOR_SHELL_TOOLS=0` turns it off.
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and
   never sees your model credentials; sign-in happens in the agents' own login flows.
 
